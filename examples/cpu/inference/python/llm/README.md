@@ -169,7 +169,8 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/
 #### 4.1.1.4 Run in static quantization INT8 with ipex.llm
 
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file <path to "llama-2-7b_qconfig.json"> --output-dir "saved_results"
+wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-7b_qconfig.json
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama/Llama-2-7b-hf --ipex-smooth-quant --qconfig-summary-file llama2-7b_qconfig.json --output-dir "saved_results"
 ```
 
 #### 4.1.1.5 Run in weight-only quantization INT8 with ipex.llm
@@ -219,7 +220,7 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py  -m meta-llama/Ll
 OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py  -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --tasks lambada_openai
 
 # Quantization
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Llama-2-7b-hf --quantized-model-path "./saved_results/best_model.pt" --dtype int8  --tasks lambada_openai
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Llama-2-7b-hf --quantized-model-path "../saved_results/best_model.pt" --dtype int8  --tasks lambada_openai
 ```
 
 #### 4.1.2.2 Distributed inference
@@ -464,10 +465,16 @@ Then we can invoke distributed inference with `deepspeed` command:
 
 - Command:
 ```bash
-deepspeed --bind_cores_to_rank  run.py --benchmark -m <SHARDED_MODEL_PATH> --dtype bfloat16 --ipex --autotp
+deepspeed --bind_cores_to_rank run.py --benchmark -m <SHARDED_MODEL_PATH> --dtype bfloat16 --ipex --autotp
 ```
 
 As the model has been sharded, we specify `SHARDED_MODEL_PATH` for `-m` argument instead of original model name or path, and `--shard-model` argument is not needed.
+
+- An example of llama2 7b model:
+```bash
+python utils/create_shard_model.py -m meta-llama/Llama-2-7b-hf --save-path ./local_llama2_7b
+deepspeed --bind_cores_to_rank run.py --benchmark -m ./local_llama2_7b --dtype bfloat16 --ipex --autotp
+```
 
 <br>
 
@@ -594,13 +601,13 @@ For the quantized models to be used in accuracy tests, we can reuse the model fi
 
 - Command:
 ```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_accuracy.py --model <MODEL ID> --quantized-model-path "./saved_results/best_model.pt" --dtype <int8 or int4> --tasks {TASK_NAME}
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run_accuracy.py --model <MODEL ID> --quantized-model-path "../saved_results/best_model.pt" --dtype <int8 or int4> --tasks {TASK_NAME}
 # Please add  "--quant-with-amp" if your model is quantized with this flag
 ```
 
 - An example of llama2 7b model:
 ```bash
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Llama-2-7b-hf --quantized-model-path "./saved_results/best_model.pt" --dtype int8  --tasks lambada_openai
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run_accuracy.py -m meta-llama/Llama-2-7b-hf --quantized-model-path "../saved_results/best_model.pt" --dtype int8  --tasks lambada_openai
 ```
 
 ### 5.2.2 Run in distributed way
@@ -670,7 +677,7 @@ python create_shard_model.py -m <MODEL ID>  --save-path <SHARD MODEL NEW PATH>
 # After sharding the model, using -m <SHARD MODEL NEW PATH> in later tests
 
 # An example of llama2 7b:
-python create_shard_model.py meta-llama/Llama-2-7b-hf --save-path ./local_llama2_7b
+python create_shard_model.py -m meta-llama/Llama-2-7b-hf --save-path ./local_llama2_7b
 ```
 
 <br>

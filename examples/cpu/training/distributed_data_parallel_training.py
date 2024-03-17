@@ -17,6 +17,7 @@ dist.init_process_group(
 backend='ccl',
 init_method='env://'
 )
+rank = os.environ['RANK']
 
 transform = torchvision.transforms.Compose([
     torchvision.transforms.Resize((224, 224)),
@@ -51,7 +52,12 @@ for batch_idx, (data, target) in enumerate(train_loader):
     loss.backward()
     optimizer.step()
     print('batch_id: {}'.format(batch_idx))
-torch.save({
-     'model_state_dict': model.state_dict(),
-     'optimizer_state_dict': optimizer.state_dict(),
-     }, 'checkpoint.pth')
+
+if rank == 0:
+    torch.save({
+         'model_state_dict': model.state_dict(),
+         'optimizer_state_dict': optimizer.state_dict(),
+         }, 'checkpoint.pth')
+
+dist.destroy_process_group()
+print("Execution finished")

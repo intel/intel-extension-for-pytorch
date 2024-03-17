@@ -175,7 +175,7 @@ cp ${MDEXAMPLE} tutorials/examples.md.bk
 if [[ ${DEVICE} == "cpu" ]]; then
     parse_example "../examples/cpu/training/single_instance_training_fp32.py" ${MDEXAMPLE} "(marker_train_single_fp32_complete)" "python"
     parse_example "../examples/cpu/training/single_instance_training_bf16.py" ${MDEXAMPLE} "(marker_train_single_bf16_complete)" "python"
-    parse_example "../examples/cpu/training/distributed_dataparallel_training.py" ${MDEXAMPLE} "(marker_train_ddp_complete)" "python"
+    parse_example "../examples/cpu/training/distributed_data_parallel_training.py" ${MDEXAMPLE} "(marker_train_ddp_complete)" "python"
     parse_example "../examples/cpu/inference/python/resnet50_eager_mode_inference_fp32.py" ${MDEXAMPLE} "(marker_inf_rn50_imp_fp32)" "python"
     parse_example "../examples/cpu/inference/python/bert_eager_mode_inference_fp32.py" ${MDEXAMPLE} "(marker_inf_bert_imp_fp32)" "python"
     parse_example "../examples/cpu/inference/python/resnet50_torchscript_mode_inference_fp32.py" ${MDEXAMPLE} "(marker_inf_rn50_ts_fp32)" "python"
