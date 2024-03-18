@@ -129,6 +129,8 @@ def _get_build_target():
             build_target = "clean"
         elif sys.argv[1] in ["develop"]:
             build_target = "develop"
+        elif sys.argv[1] in ["bdist_wheel"]:
+            build_target = "bdist_wheel"
         else:
             build_target = "python"
     return build_target
@@ -140,7 +142,7 @@ if _get_build_target() == "cppsdk":
     if torch_install_prefix is None or not os.path.exists(torch_install_prefix):
         raise RuntimeError("Can not find libtorch from env LIBTORCH_PATH!")
     torch_install_prefix = os.path.abspath(torch_install_prefix)
-elif _get_build_target() in ["develop", "python"]:
+elif _get_build_target() in ["develop", "python", "bdist_wheel"]:
     try:
         import torch
         from torch.utils.cpp_extension import BuildExtension, CppExtension
@@ -793,7 +795,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 my_env,
             )
 
-        if _get_build_target() in ["develop", "python"]:
+        if _get_build_target() in ["develop", "python", "bdist_wheel"]:
             # Generate cmake for common python module:
             build_option_python = {
                 **build_option_common,
@@ -844,7 +846,7 @@ class IPEXCPPLibBuild(build_clib, object):
             # Build the CPP UT
             _build_project(build_args, get_cpp_test_build_dir(), my_env, use_ninja)
 
-        if _get_build_target() in ["develop", "python"]:
+        if _get_build_target() in ["develop", "python", "bdist_wheel"]:
             # Build common python module:
             _build_project(build_args, ipex_python_build_dir, my_env, use_ninja)
 
@@ -933,6 +935,11 @@ def get_src_py_and_dst():
 
 # python specific setup modules
 class IPEXEggInfoBuild(egg_info, object):
+    def write_file(self, what, filename, data):
+        if _get_build_target() == "bdist_wheel" and what == "requirements":
+            data += "intel_extension_for_pytorch_deepspeed\n"
+        super(IPEXEggInfoBuild, self).write_file(what, filename, data)
+
     def finalize_options(self):
         super(IPEXEggInfoBuild, self).finalize_options()
 
@@ -1153,7 +1160,7 @@ def fill_python_target_cmd(cmdclass, ext_modules):
     ext_modules.append(pyi_isa_help_module())
 
 
-if _get_build_target() in ["develop", "python"]:
+if _get_build_target() in ["develop", "python", "bdist_wheel"]:
     fill_python_target_cmd(cmdclass, ext_modules)
 
 

@@ -190,3 +190,25 @@ def version():
         print("torch version and sha:     {}".format(__torch_gitrev__))
     print("submodule oneDNN sha:      {}".format(__gpu_onednn_gitrev__))
     print("submodule ideep sha:      {}".format(__cpu_ideep_gitrev__))
+
+
+def _register_extension_module(module_name, module):
+    m = sys.modules[__name__]
+    if hasattr(m, module_name):
+        raise RuntimeError(
+            f"The runtime module of '{module_name}' has already "
+            f"been registered with '{getattr(m, module_name)}'"
+        )
+    setattr(m, module_name, module)
+    intel_extension_for_pytorch_module_name = ".".join([__name__, module_name])
+    sys.modules[intel_extension_for_pytorch_module_name] = module
+
+
+if (
+    hasattr(sys.modules[__name__], "deepspeed") is False
+    and platform.system() == "Linux"
+):
+    try:
+        import intel_extension_for_pytorch_deepspeed
+    except ModuleNotFoundError as e:
+        print("Fail to import DeepSpeed kernels!")
