@@ -357,7 +357,8 @@ static void deconvolution(
   post_ops po;
   attr.extract_post_ops(po, dst);
   pattr.set_post_ops(po);
-  if (Settings::I().is_onednn_deterministic_enabled())
+  if (globalContext().deterministicAlgorithms() ||
+      Settings::I().is_onednn_deterministic_enabled())
     pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE
