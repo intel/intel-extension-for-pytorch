@@ -803,6 +803,12 @@ class IPEXCPPLibBuild(build_clib, object):
                 }
             else:
                 build_option_cpu = {**build_option_common, "BUILD_MODULE_TYPE": "CPU"}
+                if _get_build_target() in ["develop", "python"]:
+                    build_option_cpu["USE_CCL"] = "ON"
+                    build_option_cpu["USE_SHM"] = "ON"
+                    build_option_cpu["ENABLE_MPI_TESTS"] = "OFF"
+                    build_option_cpu["BUILD_REG_TESTS"] = "OFF"
+                    build_option_cpu["ENABLE_MPI_TESTS"] = "OFF"
 
             cmake_args_cpu = []
             define_build_options(cmake_args_cpu, **build_option_cpu)
@@ -908,7 +914,6 @@ class IPEXCPPLibBuild(build_clib, object):
                     gen_script_path
                 )
             check_call(gen_script_path, shell=True)
-
         # Copy the export library, header and cmake file to root/intel_extension_for_pytorch dir.
         # It is only copied in "develop" mode, which can save disk space in "install" mode.
         if _get_build_target() == "develop":
@@ -916,11 +921,24 @@ class IPEXCPPLibBuild(build_clib, object):
             for src, dst in ret:
                 self.copy_file(src, dst)
 
+        # remove the config.h in oneccl to avoid git status pollution
+        config_h = os.path.join(
+            get_project_dir(),
+            "third_party",
+            "oneCCL",
+            "include",
+            "oneapi",
+            "ccl",
+            "config.h",
+        )
+        if os.path.exists(config_h):
+            os.remove(config_h)
+
 
 def get_src_lib_and_dst():
     ret = []
     generated_cpp_files = glob.glob(
-        os.path.join(get_package_base_dir(), PACKAGE_NAME, "lib", "**/*.so"),
+        os.path.join(get_package_base_dir(), PACKAGE_NAME, "lib", "**/*.so*"),
         recursive=True,
     )
     generated_cpp_files.extend(
@@ -944,6 +962,48 @@ def get_src_lib_and_dst():
     generated_cpp_files.extend(
         glob.glob(
             os.path.join(get_package_base_dir(), PACKAGE_NAME, "share", "**/*.cmake"),
+            recursive=True,
+        )
+    )
+    # copy oneccl related files
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "bin", "*"),
+            recursive=True,
+        )
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(
+                get_package_base_dir(),
+                PACKAGE_NAME,
+                "opt",
+                "mpi",
+                "libfabric",
+                "lib",
+                "*.so*",
+            ),
+            recursive=True,
+        )
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(
+                get_package_base_dir(),
+                PACKAGE_NAME,
+                "opt",
+                "mpi",
+                "libfabric",
+                "lib",
+                "prov",
+                "*.so*",
+            ),
+            recursive=True,
+        )
+    )
+    generated_cpp_files.extend(
+        glob.glob(
+            os.path.join(get_package_base_dir(), PACKAGE_NAME, "env", "*.sh"),
             recursive=True,
         )
     )
@@ -1216,7 +1276,6 @@ entry_points = {
         "ipexrun = {}.launcher:main".format(PACKAGE_NAME),
     ]
 }
-
 
 setup(
     name=PACKAGE_NAME,

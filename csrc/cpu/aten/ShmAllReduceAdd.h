@@ -1,5 +1,6 @@
 #pragma once
 
+#ifdef USE_CCL
 #include <ATen/ATen.h>
 #include <dyndisp/DispatchStub.h>
 
@@ -33,3 +34,4 @@ IPEX_DECLARE_DISPATCH(
 
 } // namespace cpu
 } // namespace torch_ipex
+#endif

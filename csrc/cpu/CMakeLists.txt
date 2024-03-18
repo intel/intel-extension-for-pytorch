@@ -19,7 +19,7 @@ if(USE_CCL)
   link_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/oneCCL/deps/mpi/lib)
   find_package(oneCCL REQUIRED)
   list(APPEND DEPENDS_LIB oneCCL)
-  list(APPEND DEPENDS_LIB mpi)     
+  list(APPEND DEPENDS_LIB mpi)
 endif()   
 
 # TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
@@ -143,7 +143,10 @@ target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${ONEDNN_GENERATED_INCLUDE}
 
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PYTHON_INCLUDE_DIR})
-target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${DEPENDS_LIB})
+
+if(USE_CCL)
+  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${DEPENDS_LIB})
+endif(USE_CCL)
 
 include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)

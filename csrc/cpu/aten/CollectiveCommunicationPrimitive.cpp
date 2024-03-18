@@ -1,3 +1,4 @@
+#ifdef USE_CCL
 #include "CollectiveCommunicationPrimitive.h"
 #include <ATen/FunctionalTensorWrapper.h>
 #include <torch/all.h>
@@ -35,3 +36,4 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.impl("allgather", c10::DispatchKey::CPU, torch_ipex::cpu::allgather);
 }
 } // namespace
+#endif

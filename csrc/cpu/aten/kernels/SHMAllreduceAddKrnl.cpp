@@ -1,3 +1,4 @@
+#ifdef USE_CCL
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <aten/ShmAllReduceAdd.h>
@@ -241,3 +242,4 @@ IPEX_REGISTER_DISPATCH(
 
 } // namespace cpu
 } // namespace torch_ipex
+#endif

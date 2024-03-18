@@ -1,4 +1,4 @@
-
+#ifdef USE_CCL
 #include "ShmAllReduceAdd.h"
 #include <ATen/FunctionalTensorWrapper.h>
 #include <torch/all.h>
@@ -30,3 +30,4 @@ at::Tensor shm_all_reduce_add_forward_cpu(
 
 } // namespace cpu
 } // namespace torch_ipex
+#endif

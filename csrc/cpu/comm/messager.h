@@ -1,4 +1,5 @@
 #pragma once
+#ifdef USE_CCL
 #include <mpi.h>
 
 #include <torch/all.h>
@@ -253,3 +254,4 @@ class Messenger {
   ShmReduction* pshm;
 #endif
 };
+#endif

@@ -13,12 +13,11 @@ if(WIN32)
   set(USE_LIBXSMM ON)
 endif()
 
-option(USE_CCL "Enable oneCCL in IPEX" ON)
-option(USE_SHM "Enable shared memory communication in IPEX" ON)
 if(WIN32)
   set(USE_SHM OFF)
+  set(USE_CCL OFF)
 endif()
-#set USE_SHM to OFF if USE_CCL is OFF
+
 
 function (print_cpu_config_summary)
   # Fetch configurations of intel-ext-pt-cpu

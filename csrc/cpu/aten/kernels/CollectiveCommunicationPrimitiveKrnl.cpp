@@ -1,3 +1,4 @@
+#ifdef USE_CCL
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <aten/CollectiveCommunicationPrimitive.h>
@@ -36,3 +37,4 @@ IPEX_REGISTER_DISPATCH(allgather_kernel_stub, &allgather_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex
+#endif
