@@ -183,12 +183,13 @@ if(USE_LIBXSMM)
   endif(BUILD_LIBXSMM_VIA_CMAKE)
 endif(USE_LIBXSMM)
 
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build sleef static" FORCE)
-set(BUILD_DFT OFF CACHE BOOL "Don't build sleef DFT lib" FORCE)
-set(BUILD_GNUABI_LIBS OFF CACHE BOOL "Don't build sleef gnuabi libs" FORCE)
-set(BUILD_TESTS OFF CACHE BOOL "Don't build sleef tests" FORCE)
+# setup sleef options:
+set(SLEEF_BUILD_SHARED_LIBS OFF CACHE BOOL "Build sleef as static library" FORCE)
+set(SLEEF_BUILD_DFT OFF CACHE BOOL "Don't build sleef DFT lib" FORCE)
+set(SLEEF_BUILD_GNUABI_LIBS OFF CACHE BOOL "Don't build sleef gnuabi libs" FORCE)
+set(SLEEF_BUILD_TESTS OFF CACHE BOOL "Don't build sleef tests" FORCE)
+set(SLEEF_BUILD_SCALAR_LIB OFF CACHE BOOL "libsleefscalar will be built." FORCE)
 add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/sleef ${THIRD_PARTY_BUILD_PATH_NAME}/sleef EXCLUDE_FROM_ALL)
-set_property(TARGET sleef PROPERTY FOLDER "dependencies")
 target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE sleef)
 
 add_dependencies(${PLUGIN_NAME_CPU} dnnl)
