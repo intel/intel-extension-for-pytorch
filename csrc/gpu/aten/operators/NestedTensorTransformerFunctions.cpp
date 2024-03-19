@@ -1,6 +1,5 @@
 #include <ATen/ATen.h>
 #include <ATen/NestedTensorImpl.h>
-// #include <ATen/native/nested/NestedTensorMath.h>
 #include <ATen/native/nested/NestedTensorUtils.h>
 
 #include "comm/ATDispatch.h"
@@ -416,6 +415,58 @@ Tensor to_padded_tensor(
 
   return at::native::NestedTensor_to_padded_tensor_generic(
       t, padding, output_size);
+}
+
+Tensor NestedTensor_to_mask(
+    const Tensor& nt,
+    c10::optional<int64_t> mask_dim,
+    c10::optional<int64_t> mask_dim_length) {
+  auto* nt_impl = native::get_nested_tensor_impl(nt);
+  TORCH_CHECK(
+      nested_tensor_impl_is_contiguous(nt_impl),
+      "to_mask only works on contiguous NestedTensors.");
+  TORCH_CHECK(
+      !mask_dim || *mask_dim < nt.dim(),
+      "Requested mask dimension ",
+      *mask_dim,
+      " is bigger than dimension ",
+      nt.dim(),
+      " of given NestedTensor.");
+
+  // TODO: port optimization for 1x1 tensors from
+  // pytorch/nestedtensor's version.
+
+  TORCH_CHECK(
+      mask_dim && *mask_dim == 2 && nt.dim() == 3,
+      "Only the special case of mask_dim == 2 on a 3-D NestedTensor is supported right now.")
+  const auto& sizes = nt_impl->get_nested_sizes();
+  // Shape: # of tensors in our NestedTensor by max size along first dim
+  // TODO: calculate this without allocating a std::vector.
+  const auto result_size_1 = mask_dim_length
+      ? *mask_dim_length
+      : native::NestedTensor_get_max_size(*nt_impl)[0];
+  auto result = at::ones({sizes.sizes()[0], result_size_1}, at::kBool);
+  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(sizes.dim() == 2);
+  auto* result_data = result.data_ptr<bool>();
+  auto* sizes_ptr = sizes.data_ptr<int64_t>();
+  const auto sizes_size_1 = sizes.sizes()[1];
+  for (const auto ii : c10::irange(sizes.sizes()[0])) {
+    auto length = sizes_ptr[ii * sizes_size_1];
+    for (const auto jj : c10::irange(length)) {
+      result_data[ii * result_size_1 + jj] = false;
+    }
+  }
+  return result;
+}
+
+Tensor _nested_tensor_softmax_with_shape(
+    const Tensor& self,
+    const Tensor& query) {
+  c10::optional<Tensor> attn_mask;
+
+  attn_mask = NestedTensor_to_mask(query, 2, self.size(2));
+  attn_mask = attn_mask->to(query.device(), /*non-blocking=*/true);
+  return _masked_softmax(self, *attn_mask, self.dim() - 1, /*mask type */ 1);
 }
 
 } // namespace AtenIpexTypeNestedTensorXPU

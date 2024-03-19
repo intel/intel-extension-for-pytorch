@@ -8,7 +8,66 @@ cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
+def random_nt(device, dtype, num_tensors, max_dims, min_dims=None):
+    if min_dims is None:
+        min_dims = tuple([0] * len(max_dims))
+    ts1 = []
+    for _ in range(num_tensors):
+        tensor_dims = tuple(
+            [
+                torch.randint(low=min_dim, high=max_dim, size=(1,)).item()
+                for (min_dim, max_dim) in zip(min_dims, max_dims)
+            ]
+        )
+        t1 = torch.randn(tensor_dims, device=device, dtype=dtype)
+        ts1.append(t1)
+    return torch.nested.nested_tensor(ts1, device=device, dtype=dtype)
+
+
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_softmax(self):
+        def _test_softmax(device, dtype):
+            # normal nested tensor
+            ntensors = 4
+            nt = random_nt(device, dtype, ntensors, (4, 4))
+            # error case: softmax across nested dimension
+            self.assertRaisesRegex(
+                RuntimeError,
+                "Cannot apply softmax across nested dimension 0",
+                lambda: torch.nn.functional.softmax(nt, 0),
+            )
+            self.assertRaisesRegex(
+                RuntimeError,
+                "Cannot apply softmax across nested dimension 0",
+                lambda: torch.nn.functional.softmax(nt, -3),
+            )
+            # error case: dimension out of range
+            self.assertRaises(IndexError, lambda: torch.nn.functional.softmax(nt, 3))
+            self.assertRaises(IndexError, lambda: torch.nn.functional.softmax(nt, -4))
+            # normal case: should equal to padding -inf
+            softmaxer = torch.nn.Softmax(1)
+            y0 = softmaxer(nt)
+            y1 = torch.nn.functional.softmax(nt, 1)
+            self.assertEqual(y0, y1)
+            pt = torch.nested.to_padded_tensor(nt, float("-inf"))
+            # if an entire slice is padded, then softmax will return 0.0 / 0.0 = nan
+            # however, physically speaking that should be 0.0
+            expect = torch.nn.functional.softmax(pt, 1).nan_to_num_(0.0)
+            self.assertEqual(torch.nested.to_padded_tensor(y0, 0.0), expect)
+            # edge case: empty nested tensor
+            nt0 = torch.nested.nested_tensor([])
+            y = torch.nn.functional.softmax(nt0, 1)
+            self.assertEqual(nt0, y)
+            # edge case: nesting scalars
+            nt1 = torch.nested.nested_tensor([torch.tensor(0.0), torch.tensor(1.0)])
+            self.assertRaises(RuntimeError, lambda: torch.nn.functional.softmax(nt1, 0))
+            self.assertRaises(IndexError, lambda: torch.nn.functional.softmax(nt1, 1))
+
+        _test_softmax(dpcpp_device, torch.float32)
+
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
