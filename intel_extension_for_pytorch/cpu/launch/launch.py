@@ -272,13 +272,13 @@ def process_deprecated_params(args, logger):
         args.log_dir = args.log_path
 
     if args.multi_instance:
-        logger.info(
+        logger.warning(
             "Argument --multi_instance is deprecated. Will be removed."
             + "If you are using the deprecated argument, please update it to the new one.",
             _type=WarningType.DeprecatedArgument,
         )
     if args.distributed:
-        logger.info(
+        logger.warning(
             "Argument --distributed is deprecated. Will be removed."
             + "If you are using the deprecated argument, please update it to the new one.",
             _type=WarningType.DeprecatedArgument,
