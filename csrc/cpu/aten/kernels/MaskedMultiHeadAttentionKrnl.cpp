@@ -1306,7 +1306,8 @@ first_token_masked_mha(
   }
   auto attn_outputs = at::Tensor();
   auto attn_weights = at::Tensor();
-  if ((key.scalar_type() == at::kFloat || key.scalar_type() == at::kBFloat16) &&
+  if ((key.scalar_type() == at::kFloat || key.scalar_type() == at::kBFloat16 ||
+       key.scalar_type() == at::kHalf) &&
       attention_mask.stride(-1) == 1) {
     query = query.transpose(1, 2);
     key = key.transpose(1, 2);
