@@ -2,6 +2,7 @@
 #include <ATen/ATen.h>
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/record_function.h>
+#include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <iostream>
 #include "Blas.h"
@@ -585,7 +586,7 @@ static void mm_qkv_out(
   bool xetla_valid = fp64_valid && out0_valid && out1_valid && out2_valid &&
       input_valid && weight_valid && bias_valid && shape_valid;
 
-  if (xetla_valid) {
+  if (dpcppGetDeviceHasXMX() && xetla_valid) {
     char str__[100];
     if (!has_bias) {
       sprintf(str__, "hgemm_qkv(%d, %d, %d)", m, n, k);
@@ -721,7 +722,7 @@ static void mm_qkv_group_out(
   bool xetla_valid = fp64_valid && out0_valid && out1_valid && out2_valid &&
       input_valid && weight_valid && bias_valid && shape_valid;
 
-  if (xetla_valid) {
+  if (dpcppGetDeviceHasXMX() && xetla_valid) {
     char str__[100];
     Tensor acc_tensor_, cnt_tensor_;
     get_acc_and_cnt_tensor(
