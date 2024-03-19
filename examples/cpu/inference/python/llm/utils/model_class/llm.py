@@ -13,6 +13,7 @@ class EXAMPLE_INPUTS_MODE(IntEnum):
     MASK_KV_POS = 4
     MASK_KV_ENC = 5
     MASK_KV_PIXEL = 6
+    EMBEDS_MASK_KV = 7
 
 class LLMConfig(ABC):
     @abstractmethod

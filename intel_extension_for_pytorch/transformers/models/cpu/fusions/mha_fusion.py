@@ -117,6 +117,19 @@ class _IPEXScaleDotProductCPU(nn.Module):
                 layer_past[3].contiguous(),
             )
             return attn_output, None, present
+        if attention_mask is None:
+            query = query.transpose(1, 2).contiguous()
+            key = key.transpose(1, 2).contiguous()
+            value = value.transpose(1, 2).contiguous()
+            attn_output, _ = torch.ops.torch_ipex.flash_attention(
+                query,
+                key,
+                value,
+                dropout_p=0.0,
+                is_causal=False,
+                attention_mask=attention_mask,
+            )
+            return attn_output, None, None
         if layer_past is None:
             layer_past = (
                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),

@@ -35,6 +35,7 @@ from llm.utils.model_class.mpt import MPTConfig
 from llm.utils.model_class.stablelm import StableLMConfig
 from llm.utils.model_class.qwen import QwenConfig
 from llm.utils.model_class.git import GitConfig
+from llm.utils.model_class.llava import LlavaConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -213,7 +214,7 @@ if re.search("falcon", config.architectures[0], re.IGNORECASE) or re.search(
     model = FALCONConfig(args.model_id)
 elif re.search("GPTJ", config.architectures[0], re.IGNORECASE):
     model = GPTJConfig(args.model_id)
-elif re.search("llama", config.architectures[0], re.IGNORECASE):
+elif re.search("llama", config.architectures[0], re.IGNORECASE) and not re.search("llava", config.architectures[0], re.IGNORECASE):
     model = LLAMAConfig(args.model_id)
 elif re.search("gptneox", config.architectures[0], re.IGNORECASE):
     model = GPTNEOXConfig(args.model_id)
@@ -245,6 +246,38 @@ elif re.search("git", config.architectures[0], re.IGNORECASE):
     from PIL import Image
     import requests
     model = GitConfig(args.model_id)
+elif re.search("llava", config.architectures[0], re.IGNORECASE):
+    from PIL import Image
+    import requests
+    from io import BytesIO
+    try:
+        from llava.conversation import conv_templates
+        from llava.mm_utils import get_model_name_from_path, tokenizer_image_token
+        from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+    except ImportError:
+        pass
+    model = LlavaConfig(args.model_id)
+    def load_image(image_file):
+        if image_file.startswith('http://') or image_file.startswith('https://'):
+            response = requests.get(image_file)
+            image = Image.open(BytesIO(response.content)).convert('RGB')
+        else:
+            image = Image.open(image_file).convert('RGB')
+        return image
+    model_name = get_model_name_from_path(args.model_id)
+    if 'llama-2' in model_name.lower():
+        conv_mode = "llava_llama_2"
+    elif "v1" in model_name.lower():
+        conv_mode = "llava_v1"
+    elif "mpt" in model_name.lower():
+        conv_mode = "mpt"
+    else:
+        conv_mode = "llava_v0"
+    conv = conv_templates[conv_mode].copy()
+    if "mpt" in model_name.lower():
+        roles = ('user', 'assistant')
+    else:
+        roles = conv.roles
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -253,7 +286,7 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model.name == "mpt" and not hasattr(config, "max_seq_len") and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
-if model.name == "git":
+if model.name in ["git", "llava"]:
     config.batch_size = int(args.batch_size) * num_beams
 
 user_model = model.get_user_model(config, args.benchmark)
@@ -381,6 +414,23 @@ def get_example_inputs(model):
             attention_mask.unsqueeze(0).repeat(batch_size,1),
             tuple(past_key_value),
             pixel_inputs,
+        )
+    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.EMBEDS_MASK_KV:
+        batch_size = int(args.batch_size) * num_beams
+        past_key_value = [
+            (
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([batch_size, n_heads, 1, head_dim]).contiguous(),
+                torch.zeros([batch_size, n_heads, 1, head_dim]).contiguous(),
+                beam_idx_tmp,
+            )
+            for i in range(n_layers)
+        ]
+        input_embeds = torch.zeros(batch_size, 1, 4096).to(amp_dtype)
+        example_inputs = (
+            input_embeds,
+            attention_mask.unsqueeze(0).repeat(batch_size,1),
+            tuple(past_key_value),
         )
     else:
         raise RuntimeError("Your model does not match existing example inputs used in ipex quantization, exiting...")
@@ -723,6 +773,19 @@ if args.benchmark:
 
     if model.name == "git":
         prompt = Image.open(requests.get(args.image_url, stream=True).raw)
+    elif model.name == "llava":
+        if args.prompt is not None:
+            prompt = args.prompt
+        image = load_image(args.image_url)
+        image = [image] * args.batch_size
+        if user_model.config.mm_use_im_start_end:
+            prompt = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + prompt
+        else:
+            prompt = DEFAULT_IMAGE_TOKEN + '\n' + prompt
+        conv.append_message(conv.roles[0], prompt)
+        conv.append_message(conv.roles[1], None)
+        prompt = conv.get_prompt()
+        image_processor = model.get_image_processor()
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()
@@ -755,14 +818,18 @@ if args.benchmark:
     ):
         for i in range(num_iter):
             tic = time.time()
-            if model.name == "git":
+            if model.name == "llava":
+                input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in prompt])
+                image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(amp_dtype) for img in image]
+                output = user_model.generate(input_ids, images=image_tensor, **generate_kwargs)
+            elif model.name == "git":
                 input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
                 output = user_model.generate(pixel_values=input_ids, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = user_model.generate(input_ids, **generate_kwargs)
             gen_ids = output[0] if args.token_latency else output
-            gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+            gen_text = tokenizer.batch_decode(gen_ids[:, input_ids.shape[1]:] if model.name=="llava" else gen_ids, skip_special_tokens=True)
             toc = time.time()
             input_tokens_lengths = [x.shape[0] for x in input_ids]
             output_tokens_lengths = [x.shape[0] for x in gen_ids]
@@ -790,14 +857,18 @@ if args.benchmark:
             on_trace_ready=trace_handler,
         ) as prof:
             for i in range(5):
-                if model.name == "git":
+                if model.name == "llava":
+                    input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in prompt])
+                    image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(amp_dtype) for img in image]
+                    output = user_model.generate(input_ids, images=image_tensor, **generate_kwargs)
+                elif model.name == "git":
                     input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
                     output = user_model.generate(pixel_values=input_ids, **generate_kwargs)
                 else:
                     input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                     output = user_model.generate(input_ids, **generate_kwargs)
                 gen_ids = output[0] if args.token_latency else output
-                gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+                gen_text = tokenizer.batch_decode(gen_ids[:, input_ids.shape[1]:] if model.name=="llava" else gen_ids, skip_special_tokens=True)
                 prof.step()
 
     print("\n", "-" * 10, "Summary:", "-" * 10)

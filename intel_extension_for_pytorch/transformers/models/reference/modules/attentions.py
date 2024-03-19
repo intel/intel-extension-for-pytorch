@@ -1682,6 +1682,52 @@ def _GitVisionAttention_forward(
     return attn_output, attn_weights
 
 
+def _CLIPAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    causal_attention_mask: Optional[torch.Tensor] = None,
+    output_attentions: Optional[bool] = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, tgt_len, embed_dim = hidden_states.size()
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+        query, key, value = concat_qkv
+        query = query.view(bsz, tgt_len, self.num_heads, self.head_dim)
+        key = key.view(bsz, tgt_len, self.num_key_value_heads, self.head_dim)
+        value = value.view(bsz, tgt_len, self.num_key_value_heads, self.head_dim)
+    else:
+        query = self.q_proj(hidden_states)
+        key = self.k_proj(hidden_states)
+        value = self.v_proj(hidden_states)
+
+    if causal_attention_mask is not None:
+        if attention_mask is not None:
+            attention_mask = attention_mask + causal_attention_mask
+
+    (attn_output, attn_weights, _) = self._IPEXScaleDotProduct(
+        query,
+        key,
+        value,
+        1 / self.scale,
+        None,
+        None,
+        attention_mask,
+        vision=True,
+    )
+
+    if not output_attentions:
+        attn_weights = None
+
+    attn_output = attn_output.view(bsz, self.num_heads, tgt_len, self.head_dim)
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, tgt_len, embed_dim)
+
+    # attn_output = self.out_proj(attn_output)
+
+    return attn_output, attn_weights
+
+
 def _create_attention_mask_for_git(
     self, tgt, memory, tgt_mask, past_key_values_length, memory_key_padding_mask=None
 ):
@@ -1781,9 +1827,15 @@ class _IPEXAttentionRef(nn.Module):
             self.num_key_value_heads = module.num_key_value_heads
         else:
             if hasattr(config, "num_key_value_heads"):
-                raise ValueError(
-                    "Your transformers version does not support GQA feature, plese upgrade (>= 4.31.0)"
-                )
+                if (
+                    self.model_backbone == "LlavaLlamaForCausalLM"
+                    and module._get_name() == "CLIPAttention"
+                ):
+                    self.num_key_value_heads = self.num_attention_heads
+                else:
+                    raise ValueError(
+                        "Your transformers version does not support GQA feature, plese upgrade (>= 4.31.0)"
+                    )
             else:
                 self.num_key_value_heads = self.num_attention_heads
         self.num_key_value_groups = self.num_attention_heads // self.num_key_value_heads
@@ -1805,8 +1857,14 @@ class _IPEXAttentionRef(nn.Module):
                 "MptForCausalLM",
                 "GitForCausalLM",
             ]
-            or self.model_backbone == "BaichuanForCausalLM"
-            and hasattr(module, "rotary_emb")
+            or (
+                self.model_backbone == "BaichuanForCausalLM"
+                and hasattr(module, "rotary_emb")
+            )
+            or (
+                self.model_backbone == "LlavaLlamaForCausalLM"
+                and module._get_name() != "CLIPAttention"
+            )
         ):
             if hasattr(module, "rotary_dim"):
                 self.pos_embd_dim = module.rotary_dim
@@ -1841,6 +1899,7 @@ class _IPEXAttentionRef(nn.Module):
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",
+            "LlavaLlamaForCausalLM",
         ]:
             if (
                 hasattr(module, "q_proj")
@@ -2219,6 +2278,24 @@ class _IPEXAttentionRef(nn.Module):
                 past_key_value,
                 output_attentions,
                 pixel_values_present,
+            )
+        elif self.model_backbone == "LlavaLlamaForCausalLM":
+            if vision is not None and vision:
+                return _CLIPAttention_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    encoder_attention_mask,
+                    output_attentions,
+                )
+            return _LlamaAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

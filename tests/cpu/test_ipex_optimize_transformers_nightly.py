@@ -12,6 +12,7 @@ import itertools
 from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
 from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
 from hf_configs.qwen.modeling_qwen import QWenLMHeadModel
+from hf_configs.llava.modeling_llavallama import LlavaLlamaForCausalLM
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _disable_tpp
 
 try:
@@ -140,6 +141,13 @@ supported_models = [
         lambda m: m.git.encoder.layer[0].attention.self.__class__,
         lambda m: m.git.encoder.layer[0].__class__,
     ),
+    model_info(
+        "llava",
+        LlavaLlamaForCausalLM,
+        False,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
 ]
 
 
@@ -176,6 +184,8 @@ class OptimizeTransformersNightlyTester(TestCase):
             ]:
                 state_dict[weight] = torch.rand(state_dict[weight].shape)
             model.load_state_dict(state_dict)
+        elif m.name == "llava":
+            model.get_vision_tower().load_model()
         model.eval()
         ref_m = copy.deepcopy(model)
         ipex_m = copy.deepcopy(model)

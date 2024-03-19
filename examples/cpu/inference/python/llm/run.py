@@ -208,6 +208,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
         (group_size & (group_size-1) == 0)
     ), f"Invalid group size for WOQ: {group_size}"
 
+    if re.search("llava", str(args.model_name_or_path), re.IGNORECASE) and args.prompt is None:
+        args.prompt = "What is this image?"
     if not args.autotp:
         if not args.ipex_weight_only_quantization and not args.ipex_smooth_quant:
             path = Path(parent_path, "single_instance/run_generation.py")
@@ -493,6 +495,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "dolly": ("/dolly_local_shard"),
                 "qwen": ("/qwen_local_shard"),
                 "git": ("/git_local_shard"),
+                "llava": ("/llava_local_shard"),
             }
             model_type = next(
                 (x for x in MODEL_CLASSES.keys() if x in args.model_name_or_path.lower()), "auto"

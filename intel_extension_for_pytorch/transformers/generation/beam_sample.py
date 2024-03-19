@@ -187,9 +187,9 @@ def _beam_sample(
             "StableLmForCausalLM",
             "QWenLMHeadModel",
             "GitForCausalLM",
+            "LlavaLlamaForCausalLM",
         ]:
             first_token = False
-            has_position_id = "position_ids" in model_inputs
             if model_inputs["past_key_values"] is None:
                 first_token = True
                 if self.model_backbone == "T5ForConditionalGeneration":
@@ -305,6 +305,10 @@ def _beam_sample(
                 model_inputs["encoder_outputs"] = (
                     model_inputs["encoder_outputs"]["last_hidden_state"],
                 )
+            if self.model_backbone == "LlavaLlamaForCausalLM" and hasattr(
+                self, "prepare_inputs_labels_for_multimodal"
+            ):
+                model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)

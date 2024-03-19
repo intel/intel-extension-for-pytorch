@@ -189,6 +189,7 @@ def _beam_search(
             "StableLmForCausalLM",
             "QWenLMHeadModel",
             "GitForCausalLM",
+            "LlavaLlamaForCausalLM",
         ]:
             first_token = False
             has_position_id = model_inputs.get("position_ids", None) is not None
@@ -324,6 +325,10 @@ def _beam_search(
                 model_inputs["encoder_outputs"] = (
                     model_inputs["encoder_outputs"]["last_hidden_state"],
                 )
+            if self.model_backbone == "LlavaLlamaForCausalLM" and hasattr(
+                self, "prepare_inputs_labels_for_multimodal"
+            ):
+                model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)

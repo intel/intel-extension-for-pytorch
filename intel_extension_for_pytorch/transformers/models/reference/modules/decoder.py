@@ -1080,6 +1080,48 @@ def GitVisionEncoderLayer_forward(
     return outputs
 
 
+def CLIPEncoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: torch.Tensor,
+    causal_attention_mask: torch.Tensor,
+    output_attentions: Optional[bool] = False,
+) -> Tuple[torch.FloatTensor]:
+    residual = hidden_states
+
+    hidden_states = self.layer_norm1(hidden_states)
+    hidden_states, attn_weights = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        encoder_attention_mask=causal_attention_mask,
+        output_attentions=output_attentions,
+        vision=True,
+    )
+    if not self.distributed:
+        hidden_states = self.vision_mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.out_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    residual = hidden_states
+    hidden_states = self.layer_norm2(hidden_states)
+    # hidden_states = self.mlp(hidden_states)
+    hidden_states = self.mlp.fc1(hidden_states)
+    hidden_states = self.mlp.activation_fn(hidden_states)
+    if not self.distributed:
+        hidden_states = self.vision_mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.mlp.fc2(hidden_states)
+        hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1216,6 +1258,28 @@ class _IPEXDecoderLayerRef(nn.Module):
             # if hasattr(module, "mlp"):
             #     self.vision_linear_gelu = _IPEXlinearGeluRef(module.mlp.fc1)
             #     del self.__dict__["_modules"]["mlp"].fc1
+        elif self.model_backbone == "LlavaLlamaForCausalLM":
+            if not self.distributed:
+                if hasattr(module.self_attn, "o_proj"):
+                    self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
+                    del self.__dict__["_modules"]["self_attn"].o_proj
+                if hasattr(module.self_attn, "out_proj"):
+                    self.vision_mha_linear_add = _IPEXlinearAddRef(
+                        module.self_attn.out_proj
+                    )
+                    del self.__dict__["_modules"]["self_attn"].out_proj
+                if hasattr(module.mlp, "down_proj"):
+                    self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
+                    del self.__dict__["_modules"]["mlp"].down_proj
+                if hasattr(module.mlp, "fc2"):
+                    self.vision_mlp_linear_add = _IPEXlinearAddRef(module.mlp.fc2)
+                    del self.__dict__["_modules"]["mlp"].fc2
+            if hasattr(module.mlp, "gate_proj") and hasattr(module.mlp, "up_proj"):
+                self.linear_silu_mul = _IPEXlinearSiluMulRef(
+                    module.mlp.gate_proj, module.mlp.up_proj
+                )
+                del self.__dict__["_modules"]["mlp"].gate_proj
+                del self.__dict__["_modules"]["mlp"].up_proj
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -1407,6 +1471,24 @@ class _IPEXDecoderLayerRef(nn.Module):
                 past_key_value,
                 output_attentions,
                 pixel_values_present,
+            )
+        elif self.model_backbone == "LlavaLlamaForCausalLM":
+            if vision is not None and vision:
+                return CLIPEncoderLayer_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    encoder_attention_mask,
+                    output_attentions,
+                )
+            return LlamaDecoderLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

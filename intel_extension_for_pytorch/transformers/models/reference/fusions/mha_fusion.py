@@ -153,6 +153,7 @@ class _IPEXRopeRef(nn.Module):
             "LlamaForCausalLM",
             "MistralForCausalLM",
             "MixtralForCausalLM",
+            "LlavaLlamaForCausalLM",
         ]:
             x = x.transpose(1, 2)
             x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
@@ -292,12 +293,17 @@ class _IPEXScaleDotProductRef(nn.Module):
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",
+            "LlavaLlamaForCausalLM",
         ]:
             self.num_key_value_groups = (
                 module.num_key_value_groups
                 if hasattr(module, "num_key_value_groups")
                 else None
             )
+            if hasattr(module, "num_heads"):
+                self.num_heads = module.num_heads
+            if hasattr(module, "head_dim"):
+                self.head_dim = module.head_dim
         elif self.model_backbone == "OPTForCausalLM":
             self.num_heads = module.num_heads
             self.head_dim = module.head_dim
@@ -479,6 +485,12 @@ class _IPEXScaleDotProductRef(nn.Module):
                 key[:, :, cutoff:, :],
                 value[:, :, cutoff:, :],
             )
+        elif (
+            self.model_backbone == "LlavaLlamaForCausalLM"
+            and vision is not None
+            and vision
+        ):
+            present = None
         else:
             if layer_past is not None:
                 past_key = layer_past[0]
@@ -794,6 +806,44 @@ class _IPEXScaleDotProductRef(nn.Module):
             if head_mask is not None:
                 attn_weights = attn_weights * head_mask
             attn_output = torch.matmul(attn_weights, value)
+        elif self.model_backbone == "LlavaLlamaForCausalLM":
+            if vision is not None and vision:
+                bsz = query.shape[0]
+                proj_shape = (bsz * self.num_heads, -1, self.head_dim)
+                query_states = query.transpose(1, 2).contiguous().view(*proj_shape)
+                key_states = key.transpose(1, 2).contiguous().view(*proj_shape)
+                value_states = value.view(*proj_shape)
+
+                src_len = key_states.size(1)
+                attn_weights = (
+                    torch.bmm(query_states, key_states.transpose(1, 2)) / scale_attn
+                )
+
+                if attention_mask is not None:
+                    attn_weights = (
+                        attn_weights.view(bsz, self.num_heads, -1, src_len)
+                        + attention_mask
+                    )
+                    attn_weights = attn_weights.view(bsz * self.num_heads, -1, src_len)
+
+                attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+                attn_output = torch.bmm(attn_weights, value_states)
+                attn_weights = attn_weights.view(bsz, self.num_heads, -1, src_len)
+            else:
+                # repeat k/v heads if n_kv_heads < n_heads
+                key = self._repeat_kv(key, self.num_key_value_groups)
+                value = self._repeat_kv(value, self.num_key_value_groups)
+
+                attn_weights = torch.matmul(query, key.transpose(2, 3)) / scale_attn
+
+                if attention_mask is not None:
+                    attn_weights = attn_weights + attention_mask
+
+                # upcast attention to fp32
+                attn_weights = nn.functional.softmax(
+                    attn_weights, dim=-1, dtype=torch.float32
+                ).to(query.dtype)
+                attn_output = torch.matmul(attn_weights, value)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return attn_output, attn_weights, present

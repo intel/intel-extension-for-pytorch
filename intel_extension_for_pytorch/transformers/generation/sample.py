@@ -176,6 +176,7 @@ def _sample(
             "StableLmForCausalLM",
             "QWenLMHeadModel",
             "GitForCausalLM",
+            "LlavaLlamaForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -277,6 +278,10 @@ def _sample(
                             for i in range(num_hidden_layers)
                         ]
                     )
+            if self.model_backbone == "LlavaLlamaForCausalLM" and hasattr(
+                self, "prepare_inputs_labels_for_multimodal"
+            ):
+                model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)

@@ -153,9 +153,12 @@ def model_convert_reference(_model):
         GitEncoder_forward,
         GitVisionEncoder_forward,
         GitModel_forward,
+        CLIPEncoder_forward,
+        LlavaLlamaForCausalLM_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
         prepare_inputs_for_generation_llama,
+        prepare_inputs_labels_for_multimodal_llavallama,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -631,6 +634,55 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "LlavaLlamaForCausalLM":
+        convert_function(_model, "forward", LlavaLlamaForCausalLM_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_labels_for_multimodal",
+            prepare_inputs_labels_for_multimodal_llavallama,
+        )
+        convert_function(
+            _model.model,
+            "forward",
+            LlamaModel_forward,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_function(
+            _model.model.vision_tower.vision_tower.vision_model.encoder,
+            "forward",
+            CLIPEncoder_forward,
+        )
+        convert_class(
+            _model,
+            type(_model.model.vision_tower.vision_tower.vision_model.encoder.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(
+                _model.model.vision_tower.vision_tower.vision_model.encoder.layers[
+                    0
+                ].self_attn
+            ),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
 
     return _model
 
@@ -778,6 +830,19 @@ def get_dummy_input(_model, return_dict=False):
                 past_key_values,
                 torch.zeros(_model.config.batch_size, 3, 224, 224),
             )
+    if _model.config.architectures[0] == "LlavaLlamaForCausalLM":
+        batch_size = (
+            _model.config.batch_size if hasattr(_model.config, "batch_size") else 1
+        )
+        if return_dict:
+            sample_inputs.pop("input_ids", None)
+            sample_inputs["inputs_embeds"] = torch.zeros(batch_size, 1, 4096).to(
+                _model.dtype
+            )
+        else:
+            sample_inputs = (
+                torch.zeros(batch_size, 1, 4096).to(_model.dtype),
+            ) + sample_inputs[1:]
 
     if "return_last_logit" in model_inputs:
         if return_dict:
@@ -975,7 +1040,7 @@ def optimize(
     This API focus on transformers models, especially for generation tasks inference.
     Well supported model family:
     Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
-    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git.
+    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava.
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -1038,7 +1103,7 @@ def optimize(
     try:
         installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
         min_version = "4.28.1"
-        validated_version = "4.38.1"
+        validated_version = "4.38.2"
         if "transformers" not in installed_pkg:
             raise RuntimeError(
                 "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -1087,12 +1152,12 @@ def optimize(
             "StableLmForCausalLM",
             "QWenLMHeadModel",
             "GitForCausalLM",
+            "LlavaLlamaForCausalLM",
         ]
         if not well_supported_model:
             logger.warning(
                 "ipex.llm.optimize supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, "
-                + "GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, and Git, fallback to origin model",
-                _type=WarningType.NotSupported,
+                + "GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, and Llava, fallback to origin model"
             )
             return model
 

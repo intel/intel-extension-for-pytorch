@@ -1,0 +1,140 @@
+diff --git a/llava/model/builder.py b/llava/model/builder.py
+index 53b5d10..668172e 100644
+--- a/llava/model/builder.py
++++ b/llava/model/builder.py
+@@ -21,10 +21,12 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig, BitsAn
+ import torch
+ from llava.model import *
+ from llava.constants import DEFAULT_IMAGE_PATCH_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+-import intel_extension_for_pytorch as ipex
++from llava.mm_utils import get_model_name_from_path
+ 
+ 
+-def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, load_4bit=False, device_map="auto"):
++def load_pretrained_model(model_path, model_base=None, model_name=None, mode="pt", load_8bit=False, load_4bit=False, device_map="cpu"):
++    if model_name is None:
++        model_name = get_model_name_from_path(model_path)
+     kwargs = {"device_map": device_map}
+ 
+     if load_8bit:
+@@ -38,8 +40,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
+             bnb_4bit_quant_type='nf4'
+         )
+     else:
+-        kwargs['torch_dtype'] = torch.bfloat16
+-
++        kwargs['torch_dtype'] = torch.float32 #bfloat16
+     if 'llava' in model_name.lower():
+         # Load LLaVA model
+         if 'lora' in model_name.lower() and model_base is None:
+@@ -102,7 +103,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
+             else:
+                 tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+                 model = LlavaLlamaForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True)
+-                model = model.half().to(device=device_map, dtype=torch.bfloat16)
++                #model = model.half().to(device=device_map, dtype=torch.bfloat16)
+     else:
+         # Load language model
+         if model_base is not None:
+@@ -139,7 +140,7 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
+         vision_tower = model.get_vision_tower()
+         if not vision_tower.is_loaded:
+             vision_tower.load_model()
+-        vision_tower.to(device=device_map, dtype=torch.bfloat16)
++        vision_tower.to(device=device_map) #, dtype=torch.bfloat16
+         image_processor = vision_tower.image_processor
+ 
+     if hasattr(model.config, "max_sequence_length"):
+diff --git a/llava/model/language_model/llava_llama.py b/llava/model/language_model/llava_llama.py
+index d9ce3e8..83bfae7 100644
+--- a/llava/model/language_model/llava_llama.py
++++ b/llava/model/language_model/llava_llama.py
+@@ -136,5 +136,5 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
+         )
+         return model_inputs
+ 
+-AutoConfig.register("llava", LlavaConfig)
++AutoConfig.register("llava", LlavaConfig, exist_ok=True)
+ AutoModelForCausalLM.register(LlavaConfig, LlavaLlamaForCausalLM)
+diff --git a/llava/model/language_model/mpt/hf_prefixlm_converter.py b/llava/model/language_model/mpt/hf_prefixlm_converter.py
+index 8c1a648..8abc855 100644
+--- a/llava/model/language_model/mpt/hf_prefixlm_converter.py
++++ b/llava/model/language_model/mpt/hf_prefixlm_converter.py
+@@ -12,20 +12,73 @@ from types import MethodType
+ from typing import Any, Dict, List, Optional, Tuple, Union
+ import torch
+ from transformers.models.bloom.modeling_bloom import BaseModelOutputWithPastAndCrossAttentions, BloomForCausalLM, BloomModel, CausalLMOutputWithCrossAttentions, CrossEntropyLoss
+-from transformers.models.bloom.modeling_bloom import _expand_mask as _expand_mask_bloom
+-from transformers.models.bloom.modeling_bloom import _make_causal_mask as _make_causal_mask_bloom
+ from transformers.models.bloom.modeling_bloom import logging
+ from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
+ from transformers.models.gpt_neo.modeling_gpt_neo import GPTNeoForCausalLM
+ from transformers.models.gpt_neox.modeling_gpt_neox import GPTNeoXForCausalLM
+ from transformers.models.gptj.modeling_gptj import GPTJForCausalLM
+ from transformers.models.opt.modeling_opt import OPTForCausalLM
+-from transformers.models.opt.modeling_opt import _expand_mask as _expand_mask_opt
+-from transformers.models.opt.modeling_opt import _make_causal_mask as _make_causal_mask_opt
+ logger = logging.get_logger(__name__)
+ _SUPPORTED_GPT_MODELS = (GPT2LMHeadModel, GPTJForCausalLM, GPTNeoForCausalLM, GPTNeoXForCausalLM)
+ CAUSAL_GPT_TYPES = Union[GPT2LMHeadModel, GPTJForCausalLM, GPTNeoForCausalLM, GPTNeoXForCausalLM]
+ 
++def _expand_mask_bloom(mask: torch.Tensor, tgt_length: int) -> torch.BoolTensor:
++    """
++    Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
++    """
++    batch_size, src_length = mask.shape
++    tgt_length = tgt_length if tgt_length is not None else src_length
++
++    expanded_mask = ~(mask[:, None, None, :].to(torch.bool))
++    return expanded_mask.expand(batch_size, 1, tgt_length, src_length)
++
++def _make_causal_mask_bloom(
++    input_ids_shape: torch.Size, device: torch.device, past_key_values_length: int
++) -> torch.BoolTensor:
++    """
++    Make causal mask used for self-attention.
++    """
++    batch_size, target_length = input_ids_shape
++    mask = torch.empty((target_length, target_length + past_key_values_length), dtype=torch.bool, device=device)
++    # ONNX doesn't support `torch.Tensor.triu` properly, thus we use this workaround
++    seq_ids = torch.arange(target_length, device=device)
++    mask[:, past_key_values_length:] = seq_ids[:, None] < seq_ids[None, :]
++
++    if past_key_values_length > 0:
++        mask[:, :past_key_values_length] = False
++
++    expanded_mask = mask[None, None, :, :].expand(batch_size, 1, target_length, target_length + past_key_values_length)
++    return expanded_mask
++
++def _expand_mask_opt(mask: torch.Tensor, dtype: torch.dtype, tgt_len: Optional[int] = None):
++    """
++    Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
++    """
++    bsz, src_len = mask.size()
++    tgt_len = tgt_len if tgt_len is not None else src_len
++
++    expanded_mask = mask[:, None, None, :].expand(bsz, 1, tgt_len, src_len).to(dtype)
++
++    inverted_mask = 1.0 - expanded_mask
++
++    return inverted_mask.masked_fill(inverted_mask.to(torch.bool), torch.finfo(dtype).min)
++
++def _make_causal_mask_opt(
++    input_ids_shape: torch.Size, dtype: torch.dtype, device: torch.device, past_key_values_length: int = 0
++):
++    """
++    Make causal mask used for bi-directional self-attention.
++    """
++    bsz, tgt_len = input_ids_shape
++    mask = torch.full((tgt_len, tgt_len), torch.tensor(torch.finfo(dtype).min, device=device), device=device)
++    mask_cond = torch.arange(mask.size(-1), device=device)
++    mask.masked_fill_(mask_cond < (mask_cond + 1).view(mask.size(-1), 1), 0)
++    mask = mask.to(dtype)
++
++    if past_key_values_length > 0:
++        mask = torch.cat([torch.zeros(tgt_len, past_key_values_length, dtype=dtype, device=device), mask], dim=-1)
++    return mask[None, None, :, :].expand(bsz, 1, tgt_len, tgt_len + past_key_values_length)
++
+ def _convert_gpt_causal_lm_to_prefix_lm(model: CAUSAL_GPT_TYPES) -> CAUSAL_GPT_TYPES:
+     """Converts a GPT-style Causal LM to a Prefix LM.
+ 
