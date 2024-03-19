@@ -1154,10 +1154,15 @@ static std::
         Tensor self,
         const c10::List<c10::optional<at::Tensor>>& orig,
         bool check_range) {
-  checkIndexTensorTypes(orig);
+  checkIndexTensorTypes(orig, /*allow_int*/ true);
   // first expand BoolTensor (masks) or ByteTensor (masks) into 1 or more
   // LongTensors
   auto indices = expandTensors(self, orig);
+  for (auto& i : indices) {
+    if (i.defined() && i.dtype() == at::kInt) {
+      i = i.to(at::kLong);
+    }
+  }
   // next broadcast all index tensors together
   indices = expand_outplace(indices);
   // add missing null Tensors so that it matches self.dim()

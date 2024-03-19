@@ -60,13 +60,24 @@ static std::vector<Tensor> expandTensors(
 }
 
 static void checkIndexTensorTypes(
-    const c10::List<c10::optional<Tensor>>& indices) {
-  for (c10::optional<Tensor> tensor_opt : indices) {
-    if (tensor_opt.has_value() && tensor_opt->defined()) {
-      auto scalarType = tensor_opt->scalar_type();
-      if (scalarType != kLong && scalarType != kByte && scalarType != kBool) {
-        TORCH_CHECK(
-            "tensors used as indices must be long, byte or bool tensors");
+    IOptTensorListRef indices,
+    bool allow_int = false) {
+  for (const auto& tensor : indices) {
+    if (tensor.has_value() && tensor->defined()) {
+      auto scalarType = tensor->scalar_type();
+      if (allow_int) {
+        if (scalarType != kLong && scalarType != kByte && scalarType != kBool &&
+            scalarType != kInt) {
+          TORCH_CHECK_INDEX(
+              false,
+              "tensors used as indices must be long, byte or bool tensors");
+        }
+      } else {
+        if (scalarType != kLong && scalarType != kByte && scalarType != kBool) {
+          TORCH_CHECK_INDEX(
+              false,
+              "tensors used as indices must be long, byte or bool tensors");
+        }
       }
     }
   }
@@ -207,10 +218,11 @@ struct AdvancedIndex {
     }
 
     // Check if the indexed subspace contains a dim of size 0, but the
-    // replacement shape does not. This implies that an index is out of bounds,
-    // because there is no number that's a valid index for an empty tensor.
-    // Normally, out of bounds is handled in the indexing kernel, but this case
-    // fails earlier in restride_src with an unhelpful error message.
+    // replacement shape does not. This implies that an index is out of
+    // bounds, because there is no number that's a valid index for an empty
+    // tensor. Normally, out of bounds is handled in the indexing kernel, but
+    // this case fails earlier in restride_src with an unhelpful error
+    // message.
     if (std::find(indexed_sizes.begin(), indexed_sizes.end(), 0) !=
             indexed_sizes.end() &&
         std::find(replacement_shape.begin(), replacement_shape.end(), 0) ==
@@ -251,7 +263,7 @@ struct AdvancedIndex {
 static AdvancedIndex make_info(
     Tensor self,
     const c10::List<c10::optional<Tensor>>& orig) {
-  checkIndexTensorTypes(orig);
+  checkIndexTensorTypes(orig, /*allow_int*/ true);
   // LongTensors
   auto indices = expandTensors(self, orig);
   try {
@@ -273,6 +285,11 @@ static AdvancedIndex make_info(
   for (size_t i = 0; i < indices.size(); i++) {
     if (indices[i].defined() && indices[i].device() != self.device()) {
       indices[i] = indices[i].to(self.device());
+    }
+  }
+  for (auto& indice : indices) {
+    if (indice.defined() && indice.dtype() == at::kInt) {
+      indice = indice.to(at::kLong);
     }
   }
   return AdvancedIndex(self, indices);
