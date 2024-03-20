@@ -981,7 +981,7 @@ def QWenBlock_forward(
     if not self.distributed:
         hidden_states = self.mlp_linear_add(mlp_gate, residual)
     else:
-        hidden_states = self.mlp.down_proj(mlp_gate)
+        hidden_states = self.mlp.c_proj(mlp_gate)
         hidden_states = residual + hidden_states
 
     if use_cache:

@@ -339,7 +339,7 @@ if args.benchmark:
 
 # For now, Falcon, baichuan, baichuan2, and gptbigcode have accuracy issue with from_config with deepspeed meta device load.
 # TODO: we will change the scope once deepspeed providing the support
-if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode", "git"]:
+if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode", "git", "qwen"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
