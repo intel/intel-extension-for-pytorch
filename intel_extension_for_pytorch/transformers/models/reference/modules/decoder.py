@@ -902,7 +902,7 @@ def StableLMEpochDecoderLayer_forward(
     hidden_states = self.input_layernorm(hidden_states)
 
     # Self Attention
-    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+    self_attn_output, self_attn_weights, present_key_value = self.self_attn(
         hidden_states=hidden_states,
         attention_mask=attention_mask,
         position_ids=position_ids,
@@ -910,23 +910,34 @@ def StableLMEpochDecoderLayer_forward(
         output_attentions=output_attentions,
         use_cache=use_cache,
     )
-    if not self.distributed:
-        hidden_states = self.mha_linear_add(hidden_states, residual)
+    if hasattr(self, "use_parallel_residual") and self.use_parallel_residual:
+        self_attn_output = self.self_attn.o_proj(self_attn_output)
+        mlp_gate = self.linear_silu_mul(hidden_states)
+        if not self.distributed:
+            hidden_states = self.mlp_linear_add_add(
+                mlp_gate, residual, self_attn_output
+            )
+        else:
+            hidden_states = self.mlp.down_proj(mlp_gate)
+            hidden_states = residual + self_attn_output + hidden_states
     else:
-        hidden_states = self.self_attn.o_proj(hidden_states)
-        hidden_states = residual + hidden_states
+        if not self.distributed:
+            hidden_states = self.mha_linear_add(self_attn_output, residual)
+        else:
+            hidden_states = self.self_attn.o_proj(self_attn_output)
+            hidden_states = residual + hidden_states
 
-    # Fully Connected
-    residual = hidden_states
-    hidden_states = self.post_attention_layernorm(hidden_states)
+        # Fully Connected
+        residual = hidden_states
+        hidden_states = self.post_attention_layernorm(hidden_states)
 
-    mlp_gate = self.linear_silu_mul(hidden_states)
+        mlp_gate = self.linear_silu_mul(hidden_states)
 
-    if not self.distributed:
-        hidden_states = self.mlp_linear_add(mlp_gate, residual)
-    else:
-        hidden_states = self.mlp.down_proj(mlp_gate)
-        hidden_states = residual + hidden_states
+        if not self.distributed:
+            hidden_states = self.mlp_linear_add(mlp_gate, residual)
+        else:
+            hidden_states = self.mlp.down_proj(mlp_gate)
+            hidden_states = residual + hidden_states
 
     outputs = (hidden_states,)
 
@@ -1143,7 +1154,6 @@ class _IPEXDecoderLayerRef(nn.Module):
             "LlamaForCausalLM",
             "BaichuanForCausalLM",
             "MistralForCausalLM",
-            "StableLmForCausalLM",
         ]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
@@ -1155,7 +1165,24 @@ class _IPEXDecoderLayerRef(nn.Module):
             )
             del self.__dict__["_modules"]["mlp"].gate_proj
             del self.__dict__["_modules"]["mlp"].up_proj
-
+        elif self.model_backbone == "StableLmForCausalLM":
+            if not self.distributed:
+                if (
+                    hasattr(self, "use_parallel_residual")
+                    and self.use_parallel_residual
+                ):
+                    self.mlp_linear_add_add = _IPEXlinearAddAddRef(module.mlp.down_proj)
+                    del self.__dict__["_modules"]["mlp"].down_proj
+                else:
+                    self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
+                    self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
+                    del self.__dict__["_modules"]["self_attn"].o_proj
+                    del self.__dict__["_modules"]["mlp"].down_proj
+            self.linear_silu_mul = _IPEXlinearSiluMulRef(
+                module.mlp.gate_proj, module.mlp.up_proj
+            )
+            del self.__dict__["_modules"]["mlp"].gate_proj
+            del self.__dict__["_modules"]["mlp"].up_proj
         elif self.model_backbone == "OPTForCausalLM":
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)

@@ -1415,7 +1415,6 @@ def _StableLMEpochAttention_forward(
         query = self.q_proj(hidden_states)
         key = self.k_proj(hidden_states)
         value = self.v_proj(hidden_states)
-
     kv_seq_len = (
         q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
     )
@@ -1437,6 +1436,9 @@ def _StableLMEpochAttention_forward(
         query = query.view(bsz, q_len, self.num_heads, self.head_dim)
         key = key.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
         value = value.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+        if hasattr(self, "use_qk_layernorm") and self.use_qk_layernorm:
+            query = self.q_norm(query.transpose(1, 2)).transpose(1, 2)
+            key = self.k_norm(key.transpose(1, 2)).transpose(1, 2)
         key = self._IPEXROPE(
             key,
             position_ids,
@@ -1905,7 +1907,7 @@ class _IPEXAttentionRef(nn.Module):
                 hasattr(module, "q_proj")
                 and hasattr(module, "k_proj")
                 and hasattr(module, "v_proj")
-            ):
+            ) and not (hasattr(self, "use_qk_layernorm") and self.use_qk_layernorm):
 
                 def get_weight_shape(mod):
                     if hasattr(mod, "in_features") and hasattr(mod, "out_features"):
