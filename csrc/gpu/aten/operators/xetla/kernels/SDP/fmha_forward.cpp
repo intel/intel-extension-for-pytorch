@@ -1085,10 +1085,10 @@ void fmha_forward_kernel_policy(
       CALL_IMPL_FUNC(fmha_policy_128x128x128);
     } else if (head_size <= 256) {
       CALL_IMPL_FUNC(fmha_policy_128x128x256);
+    } else if (head_size <= 512) {
+      CALL_IMPL_FUNC(fmha_policy_64x128x512);
     } else {
-      std::cout << "No policy available for current head_size " << head_size
-                << "\n";
-      return;
+      assert(false);
     }
   } else {
     // roughly policy should match (num_queries)x(num_keys)x(head_size)
@@ -1124,10 +1124,10 @@ void fmha_forward_kernel_policy(
           CALL_IMPL_FUNC(fmha_policy_64x256x256);
         }
       }
+    } else if (head_size <= 512) {
+      CALL_IMPL_FUNC(fmha_policy_64x128x512);
     } else {
-      std::cout << "No policy available for current head_size " << head_size
-                << "\n";
-      return;
+      assert(false);
     }
   }
 }

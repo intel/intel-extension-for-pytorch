@@ -518,7 +518,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   char str__[100];
   sprintf(
       str__,
-      "xetla_fsdp_forward_atten_mask_alibi_strided(Nq=%d, Nkv=%d, M=%d, N=%d)",
+      "xetla_fsdp_forward_atten_mask_alibi_strided(Nq=%ld, Nkv=%ld, M=%ld, N=%ld)",
       num_heads_q,
       num_heads_k,
       M,

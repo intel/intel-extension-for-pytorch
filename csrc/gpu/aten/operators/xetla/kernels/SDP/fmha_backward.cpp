@@ -1203,10 +1203,10 @@ void fmha_backward_kernel_policy(
     CALL_IMPL_FUNC(fmha_bwd_policy_128x128x128);
   } else if (head_size <= 256) {
     CALL_IMPL_FUNC(fmha_bwd_policy_128x128x256);
+  } else if (head_size <= 512) {
+    CALL_IMPL_FUNC(fmha_bwd_policy_64x128x512);
   } else {
-    std::cout << "No policy available for current head_size " << head_size
-              << "\n";
-    return;
+    assert(false);
   }
 }
 

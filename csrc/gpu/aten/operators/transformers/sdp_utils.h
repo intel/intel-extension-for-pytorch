@@ -111,6 +111,13 @@ inline bool xetla_supported(sdp::sdp_params params) {
   return is_supported;
 }
 
+inline bool check_head_dim(sdp_params params) {
+  if (params.query.sym_size(-1) > 512) {
+    return false;
+  }
+  return true;
+}
+
 inline bool input_requires_grad(sdp_params params) {
   const bool any_inputs_require_grad = params.query.requires_grad() ||
       params.key.requires_grad() || params.value.requires_grad();
@@ -375,7 +382,8 @@ inline bool use_mem_efficient_attention(sdp::sdp_params params) {
       sdp::check_batch_size_and_num_heads,
       sdp::check_for_seq_len_0_nested_tensor,
       sdp::check_nonzero_sequence_lengths,
-      sdp::check_last_dim_stride_equals_1);
+      sdp::check_last_dim_stride_equals_1,
+      sdp::check_head_dim);
   for (auto& constraint : constraints) {
     if (!constraint(params)) {
       return false;
