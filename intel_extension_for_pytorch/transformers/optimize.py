@@ -131,7 +131,6 @@ def model_convert_reference(_model):
         FalconForCausalLM_forward,
         CodeGenForCausalLM_forward,
         BaichuanForCausalLM_forward,
-        BaichuanModel_forward,
         ChatGLMModel_forward,
         GLMTransformer_forward,
         ChatGLMForConditionalGeneration_forward,
@@ -480,12 +479,16 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-        if not distributed:
-            convert_function(_model.model, "forward", BaichuanModel_forward)
-            _model.model.future_mask = _gen_baichuan_alibi_mask(
-                _model.model.layers[0].self_attn.num_heads,
-                _model.model.layers[0].self_attn.max_position_embeddings,
+        if hasattr(_model.model, "first_run"):  # baichuan 13b
+            _model.model.register_buffer(
+                "future_mask",
+                _gen_baichuan_alibi_mask(
+                    _model.model.n_head,
+                    _model.model.max_cache_pos,
+                ).to(_model.config.torch_dtype),
+                persistent=False,
             )
+            _model.model.first_run = False
     elif _model.config.architectures[0] == "ChatGLMModel":
         convert_function(_model, "forward", ChatGLMForConditionalGeneration_forward)
         convert_function(_model.transformer, "forward", ChatGLMModel_forward)
