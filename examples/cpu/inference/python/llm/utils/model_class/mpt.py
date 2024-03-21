@@ -1,8 +1,5 @@
 from .llm import LLMConfig, EXAMPLE_INPUTS_MODE
 from transformers.models.mpt.modeling_mpt import MptForCausalLM
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-import intel_extension_for_pytorch as ipex
 
 class MPTConfig(LLMConfig):
     def __init__(self, model_id):
@@ -16,32 +13,7 @@ class MPTConfig(LLMConfig):
         self.use_ipex_autotune = True
 
     def get_user_model(self, config, benchmark):
-        if benchmark:
-            try:
-                with ipex.OnDevice(dtype=torch.float, device="meta"):
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        self.model_id,
-                        torch_dtype=torch.float,
-                        config=config,
-                        low_cpu_mem_usage=True,
-                        trust_remote_code=True,
-                    )
-            except (RuntimeError, AttributeError):
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    self.model_id,
-                    torch_dtype=torch.float,
-                    config=config,
-                    low_cpu_mem_usage=True,
-                    trust_remote_code=True,
-                )
-        else:
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_id,
-                torch_dtype=torch.float,
-                config=config,
-                low_cpu_mem_usage=True,
-                trust_remote_code=True,
-            )
+        super().get_user_model(config, benchmark)
         if not isinstance(self.model, MptForCausalLM) and not benchmark:
             print(
                 "You're using a model from remote hub. To successfully save/load quantized model, \
@@ -49,6 +21,3 @@ class MPTConfig(LLMConfig):
             )
             exit(0)
         return self.model
-
-    def get_tokenizer(self):
-        return AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=True)

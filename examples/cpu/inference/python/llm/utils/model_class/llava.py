@@ -1,12 +1,8 @@
-import torch
-
 from .llm import LLMConfig, EXAMPLE_INPUTS_MODE
 try:
     from llava.model.builder import load_pretrained_model
 except ImportError:
     pass
-
-import intel_extension_for_pytorch as ipex
 
 class LlavaConfig(LLMConfig):
     def __init__(self, model_id):

@@ -1,7 +1,4 @@
 from .llm import LLMConfig, EXAMPLE_INPUTS_MODE
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-import intel_extension_for_pytorch as ipex
 
 class StableLMConfig(LLMConfig):
     def __init__(self, model_id):

@@ -47,15 +47,6 @@ class OnDevice(object):
                     "Meta tensor support is not available, please upgrade to torch 1.10+"
                 )
 
-        def _rebuild_tensor(storage, storage_offset, size, stride):
-            # first construct a tensor with the correct dtype/device
-            t = torch.tensor(
-                [], dtype=storage.dtype, device=storage._untyped_storage.device
-            )
-            return t.set_(storage._untyped_storage, storage_offset, size, stride)
-
-        torch._utils._rebuild_tensor = _rebuild_tensor
-
     def fp_tensor_constructor(
         self, fn: Callable, target_fp_dtype: torch.dtype
     ) -> Callable:
