@@ -396,3 +396,27 @@ class _IPEXlinearSiluMulCPU(nn.Module):
             )
         else:  # fallback path
             return nn.functional.silu(self.linear_s(x)) * self.linear_m(x)
+
+
+class _IPEXlinearSiluAndMulCPU(nn.Module):
+    def __init__(self, module, tpp=False, woq=False):
+        super().__init__()
+        self.tpp = tpp
+        self.woq = woq
+        self.linear = module
+        self.dtype = module.weight.dtype if self.tpp else None
+
+    def forward(self, x, y):
+        if self.tpp and not self.linear.tpp_fallback:
+            x = x.to(self.dtype).contiguous()
+            x1 = torch.ops.torch_ipex.tpp_linear_silu(
+                x,
+                self.linear.weight.detach(),
+                self.linear.bias.detach()
+                if self.linear.bias is not None
+                else x.new_empty(0),
+                self.linear.out_features,
+            )
+            return x1 * y
+        else:  # fallback path
+            return nn.functional.silu(self.linear(x)) * y

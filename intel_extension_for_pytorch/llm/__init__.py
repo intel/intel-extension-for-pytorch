@@ -1,4 +1,11 @@
+import warnings
 from .frontend import optimize
+from . import modules
+
+try:
+    from . import generation
+except ImportError as e:
+    warnings.warn(f"failed to use huggingface generation fuctions due to: {e}.")
 
 try:
     from .utils import (

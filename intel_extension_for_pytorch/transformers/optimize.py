@@ -894,7 +894,7 @@ def model_convert_lowering(
 
     if device == "cpu":
         from .models.cpu.modules.attentions import _IPEXAttentionCPU
-        from .models.cpu.fusions.mha_fusion import _IPEXRMSNorm
+        from .models.cpu.fusions.mha_fusion import _IPEXRMSNormCPU
         from .models.cpu.modules.decoder import _IPEXDecoderLayerCPU
 
         _disable_tpp()
@@ -949,7 +949,7 @@ def model_convert_lowering(
                 lowering_class_cpu(
                     _model,
                     supported_class,
-                    _IPEXRMSNorm,
+                    _IPEXRMSNormCPU,
                     _model.config,
                     tpp=False,
                     woq=False,
