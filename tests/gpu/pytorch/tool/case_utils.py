@@ -13,10 +13,12 @@ def match_cases(data, pattern_str, *select_ids):
 
 def match_name(name, name_list):
     for should_skip in name_list:
-        if re.search(should_skip, name, re.M):
+        if name in should_skip:
             return True
-        if re.search(name, should_skip, re.M):
-            return True
+        #if re.search(should_skip, name, re.M):
+        #    return True
+        #if re.search(name, should_skip, re.M):
+        #    return True
     return False
 
 def match_dtype(name, dtypes):

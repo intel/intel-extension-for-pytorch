@@ -50,13 +50,30 @@
   - test_view_ops
   - test_vmap
 - CI_TESTS:
+  - nn/test_dropout
+  - nn/test_embedding
+  - nn/test_pooling
   - test_autograd
+  - test_dlpack
+  - test_foreach
+  - test_indexing
+  - test_linalg
+  - test_masked
   - test_modules
+  - test_nestedtensor
   - test_nn
   - test_ops
   - test_ops_gradients
   - test_ops_jit
+  - test_reductions
+  - test_scatter_gather_ops
+  - test_segment_reductions
+  - test_serialization
+  - test_shape_ops
+  - test_sort_and_select
+  - test_tensor_creation_ops
   - test_torch
+  - test_type_promotion
 - CORE_TESTS:
   - test_autograd
   - test_modules
