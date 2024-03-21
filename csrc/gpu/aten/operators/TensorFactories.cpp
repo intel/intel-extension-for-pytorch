@@ -97,8 +97,8 @@ Tensor empty_quantized(
       qtensor.qscheme() == kPerChannelAffineFloatQParams) {
     output = at::_empty_per_channel_affine_quantized(
         size,
-        qtensor.q_per_channel_scales(),
-        qtensor.q_per_channel_zero_points(),
+        qtensor.q_per_channel_scales().to(options.device()),
+        qtensor.q_per_channel_zero_points().to(options.device()),
         qtensor.q_per_channel_axis(),
         options);
   } else {

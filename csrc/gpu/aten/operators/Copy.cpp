@@ -436,9 +436,24 @@ Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
     auto mfmt = self.is_contiguous(at::MemoryFormat::ChannelsLast)
         ? at::MemoryFormat::ChannelsLast
         : at::MemoryFormat::Contiguous;
-    self = _empty_affine_quantized(
-        self.sizes(), self.options(), src.q_scale(), src.q_zero_point(), mfmt);
-    set_quantizer_(self, src.quantizer());
+    if (src.qscheme() == kPerTensorAffine) {
+      self = _empty_affine_quantized(
+          self.sizes(),
+          self.options(),
+          src.q_scale(),
+          src.q_zero_point(),
+          mfmt);
+      set_quantizer_(self, src.quantizer());
+    } else {
+      self = _empty_per_channel_affine_quantized(
+          self.sizes(),
+          src.q_per_channel_scales().to(self.device()),
+          src.q_per_channel_zero_points().to(self.device()),
+          src.q_per_channel_axis(),
+          self.options(),
+          mfmt);
+      set_quantizer_(self, src.quantizer());
+    }
   }
 
   BUILD_TENSOR_ITER(self, src, iter);

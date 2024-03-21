@@ -55,7 +55,7 @@ class LinearBias(torch.nn.Module):
         return x
 
 
-def trace_int8_model(model, device, test_input):
+def trace_int8_model(model, device, test_input, per_channel=False):
     model = model.to(device)
     modelJit = torch.jit.script(model)
     # modelJit = torch.jit.trace(model, test_input.to("cpu"))
@@ -65,11 +65,16 @@ def trace_int8_model(model, device, test_input):
     print("finish jit scripting...")
 
     print("start ", device, " calibration ...")
+    if per_channel:
+        weight_qconfig = torch.quantization.default_per_channel_weight_observer
+    else:
+        weight_qconfig = torch.quantization.default_weight_observer
+
     qconfig_u8 = torch.quantization.QConfig(
         activation=torch.quantization.observer.MinMaxObserver.with_args(
             qscheme=torch.per_tensor_symmetric, reduce_range=False, dtype=torch.quint8
         ),
-        weight=torch.quantization.default_weight_observer,
+        weight=weight_qconfig,
     )
 
     modelJit = prepare_jit(modelJit, {"": qconfig_u8}, True)
@@ -81,6 +86,7 @@ def trace_int8_model(model, device, test_input):
             calib_input = test_input
             modelJit(calib_input)
     print("start ", device, " convert...")
+    modelJit.to(device)
     modelJit = convert_jit(modelJit, True)
     # inference
     print("start ", device, " inference ...")
@@ -95,36 +101,40 @@ class TestTorchMethod(TestCase):
     def test_composite(self, dtype=torch.float):
         for device in ["xpu", "cpu"]:
             for model in [LinearBias(), ConvBias()]:
-                if device == "xpu":
-                    torch.backends.quantized.engine = "qxpu"
-                    # torch.xpu.set_quant_save_backend("xpu")
-                else:
-                    torch.backends.quantized.engine = "x86"
-                if isinstance(model, LinearBias):
-                    test_input = torch.randn([4, 128])
-                else:
-                    test_input = torch.rand([1, 3, 8, 8])
+                for per_channel in [False, True]:
+                    if device == "xpu":
+                        torch.backends.quantized.engine = "qxpu"
+                        # torch.xpu.set_quant_save_backend("xpu")
+                    else:
+                        torch.backends.quantized.engine = "x86"
+                    if isinstance(model, LinearBias):
+                        test_input = torch.randn([4, 128])
+                    else:
+                        test_input = torch.rand([1, 3, 8, 8])
 
-                modelJit = copy.deepcopy(model)
-                modelJit, xpu_res = trace_int8_model(modelJit, device, test_input)
-                print("===== start saving model =====")
-                torch.jit.save(modelJit, "int8_conv_sigmoid.pt")
-                # print(modelJit.inlined_graph)
-                print("===== start loading model =====")
-                modelLoad = torch.jit.load("int8_conv_sigmoid.pt")
-                print("===== end loading model =====")
-                # print(modelLoad.inlined_graph)
-                # with torch.inference_mode():
-                print("start test inference")
-                # modelJit = modelJit.to("cpu")
-                # modelLoad = modelLoad.to("cpu")
-                with torch.no_grad():
-                    xpu_res = modelJit(test_input.to(device))
-                    load_res = modelLoad(test_input.to(device))
-                print("end test inference")
-                print(xpu_res.dtype)
-                print(load_res.dtype)
-                self.assertEqual(load_res.cpu(), xpu_res.cpu())
+                    modelJit = copy.deepcopy(model)
+                    modelJit, xpu_res = trace_int8_model(
+                        modelJit, device, test_input, per_channel
+                    )
+                    print("===== start saving model =====")
+                    print("start jit save")
+                    torch.jit.save(modelJit, "int8_conv_sigmoid.pt")
+                    # print(modelJit.inlined_graph)
+                    print("===== start loading model =====")
+                    modelLoad = torch.jit.load("int8_conv_sigmoid.pt")
+                    print("===== end loading model =====")
+                    # print(modelLoad.inlined_graph)
+                    # with torch.inference_mode():
+                    print("start test inference")
+                    # modelJit = modelJit.to("cpu")
+                    # modelLoad = modelLoad.to("cpu")
+                    with torch.no_grad():
+                        xpu_res = modelJit(test_input.to(device))
+                        load_res = modelLoad(test_input.to(device))
+                    print("end test inference")
+                    print(xpu_res.dtype)
+                    print(load_res.dtype)
+                    self.assertEqual(load_res.cpu(), xpu_res.cpu())
         torch.backends.quantized.engine = "x86"  # set back to default engine
 
     def test_imperative(self):
