@@ -1,7 +1,7 @@
 From 4400b4896a315a7c9009b141b6e8f9f737cfeb7e Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 12 Oct 2023 23:40:03 +0800
-Subject: [PATCH 11/26] support channel last for xpu conv in inductor layout
+Subject: [PATCH 11/29] support channel last for xpu conv in inductor layout
  opt path (#174)
 
 ---

@@ -1,7 +1,7 @@
 From 407a10305a5c104edc1e5bdd22cf7aa3544c7894 Mon Sep 17 00:00:00 2001
 From: zhuhong61 <95205772+zhuhong61@users.noreply.github.com>
 Date: Thu, 21 Sep 2023 13:14:52 +0800
-Subject: [PATCH 06/26] C10d: Add xpu as the supported device in device backend
+Subject: [PATCH 06/29] C10d: Add xpu as the supported device in device backend
  map (#166)
 
 ---

@@ -1,7 +1,7 @@
 From f24e7798951208a4409cef909ff9615065577329 Mon Sep 17 00:00:00 2001
 From: Lei Zhenyuan <zhenyuan.lei@intel.com>
 Date: Fri, 1 Mar 2024 12:33:22 +0800
-Subject: [PATCH 26/26] expose nested header to wheel (#206)
+Subject: [PATCH 26/29] expose nested header to wheel (#206)
 
 ---
  setup.py | 1 +

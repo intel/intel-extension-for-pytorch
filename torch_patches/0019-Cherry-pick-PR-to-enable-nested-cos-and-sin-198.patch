@@ -1,7 +1,7 @@
 From b5c6f139f0f7b3972d956e7246a88facee18e842 Mon Sep 17 00:00:00 2001
 From: zejun <zejun.chen@intel.com>
 Date: Wed, 29 Nov 2023 15:10:51 +0800
-Subject: [PATCH 19/26] Cherry pick PR to enable nested cos and sin (#198)
+Subject: [PATCH 19/29] Cherry pick PR to enable nested cos and sin (#198)
 
 Signed-off-by: Chen, Zejun <zejun.chen@intel.com>
 ---

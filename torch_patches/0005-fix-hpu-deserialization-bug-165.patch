@@ -1,7 +1,7 @@
 From 414928de5c0e00ea4d21fbef5297ddd90c887cd7 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Tue, 19 Sep 2023 09:39:36 +0800
-Subject: [PATCH 05/26] fix hpu deserialization bug (#165)
+Subject: [PATCH 05/29] fix hpu deserialization bug (#165)
 
 ---
  torch/serialization.py | 4 ++--

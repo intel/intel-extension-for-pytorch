@@ -1,7 +1,7 @@
 From 58392a58c207ab03600c7abd6e7b3baa21262c3a Mon Sep 17 00:00:00 2001
 From: "Wang, Chuanqi" <chuanqi.wang@intel.com>
 Date: Thu, 12 Oct 2023 14:29:35 +0800
-Subject: [PATCH 10/26] Enable xpu backend in torchdynamo benchmarks (#171)
+Subject: [PATCH 10/29] Enable xpu backend in torchdynamo benchmarks (#171)
 
 ---
  benchmarks/dynamo/common.py      | 29 ++++++++++++++++++++++-------
