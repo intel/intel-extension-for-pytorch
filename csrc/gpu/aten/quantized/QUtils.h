@@ -18,7 +18,7 @@
 #include <tensor/Context.h>
 #include <utils/DPCPP.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 // Note: [Opaque u8 tensor]
@@ -69,7 +69,7 @@ static inline at::Tensor u8tos8(const at::Tensor& u8) {
       0,
       u8.suggest_memory_format());
 
-  auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
+  auto& dpcpp_queue = torch_ipex::xpu::dpcpp::dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
     uint8_t* u8_ptr = (uint8_t*)u8.data_ptr();
     int8_t* s8_ptr = (int8_t*)s8.data_ptr();
@@ -181,11 +181,11 @@ struct fetch_cached_quantizer_base_zp_functor {
 
 static inline XPUQuantizerBase<float, int32_t, false>
 fetch_cached_quantizer_base(float dnn_sc, int32_t dnn_zp) {
-  using key_t = xpu::dpcpp::lru_key_t;
+  using key_t = torch_ipex::xpu::dpcpp::lru_key_t;
   key_t key_sc_zp;
-  xpu::dpcpp::create_key(key_sc_zp, dnn_sc, dnn_zp);
+  torch_ipex::xpu::dpcpp::create_key(key_sc_zp, dnn_sc, dnn_zp);
 
-  bool sc_zp_key_found = xpu::dpcpp::find_key<
+  bool sc_zp_key_found = torch_ipex::xpu::dpcpp::find_key<
       XPUQuantizerBase<float, int32_t, false>,
       key_t,
       /*capacity*/ 256>(key_sc_zp);
@@ -194,14 +194,14 @@ fetch_cached_quantizer_base(float dnn_sc, int32_t dnn_zp) {
   float* sc_ptr;
   int32_t* zp_ptr;
   if (sc_zp_key_found) {
-    quant_base = xpu::dpcpp::fetch_m<
+    quant_base = torch_ipex::xpu::dpcpp::fetch_m<
         XPUQuantizerBase<float, int32_t, false>,
         key_t,
         /*capacity*/ 256>(key_sc_zp);
     sc_ptr = quant_base.scale_ptr();
     zp_ptr = quant_base.zero_point_ptr();
   } else {
-    quant_base = xpu::dpcpp::create_and_fetch_m<
+    quant_base = torch_ipex::xpu::dpcpp::create_and_fetch_m<
         XPUQuantizerBase<float, int32_t, false>,
         key_t,
         /*capacity*/ 256>(key_sc_zp, /*size*/ 1, dpcppGetCurrentQueue());
@@ -222,7 +222,7 @@ static inline std::pair<float*, int32_t*> q_get_sc_zp_gpu_ptr(const Tensor qx) {
   return {quant_base.scale_ptr(), quant_base.zero_point_ptr()};
 }
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 template <int kSpatialDim>

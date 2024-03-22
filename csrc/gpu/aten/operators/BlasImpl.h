@@ -14,8 +14,8 @@
 #include <c10/util/typeid.h>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -736,7 +736,7 @@ static Tensor& matmul_fusion_variants(
     is_fused = true;
     Tensor result = output.defined() ? output.view({1, 1})
                                      : at::empty({1, 1}, tensor1.options());
-    xpu::oneDNN::matmul(
+    torch_ipex::xpu::oneDNN::matmul(
         result,
         tensor1.view({1, tensor1.size(0)}),
         tensor2.view({tensor2.size(0), 1}),
@@ -763,7 +763,7 @@ static Tensor& matmul_fusion_variants(
 
     is_fused = get_onednn_matmul_binary_attr(
         result, attr, dim_tensor1, dim_tensor2, output_shape);
-    xpu::oneDNN::matmul(result, tensor1, t2, bias, trans, attr);
+    torch_ipex::xpu::oneDNN::matmul(result, tensor1, t2, bias, trans, attr);
     if (output.defined() && !output.is_alias_of(result)) {
       output.copy_(result);
     } else {
@@ -785,7 +785,7 @@ static Tensor& matmul_fusion_variants(
 
     is_fused = get_onednn_matmul_binary_attr(
         result, attr, dim_tensor1, dim_tensor2, output_shape);
-    xpu::oneDNN::matmul(result, t1, tensor2, bias, trans, attr);
+    torch_ipex::xpu::oneDNN::matmul(result, t1, tensor2, bias, trans, attr);
     if (output.defined() && !output.is_alias_of(result)) {
       output.copy_(result);
     } else {
@@ -805,7 +805,8 @@ static Tensor& matmul_fusion_variants(
 
     is_fused = get_onednn_matmul_binary_attr(
         result, attr, dim_tensor1, dim_tensor2, output_shape);
-    xpu::oneDNN::matmul(result, tensor1, tensor2, bias, trans, attr);
+    torch_ipex::xpu::oneDNN::matmul(
+        result, tensor1, tensor2, bias, trans, attr);
     if (output.defined() && !output.is_alias_of(result)) {
       output.copy_(result);
     } else {
@@ -846,7 +847,7 @@ static Tensor& matmul_fusion_variants(
         t2_is_matrix,
         should_fold_tensor1,
         should_fold_tensor2);
-    xpu::oneDNN::matmul(result, t1, t2, bias, trans, attr);
+    torch_ipex::xpu::oneDNN::matmul(result, t1, t2, bias, trans, attr);
     if (output.defined() && !output.is_alias_of(result)) {
       output.copy_(result);
     } else {
@@ -899,7 +900,7 @@ static Tensor& matmul_fusion_variants(
         t2_is_matrix,
         should_fold_tensor1,
         should_fold_tensor2);
-    xpu::oneDNN::matmul(result, t1, t2, bias, trans, attr);
+    torch_ipex::xpu::oneDNN::matmul(result, t1, t2, bias, trans, attr);
     if (output.defined() && !output.is_alias_of(result)) {
       output.copy_(result);
     } else {
@@ -961,7 +962,7 @@ static Tensor& matmul_fusion_variants(
 
     is_fused = get_onednn_matmul_binary_attr(
         result, attr, dim_tensor1, dim_tensor2, output_shape);
-    xpu::oneDNN::matmul(
+    torch_ipex::xpu::oneDNN::matmul(
         result, tensor1_expanded, tensor2_expanded, bias, trans, attr);
     if (output.defined() && !output.is_alias_of(result)) {
       output.copy_(result);

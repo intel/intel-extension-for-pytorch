@@ -12,9 +12,9 @@
 #include <vector>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::native;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -533,8 +533,9 @@ void max_pool3d_with_indices_out_template(
       "max_pool3d_with_indices_out_template()",
       /*check_input_size=*/true);
 
-  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng ||
+  auto real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng ||
       input.is_quantized()) { // oneDNN path
     Tensor input_;
     if (input.ndimension() == 4) {
@@ -560,9 +561,9 @@ void max_pool3d_with_indices_out_template(
     std::vector<int64_t> padding_vec = {padD, padH, padW};
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
-    // is used in ::xpu::oneDNN::pooling
+    // is used in torch_ipex::xpu::oneDNN::pooling
     std::vector<int64_t> dilation_vec = {0, 0, 0};
-    ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
+    torch_ipex::xpu::oneDNN::pooling<alg::pooling_max>(
         output,
         indices,
         input_,
@@ -797,13 +798,13 @@ void max_pool3d_with_indices_backward_out_template(
       "max_pool3d_with_indices_backward_out_template()");
 
   auto compute_eng = Settings::I().get_compute_eng();
-  if (IPEX_ANY(xpu::oneDNN::is_onednn_layout, gradOutput, input) ||
-      compute_eng == xpu::COMPUTE_ENG::ONEDNN) { // oneDNN path
+  if (IPEX_ANY(torch_ipex::xpu::oneDNN::is_onednn_layout, gradOutput, input) ||
+      compute_eng == torch_ipex::xpu::COMPUTE_ENG::ONEDNN) { // oneDNN path
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
-    // is used in ::xpu::oneDNN::pooling
+    // is used in torch_ipex::xpu::oneDNN::pooling
     std::vector<int64_t> dilation_vec = {0, 0, 0};
-    ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
+    torch_ipex::xpu::oneDNN::pooling_backward<alg::pooling_max>(
         gradInput,
         gradOutput,
         input,

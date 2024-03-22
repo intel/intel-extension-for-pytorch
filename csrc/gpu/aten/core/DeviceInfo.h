@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 enum device_type {
@@ -36,4 +36,4 @@ struct DeviceInfo {
 };
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

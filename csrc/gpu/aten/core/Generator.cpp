@@ -1,7 +1,7 @@
 #include <core/Device.h>
 #include <core/Generator.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -171,4 +171,4 @@ c10::intrusive_ptr<c10::TensorImpl> DPCPPGeneratorImpl::get_state() const {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

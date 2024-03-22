@@ -26,7 +26,7 @@
 #include <c10/core/Stream.h>
 #include "Macros.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 
 /// Get a sycl queue from a c10 stream. Generate a dpcpp stream from c10 stream,
 /// and get dpcpp queue.
@@ -34,4 +34,4 @@ namespace xpu {
 /// @returns: dpcpp queue.
 IPEX_API sycl::queue& get_queue_from_stream(c10::Stream stream);
 
-} // namespace xpu
+} // namespace torch_ipex::xpu

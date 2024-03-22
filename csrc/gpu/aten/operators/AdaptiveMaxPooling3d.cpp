@@ -10,8 +10,8 @@
 #include <vector>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -101,7 +101,7 @@ void adaptive_max_pool3d_out_template(
 
   // per oneDNN definition, no dilation means dilation ratio is 0
   std::vector<int64_t> dilation_vec = {0, 0, 0};
-  ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
+  torch_ipex::xpu::oneDNN::pooling<alg::pooling_max>(
       output,
       indices,
       input_,
@@ -158,7 +158,7 @@ Tensor& adaptive_max_pool3d_backward_out_template(
 
   // per oneDNN definition, no dilation means dilation ratio is 0
   std::vector<int64_t> dilation_vec = {0, 0, 0};
-  ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
+  torch_ipex::xpu::oneDNN::pooling_backward<alg::pooling_max>(
       gradInput,
       gradOutput,
       input,

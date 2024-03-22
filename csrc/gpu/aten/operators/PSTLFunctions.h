@@ -11,7 +11,7 @@
 #include "comm/SimpleReduce.h"
 
 using namespace at::AtenIpexTypeXPU;
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace pstl {
 
 template <int scan_type, class InputIt, class OutputIt, class T>
@@ -1501,7 +1501,7 @@ void merge_sort(
   }
 }
 
-// xpu::pstl::sort for non-batched tensor sort case.
+// torch_ipex::xpu::pstl::sort for non-batched tensor sort case.
 // we have two sort API: one for user defined compare function; one for
 // descending/ascending
 //
@@ -1565,4 +1565,4 @@ void sort(
 }
 
 } // namespace pstl
-} // namespace xpu
+} // namespace torch_ipex::xpu

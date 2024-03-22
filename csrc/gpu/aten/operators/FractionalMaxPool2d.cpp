@@ -7,7 +7,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

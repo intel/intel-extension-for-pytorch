@@ -12,7 +12,7 @@
 
 // A fixed-size array type usable from DPCPP kernels.
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 template <typename T, int size>
@@ -38,4 +38,4 @@ struct alignas(16) Array {
   }
 };
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

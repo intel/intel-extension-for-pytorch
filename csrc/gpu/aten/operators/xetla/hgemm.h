@@ -2,7 +2,7 @@
 #include <sycl/sycl.hpp>
 #include "xetla_kernel_api.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 enum class GemmStatus { kSuccess, kError };
 
@@ -228,4 +228,4 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv_group_bias(
     const int head_dim,
     const bool is_b_row_major);
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

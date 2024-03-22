@@ -9,8 +9,8 @@
 using namespace dnnl;
 using namespace at::native;
 using namespace at::AtenIpexTypeXPU;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -1504,7 +1504,7 @@ Tensor& _upsample_nearest_exact3d_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& output) {
-  xpu::oneDNN::resample(
+  torch_ipex::xpu::oneDNN::resample(
       input,
       output,
       output_size,
@@ -1540,19 +1540,19 @@ Tensor& upsample_nearest3d_out(
   bool onednn_path = (output_depth % input_depth == 0) &&
       (output_height % input_height == 0) && (output_width % input_width == 0);
 
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
     // Always use sycl implementation due to onednn path has acc issue
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   }
 
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
-    xpu::oneDNN::resample(
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    torch_ipex::xpu::oneDNN::resample(
         input,
         output,
         output_size,
@@ -1601,7 +1601,7 @@ Tensor _upsample_nearest_exact3d(
   auto scale_d = get_scale_value(scale_factors, 0);
   auto scale_h = get_scale_value(scale_factors, 1);
   auto scale_w = get_scale_value(scale_factors, 2);
-  xpu::oneDNN::resample(
+  torch_ipex::xpu::oneDNN::resample(
       input,
       output,
       osize,
@@ -1620,7 +1620,7 @@ Tensor& _upsample_nearest_exact3d_backward_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& grad_input) {
-  xpu::oneDNN::resample_backward(
+  torch_ipex::xpu::oneDNN::resample_backward(
       grad_input,
       grad_output,
       input_size,
@@ -1652,19 +1652,19 @@ Tensor& upsample_nearest3d_backward_out(
        (output_height % input_height == 0) &&
        (output_width % input_width == 0));
 
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
     // Always use sycl implementation due to onednn path has acc issue
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   }
 
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
-    xpu::oneDNN::resample_backward(
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    torch_ipex::xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
         input_size,
@@ -1694,7 +1694,7 @@ Tensor& _upsample_nearest_exact2d_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& output) {
-  xpu::oneDNN::resample(
+  torch_ipex::xpu::oneDNN::resample(
       input,
       output,
       output_size,
@@ -1718,19 +1718,19 @@ Tensor& upsample_nearest2d_out(
   bool onednn_path =
       (output_height % input_height == 0) && (output_width % input_width == 0);
 
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
     // Always use sycl implementation due to onednn path has acc issue
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   }
 
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
-    xpu::oneDNN::resample(
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    torch_ipex::xpu::oneDNN::resample(
         input,
         output,
         output_size,
@@ -1752,7 +1752,7 @@ Tensor& _upsample_nearest_exact2d_backward_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& grad_input) {
-  xpu::oneDNN::resample_backward(
+  torch_ipex::xpu::oneDNN::resample_backward(
       grad_input,
       grad_output,
       input_size,
@@ -1779,18 +1779,18 @@ Tensor& upsample_nearest2d_backward_out(
   bool onednn_path =
       (output_height % input_height == 0) && (output_width % input_width == 0);
 
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
     // Always use sycl implementation due to onednn path has acc issue
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   }
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
-    xpu::oneDNN::resample_backward(
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    torch_ipex::xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
         input_size,
@@ -1846,21 +1846,21 @@ Tensor upsample_nearest1d(
   // non-integral scale cases
   bool onednn_path = (output_width % input_width == 0);
 
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
     // Always use sycl implementation due to onednn path has acc issue
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   }
 
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     auto output = at::empty(
         {nbatch, channels, output_width},
         input.options(),
         suggest_memory_format_dpcpp(input));
 
-    xpu::oneDNN::resample(
+    torch_ipex::xpu::oneDNN::resample(
         input,
         output,
         output_size,
@@ -1893,19 +1893,19 @@ Tensor& upsample_nearest1d_out(
 
   bool onednn_path = (output_width % input_width == 0);
 
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
     // Always use sycl implementation due to onednn path has acc issue
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   }
 
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
-    xpu::oneDNN::resample(
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    torch_ipex::xpu::oneDNN::resample(
         input,
         output,
         output_size,
@@ -1925,7 +1925,7 @@ Tensor& _upsample_nearest_exact1d_backward_out(
     IntArrayRef input_size,
     c10::optional<double> scales,
     Tensor& grad_input) {
-  xpu::oneDNN::resample_backward(
+  torch_ipex::xpu::oneDNN::resample_backward(
       grad_input,
       grad_output,
       input_size,
@@ -1945,18 +1945,18 @@ Tensor& upsample_nearest1d_backward_out(
   int64_t input_width = input_size[2];
 
   bool onednn_path = (output_width % input_width == 0);
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
     // Always use sycl implementation due to onednn path has acc issue
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   }
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
-    xpu::oneDNN::resample_backward(
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    torch_ipex::xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
         input_size,
@@ -1981,7 +1981,7 @@ Tensor& _upsample_nearest_exact1d_out(
     IntArrayRef output_size,
     c10::optional<double> scales,
     Tensor& output) {
-  xpu::oneDNN::resample(
+  torch_ipex::xpu::oneDNN::resample(
       input,
       output,
       output_size,
@@ -2131,23 +2131,23 @@ Tensor upsample_nearest2d(
   int input_width = input.size(3);
   bool onednn_path =
       (output_height % input_height == 0) && (output_width % input_width == 0);
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
     // Always use sycl implementation due to onednn path has acc issue
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   }
   // temp fix: restore onednn path for integral scale cases
   // TODO: optimize perf for sycl implementation for both integral and
   // non-integral scale cases
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     Tensor output = at::_empty_affine_quantized(
         input.sizes(),
         input.options().dtype(toQIntType(input.scalar_type())),
         input.q_scale(),
         input.q_zero_point());
-    xpu::oneDNN::resample(
+    torch_ipex::xpu::oneDNN::resample(
         input,
         output,
         output_size,

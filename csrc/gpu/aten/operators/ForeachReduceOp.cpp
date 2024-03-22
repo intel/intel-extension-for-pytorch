@@ -179,7 +179,7 @@ std::vector<Tensor> _foreach_norm(TensorList tensors, const Scalar& ord) {
   const int ntensors = tensors.size();
   int max_chunks_per_tensor = -1;
 
-  int64_t wg_size = xpu::dpcpp::dpcppMaxWorkGroupSize();
+  int64_t wg_size = torch_ipex::xpu::dpcpp::dpcppMaxWorkGroupSize();
   int64_t kChunkSize = kElementPerThread * wg_size;
 
   for (int t = 0; t < ntensors; t++) {

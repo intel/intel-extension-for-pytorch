@@ -3,7 +3,7 @@
 
 #include "forward.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 XETLA_KERNEL_API cgfs_t gru_forward(
     void* layer_ptr,
@@ -76,5 +76,5 @@ XETLA_KERNEL_API cgfs_t gru_forward(
   }
 }
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla
 #endif

@@ -3,7 +3,7 @@
 #include <core/Stream.h>
 #include "Allocator.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace impl {
 
@@ -126,7 +126,7 @@ Stream DPCPPGuardImpl::getStreamFromGlobalPool(
       is_high_priority == false, "xpu doesn't support prioritized steam");
 
   DPCPPStream dpcpp_stream =
-      xpu::dpcpp::getStreamFromPool(false, device.index());
+      torch_ipex::xpu::dpcpp::getStreamFromPool(false, device.index());
   return dpcpp_stream.unwrap();
 }
 
@@ -144,4 +144,4 @@ void DPCPPGuardImpl::recordDataPtrOnStream(
 
 } // namespace impl
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

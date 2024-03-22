@@ -5,7 +5,7 @@
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/utils/object_ptr.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 
 static bool run_yet = false;
 
@@ -48,4 +48,4 @@ void set_run_yet_variable_to_true() {
   run_yet = true;
 }
 
-} // namespace xpu
+} // namespace torch_ipex::xpu

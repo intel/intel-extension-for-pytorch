@@ -54,17 +54,17 @@ inline memory::desc Q_PER_TENSOR_SC_MD =
 inline memory::desc Q_PER_TENSOR_ZP_MD =
     memory::desc({1}, memory::data_type::s32, memory::format_tag::x);
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static inline std::pair<memory, memory> q_get_sc_zp_gpu_mem(
     const Tensor& qx,
     dnnl::engine& engine) {
   memory qx_sc_m, qx_zp_m;
-  using xpu::dpcpp::XPUQuantizerBase;
-  xpu::dpcpp::lru_key_t key_sc_zp;
-  auto quant_base =
-      xpu::dpcpp::fetch_cached_quantizer_base(qx.q_scale(), qx.q_zero_point());
+  using torch_ipex::xpu::dpcpp::XPUQuantizerBase;
+  torch_ipex::xpu::dpcpp::lru_key_t key_sc_zp;
+  auto quant_base = torch_ipex::xpu::dpcpp::fetch_cached_quantizer_base(
+      qx.q_scale(), qx.q_zero_point());
   auto sc_ptr = quant_base.scale_ptr();
   auto zp_ptr = quant_base.zero_point_ptr();
   qx_sc_m = dpcpp_onednn_memory(Q_PER_TENSOR_SC_MD, engine, sc_ptr);
@@ -76,7 +76,8 @@ static inline memory q_get_wgh_sc_gpu_mem(
     const Tensor& qw,
     dnnl::engine& engine) {
   float dnn_scale = qw.q_scale();
-  auto quant_base = xpu::dpcpp::fetch_cached_quantizer_base(dnn_scale, 0);
+  auto quant_base =
+      torch_ipex::xpu::dpcpp::fetch_cached_quantizer_base(dnn_scale, 0);
   auto sc_ptr = quant_base.scale_ptr();
   memory sc_m = dpcpp_onednn_memory(Q_PER_TENSOR_SC_MD, engine, sc_ptr);
   return sc_m;
@@ -244,12 +245,12 @@ inline void array_copy(T* dst, const T* src, size_t size) {
 }
 
 inline bool onednn_strides_check(const Tensor& src) {
-  auto adims = xpu::oneDNN::get_onednn_dims(src);
+  auto adims = torch_ipex::xpu::oneDNN::get_onednn_dims(src);
   int ndims = (int)adims.size();
   auto dims = adims.data();
   auto data_type = static_cast<dnnl_data_type_t>(
-      xpu::oneDNN::get_onednn_dtype(src, /*allow_undef*/ true));
-  auto strides_info = xpu::oneDNN::get_onednn_strides(src);
+      torch_ipex::xpu::oneDNN::get_onednn_dtype(src, /*allow_undef*/ true));
+  auto strides_info = torch_ipex::xpu::oneDNN::get_onednn_strides(src);
   auto strides = strides_info.empty() ? nullptr : &strides_info[0];
 
   dnnl_memory_desc_t md;
@@ -409,7 +410,7 @@ template <typename T>
 static inline bool iteratable_has_onednn_layout(T container) {
   bool has_onednn_layout_tensor =
       std::any_of(container.begin(), container.end(), [](const Tensor& t) {
-        return xpu::oneDNN::is_onednn_layout(t);
+        return torch_ipex::xpu::oneDNN::is_onednn_layout(t);
       });
   return has_onednn_layout_tensor;
 }
@@ -759,7 +760,7 @@ static inline bool eltwise_forward_valid(
     } else {
       // The output tensor is a slice of another tensor
       TORCH_CHECK(
-          !xpu::oneDNN::is_onednn_layout(out),
+          !torch_ipex::xpu::oneDNN::is_onednn_layout(out),
           "cannot convert tensor slice to plain format");
       return false;
     }
@@ -785,7 +786,7 @@ static inline bool eltwise_backward_valid(
     } else {
       // The output tensor is a slice of another tensor
       TORCH_CHECK(
-          !xpu::oneDNN::is_onednn_layout(out),
+          !torch_ipex::xpu::oneDNN::is_onednn_layout(out),
           "cannot convert tensor slice to plain format");
       return false;
     }
@@ -797,7 +798,7 @@ static inline bool binary_forward_valid(
     const Tensor& self,
     const Tensor& other) {
   bool onednn_path_valid = true;
-  if (!(IPEX_ANY(xpu::oneDNN::is_onednn_layout, self, other) &&
+  if (!(IPEX_ANY(torch_ipex::xpu::oneDNN::is_onednn_layout, self, other) &&
         binary_valid(self, other))) {
     onednn_path_valid = false;
   }
@@ -811,7 +812,7 @@ static inline bool binary_forward_valid(
     } else {
       // The output tensor is a slice of another tensor
       TORCH_CHECK(
-          !xpu::oneDNN::is_onednn_layout(out),
+          !torch_ipex::xpu::oneDNN::is_onednn_layout(out),
           "cannot convert tensor slice to plain format");
       return false;
     }
@@ -891,4 +892,4 @@ static inline bool requires_runtime_zp(const Tensor& src) {
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

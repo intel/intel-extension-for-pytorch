@@ -1,7 +1,7 @@
 #ifdef USE_XETLA_XE_HPG
 #include "gemm_int4.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 #define HGEMM_WINT4_ARC_IMPL_FUNC_ASTR(                       \
     scalar_t,                                                 \
@@ -617,5 +617,5 @@ HGEMM_WINT4_ARC_IMPL_FUNC(
     1024,
     1,
     static_cast<int>(gpu_arch::XeHpg));
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla
 #endif

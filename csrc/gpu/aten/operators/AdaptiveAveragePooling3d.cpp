@@ -10,8 +10,8 @@
 #include <vector>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -101,7 +101,7 @@ void adaptive_avg_pool3d_out_template(
   std::vector<int64_t> stride_vec = {dD, dH, dW};
   std::vector<int64_t> padding_vec = {padD, padH, padW};
 
-  xpu::oneDNN::pooling<alg::pooling_avg_exclude_padding>(
+  torch_ipex::xpu::oneDNN::pooling<alg::pooling_avg_exclude_padding>(
       output,
       input_,
       nbatch,
@@ -157,7 +157,7 @@ Tensor& adaptive_avg_pool3d_backward_out_template(
 
   std::vector<int64_t> dilation_vec = {0, 0, 0};
   // per oneDNN definition, no dilation means dilation ratio is 0
-  xpu::oneDNN::pooling_backward<alg::pooling_avg_exclude_padding>(
+  torch_ipex::xpu::oneDNN::pooling_backward<alg::pooling_avg_exclude_padding>(
       gradInput,
       gradOutput,
       input,

@@ -3,7 +3,7 @@
 #include "../xetla.h"
 #include "kernel_attr.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 template <typename T, typename Act_T>
 struct fwd_config_t {
@@ -806,4 +806,4 @@ std::vector<std::function<void(sycl::handler&)>> gru_forward_impl(
   return cgfs;
 }
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

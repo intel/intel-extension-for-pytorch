@@ -91,9 +91,9 @@ spatial_softmax_forward used for softmax forward with inner_size != 1
 */
 
 using namespace dnnl;
-using namespace xpu::dpcpp::detail;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 #define MIN_WG_NUM 32768
 
@@ -2509,12 +2509,12 @@ Tensor& _softmax_out(
     Tensor& out) {
   checkBackend("_softmax", {input_}, Backend::XPU);
 
-  xpu::COMPUTE_ENG real_eng;
-  bool is_softmax_valid = xpu::oneDNN::softmax_valid(input_);
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
+  bool is_softmax_valid = torch_ipex::xpu::oneDNN::softmax_valid(input_);
   if (!is_softmax_valid) {
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input_);
+    real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input_);
   }
 
   // 1.check the tensors type are supported by oneDNN or not
@@ -2523,8 +2523,8 @@ Tensor& _softmax_out(
   // when satify the aformentioned two conditions,
   // the oneDNN path will be selected,
   // all the other cases will go to SYCL path
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
-    xpu::oneDNN::softmax(input_, dim, half_to_float, out);
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+    torch_ipex::xpu::oneDNN::softmax(input_, dim, half_to_float, out);
     return out;
   } else {
     Tensor input = to_plain_if_needed(input_).contiguous();
@@ -2553,9 +2553,11 @@ Tensor& _softmax_backward_data_out(
   // when satify the aformentioned conditions,
   // the oneDNN path will be selected,
   // all the other cases will go to SYCL path
-  if (xpu::oneDNN::softmax_backward_valid(grad_output, output, grad_input) &&
-      IPEX_ANY(xpu::oneDNN::is_onednn_layout, grad_output, output)) {
-    xpu::oneDNN::softmax_backward(
+  if (torch_ipex::xpu::oneDNN::softmax_backward_valid(
+          grad_output, output, grad_input) &&
+      IPEX_ANY(
+          torch_ipex::xpu::oneDNN::is_onednn_layout, grad_output, output)) {
+    torch_ipex::xpu::oneDNN::softmax_backward(
         grad_output, output, dim, half_to_float, grad_input);
     return grad_input;
   } else {

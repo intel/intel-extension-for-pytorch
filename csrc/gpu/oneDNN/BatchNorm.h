@@ -18,10 +18,10 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static inline memory::format_tag bn_src_format(const at::Tensor& t) {
@@ -120,7 +120,8 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
       dst = empty_opaque_tensor(dst_md, src.options(), dst_fmt);
     } else {
       dst = using_channels_last_for_onednn_op(src)
-          ? xpu::dpcpp::empty_like_dpcpp(src, src.options(), src_cl_mfmt)
+          ? torch_ipex::xpu::dpcpp::empty_like_dpcpp(
+                src, src.options(), src_cl_mfmt)
           : at::empty_like(src);
     }
   }
@@ -268,7 +269,7 @@ batch_normalization_backward(
     diff_dst_m =
         dpcpp_onednn_memory(expected_dst_md, engine, diff_dst_.data_ptr());
     diff_dst_md = expected_dst_md;
-    xpu::oneDNN::reorder(diff_dst, diff_dst_);
+    torch_ipex::xpu::oneDNN::reorder(diff_dst, diff_dst_);
   }
 
   prop_kind p_kind;
@@ -360,4 +361,4 @@ batch_normalization_backward(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

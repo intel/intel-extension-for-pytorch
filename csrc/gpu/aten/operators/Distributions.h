@@ -215,7 +215,7 @@ template <
     typename transform_t>
 void distribution_nullary_kernel(
     at::TensorIterator& iter,
-    xpu::dpcpp::DPCPPGeneratorImpl* gen,
+    torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl* gen,
     const dist_t& dist_func,
     const transform_t transform_func) {
   int64_t numel = iter.numel();

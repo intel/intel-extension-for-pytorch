@@ -14,8 +14,8 @@
 
 #include "Loops.h"
 
-using namespace xpu::dpcpp::detail;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

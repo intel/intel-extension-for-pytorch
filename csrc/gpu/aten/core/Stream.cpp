@@ -11,7 +11,7 @@
 #include <iostream>
 #include <mutex>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace {
 
@@ -62,7 +62,7 @@ static void initDPCPPStreamsOnce() {
     return;
   }
 
-  num_devices = xpu::dpcpp::device_count();
+  num_devices = torch_ipex::xpu::dpcpp::device_count();
   TORCH_CHECK(
       num_devices > 0, "Number of XPU devices should be greater than zero!");
 
@@ -148,7 +148,7 @@ DPCPPStream getStreamFromPool(
     DeviceId device_index) {
   initDPCPPStreamsOnce();
   if (device_index == -1)
-    device_index = xpu::dpcpp::current_device();
+    device_index = torch_ipex::xpu::dpcpp::current_device();
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
   return DPCPPStreamForId(
@@ -161,7 +161,7 @@ DPCPPStream getStreamFromPool(
 DPCPPStream getCurrentDPCPPStream(DeviceId device_index) {
   initDPCPPStreamsOnce();
   if (device_index == -1)
-    device_index = xpu::dpcpp::current_device();
+    device_index = torch_ipex::xpu::dpcpp::current_device();
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
   return DPCPPStreamForId(device_index, current_streams[device_index]);
@@ -179,7 +179,7 @@ std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s) {
 void deviceSynchronize(DeviceIndex device_index) {
   initDPCPPStreamsOnce();
   if (device_index == -1)
-    device_index = xpu::dpcpp::current_device();
+    device_index = torch_ipex::xpu::dpcpp::current_device();
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
 
@@ -191,12 +191,13 @@ void deviceSynchronize(DeviceIndex device_index) {
   for (auto i = 0; i < kQueuesPerPool; i++) {
     /**
      * Why we don NOT need a barrier for synchronization snapshot here? Because
-     * xpu::dpcpp::queue_barrier is so much time-consuming.
+     * torch_ipex::xpu::dpcpp::queue_barrier is so much time-consuming.
      */
 #ifdef USE_QUEUE_BARRIER
     dpcppGetRawQueue(device_index, i).wait();
 #else
-    events[i] = xpu::dpcpp::queue_barrier(dpcppGetRawQueue(device_index, i));
+    events[i] = torch_ipex::xpu::dpcpp::queue_barrier(
+        dpcppGetRawQueue(device_index, i));
 #endif
   }
 
@@ -215,4 +216,4 @@ IPEX_API sycl::queue& get_queue_from_stream(c10::Stream stream) {
       dpcpp_stream.device_index(), dpcpp_stream.queue_index());
 }
 
-} // namespace xpu
+} // namespace torch_ipex::xpu

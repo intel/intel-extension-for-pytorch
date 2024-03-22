@@ -19,12 +19,12 @@
       XETLA_CASE_TYPE(                                                       \
           at::ScalarType::Half,                                              \
           at::Half,                                                          \
-          xpu::xetla::XetlaType::fp16,                                       \
+          torch_ipex::xpu::xetla::XetlaType::fp16,                           \
           __VA_ARGS__)                                                       \
       XETLA_CASE_TYPE(                                                       \
           at::ScalarType::BFloat16,                                          \
           at::BFloat16,                                                      \
-          xpu::xetla::XetlaType::bf16,                                       \
+          torch_ipex::xpu::xetla::XetlaType::bf16,                           \
           __VA_ARGS__)                                                       \
       default:                                                               \
         AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");       \

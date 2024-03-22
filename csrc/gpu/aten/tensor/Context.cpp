@@ -3,7 +3,7 @@
 #include <oneDNN/oneDNN.h>
 #include <operators/comm/Scalar.h>
 
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -64,7 +64,7 @@ at::Tensor DPCPPTensorConvertor::to_plain(const at::Tensor& from_original) {
   auto to_meta = ctx.aten_meta();
   auto to_ = share_storage_and_set_strided_as(
       to, to_meta.sizes_, to_meta.strides_, c10::nullopt);
-  xpu::oneDNN::reorder(from, to_);
+  torch_ipex::xpu::oneDNN::reorder(from, to_);
 
   if (!is_equal && !is_opaque_u8_qtensor) {
     // reconstruct the [to] tensor with the original tensor meta

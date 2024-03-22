@@ -10,7 +10,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/Math.h"
-using namespace xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp::detail;
 
 namespace at {
 namespace AtenIpexTypeXPU {

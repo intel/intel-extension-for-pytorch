@@ -5,7 +5,7 @@
 #include "xetla_kernel_api.h"
 
 namespace gpu::xetla {
-using namespace xpu::xetla;
+using namespace torch_ipex::xpu::xetla;
 
 struct fmha_forward_kernel_args_t {
   void* query;

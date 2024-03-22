@@ -18,8 +18,8 @@
 #include "EmbeddingBackwardKernel.h"
 #include "EmbeddingBagKernel.h"
 
-using namespace xpu::dpcpp;
-using namespace xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -671,8 +671,8 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
   // directly
   {
     sorted_indices.copy_(indices);
-    xpu::pstl::iota(orig_begin, orig_begin + numel, (index_t)0);
-    xpu::pstl::sort<index_t, index_t>(
+    torch_ipex::xpu::pstl::iota(orig_begin, orig_begin + numel, (index_t)0);
+    torch_ipex::xpu::pstl::sort<index_t, index_t>(
         indices.data_ptr<index_t>(), sorted_begin, orig_begin, numel, false);
   }
 
@@ -685,7 +685,7 @@ Tensor embedding_bag_backward_dpcpp_sum_avg(
     //  count: 1 3 3 3 2 2 1 2 2
     //
     embedding_bag_backward_dpcpp_sum_avg_functor<index_t> f;
-    xpu::pstl::count_by_segment<index_t, index_t, index_t>(
+    torch_ipex::xpu::pstl::count_by_segment<index_t, index_t, index_t>(
         sorted_begin, sorted_begin + numel, count_begin, f);
   }
 

@@ -3,7 +3,7 @@
 #include <utils/DPCPP.h>
 #include <algorithm>
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 static inline int64_t roundup_pow2(int64_t n) {
   n--;

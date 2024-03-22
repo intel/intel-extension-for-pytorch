@@ -19,7 +19,7 @@
 #include "comm/ApplyUtils.h"
 
 using namespace at;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 static inline void col2im_shape_check(
     const Tensor& input,

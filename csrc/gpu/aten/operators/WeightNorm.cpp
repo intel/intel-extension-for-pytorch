@@ -9,7 +9,7 @@
 #include "comm/RegistrationDeclarations.h"
 #include "comm/TensorOptions.h"
 
-using namespace xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp::detail;
 
 namespace at {
 namespace AtenIpexTypeXPU {

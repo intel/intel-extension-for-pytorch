@@ -13,8 +13,8 @@
 #include "utils/ComputeEngine.h"
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 using namespace torch::autograd;
 
 namespace at {
@@ -48,7 +48,7 @@ class LSTMFunction : public Function<LSTMFunction> {
     ctx->saved_data["train"] = train;
     ctx->saved_data["bidirectional"] = bidirectional;
 
-    auto result_ = xpu::oneDNN::lstm(
+    auto result_ = torch_ipex::xpu::oneDNN::lstm(
         input,
         hx,
         cx,
@@ -102,7 +102,7 @@ class LSTMFunction : public Function<LSTMFunction> {
     auto train = ctx->saved_data["train"].toBool();
     auto bidirectional = ctx->saved_data["bidirectional"].toBool();
     auto layer_num = ctx->saved_data["layer_num"].toInt();
-    auto result_ = xpu::oneDNN::lstm_backward(
+    auto result_ = torch_ipex::xpu::oneDNN::lstm_backward(
         input,
         hx,
         cx,
@@ -147,11 +147,11 @@ std::tuple<Tensor, Tensor, Tensor> lstm(
     bool bidirectional,
     bool batch_first) {
   // Use oneDNN as recommend engine after big memory issues fixed.
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::RECOMMEND, input);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::RECOMMEND, input);
 
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng ||
-      xpu::COMPUTE_ENG::RECOMMEND == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng ||
+      torch_ipex::xpu::COMPUTE_ENG::RECOMMEND == real_eng) {
     Variable input_v = input;
     if (batch_first) {
       input_v = input_v.transpose(0, 1).contiguous();

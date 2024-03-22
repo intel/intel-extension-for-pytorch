@@ -11,11 +11,11 @@
 #include "../comm/Numerics.h"
 
 #define I_INFO(tensor) \
-  xpu::dpcpp::detail::getTensorInfo<int64_t, uint64_t>(tensor)
+  torch_ipex::xpu::dpcpp::detail::getTensorInfo<int64_t, uint64_t>(tensor)
 #define V_INFO(tensor) \
-  xpu::dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(tensor)
+  torch_ipex::xpu::dpcpp::detail::getTensorInfo<scalar_t, uint64_t>(tensor)
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::sparse;
 
 inline void alpha_check(const ScalarType dtype, const Scalar& alpha) {
@@ -33,7 +33,7 @@ inline void alpha_check(const ScalarType dtype, const Scalar& alpha) {
 namespace at {
 namespace AtenIpexTypeSparseXPU {
 
-using xpu::dpcpp::detail::TensorInfo;
+using torch_ipex::xpu::dpcpp::detail::TensorInfo;
 using indexT = int64_t;
 
 namespace impl {

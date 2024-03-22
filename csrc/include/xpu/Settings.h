@@ -20,7 +20,7 @@
 
 #include "../Macros.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 
 /// \enum FP32_MATH_MODE
 /// \brief specifies the available DPCCP packet types
@@ -55,4 +55,4 @@ FP32_MATH_MODE get_fp32_math_mode();
 ///     ``FP32MathMode.BF32`.
 bool set_fp32_math_mode(FP32_MATH_MODE mode);
 
-} // namespace xpu
+} // namespace torch_ipex::xpu

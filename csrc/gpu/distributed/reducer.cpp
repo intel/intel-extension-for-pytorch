@@ -12,13 +12,18 @@ class XPUTimer : public Timer {
  private:
   c10::Device device;
 
-  xpu::dpcpp::DPCPPEvent forward_start = xpu::dpcpp::DPCPPEvent();
-  xpu::dpcpp::DPCPPEvent backward_compute_start = xpu::dpcpp::DPCPPEvent();
-  xpu::dpcpp::DPCPPEvent backward_compute_end = xpu::dpcpp::DPCPPEvent();
-  xpu::dpcpp::DPCPPEvent backward_comm_start = xpu::dpcpp::DPCPPEvent();
-  xpu::dpcpp::DPCPPEvent backward_comm_end = xpu::dpcpp::DPCPPEvent();
+  torch_ipex::xpu::dpcpp::DPCPPEvent forward_start =
+      torch_ipex::xpu::dpcpp::DPCPPEvent();
+  torch_ipex::xpu::dpcpp::DPCPPEvent backward_compute_start =
+      torch_ipex::xpu::dpcpp::DPCPPEvent();
+  torch_ipex::xpu::dpcpp::DPCPPEvent backward_compute_end =
+      torch_ipex::xpu::dpcpp::DPCPPEvent();
+  torch_ipex::xpu::dpcpp::DPCPPEvent backward_comm_start =
+      torch_ipex::xpu::dpcpp::DPCPPEvent();
+  torch_ipex::xpu::dpcpp::DPCPPEvent backward_comm_end =
+      torch_ipex::xpu::dpcpp::DPCPPEvent();
 
-  xpu::dpcpp::DPCPPEvent& getEvent(Event event) {
+  torch_ipex::xpu::dpcpp::DPCPPEvent& getEvent(Event event) {
     switch (event) {
       case Event::kForwardStart:
         return forward_start;
@@ -47,8 +52,8 @@ class XPUTimer : public Timer {
 
   c10::optional<int64_t> measureDifference(Event start, Event end) override {
     c10::DeviceGuard g(device);
-    xpu::dpcpp::DPCPPEvent& start_event = getEvent(start);
-    xpu::dpcpp::DPCPPEvent& end_event = getEvent(end);
+    torch_ipex::xpu::dpcpp::DPCPPEvent& start_event = getEvent(start);
+    torch_ipex::xpu::dpcpp::DPCPPEvent& end_event = getEvent(end);
     // It is possible users did not call backward or run codes in
     // no-sync mode, in this case, some Events like "backward_compute_end"
     // or "backward_comm_start" or "backward_comm_end" will not be recorded.

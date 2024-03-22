@@ -102,8 +102,8 @@ template <int current>
 struct multi_outputs_store_helper {
   template <int ntensors, int num_outputs, typename... Args>
   static void apply(
-      xpu::dpcpp::Array<char*, ntensors> data,
-      xpu::dpcpp::Array<uint32_t, num_outputs> offsets,
+      torch_ipex::xpu::dpcpp::Array<char*, ntensors> data,
+      torch_ipex::xpu::dpcpp::Array<uint32_t, num_outputs> offsets,
       std::tuple<Args...> ret) {
     using T = typename std::tuple_element<current, std::tuple<Args...>>::type;
     T* to = reinterpret_cast<T*>(data[current]) + offsets[current];
@@ -188,8 +188,10 @@ struct LoadWithoutCast {
 
 template <int N, bool no_double_cast = false>
 struct LoadWithCast {
-  using array_t = xpu::dpcpp::Array<at::ScalarType, std::max<int>(N, 1)>;
-  using size_array_t = xpu::dpcpp::Array<uint32_t, std::max<int>(N, 1)>;
+  using array_t =
+      torch_ipex::xpu::dpcpp::Array<at::ScalarType, std::max<int>(N, 1)>;
+  using size_array_t =
+      torch_ipex::xpu::dpcpp::Array<uint32_t, std::max<int>(N, 1)>;
 
   array_t dtypes;
   size_array_t element_sizes;
@@ -567,19 +569,19 @@ static inline int preferred_vector_width(DeviceId dev_id, int elem_sz) {
   switch (elem_sz) {
     case 1:
       static_assert(sizeof(char) == 1, "the char size is not 1 bytes");
-      ret = xpu::dpcpp::dpcppPrefVectorWidth<char>(dev_id);
+      ret = torch_ipex::xpu::dpcpp::dpcppPrefVectorWidth<char>(dev_id);
       break;
     case 2:
       static_assert(sizeof(short) == 2, "the short size is not 2 bytes");
-      ret = xpu::dpcpp::dpcppPrefVectorWidth<short>(dev_id);
+      ret = torch_ipex::xpu::dpcpp::dpcppPrefVectorWidth<short>(dev_id);
       break;
     case 4:
-      ret = xpu::dpcpp::dpcppPrefVectorWidth<int>(dev_id);
+      ret = torch_ipex::xpu::dpcpp::dpcppPrefVectorWidth<int>(dev_id);
       static_assert(sizeof(int) == 4, "the long size is not 4 bytes");
       break;
     case 8:
       static_assert(sizeof(int64_t) == 8, "the long size is not 8");
-      ret = xpu::dpcpp::dpcppPrefVectorWidth<int64_t>(dev_id);
+      ret = torch_ipex::xpu::dpcpp::dpcppPrefVectorWidth<int64_t>(dev_id);
       break;
     default:
       // no vectorize

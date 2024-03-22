@@ -4,7 +4,7 @@
 #include "utils/CustomOperatorRegistration.h"
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

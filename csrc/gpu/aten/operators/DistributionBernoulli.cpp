@@ -65,8 +65,9 @@ struct bernoulli_functor_2 {
 
 Tensor& bernoulli_(Tensor& self, double p_, c10::optional<Generator> gen_) {
   auto iter = TensorIterator::nullary_op(self);
-  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
-      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen =
+      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+          gen_, torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

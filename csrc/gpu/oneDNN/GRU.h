@@ -13,10 +13,10 @@
 
 #include <oneapi/dnnl/dnnl.hpp>
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static inline Tensor gru_forward(
@@ -81,7 +81,7 @@ static inline Tensor gru_forward(
 #endif
 
   if (data_t == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+    pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
   auto gru_forward_pd = lbr_gru_forward::primitive_desc(
@@ -137,7 +137,7 @@ static inline Tensor gru_forward(
         expected_weights_layer_md, weight_layer.options(), c10::nullopt);
     weights_layer_memory = dpcpp_onednn_memory(
         expected_weights_layer_md, engine, weight_layer_.data_ptr());
-    xpu::oneDNN::reorder(new_weight_layer, weight_layer_);
+    torch_ipex::xpu::oneDNN::reorder(new_weight_layer, weight_layer_);
   }
 
   auto expected_weights_iter_md = gru_forward_pd.weights_iter_desc();
@@ -147,7 +147,7 @@ static inline Tensor gru_forward(
         expected_weights_iter_md, weight_iter.options(), c10::nullopt);
     weights_iter_memory = dpcpp_onednn_memory(
         expected_weights_iter_md, engine, weight_iter_.data_ptr());
-    xpu::oneDNN::reorder(new_weight_iter, weight_iter_);
+    torch_ipex::xpu::oneDNN::reorder(new_weight_iter, weight_iter_);
   }
 
   auto expected_bias_md = gru_forward_pd.bias_desc();
@@ -156,7 +156,7 @@ static inline Tensor gru_forward(
     bias_ = empty_opaque_tensor(expected_bias_md, bias.options(), c10::nullopt);
     bias_memory =
         dpcpp_onednn_memory(expected_bias_md, engine, bias_.data_ptr());
-    xpu::oneDNN::reorder(new_bias, bias_);
+    torch_ipex::xpu::oneDNN::reorder(new_bias, bias_);
   }
 
   auto expected_src_layer_md = gru_forward_pd.src_layer_desc();
@@ -166,7 +166,7 @@ static inline Tensor gru_forward(
         expected_src_layer_md, src_layer.options(), c10::nullopt);
     src_layer_memory = dpcpp_onednn_memory(
         expected_src_layer_md, engine, src_layer_.data_ptr());
-    xpu::oneDNN::reorder(src_layer, src_layer_);
+    torch_ipex::xpu::oneDNN::reorder(src_layer, src_layer_);
   }
 
   auto expected_src_iter_md = gru_forward_pd.src_iter_desc();
@@ -176,7 +176,7 @@ static inline Tensor gru_forward(
         expected_src_iter_md, src_iter.options(), c10::nullopt);
     src_iter_memory =
         dpcpp_onednn_memory(expected_src_iter_md, engine, src_iter_.data_ptr());
-    xpu::oneDNN::reorder(new_src_iter, src_iter_);
+    torch_ipex::xpu::oneDNN::reorder(new_src_iter, src_iter_);
   }
 
   auto expected_dst_layer_md = gru_forward_pd.dst_layer_desc();
@@ -186,7 +186,7 @@ static inline Tensor gru_forward(
         expected_dst_layer_md, dst_layer.options(), c10::nullopt);
     dst_layer_memory = dpcpp_onednn_memory(
         expected_dst_layer_md, engine, dst_layer_.data_ptr());
-    xpu::oneDNN::reorder(dst_layer, dst_layer_);
+    torch_ipex::xpu::oneDNN::reorder(dst_layer, dst_layer_);
   }
 
   auto expected_dst_iter_md = gru_forward_pd.dst_iter_desc();
@@ -196,7 +196,7 @@ static inline Tensor gru_forward(
         expected_dst_iter_md, dst_iter.options(), c10::nullopt);
     dst_iter_memory =
         dpcpp_onednn_memory(expected_dst_iter_md, engine, dst_iter_.data_ptr());
-    xpu::oneDNN::reorder(dst_iter, dst_iter_);
+    torch_ipex::xpu::oneDNN::reorder(dst_iter, dst_iter_);
   }
 
   std::unordered_map<int, memory> args;
@@ -231,11 +231,11 @@ static inline Tensor gru_forward(
   DPCPP_ONEDNN_EXEC(gru_forward_p, strm, args);
 
   if (dst_layer_memory != dst_layer_usr_memory) {
-    xpu::oneDNN::reorder(dst_layer_, dst_layer);
+    torch_ipex::xpu::oneDNN::reorder(dst_layer_, dst_layer);
   }
 
   if (dst_iter_memory != dst_iter_usr_memory) {
-    xpu::oneDNN::reorder(dst_iter_, dst_iter);
+    torch_ipex::xpu::oneDNN::reorder(dst_iter_, dst_iter);
   }
   return workspace;
 }
@@ -339,7 +339,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
 #endif
 
   if (data_dt == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+    pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
   auto gru_forward_pd = lbr_gru_forward::primitive_desc(
@@ -453,7 +453,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         expected_src_layer_md, src_layer.options(), c10::nullopt);
     src_layer_memory = dpcpp_onednn_memory(
         expected_src_layer_md, engine, src_layer_.data_ptr());
-    xpu::oneDNN::reorder(src_layer, src_layer_);
+    torch_ipex::xpu::oneDNN::reorder(src_layer, src_layer_);
   }
 
   auto expected_src_iter_md = gru_forward_pd.src_iter_desc();
@@ -463,7 +463,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         expected_src_iter_md, src_iter.options(), c10::nullopt);
     src_iter_memory =
         dpcpp_onednn_memory(expected_src_iter_md, engine, src_iter_.data_ptr());
-    xpu::oneDNN::reorder(new_src_iter, src_iter_);
+    torch_ipex::xpu::oneDNN::reorder(new_src_iter, src_iter_);
   }
 
   auto expected_dst_layer_md = gru_forward_pd.dst_layer_desc();
@@ -473,7 +473,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         expected_dst_layer_md, dst_layer.options(), c10::nullopt);
     dst_layer_memory = dpcpp_onednn_memory(
         expected_dst_layer_md, engine, dst_layer_.data_ptr());
-    xpu::oneDNN::reorder(dst_layer, dst_layer_);
+    torch_ipex::xpu::oneDNN::reorder(dst_layer, dst_layer_);
   }
 
   auto expected_dst_iter_md = gru_forward_pd.dst_iter_desc();
@@ -483,7 +483,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         expected_dst_iter_md, dst_iter.options(), c10::nullopt);
     dst_iter_memory =
         dpcpp_onednn_memory(expected_dst_iter_md, engine, dst_iter_.data_ptr());
-    xpu::oneDNN::reorder(new_dst_iter, dst_iter_);
+    torch_ipex::xpu::oneDNN::reorder(new_dst_iter, dst_iter_);
   }
 
   auto expected_weights_layer_md = gru_forward_pd.weights_layer_desc();
@@ -493,7 +493,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         expected_weights_layer_md, weight_layer.options(), c10::nullopt);
     weights_layer_memory = dpcpp_onednn_memory(
         expected_weights_layer_md, engine, weight_layer_.data_ptr());
-    xpu::oneDNN::reorder(new_weight_layer, weight_layer_);
+    torch_ipex::xpu::oneDNN::reorder(new_weight_layer, weight_layer_);
   }
 
   auto expected_weights_iter_md = gru_forward_pd.weights_iter_desc();
@@ -503,7 +503,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         expected_weights_iter_md, weight_iter.options(), c10::nullopt);
     weights_iter_memory = dpcpp_onednn_memory(
         expected_weights_iter_md, engine, weight_iter_.data_ptr());
-    xpu::oneDNN::reorder(new_weight_iter, weight_iter_);
+    torch_ipex::xpu::oneDNN::reorder(new_weight_iter, weight_iter_);
   }
 
   auto expected_bias_md = gru_backward_pd.bias_desc();
@@ -512,7 +512,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
     bias_ = empty_opaque_tensor(expected_bias_md, bias.options(), c10::nullopt);
     bias_memory =
         dpcpp_onednn_memory(expected_bias_md, engine, bias_.data_ptr());
-    xpu::oneDNN::reorder(new_bias, bias_);
+    torch_ipex::xpu::oneDNN::reorder(new_bias, bias_);
   }
 
   auto bwd_expected_weights_layer_md = gru_backward_pd.weights_layer_desc();
@@ -522,7 +522,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         bwd_expected_weights_layer_md, weight_layer.options(), c10::nullopt);
     bwd_weights_layer_memory = dpcpp_onednn_memory(
         bwd_expected_weights_layer_md, engine, bwd_weight_layer_.data_ptr());
-    xpu::oneDNN::reorder(new_weight_layer, bwd_weight_layer_);
+    torch_ipex::xpu::oneDNN::reorder(new_weight_layer, bwd_weight_layer_);
   }
 
   auto bwd_expected_weights_iter_md = gru_backward_pd.weights_iter_desc();
@@ -532,7 +532,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         bwd_expected_weights_iter_md, weight_iter.options(), c10::nullopt);
     bwd_weights_iter_memory = dpcpp_onednn_memory(
         bwd_expected_weights_iter_md, engine, bwd_weight_iter_.data_ptr());
-    xpu::oneDNN::reorder(new_weight_iter, bwd_weight_iter_);
+    torch_ipex::xpu::oneDNN::reorder(new_weight_iter, bwd_weight_iter_);
   }
 
   auto expected_diff_src_layer_md = gru_backward_pd.diff_src_layer_desc();
@@ -560,7 +560,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         expected_diff_dst_layer_md, diff_dst_layer.options(), c10::nullopt);
     diff_dst_layer_memory = dpcpp_onednn_memory(
         expected_diff_dst_layer_md, engine, diff_dst_layer_.data_ptr());
-    xpu::oneDNN::reorder(diff_dst_layer, diff_dst_layer_);
+    torch_ipex::xpu::oneDNN::reorder(diff_dst_layer, diff_dst_layer_);
   }
 
   auto expected_diff_dst_iter_md = gru_backward_pd.diff_dst_iter_desc();
@@ -570,7 +570,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         expected_diff_dst_iter_md, diff_dst_iter.options(), c10::nullopt);
     diff_dst_iter_memory = dpcpp_onednn_memory(
         expected_diff_dst_layer_md, engine, diff_dst_iter_.data_ptr());
-    xpu::oneDNN::reorder(new_diff_dst_iter, diff_dst_iter_);
+    torch_ipex::xpu::oneDNN::reorder(new_diff_dst_iter, diff_dst_iter_);
   }
 
   auto expected_diff_weights_layer_md =
@@ -584,7 +584,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         c10::nullopt);
     diff_weights_layer_memory = dpcpp_onednn_memory(
         expected_diff_weights_layer_md, engine, diff_weight_layer_.data_ptr());
-    xpu::oneDNN::reorder(diff_weight_layer, diff_weight_layer_);
+    torch_ipex::xpu::oneDNN::reorder(diff_weight_layer, diff_weight_layer_);
   }
 
   auto expected_diff_weights_iter_md = gru_backward_pd.diff_weights_iter_desc();
@@ -597,7 +597,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         c10::nullopt);
     diff_weights_iter_memory = dpcpp_onednn_memory(
         expected_diff_weights_iter_md, engine, diff_weight_iter_.data_ptr());
-    xpu::oneDNN::reorder(diff_weight_iter, diff_weight_iter_);
+    torch_ipex::xpu::oneDNN::reorder(diff_weight_iter, diff_weight_iter_);
   }
 
   auto expected_diff_bias_md = gru_backward_pd.diff_bias_desc();
@@ -607,7 +607,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
         expected_diff_bias_md, diff_bias.options(), c10::nullopt);
     diff_bias_memory = dpcpp_onednn_memory(
         expected_diff_bias_md, engine, diff_bias_.data_ptr());
-    xpu::oneDNN::reorder(diff_bias, diff_bias_);
+    torch_ipex::xpu::oneDNN::reorder(diff_bias, diff_bias_);
   }
 
   auto workspace_memory = dpcpp_onednn_memory(
@@ -643,19 +643,19 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
   DPCPP_ONEDNN_EXEC(gru_backward_p, strm, args);
 
   if (diff_src_layer_usr_memory != diff_src_layer_memory) {
-    xpu::oneDNN::reorder(diff_src_layer_, diff_src_layer);
+    torch_ipex::xpu::oneDNN::reorder(diff_src_layer_, diff_src_layer);
   }
   if (diff_src_iter_usr_memory != diff_src_iter_memory) {
-    xpu::oneDNN::reorder(diff_src_iter_, diff_src_iter);
+    torch_ipex::xpu::oneDNN::reorder(diff_src_iter_, diff_src_iter);
   }
   if (diff_weights_layer_usr_memory != diff_weights_layer_memory) {
-    xpu::oneDNN::reorder(diff_weight_layer_, diff_weight_layer);
+    torch_ipex::xpu::oneDNN::reorder(diff_weight_layer_, diff_weight_layer);
   }
   if (diff_weights_iter_usr_memory != diff_weights_iter_memory) {
-    xpu::oneDNN::reorder(diff_weight_iter_, diff_weight_iter);
+    torch_ipex::xpu::oneDNN::reorder(diff_weight_iter_, diff_weight_iter);
   }
   if (diff_bias_usr_memory != diff_bias_memory) {
-    xpu::oneDNN::reorder(diff_bias_, diff_bias);
+    torch_ipex::xpu::oneDNN::reorder(diff_bias_, diff_bias);
   }
 
   if (src_layer.scalar_type() == ScalarType::BFloat16) {
@@ -674,4 +674,4 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
       diff_bias};
 }
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

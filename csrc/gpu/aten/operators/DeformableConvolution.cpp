@@ -11,7 +11,7 @@
 
 namespace at {
 namespace AtenIpexTypeXPU {
-using xpu::oneDNN::Attr;
+using torch_ipex::xpu::oneDNN::Attr;
 
 Tensor _convolution(
     const Tensor& input_r,

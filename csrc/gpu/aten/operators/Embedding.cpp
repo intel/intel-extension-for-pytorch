@@ -13,8 +13,8 @@
 #include "comm/Atomics.h"
 #include "comm/SYCLGroupAlgorithm.h"
 
-using namespace xpu::dpcpp;
-using namespace xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -267,9 +267,9 @@ Tensor embedding_dense_backward(
               auto orig_begin = orig_indices.data_ptr<index_t>();
               {
                 sorted_indices.copy_(indices);
-                xpu::pstl::iota(
+                torch_ipex::xpu::pstl::iota(
                     orig_begin, orig_begin + num_indices, (index_t)0);
-                xpu::pstl::sort<index_t, index_t>(
+                torch_ipex::xpu::pstl::sort<index_t, index_t>(
                     indices.data_ptr<index_t>(),
                     sorted_begin,
                     orig_begin,
@@ -285,8 +285,12 @@ Tensor embedding_dense_backward(
                 //  count: 1 3 3 3 2 2 1 2 2
                 //
                 embedding_dense_backward_eq_functor<index_t> f;
-                xpu::pstl::count_by_segment<index_t, index_t, index_t>(
-                    sorted_begin, sorted_begin + num_indices, count_begin, f);
+                torch_ipex::xpu::pstl::
+                    count_by_segment<index_t, index_t, index_t>(
+                        sorted_begin,
+                        sorted_begin + num_indices,
+                        count_begin,
+                        f);
               }
               grad_weight = impl::
                   embedding_backward_deterministic_kernel<scalar_t, index_t>(
@@ -333,7 +337,7 @@ Tensor& embedding_renorm_(
 
     int64_t num_unique_indices;
     embedding_renorm_cmp_functor f;
-    num_unique_indices = xpu::pstl::unique<index_t, index_t>(
+    num_unique_indices = torch_ipex::xpu::pstl::unique<index_t, index_t>(
                              unique_indices.data_ptr<index_t>(),
                              unique_indices.data_ptr<index_t>() + num_indices,
                              f) -

@@ -16,9 +16,9 @@
 #include "xetla/GRU.h"
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
-using namespace xpu::xetla;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
+using namespace torch_ipex::xpu::xetla;
 using namespace torch::autograd;
 
 namespace at {
@@ -66,7 +66,7 @@ std::tuple<Tensor, Tensor, Tensor> gru_forward_layer(
   if (weight1.scalar_type() != ScalarType::Half)
     bias = bias.to(at::kFloat);
 
-  auto workspace = xpu::oneDNN::gru_forward(
+  auto workspace = torch_ipex::xpu::oneDNN::gru_forward(
       input,
       hx,
       weight_ih,
@@ -127,7 +127,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward_layer(
     bias = bias.to(at::kFloat);
 
   std::tie(grad_input, grad_hx, grad_weight_ih, grad_weight_hh, grad_bias) =
-      xpu::oneDNN::gru_backward(
+      torch_ipex::xpu::oneDNN::gru_backward(
           input,
           hx,
           weight_ih,
@@ -385,7 +385,7 @@ xetla_gru_forward(
   }
 
   auto Queue = dpcppGetCurrentQueue();
-  auto cgfs = xpu::xetla::gru_forward(
+  auto cgfs = torch_ipex::xpu::xetla::gru_forward(
       input.data_ptr(),
       hx.data_ptr(),
       i_weights.data_ptr(),
@@ -474,7 +474,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> xetla_gru_backward(
       at::empty(i_biases.sizes(), i_biases.options()).to(at::kFloat);
   auto grad_h_bias =
       at::empty(h_biases.sizes(), h_biases.options()).to(at::kFloat);
-  auto cgfs_data = xpu::xetla::gru_backward_data(
+  auto cgfs_data = torch_ipex::xpu::xetla::gru_backward_data(
       grad_hy.data_ptr(),
       grad_y.data_ptr(),
       grad_input.data_ptr(),
@@ -498,7 +498,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> xetla_gru_backward(
       drop_prob);
   DPCPP_Q_SUBMIT_CGFS(Queue, cgfs_data);
 
-  auto cgfs_wei = xpu::xetla::gru_backward_weight(
+  auto cgfs_wei = torch_ipex::xpu::xetla::gru_backward_weight(
       bpi0_grad.data_ptr(),
       bpi1_grad.data_ptr(),
       input.data_ptr(),
@@ -709,8 +709,8 @@ std::tuple<Tensor, Tensor> gru(
   //  TORCH_CHECK(!train || dropout == 0.0, "onednn_rnn doesn't support
   //  dropout");
   auto compute_eng = Settings::I().get_compute_eng();
-  if (compute_eng == xpu::COMPUTE_ENG::RECOMMEND ||
-      compute_eng == xpu::COMPUTE_ENG::ONEDNN) {
+  if (compute_eng == torch_ipex::xpu::COMPUTE_ENG::RECOMMEND ||
+      compute_eng == torch_ipex::xpu::COMPUTE_ENG::ONEDNN) {
     auto input = input_;
     if (batch_first) {
       input = input.transpose(0, 1);
@@ -767,7 +767,8 @@ std::tuple<Tensor, Tensor> gru(
   }
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   else if (
-      dpcppGetDeviceHasXMX() && compute_eng == xpu::COMPUTE_ENG::XETLA &&
+      dpcppGetDeviceHasXMX() &&
+      compute_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA &&
       is_xetla_gru_available(
           input_.size(0), input_.size(2), hx_.size(2), input_.scalar_type())) {
     int num_bias_gate = 4;

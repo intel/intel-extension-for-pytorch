@@ -1,7 +1,7 @@
 #ifdef USE_XETLA_XE_LPG
 #include "gemm_int4.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 #define HGEMM_WINT4_MTL_IMPL_FUNC(                            \
     scalar_t,                                                 \
     WG_M,                                                     \
@@ -390,5 +390,5 @@ HGEMM_WINT4_MTL_IMPL_FUNC_GZ(128);
 HGEMM_WINT4_MTL_IMPL_FUNC_GZ(256);
 HGEMM_WINT4_MTL_IMPL_FUNC_GZ(512);
 HGEMM_WINT4_MTL_IMPL_FUNC_GZ(1024);
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla
 #endif

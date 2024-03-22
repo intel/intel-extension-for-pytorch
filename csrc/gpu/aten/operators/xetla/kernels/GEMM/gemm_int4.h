@@ -5,7 +5,7 @@
 #include "../xetlaDispatch.h"
 #include "epilogue_impl.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 using namespace gpu::xetla;
 
 template <
@@ -2327,4 +2327,4 @@ inline cgfs_t hgemm_res_wint4(
       const uint32_t m,                      \
       const uint32_t n,                      \
       const uint32_t k);
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

@@ -9,7 +9,7 @@
 #include "jit_nodes.h"
 #include "utils/CustomOperatorRegistration.h"
 
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace torch {
 namespace jit {

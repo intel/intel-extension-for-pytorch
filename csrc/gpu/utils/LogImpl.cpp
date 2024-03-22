@@ -53,7 +53,7 @@ void log_result(int log_level, std::string message) {
 }
 
 IPEXLoggingSetting::IPEXLoggingSetting() {
-  int log_level = xpu::dpcpp::Settings::I().get_log_level();
+  int log_level = torch_ipex::xpu::dpcpp::Settings::I().get_log_level();
 
   if (log_level == -1) {
     this->enable_logging = false;
@@ -63,7 +63,8 @@ IPEXLoggingSetting::IPEXLoggingSetting() {
     this->logging_level = get_log_level_from_int(log_level);
   }
 
-  this->output_file_path = xpu::dpcpp::Settings::I().get_log_output_file_path();
+  this->output_file_path =
+      torch_ipex::xpu::dpcpp::Settings::I().get_log_output_file_path();
 
   if (this->output_file_path.size() > 0) {
     this->enable_file = true;
@@ -74,8 +75,10 @@ IPEXLoggingSetting::IPEXLoggingSetting() {
   }
 
   if (this->enable_file) {
-    int rotate_file_size = xpu::dpcpp::Settings::I().get_log_rotate_file_size();
-    int split_file_size = xpu::dpcpp::Settings::I().get_log_split_file_size();
+    int rotate_file_size =
+        torch_ipex::xpu::dpcpp::Settings::I().get_log_rotate_file_size();
+    int split_file_size =
+        torch_ipex::xpu::dpcpp::Settings::I().get_log_split_file_size();
     if (rotate_file_size == -1 && split_file_size == -1) {
       this->rotate_file_size = 10 * 1024 * 1024;
     } else if (rotate_file_size != -1) {
@@ -87,7 +90,8 @@ IPEXLoggingSetting::IPEXLoggingSetting() {
     }
   }
 
-  std::string log_component_str = xpu::dpcpp::Settings::I().get_log_component();
+  std::string log_component_str =
+      torch_ipex::xpu::dpcpp::Settings::I().get_log_component();
 
   // For the smallest validate log_component is "ALL" or "OPS", should be larger
   // than 3

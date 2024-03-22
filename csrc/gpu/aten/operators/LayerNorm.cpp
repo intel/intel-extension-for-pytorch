@@ -7,7 +7,7 @@
 #include "comm/RegistrationDeclarations.h"
 #include "utils/ComputeEngine.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU::normalization;
 
 namespace at {
@@ -718,14 +718,14 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm(
   Tensor output = at::empty(input.sizes(), input.options());
   Tensor mean, rstd;
   if (input.numel() != 0) {
-    xpu::COMPUTE_ENG real_eng =
-        choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
-    if (xpu::COMPUTE_ENG::ONEDNN == real_eng && input.dim() > 1) {
-      Tensor input_ = xpu::oneDNN::contiguous_if_needed(input);
-      Tensor weight_ = xpu::oneDNN::contiguous_if_needed(weight);
-      Tensor bias_ = xpu::oneDNN::contiguous_if_needed(bias);
+    torch_ipex::xpu::COMPUTE_ENG real_eng =
+        choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
+    if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng && input.dim() > 1) {
+      Tensor input_ = torch_ipex::xpu::oneDNN::contiguous_if_needed(input);
+      Tensor weight_ = torch_ipex::xpu::oneDNN::contiguous_if_needed(weight);
+      Tensor bias_ = torch_ipex::xpu::oneDNN::contiguous_if_needed(bias);
       std::tie(output, mean, rstd) =
-          xpu::oneDNN::layer_norm(input_, weight_, bias_, epsilon);
+          torch_ipex::xpu::oneDNN::layer_norm(input_, weight_, bias_, epsilon);
     } else {
       Tensor input_ = (input.dim() == 1) ? input.reshape({M, N}) : input;
       Tensor output_ = (output.dim() == 1) ? output.reshape({M, N}) : output;
@@ -811,13 +811,15 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
 
   if (input.numel() != 0 && grad_output.numel() != 0) {
     if (M > 0 && N > 0) {
-      auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
-      if (xpu::COMPUTE_ENG::ONEDNN == real_eng && input.dim() > 1) {
-        Tensor grad_output_ = xpu::oneDNN::contiguous_if_needed(grad_output);
-        Tensor input_ = xpu::oneDNN::contiguous_if_needed(input);
-        Tensor weight_ = xpu::oneDNN::contiguous_if_needed(weight);
+      auto real_eng =
+          choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
+      if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng && input.dim() > 1) {
+        Tensor grad_output_ =
+            torch_ipex::xpu::oneDNN::contiguous_if_needed(grad_output);
+        Tensor input_ = torch_ipex::xpu::oneDNN::contiguous_if_needed(input);
+        Tensor weight_ = torch_ipex::xpu::oneDNN::contiguous_if_needed(weight);
         std::tie(grad_input, grad_weight, grad_bias) =
-            xpu::oneDNN::layer_norm_backward(
+            torch_ipex::xpu::oneDNN::layer_norm_backward(
                 grad_output_, input_, mean, rstd, weight_, 1e-5);
       } else {
         Tensor input_ = (input.dim() == 1) ? input.reshape({M, N}) : input;

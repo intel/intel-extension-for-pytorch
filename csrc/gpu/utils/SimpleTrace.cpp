@@ -9,7 +9,7 @@
 
 #define LOG_LEVEL_TRACE 0
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 int thread_local SimpleTrace::gindent = -1;
@@ -45,6 +45,6 @@ SimpleTrace::~SimpleTrace() {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu
 
 #endif // BUILD_SIMPLE_TRACE

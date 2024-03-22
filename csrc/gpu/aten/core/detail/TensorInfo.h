@@ -5,7 +5,7 @@
 
 #include <core/IntegerDivider.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -260,4 +260,4 @@ TensorInfo<scalar, IndexType> getTensorInfo(const at::Tensor& t) {
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

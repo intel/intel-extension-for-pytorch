@@ -11,9 +11,9 @@
 #include "Utils.h"
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 /* oneDNN quantization usage:
    https://oneapi-src.github.io/oneDNN/dev_guide_attributes_quantization.html#
@@ -366,7 +366,8 @@ class Attr {
               empty_opaque_tensor(expected_md, binary.options(), c10::nullopt);
           binary_m = dpcpp_onednn_memory(
               expected_md, engine, ops_params_[i].expected_binary_.data_ptr());
-          xpu::oneDNN::reorder(binary, ops_params_[i].expected_binary_);
+          torch_ipex::xpu::oneDNN::reorder(
+              binary, ops_params_[i].expected_binary_);
         } else {
           binary_m = dpcpp_onednn_memory(md, engine, binary.data_ptr());
         }
@@ -378,16 +379,16 @@ class Attr {
 
 #ifdef USE_PRIMITIVE_CACHE
   void to_bytes(bytestring& bytes) {
-    xpu::dpcpp::to_bytes(bytes, q_scale_);
-    xpu::dpcpp::to_bytes(bytes, q_zero_point_);
+    torch_ipex::xpu::dpcpp::to_bytes(bytes, q_scale_);
+    torch_ipex::xpu::dpcpp::to_bytes(bytes, q_zero_point_);
     for (int i = 0; i < ops_params_.size(); ++i) {
-      xpu::dpcpp::to_bytes(bytes, ops_params_[i].scale_);
-      xpu::dpcpp::to_bytes(bytes, ops_params_[i].alpha_);
-      xpu::dpcpp::to_bytes(bytes, ops_params_[i].beta_);
-      xpu::dpcpp::to_bytes(bytes, ops_params_[i].algo_);
-      xpu::dpcpp::to_bytes(bytes, ops_params_[i].kind_);
-      xpu::dpcpp::to_bytes(bytes, ops_params_[i].mask_);
-      xpu::dpcpp::to_bytes(bytes, ops_params_[i].meta_);
+      torch_ipex::xpu::dpcpp::to_bytes(bytes, ops_params_[i].scale_);
+      torch_ipex::xpu::dpcpp::to_bytes(bytes, ops_params_[i].alpha_);
+      torch_ipex::xpu::dpcpp::to_bytes(bytes, ops_params_[i].beta_);
+      torch_ipex::xpu::dpcpp::to_bytes(bytes, ops_params_[i].algo_);
+      torch_ipex::xpu::dpcpp::to_bytes(bytes, ops_params_[i].kind_);
+      torch_ipex::xpu::dpcpp::to_bytes(bytes, ops_params_[i].mask_);
+      torch_ipex::xpu::dpcpp::to_bytes(bytes, ops_params_[i].meta_);
     }
   }
 #endif
@@ -399,4 +400,4 @@ class Attr {
 }; // namespace oneDNN
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

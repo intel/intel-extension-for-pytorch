@@ -56,9 +56,10 @@ static void post_sum_div_kernel(
     const int64_t segment_count,
     bool is_initial_set,
     scalar_t initial) {
-  auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
-  const auto dev_id = xpu::dpcpp::dpcppGetDeviceIdOfCurrentQueue();
-  const auto wgroup_size = xpu::dpcpp::dpcppMaxWorkGroupSize(dev_id);
+  auto& dpcpp_queue = torch_ipex::xpu::dpcpp::dpcppGetCurrentQueue();
+  const auto dev_id = torch_ipex::xpu::dpcpp::dpcppGetDeviceIdOfCurrentQueue();
+  const auto wgroup_size =
+      torch_ipex::xpu::dpcpp::dpcppMaxWorkGroupSize(dev_id);
   const auto ngroups = (segment_count + wgroup_size - 1) / wgroup_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -203,7 +204,8 @@ void segment_reduce_forward_kernel(
     const int64_t output_size_axis,
     const int64_t lengths_cumsum_stride_axis) {
   const int64_t size = outer_offset * segment_count * inner_offset;
-  const int64_t work_group_size = xpu::dpcpp::dpcppMaxWorkGroupSize();
+  const int64_t work_group_size =
+      torch_ipex::xpu::dpcpp::dpcppMaxWorkGroupSize();
   const int64_t work_group_num = (size + work_group_size - 1) / work_group_size;
   auto cgf = DPCPP_Q_CGF(cgh) {
     SegmentReduceForwardKernelFunctor<scalar_t, index_t> kfn(
@@ -232,7 +234,7 @@ void segment_reduce_forward_kernel(
         kfn);
   };
 
-  auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
+  auto& dpcpp_queue = torch_ipex::xpu::dpcpp::dpcppGetCurrentQueue();
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 
@@ -409,7 +411,8 @@ void segment_reduce_backward_kernel(
     const int64_t output_size_axis,
     const int64_t lengths_cumsum_stride_axis) {
   const int64_t size = outer_offset * segment_count * inner_offset;
-  const int64_t work_group_size = xpu::dpcpp::dpcppMaxWorkGroupSize();
+  const int64_t work_group_size =
+      torch_ipex::xpu::dpcpp::dpcppMaxWorkGroupSize();
   const int64_t work_group_num = (size + work_group_size - 1) / work_group_size;
 
   auto cgf = DPCPP_Q_CGF(cgh) {
@@ -440,7 +443,7 @@ void segment_reduce_backward_kernel(
         kfn);
   };
 
-  auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
+  auto& dpcpp_queue = torch_ipex::xpu::dpcpp::dpcppGetCurrentQueue();
   DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
 }
 

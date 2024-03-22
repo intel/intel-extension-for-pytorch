@@ -18,10 +18,10 @@ at::Tensor permute_contiguous(
     at::MemoryFormat dim_contiguous) {
   Tensor result;
 
-  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self);
+  auto real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, self);
 
   // plain format tensor will go through naitve permute contiguous pass
-  if (real_eng != xpu::COMPUTE_ENG::ONEDNN) {
+  if (real_eng != torch_ipex::xpu::COMPUTE_ENG::ONEDNN) {
     result = at::native::permute(self, dims).contiguous(dim_contiguous);
     return result;
   }
@@ -67,7 +67,7 @@ at::Tensor permute_contiguous(
 
   // 4.reorder the input tensor to plain format and put it into the new tensor,
   // which will be contiguous in the shape of the desire output one.
-  ::xpu::oneDNN::reorder(self, permute_one);
+  torch_ipex::xpu::oneDNN::reorder(self, permute_one);
   result = at::native::permute(permute_one, dims);
   return result;
 }

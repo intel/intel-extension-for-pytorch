@@ -1,6 +1,6 @@
 #include "oneMKLUtils.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneMKL {
 
 oneMKLExpInfo& oneMKLExpInfo::Instance() {
@@ -18,4 +18,4 @@ bool set_onemkl_verbose(int level) {
 }
 
 } // namespace oneMKL
-} // namespace xpu
+} // namespace torch_ipex::xpu

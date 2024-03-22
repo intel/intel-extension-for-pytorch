@@ -143,7 +143,7 @@ struct BeamSearchTopkStage1KernelFunctor {
                        TopK<scalar_t, MAX_K> other) -> TopK<scalar_t, MAX_K> {
       return reduce_topk_op<scalar_t, MAX_K>(value, other);
     };
-    value = xpu::dpcpp::detail::group_reduce<
+    value = torch_ipex::xpu::dpcpp::detail::group_reduce<
         TopK<scalar_t, MAX_K>,
         decltype(item),
         decltype(combine),
@@ -262,7 +262,7 @@ struct BeamSearchTopkStage2KernelFunctor {
                        TopK<scalar_t, MAX_K> other) -> TopK<scalar_t, MAX_K> {
       return reduce_topk_op<scalar_t, MAX_K>(value, other);
     };
-    value = xpu::dpcpp::detail::group_reduce<
+    value = torch_ipex::xpu::dpcpp::detail::group_reduce<
         TopK<scalar_t, MAX_K>,
         decltype(item),
         decltype(combine),
@@ -421,7 +421,7 @@ struct BatchTopkKernelFunctor {
                        TopK<scalar_t, MAX_K> other) -> TopK<scalar_t, MAX_K> {
       return reduce_topk_op<scalar_t, MAX_K>(value, other);
     };
-    value = xpu::dpcpp::detail::group_reduce<
+    value = torch_ipex::xpu::dpcpp::detail::group_reduce<
         TopK<scalar_t, MAX_K>,
         decltype(item),
         decltype(combine),

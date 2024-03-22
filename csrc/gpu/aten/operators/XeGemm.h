@@ -11,7 +11,7 @@
 #include "xetla/hgemm.h"
 #include "xetla/kernels/GEMM/hgemm_policy.h"
 
-using namespace xpu::xetla;
+using namespace torch_ipex::xpu::xetla;
 
 #define RECORD_FUNCTION_IMPL(F, M, N, K)            \
   char str__[100];                                  \
@@ -228,12 +228,12 @@ class HGEMM_XETLA final {
 #undef __CHECK
   }
 
-  xpu::xetla::GemmStatus run() {
+  torch_ipex::xpu::xetla::GemmStatus run() {
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
 
-    xpu::xetla::GemmStatus status;
+    torch_ipex::xpu::xetla::GemmStatus status;
 
     Tensor acc_tensor_, cnt_tensor_;
     if (num_epilogues_ == 0) {
@@ -243,7 +243,7 @@ class HGEMM_XETLA final {
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
       if (policy_id < 0) {
-        status = xpu::xetla::GemmStatus::kError;
+        status = torch_ipex::xpu::xetla::GemmStatus::kError;
       } else {
         auto cgfs = hgemm_common(
             policy_id,
@@ -257,7 +257,7 @@ class HGEMM_XETLA final {
             k_,
             is_b_row_major_);
         DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-        status = xpu::xetla::GemmStatus::kSuccess;
+        status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
       }
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_ADD) {
       if (alpha_ == 1.0f) {
@@ -266,7 +266,7 @@ class HGEMM_XETLA final {
             m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
         int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
         if (policy_id < 0) {
-          status = xpu::xetla::GemmStatus::kError;
+          status = torch_ipex::xpu::xetla::GemmStatus::kError;
         } else {
           auto cgfs = hgemm_res(
               policy_id,
@@ -283,7 +283,7 @@ class HGEMM_XETLA final {
               epilogue_params_[0],
               is_b_row_major_);
           DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-          status = xpu::xetla::GemmStatus::kSuccess;
+          status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
         }
       } else {
         RECORD_FUNCTION_IMPL(hgemm_addmm, m_, n_, k_)
@@ -291,7 +291,7 @@ class HGEMM_XETLA final {
             m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
         int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
         if (policy_id < 0) {
-          status = xpu::xetla::GemmStatus::kError;
+          status = torch_ipex::xpu::xetla::GemmStatus::kError;
         } else {
           auto cgfs = hgemm_addmm(
               policy_id,
@@ -309,7 +309,7 @@ class HGEMM_XETLA final {
               epilogue_params_[0],
               is_b_row_major_);
           DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-          status = xpu::xetla::GemmStatus::kSuccess;
+          status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
         }
       }
     } else if (
@@ -321,7 +321,7 @@ class HGEMM_XETLA final {
       TORCH_CHECK(alpha_ == 1.0f);
       int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
       if (policy_id < 0) {
-        status = xpu::xetla::GemmStatus::kError;
+        status = torch_ipex::xpu::xetla::GemmStatus::kError;
       } else {
         auto cgfs = hgemm_res_res(
             policy_id,
@@ -341,7 +341,7 @@ class HGEMM_XETLA final {
             epilogue_params_[1],
             is_b_row_major_);
         DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-        status = xpu::xetla::GemmStatus::kSuccess;
+        status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
       }
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == BIAS) {
       RECORD_FUNCTION_IMPL(hgemm_bias, m_, n_, k_)
@@ -350,7 +350,7 @@ class HGEMM_XETLA final {
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
       if (policy_id < 0) {
-        status = xpu::xetla::GemmStatus::kError;
+        status = torch_ipex::xpu::xetla::GemmStatus::kError;
       } else {
         auto cgfs = hgemm_bias(
             policy_id,
@@ -367,7 +367,7 @@ class HGEMM_XETLA final {
             epilogue_params_[0],
             is_b_row_major_);
         DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-        status = xpu::xetla::GemmStatus::kSuccess;
+        status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
       }
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
@@ -378,7 +378,7 @@ class HGEMM_XETLA final {
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
       if (policy_id < 0) {
-        status = xpu::xetla::GemmStatus::kError;
+        status = torch_ipex::xpu::xetla::GemmStatus::kError;
       } else {
         auto cgfs = hgemm_bias_res(
             policy_id,
@@ -398,7 +398,7 @@ class HGEMM_XETLA final {
             epilogue_params_[1],
             is_b_row_major_);
         DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-        status = xpu::xetla::GemmStatus::kSuccess;
+        status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
       }
     } else if (
         num_epilogues_ == 3 && epilogue_types_[0] == BIAS &&
@@ -409,7 +409,7 @@ class HGEMM_XETLA final {
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
       if (policy_id < 0) {
-        status = xpu::xetla::GemmStatus::kError;
+        status = torch_ipex::xpu::xetla::GemmStatus::kError;
       } else {
         auto cgfs = hgemm_bias_res_res(
             policy_id,
@@ -432,7 +432,7 @@ class HGEMM_XETLA final {
             epilogue_params_[2],
             is_b_row_major_);
         DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-        status = xpu::xetla::GemmStatus::kSuccess;
+        status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
       }
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
@@ -443,7 +443,7 @@ class HGEMM_XETLA final {
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
       if (policy_id < 0) {
-        status = xpu::xetla::GemmStatus::kError;
+        status = torch_ipex::xpu::xetla::GemmStatus::kError;
       } else {
         auto cgfs = hgemm_bias_relu(
             policy_id,
@@ -460,7 +460,7 @@ class HGEMM_XETLA final {
             epilogue_params_[0],
             is_b_row_major_);
         DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-        status = xpu::xetla::GemmStatus::kSuccess;
+        status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
       }
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
@@ -471,7 +471,7 @@ class HGEMM_XETLA final {
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
       if (policy_id < 0) {
-        status = xpu::xetla::GemmStatus::kError;
+        status = torch_ipex::xpu::xetla::GemmStatus::kError;
       } else {
         auto cgfs = hgemm_bias_gelu(
             policy_id,
@@ -488,7 +488,7 @@ class HGEMM_XETLA final {
             epilogue_params_[0],
             is_b_row_major_);
         DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-        status = xpu::xetla::GemmStatus::kSuccess;
+        status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
       }
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_MUL) {
       RECORD_FUNCTION_IMPL(hgemm_resmul, m_, n_, k_)
@@ -497,7 +497,7 @@ class HGEMM_XETLA final {
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
       if (policy_id < 0) {
-        status = xpu::xetla::GemmStatus::kError;
+        status = torch_ipex::xpu::xetla::GemmStatus::kError;
       } else {
         auto cgfs = hgemm_resmul(
             policy_id,
@@ -513,7 +513,7 @@ class HGEMM_XETLA final {
             k_,
             is_b_row_major_);
         DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-        status = xpu::xetla::GemmStatus::kSuccess;
+        status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
       }
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == SILU) {
       RECORD_FUNCTION_IMPL(hgemm_silu, m_, n_, k_)
@@ -522,7 +522,7 @@ class HGEMM_XETLA final {
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
       if (policy_id < 0) {
-        status = xpu::xetla::GemmStatus::kError;
+        status = torch_ipex::xpu::xetla::GemmStatus::kError;
       } else {
         auto cgfs = hgemm_silu(
             policy_id,
@@ -536,7 +536,7 @@ class HGEMM_XETLA final {
             k_,
             is_b_row_major_);
         DPCPP_Q_SUBMIT_CGFS(q, cgfs);
-        status = xpu::xetla::GemmStatus::kSuccess;
+        status = torch_ipex::xpu::xetla::GemmStatus::kSuccess;
       }
     } else {
       TORCH_CHECK(false, "No mateched policy");

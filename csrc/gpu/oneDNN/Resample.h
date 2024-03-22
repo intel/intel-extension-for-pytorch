@@ -8,9 +8,9 @@
 #include <utils/LRUCache.h>
 #include "Utils.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static inline void set_params(
@@ -267,4 +267,4 @@ static void resample_backward(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

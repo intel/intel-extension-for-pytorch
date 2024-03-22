@@ -20,7 +20,7 @@
 #include <ATen/Tensor.h>
 #include "Macros.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 /// Get a tensor from a united shared memory.
@@ -47,4 +47,4 @@ C10_DEPRECATED_MESSAGE(
 IPEX_API void* toUSM(const at::Tensor& src);
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

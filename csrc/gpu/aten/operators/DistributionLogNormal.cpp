@@ -36,8 +36,9 @@ Tensor& log_normal_(
   TORCH_CHECK(
       std_ > 0.0, "log_normal_ expects std > 0.0, but found std=", std_);
   auto iter = TensorIterator::nullary_op(self);
-  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
-      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen =
+      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+          gen_, torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

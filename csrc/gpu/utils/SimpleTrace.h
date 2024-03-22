@@ -4,7 +4,7 @@
 #include <utils/Helpers.h>
 #include <utils/Settings.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 #ifdef BUILD_SIMPLE_TRACE
@@ -30,4 +30,4 @@ class SimpleTrace {
 #endif
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

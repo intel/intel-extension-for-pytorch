@@ -427,8 +427,9 @@ Tensor linear_pointwise_meta(
   att = construct_unary_attr(attr, scalars, algorithm, att);
   Tensor result;
   Tensor _bias = bias_opt.has_value() ? bias_opt.value() : at::Tensor();
-  Tensor _input =
-      input_t.dim() <= 2 ? input_t : xpu::oneDNN::contiguous_if_needed(input_t);
+  Tensor _input = input_t.dim() <= 2
+      ? input_t
+      : torch_ipex::xpu::oneDNN::contiguous_if_needed(input_t);
   bool is_fused = false;
   result = matmul_fusion_variants_meta(
       result, _input, weight_t, true, att, /*is_fused*/ is_fused, _bias);
@@ -461,8 +462,9 @@ Tensor linear_pointwise_binary(
   Attr attr;
   attr = construct_binary_attr(binary_attr, /*alpha*/ 1.f, other_t, attr);
 
-  Tensor _input =
-      input_t.dim() <= 2 ? input_t : xpu::oneDNN::contiguous_if_needed(input_t);
+  Tensor _input = input_t.dim() <= 2
+      ? input_t
+      : torch_ipex::xpu::oneDNN::contiguous_if_needed(input_t);
   bool is_fused = false;
   auto linear_wrapper = LinearConverter();
   Tensor result;

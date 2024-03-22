@@ -7,7 +7,7 @@
 
 using namespace at;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 static InitFnPtr pre_init_hook = nullptr;
@@ -84,15 +84,16 @@ DeviceInfo* getDeviceInfo(DeviceIndex device) {
 }
 
 int prefetch_device_count(int& device_count) noexcept {
-  return xpu::dpcpp::dpcppPrefetchDeviceCount(device_count);
+  return torch_ipex::xpu::dpcpp::dpcppPrefetchDeviceCount(device_count);
 }
 
 // This function can be used to get if fp64 data type is supported and no
 // execption. It is used in device_count() and is_available() such that both two
 // functions can be called before forking process.
 int prefetch_device_has_fp64_dtype(int device_id, bool& has_fp64) noexcept {
-  return xpu::dpcpp::dpcppPrefetchDeviceHasFP64Dtype(device_id, has_fp64);
+  return torch_ipex::xpu::dpcpp::dpcppPrefetchDeviceHasFP64Dtype(
+      device_id, has_fp64);
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

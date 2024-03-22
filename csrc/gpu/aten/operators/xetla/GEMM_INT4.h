@@ -3,7 +3,7 @@
 #include <xetla_common_types.hpp>
 #include "xetla_kernel_api.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 template <
     int WG_M = 8,
     int WG_N = 32,
@@ -333,4 +333,4 @@ XETLA_KERNEL_API cgfs_t hgemm_res_wint4(
     const uint32_t n,
     const uint32_t k);
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

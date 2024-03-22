@@ -3,7 +3,7 @@
 #include <core/Stream.h>
 #include <utils/DPCPP.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 enum dpcppMemcpyKind { HostToDevice, DeviceToHost, DeviceToDevice };
@@ -25,4 +25,4 @@ void dpcppMemset(void* data, int value, size_t n_bytes);
 void dpcppMemsetAsync(void* data, int value, size_t n_bytes);
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

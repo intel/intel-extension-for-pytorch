@@ -22,7 +22,7 @@
 #include <utility>
 #include "comm/Numerics.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 template <class arg_t, class item_t, class CombineFunc, int out_vec_sz = 1>
@@ -170,13 +170,13 @@ inline at::detail::Array<arg_t, out_vec_sz> group_y_reduce(
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu
 
 namespace at {
 namespace AtenIpexTypeXPU {
 
-using namespace xpu::dpcpp;
-using namespace xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
 using namespace at::native::Memory::detail;
 using at::detail::Array;
 

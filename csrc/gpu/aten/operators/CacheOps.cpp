@@ -31,7 +31,7 @@ void swap_blocks(
 ) {
   at::Device src_device = src.device();
   at::Device dst_device = dst.device();
-  xpu::dpcpp::DPCPPGuard device_guard(src.device());
+  torch_ipex::xpu::dpcpp::DPCPPGuard device_guard(src.device());
   dpcppMemcpyKind cpy_kind;
   if (src_device.is_xpu() && dst_device.is_cpu()) {
     cpy_kind = dpcppMemcpyKind::DeviceToHost;
@@ -187,7 +187,7 @@ void copy_blocks(
   TORCH_CHECK(
       k_cache_device.is_xpu() && v_cache_device.is_xpu() &&
       map_device.is_xpu());
-  xpu::dpcpp::DPCPPGuard device_guard(key_caches[0].device());
+  torch_ipex::xpu::dpcpp::DPCPPGuard device_guard(key_caches[0].device());
   std::vector<int64_t> k_cache_ptr{};
   std::vector<int64_t> v_cache_ptr{};
   for (int i = 0; i < key_caches.size(); ++i) {
@@ -336,7 +336,7 @@ void reshape_and_cache(
     at::Tensor& value_cache, // [num_blocks, num_heads, head_size, block_size]
     at::Tensor& slot_map) // [num_tokens]
 {
-  xpu::dpcpp::DPCPPGuard device_guard(key.device());
+  torch_ipex::xpu::dpcpp::DPCPPGuard device_guard(key.device());
   int num_tokens = key.size(0);
   int num_heads = key.size(1);
   int head_size = key.size(2);

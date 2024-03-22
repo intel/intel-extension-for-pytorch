@@ -6,7 +6,7 @@
 #include "fmha_utils.h"
 
 namespace gpu::xetla {
-using namespace xpu::xetla;
+using namespace torch_ipex::xpu::xetla;
 
 namespace fmha {
 

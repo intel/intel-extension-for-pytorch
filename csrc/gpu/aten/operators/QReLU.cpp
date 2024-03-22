@@ -20,7 +20,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::native;
 
 namespace at {
@@ -148,7 +148,7 @@ void q_relu_xpu(const Tensor& qx, Tensor& qy) {
         qx.q_scale(),
         qx.q_zero_point());
     auto qx_plain = AtenIpexTypeXPU::to_plain_if_needed(qx);
-    int64_t num_ele = xpu::dpcpp::detail::prod_intlist(qx.sizes());
+    int64_t num_ele = torch_ipex::xpu::dpcpp::detail::prod_intlist(qx.sizes());
     int64_t zp = static_cast<int64_t>(qx.q_zero_point());
 
     impl::q_relu_xpu_kernel(
@@ -168,11 +168,13 @@ Tensor relu(const Tensor& qx) {
 Tensor& q_leaky_relu(Tensor& out, const Tensor& self, Scalar negative_slope) {
   if (self.q_zero_point() == 0) {
     float alpha = negative_slope.to<float>();
-    xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(out, self, alpha, 0.0f);
+    torch_ipex::xpu::oneDNN::eltwise<dnnl::algorithm::eltwise_relu>(
+        out, self, alpha, 0.0f);
     return out;
   } else {
     IPEX_DISPATCH_QINT_TYPES(self.scalar_type(), "q_leakyrelu", [&]() {
-      int64_t num_ele = xpu::dpcpp::detail::prod_intlist(self.sizes());
+      int64_t num_ele =
+          torch_ipex::xpu::dpcpp::detail::prod_intlist(self.sizes());
       impl::q_leaky_relu_xpu_kernel<underlying_t>(
           reinterpret_cast<underlying_t*>(self.data_ptr()),
           reinterpret_cast<underlying_t*>(out.data_ptr()),

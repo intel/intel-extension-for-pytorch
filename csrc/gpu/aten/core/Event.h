@@ -5,7 +5,7 @@
 #include <core/Stream.h>
 #include <utils/DPCPP.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 /*
@@ -66,4 +66,4 @@ struct DPCPPEvent : public DPCPPEventBase {
 };
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

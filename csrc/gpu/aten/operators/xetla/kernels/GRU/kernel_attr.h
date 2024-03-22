@@ -2,7 +2,7 @@
 
 #include "../xetla.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 class gru_base_config {
  public:
@@ -89,4 +89,4 @@ class m512k92n256_bpi : public gru_base_config {
   static constexpr uint32_t sg_tile_k = 32;
 };
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

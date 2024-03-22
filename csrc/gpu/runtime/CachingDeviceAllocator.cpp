@@ -5,7 +5,7 @@
 #include <runtime/Utils.h>
 #include <utils/Helpers.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 // NOTE: Make it global to avoid its destruction
@@ -390,7 +390,7 @@ void CachingDeviceAllocator::emptyCache() {
   int count = 0;
   AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));
   for (auto i = 0; i < count; i++) {
-    xpu::dpcpp::deviceSynchronize(i);
+    torch_ipex::xpu::dpcpp::deviceSynchronize(i);
   }
 
   free_blocks(large_blocks, large_blocks.begin(), large_blocks.end());
@@ -633,7 +633,7 @@ void CachingDeviceAllocator::free_cached_blocks(DeviceId di) {
   /*
    * See Note [Safe to Free Blocks on BlockPool]
    */
-  xpu::dpcpp::deviceSynchronize(di);
+  torch_ipex::xpu::dpcpp::deviceSynchronize(di);
 
   BlockPool::iterator begin;
   BlockPool::iterator end;
@@ -791,4 +791,4 @@ void CachingDeviceAllocator::dumpMemoryStatus(DeviceId deviceIndex) {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

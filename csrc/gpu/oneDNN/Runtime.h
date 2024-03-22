@@ -12,9 +12,9 @@
 #include <vector>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 // Keep non-static and non-inline
@@ -37,7 +37,8 @@ struct GpuEngineManager {
 
   engine& get_engine(const Device& device) {
     TORCH_INTERNAL_ASSERT(device.type() == kXPU);
-    TORCH_INTERNAL_ASSERT(device.index() < xpu::dpcpp::device_count());
+    TORCH_INTERNAL_ASSERT(
+        device.index() < torch_ipex::xpu::dpcpp::device_count());
     return *engine_pool[device.index()];
   }
 
@@ -46,7 +47,7 @@ struct GpuEngineManager {
 
  protected:
   GpuEngineManager() {
-    int device_count = (int)xpu::dpcpp::device_count();
+    int device_count = (int)torch_ipex::xpu::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(device_count > 0);
     for (int i = 0; i < device_count; i++) {
       engine_pool.push_back(
@@ -67,7 +68,8 @@ struct GpuStreamManager {
 #ifdef USE_PERSIST_STREAM
   dnnl::stream& get_stream() {
     int device_index = current_device();
-    TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
+    TORCH_INTERNAL_ASSERT(
+        device_index < torch_ipex::xpu::dpcpp::device_count());
     int queue_id = getCurrentDPCPPStream(device_index).queue_index();
     if (stream_pool[device_index][queue_id] == nullptr) {
       stream_pool[device_index][queue_id] =
@@ -80,7 +82,8 @@ struct GpuStreamManager {
 #else
   dnnl::stream get_stream() {
     int device_index = current_device();
-    TORCH_INTERNAL_ASSERT(device_index < xpu::dpcpp::device_count());
+    TORCH_INTERNAL_ASSERT(
+        device_index < torch_ipex::xpu::dpcpp::device_count());
     return dnnl::sycl_interop::make_stream(
         GpuEngineManager::Instance().get_engine({kXPU, device_index}),
         dpcppGetQueueFromStream(getCurrentDPCPPStream(device_index)));
@@ -93,7 +96,7 @@ struct GpuStreamManager {
  protected:
   GpuStreamManager() {
 #ifdef USE_PERSIST_STREAM
-    int deviceCount = xpu::dpcpp::device_count();
+    int deviceCount = torch_ipex::xpu::dpcpp::device_count();
     TORCH_INTERNAL_ASSERT(deviceCount > 0);
     stream_pool.clear();
     stream_pool.resize(deviceCount);
@@ -115,4 +118,4 @@ struct GpuStreamManager {
 };
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

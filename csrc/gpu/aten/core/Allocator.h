@@ -8,7 +8,7 @@
 #include <core/Stream.h>
 #include <utils/Macros.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 /// Device Allocator
@@ -47,4 +47,4 @@ void emptyCacheInHostAlloc();
 bool isAllocatedByHostAlloc(const void* ptr);
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

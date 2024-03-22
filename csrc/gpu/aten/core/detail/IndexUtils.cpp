@@ -1,7 +1,7 @@
 #include <core/detail/IndexUtils.h>
 #include <vector>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -84,4 +84,4 @@ bool canUse32BitIndexMath(const at::Tensor& t, int64_t max_elem) {
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

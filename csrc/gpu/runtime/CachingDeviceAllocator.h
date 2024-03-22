@@ -18,7 +18,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 class CachingDeviceAllocator final {
@@ -160,4 +160,4 @@ class CachingDeviceAllocator final {
 };
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

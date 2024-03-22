@@ -18,8 +18,8 @@
 #include "SortingFastGroupSort.h"
 #include "SortingSingleTile.h"
 
-using namespace xpu::dpcpp::detail;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -62,7 +62,8 @@ void topk_out_with_single_tile_sort(
       [&]() {
         scalar_t* values_ptr = sorted_values.data_ptr<scalar_t>();
         int64_t* indices_ptr = sorted_indices.data_ptr<int64_t>();
-        xpu::pstl::iota(indices_ptr, indices_ptr + nsort, (int64_t)0);
+        torch_ipex::xpu::pstl::iota(
+            indices_ptr, indices_ptr + nsort, (int64_t)0);
 #define ONETILE(DESCENDING)                              \
   radix_sort_single_tile<scalar_t, int64_t, DESCENDING>( \
       (scalar_t*)values_ptr, (int64_t*)indices_ptr, nsort);

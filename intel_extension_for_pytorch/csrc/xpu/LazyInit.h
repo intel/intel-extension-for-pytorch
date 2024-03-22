@@ -1,6 +1,6 @@
 #pragma once
 
-namespace xpu {
+namespace torch_ipex::xpu {
 
 // C++ API for lazy initialization. Note: don't put this function in destructor,
 // because it may result in a deadlock.
@@ -10,4 +10,4 @@ void set_run_yet_variable_to_false();
 
 void set_run_yet_variable_to_true();
 
-} // namespace xpu
+} // namespace torch_ipex::xpu

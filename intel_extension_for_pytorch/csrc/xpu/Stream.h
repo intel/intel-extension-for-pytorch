@@ -4,10 +4,10 @@
 #include <torch/csrc/Stream.h>
 #include <torch/csrc/python_headers.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 
 struct THDPStream : THPStream {
-  xpu::dpcpp::DPCPPStream dpcpp_stream;
+  torch_ipex::xpu::dpcpp::DPCPPStream dpcpp_stream;
 };
 extern PyObject* THDPStreamClass;
 
@@ -17,4 +17,4 @@ inline bool THDPStream_Check(PyObject* obj) {
   return THDPStreamClass && PyObject_IsInstance(obj, THDPStreamClass);
 }
 
-} // namespace xpu
+} // namespace torch_ipex::xpu

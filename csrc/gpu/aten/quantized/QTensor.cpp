@@ -10,7 +10,7 @@
 #include <utils/DPCPP.h>
 
 using namespace at::native;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -24,11 +24,11 @@ Tensor new_qtensor(
   auto memory_format =
       options.memory_format_opt().value_or(MemoryFormat::Contiguous);
 
-  at::Allocator* allocator = xpu::dpcpp::getDeviceAllocator();
+  at::Allocator* allocator = torch_ipex::xpu::dpcpp::getDeviceAllocator();
 
   at::DispatchKey tensorDispatchKey = options.computeDispatchKey();
   native::check_size_nonnegative(sizes);
-  int64_t nelements = xpu::dpcpp::detail::prod_intlist(sizes);
+  int64_t nelements = torch_ipex::xpu::dpcpp::detail::prod_intlist(sizes);
   auto dtype = options.dtype();
   TORCH_CHECK(
       isQIntType(typeMetaToScalarType(dtype)),

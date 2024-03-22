@@ -6,7 +6,7 @@
 
 using namespace at;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -28,4 +28,4 @@ IPEX_API Tensor fromUSM(
 
 IPEX_API void* toUSM(const Tensor& src);
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

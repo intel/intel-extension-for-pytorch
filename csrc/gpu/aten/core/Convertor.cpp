@@ -2,7 +2,7 @@
 #include <core/PreInitHook.h>
 #include <runtime/Device.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -14,7 +14,7 @@ at::Device getATenDeviceFromUSM(void* src, const DeviceIndex device_id) {
   // which tile the src is allocated in.
   TORCH_INTERNAL_ASSERT(false);
 #endif
-  auto& default_ctx = xpu::dpcpp::dpcppGetDeviceContext();
+  auto& default_ctx = torch_ipex::xpu::dpcpp::dpcppGetDeviceContext();
   // Check that pointer is known in the context
   sycl::usm::alloc alloc_type = sycl::get_pointer_type(src, default_ctx);
 
@@ -32,7 +32,7 @@ at::Device getATenDeviceFromUSM(void* src, const DeviceIndex device_id) {
   // It is possible that _lazy_init has not been called. Then we need to make
   // sure we have called _lazy_init here.
   do_pre_init_hook();
-  auto raw_device_id = xpu::dpcpp::dpcppGetDeviceIndex(raw_device);
+  auto raw_device_id = torch_ipex::xpu::dpcpp::dpcppGetDeviceIndex(raw_device);
   // When src is allocated without a specified tile, we will can't find which
   // tile is src in.
   TORCH_CHECK(
@@ -81,4 +81,4 @@ void* toUSM(const Tensor& src) {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

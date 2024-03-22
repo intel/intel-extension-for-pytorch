@@ -11,7 +11,7 @@ class XPUActivityProfilerProxy;
 }
 #endif
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace profiler {
 namespace impl {
@@ -78,4 +78,4 @@ void prepareTrace(
 } // namespace impl
 } // namespace profiler
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

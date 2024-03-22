@@ -14,7 +14,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::sparse;
 
 namespace at {
@@ -401,20 +401,21 @@ Tensor _coalesce(const Tensor& self) {
   auto origIndices_ptr = origIndices.data_ptr<int64_t>();
   auto uniqueOffsets_ptr = uniqueOffsets.data_ptr<int64_t>();
 
-  xpu::pstl::iota<int64_t>(origIndices_ptr, origIndices_ptr + nnz, (int64_t)0);
-  xpu::pstl::iota<int64_t>(
+  torch_ipex::xpu::pstl::iota<int64_t>(
+      origIndices_ptr, origIndices_ptr + nnz, (int64_t)0);
+  torch_ipex::xpu::pstl::iota<int64_t>(
       uniqueOffsets_ptr, uniqueOffsets_ptr + nnz, (int64_t)0);
 
   auto indices1D_ptr = indices1D.data_ptr<int64_t>();
   _coalesce_lt_functor lt_functor;
-  xpu::pstl::sort<int64_t, int64_t>(
+  torch_ipex::xpu::pstl::sort<int64_t, int64_t>(
       indices1D_ptr, origIndices_ptr, indices1D.size(0), lt_functor);
 
   auto indices1D_end = indices1D_ptr;
   auto uniqueOffsets_end = uniqueOffsets_ptr;
   _coalesce_eq_functor eq_functor;
   std::tie(indices1D_end, uniqueOffsets_end) =
-      xpu::pstl::unique_with_zip<int64_t, int64_t, int64_t>(
+      torch_ipex::xpu::pstl::unique_with_zip<int64_t, int64_t, int64_t>(
           indices1D_ptr, indices1D_ptr + nnz, uniqueOffsets_ptr, eq_functor);
   newNnz = std::distance(indices1D_ptr, indices1D_end);
 
@@ -425,7 +426,8 @@ Tensor _coalesce(const Tensor& self) {
 
   if (newValues.numel() > 0) {
     values = values.contiguous();
-    int64_t stride = xpu::dpcpp::detail::prod_intlist(values.sizes().slice(1));
+    int64_t stride =
+        torch_ipex::xpu::dpcpp::detail::prod_intlist(values.sizes().slice(1));
     IPEX_DISPATCH_ALL_TYPES_AND2(
         at::ScalarType::BFloat16,
         at::ScalarType::Half,

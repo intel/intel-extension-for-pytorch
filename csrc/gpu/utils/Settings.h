@@ -3,7 +3,7 @@
 #include <include/xpu/Settings.h>
 #include <utils/Macros.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 
 enum ENV_VAL { OFF = 0, ON = 1, ENV_VAL_MIN = OFF, ENV_VAL_MAX = ON };
 static const char* ENV_VAL_STR[]{"OFF", "ON"};
@@ -166,4 +166,4 @@ class IPEX_API Settings final {
 };
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

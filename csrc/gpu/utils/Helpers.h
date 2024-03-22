@@ -21,7 +21,7 @@ sycl::event dpcpp_q_barrier(sycl::queue& q, std::vector<sycl::event>& events);
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 /*
@@ -32,4 +32,4 @@ namespace dpcpp {
 EXPORT_TO_XPU_ALIAS(dpcpp_q_barrier, queue_barrier);
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

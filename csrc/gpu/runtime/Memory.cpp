@@ -2,7 +2,7 @@
 #include <runtime/Memory.h>
 #include <runtime/Utils.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 void memcpyHostToDevice(
@@ -102,4 +102,4 @@ void memsetDevice(void* dst, int value, size_t n_bytes, bool async) {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

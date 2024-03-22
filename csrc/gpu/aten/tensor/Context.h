@@ -7,7 +7,7 @@
 #include <oneapi/dnnl/dnnl.hpp>
 #include <utils/DPCPP.h>
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 using mem_desc_t = dnnl::memory::desc;
 using mem_dtype_t = dnnl::memory::data_type;

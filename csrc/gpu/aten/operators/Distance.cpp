@@ -13,7 +13,7 @@
 
 #include <torch/custom_class.h>
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 template <typename scalar_t>
 static scalar_t device_sqrt(scalar_t val) {

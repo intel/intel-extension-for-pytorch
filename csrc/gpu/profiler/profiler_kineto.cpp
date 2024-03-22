@@ -11,7 +11,7 @@
 #include <runtime/Queue.h>
 #endif
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace profiler {
 
@@ -28,7 +28,7 @@ void prepareProfiler(
       config.state == ProfilerState::KINETO ||
           config.state == ProfilerState::KINETO_GPU_FALLBACK,
       "Supported only in Kineto profiler");
-  xpu::dpcpp::profiler::impl::kineto::prepareTrace(
+  torch_ipex::xpu::dpcpp::profiler::impl::kineto::prepareTrace(
       /*cpuOnly=*/!at::hasXPU(), activities, config.experimental_config);
 
   if (!config.experimental_config.performance_events.empty()) {
@@ -54,4 +54,4 @@ void prepareProfiler(
 
 } // namespace profiler
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

@@ -23,7 +23,7 @@
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -34,8 +34,8 @@ namespace impl {
 
 // Pretend that the scalar tensor is in fact a one-element vector.
 template <typename T, typename IndexType>
-xpu::dpcpp::detail::TensorInfo<T, IndexType> tensorInfoIfScalar(
-    xpu::dpcpp::detail::TensorInfo<T, IndexType> ti) {
+torch_ipex::xpu::dpcpp::detail::TensorInfo<T, IndexType> tensorInfoIfScalar(
+    torch_ipex::xpu::dpcpp::detail::TensorInfo<T, IndexType> ti) {
   if (ti.dims == 0) {
     ti.dims = 1;
     ti.sizes[0] = 1;
@@ -232,7 +232,7 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
     int64_t* range_begin = nullptr;
 
     nonzero_copy_if_functor<scalar_t> f(self_begin);
-    auto idx_flat_end = xpu::pstl::copy_if<int64_t>(
+    auto idx_flat_end = torch_ipex::xpu::pstl::copy_if<int64_t>(
         range_begin, range_begin + N, idx_flat_begin, f);
 
     auto num_nonzeros = std::distance(idx_flat_begin, idx_flat_end);
@@ -673,7 +673,7 @@ void MaskedScatter(Tensor& tensor, const Tensor& mask_, const Tensor& src) {
 
   auto maskLong_ptr = acc_maskLong_data;
   auto maskPrefixSum_ptr = acc_maskPrefixSum_data;
-  xpu::pstl::exclusive_scan(
+  torch_ipex::xpu::pstl::exclusive_scan(
       maskLong_ptr,
       maskLong_ptr + size,
       maskPrefixSum_ptr,
@@ -786,7 +786,7 @@ void MaskedSelect(Tensor& tensor, const Tensor& src, const Tensor& mask) {
 
   auto acc_maskLong_ptr = maskLong.data_ptr<int64_t>();
   auto acc_maskPrefixSum_ptr = maskPrefixSum.data_ptr<int64_t>();
-  xpu::pstl::inclusive_scan<int64_t>(
+  torch_ipex::xpu::pstl::inclusive_scan<int64_t>(
       acc_maskLong_ptr,
       acc_maskLong_ptr + size,
       acc_maskPrefixSum_ptr,
@@ -1271,11 +1271,11 @@ void index_put_deterministic_impl(
     linearIndex.divide_(sliceSize, "trunc");
 
     sorted_indices.copy_(linearIndex);
-    xpu::pstl::iota(
+    torch_ipex::xpu::pstl::iota(
         orig_indices.data_ptr<int64_t>(),
         orig_indices.data_ptr<int64_t>() + linearIndex.numel(),
         (int64_t)0);
-    xpu::pstl::sort<int64_t, int64_t>(
+    torch_ipex::xpu::pstl::sort<int64_t, int64_t>(
         linearIndex.data_ptr<int64_t>(),
         sorted_indices.data_ptr<int64_t>(),
         orig_indices.data_ptr<int64_t>(),

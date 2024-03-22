@@ -12,9 +12,9 @@
 
 using namespace dnnl;
 using dnnl::algorithm;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 template <algorithm alg_kind>
@@ -219,7 +219,7 @@ static inline void eltwise_backward(
       diff_dst_memory =
           dpcpp_onednn_memory(expected_dst_md, engine, diff_dst__.data_ptr());
       diff_dst_md = expected_dst_md;
-      xpu::oneDNN::reorder(diff_dst, diff_dst__);
+      torch_ipex::xpu::oneDNN::reorder(diff_dst, diff_dst__);
     }
   }
 
@@ -301,4 +301,4 @@ static inline void eltwise_backward(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

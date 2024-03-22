@@ -13,8 +13,8 @@
 using namespace dnnl;
 using namespace at::native;
 using namespace at::AtenIpexTypeXPU;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -441,7 +441,7 @@ Tensor& upsample_trilinear3d_out(
       align_corners == false,
       "we don't support align_cornser path by currently as oneDNN don't support this "
       "algorithm!\n")
-  xpu::oneDNN::resample(
+  torch_ipex::xpu::oneDNN::resample(
       input,
       output,
       output_size,
@@ -464,7 +464,7 @@ Tensor upsample_trilinear3d(
       align_corners == false,
       "We don't support align_corners currently as oneDNN don't support this "
       "algorithm!\n");
-  xpu::oneDNN::resample(
+  torch_ipex::xpu::oneDNN::resample(
       input,
       output,
       output_size,
@@ -489,7 +489,7 @@ Tensor upsample_trilinear3d(
   auto scale_d = get_scale_value(scale_factors, 0);
   auto scale_h = get_scale_value(scale_factors, 1);
   auto scale_w = get_scale_value(scale_factors, 2);
-  xpu::oneDNN::resample(
+  torch_ipex::xpu::oneDNN::resample(
       input,
       output,
       osize,
@@ -513,7 +513,7 @@ Tensor& upsample_trilinear3d_backward_out(
       align_corners == false,
       "We don't support align_corners currently as oneDNN don't support this "
       "algorithm!\n");
-  xpu::oneDNN::resample_backward(
+  torch_ipex::xpu::oneDNN::resample_backward(
       grad_input,
       grad_output,
       input_size,
@@ -546,7 +546,7 @@ Tensor upsample_trilinear3d_backward(
     grad_input = at::empty(input_size, grad_output.options());
   }
 
-  xpu::oneDNN::resample_backward(
+  torch_ipex::xpu::oneDNN::resample_backward(
       grad_input,
       grad_output,
       input_size,
@@ -583,7 +583,7 @@ Tensor upsample_trilinear3d_backward(
     grad_input = at::empty(input_size, grad_output.options());
   }
 
-  xpu::oneDNN::resample_backward(
+  torch_ipex::xpu::oneDNN::resample_backward(
       grad_input,
       grad_output,
       input_size,
@@ -602,20 +602,20 @@ Tensor& upsample_bilinear2d_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& output) {
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
 
   if (align_corners) {
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::ONEDNN, input);
+    real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, input);
   }
 
-  if (xpu::COMPUTE_ENG::BASIC == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::BASIC == real_eng) {
     at::AtenIpexTypeXPU::to_plain_if_needed_(input);
     upsample_bilinear2d_out_dpcpp_template(
         output, input, output_size, true, scales_h, scales_w);
   } else {
-    xpu::oneDNN::resample(
+    torch_ipex::xpu::oneDNN::resample(
         input,
         output,
         output_size,
@@ -633,19 +633,19 @@ Tensor upsample_bilinear2d(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w) {
   auto output = at::empty({0}, input.options());
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (align_corners) {
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::ONEDNN, input);
+    real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, input);
   }
 
-  if (xpu::COMPUTE_ENG::BASIC == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::BASIC == real_eng) {
     at::AtenIpexTypeXPU::to_plain_if_needed_(input);
     upsample_bilinear2d_out_dpcpp_template(
         output, input, output_size, true, scales_h, scales_w);
   } else {
-    xpu::oneDNN::resample(
+    torch_ipex::xpu::oneDNN::resample(
         input,
         output,
         output_size,
@@ -665,19 +665,19 @@ Tensor upsample_bilinear2d(
   auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
   auto scales_h = get_scale_value(scale_factors, 0);
   auto scales_w = get_scale_value(scale_factors, 1);
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (align_corners) {
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::ONEDNN, input);
+    real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, input);
   }
 
-  if (xpu::COMPUTE_ENG::BASIC == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::BASIC == real_eng) {
     at::AtenIpexTypeXPU::to_plain_if_needed_(input);
     upsample_bilinear2d_out_dpcpp_template(
         output, input, osize, true, scales_h, scales_w);
   } else {
-    xpu::oneDNN::resample(
+    torch_ipex::xpu::oneDNN::resample(
         input,
         output,
         osize,
@@ -696,14 +696,15 @@ Tensor& upsample_bilinear2d_backward_out(
     c10::optional<double> scales_h,
     c10::optional<double> scales_w,
     Tensor& grad_input) {
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (align_corners) {
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::ONEDNN, grad_output);
+    real_eng =
+        choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, grad_output);
   }
 
-  if (xpu::COMPUTE_ENG::BASIC == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::BASIC == real_eng) {
     at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
     upsample_bilinear2d_backward_out_dpcpp_template(
         grad_input,
@@ -714,7 +715,7 @@ Tensor& upsample_bilinear2d_backward_out(
         scales_h,
         scales_w);
   } else {
-    xpu::oneDNN::resample_backward(
+    torch_ipex::xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
         input_size,
@@ -742,14 +743,15 @@ Tensor upsample_bilinear2d_backward(
     grad_input = at::empty(input_size, grad_output.options());
   }
 
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (align_corners) {
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::ONEDNN, grad_output);
+    real_eng =
+        choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, grad_output);
   }
 
-  if (xpu::COMPUTE_ENG::BASIC == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::BASIC == real_eng) {
     at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
     upsample_bilinear2d_backward_out_dpcpp_template(
         grad_input,
@@ -760,7 +762,7 @@ Tensor upsample_bilinear2d_backward(
         scales_h,
         scales_w);
   } else {
-    xpu::oneDNN::resample_backward(
+    torch_ipex::xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
         input_size,
@@ -790,14 +792,15 @@ Tensor upsample_bilinear2d_backward(
     grad_input = at::empty(input_size, grad_output.options());
   }
 
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   if (align_corners) {
-    real_eng = xpu::COMPUTE_ENG::BASIC;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
   } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::ONEDNN, grad_output);
+    real_eng =
+        choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, grad_output);
   }
 
-  if (xpu::COMPUTE_ENG::BASIC == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::BASIC == real_eng) {
     at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
     upsample_bilinear2d_backward_out_dpcpp_template(
         grad_input,
@@ -808,7 +811,7 @@ Tensor upsample_bilinear2d_backward(
         scales_h,
         scales_w);
   } else {
-    xpu::oneDNN::resample_backward(
+    torch_ipex::xpu::oneDNN::resample_backward(
         grad_input,
         grad_output,
         input_size,
@@ -830,7 +833,7 @@ Tensor& upsample_linear1d_out(
       align_corners == false,
       "We don't support align_corners currently as oneDNN don't support this "
       "algorithm!\n");
-  xpu::oneDNN::resample(
+  torch_ipex::xpu::oneDNN::resample(
       input,
       output,
       output_size,
@@ -850,7 +853,7 @@ Tensor& upsample_linear1d_backward_out(
       align_corners == false,
       "We don't support align_corners currently as oneDNN don't support this "
       "algorithm!\n");
-  xpu::oneDNN::resample_backward(
+  torch_ipex::xpu::oneDNN::resample_backward(
       grad_input,
       grad_output,
       input_size,

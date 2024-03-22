@@ -28,7 +28,8 @@ struct OffsetCalculator {
       std::conditional_t<signed_strides, std::make_signed_t<index_t>, index_t>;
 
   // The offset for each argument (in bytes). Wrapper around fixed-size array.
-  using offset_type = xpu::dpcpp::Array<stride_t, std::max<int>(NARGS, 1)>;
+  using offset_type =
+      torch_ipex::xpu::dpcpp::Array<stride_t, std::max<int>(NARGS, 1)>;
 
   // if element_sizes is nullptr, then the strides will be in bytes, otherwise
   // the strides will be in # of elements.
@@ -80,7 +81,8 @@ template <int NARGS, typename index_t = uint32_t>
 struct TrivialOffsetCalculator {
   // The offset for each argument. Wrapper around fixed-size array.
   // The offsets are in # of elements, not in bytes.
-  using offset_type = xpu::dpcpp::Array<index_t, std::max<int>(NARGS, 1)>;
+  using offset_type =
+      torch_ipex::xpu::dpcpp::Array<index_t, std::max<int>(NARGS, 1)>;
 
   offset_type get(index_t linear_idx) const {
     offset_type offsets;

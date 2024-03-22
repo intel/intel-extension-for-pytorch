@@ -8,7 +8,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -368,4 +368,4 @@ void embedding_bag_max_template(
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

@@ -13,7 +13,7 @@
 #include "Loops.h"
 #include "LoopsTemplates.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

@@ -14,7 +14,7 @@ void InitIpexBindings(py::module& m) {
   m.def("_has_cpu", []() { return false; });
 #endif
 #ifdef BUILD_WITH_XPU
-  xpu::init_xpu_module(m);
+  torch_ipex::xpu::init_xpu_module(m);
   m.def("_has_xpu", []() { return true; });
 #else
   m.def("_has_xpu", []() { return false; });

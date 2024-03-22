@@ -24,8 +24,8 @@ static inline Tensor& unary_out_with_onednn_and_loops(
     float beta = 0.0f,
     bool if_enable_onednn_path = true) {
   bool is_out_defined = out.defined();
-  bool use_onednn_path =
-      if_enable_onednn_path && xpu::oneDNN::eltwise_forward_valid(out, self);
+  bool use_onednn_path = if_enable_onednn_path &&
+      torch_ipex::xpu::oneDNN::eltwise_forward_valid(out, self);
 
   Tensor self_;
   if (use_onednn_path) {
@@ -39,7 +39,7 @@ static inline Tensor& unary_out_with_onednn_and_loops(
   auto iter = iter_creator(out, self_);
 
   if (use_onednn_path) {
-    xpu::oneDNN::eltwise<algorithm_t>(out, self_, alpha, beta);
+    torch_ipex::xpu::oneDNN::eltwise<algorithm_t>(out, self_, alpha, beta);
   } else {
     fn(iter);
     if (!is_out_defined)
@@ -61,7 +61,7 @@ static inline Tensor& unary_out_with_onednn_and_loops_bw(
     bool if_enable_onednn_path = true) {
   bool is_out_defined = out.defined();
   bool use_onednn_path = if_enable_onednn_path &&
-      xpu::oneDNN::eltwise_backward_valid(out, self, other);
+      torch_ipex::xpu::oneDNN::eltwise_backward_valid(out, self, other);
 
   Tensor self_, other_;
   if (use_onednn_path) {
@@ -77,7 +77,8 @@ static inline Tensor& unary_out_with_onednn_and_loops_bw(
   auto iter = iter_creator(out, self_, other_);
 
   if (use_onednn_path) {
-    xpu::oneDNN::eltwise_backward<algorithm_t>(out, self_, other_, alpha, beta);
+    torch_ipex::xpu::oneDNN::eltwise_backward<algorithm_t>(
+        out, self_, other_, alpha, beta);
   } else {
     fn(iter);
     if (!is_out_defined)
@@ -97,7 +98,7 @@ static inline Tensor& binary_out_template(
     bool if_enable_onednn_path = true) {
   bool is_out_defined = out.defined();
   bool use_onednn_path = if_enable_onednn_path &&
-      xpu::oneDNN::binary_forward_valid(out, self, other);
+      torch_ipex::xpu::oneDNN::binary_forward_valid(out, self, other);
 
   Tensor self_, other_;
   if (use_onednn_path) {
@@ -113,7 +114,7 @@ static inline Tensor& binary_out_template(
   auto iter = iter_creator(out, self_, other_);
 
   if (use_onednn_path) {
-    xpu::oneDNN::bin<algorithm_t>(out, self_, other_);
+    torch_ipex::xpu::oneDNN::bin<algorithm_t>(out, self_, other_);
   } else {
     fn(iter);
     if (!is_out_defined)

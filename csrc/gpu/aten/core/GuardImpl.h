@@ -6,9 +6,9 @@
 #include <core/Device.h>
 #include <core/Stream.h>
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace impl {
 
@@ -59,4 +59,4 @@ struct DPCPPGuardImpl final : public c10::impl::DeviceGuardImplInterface {
 };
 } // namespace impl
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

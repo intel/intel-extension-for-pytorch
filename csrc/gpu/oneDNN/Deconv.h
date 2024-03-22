@@ -11,9 +11,9 @@
 #include "Attr.h"
 #include "ConvUtils.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 namespace {
 
@@ -225,7 +225,7 @@ static memory deconv_get_expected_src_memory(
       src_m =
           dpcpp_onednn_memory(expected_src_md, engine, src_blocked.data_ptr());
       if (need_reorder)
-        xpu::oneDNN::reorder(src, src_blocked);
+        torch_ipex::xpu::oneDNN::reorder(src, src_blocked);
     }
   } else {
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
@@ -272,7 +272,7 @@ static memory deconv_get_expected_wgh_memory(
         // oneDNN deconv weight dim g/o/i/h/w or g/o/h/w/i
         reshaped_wgh = wgh.transpose(0, 1);
       }
-      xpu::oneDNN::reorder(reshaped_wgh, wgh_blocked);
+      torch_ipex::xpu::oneDNN::reorder(reshaped_wgh, wgh_blocked);
 
       if (weight_cache_optimization) {
         auto wgh_opt_ctx = DPCPPTensorContext::release_tensor_ctx(wgh_blocked);
@@ -302,7 +302,7 @@ static memory deconv_get_expected_dst_memory(
     dst_m =
         dpcpp_onednn_memory(expected_dst_md, engine, dst_blocked.data_ptr());
     if (need_reorder)
-      xpu::oneDNN::reorder(dst, dst_blocked);
+      torch_ipex::xpu::oneDNN::reorder(dst, dst_blocked);
   } else {
     dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
     dst_blocked = dst;
@@ -367,7 +367,7 @@ static void deconvolution(
 #endif
 
   if (src_usr_md.get_data_type() == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+    pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
   auto deconv_fwd_pd = deconvolution_forward::primitive_desc(
@@ -482,7 +482,7 @@ static void deconvolution_backward_data(
   // create fwd primitive desc hint
   primitive_attr pattr;
   if (dst_usr_md.get_data_type() == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+    pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
   }
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
@@ -617,7 +617,7 @@ static void deconvolution_backward_weights(
   memory::dims _dilation = deconv_compatible_dilation(dilation);
   primitive_attr pattr;
   if (src_usr_md.get_data_type() == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+    pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
   if (globalContext().deterministicAlgorithms() ||
@@ -718,9 +718,9 @@ static void deconvolution_backward_weights(
     } else {
       reshaped_diff_wgh = diff_wgh.transpose(0, 1);
     }
-    xpu::oneDNN::reorder(expected_diff_wgh, reshaped_diff_wgh);
+    torch_ipex::xpu::oneDNN::reorder(expected_diff_wgh, reshaped_diff_wgh);
   }
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

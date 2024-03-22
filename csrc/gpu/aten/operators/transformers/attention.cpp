@@ -77,7 +77,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
       scale.has_value() ? scale.value() : (1.0 / std::sqrt(query.size(-1)));
 
   const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
-  xpu::xetla::XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  auto xeType = sdp::aten_to_Xetla_dtype(query);
   gpu_arch xeArch = sdp::aten_to_Xetla_arch();
   auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,
@@ -395,8 +395,10 @@ _scaled_dot_product_efficient_attention(
   int64_t M = query.size(-2);
   int64_t N = key.size(-2);
 
-  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
-      c10::nullopt, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen =
+      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+          c10::nullopt,
+          torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   std::pair<uint64_t, uint64_t> philox_state;
   {
     // See Note [Acquire lock when using random generators]
@@ -800,7 +802,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
 
 #if defined(USE_XETLA)
-  xpu::xetla::XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  auto xeType = sdp::aten_to_Xetla_dtype(query);
   gpu_arch xeArch = sdp::aten_to_Xetla_arch();
   auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,

@@ -7,7 +7,7 @@
 #include <utils/DPCPP.h>
 #include "UpSample.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 template <typename T>
 struct Im2colKernelFunctor {

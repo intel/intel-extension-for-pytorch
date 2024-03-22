@@ -7,7 +7,7 @@
 #include "comm/Atomics.h"
 #include "core/detail/TensorInfo.h"
 using namespace at::AtenIpexTypeXPU;
-using namespace xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp::detail;
 
 template <class SrcInfo, class DstInfo, class IdxInfo, class FuncType>
 class IndexKernelConfig : public BatchKernelConfig {

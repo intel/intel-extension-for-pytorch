@@ -13,8 +13,8 @@
 
 using namespace dnnl;
 using namespace at::native;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 using namespace at::AtenIpexTypeXPU::impl;
 
 namespace at {
@@ -67,7 +67,8 @@ struct QLinearConverter {
 
       is_fused_ = get_onednn_matmul_binary_attr(
           result, attr, dim_tensor1, dim_tensor2, result_shape);
-      xpu::oneDNN::quantized_matmul(result, input, weight, bias, false, attr);
+      torch_ipex::xpu::oneDNN::quantized_matmul(
+          result, input, weight, bias, false, attr);
       if (result.defined()) {
         set_quantizer_(
             result,
@@ -92,7 +93,8 @@ struct QLinearConverter {
       }
       is_fused_ = get_onednn_matmul_binary_attr(
           result, attr, dim_tensor1, dim_tensor2, result_shape);
-      xpu::oneDNN::quantized_matmul(result, input, weight, bias, false, attr);
+      torch_ipex::xpu::oneDNN::quantized_matmul(
+          result, input, weight, bias, false, attr);
       return;
     }
 
@@ -120,7 +122,7 @@ struct QLinearConverter {
       }
       is_fused_ = get_onednn_matmul_binary_attr(
           result, attr, dim_tensor1, dim_tensor2, result_shape);
-      xpu::oneDNN::quantized_matmul(
+      torch_ipex::xpu::oneDNN::quantized_matmul(
           result, input_view, weight, bias, false, attr);
       result = result.view(output_shape);
       return;

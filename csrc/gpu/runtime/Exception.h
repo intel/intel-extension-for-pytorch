@@ -5,7 +5,7 @@
 #include <utils/Macros.h>
 #include <utils/oneMKLUtils.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 #define AT_DPCPP_TRY try {
@@ -13,7 +13,7 @@ namespace dpcpp {
 #define AT_DPCPP_CATCH_RETHROW(filename, lineno)                               \
   }                                                                            \
   catch (oneapi::mkl::lapack::exception & e) {                                 \
-    xpu::oneMKL::oneMKLExpInfo::Instance().setLastInfo(e.info());              \
+    torch_ipex::xpu::oneMKL::oneMKLExpInfo::Instance().setLastInfo(e.info());  \
     TORCH_WARN(                                                                \
         "ONEMKL Exception:",                                                   \
         e.info(),                                                              \
@@ -32,7 +32,7 @@ namespace dpcpp {
 #define AT_DPCPP_CATCH_NOTHROW(filename, lineno)                               \
   }                                                                            \
   catch (oneapi::mkl::lapack::exception & e) {                                 \
-    xpu::oneMKL::oneMKLExpInfo::Instance().setLastInfo(e.info());              \
+    torch_ipex::xpu::oneMKL::oneMKLExpInfo::Instance().setLastInfo(e.info());  \
     TORCH_WARN(                                                                \
         "ONEMKL Exception:",                                                   \
         e.info(),                                                              \
@@ -113,4 +113,4 @@ static sycl::async_handler dpcppAsyncHandler = [](sycl::exception_list eL) {
 };
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

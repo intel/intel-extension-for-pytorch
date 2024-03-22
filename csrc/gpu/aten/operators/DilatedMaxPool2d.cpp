@@ -14,8 +14,8 @@
 
 using namespace dnnl;
 using namespace at::native;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -682,15 +682,17 @@ void max_pool2d_with_indices_out_template(
     indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
   }
 
-  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  auto real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
 
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng || input.is_quantized()) {
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng ||
+      input.is_quantized()) {
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
-    // is used in ::xpu::oneDNN::pooling
+    // is used in torch_ipex::xpu::oneDNN::pooling
     dilation_vec = {0, 0};
 
-    ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_max>(
+    torch_ipex::xpu::oneDNN::pooling<alg::pooling_max>(
         output,
         indices,
         input_,
@@ -920,13 +922,15 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputWidth,
       memory_format);
 
-  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
-  if ((input.is_quantized()) || real_eng == xpu::COMPUTE_ENG::ONEDNN) {
+  auto real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
+  if ((input.is_quantized()) ||
+      real_eng == torch_ipex::xpu::COMPUTE_ENG::ONEDNN) {
     // per oneDNN definition, no dilation means dilation ratio is 0.
     // Since dilation is already designed in the output size, no dilation
-    // is used in ::xpu::oneDNN::pooling
+    // is used in torch_ipex::xpu::oneDNN::pooling
     dilation_vec = {0, 0};
-    ::xpu::oneDNN::pooling_backward<::xpu::oneDNN::alg::pooling_max>(
+    torch_ipex::xpu::oneDNN::pooling_backward<alg::pooling_max>(
         gradInput,
         gradOutput,
         input,

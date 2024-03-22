@@ -29,7 +29,7 @@
 
 using namespace at;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 // Put them here to share with DPCPPStream and oneDNN's runtime
@@ -73,4 +73,4 @@ uint32_t dpcppGetQueueIndex(DeviceIndex device_index);
 sycl::queue& dpcppGetRawQueue(DeviceIndex device_index, QueueIndex queue_index);
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

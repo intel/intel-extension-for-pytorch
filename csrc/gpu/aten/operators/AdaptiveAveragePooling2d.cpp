@@ -14,8 +14,8 @@
 #include <vector>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace {
 
@@ -250,7 +250,7 @@ void adaptive_avg_pool2d_out_template(
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
   std::vector<int64_t> padding_vec = {padH, padW};
 
-  if (xpu::oneDNN::is_valid_pooling(
+  if (torch_ipex::xpu::oneDNN::is_valid_pooling(
           {inputHeight, inputWidth},
           {outputHeight, outputWidth},
           {kH, kW},
@@ -264,7 +264,7 @@ void adaptive_avg_pool2d_out_template(
        (C, H, W) case. Then the suggest_memory_format can only be Contiguous.
        2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
        This case supports Contiguous and ChannelsLast2D memory_format. */
-    xpu::oneDNN::pooling<xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+    torch_ipex::xpu::oneDNN::pooling<alg::pooling_avg_exclude_padding>(
         output,
         input_,
         nbatch,
@@ -714,14 +714,13 @@ void adaptive_avg_pool2d_backward_out_template(
 
   // per oneDNN definition, no dilation means dilation ratio is 0
   std::vector<int64_t> dilation_vec = {0, 0};
-  if (xpu::oneDNN::is_valid_pooling(
+  if (torch_ipex::xpu::oneDNN::is_valid_pooling(
           {inputHeight, inputWidth},
           {outputHeight, inputHeight},
           {kH, kW},
           {dH, dW},
           {padH, padW})) {
-    xpu::oneDNN::pooling_backward<
-        xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+    torch_ipex::xpu::oneDNN::pooling_backward<alg::pooling_avg_exclude_padding>(
         gradInput,
         gradOutput,
         input,

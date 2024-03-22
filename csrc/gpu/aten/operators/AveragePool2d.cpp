@@ -14,8 +14,8 @@
 
 using namespace dnnl;
 using namespace at::native;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -444,13 +444,13 @@ void avg_pool2d_out_template(
 
   // per oneDNN definition, no dilation means dilation ratio is 0
   std::vector<int64_t> dilation_vec = {0, 0};
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
 
   // for onednn block format
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     if (count_include_pad) {
-      ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
+      torch_ipex::xpu::oneDNN::pooling<alg::pooling_avg_include_padding>(
           output,
           input_,
           nbatch,
@@ -467,7 +467,7 @@ void avg_pool2d_out_template(
           padding_vec,
           padding_vec);
     } else {
-      ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+      torch_ipex::xpu::oneDNN::pooling<alg::pooling_avg_exclude_padding>(
           output,
           input_,
           nbatch,
@@ -609,8 +609,7 @@ Tensor& avg_pool2d_backward_out_template(
   // per oneDNN definition, no dilation means dilation ratio is 0
   std::vector<int64_t> dilation_vec = {0, 0};
   if (count_include_pad) {
-    ::xpu::oneDNN::pooling_backward<
-        ::xpu::oneDNN::alg::pooling_avg_include_padding>(
+    torch_ipex::xpu::oneDNN::pooling_backward<alg::pooling_avg_include_padding>(
         gradInput,
         gradOutput,
         input,
@@ -628,8 +627,7 @@ Tensor& avg_pool2d_backward_out_template(
         padding_vec,
         padding_vec);
   } else {
-    ::xpu::oneDNN::pooling_backward<
-        ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+    torch_ipex::xpu::oneDNN::pooling_backward<alg::pooling_avg_exclude_padding>(
         gradInput,
         gradOutput,
         input,

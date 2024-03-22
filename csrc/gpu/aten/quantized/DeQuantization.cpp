@@ -12,8 +12,8 @@
 
 using namespace dnnl;
 using namespace at::native;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 using namespace at::AtenIpexTypeQuantizedXPU;
 
 namespace at {
@@ -32,7 +32,7 @@ Tensor dequantize_tensor_per_tensor_affine(
 
   Tensor rtensor_ = at::empty(qtensor.sizes(), rtensor.options());
   auto quant_base = fetch_cached_quantizer_base(scale, zero_point);
-  xpu::oneDNN::quantized_reorder(
+  torch_ipex::xpu::oneDNN::quantized_reorder(
       qtensor,
       rtensor_,
       (float*)quant_base.scale_ptr(),
@@ -60,7 +60,7 @@ Tensor dequantize_tensor_per_channel_affine(
   // Check zero point here
   rattr.set_src_zp_mask(mask);
   Tensor rtensor_ = at::empty(qtensor.sizes(), rtensor.options());
-  xpu::oneDNN::quantized_reorder(
+  torch_ipex::xpu::oneDNN::quantized_reorder(
       qtensor,
       rtensor_,
       (float*)scales.data_ptr(),

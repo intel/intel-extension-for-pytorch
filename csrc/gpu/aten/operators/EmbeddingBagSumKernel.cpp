@@ -2,7 +2,7 @@
 #include "MemoryAccess.h"
 #include "comm/ATDispatch.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -75,4 +75,4 @@ void embedding_bag_sum_template(
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

@@ -5,7 +5,7 @@
 #include "MemoryAccess.h"
 #include "MultiTensorApply.h"
 #include "Pow.h"
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace {

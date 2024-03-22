@@ -17,7 +17,7 @@
 #include <profiler/XPUActivityApi.h>
 #endif
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 // Global device pool state
@@ -604,15 +604,16 @@ bool dpcppGetDeviceHas2DBlock(DeviceId device_id) noexcept {
 // device_count() and is_available() such that both two functions can be called
 // before forking process.
 int dpcppPrefetchDeviceCount(int& device_count) noexcept {
-  return xpu::dpcpp::dpcppGetDeviceCountFork(device_count);
+  return torch_ipex::xpu::dpcpp::dpcppGetDeviceCountFork(device_count);
 }
 
 // This function can be used to get if fp64 data type is supported and no
 // execption. It is used in device_count() and is_available() such that both two
 // functions can be called before forking process.
 int dpcppPrefetchDeviceHasFP64Dtype(int device_id, bool& has_fp64) noexcept {
-  return xpu::dpcpp::dpcppGetDeviceHasFP64DtypeFork(device_id, has_fp64);
+  return torch_ipex::xpu::dpcpp::dpcppGetDeviceHasFP64DtypeFork(
+      device_id, has_fp64);
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

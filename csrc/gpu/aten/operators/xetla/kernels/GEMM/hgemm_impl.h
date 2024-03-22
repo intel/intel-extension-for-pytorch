@@ -3,7 +3,7 @@
 #include "../xetla.h"
 #include "epilogue_impl.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 template <
     typename scalar_t,
@@ -1306,4 +1306,4 @@ inline cgfs_t hgemm_qkv_group_bias(
   }};
 }
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

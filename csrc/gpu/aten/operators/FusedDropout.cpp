@@ -15,8 +15,8 @@
 #include <aten/operators/MemoryAccess.h>
 
 using namespace at;
-using namespace xpu::dpcpp::detail;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -535,8 +535,10 @@ std::tuple<Tensor, Tensor> native_dropout(
     return std::tuple<Tensor, Tensor>(ret, mask);
   }
 
-  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
-      c10::nullopt, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen =
+      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+          c10::nullopt,
+          torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   double p1m = 1. - p;
   return impl::dropout_template<bool>(gen, self, p1m);
 }
@@ -546,8 +548,9 @@ std::tuple<Tensor, Tensor> _fused_dropout(
     const Tensor& self,
     double p,
     c10::optional<Generator> gen_) {
-  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
-      gen_, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen =
+      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+          gen_, torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   return impl::dropout_template<uint8_t>(gen, self, p);
 }
 

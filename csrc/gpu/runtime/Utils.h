@@ -11,7 +11,7 @@
 
 using namespace at;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 static inline bool dpcppIsAvailable() {
@@ -206,4 +206,4 @@ uint32_t dpcppNativeVectorWidth(
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

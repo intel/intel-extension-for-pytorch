@@ -24,7 +24,7 @@
 
 namespace gpu::xetla::group {
 
-using quant_mode = xpu::xetla::quant_mode;
+using quant_mode = torch_ipex::xpu::xetla::quant_mode;
 
 /// @brief Compute policy for unaligned shape and xmx engine.
 /// @tparam compute_attr_ Is compute-related attributes.

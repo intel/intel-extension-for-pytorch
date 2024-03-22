@@ -17,7 +17,7 @@
 #include <functional>
 #include <memory>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 namespace {
@@ -29,14 +29,15 @@ static std::once_flag init_global_id_pool_flag;
 static std::deque<std::once_flag> init_aten_device_flag;
 
 static void initGlobalIdPoolState() {
-  auto num_gpus = xpu::dpcpp::device_count();
+  auto num_gpus = torch_ipex::xpu::dpcpp::device_count();
   aten_device_global_ids.resize(num_gpus);
   init_aten_device_flag.resize(num_gpus);
 }
 
 // Get gpu device id from all SYCL devices associated with the SYCL platform.
 static void initGlobalIdFromATenDeviceId(const DeviceId aten_device_id) {
-  sycl::device& xpu_device = xpu::dpcpp::dpcppGetRawDevice(aten_device_id);
+  sycl::device& xpu_device =
+      torch_ipex::xpu::dpcpp::dpcppGetRawDevice(aten_device_id);
   sycl::device target_device;
 
   if (Settings::I().is_device_hierarchy_composite_enabled()) {
@@ -120,7 +121,8 @@ DLDevice_& XPUHooks::getDLPackDeviceFromATenDevice(
 }
 
 Generator XPUHooks::getXPUGenerator(DeviceIndex device_index) const {
-  auto generator = make_generator<xpu::dpcpp::DPCPPGeneratorImpl>(device_index);
+  auto generator =
+      make_generator<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(device_index);
   return generator;
 }
 
@@ -131,11 +133,11 @@ const Generator& XPUHooks::getDefaultXPUGenerator(
 }
 
 int XPUHooks::getNumGPUs() const {
-  return xpu::dpcpp::device_count();
+  return torch_ipex::xpu::dpcpp::device_count();
 }
 
 REGISTER_XPU_HOOKS(XPUHooks);
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

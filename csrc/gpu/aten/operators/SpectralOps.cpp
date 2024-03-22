@@ -14,8 +14,8 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
-using namespace xpu::dpcpp;
-using namespace xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
 
 #ifdef USE_ONEMKL
 using namespace oneapi::mkl::dft;
@@ -26,7 +26,7 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 template <typename index_t>
 struct HermitianSymmetryOffsetCalculator {
-  using offset_type = xpu::dpcpp::Array<index_t, 1>;
+  using offset_type = torch_ipex::xpu::dpcpp::Array<index_t, 1>;
   using dim_type = std::remove_cv_t<decltype(MAX_TENSORINFO_DIMS)>;
   dim_type dims;
   IntDivider<index_t> sizes_[MAX_TENSORINFO_DIMS];
@@ -322,18 +322,18 @@ class dft_config_t {
   }
 
   void to_bytes(bytestring& bytes) {
-#define MAP_TO_BYTES(val_map)                  \
-  for (auto& value : (val_map)) {              \
-    xpu::dpcpp::to_bytes(bytes, value.first);  \
-    xpu::dpcpp::to_bytes(bytes, value.second); \
+#define MAP_TO_BYTES(val_map)                              \
+  for (auto& value : (val_map)) {                          \
+    torch_ipex::xpu::dpcpp::to_bytes(bytes, value.first);  \
+    torch_ipex::xpu::dpcpp::to_bytes(bytes, value.second); \
   }
 
     MAP_TO_BYTES(val_int64_);
     MAP_TO_BYTES(val_float_);
     MAP_TO_BYTES(val_double_);
 
-    xpu::dpcpp::to_bytes(bytes, fwd_strides_);
-    xpu::dpcpp::to_bytes(bytes, bwd_strides_);
+    torch_ipex::xpu::dpcpp::to_bytes(bytes, fwd_strides_);
+    torch_ipex::xpu::dpcpp::to_bytes(bytes, bwd_strides_);
   }
 
  private:
@@ -382,7 +382,7 @@ class dft_desc_t {
 } // namespace at
 
 #ifdef USE_ONEMKL
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 template <precision prec, domain dom>
@@ -408,7 +408,7 @@ class dft_desc_handle
 };
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu
 #endif
 
 namespace at {

@@ -11,7 +11,7 @@
 #include <array>
 #include <vector>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 struct Stat {
@@ -60,4 +60,4 @@ struct SegmentInfo {
 };
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

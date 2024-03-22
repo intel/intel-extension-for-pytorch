@@ -3,7 +3,7 @@
 #include <iostream>
 #include "hgemm_impl.h"
 #include "hgemm_policy.h"
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 // clang-format off
 
@@ -1009,5 +1009,5 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv_group_bias(
       head_dim);
 }
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla
 #endif

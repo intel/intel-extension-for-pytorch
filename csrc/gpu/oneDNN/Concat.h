@@ -9,9 +9,9 @@
 
 #include <oneapi/dnnl/dnnl.hpp>
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 namespace {
 
@@ -180,4 +180,4 @@ static void concat(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

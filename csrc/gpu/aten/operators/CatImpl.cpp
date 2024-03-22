@@ -20,8 +20,8 @@
 #include "utils/ComputeEngine.h"
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -298,7 +298,7 @@ void parallel_cat(
         // update offset
         offset += dimSize;
       }
-      xpu::dpcpp::memcpyHostToDevice(
+      torch_ipex::xpu::dpcpp::memcpyHostToDevice(
           d_inputs, stackInputs, tensorMetadataSize, /* async= */ true);
       HostAllocator::Instance()->release(stackInputs);
     }
@@ -432,7 +432,7 @@ static void cat(
 
   const bool all32BitIndexable =
       std::all_of(inputs.begin(), inputs.end(), [](const Tensor& t) {
-        return xpu::dpcpp::detail::canUse32BitIndexMath(t);
+        return torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(t);
       });
   const bool allContiguous =
       std::all_of(inputs.begin(), inputs.end(), [](const Tensor& t) {
@@ -441,8 +441,8 @@ static void cat(
 
   if (inputs.size() > 1 && !hasSkippedInput &&
       result.dim() <= CAT_ARRAY_MAX_INPUT_DIMS &&
-      xpu::dpcpp::detail::canUse32BitIndexMath(result) && allContiguous &&
-      all32BitIndexable && allSameType &&
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(result) &&
+      allContiguous && all32BitIndexable && allSameType &&
       (inputs[0].get().scalar_type() == result.scalar_type()) &&
       (!inputs[0].get().is_quantized())) {
     IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
@@ -464,8 +464,9 @@ static void cat(
   } else if (
       inputs.size() > 1 && !hasSkippedInput &&
       result.dim() <= CAT_ARRAY_MAX_INPUT_DIMS &&
-      xpu::dpcpp::detail::canUse32BitIndexMath(result) && allContiguous &&
-      all32BitIndexable && allSameType && inputs[0].get().is_quantized()) {
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(result) &&
+      allContiguous && all32BitIndexable && allSameType &&
+      inputs[0].get().is_quantized()) {
     // dispatch code for quantization(kQInt8, kQUInt8) tensor
     IPEX_DISPATCH_QTYPE_WITH_UNDERLYING(
         result.scalar_type(), "cat_dpcpp", 0, [&]() {
@@ -550,11 +551,11 @@ void cat_(const ITensorListRef& container, int64_t dim, Tensor& out) {
   // when satify none of the input tensors is block fmt
   // cat will go to DPCPP path, all the other cases will go to oneDNN path
 
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, container);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, container);
 
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng && (!isQuant)) {
-    xpu::oneDNN::concat(out, tensors, dim);
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng && (!isQuant)) {
+    torch_ipex::xpu::oneDNN::concat(out, tensors, dim);
   } else {
     auto atens = at::AtenIpexTypeXPU::to_plain_if_needed(tensors);
     impl::cat(

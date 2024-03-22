@@ -4,7 +4,7 @@
 #include <tensor/Tensor.h>
 #include "comm/RegistrationDeclarations.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -47,7 +47,7 @@ Tensor& set_(Tensor& self) {
   Storage storage(
       c10::Storage::use_byte_size_t(),
       0,
-      xpu::dpcpp::getDeviceAllocator(),
+      torch_ipex::xpu::dpcpp::getDeviceAllocator(),
       true);
   self.set_(storage, 0, {0}, {});
   TORCH_INTERNAL_ASSERT(type == self.scalar_type());

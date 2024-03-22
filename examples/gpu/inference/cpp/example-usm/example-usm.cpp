@@ -5,7 +5,7 @@
 #include <CL/sycl.hpp>
 
 using namespace sycl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 int main(int argc, const char* argv[]) {
   torch::jit::script::Module module;
@@ -24,7 +24,7 @@ int main(int argc, const char* argv[]) {
   auto device_type = c10::DeviceType::XPU;
   c10::impl::VirtualGuardImpl impl(device_type);
   c10::Stream xpu_stream = impl.getStream(c10::Device(device_type));
-  auto& sycl_queue = xpu::get_queue_from_stream(xpu_stream);
+  auto& sycl_queue = torch_ipex::xpu::get_queue_from_stream(xpu_stream);
   float *input_ptr = malloc_device<float>(224 * 224 * 3, sycl_queue);
   auto input = fromUSM(input_ptr, at::ScalarType::Float, {1, 3, 224, 224}, c10::nullopt, -1).to(at::kXPU);
   std::cout << "input tensor created from usm " << std::endl;

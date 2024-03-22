@@ -1,7 +1,7 @@
 #include <oneapi/dnnl/dnnl_debug.h>
 #include "Deconv.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 namespace {
 
@@ -130,7 +130,7 @@ static memory qdeconv_get_expected_src_memory(
           empty_opaque_tensor(expected_src_md, src.options(), c10::nullopt);
       src_m =
           dpcpp_onednn_memory(expected_src_md, engine, src_blocked.data_ptr());
-      xpu::oneDNN::reorder(src, src_blocked);
+      torch_ipex::xpu::oneDNN::reorder(src, src_blocked);
     }
   } else {
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
@@ -164,7 +164,7 @@ static memory qdeconv_get_expected_wgh_memory(
           compatible_groups_conv_strides(wgh, wgh_blocked.sizes().vec()),
           c10::nullopt);
     }
-    xpu::oneDNN::reorder(reshaped_wgh, wgh_blocked);
+    torch_ipex::xpu::oneDNN::reorder(reshaped_wgh, wgh_blocked);
 
     if (weight_cache_optimization) {
       auto wgh_opt_ctx = DPCPPTensorContext::release_tensor_ctx(wgh_blocked);
@@ -198,7 +198,7 @@ static memory qdeconv_get_block_dst_memory(
 
     // TODO: qdeconv currently does not post ops
     // if (attr.with_sum())
-    //   xpu::oneDNN::reorder(dst, dst_blocked);
+    //   torch_ipex::xpu::oneDNN::reorder(dst, dst_blocked);
   } else {
     dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
     dst_blocked = dst;
@@ -399,4 +399,4 @@ static Tensor quantized_deconvolution(
 
 } // namespace
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

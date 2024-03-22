@@ -90,9 +90,9 @@ Tensor& addmm_out(
   bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
 
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, self, mat1, mat2);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, self, mat1, mat2);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid && compute_eng_valid;
   if (dpcppGetDeviceHasXMX()) {
     if (alpha.to<float>() == 1.f && self.dim() == 1) {
@@ -106,7 +106,7 @@ Tensor& addmm_out(
               .build();
       if (xetla_valid && policy.valid()) {
         auto status = policy.run();
-        if (status == xpu::xetla::GemmStatus::kSuccess)
+        if (status == torch_ipex::xpu::xetla::GemmStatus::kSuccess)
           return result;
       }
     } else if (
@@ -123,7 +123,7 @@ Tensor& addmm_out(
               .build();
       if (xetla_valid && policy.valid()) {
         auto status = policy.run();
-        if (status == xpu::xetla::GemmStatus::kSuccess)
+        if (status == torch_ipex::xpu::xetla::GemmStatus::kSuccess)
           return result;
       }
     }
@@ -160,7 +160,7 @@ Tensor& addmm_out(
         attr.append_post_eltwise(1.f, beta_, 0.f, attr.kind_with_linear);
     }
   }
-  xpu::oneDNN::matmul(result, mat1, mat2, bias, true, attr);
+  torch_ipex::xpu::oneDNN::matmul(result, mat1, mat2, bias, true, attr);
   return result;
 }
 
@@ -219,9 +219,9 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
   bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
 
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, self, mat2);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, self, mat2);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid && compute_eng_valid;
   if (dpcppGetDeviceHasXMX()) {
     auto policy = HGEMM_XETLA()
@@ -231,13 +231,14 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
                       .build();
     if (xetla_valid && policy.valid()) {
       auto status = policy.run();
-      if (status == xpu::xetla::GemmStatus::kSuccess)
+      if (status == torch_ipex::xpu::xetla::GemmStatus::kSuccess)
         return result;
     }
   }
 #endif
 
-  xpu::oneDNN::matmul(result, self, mat2, at::Tensor(), true, Attr());
+  torch_ipex::xpu::oneDNN::matmul(
+      result, self, mat2, at::Tensor(), true, Attr());
   return result;
 }
 
@@ -317,7 +318,8 @@ Tensor& baddbmm_out(
     if (beta_ != 1.f)
       attr.append_post_eltwise(1.f, beta_, 0.f, attr.kind_with_linear);
   }
-  xpu::oneDNN::matmul(result, batch1, batch2, at::Tensor(), true, attr);
+  torch_ipex::xpu::oneDNN::matmul(
+      result, batch1, batch2, at::Tensor(), true, attr);
   return result;
 }
 
@@ -426,7 +428,8 @@ Tensor& bmm_out(const Tensor& self, const Tensor& batch2, Tensor& result) {
         "Double and complex datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   }
-  xpu::oneDNN::matmul(result, self, batch2, at::Tensor(), true, Attr());
+  torch_ipex::xpu::oneDNN::matmul(
+      result, self, batch2, at::Tensor(), true, Attr());
   return result;
 }
 
@@ -1348,7 +1351,7 @@ Tensor addmm(
     result.copy_(*accumu);
     attr.append_post_sum(/* sum_scale */ beta.to<float>());
   }
-  xpu::oneDNN::matmul(result, m1, m2, at::Tensor(), true, attr);
+  torch_ipex::xpu::oneDNN::matmul(result, m1, m2, at::Tensor(), true, attr);
   return result;
 }
 

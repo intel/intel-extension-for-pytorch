@@ -11,7 +11,7 @@
 
 #include <iostream>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace {
 
@@ -87,4 +87,4 @@ sycl::queue& dpcppGetRawQueue(DeviceId device_index, QueueIndex queue_index) {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

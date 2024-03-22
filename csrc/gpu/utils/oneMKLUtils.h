@@ -9,7 +9,7 @@
 #define DPCPP_ONEMKL_SUBMIT(q, routine, ...) \
   { DPCPP_EXT_SUBMIT((q), "onemkl_kernel", routine(__VA_ARGS__)); }
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneMKL {
 
 // oneMKLExpInfo singleton
@@ -45,4 +45,4 @@ class oneMKLExpInfo {
 bool set_onemkl_verbose(int level);
 
 } // namespace oneMKL
-} // namespace xpu
+} // namespace torch_ipex::xpu

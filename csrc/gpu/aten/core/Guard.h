@@ -8,7 +8,7 @@
 #include <utils/Macros.h>
 #include <cstddef>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 struct DPCPPGuard {
@@ -173,4 +173,4 @@ struct OptionalDPCPPStreamGuard {
   c10::impl::InlineOptionalStreamGuard<impl::DPCPPGuardImpl> guard_;
 };
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

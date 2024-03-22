@@ -14,7 +14,7 @@
 #include "Loops.h"
 #include "comm/FlattenIndicesCommon.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::sparse;
 
 namespace at {

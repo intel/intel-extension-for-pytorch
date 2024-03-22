@@ -9,7 +9,7 @@
 
 #include <utils/Helpers.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 #if 0
@@ -95,7 +95,8 @@ void DPCPPEvent::record(const DPCPPStream& stream) {
         ".");
   }
 
-  events_.push_back(xpu::dpcpp::queue_barrier(dpcppGetQueueFromStream(stream)));
+  events_.push_back(
+      torch_ipex::xpu::dpcpp::queue_barrier(dpcppGetQueueFromStream(stream)));
 }
 
 void DPCPPEvent::recordOnce(const DPCPPStream& stream) {
@@ -105,7 +106,8 @@ void DPCPPEvent::recordOnce(const DPCPPStream& stream) {
 
 void DPCPPEvent::block(const DPCPPStream& stream) {
   if (!events_.empty()) {
-    xpu::dpcpp::queue_barrier(dpcppGetQueueFromStream(stream), events_);
+    torch_ipex::xpu::dpcpp::queue_barrier(
+        dpcppGetQueueFromStream(stream), events_);
   }
 }
 
@@ -156,4 +158,4 @@ std::shared_ptr<DPCPPEventBase> create_dpcpp_event() {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

@@ -25,7 +25,7 @@
   if (!(cmd))            \
   return
 
-namespace xpu {
+namespace torch_ipex::xpu {
 
 PyObject* module;
 
@@ -35,7 +35,7 @@ static bool in_bad_fork = false; // True for children forked after xpu init
 // Called in the forked child if xpu has already been initialized
 static void forked_child() {
   in_bad_fork = true;
-  set_run_yet_variable_to_false();
+  torch_ipex::xpu::set_run_yet_variable_to_false();
 }
 #endif
 
@@ -52,7 +52,7 @@ PyObject* THPModule_setDevice_wrap(PyObject* self, PyObject* arg) {
   THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to setDevice");
   int64_t device = THPUtils_unpackLong(arg);
 
-  xpu::dpcpp::set_device(static_cast<c10::DeviceIndex>(device));
+  torch_ipex::xpu::dpcpp::set_device(static_cast<c10::DeviceIndex>(device));
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -67,9 +67,9 @@ PyObject* THPModule_exchangeDevice(PyObject* self, PyObject* arg) {
     return THPUtils_packInt32(-1);
   }
 
-  auto current_device = xpu::dpcpp::current_device();
+  auto current_device = torch_ipex::xpu::dpcpp::current_device();
   if (current_device != device) {
-    xpu::dpcpp::set_device(static_cast<c10::DeviceIndex>(device));
+    torch_ipex::xpu::dpcpp::set_device(static_cast<c10::DeviceIndex>(device));
   }
 
   return THPUtils_packInt32(static_cast<int>(current_device));
@@ -78,7 +78,7 @@ PyObject* THPModule_exchangeDevice(PyObject* self, PyObject* arg) {
 
 PyObject* THPModule_getDevice_wrap(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  auto device = static_cast<int>(xpu::dpcpp::current_device());
+  auto device = static_cast<int>(torch_ipex::xpu::dpcpp::current_device());
   return THPUtils_packInt32(device);
   END_HANDLE_TH_ERRORS
 }
@@ -87,14 +87,14 @@ PyObject* THPModule_getDevice_wrap(PyObject* self, PyObject* noargs) {
 // it is not necessary to add poison_fork here repeatedly.
 PyObject* THPModule_getDeviceCount_wrap(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  return THPUtils_packUInt64(xpu::dpcpp::device_count());
+  return THPUtils_packUInt64(torch_ipex::xpu::dpcpp::device_count());
   END_HANDLE_TH_ERRORS
 }
 
 PyObject* THPModule_prefetchDeviceCount_wrap(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
   int device_count = 0;
-  auto status = xpu::dpcpp::prefetch_device_count(device_count);
+  auto status = torch_ipex::xpu::dpcpp::prefetch_device_count(device_count);
   PyObject* output_tuple = PyTuple_New(2);
   PyTuple_SetItem(output_tuple, 0, THPUtils_packInt32(status));
   PyTuple_SetItem(
@@ -154,13 +154,13 @@ static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
   // circular calls.
   // Put set_run_yet_variable_to_true() here instead of in C++ API's lazy_init()
   // to avoid circular calls when directly call Python API's _lazy_init().
-  set_run_yet_variable_to_true();
+  torch_ipex::xpu::set_run_yet_variable_to_true();
   // call device_count() for getting gpu amounts
-  auto num_gpus = xpu::dpcpp::device_count();
+  auto num_gpus = torch_ipex::xpu::dpcpp::device_count();
   auto default_dpcpp_generators =
       PyTuple_New(static_cast<Py_ssize_t>(num_gpus));
   for (int i = 0; i < num_gpus; i++) {
-    auto gen = xpu::dpcpp::detail::getDefaultDPCPPGenerator(i);
+    auto gen = torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator(i);
     // auto cast_gen = (THPGenerator*)DPCPPGenerator_initDefaultGenerator(gen);
     auto cast_gen = (THPGenerator*)THPGenerator_initDefaultGenerator(gen);
     // This reference is meant to be given away, so no need to incref here.
@@ -179,7 +179,7 @@ PyObject* THPModule_getCurrentStream_wrap(
   THPUtils_assert(
       THPUtils_checkLong(device_index), "invalid argument to getCurrentStream");
   int64_t device = THPUtils_unpackLong(device_index);
-  auto stream = xpu::dpcpp::getCurrentDPCPPStream(device);
+  auto stream = torch_ipex::xpu::dpcpp::getCurrentDPCPPStream(device);
   PyObject* output_tuple = PyTuple_New(3);
   PyTuple_SetItem(
       output_tuple, 0, THPUtils_packInt64(static_cast<int64_t>(stream.id())));
@@ -206,7 +206,7 @@ PyObject* THPModule_getCurrentRawStream(
   // NOTE: Here is a high dependency on the implementation of queue pool using
   // smart pointer in runtime.
   return PyCapsule_New(
-      xpu::dpcpp::getCurrentDPCPPStream(device).queue(),
+      torch_ipex::xpu::dpcpp::getCurrentDPCPPStream(device).queue(),
       "torch.xpu.Stream.sycl_queue",
       nullptr);
   END_HANDLE_TH_ERRORS
@@ -233,14 +233,14 @@ PyObject* THPModule_setCurrentStream_wrap(
           &device_type)) {
   }
 
-  auto stream = xpu::dpcpp::DPCPPStream::unpack3(
+  auto stream = torch_ipex::xpu::dpcpp::DPCPPStream::unpack3(
       stream_id, device_index, static_cast<c10::DeviceType>(device_type));
 
-  auto device = xpu::dpcpp::current_device();
+  auto device = torch_ipex::xpu::dpcpp::current_device();
   if (device != stream.device_index()) {
-    xpu::dpcpp::set_device(stream.device_index());
+    torch_ipex::xpu::dpcpp::set_device(stream.device_index());
   }
-  xpu::dpcpp::setCurrentDPCPPStream(stream);
+  torch_ipex::xpu::dpcpp::setCurrentDPCPPStream(stream);
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -276,7 +276,7 @@ PyObject* THPModule_resetPeakMemoryStats(PyObject* _unused, PyObject* arg) {
   THPUtils_assert(
       THPUtils_checkLong(arg), "invalid argument to reset_peak_memory_stats");
   const int device = (int)THPUtils_unpackLong(arg);
-  xpu::dpcpp::resetPeakStatsInDevAlloc(device);
+  torch_ipex::xpu::dpcpp::resetPeakStatsInDevAlloc(device);
   END_HANDLE_TH_ERRORS
   Py_RETURN_NONE;
 }
@@ -289,14 +289,14 @@ PyObject* THPModule_resetAccumulatedMemoryStats(
       THPUtils_checkLong(arg),
       "invalid argument to reset_accumulated_memory_stats");
   const int device = (int)THPUtils_unpackLong(arg);
-  xpu::dpcpp::resetAccumulatedStatsInDevAlloc(device);
+  torch_ipex::xpu::dpcpp::resetAccumulatedStatsInDevAlloc(device);
   END_HANDLE_TH_ERRORS
   Py_RETURN_NONE;
 }
 
 PyObject* THPModule_emptyCache(PyObject* _unused, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  xpu::dpcpp::emptyCacheInDevAlloc();
+  torch_ipex::xpu::dpcpp::emptyCacheInDevAlloc();
   END_HANDLE_TH_ERRORS
   Py_RETURN_NONE;
 }
@@ -307,10 +307,10 @@ PyObject* THPModule_memoryStats(PyObject* _unused, PyObject* arg) {
       THPUtils_checkLong(arg), "invalid argument to memory_allocated");
   const int device = (int)THPUtils_unpackLong(arg);
 
-  using xpu::dpcpp::DeviceStats;
-  using xpu::dpcpp::Stat;
-  using xpu::dpcpp::StatArray;
-  using xpu::dpcpp::StatType;
+  using torch_ipex::xpu::dpcpp::DeviceStats;
+  using torch_ipex::xpu::dpcpp::Stat;
+  using torch_ipex::xpu::dpcpp::StatArray;
+  using torch_ipex::xpu::dpcpp::StatType;
 
   const auto statToDict = [](const Stat& stat) {
     py::dict dict;
@@ -332,7 +332,7 @@ PyObject* THPModule_memoryStats(PyObject* _unused, PyObject* arg) {
     return dict;
   };
 
-  const auto stats = xpu::dpcpp::getDeviceStatsFromDevAlloc(device);
+  const auto stats = torch_ipex::xpu::dpcpp::getDeviceStatsFromDevAlloc(device);
 
   py::dict result;
   result["num_alloc_retries"] = stats.num_alloc_retries;
@@ -353,8 +353,8 @@ PyObject* THPModule_memoryStats(PyObject* _unused, PyObject* arg) {
 PyObject* THPModule_memorySnapshot(PyObject* _unused, PyObject* noargs) {
   HANDLE_TH_ERRORS
 
-  using xpu::dpcpp::BlockInfo;
-  using xpu::dpcpp::SegmentInfo;
+  using torch_ipex::xpu::dpcpp::BlockInfo;
+  using torch_ipex::xpu::dpcpp::SegmentInfo;
 
   const auto segmentInfoToDict = [](const SegmentInfo& segmentInfo) {
     py::dict segmentDict;
@@ -380,7 +380,7 @@ PyObject* THPModule_memorySnapshot(PyObject* _unused, PyObject* noargs) {
     return segmentDict;
   };
 
-  const std::vector<SegmentInfo>& snapshot = xpu::dpcpp::snapshotOfDevAlloc();
+  const std::vector<SegmentInfo>& snapshot = torch_ipex::xpu::dpcpp::snapshotOfDevAlloc();
   py::list result;
 
   for (const auto& segmentInfo : snapshot) {
@@ -457,7 +457,7 @@ PyObject* THPModule_fromUSM(PyObject* _unused, PyObject* args) {
   // Here, it is not necessary to add lazy_init repeatedly. It will be called
   // automatically.
   auto tensor =
-      xpu::dpcpp::fromUSM((void*)src, stype, shape, strides, device_id);
+      torch_ipex::xpu::dpcpp::fromUSM((void*)src, stype, shape, strides, device_id);
   return THPVariable_Wrap(tensor);
   END_HANDLE_TH_ERRORS
 }
@@ -465,7 +465,7 @@ PyObject* THPModule_fromUSM(PyObject* _unused, PyObject* args) {
 PyObject* THPModule_toUSM(PyObject* _unused, PyObject* data) {
   HANDLE_TH_ERRORS
   THPUtils_assert(THPVariable_Check(data), "data must be a Tensor");
-  auto usm = xpu::dpcpp::toUSM(THPVariable_Unpack(data));
+  auto usm = torch_ipex::xpu::dpcpp::toUSM(THPVariable_Unpack(data));
   return PyCapsule_New(usm, "USMtensor", NULL);
   END_HANDLE_TH_ERRORS
 }
@@ -531,23 +531,23 @@ static struct PyMethodDef _THPModule_methods[] = {
 std::string get_dev_type(const DeviceInfo& info) {
   std::ostringstream stream;
   switch (info.dev_type) {
-    case xpu::dpcpp::device_type::cpu:
+    case torch_ipex::xpu::dpcpp::device_type::cpu:
       stream << "cpu";
       break;
-    case xpu::dpcpp::device_type::gpu:
+    case torch_ipex::xpu::dpcpp::device_type::gpu:
       stream << "gpu";
       break;
-    case xpu::dpcpp::device_type::accelerator:
+    case torch_ipex::xpu::dpcpp::device_type::accelerator:
       stream << "accelerator";
       break;
-    case xpu::dpcpp::device_type::host:
+    case torch_ipex::xpu::dpcpp::device_type::host:
       stream << "host";
       break;
     default:
       stream
           << "unknown device type:"
           << static_cast<
-                 typename std::underlying_type<xpu::dpcpp::device_type>::type>(
+                 typename std::underlying_type<torch_ipex::xpu::dpcpp::device_type>::type>(
                  info.dev_type);
       break;
   }
@@ -592,7 +592,7 @@ static void bindGetDeviceInfo(PyObject* module) {
   m.def(
       "_get_device_properties",
       [](int device) -> DeviceInfo* {
-        return xpu::dpcpp::getDeviceInfo(device);
+        return torch_ipex::xpu::dpcpp::getDeviceInfo(device);
       },
       py::return_value_policy::reference);
 }
@@ -621,13 +621,13 @@ at::Scalar scalar_slow(PyObject* object) {
 void init_xpu_module(pybind11::module& m) {
   // For Runtime API, still use pybind
   m.def("_synchronize", [](const int& device_index) {
-    xpu::dpcpp::deviceSynchronize(device_index);
+    torch_ipex::xpu::dpcpp::deviceSynchronize(device_index);
   });
 
   m.def("sycl_device", [](const int& device_index) {
     auto dev_id =
-        (device_index == -1) ? xpu::dpcpp::current_device() : device_index;
-    auto dev_ptr = xpu::dpcpp::sycl_device(device_index);
+        (device_index == -1) ? torch_ipex::xpu::dpcpp::current_device() : device_index;
+    auto dev_ptr = torch_ipex::xpu::dpcpp::sycl_device(device_index);
     // NOTE: Here is a high dependency on the implementation of device pool
     // using smart pointer in runtime.
     return py::capsule(
@@ -635,7 +635,7 @@ void init_xpu_module(pybind11::module& m) {
   });
 
   m.def("dump_memory_stat", [](const int& device_index) {
-    return xpu::dpcpp::dumpMemoryStatusFromDevAlloc(device_index);
+    return torch_ipex::xpu::dpcpp::dumpMemoryStatusFromDevAlloc(device_index);
   });
 
   m.def(
@@ -655,7 +655,7 @@ void init_xpu_module(pybind11::module& m) {
 
   m.def("_preftech_has_fp64_dtype", [](int device) {
     bool has_fp64 = false;
-    auto status = xpu::dpcpp::prefetch_device_has_fp64_dtype(device, has_fp64);
+    auto status = torch_ipex::xpu::dpcpp::prefetch_device_has_fp64_dtype(device, has_fp64);
     return std::make_tuple(status, has_fp64);
   });
 
@@ -772,11 +772,11 @@ void init_xpu_module(pybind11::module& m) {
   });
 
   py::enum_<xpu::COMPUTE_ENG>(m, "XPUComputeEng")
-      .value("RECOMMEND", xpu::COMPUTE_ENG::RECOMMEND)
-      .value("BASIC", xpu::COMPUTE_ENG::BASIC)
-      .value("ONEDNN", xpu::COMPUTE_ENG::ONEDNN)
-      .value("ONEMKL", xpu::COMPUTE_ENG::ONEMKL)
-      .value("XETLA", xpu::COMPUTE_ENG::XETLA)
+      .value("RECOMMEND", torch_ipex::xpu::COMPUTE_ENG::RECOMMEND)
+      .value("BASIC", torch_ipex::xpu::COMPUTE_ENG::BASIC)
+      .value("ONEDNN", torch_ipex::xpu::COMPUTE_ENG::ONEDNN)
+      .value("ONEMKL", torch_ipex::xpu::COMPUTE_ENG::ONEMKL)
+      .value("XETLA", torch_ipex::xpu::COMPUTE_ENG::XETLA)
       .export_values();
 
   m.def("_get_compute_eng", []() {
@@ -818,7 +818,7 @@ void init_xpu_module(pybind11::module& m) {
 
   m.def("_is_pti_enabled", []() { return Settings::I().is_pti_enabled(); });
 
-  m.def("_prepare_profiler", xpu::dpcpp::profiler::prepareProfiler);
+  m.def("_prepare_profiler", torch_ipex::xpu::dpcpp::profiler::prepareProfiler);
 
   auto module = m.ptr();
   THDPStream_init(module);
@@ -828,4 +828,4 @@ void init_xpu_module(pybind11::module& m) {
   bindGetDeviceInfo(module);
 }
 
-} // namespace xpu
+} // namespace torch_ipex::xpu

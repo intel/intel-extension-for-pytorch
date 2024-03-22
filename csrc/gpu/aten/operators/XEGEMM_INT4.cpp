@@ -597,7 +597,8 @@ Tensor _weight_int4pack_mm_xpu(
           .add_matrix_zp(q_zeros)
           .add_calib_gz(qGroupSize)
           .add_arch(GetGpuArchId())
-          .add_quant_mode(xpu::xetla::quant_mode::S4_ASYM_ZERO_NO_DEGRAD)
+          .add_quant_mode(
+              torch_ipex::xpu::xetla::quant_mode::S4_ASYM_ZERO_NO_DEGRAD)
           .build();
   TORCH_CHECK(policy.fallback() == false, "mm int4: invalid gemm shape");
   policy.run();

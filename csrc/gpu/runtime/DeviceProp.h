@@ -3,7 +3,7 @@
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 struct DeviceProp {
@@ -144,4 +144,4 @@ struct DeviceProp {
 };
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

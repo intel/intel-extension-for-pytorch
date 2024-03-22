@@ -6,7 +6,7 @@
 #include <utils/DPCPP.h>
 #include "utils/CustomOperatorRegistration.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -41,7 +41,7 @@ sycl::event dpcpp_q_barrier(sycl::queue& q, std::vector<sycl::event>& events) {
 }
 
 bool check_onednn_layout(const at::Tensor& input) {
-  return xpu::oneDNN::is_onednn_layout(input);
+  return torch_ipex::xpu::oneDNN::is_onednn_layout(input);
 }
 
 } // namespace AtenIpexTypeXPU

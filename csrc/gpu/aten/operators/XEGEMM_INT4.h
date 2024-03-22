@@ -10,7 +10,7 @@
 #include "comm/RegistrationDeclarations.h"
 #include "xetla/GEMM_INT4.h"
 
-using namespace xpu::xetla;
+using namespace torch_ipex::xpu::xetla;
 
 #define RECORD_FUNCTION_IMPL(                                       \
     F,                                                              \
@@ -524,32 +524,34 @@ using namespace xpu::xetla;
     RECORD_FUNCTION_IMPL(F, ##__VA_ARGS__)                                               \
     XETLA_ALL_TYPES(in_scalar_type, #F, [&] {                                            \
       if constexpr ((arch == static_cast<int>(gpu::xetla::gpu_arch::XeLpg) &&            \
-                     (xetla_t == xpu::xetla::XetlaType::bf16))) {                        \
+                     (xetla_t == torch_ipex::xpu::xetla::XetlaType::bf16))) {            \
         AT_ERROR("not support Bfloat16 on mtl.");                                        \
       } else {                                                                           \
         switch (quant_mode_) {                                                           \
-          case xpu::xetla::quant_mode::S4_ASYM_ZERO_NO_DEGRAD: {                         \
+          case torch_ipex::xpu::xetla::quant_mode::S4_ASYM_ZERO_NO_DEGRAD: {             \
             if constexpr ((arch ==                                                       \
                                static_cast<int>(                                         \
                                    gpu::xetla::gpu_arch::XeLpg) &&                       \
-                           (xetla_t == xpu::xetla::XetlaType::fp16))) {                  \
+                           (xetla_t ==                                                   \
+                            torch_ipex::xpu::xetla::XetlaType::fp16))) {                 \
               AT_ERROR(                                                                  \
                   "not support float16 with quant_mode S4_ASYM_ZERO_NO_DEGRAD on mtl."); \
             } else {                                                                     \
               auto cgfs = DISPATCHER(                                                    \
                   F,                                                                     \
                   ##__VA_ARGS__,                                                         \
-                  static_cast<int>(                                                      \
-                      xpu::xetla::quant_mode::S4_ASYM_ZERO_NO_DEGRAD));                  \
+                  static_cast<int>(torch_ipex::xpu::xetla::quant_mode::                  \
+                                       S4_ASYM_ZERO_NO_DEGRAD));                         \
               DPCPP_Q_SUBMIT_CGFS(q, cgfs);                                              \
             }                                                                            \
             break;                                                                       \
           }                                                                              \
-          case xpu::xetla::quant_mode::S4_FULLRANGE_NO_ZP: {                             \
+          case torch_ipex::xpu::xetla::quant_mode::S4_FULLRANGE_NO_ZP: {                 \
             auto cgfs = DISPATCHER(                                                      \
                 F,                                                                       \
                 ##__VA_ARGS__,                                                           \
-                static_cast<int>(xpu::xetla::quant_mode::S4_FULLRANGE_NO_ZP));           \
+                static_cast<int>(                                                        \
+                    torch_ipex::xpu::xetla::quant_mode::S4_FULLRANGE_NO_ZP));            \
             DPCPP_Q_SUBMIT_CGFS(q, cgfs);                                                \
             break;                                                                       \
           }                                                                              \
@@ -937,7 +939,8 @@ class HGEMMXetla_INT4 final {
   int m_, n_, k_;
   int64_t calib_gz_;
   int8_t arch_ = static_cast<int>(gpu::xetla::gpu_arch::XeHpc);
-  xpu::xetla::quant_mode quant_mode_= xpu::xetla::quant_mode::S4_FULLRANGE_NO_ZP;
+  torch_ipex::xpu::xetla::quant_mode quant_mode_ =
+      torch_ipex::xpu::xetla::quant_mode::S4_FULLRANGE_NO_ZP;
 
   template <uint32_t a, uint32_t b>
   struct gcd {
@@ -989,7 +992,7 @@ class HGEMMXetla_INT4 final {
     arch_ = arch;
     return *this;
   }
-  HGEMMXetla_INT4& add_quant_mode(xpu::xetla::quant_mode quant_mode) {
+  HGEMMXetla_INT4& add_quant_mode(torch_ipex::xpu::xetla::quant_mode quant_mode) {
     quant_mode_ = quant_mode;
     return *this;
   }

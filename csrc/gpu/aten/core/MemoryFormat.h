@@ -11,7 +11,7 @@
 
 using namespace at;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 inline std::vector<int64_t> get_channels_last_strides_1d_dpcpp(
@@ -206,4 +206,4 @@ inline MemoryFormat get_cl_tag_by_ndim(const int64_t ndim) {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

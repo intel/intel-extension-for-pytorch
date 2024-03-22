@@ -2,7 +2,7 @@
 #include <core/Memory.h>
 #include <runtime/Memory.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 void dpcppMemcpy(
@@ -54,4 +54,4 @@ void dpcppMemsetAsync(void* data, int value, size_t n_bytes) {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

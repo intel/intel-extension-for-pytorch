@@ -10,7 +10,7 @@
 
 constexpr int n_elems_per_work_item = UNROLLED_ELEM_PER_WORK_ITEM;
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {

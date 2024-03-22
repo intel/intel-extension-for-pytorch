@@ -2,7 +2,7 @@
 #include <sycl/sycl.hpp>
 #include "xetla_kernel_api.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 XETLA_KERNEL_API cgfs_t gru_forward(
     void* layer_ptr,
@@ -63,4 +63,4 @@ XETLA_KERNEL_API cgfs_t gru_backward_weight(
     const int hidden_size,
     const int sequence_length,
     const int layer_size);
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

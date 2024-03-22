@@ -8,7 +8,7 @@
 #include <core/Stream.h>
 #include <utils/Macros.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 class HostAllocator final : public at::Allocator {
  public:
@@ -34,4 +34,4 @@ class HostAllocator final : public at::Allocator {
   CachingHostAllocator* alloc();
 };
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

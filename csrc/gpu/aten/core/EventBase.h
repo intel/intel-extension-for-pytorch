@@ -4,7 +4,7 @@
 #include <core/Stream.h>
 #include <memory>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 struct DPCPPEventBase {
@@ -40,4 +40,4 @@ struct DPCPPEventBase {
 IPEX_API std::shared_ptr<DPCPPEventBase> create_dpcpp_event();
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

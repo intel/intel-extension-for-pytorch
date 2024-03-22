@@ -3,7 +3,7 @@
 #include <torch/csrc/utils/python_arg_parser.h>
 #include "Stream.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 
 PyObject* THDPEventClass = nullptr;
 
@@ -34,7 +34,7 @@ static PyObject* THDPEvent_pynew(
   //    (enable_timing ? xpuEventDefault : xpuEventDisableTiming) |
   //    (interprocess ? xpuEventInterprocess : xpuEventDefault);
 
-  self->dpcpp_event = xpu::dpcpp::create_dpcpp_event();
+  self->dpcpp_event = torch_ipex::xpu::dpcpp::create_dpcpp_event();
 
   return (PyObject*)ptr.release();
   END_HANDLE_TH_ERRORS
@@ -69,7 +69,7 @@ static PyObject* THDPEvent_from_ipc_handle(
 
   //  xpuIpcEventHandle_t handle;
   //  std::memcpy(&handle, handle_string.c_str(), handle_string.size());
-  self->dpcpp_event = xpu::dpcpp::create_dpcpp_event();
+  self->dpcpp_event = torch_ipex::xpu::dpcpp::create_dpcpp_event();
 
   return (PyObject*)ptr.release();
   END_HANDLE_TH_ERRORS
@@ -223,4 +223,4 @@ void THDPEvent_init(PyObject* module) {
     throw python_error();
   }
 }
-} // namespace xpu
+} // namespace torch_ipex::xpu

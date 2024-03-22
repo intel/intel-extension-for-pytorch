@@ -12,10 +12,10 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static inline void get_dnnl_format(
@@ -165,7 +165,7 @@ static Tensor softmax_backward(
     grad_memory = dpcpp_onednn_memory(
         softmax_forward_pd.dst_desc(), engine, grad_opt.data_ptr());
     grad_md = softmax_forward_pd.dst_desc();
-    xpu::oneDNN::reorder(grad, grad_opt);
+    torch_ipex::xpu::oneDNN::reorder(grad, grad_opt);
   }
 
   auto softmax_backward_pd = dnnl::softmax_backward::primitive_desc(
@@ -199,4 +199,4 @@ static Tensor softmax_backward(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

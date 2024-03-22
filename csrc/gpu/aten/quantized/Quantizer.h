@@ -10,7 +10,7 @@
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 struct DPCPPPerTensorAffineQuantizer : public AffineQuantizer {
   explicit DPCPPPerTensorAffineQuantizer(

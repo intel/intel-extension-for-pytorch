@@ -46,7 +46,7 @@ Tensor fp8_gemm_backward(
   }
   Tensor result = at::empty(result_shape, m1.options());
   if (m1.dim() == 3 && m2.dim() == 2) {
-    xpu::oneDNN::matmul(
+    torch_ipex::xpu::oneDNN::matmul(
         result,
         m1.reshape({m1.sizes()[0] * m1.sizes()[1], m1.sizes()[2]}),
         m2,
@@ -56,7 +56,7 @@ Tensor fp8_gemm_backward(
     return result.view_symint(
         {m1.sizes()[0], m1.sizes()[1], result.sym_size(1)});
   }
-  xpu::oneDNN::matmul(result, m1, m2, at::Tensor(), true, Attr());
+  torch_ipex::xpu::oneDNN::matmul(result, m1, m2, at::Tensor(), true, Attr());
   return result;
 }
 

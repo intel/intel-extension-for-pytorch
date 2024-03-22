@@ -8,7 +8,7 @@
 #include "DeviceAllocator.h"
 #include "HostAllocator.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 void DeviceAllocator::deleter(void* ptr) {
@@ -225,4 +225,4 @@ bool isAllocatedByHostAlloc(const void* ptr) {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

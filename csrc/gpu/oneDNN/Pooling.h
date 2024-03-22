@@ -13,11 +13,11 @@
 
 #include <oneapi/dnnl/dnnl.hpp>
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 using namespace at::AtenIpexTypeQuantizedXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static inline bool is_valid_pooling(
@@ -361,7 +361,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
   }
 
   return {dst, idx};
-} // namespace xpu
+} // namespace torch_ipex::xpu
 
 template <alg alg_kind>
 static at::Tensor pooling_backward(
@@ -715,7 +715,7 @@ static at::Tensor pooling_backward(
         at::TensorOptions(at::kXPU).dtype(at::kInt),
         c10::nullopt);
     idx_m = dpcpp_onednn_memory(expexted_idx_md, engine, idx_opt.data_ptr());
-    xpu::oneDNN::reorder(idx_usr, idx_opt);
+    torch_ipex::xpu::oneDNN::reorder(idx_usr, idx_opt);
   }
 
   auto pooling_bwd = dnnl::pooling_backward(pooling_bwd_pd);
@@ -730,4 +730,4 @@ static at::Tensor pooling_backward(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

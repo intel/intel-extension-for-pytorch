@@ -13,7 +13,7 @@
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static void reduce(
@@ -59,4 +59,4 @@ static void reduce(
       prim, strm, {{DNNL_ARG_SRC, mem_src}, {DNNL_ARG_DST, mem_dst}});
 }
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

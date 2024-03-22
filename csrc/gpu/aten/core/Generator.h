@@ -6,7 +6,7 @@
 
 using namespace at;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 struct IPEX_API DPCPPGeneratorImpl : public GeneratorImpl {
@@ -43,4 +43,4 @@ IPEX_API const Generator& getDefaultDPCPPGenerator(
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

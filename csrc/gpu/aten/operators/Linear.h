@@ -19,8 +19,9 @@ struct LinearConverter {
       Func func) {
     Attr attr = func();
     Tensor _bias = bias.has_value() ? bias.value() : at::Tensor();
-    Tensor _input =
-        input.dim() <= 2 ? input : xpu::oneDNN::contiguous_if_needed(input);
+    Tensor _input = input.dim() <= 2
+        ? input
+        : torch_ipex::xpu::oneDNN::contiguous_if_needed(input);
     return impl::matmul_fusion_variants(
         result, _input, weight, false, attr, is_fused_, _bias);
   }
@@ -30,10 +31,11 @@ struct LinearConverter {
       const Tensor& input,
       const Tensor& weight,
       const c10::optional<Tensor>& bias,
-      xpu::oneDNN::Attr attr) {
+      torch_ipex::xpu::oneDNN::Attr attr) {
     Tensor _bias = bias.has_value() ? bias.value() : at::Tensor();
-    Tensor _input =
-        input.dim() <= 2 ? input : xpu::oneDNN::contiguous_if_needed(input);
+    Tensor _input = input.dim() <= 2
+        ? input
+        : torch_ipex::xpu::oneDNN::contiguous_if_needed(input);
     return impl::matmul_fusion_variants(
         result, _input, weight, /*trans*/ true, attr, is_fused_, _bias);
   }

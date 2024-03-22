@@ -14,8 +14,8 @@
 #include "utils/ComputeEngine.h"
 #include "utils/DPCPP.h"
 using namespace dnnl;
-using namespace xpu::dpcpp;
-using namespace xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -128,7 +128,7 @@ int inline get_nhwc_suggest_vec_size(
 
   // just to load/store data
   auto func = [](scalar_t a) { return a + static_cast<scalar_t>(1.0f); };
-  xpu::dpcpp::Array<char*, 1> data;
+  torch_ipex::xpu::dpcpp::Array<char*, 1> data;
   data[0] = (char*)input.data_ptr();
 
   int vec_size = at::native::Memory::can_vectorize_up_to_loop<decltype(func)>(
@@ -1783,7 +1783,7 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
     Tensor& out,
     Tensor& save_mean,
     Tensor& save_invstd) {
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   int sp = input.numel() / input.size(1);
   int ic = input.size(1);
 
@@ -1803,12 +1803,12 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
   bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
 
   if (input.is_quantized() || adopt_onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+    real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
   }
 
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     c10::MaybeOwned<Tensor> weight_maybe_owned =
         at::borrow_from_optional_tensor(weight_opt);
     const Tensor& weight = *weight_maybe_owned;
@@ -1843,7 +1843,7 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
       TORCH_CHECK(0, ss.str());
     }
 
-    xpu::oneDNN::batch_normalization(
+    torch_ipex::xpu::oneDNN::batch_normalization(
         condition_contiguous(input),
         condition_contiguous(weight),
         condition_contiguous(bias),
@@ -4269,7 +4269,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> grad_input_mask) {
-  xpu::COMPUTE_ENG real_eng;
+  torch_ipex::xpu::COMPUTE_ENG real_eng;
   int sp = input.numel() / input.size(1);
   int ic = input.size(1);
 
@@ -4288,12 +4288,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
   // implementation
   bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
   if (adopt_onednn_path) {
-    real_eng = xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
   } else {
-    real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+    real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
   }
 
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     c10::MaybeOwned<Tensor> weight_maybe_owned =
         at::borrow_from_optional_tensor(weight_opt);
     const Tensor& weight = *weight_maybe_owned;
@@ -4331,7 +4331,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
          << input.scalar_type();
       TORCH_CHECK(0, ss.str());
     } else {
-      return xpu::oneDNN::batch_normalization_backward(
+      return torch_ipex::xpu::oneDNN::batch_normalization_backward(
           condition_contiguous(grad_output),
           condition_contiguous(input),
           condition_contiguous(weight),
@@ -4843,7 +4843,7 @@ std::tuple<Tensor, Tensor> batch_norm_gather_stats_with_counts_xpu(
       "batch_norm_update_stats_xpu",
       [&] {
         using accscalar_t = acc_type<scalar_t>;
-        if (xpu::dpcpp::detail::canUse32BitIndexMath(self)) {
+        if (torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(self)) {
           return batch_norm_gather_stats_xpu_template<
               scalar_t,
               accscalar_t,

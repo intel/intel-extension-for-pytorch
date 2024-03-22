@@ -4,7 +4,7 @@
 #include <ATen/detail/XPUHooksInterface.h>
 #include <ATen/dlpack.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -29,4 +29,4 @@ struct XPUHooks : public at::XPUHooksInterface {
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

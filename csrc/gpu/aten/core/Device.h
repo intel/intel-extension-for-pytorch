@@ -9,7 +9,7 @@
 
 using namespace at;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 IPEX_API DeviceIndex device_count() noexcept;
@@ -84,4 +84,4 @@ IPEX_API int prefetch_device_has_fp64_dtype(
     bool& has_fp64) noexcept;
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

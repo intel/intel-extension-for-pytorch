@@ -4,7 +4,7 @@
 #include <functional>
 #include <vector>
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 // Type alias for a vector of CGFs
 using cgf_t = std::function<void(sycl::handler&)>;
 using cgfs_t = std::vector<cgf_t>;
@@ -37,4 +37,4 @@ enum class XetlaType : uint8_t {
 #else
 #define XETLA_KERNEL_API XETLA_KERNEL_IMPORT
 #endif
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

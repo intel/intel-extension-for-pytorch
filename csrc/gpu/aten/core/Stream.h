@@ -15,7 +15,7 @@
 
 using namespace at;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 // Please keep synchronized with QueueIndex in runtime/Queue.h
@@ -141,14 +141,14 @@ IPEX_API void setCurrentDPCPPStream(DPCPPStream stream);
 IPEX_API void deviceSynchronize(DeviceIndex device_index = -1);
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace std {
 template <>
-struct hash<xpu::dpcpp::DPCPPStream> {
-  size_t operator()(xpu::dpcpp::DPCPPStream s) const noexcept {
+struct hash<torch_ipex::xpu::dpcpp::DPCPPStream> {
+  size_t operator()(torch_ipex::xpu::dpcpp::DPCPPStream s) const noexcept {
     return std::hash<c10::Stream>{}(s.unwrap());
   }
 };

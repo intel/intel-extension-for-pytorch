@@ -18,7 +18,7 @@
 
 #include "Loops.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -250,7 +250,7 @@ static void isin_sorting(
   int64_t num_inp = sorted_elements.numel();
   Tensor sorted_order = at::empty({num_inp}, index_options);
   auto sorted_indices_begin = sorted_order.data_ptr<int64_t>();
-  xpu::pstl::iota(
+  torch_ipex::xpu::pstl::iota(
       sorted_indices_begin, sorted_indices_begin + num_inp, (int64_t)0);
   auto scalar_t = all_elements.scalar_type();
 
@@ -261,7 +261,7 @@ static void isin_sorting(
         all_elements.scalar_type(),
         "isin_sort",
         [&]() {
-          xpu::pstl::sort<scalar_t, int64_t>(
+          torch_ipex::xpu::pstl::sort<scalar_t, int64_t>(
               all_elements.data_ptr<scalar_t>(),
               sorted_elements.data_ptr<scalar_t>(),
               sorted_order.data_ptr<int64_t>(),

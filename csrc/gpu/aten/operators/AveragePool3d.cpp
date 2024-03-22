@@ -16,8 +16,8 @@
 
 using namespace dnnl;
 using namespace at::native;
-using namespace xpu::dpcpp;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::dpcpp;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -1107,11 +1107,11 @@ void avg_pool3d_out_template(
       "avg_pool3d_out_template()",
       /*check_input_size=*/true);
 
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
 
   // for onednn block format
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     Tensor input_;
     if (input.ndimension() == 4) {
       // 4D: Input (C, D, H, W),  Output (C, D0, H0, W0)
@@ -1133,7 +1133,7 @@ void avg_pool3d_out_template(
     // per oneDNN definition, no dilation means dilation ratio is 0
     std::vector<int64_t> dilation_vec = {0, 0, 0};
     if (count_include_pad) {
-      ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_include_padding>(
+      torch_ipex::xpu::oneDNN::pooling<alg::pooling_avg_include_padding>(
           output,
           input_,
           nbatch,
@@ -1150,7 +1150,7 @@ void avg_pool3d_out_template(
           padding_vec,
           padding_vec);
     } else {
-      ::xpu::oneDNN::pooling<::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+      torch_ipex::xpu::oneDNN::pooling<alg::pooling_avg_exclude_padding>(
           output,
           input_,
           nbatch,
@@ -1187,7 +1187,7 @@ void avg_pool3d_out_template(
           int64_t offsetZ = 0;
 
           while (totalZ > 0) {
-            if (xpu::dpcpp::detail::canUse32BitIndexMath(input)) {
+            if (torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(input)) {
               avg_pool3d_out_frame<scalar_t, accscalar_t, int32_t>(
                   work_input,
                   work_output,
@@ -1325,15 +1325,15 @@ Tensor& avg_pool3d_backward_out_template(
       owidth,
       "avg_pool3d_backward_out_template()");
 
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, gradInput);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, gradInput);
 
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     // per oneDNN definition, no dilation means dilation ratio is 0
     std::vector<int64_t> dilation_vec = {0, 0, 0};
     if (count_include_pad) {
-      ::xpu::oneDNN::pooling_backward<
-          ::xpu::oneDNN::alg::pooling_avg_include_padding>(
+      torch_ipex::xpu::oneDNN::pooling_backward<
+          alg::pooling_avg_include_padding>(
           gradInput,
           gradOutput,
           input,
@@ -1351,8 +1351,8 @@ Tensor& avg_pool3d_backward_out_template(
           padding_vec,
           padding_vec);
     } else {
-      ::xpu::oneDNN::pooling_backward<
-          ::xpu::oneDNN::alg::pooling_avg_exclude_padding>(
+      torch_ipex::xpu::oneDNN::pooling_backward<
+          alg::pooling_avg_exclude_padding>(
           gradInput,
           gradOutput,
           input,
@@ -1385,7 +1385,7 @@ Tensor& avg_pool3d_backward_out_template(
       workOutput =
           workOutput.reshape({nbatch * nblock, odepth, oheight, owidth});
     }
-    if (xpu::dpcpp::detail::canUse32BitIndexMath(workInput)) {
+    if (torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(workInput)) {
       if (dD == 1 && dH == 1 && dW == 1 && padD == 0 && padH == 0 &&
           padW == 0) {
         IPEX_DISPATCH_FLOATING_TYPES_AND2(

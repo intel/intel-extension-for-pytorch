@@ -3,7 +3,7 @@
 #include "../xetla.h"
 #include "kernel_attr.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 template <typename T>
 struct bpi_config_t {
@@ -918,4 +918,4 @@ cgfs_t gru_backward_data_impl(
   };
 }
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

@@ -1,7 +1,7 @@
 #pragma once
 #include <utils/Macros.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 // Here we use a hook mechanism to register the lazy_init function to
@@ -22,10 +22,10 @@ struct PreInitHookRegister {
   }
 };
 
-#define IPEX_REGISTER_PRE_INIT_HOOK(fn)                         \
-  namespace {                                                   \
-  static xpu::dpcpp::PreInitHookRegister g_pre_init_hook_d(fn); \
+#define IPEX_REGISTER_PRE_INIT_HOOK(fn)                                     \
+  namespace {                                                               \
+  static torch_ipex::xpu::dpcpp::PreInitHookRegister g_pre_init_hook_d(fn); \
   }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

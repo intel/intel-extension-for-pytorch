@@ -13,7 +13,7 @@
 using namespace dnnl;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static inline Tensor sum(
@@ -109,4 +109,4 @@ static inline Tensor sum(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

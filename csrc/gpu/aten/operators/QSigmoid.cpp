@@ -14,7 +14,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::native;
 
 namespace at {

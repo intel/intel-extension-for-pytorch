@@ -7,7 +7,7 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -247,7 +247,7 @@ void replication_pad2d_out_template(
     const Tensor& input,
     IntArrayRef paddingSize) {
   TORCH_CHECK(
-      xpu::dpcpp::detail::canUse32BitIndexMath(input),
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(input),
       "input tensor must fit into 32-bit index math");
   TORCH_CHECK(paddingSize.size() == 4, "padding Size is expected to be 4");
 
@@ -481,10 +481,10 @@ void replication_pad2d_backward_out_template(
     const Tensor& input,
     IntArrayRef paddingSize) {
   TORCH_CHECK(
-      xpu::dpcpp::detail::canUse32BitIndexMath(input),
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(input),
       "input tensor must fit into 32-bit index math");
   TORCH_CHECK(
-      xpu::dpcpp::detail::canUse32BitIndexMath(gradOutput),
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(gradOutput),
       "output gradient tensor must fit into 32-bit index math");
   TORCH_CHECK(paddingSize.size() == 4, "padding Size is expected to be 4");
 
@@ -722,7 +722,7 @@ static inline void shapeAndGradOutputCheck3d(
     int64_t pad_front,
     int64_t pad_back) {
   TORCH_CHECK(
-      xpu::dpcpp::detail::canUse32BitIndexMath(input),
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(input),
       "input tensor must fit into 32-bit index math");
   int64_t num_input_dims = input.dim();
 
@@ -769,7 +769,7 @@ static inline void shapeAndGradOutputCheck3d(
       owidth);
 
   TORCH_CHECK(
-      xpu::dpcpp::detail::canUse32BitIndexMath(grad_output),
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(grad_output),
       "output gradient tensor must fit into 32-bit index math");
 
   TORCH_CHECK(
@@ -857,7 +857,7 @@ Tensor& replication_pad1d_out(
     IntArrayRef padding,
     Tensor& output) {
   TORCH_CHECK(
-      xpu::dpcpp::detail::canUse32BitIndexMath(input),
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(input),
       "input tensor must fit into 32-bit index math");
 
   if (output.numel() == 0) {
@@ -893,10 +893,10 @@ Tensor& replication_pad1d_backward_out(
     IntArrayRef padding,
     Tensor& grad_input) {
   TORCH_CHECK(
-      xpu::dpcpp::detail::canUse32BitIndexMath(input),
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(input),
       "input tensor must fit into 32-bit index math");
   TORCH_CHECK(
-      xpu::dpcpp::detail::canUse32BitIndexMath(grad_output),
+      torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(grad_output),
       "output gradient tensor must fit into 32-bit index math");
 
   if (grad_input.numel() == 0) {

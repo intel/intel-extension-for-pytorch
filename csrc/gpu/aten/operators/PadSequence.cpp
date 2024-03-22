@@ -7,7 +7,7 @@
 #include <torch/custom_class.h>
 #include "comm/ATDispatch.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -202,7 +202,7 @@ void parallel_pad(
     {
       CatArrInputTensor<scalar_t, unsigned int>* stackInputs;
       stackInputs = (CatArrInputTensor<scalar_t, unsigned int>*)
-                        xpu::dpcpp::HostAllocator::Instance()
+                        torch_ipex::xpu::dpcpp::HostAllocator::Instance()
                             ->raw_allocate(tensorMetadataSize);
       for (batchCounter = 0; batchCounter < PAD_ARRAY_BATCH_SIZE &&
            (i + batchCounter) < inputs.size();
@@ -218,9 +218,9 @@ void parallel_pad(
         // update offset
         offset += dimSize;
       }
-      xpu::dpcpp::memcpyHostToDevice(
+      torch_ipex::xpu::dpcpp::memcpyHostToDevice(
           d_inputs, stackInputs, tensorMetadataSize, /* async= */ true);
-      xpu::dpcpp::HostAllocator::Instance()->release(stackInputs);
+      torch_ipex::xpu::dpcpp::HostAllocator::Instance()->release(stackInputs);
     }
 
 #define HANDLE_CASE(DIMS)                            \
@@ -288,11 +288,11 @@ Tensor pad_sequence(
 
   bool isBlockfmt =
       std::any_of(sequences.begin(), sequences.end(), [](const Tensor& t) {
-        return xpu::oneDNN::is_onednn_layout(t);
+        return torch_ipex::xpu::oneDNN::is_onednn_layout(t);
       });
   const bool all32BitIndexable =
       std::all_of(sequences.begin(), sequences.end(), [](const Tensor& t) {
-        return xpu::dpcpp::detail::canUse32BitIndexMath(t);
+        return torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(t);
       });
   const bool allContiguous =
       std::all_of(sequences.begin(), sequences.end(), [](const Tensor& t) {

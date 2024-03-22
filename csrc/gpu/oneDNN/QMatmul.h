@@ -13,10 +13,10 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 static inline void quantized_matmul(
     Tensor& result,
@@ -41,13 +41,13 @@ static inline void quantized_matmul(
   auto engine_index = curDevice.index();
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  Tensor m1 = xpu::oneDNN::is_onednn_matmul_strides(mat1)
+  Tensor m1 = torch_ipex::xpu::oneDNN::is_onednn_matmul_strides(mat1)
       ? mat1
       : contiguous_if_needed(mat1);
-  Tensor m2 = xpu::oneDNN::is_onednn_matmul_strides(mat2)
+  Tensor m2 = torch_ipex::xpu::oneDNN::is_onednn_matmul_strides(mat2)
       ? mat2
       : contiguous_if_needed(mat2);
-  Tensor dst = xpu::oneDNN::is_onednn_matmul_strides(result, true)
+  Tensor dst = torch_ipex::xpu::oneDNN::is_onednn_matmul_strides(result, true)
       ? result
       : contiguous_if_needed(result);
 
@@ -323,14 +323,14 @@ static inline void quantized_matmul(
   if (m1_usr_m.get_desc() != expected_m1_md) {
     m1_ = empty_opaque_tensor(expected_m1_md, m1.options(), c10::nullopt);
     m1_m = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
-    xpu::oneDNN::reorder(m1, m1_);
+    torch_ipex::xpu::oneDNN::reorder(m1, m1_);
   }
 
   if (m2_usr_m.get_desc() != expected_m2_md) {
     m2_ = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
     m2_m = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
     auto m2_onednn_matmul_shape_compatible = m2_trans ? m2 : m2.t();
-    xpu::oneDNN::reorder(m2_onednn_matmul_shape_compatible, m2_);
+    torch_ipex::xpu::oneDNN::reorder(m2_onednn_matmul_shape_compatible, m2_);
 
     if (weight_cache_optimization) {
       auto ctx_ =
@@ -349,7 +349,7 @@ static inline void quantized_matmul(
     dst_ = empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
     dst_m = dpcpp_onednn_memory(expected_dst_md, engine, dst_.data_ptr());
     if (attr.with_sum())
-      xpu::oneDNN::reorder(dst, dst_);
+      torch_ipex::xpu::oneDNN::reorder(dst, dst_);
   }
   if (attr.with_binary())
     attr.construct_post_binary(matmul_pd, args);
@@ -369,7 +369,8 @@ static inline void quantized_matmul(
       memory::desc({1}, memory::data_type::f32, memory::format_tag::x);
   if (m2.is_quantized()) {
     if (m2.qscheme() == kPerTensorAffine) {
-      std::tie(m2_sc_m, m2_zp_m) = xpu::oneDNN::q_get_sc_zp_gpu_mem(m2, engine);
+      std::tie(m2_sc_m, m2_zp_m) =
+          torch_ipex::xpu::oneDNN::q_get_sc_zp_gpu_mem(m2, engine);
     } else {
       m2_sc = m2.q_per_channel_scales().to(at::kFloat);
       m2_sc_m = dpcpp_onednn_memory(m2_sc_md, engine, m2_sc.data_ptr());
@@ -384,7 +385,8 @@ static inline void quantized_matmul(
   memory m1_sc_m, m1_zp_m;
   if (m1.is_quantized()) {
     int mask_ac = 0;
-    std::tie(m1_sc_m, m1_zp_m) = xpu::oneDNN::q_get_sc_zp_gpu_mem(m1, engine);
+    std::tie(m1_sc_m, m1_zp_m) =
+        torch_ipex::xpu::oneDNN::q_get_sc_zp_gpu_mem(m1, engine);
     args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC, m1_sc_m});
     if (m1_need_zp) {
       args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, m1_zp_m});
@@ -402,4 +404,4 @@ static inline void quantized_matmul(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

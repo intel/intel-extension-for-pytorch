@@ -12,10 +12,10 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 struct ReorderAttr {
@@ -224,8 +224,8 @@ static inline void quantized_reorder(
 
 static inline void reorder_copy(const Tensor& src, Tensor& dst) {
   RECORD_FUNCTION("reorder_copy", std::vector<c10::IValue>({src}));
-  xpu::oneDNN::reorder(src, dst);
+  torch_ipex::xpu::oneDNN::reorder(src, dst);
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

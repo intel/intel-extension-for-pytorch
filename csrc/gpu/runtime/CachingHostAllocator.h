@@ -5,7 +5,7 @@
 #include <runtime/Device.h>
 #include <utils/DPCPP.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 class CachingHostAllocator final {
@@ -99,4 +99,4 @@ class CachingHostAllocator final {
 };
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

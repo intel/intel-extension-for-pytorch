@@ -2,7 +2,7 @@
 
 #include "../xetla.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 using namespace cl::sycl;
 using namespace gpu;
@@ -288,4 +288,4 @@ struct silu_op_t {
 
 } // namespace epilogue_impl
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla

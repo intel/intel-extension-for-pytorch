@@ -4,7 +4,7 @@
 #include "backward_input.h"
 #include "backward_weight.h"
 
-namespace xpu::xetla {
+namespace torch_ipex::xpu::xetla {
 
 cgfs_t gru_backward_data(
     void* layer_err_ptr,
@@ -115,5 +115,5 @@ cgfs_t gru_backward_weight(
   }
 }
 
-} // namespace xpu::xetla
+} // namespace torch_ipex::xpu::xetla
 #endif

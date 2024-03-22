@@ -3,7 +3,7 @@
 #include <ATen/ATen.h>
 #include <limits>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace detail {
 
@@ -14,4 +14,4 @@ bool canUse32BitIndexMath(
 
 } // namespace detail
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

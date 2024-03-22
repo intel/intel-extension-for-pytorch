@@ -7,7 +7,7 @@
 
 #include "Loops.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 /* Fake quantize a tensor
 Args:

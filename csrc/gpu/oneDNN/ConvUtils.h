@@ -13,7 +13,7 @@
 #include "Reorder.h"
 #include "Utils.h"
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 constexpr int src_batch_size_dim = 0;
@@ -122,4 +122,4 @@ static inline memory::dims compatible_dilation(IntArrayRef& dilation) {
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

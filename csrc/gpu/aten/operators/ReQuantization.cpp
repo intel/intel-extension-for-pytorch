@@ -3,7 +3,7 @@
 
 using namespace dnnl;
 using namespace at::native;
-using namespace xpu::oneDNN;
+using namespace torch_ipex::xpu::oneDNN;
 
 namespace at {
 namespace AtenIpexTypeQuantizedXPU {
@@ -22,7 +22,7 @@ Tensor requantize(
       scale_out, zero_point_out, typeMetaToScalarType(src.options().dtype()));
   auto dst_ = empty_opaque_qtensor(dst_md, c10::nullopt, quantizer);
 
-  auto reorder_attr = xpu::oneDNN::ReorderAttr();
+  auto reorder_attr = torch_ipex::xpu::oneDNN::ReorderAttr();
   int mask = 0;
   auto sc_in = src.q_scale();
   int32_t zp_in = src.q_zero_point();
@@ -39,7 +39,7 @@ Tensor requantize(
     reorder_attr.set_dst_zp_mask(mask);
   reorder_attr.set_dst_sc_mask(mask);
   reorder_attr.set_src_sc_mask(mask);
-  xpu::oneDNN::quantized_reorder(
+  torch_ipex::xpu::oneDNN::quantized_reorder(
       src,
       dst_,
       quant_base_src.scale_ptr(),

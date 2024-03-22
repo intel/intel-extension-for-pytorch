@@ -59,7 +59,7 @@ Tensor q_cat(
 
   bool isBlockfmt =
       std::any_of(tensors.begin(), tensors.end(), [](const Tensor& t) {
-        return xpu::oneDNN::is_onednn_layout(t);
+        return torch_ipex::xpu::oneDNN::is_onednn_layout(t);
       });
   auto out = at::_empty_affine_quantized(
       {0},
@@ -80,7 +80,7 @@ Tensor q_cat(
     }
     TensorList tensors_cat_array(tensors_);
     ITensorListRef tensors_ref = ITensorListRef(tensors_cat_array);
-    xpu::oneDNN::concat(out, tensors_ref.materialize(), dim);
+    torch_ipex::xpu::oneDNN::concat(out, tensors_ref.materialize(), dim);
   }
   return out;
 }

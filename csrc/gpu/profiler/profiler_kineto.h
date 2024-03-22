@@ -4,7 +4,7 @@
 
 #include <utils/Macros.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 namespace profiler {
 
@@ -14,4 +14,4 @@ IPEX_API void prepareProfiler(
 
 } // namespace profiler
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

@@ -11,7 +11,7 @@
 #include <optional>
 #include <sstream>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 // clang-format off
@@ -506,11 +506,11 @@ bool Settings::set_fp32_math_mode(FP32_MATH_MODE mode) {
 }
 
 bool Settings::set_onednn_verbose(int level) {
-  return xpu::oneDNN::set_onednn_verbose(level);
+  return torch_ipex::xpu::oneDNN::set_onednn_verbose(level);
 }
 
 bool Settings::set_onemkl_verbose(int level) {
-  return xpu::oneMKL::set_onemkl_verbose(level);
+  return torch_ipex::xpu::oneMKL::set_onemkl_verbose(level);
 }
 
 bool Settings::is_onemkl_enabled() const {
@@ -597,4 +597,4 @@ bool set_fp32_math_mode(FP32_MATH_MODE mode) {
   return dpcpp::Settings::I().set_fp32_math_mode(mode);
 }
 
-} // namespace xpu
+} // namespace torch_ipex::xpu

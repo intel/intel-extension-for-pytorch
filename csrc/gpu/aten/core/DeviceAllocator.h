@@ -9,7 +9,7 @@
 #include <core/Stream.h>
 #include <utils/Macros.h>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 class DeviceAllocator final : public at::Allocator {
  public:
@@ -58,4 +58,4 @@ class DeviceAllocator final : public at::Allocator {
   CachingDeviceAllocator* alloc();
 };
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

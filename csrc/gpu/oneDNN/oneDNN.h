@@ -27,7 +27,7 @@
 #include "QDeconv.h"
 #include "QMatmul.h"
 
-namespace xpu::oneDNN {
+namespace torch_ipex::xpu::oneDNN {
 
 sycl::event convolution(
     at::Tensor& dst,
@@ -73,6 +73,6 @@ sycl::event matmul(
     const Tensor& mat2,
     const Tensor& b_raw,
     bool m2_trans,
-    xpu::oneDNN::Attr attr,
+    torch_ipex::xpu::oneDNN::Attr attr,
     const std::vector<sycl::event>& deps = {});
-} // namespace xpu::oneDNN
+} // namespace torch_ipex::xpu::oneDNN

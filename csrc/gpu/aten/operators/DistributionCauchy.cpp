@@ -39,8 +39,10 @@ Tensor& cauchy_(
   TORCH_CHECK(
       sigma_ > 0.0, "cauchy_ expects sigma > 0.0, but found sigma=", sigma_);
   auto iter = TensorIterator::nullary_op(self);
-  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
-      generator, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen =
+      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+          generator,
+          torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

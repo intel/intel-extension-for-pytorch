@@ -17,7 +17,7 @@
 #define SIMD16 16
 #define SIMD32 32
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -583,13 +583,13 @@ struct dpcpp_loops_launch_legacy_kernel_functor {
   }
 
   dpcpp_loops_launch_legacy_kernel_functor(
-      xpu::dpcpp::Array<char*, ntensors> data_,
+      torch_ipex::xpu::dpcpp::Array<char*, ntensors> data_,
       offset_calc_t offset_calc_,
       const func_t f_)
       : data(data_), offset_calc(offset_calc_), f(f_) {}
 
  private:
-  xpu::dpcpp::Array<char*, ntensors> data;
+  torch_ipex::xpu::dpcpp::Array<char*, ntensors> data;
   offset_calc_t offset_calc;
   const func_t f;
 };
@@ -614,14 +614,14 @@ struct dpcpp_loops_launch_legacy_kernel_dynamic_casting_functor {
   }
 
   dpcpp_loops_launch_legacy_kernel_dynamic_casting_functor(
-      xpu::dpcpp::Array<char*, ntensors> data_,
+      torch_ipex::xpu::dpcpp::Array<char*, ntensors> data_,
       at::detail::Array<ScalarType, ntensors> dtypes_,
       offset_calc_t offset_calc_,
       const func_t f_)
       : data(data_), dtypes(dtypes_), offset_calc(offset_calc_), f(f_) {}
 
  private:
-  xpu::dpcpp::Array<char*, ntensors> data;
+  torch_ipex::xpu::dpcpp::Array<char*, ntensors> data;
   at::detail::Array<ScalarType, ntensors> dtypes;
   offset_calc_t offset_calc;
   const func_t f;
@@ -637,7 +637,7 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
   TORCH_INTERNAL_ASSERT(iter.ninputs() >= traits::arity);
   TORCH_INTERNAL_ASSERT(iter.noutputs() == 1);
 
-  xpu::dpcpp::Array<char*, ntensors> data;
+  torch_ipex::xpu::dpcpp::Array<char*, ntensors> data;
   for (int i = 0; i < ntensors; i++) {
     data[i] = (char*)iter.data_ptr(i);
   }
@@ -681,7 +681,7 @@ void dpcpp_loops_kernel(TensorIteratorBase& iter, const func_t f) {
       launch_legacy_kernel(numel, functor);
     }
   } else {
-    xpu::dpcpp::Array<ScalarType, traits::arity> dtypes;
+    torch_ipex::xpu::dpcpp::Array<ScalarType, traits::arity> dtypes;
     for (int i = 0; i < traits::arity; i++) {
       dtypes[i] = iter.tensor(i + 1).scalar_type();
     }
@@ -844,7 +844,7 @@ void dpcpp_loops_multiple_outputs_kernel(
   TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
   TORCH_INTERNAL_ASSERT(iter.ntensors() == ntensors);
 
-  xpu::dpcpp::Array<char*, ntensors> data;
+  torch_ipex::xpu::dpcpp::Array<char*, ntensors> data;
   for (int i = 0; i < ntensors; i++) {
     data[i] = (char*)iter.data_ptr(i);
   }

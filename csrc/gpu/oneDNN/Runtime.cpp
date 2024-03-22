@@ -6,7 +6,7 @@
  * Only maintain oneDNN runtime states in this file.
  * */
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 using namespace dnnl;
@@ -27,4 +27,4 @@ bool set_onednn_verbose(int level) {
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

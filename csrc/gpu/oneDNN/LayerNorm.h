@@ -14,10 +14,10 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static std::tuple<Tensor, Tensor, Tensor> layer_norm(
@@ -235,7 +235,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   memory src_m = dpcpp_onednn_memory(src_md, engine, src.data_ptr());
   if (src_md != exp_md) {
     src_ = empty_opaque_tensor(exp_md, src.options(), c10::nullopt);
-    xpu::oneDNN::reorder(src, src_);
+    torch_ipex::xpu::oneDNN::reorder(src, src_);
     src_m = dpcpp_onednn_memory(exp_md, engine, src_.data_ptr());
   }
 
@@ -244,7 +244,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
       dpcpp_onednn_memory(diff_dst_md, engine, diff_dst.data_ptr());
   if (diff_dst_md != exp_md) {
     diff_dst_ = empty_opaque_tensor(exp_md, diff_dst.options(), c10::nullopt);
-    xpu::oneDNN::reorder(diff_dst, diff_dst_);
+    torch_ipex::xpu::oneDNN::reorder(diff_dst, diff_dst_);
     diff_dst_m = dpcpp_onednn_memory(exp_md, engine, diff_dst_.data_ptr());
   }
 
@@ -258,7 +258,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   memory mean_m = dpcpp_onednn_memory(mean_md, engine, mean.data_ptr());
   if (mean_md != stats_exp_md) {
     mean_ = empty_opaque_tensor(stats_exp_md, mean.options(), c10::nullopt);
-    xpu::oneDNN::reorder(mean, mean_);
+    torch_ipex::xpu::oneDNN::reorder(mean, mean_);
     mean_m = dpcpp_onednn_memory(stats_exp_md, engine, mean_.data_ptr());
   }
 
@@ -266,7 +266,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   memory rstd_m = dpcpp_onednn_memory(rstd_md, engine, rstd.data_ptr());
   if (rstd_md != stats_exp_md) {
     rstd_ = empty_opaque_tensor(stats_exp_md, rstd.options(), c10::nullopt);
-    xpu::oneDNN::reorder(rstd, rstd_);
+    torch_ipex::xpu::oneDNN::reorder(rstd, rstd_);
     rstd_m = dpcpp_onednn_memory(stats_exp_md, engine, rstd_.data_ptr());
   }
 
@@ -319,4 +319,4 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

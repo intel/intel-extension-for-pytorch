@@ -70,7 +70,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
       scale.has_value() ? scale.value() : (1.0 / std::sqrt(query.size(-1)));
 
   const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
-  xpu::xetla::XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  auto xeType = sdp::aten_to_Xetla_dtype(query);
   auto dpcpp_queue = dpcppGetCurrentQueue();
 
   auto cgfs = fmha_backward_kernel(

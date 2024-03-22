@@ -11,7 +11,7 @@
 #include <utils/DPCPP.h>
 
 using namespace at::native;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -68,14 +68,15 @@ Tensor quantize_tensor_per_channel_affine(
     const Tensor& scales,
     const Tensor& zero_points,
     int64_t axis) {
-  xpu::oneDNN::ReorderAttr rattr = xpu::oneDNN::ReorderAttr();
+  torch_ipex::xpu::oneDNN::ReorderAttr rattr =
+      torch_ipex::xpu::oneDNN::ReorderAttr();
   int mask = (1 << axis);
   // See [Note: Scale setting for reorder]
   memory::dims scale_zp_sz = scales.sizes().vec();
   memory::dims scale_zp_st = scales.strides().vec();
   rattr.set_dst_sc_mask(mask);
   rattr.set_dst_zp_mask(mask);
-  xpu::oneDNN::quantized_reorder(
+  torch_ipex::xpu::oneDNN::quantized_reorder(
       rtensor,
       qtensor,
       /*src_scale=*/nullptr,
@@ -96,7 +97,8 @@ Tensor quantize_tensor_per_tensor_affine(
     int64_t zero_point) {
   auto r_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(rtensor);
 
-  xpu::oneDNN::ReorderAttr rattr = xpu::oneDNN::ReorderAttr();
+  torch_ipex::xpu::oneDNN::ReorderAttr rattr =
+      torch_ipex::xpu::oneDNN::ReorderAttr();
   int mask = 0;
   rattr.set_dst_sc_mask(mask);
   if (zero_point != 0)
@@ -105,7 +107,7 @@ Tensor quantize_tensor_per_tensor_affine(
   const memory::dim scale_zp_st = 1;
   float dnn_scale = scale;
   auto quant_base = fetch_cached_quantizer_base(dnn_scale, zero_point);
-  xpu::oneDNN::quantized_reorder(
+  torch_ipex::xpu::oneDNN::quantized_reorder(
       rtensor,
       qtensor,
       /*src_scale=*/nullptr,

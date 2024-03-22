@@ -82,7 +82,7 @@ Tensor empty_opaque_tensor(
     DPCPPTensorContext::Meta meta,
     const TensorOptions& options,
     c10::optional<MemoryFormat> optional_memory_format) {
-  auto* allocator = xpu::dpcpp::getDeviceAllocator();
+  auto* allocator = torch_ipex::xpu::dpcpp::getDeviceAllocator();
   auto dtype = options.dtype();
 
   at::detail::check_size_nonnegative(meta.get_dims());
@@ -109,7 +109,8 @@ Tensor empty_opaque_tensor(
         "required rank 3 tensor to use channels_last_1d format");
     tensor.unsafeGetTensorImpl()->set_sizes_and_strides(
         meta.get_dims(),
-        xpu::dpcpp::get_channels_last_strides_1d_dpcpp(meta.get_dims()));
+        torch_ipex::xpu::dpcpp::get_channels_last_strides_1d_dpcpp(
+            meta.get_dims()));
   } else {
     tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
   }
@@ -130,7 +131,7 @@ Tensor empty_opaque_qtensor(
     QuantizerPtr quantizer) {
   at::detail::check_size_nonnegative(meta.get_dims());
 
-  auto* allocator = xpu::dpcpp::getDeviceAllocator();
+  auto* allocator = torch_ipex::xpu::dpcpp::getDeviceAllocator();
   auto dtype = scalarTypeToTypeMeta(quantizer->scalar_type());
 
   int64_t size_bytes = meta.get_size();
@@ -157,7 +158,8 @@ Tensor empty_opaque_qtensor(
         "required rank 3 tensor to use channels_last_1d format");
     tensor.unsafeGetTensorImpl()->set_sizes_and_strides(
         meta.get_dims(),
-        xpu::dpcpp::get_channels_last_strides_1d_dpcpp(meta.get_dims()));
+        torch_ipex::xpu::dpcpp::get_channels_last_strides_1d_dpcpp(
+            meta.get_dims()));
   } else {
     tensor.unsafeGetTensorImpl()->empty_tensor_restride(memory_format);
   }

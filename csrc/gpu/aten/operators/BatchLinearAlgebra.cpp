@@ -18,7 +18,7 @@
 #include <torch/custom_class.h>
 #include "comm/ParamUtils.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -777,13 +777,13 @@ void apply_triu_tril(Tensor& result, const Tensor& self, const int64_t k) {
   DPCPP_Q_SUBMIT(queue, cgf);
 }
 
-#define TRIU_TRIL_LAMBDA(upper)                                   \
-  [&] {                                                           \
-    if (xpu::dpcpp::detail::canUse32BitIndexMath(self)) {         \
-      apply_triu_tril<scalar_t, int32_t, upper>(result, self, k); \
-    } else {                                                      \
-      apply_triu_tril<scalar_t, int64_t, upper>(result, self, k); \
-    }                                                             \
+#define TRIU_TRIL_LAMBDA(upper)                                       \
+  [&] {                                                               \
+    if (torch_ipex::xpu::dpcpp::detail::canUse32BitIndexMath(self)) { \
+      apply_triu_tril<scalar_t, int32_t, upper>(result, self, k);     \
+    } else {                                                          \
+      apply_triu_tril<scalar_t, int64_t, upper>(result, self, k);     \
+    }                                                                 \
   }
 
 Tensor& tril_dpcpp_out(Tensor& result, const Tensor& self, int64_t k) {

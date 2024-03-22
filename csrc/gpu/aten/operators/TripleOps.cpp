@@ -23,7 +23,7 @@
 #include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::sparse;
 
 namespace at {
@@ -160,7 +160,7 @@ std::vector<int64_t> dim_expand(
 
 bool check_opaque(std::vector<Tensor> tensor_list) {
   for (auto& tensor : tensor_list) {
-    if (xpu::oneDNN::is_onednn_layout(tensor))
+    if (torch_ipex::xpu::oneDNN::is_onednn_layout(tensor))
       return true;
   }
   return false;
@@ -183,8 +183,8 @@ struct mul_scalar_add_scalar_functor {
 };
 
 Tensor silu_mul(const Tensor& self, const Tensor& other, Tensor& out) {
-  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self);
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  auto real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, self);
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     AtenIpexTypeXPU::silu_out(self, out);
     out = AtenIpexTypeXPU::mul(out, other);
   } else {
@@ -217,8 +217,8 @@ Tensor gelu_mul(
     const Tensor& other,
     Tensor& out,
     c10::string_view approximate) {
-  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self);
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  auto real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, self);
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     AtenIpexTypeXPU::gelu_out(self, approximate, out);
     out = AtenIpexTypeXPU::mul(out, other);
   } else {
@@ -266,8 +266,8 @@ Tensor mul_scalar_add_scalar(
     Scalar accumu,
     Scalar alpha) {
   Tensor result;
-  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self);
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  auto real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, self);
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     result = AtenIpexTypeXPU::mul(self, other);
     result = AtenIpexTypeXPU::add(result, accumu, alpha);
   } else {
@@ -320,8 +320,9 @@ Tensor mul_add_scalar(
     Scalar accumu,
     Scalar alpha) {
   Tensor result;
-  auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self, other);
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  auto real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, self, other);
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     result = AtenIpexTypeXPU::mul(self, other);
     return AtenIpexTypeXPU::add(result, accumu, alpha);
   }
@@ -388,9 +389,9 @@ Tensor mul_scalar_add(
     const Tensor& accumu,
     Scalar alpha) {
   Tensor result;
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self, accumu);
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, self, accumu);
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     result = AtenIpexTypeXPU::mul(self, other);
     result = AtenIpexTypeXPU::add(result, accumu, alpha);
   } else {
@@ -446,9 +447,9 @@ Tensor mul_add(
     const Tensor& accumu,
     Scalar alpha) {
   Tensor result;
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::BASIC, self, other, accumu);
-  if (xpu::COMPUTE_ENG::ONEDNN == real_eng) {
+  torch_ipex::xpu::COMPUTE_ENG real_eng = choose_compute_eng(
+      torch_ipex::xpu::COMPUTE_ENG::BASIC, self, other, accumu);
+  if (torch_ipex::xpu::COMPUTE_ENG::ONEDNN == real_eng) {
     result = AtenIpexTypeXPU::mul(self, other);
     result = AtenIpexTypeXPU::add(result, accumu, alpha);
   } else {
@@ -653,7 +654,7 @@ static inline void sparse_packed_add_kernel(
   auto uniqueOffsets_end = uniqueOffsets;
   sparse_packed_add_kernel_functor f;
   std::tie(indices1D_end, uniqueOffsets_end) =
-      xpu::pstl::unique_with_zip<int64_t, int64_t, int64_t>(
+      torch_ipex::xpu::pstl::unique_with_zip<int64_t, int64_t, int64_t>(
           indices1D, indices1D + nnz, uniqueOffsets, f);
   newNnz = std::distance(indices1D, indices1D_end);
 
@@ -711,7 +712,8 @@ Tensor packed_add(
     Tensor top_half_view = top_half.view({view_rows, view_columns});
     Tensor bot_half_view = bot_half.view({view_rows, view_columns});
     values = values.contiguous();
-    int64_t stride = xpu::dpcpp::detail::prod_intlist(values.sizes().slice(1));
+    int64_t stride =
+        torch_ipex::xpu::dpcpp::detail::prod_intlist(values.sizes().slice(1));
 
     Tensor uniqueOffsets = at::arange(0, {nnz}, indices.options());
     Tensor new_indices, origIndices;

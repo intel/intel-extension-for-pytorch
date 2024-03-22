@@ -21,7 +21,7 @@
 #include "comm/RegistrationDeclarations.h"
 
 using namespace at::native;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -38,8 +38,8 @@ Tensor empty_dpcpp(
   // been
   // "unpacked"
 
-  auto* allocator = xpu::dpcpp::getDeviceAllocator();
-  int64_t nelements = xpu::dpcpp::detail::prod_intlist(size);
+  auto* allocator = torch_ipex::xpu::dpcpp::getDeviceAllocator();
+  int64_t nelements = torch_ipex::xpu::dpcpp::detail::prod_intlist(size);
   auto dtype = options.dtype();
   int64_t size_bytes = nelements * dtype.itemsize();
   auto storage_impl = c10::make_intrusive<StorageImpl>(
@@ -166,9 +166,9 @@ Tensor randperm_dpcpp(
     shuffled_data = shuffled.data_ptr<scalar_t>();
   }
 
-  xpu::pstl::iota(shuffled_data, shuffled_data + n, scalar_t(0));
+  torch_ipex::xpu::pstl::iota(shuffled_data, shuffled_data + n, scalar_t(0));
   randperm_dpcpp_lt_functor<scalar_t> f;
-  xpu::pstl::merge_sort<scalar_t, scalar_t>(
+  torch_ipex::xpu::pstl::merge_sort<scalar_t, scalar_t>(
       keys_data, shuffled_data, keys.size(0), f);
 
   if (!result.is_contiguous()) {

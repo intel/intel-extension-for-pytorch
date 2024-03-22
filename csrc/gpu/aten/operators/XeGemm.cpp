@@ -16,7 +16,7 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-using namespace xpu::xetla;
+using namespace torch_ipex::xpu::xetla;
 
 inline bool fp64_valid() {
   DeviceId curDevID;
@@ -35,8 +35,9 @@ static Tensor mm_common(const Tensor& a, const Tensor& b) {
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
-  xpu::COMPUTE_ENG real_eng = choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, a, b);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy = HGEMM_XETLA()
                     .add_matrix_c(output)
@@ -69,9 +70,9 @@ static Tensor mm_resadd(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, res);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, a, b, res);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
@@ -112,9 +113,9 @@ static Tensor mm_resadd_resadd(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, res0, res1);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, a, b, res0, res1);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
@@ -157,9 +158,9 @@ static Tensor mm_bias(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, bias);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, a, b, bias);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
@@ -200,9 +201,9 @@ static Tensor mm_bias_resadd(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, bias, res);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, a, b, bias, res);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
@@ -248,9 +249,9 @@ static Tensor mm_bias_resadd_resadd(
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, bias, res0, res1);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng = choose_compute_eng(
+      torch_ipex::xpu::COMPUTE_ENG::XETLA, a, b, bias, res0, res1);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy =
       HGEMM_XETLA()
@@ -293,9 +294,9 @@ static Tensor mm_resmul(const Tensor& a, const Tensor& b, const Tensor& res) {
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b, res);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, a, b, res);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy = HGEMM_XETLA()
                     .add_matrix_c(output)
@@ -329,8 +330,9 @@ static Tensor mm_silu(const Tensor& a, const Tensor& b) {
   int n = b.sizes()[1];
   int k = b.sizes()[0];
   auto output = at::empty({m, n}, a.options());
-  xpu::COMPUTE_ENG real_eng = choose_compute_eng(xpu::COMPUTE_ENG::XETLA, a, b);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, a, b);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   auto policy = HGEMM_XETLA()
                     .add_matrix_c(output)
@@ -361,9 +363,9 @@ Tensor matmul_relu(
   int n = weight.sizes()[1];
   int k = weight.sizes()[0];
   auto output = at::empty({m, n}, input.options());
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, input);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, input);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   GemmStatus status = GemmStatus::kError;
   if (bias.has_value()) {
@@ -410,9 +412,9 @@ Tensor matmul_gelu(
   int n = weight.sizes()[1];
   int k = weight.sizes()[0];
   auto output = at::empty({m, n}, input.options());
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, input);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  torch_ipex::xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, input);
+  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
   if (bias.has_value() && approximate == "tanh") {
     auto policy =
@@ -582,7 +584,7 @@ static void mm_qkv_out(
   TORCH_CHECK(is_a_contiguous && is_b_row_major);
   TORCH_CHECK(input.scalar_type() == kHalf && weight.scalar_type() == kHalf);
 
-  using namespace xpu::xetla;
+  using namespace torch_ipex::xpu::xetla;
   using scalar_t =
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
@@ -728,7 +730,7 @@ static void mm_qkv_group_out(
   TORCH_CHECK(is_a_contiguous && is_b_row_major);
   TORCH_CHECK(input.scalar_type() == kHalf && weight.scalar_type() == kHalf);
 
-  using namespace xpu::xetla;
+  using namespace torch_ipex::xpu::xetla;
   using scalar_t =
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& queue = dpcppGetCurrentQueue();

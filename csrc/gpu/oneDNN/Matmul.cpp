@@ -22,10 +22,10 @@
 #include <oneapi/dnnl/dnnl.hpp>
 
 using namespace dnnl;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 sycl::event matmul(
     Tensor& result,
@@ -51,11 +51,13 @@ sycl::event matmul(
   auto engine_index = curDevice.index();
   auto strm = GpuStreamManager::Instance().get_stream();
 
-  Tensor m1 =
-      xpu::oneDNN::is_onednn_matmul_strides(mat1) ? mat1 : mat1.contiguous();
-  Tensor m2 =
-      xpu::oneDNN::is_onednn_matmul_strides(mat2) ? mat2 : mat2.contiguous();
-  Tensor dst = xpu::oneDNN::is_onednn_matmul_strides(result, true)
+  Tensor m1 = torch_ipex::xpu::oneDNN::is_onednn_matmul_strides(mat1)
+      ? mat1
+      : mat1.contiguous();
+  Tensor m2 = torch_ipex::xpu::oneDNN::is_onednn_matmul_strides(mat2)
+      ? mat2
+      : mat2.contiguous();
+  Tensor dst = torch_ipex::xpu::oneDNN::is_onednn_matmul_strides(result, true)
       ? result
       : result.contiguous();
 
@@ -265,7 +267,7 @@ sycl::event matmul(
 #endif
 
     if (m1_dt == memory::data_type::f32) {
-      pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+      pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
     }
 
     // STEP3: create primitive
@@ -324,14 +326,14 @@ sycl::event matmul(
   if (m1_usr_m.get_desc() != expected_m1_md) {
     m1_ = empty_opaque_tensor(expected_m1_md, m1.options(), c10::nullopt);
     m1_m = dpcpp_onednn_memory(expected_m1_md, engine, m1_.data_ptr());
-    xpu::oneDNN::reorder(m1, m1_);
+    torch_ipex::xpu::oneDNN::reorder(m1, m1_);
   }
 
   if (m2_usr_m.get_desc() != expected_m2_md) {
     m2_ = empty_opaque_tensor(expected_m2_md, m2.options(), c10::nullopt);
     m2_m = dpcpp_onednn_memory(expected_m2_md, engine, m2_.data_ptr());
     auto m2_onednn_matmul_shape_compatible = m2_trans ? m2 : m2.t();
-    xpu::oneDNN::reorder(m2_onednn_matmul_shape_compatible, m2_);
+    torch_ipex::xpu::oneDNN::reorder(m2_onednn_matmul_shape_compatible, m2_);
 
     if (weight_cache_optimization) {
       auto ctx_ =
@@ -350,7 +352,7 @@ sycl::event matmul(
     dst_ = empty_opaque_tensor(expected_dst_md, dst.options(), c10::nullopt);
     dst_m = dpcpp_onednn_memory(expected_dst_md, engine, dst_.data_ptr());
     if (attr.with_sum())
-      xpu::oneDNN::reorder(dst, dst_);
+      torch_ipex::xpu::oneDNN::reorder(dst, dst_);
   }
   if (attr.with_binary())
     attr.construct_post_binary(matmul_pd, args);
@@ -387,4 +389,4 @@ sycl::event matmul(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

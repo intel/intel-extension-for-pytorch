@@ -8,8 +8,8 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h" // important
 
-using namespace xpu::dpcpp::detail;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::native;
 
 static constexpr int64_t GRU_WORKSPACE_MULTIPLIER = 5;

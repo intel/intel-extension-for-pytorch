@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 using bytestring = std::string;
@@ -381,4 +381,4 @@ inline void create_key(bytestring& key_to_create, Ts&&... args) {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

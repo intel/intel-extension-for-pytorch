@@ -24,7 +24,7 @@
 #include "Loops.h"
 
 using namespace at;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
 namespace impl {
@@ -176,7 +176,7 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
 
 template <typename func_t>
 void dpcpp_loops_memcpy_kernel(TensorIteratorBase& iter, const func_t& f) {
-  xpu::dpcpp::Array<char*, 2> data;
+  torch_ipex::xpu::dpcpp::Array<char*, 2> data;
   data[0] = (char*)iter.data_ptr(0);
   data[1] = (char*)iter.data_ptr(1);
   int vec_size = at::native::Memory::can_vectorize_up_to_loop<func_t>(

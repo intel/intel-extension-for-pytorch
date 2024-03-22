@@ -13,10 +13,10 @@
 
 #include <oneapi/dnnl/dnnl.hpp>
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace oneDNN {
 
 static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
@@ -42,12 +42,12 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
   int32_t num_directions = bidirectional ? 2 : 1;
   int32_t num_gate = 4;
 
-  auto src_data_t = xpu::oneDNN::get_onednn_dtype(src);
-  auto iter_c_data_t = xpu::oneDNN::get_onednn_dtype(src);
+  auto src_data_t = torch_ipex::xpu::oneDNN::get_onednn_dtype(src);
+  auto iter_c_data_t = torch_ipex::xpu::oneDNN::get_onednn_dtype(src);
 
   auto bia_ = bia;
   auto cx_ = cx;
-  auto bia_data_t = xpu::oneDNN::get_onednn_dtype(bia_);
+  auto bia_data_t = torch_ipex::xpu::oneDNN::get_onednn_dtype(bia_);
   if (bia_.scalar_type() == ScalarType::BFloat16) {
     bia_ = bia_.to(at::kFloat);
     cx_ = cx_.to(at::kFloat);
@@ -123,7 +123,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
 #endif
 
   if (src_data_t == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+    pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
   std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
@@ -375,13 +375,13 @@ lstm_backward(
   auto diff_wgh_h = at::zeros_like(wgh_h, diff_dst.dtype());
   auto diff_bia = at::zeros_like(bia, diff_dst.dtype());
 
-  auto src_data_t = xpu::oneDNN::get_onednn_dtype(src);
-  auto iter_c_data_t = xpu::oneDNN::get_onednn_dtype(src);
+  auto src_data_t = torch_ipex::xpu::oneDNN::get_onednn_dtype(src);
+  auto iter_c_data_t = torch_ipex::xpu::oneDNN::get_onednn_dtype(src);
 
   auto bia_ = bia;
   auto cx_ = cx;
-  auto bia_data_t = xpu::oneDNN::get_onednn_dtype(bia_);
-  auto diff_data_t = xpu::oneDNN::get_onednn_dtype(diff_dst);
+  auto bia_data_t = torch_ipex::xpu::oneDNN::get_onednn_dtype(bia_);
+  auto diff_data_t = torch_ipex::xpu::oneDNN::get_onednn_dtype(diff_dst);
   if (bia_.scalar_type() == ScalarType::BFloat16) {
     bia_ = bia_.to(at::kFloat);
     cx_ = cx_.to(at::kFloat); // onednn needs the cell state datatype is f32
@@ -472,7 +472,7 @@ lstm_backward(
 #endif
 
   if (src_data_t == memory::data_type::f32) {
-    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+    pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
   }
 
   std::shared_ptr<lstm_forward::primitive_desc> lstm_forward_pd;
@@ -830,4 +830,4 @@ lstm_backward(
 }
 
 } // namespace oneDNN
-} // namespace xpu
+} // namespace torch_ipex::xpu

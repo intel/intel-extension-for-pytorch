@@ -12,8 +12,8 @@
 #include "SortingDeviceRadixSort.h"
 #include "SortingFastGroupSort.h"
 
-using namespace xpu::dpcpp::detail;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::AtenIpexTypeXPU;
 
 namespace at {

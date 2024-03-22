@@ -11,7 +11,7 @@
 #include <runtime/Utils.h>
 #include "comm/ParamUtils.h"
 
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 using namespace at::native;
 
 namespace at {
@@ -99,7 +99,7 @@ Tensor q_add_impl(
   q_add_impl_func<T> func(
       oscale, ascale, azp, bscale, bzp, with_relu, zero_point);
 
-  auto& dpcpp_queue = xpu::dpcpp::dpcppGetCurrentQueue();
+  auto& dpcpp_queue = torch_ipex::xpu::dpcpp::dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
     T* qa_ptr = (T*)qa_.data_ptr();
     T* qb_ptr = (T*)qb_.data_ptr();

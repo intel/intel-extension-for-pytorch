@@ -8,7 +8,7 @@
 #include <set>
 #include <unordered_map>
 
-namespace xpu {
+namespace torch_ipex::xpu {
 namespace dpcpp {
 
 constexpr size_t kHostAlignment = 512;
@@ -169,4 +169,4 @@ void CachingHostAllocator::release(void* ptr) {
 }
 
 } // namespace dpcpp
-} // namespace xpu
+} // namespace torch_ipex::xpu

@@ -9,7 +9,7 @@
 
 using namespace dnnl;
 using namespace at::native;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp;
 
 template <int kSpatialDim>
 c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> at::
