@@ -56,7 +56,7 @@ static Tensor softmax(
     Tensor& output) {
   TORCH_CHECK(input.dim() <= 4 && input.dim() >= 1, "Input Dims out of range");
 
-  Device curDevice = Device(at::kXPU, current_device());
+  Device curDevice = Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -116,7 +116,7 @@ static Tensor softmax_backward(
     Tensor gI) {
   TORCH_CHECK(grad.dim() <= 4 && grad.dim() >= 1, "Input Dims out of range");
 
-  Device curDevice = Device(at::kXPU, current_device());
+  Device curDevice = Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
   if (!gI.defined()) {

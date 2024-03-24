@@ -497,7 +497,7 @@ Tensor _efficientzerotensor(
     c10::optional<bool> pin_memory) {
   auto device_ = device_or_default(device);
   if (!device_.has_index()) {
-    device_.set_index(current_device());
+    device_.set_index(at::xpu::current_device());
   }
   auto allocator = at::native::ZeroTensorAllocator(device_);
   auto dtype_ = dtype_or_default(dtype);

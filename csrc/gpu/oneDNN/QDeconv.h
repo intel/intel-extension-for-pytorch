@@ -220,8 +220,8 @@ static Tensor quantized_deconvolution(
   auto wgh = wgh_r;
 
   bool with_bias = bia.defined();
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine(
+      {kXPU, at::xpu::current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto memory_layout_for_conv =

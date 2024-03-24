@@ -326,8 +326,9 @@ inline void device_radix_sort_impl(
     DPCPP_Q_SUBMIT(q, cgf);                              \
   }
 
-  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-  switch (dev_prop->subgroup_sizes[0] * 2) {
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  switch (dev_prop->sub_group_sizes[0] * 2) {
     case 32:
       DISPATCH_SG(32);
       break;

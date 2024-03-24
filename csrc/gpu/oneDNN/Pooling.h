@@ -57,7 +57,7 @@ static at::Tensor pooling(
     std::vector<int64_t>& dilation_vec,
     std::vector<int64_t>& padding_l_vec,
     std::vector<int64_t>& padding_r_vec) {
-  at::Device curDevice = at::Device(at::kXPU, current_device());
+  at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -200,7 +200,7 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
     std::vector<int64_t>& dilation_vec,
     std::vector<int64_t>& padding_l_vec,
     std::vector<int64_t>& padding_r_vec) {
-  at::Device curDevice = at::Device(at::kXPU, current_device());
+  at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -381,7 +381,7 @@ static at::Tensor pooling_backward(
     std::vector<int64_t>& dilation_vec,
     std::vector<int64_t>& padding_l_vec,
     std::vector<int64_t>& padding_r_vec) {
-  at::Device curDevice = at::Device(at::kXPU, current_device());
+  at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
   prop_kind prop_kind = dnnl::prop_kind::forward_training;
@@ -551,7 +551,7 @@ static at::Tensor pooling_backward(
     std::vector<int64_t>& dilation_vec,
     std::vector<int64_t>& padding_l_vec,
     std::vector<int64_t>& padding_r_vec) {
-  at::Device curDevice = at::Device(at::kXPU, current_device());
+  at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 

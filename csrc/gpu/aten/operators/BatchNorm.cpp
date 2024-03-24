@@ -75,8 +75,9 @@ static int getNumThreads(int nElem, int max_size) {
 int get_prefer_simd(int numPlane, int nHw) {
   // decide SIMD: SIMD32 or SIMD16
 
-  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-  auto sub_group_size = dev_prop->subgroup_sizes;
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  auto sub_group_size = dev_prop->sub_group_sizes;
   int simd = sub_group_size[1];
   if (simd <= SIMD16)
     return simd;

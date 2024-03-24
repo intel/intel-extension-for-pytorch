@@ -23,22 +23,22 @@ Device DPCPPGuardImpl::exchangeDevice(Device d) const {
   TORCH_INTERNAL_ASSERT(d.type() == DeviceType::XPU);
   Device old_device = getDevice();
   if (old_device.index() != d.index()) {
-    set_device(d.index());
+    at::xpu::set_device(d.index());
   }
   return old_device;
 }
 
 Device DPCPPGuardImpl::getDevice() const {
-  return Device(DeviceType::XPU, current_device());
+  return Device(DeviceType::XPU, at::xpu::current_device());
 }
 
 void DPCPPGuardImpl::setDevice(Device d) const {
   TORCH_INTERNAL_ASSERT(d.type() == DeviceType::XPU);
-  set_device(d.index());
+  at::xpu::set_device(d.index());
 }
 
 void DPCPPGuardImpl::uncheckedSetDevice(Device d) const noexcept {
-  set_device(d.index());
+  at::xpu::set_device(d.index());
 }
 
 Stream DPCPPGuardImpl::getStream(Device d) const noexcept {
@@ -53,7 +53,7 @@ Stream DPCPPGuardImpl::exchangeStream(Stream s) const noexcept {
 }
 
 DeviceIndex DPCPPGuardImpl::deviceCount() const noexcept {
-  return device_count();
+  return at::xpu::device_count();
 }
 
 void DPCPPGuardImpl::destroyEvent(void* event, const DeviceIndex device_index)

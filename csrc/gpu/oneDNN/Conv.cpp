@@ -210,7 +210,7 @@ sycl::event convolution(
     int64_t groups,
     Attr& attr,
     const std::vector<sycl::event>& deps) {
-  at::Device curDevice = at::Device(kXPU, current_device());
+  at::Device curDevice = at::Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // Indicate on which device the engine is created
   auto engine_index = curDevice.index();
@@ -409,7 +409,7 @@ sycl::event convolution_backward_weights(
     IntArrayRef dilation,
     int64_t groups,
     const std::vector<sycl::event>& deps) {
-  at::Device curDevice = at::Device(kXPU, current_device());
+  at::Device curDevice = at::Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // Indicate on which device the engine is created
   auto engine_index = curDevice.index();
@@ -629,7 +629,7 @@ sycl::event convolution_backward_data(
     int64_t groups,
     bool bias_defined,
     const std::vector<sycl::event>& deps) {
-  at::Device curDevice = at::Device(kXPU, current_device());
+  at::Device curDevice = at::Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // Indicate on which device the engine is created
   auto engine_index = curDevice.index();

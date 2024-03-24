@@ -25,7 +25,7 @@ static void reduce(
   TORCH_CHECK(
       src.ndimension() == dst.ndimension(),
       "ndim should be same for src and dst");
-  at::Device curDevice = at::Device(at::kXPU, current_device());
+  at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 

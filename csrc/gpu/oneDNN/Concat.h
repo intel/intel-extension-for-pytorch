@@ -99,8 +99,8 @@ static void concat(
     dst.resize_(dst_tz, smf);
   }
 
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine(
+      {kXPU, at::xpu::current_device()});
 
   std::vector<memory::desc> srcs_md;
   std::vector<memory> srcs_m;

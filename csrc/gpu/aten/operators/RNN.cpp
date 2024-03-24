@@ -26,7 +26,7 @@ std::tuple<Tensor, Tensor, Tensor> _dpcpp_impl(
     bool bidirectional,
     bool batch_first) {
   TORCH_CHECK(!batch_first, "oneDNN does not support batch first input");
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 

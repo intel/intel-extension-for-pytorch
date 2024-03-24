@@ -321,8 +321,8 @@ static void deconvolution(
     IntArrayRef dilation,
     int64_t groups,
     Attr& attr) {
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine(
+      {kXPU, at::xpu::current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto ndim = src.ndimension();
@@ -454,8 +454,8 @@ static void deconvolution_backward_data(
     IntArrayRef dilation,
     int64_t groups,
     bool bias_defined) {
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine(
+      {kXPU, at::xpu::current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto memory_layout_for_conv =
@@ -585,8 +585,8 @@ static void deconvolution_backward_weights(
     IntArrayRef padding,
     IntArrayRef dilation,
     int64_t groups) {
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine(
+      {kXPU, at::xpu::current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto memory_layout_for_conv =

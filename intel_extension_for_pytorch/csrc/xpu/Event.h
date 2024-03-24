@@ -7,7 +7,8 @@
 namespace torch_ipex::xpu {
 
 struct THDPEvent {
-  PyObject_HEAD std::shared_ptr<torch_ipex::xpu::dpcpp::DPCPPEventBase> dpcpp_event;
+  PyObject_HEAD std::shared_ptr<torch_ipex::xpu::dpcpp::DPCPPEventBase>
+      dpcpp_event;
 };
 extern PyObject* THDPEventClass;
 

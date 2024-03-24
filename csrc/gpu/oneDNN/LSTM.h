@@ -31,7 +31,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor> lstm(
     double dropout_p,
     bool train,
     bool bidirectional) {
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -337,8 +337,8 @@ lstm_backward(
     double dropout_p,
     bool train,
     bool bidirectional) {
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine(
+      {kXPU, at::xpu::current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   int32_t hidden_sz = hx.size(-1);

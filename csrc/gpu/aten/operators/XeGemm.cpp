@@ -2,7 +2,6 @@
 #include <ATen/ATen.h>
 #include <ATen/CPUApplyUtils.h>
 #include <ATen/record_function.h>
-#include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <iostream>
 #include "Blas.h"
@@ -19,8 +18,7 @@ namespace AtenIpexTypeXPU {
 using namespace torch_ipex::xpu::xetla;
 
 inline bool fp64_valid() {
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceId curDevID = at::xpu::current_device();
   return Settings::I().has_2d_block_array(curDevID);
 }
 
@@ -589,8 +587,7 @@ static void mm_qkv_out(
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& q = dpcppGetCurrentQueue();
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceId curDevID = at::xpu::current_device();
   bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
   bool out0_valid =
       reinterpret_cast<uint64_t>(out0.data_ptr<scalar_t>()) % 8 == 0;
@@ -735,8 +732,7 @@ static void mm_qkv_group_out(
       decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
   auto& queue = dpcppGetCurrentQueue();
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceId curDevID = at::xpu::current_device();
   bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
   bool out0_valid =
       reinterpret_cast<uint64_t>(out0.data_ptr<scalar_t>()) % 8 == 0;

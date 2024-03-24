@@ -230,7 +230,7 @@ static at::Tensor quantized_convolution(
       "convolution only supports 3D, 4D, 5D tensor");
   TORCH_CHECK(dst.defined(), "Quantized convlution should always define dst");
 
-  auto curDevice = at::Device(at::kXPU, current_device());
+  auto curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // engine index means the engine created on which device
   auto engine_index = curDevice.index();

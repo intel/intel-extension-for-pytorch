@@ -18,7 +18,7 @@ void inner_product(
     Tensor bias,
     bool use_bias) {
   Tensor input = input_.is_quantized() ? at::dequantize(input_) : input_;
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 

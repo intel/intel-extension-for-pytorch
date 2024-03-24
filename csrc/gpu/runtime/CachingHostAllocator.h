@@ -2,6 +2,7 @@
 
 #include <ATen/Context.h>
 #include <ATen/core/ATenGeneral.h>
+#include <ATen/xpu/XPUContext.h>
 #include <runtime/Device.h>
 #include <utils/DPCPP.h>
 

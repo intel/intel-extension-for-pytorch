@@ -1689,8 +1689,9 @@ Tensor& MaskedSoftMaxForward(
       canUse32BitIndexMath(input) && canUse32BitIndexMath(output);
 
   // decide SIMD: SIMD32 or SIMD16
-  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-  auto sub_group_size = dev_prop->subgroup_sizes;
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  auto sub_group_size = dev_prop->sub_group_sizes;
   int SIMD = sub_group_size[1];
   if (SIMD == SIMD32) {
     if (dim_size < SIMD16 * INNER_LOOP)
@@ -1803,8 +1804,9 @@ void SpatialSoftMaxForward(Tensor& output, Tensor& input, int dim) {
       canUse32BitIndexMath(input) && canUse32BitIndexMath(output);
 
   // decide SIMD: SIMD32 or SIMD16
-  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-  auto sub_group_size = dev_prop->subgroup_sizes;
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  auto sub_group_size = dev_prop->sub_group_sizes;
   int SIMD = sub_group_size[1];
   if (SIMD == SIMD32) {
     if (dim_size < SIMD16 * INNER_LOOP)
@@ -1989,8 +1991,9 @@ Tensor& add_view_softmax_impl(
         ((uint64_t)output.data_ptr()) % align_bytes / sizeof(scalar_t);
 
     // decide SIMD: SIMD32 or SIMD16
-    auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-    auto sub_group_size = dev_prop->subgroup_sizes;
+    auto* dev_prop =
+        at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+    auto sub_group_size = dev_prop->sub_group_sizes;
     int SIMD = sub_group_size[1];
     if (SIMD == SIMD32) {
       if (dim_size < SIMD16 * INNER_LOOP)
@@ -2101,8 +2104,9 @@ void SpatialSoftMaxBackward(
       canUse32BitIndexMath(output) && canUse32BitIndexMath(gradOutput);
 
   // decide SIMD: SIMD32 or SIMD16
-  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-  auto sub_group_size = dev_prop->subgroup_sizes;
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  auto sub_group_size = dev_prop->sub_group_sizes;
   int SIMD = sub_group_size[1];
   if (SIMD == SIMD32) {
     if (dim_size < SIMD16 * max_vec_size)
@@ -2243,8 +2247,9 @@ void MaskedSoftMaxBackward(
       canUse32BitIndexMath(output) && canUse32BitIndexMath(gradOutput);
 
   // decide SIMD: SIMD32 or SIMD16
-  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-  auto sub_group_size = dev_prop->subgroup_sizes;
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  auto sub_group_size = dev_prop->sub_group_sizes;
   int SIMD = sub_group_size[1];
   if (SIMD == SIMD32) {
     if (dim_size < SIMD16 * max_vec_size)

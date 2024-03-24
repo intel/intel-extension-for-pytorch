@@ -85,8 +85,7 @@ Tensor& addmm_out(
 #endif
   }
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceId curDevID = at::xpu::current_device();
   bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
 
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
@@ -214,8 +213,7 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
 #endif
   }
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceId curDevID = at::xpu::current_device();
   bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
 
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)

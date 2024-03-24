@@ -23,7 +23,7 @@ static inline void eltwise(
     const at::Tensor& src,
     float alpha = 0,
     float beta = 0) {
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
 
   std::vector<int64_t> dims;
@@ -138,7 +138,7 @@ static inline void eltwise_backward(
     const at::Tensor& diff_dst_,
     float alpha = 0,
     float beta = 0) {
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 

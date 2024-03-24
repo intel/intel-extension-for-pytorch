@@ -43,8 +43,7 @@ static std::string format_size(uint64_t size) {
 }
 
 static inline void assertValidDevice(DeviceId di) {
-  auto dev_cnt = 0;
-  AT_DPCPP_CHECK(dpcppGetDeviceCount(&dev_cnt));
+  auto dev_cnt = at::xpu::device_count();
   AT_ASSERTM(0 <= (int)di && (int)di < dev_cnt, "Invalid device argument.");
 }
 
@@ -99,8 +98,7 @@ CachingDeviceAllocator::Block::Block(
       m_prev(nullptr),
       m_next(nullptr),
       m_event_cnt(0) {
-  auto device_cnt = 0;
-  AT_DPCPP_CHECK(dpcppGetDeviceCount(&device_cnt));
+  auto device_cnt = at::xpu::device_count();
   std::vector<DeviceStats> dev_stats;
 }
 
@@ -147,17 +145,17 @@ int CachingDeviceAllocator::malloc_with_retry(
     DeviceId di,
     void** devPtr,
     size_t size) {
-  auto& syclDev = dpcppGetRawDevice(di);
+  auto& syclDev = at::xpu::get_raw_device(di);
   // Our minimum allocated memory is 512. Thus we set mem align to 512.
   *devPtr = sycl::aligned_alloc_device(
-      kDevAlignment, size, syclDev, dpcppGetDeviceContext(di));
+      kDevAlignment, size, syclDev, at::xpu::get_device_context());
 
   if (*devPtr == NULL) {
     DeviceStats& stats = get_stats_for_device(di);
     stats.num_alloc_retries += 1;
     free_cached_blocks(di);
     *devPtr = sycl::aligned_alloc_device(
-        kDevAlignment, size, syclDev, dpcppGetDeviceContext(di));
+        kDevAlignment, size, syclDev, at::xpu::get_device_context());
     if (*devPtr == NULL) {
       return DPCPP_FAILURE;
     }
@@ -172,9 +170,7 @@ void CachingDeviceAllocator::malloc(
     sycl::queue* queue) {
   std::lock_guard<std::recursive_mutex> lock(mutex);
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-
+  DeviceId curDevID = at::xpu::current_device();
   process_events();
 
   auto size = (asize < kMinBlockSize)
@@ -247,7 +243,7 @@ void CachingDeviceAllocator::malloc(
       update_stat_array(stats.segment, 1, stat_types);
       update_stat_array(stats.reserved_bytes, alloc_size, stat_types);
     } else {
-      auto& dpcppDev = dpcppGetRawDevice(curDevID);
+      auto& dpcppDev = at::xpu::get_raw_device(curDevID);
       size_t device_total = dpcppGlobalMemSize(curDevID);
       stats.num_ooms += 1;
 
@@ -387,8 +383,7 @@ void CachingDeviceAllocator::emptyCache() {
    * held on all the GPUs. So we have to do a device-level synchronization on
    * all GPUs.
    */
-  int count = 0;
-  AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));
+  auto count = at::xpu::device_count();
   for (auto i = 0; i < count; i++) {
     torch_ipex::xpu::dpcpp::deviceSynchronize(i);
   }
@@ -576,8 +571,7 @@ void CachingDeviceAllocator::free_blocks(
   while (it != end) {
     Block* block = *it;
     if (!block->m_prev && !block->m_next) {
-      sycl::free(
-          (void*)block->m_buffer, dpcppGetDeviceContext(block->m_device));
+      sycl::free((void*)block->m_buffer, at::xpu::get_device_context());
 
       DeviceStats& stats = get_stats_for_device(block->m_device);
       StatTypes stat_types;
@@ -775,7 +769,7 @@ std::vector<SegmentInfo> CachingDeviceAllocator::snapshot() const {
 
 void CachingDeviceAllocator::dumpMemoryStatus(DeviceId deviceIndex) {
   DeviceStats& stats = get_stats_for_device(deviceIndex);
-  auto& dpcppDev = dpcppGetRawDevice(deviceIndex);
+  auto& dpcppDev = at::xpu::get_raw_device(deviceIndex);
   size_t device_total = dpcppGlobalMemSize(deviceIndex);
   TORCH_WARN("GPU", deviceIndex, " memory status:");
   TORCH_WARN("Total capacity: ", format_size(device_total));

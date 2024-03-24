@@ -4,7 +4,6 @@
 
 #include "Stream.h"
 
-#include <core/Device.h>
 #include <core/Stream.h>
 #include <structmember.h>
 
@@ -17,7 +16,7 @@ static PyObject* THDPStream_pynew(
     PyObject* args,
     PyObject* kwargs) {
   HANDLE_TH_ERRORS
-  const auto current_device = torch_ipex::xpu::dpcpp::current_device();
+  const auto current_device = 0;
 
   int priority = 0;
   int64_t stream_id = 0;
@@ -43,7 +42,8 @@ static PyObject* THDPStream_pynew(
     return nullptr;
   }
 
-  torch_ipex::xpu::dpcpp::DPCPPStream stream = (stream_id || device_index || device_type)
+  torch_ipex::xpu::dpcpp::DPCPPStream stream =
+      (stream_id || device_index || device_type)
       ? torch_ipex::xpu::dpcpp::DPCPPStream::unpack3(
             stream_id, device_index, static_cast<c10::DeviceType>(device_type))
       : torch_ipex::xpu::dpcpp::getStreamFromPool(

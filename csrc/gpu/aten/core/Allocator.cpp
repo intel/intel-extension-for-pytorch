@@ -19,8 +19,7 @@ void DeviceAllocator::deleter(void* ptr) {
 }
 
 DataPtr DeviceAllocator::allocate(size_t size) const {
-  DeviceIndex curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceIndex curDevID = at::xpu::current_device();
   void* r = nullptr;
   if (size != 0) {
     auto stream = getCurrentDPCPPStream(curDevID);
@@ -32,7 +31,14 @@ DataPtr DeviceAllocator::allocate(size_t size) const {
 
 DataPtr DeviceAllocator::allocate(const sycl::queue& queue, size_t size) const {
   void* r = nullptr;
-  DeviceIndex devID = dpcppGetDeviceIndex(queue.get_device());
+  DeviceIndex devID = -1;
+  for (auto i = 0; i < at::xpu::device_count(); i++) {
+    if (at::xpu::get_raw_device(i) == queue.get_device()) {
+      devID = i;
+      break;
+    }
+  }
+  TORCH_CHECK(devID != -1, "Unrecognized queue in DeviceAllocator::allocate.");
   if (size != 0) {
     Instance()->alloc()->malloc(&r, size, &const_cast<sycl::queue&>(queue));
   }
@@ -41,8 +47,7 @@ DataPtr DeviceAllocator::allocate(const sycl::queue& queue, size_t size) const {
 }
 
 void* DeviceAllocator::raw_allocate(size_t size) {
-  DeviceIndex curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceIndex curDevID = at::xpu::current_device();
   void* r = nullptr;
   if (size != 0) {
     auto stream = getCurrentDPCPPStream(curDevID);

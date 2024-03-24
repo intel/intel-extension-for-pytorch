@@ -58,8 +58,8 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
     at::Tensor& dst,
     at::Tensor& save_mean,
     at::Tensor& save_var) {
-  auto engine =
-      GpuEngineManager::Instance().get_engine({at::kXPU, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine(
+      {at::kXPU, at::xpu::current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   at::Tensor wgh = wgh_option;
@@ -208,8 +208,8 @@ batch_normalization_backward(
     bool training,
     double epsilon,
     std::array<bool, 3> diff_src_mask) {
-  auto engine =
-      GpuEngineManager::Instance().get_engine({at::kXPU, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine(
+      {at::kXPU, at::xpu::current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   at::Tensor diff_src, diff_wgh, diff_bia;

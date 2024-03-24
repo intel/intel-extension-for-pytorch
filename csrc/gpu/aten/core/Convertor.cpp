@@ -9,12 +9,7 @@ namespace detail {
 // Parameter `device_id` is a device index in sycl::device::get_devices(). It is
 // unused but a reserved parameter.
 at::Device getATenDeviceFromUSM(void* src, const DeviceIndex device_id) {
-#if defined(USE_MULTI_CONTEXT)
-  // We can't get the context created by external libaray. So we can't find
-  // which tile the src is allocated in.
-  TORCH_INTERNAL_ASSERT(false);
-#endif
-  auto& default_ctx = torch_ipex::xpu::dpcpp::dpcppGetDeviceContext();
+  auto& default_ctx = at::xpu::get_device_context();
   // Check that pointer is known in the context
   sycl::usm::alloc alloc_type = sycl::get_pointer_type(src, default_ctx);
 
@@ -25,19 +20,7 @@ at::Device getATenDeviceFromUSM(void* src, const DeviceIndex device_id) {
       alloc_type == sycl::usm::alloc::device,
       "XPU only support sycl::usm::alloc::device type pointer.");
 
-  // Get sycl::device where the data was allocated, but if src is allocated with
-  // a default device and without a specified tile, raw_device will be a parent
-  // device, which can't be enumerated in IPEX.
-  auto raw_device = sycl::get_pointer_device(src, default_ctx);
-  // It is possible that _lazy_init has not been called. Then we need to make
-  // sure we have called _lazy_init here.
-  do_pre_init_hook();
-  auto raw_device_id = torch_ipex::xpu::dpcpp::dpcppGetDeviceIndex(raw_device);
-  // When src is allocated without a specified tile, we will can't find which
-  // tile is src in.
-  TORCH_CHECK(
-      raw_device_id != -1,
-      "The IPEX cannot find the sycl device becuase it is not enumerated in IPEX.");
+  auto raw_device_id = at::xpu::get_device_idx_from_pointer(src);
   return at::Device(c10::DeviceType::XPU, raw_device_id);
 }
 } // namespace detail

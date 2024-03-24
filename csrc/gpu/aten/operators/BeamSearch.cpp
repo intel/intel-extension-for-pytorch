@@ -243,9 +243,7 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
     Tensor& candidate_output_ids, // sentences with eos (decode done)
     Tensor& candidate_sequence_lengths,
     Tensor& candidate_score) {
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceId curDevID = at::xpu::current_device();
   int32_t eu_count = dpcppGpuEuCount();
   int32_t num_wg_per_beam;
   if (!Settings::I().has_2d_block_array(curDevID)) {

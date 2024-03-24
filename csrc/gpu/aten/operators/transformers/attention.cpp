@@ -646,8 +646,7 @@ inline bool xetla_supported(
   bool is_supported = false;
 #if defined(USE_XETLA)
   if (dpcppGetDeviceHasXMX()) {
-    DeviceId curDevID;
-    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+    DeviceId curDevID = at::xpu::current_device();
     if ((q.dtype() == at::kHalf || q.dtype() == at::kBFloat16) &&
         Settings::I().has_2d_block_array(curDevID)) {
       if ((q.sym_size(-1) * q.itemsize() % 128 == 0) &&

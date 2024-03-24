@@ -215,8 +215,9 @@ inline void fast_group_radix_select_impl(
     int nsegments,
     int nelements,
     int ntopk) {
-  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-  switch (dev_prop->subgroup_sizes[0] * 2) {
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  switch (dev_prop->sub_group_sizes[0] * 2) {
     // TODO: Fixed subgroup size is used currently for performance consideration
     // however, runtime acquisition is better for scalability
     case 32:

@@ -111,8 +111,8 @@ static inline void reorder(
   if (dst.is_same(src))
     return;
 
-  auto engine =
-      GpuEngineManager::Instance().get_engine({kXPU, current_device()});
+  auto engine = GpuEngineManager::Instance().get_engine(
+      {kXPU, at::xpu::current_device()});
   auto strm = GpuStreamManager::Instance().get_stream();
 
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
@@ -147,7 +147,7 @@ static inline void quantized_reorder(
     memory::dims scale_zp_sz,
     memory::dims scale_zp_st,
     const ReorderAttr& rattr) {
-  at::Device curDevice = at::Device(at::kXPU, current_device());
+  at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // engine index means the engine created on which device
   auto engine_index = curDevice.index();

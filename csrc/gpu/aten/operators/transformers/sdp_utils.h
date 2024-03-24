@@ -118,8 +118,7 @@ inline bool xetla_supported(sdp::sdp_params params) {
   bool is_supported = false;
 #if defined(USE_XETLA)
   if (dpcppGetDeviceHasXMX()) {
-    DeviceId curDevID;
-    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+    DeviceId curDevID = at::xpu::current_device();
     if ((params.query.dtype() == at::kHalf ||
          params.query.dtype() == at::kBFloat16) &&
         Settings::I().has_2d_block_array(curDevID)) {

@@ -47,8 +47,7 @@ namespace AtenIpexTypeXPU {
   }
 
 int8_t GetGpuArchId() noexcept {
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceId curDevID = at::xpu::current_device();
   bool is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
   bool is_xmx = dpcppGetDeviceHasXMX(curDevID);
   if (is_2d_block && is_xmx) {
@@ -585,9 +584,6 @@ Tensor _weight_int4pack_mm_xpu(
   auto q_zeros = q_scale_and_zeros_vec[1].reshape({-1, N}).contiguous();
   TORCH_CHECK(A.dim() == 2 && b_recast.dim() == 2);
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
   auto policy =
       HGEMMXetla_INT4()
           .add_matrix_out(C)

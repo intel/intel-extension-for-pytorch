@@ -1,9 +1,10 @@
 #pragma once
 
-#include <runtime/Device.h>
+#include <ATen/xpu/XPUContext.h>
 #include <utils/DPCPP.h>
 
 #include <core/AllocationInfo.h>
+#include <runtime/Device.h>
 
 #include <algorithm>
 #include <bitset>

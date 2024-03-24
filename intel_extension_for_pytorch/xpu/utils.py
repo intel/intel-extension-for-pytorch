@@ -424,27 +424,6 @@ class sync_mode(OnOff):
         super().__init__(using_sync_mode, enable_sync_mode, disable_sync_mode)
 
 
-def using_tile_as_device():
-    warnings.warn(
-        "using_tile_as_device will be deprecated. It is vaild only when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`"
-    )
-    return _C._is_tile_as_device_enabled()
-
-
-def enable_tile_as_device():
-    warnings.warn(
-        "enable_tile_as_device will be deprecated, please use `ZE_FLAT_DEVICE_HIERARCHY` instead, refering to https://spec.oneapi.io/level-zero/latest/core/PROG.html#device-hierarchy. Currently, it works only when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`"  # noqa: B950
-    )
-    _C._enable_tile_as_device()
-
-
-def disable_tile_as_device():
-    warnings.warn(
-        "disable_tile_as_device will be deprecated, please use `ZE_FLAT_DEVICE_HIERARCHY` instead, refering to https://spec.oneapi.io/level-zero/latest/core/PROG.html#device-hierarchy. Currently, it works only when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`"  # noqa: B950
-    )
-    _C._disable_tile_as_device()
-
-
 ################################################################
 # EXPERIMENTAL options:
 # NOTE: Below options are under experimental.

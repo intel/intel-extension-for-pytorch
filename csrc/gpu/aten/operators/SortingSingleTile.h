@@ -1147,7 +1147,8 @@ void radix_sort_iteration(
     ValueType* values_out,
     int32_t* count,
     const int32_t count_sz) {
-  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
 
 #define DISPATCH_RADIX_SORT_IMPI(SG_SIZE, WG_SIZE) \
   radix_sort_iteration_impl<                       \
@@ -1167,7 +1168,7 @@ void radix_sort_iteration(
       count_sz);
 
   if (dpcppMaxWorkGroupSize() < 512) {
-    switch (dev_prop->subgroup_sizes[0] * 2) {
+    switch (dev_prop->sub_group_sizes[0] * 2) {
       case 32:
         DISPATCH_RADIX_SORT_IMPI(32, 256)
         break;
@@ -1175,7 +1176,7 @@ void radix_sort_iteration(
         DISPATCH_RADIX_SORT_IMPI(16, 256)
     }
   } else {
-    switch (dev_prop->subgroup_sizes[0] * 2) {
+    switch (dev_prop->sub_group_sizes[0] * 2) {
       case 32:
         DISPATCH_RADIX_SORT_IMPI(32, 512)
         break;

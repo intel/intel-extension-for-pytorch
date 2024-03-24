@@ -111,12 +111,6 @@ class IPEX_API Settings final {
   void enable_sync_mode();
   void disable_sync_mode();
 
-  bool is_tile_as_device_enabled() const;
-  void enable_tile_as_device();
-  void disable_tile_as_device();
-
-  bool is_device_hierarchy_composite_enabled() const;
-
   bool is_onednn_layout_enabled() const;
   void enable_onednn_layout();
   void disable_onednn_layout();

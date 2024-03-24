@@ -4,31 +4,14 @@
 
 #include <ATen/TensorUtils.h>
 #include <c10/core/Device.h>
-#include <core/DeviceInfo.h>
+#include <c10/xpu/XPUFunctions.h>
+#include <runtime/Device.h>
 #include <utils/Macros.h>
 
 using namespace at;
 
 namespace torch_ipex::xpu {
 namespace dpcpp {
-
-IPEX_API DeviceIndex device_count() noexcept;
-
-IPEX_API DeviceIndex current_device();
-
-IPEX_API void set_device(DeviceIndex device);
-
-IPEX_API void* sycl_device(DeviceIndex device);
-
-DeviceIndex get_device_index_from_ptr(void* ptr);
-
-DeviceInfo* getCurrentDeviceInfo();
-
-IPEX_API DeviceInfo* getDeviceInfo(DeviceIndex device);
-
-IPEX_API std::vector<int> prefetchDeviceIdListForCard(int card_id);
-
-IPEX_API std::vector<int>& getDeviceIdListForCard(int card_id);
 
 static inline void isOnSameDevice(
     at::CheckedFrom c,
@@ -69,19 +52,13 @@ static inline bool isOnSameDevice(const at::TensorList& tensor_list) {
   if (tensor_list.empty()) {
     return true;
   }
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   for (const Tensor& t : tensor_list) {
     if (t.device() != curDevice)
       return false;
   }
   return true;
 }
-
-IPEX_API int prefetch_device_count(int& device_count) noexcept;
-
-IPEX_API int prefetch_device_has_fp64_dtype(
-    int device_id,
-    bool& has_fp64) noexcept;
 
 } // namespace dpcpp
 } // namespace torch_ipex::xpu

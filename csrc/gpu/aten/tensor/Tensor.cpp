@@ -18,8 +18,7 @@ namespace AtenIpexTypeXPU {
 static void storage_resize(at::StorageImpl* self, ptrdiff_t size_bytes) {
   TORCH_CHECK(size_bytes >= 0, "invalid size");
   TORCH_INTERNAL_ASSERT(self->allocator() != nullptr);
-  c10::DeviceIndex device;
-  AT_DPCPP_CHECK(dpcppGetDevice(&device));
+  c10::DeviceIndex device = at::xpu::current_device();
 
   if (!self->resizable())
     TORCH_CHECK(false, "Trying to resize storage that is not resizable");

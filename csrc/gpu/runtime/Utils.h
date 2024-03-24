@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ATen/xpu/XPUContext.h>
 #include <core/Stream.h>
 #include <runtime/Device.h>
 #include <runtime/Exception.h>
@@ -14,22 +15,8 @@ using namespace at;
 namespace torch_ipex::xpu {
 namespace dpcpp {
 
-static inline bool dpcppIsAvailable() {
-  int count;
-  AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));
-  return count > 0;
-}
-
 static inline DeviceId dpcppGetDeviceIdOfCurrentQueue() {
-  DeviceId cur_device;
-  AT_DPCPP_CHECK(dpcppGetDevice(&cur_device));
-  return static_cast<DeviceId>(cur_device);
-}
-
-static inline bool dpcppIsDeviceAvailable(
-    DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
-  return dev_prop->is_available;
+  return at::xpu::current_device();
 }
 
 static inline sycl::queue& dpcppGetQueueFromStream(DPCPPStream stream) {
@@ -46,14 +33,14 @@ static inline QueueIndex dpcppGetCurrentQueueId() {
 
 static inline int64_t dpcppMaxWorkGroupSize(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   return dev_prop->max_work_group_size;
 }
 
 static inline int64_t dpcppMaxSubGroupSize(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
-  auto subgroup_sizes = dev_prop->subgroup_sizes;
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
+  auto subgroup_sizes = dev_prop->sub_group_sizes;
   int64_t max_val = 0;
   for (auto i : subgroup_sizes) {
     if (i > max_val)
@@ -64,8 +51,8 @@ static inline int64_t dpcppMaxSubGroupSize(
 
 static inline int64_t dpcppMinSubGroupSize(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
-  auto subgroup_sizes = dev_prop->subgroup_sizes;
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
+  auto subgroup_sizes = dev_prop->sub_group_sizes;
   int64_t min_val = dev_prop->max_work_group_size;
   for (auto i : subgroup_sizes) {
     if (i < min_val)
@@ -76,43 +63,43 @@ static inline int64_t dpcppMinSubGroupSize(
 
 static inline int64_t dpcppMaxComputeUnitSize(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   return dev_prop->max_compute_units;
 }
 
 static inline int64_t dpcppGpuEuCount(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   return dev_prop->gpu_eu_count;
 }
 
 static inline int64_t dpcppGpuEuSimdWidth(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   return dev_prop->gpu_eu_simd_width;
 }
 
 static inline int64_t dpcppGpuHWThreadsPerEU(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   return dev_prop->gpu_hw_threads_per_eu;
 }
 
 static inline bool dpcppSupportAtomic64(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
-  return dev_prop->support_atomic64;
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
+  return dev_prop->has_atomic64;
 }
 
 static inline bool dpcppSupportFP64(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
-  return dev_prop->support_fp64;
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
+  return dev_prop->has_fp64;
 }
 
 static inline int64_t dpcppMaxWorkItemsPerTile(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   int64_t eu_cnt = dev_prop->gpu_eu_count;
   int64_t simd_width = dpcppMaxSubGroupSize(dev_id);
   int64_t hw_threads = dev_prop->gpu_hw_threads_per_eu;
@@ -121,7 +108,7 @@ static inline int64_t dpcppMaxWorkItemsPerTile(
 
 static inline int64_t dpcppMaxWorkItemsPerEU(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   int64_t simd_width = dpcppMaxSubGroupSize(dev_id);
   int64_t hw_threads = dev_prop->gpu_hw_threads_per_eu;
   return simd_width * hw_threads;
@@ -137,40 +124,40 @@ static inline int64_t dpcppMaxDSSNum(
 
 static inline size_t dpcppGlobalMemSize(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   return dev_prop->global_mem_size;
 }
 
 static inline int64_t dpcppLocalMemSize(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   return dev_prop->local_mem_size;
 }
 
 template <typename T>
 uint32_t dpcppPrefVectorWidth(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   if (std::is_same<T, char>::value) {
-    return dev_prop->pref_vec_width_char;
+    return dev_prop->preferred_vector_width_char;
   }
   if (std::is_same<T, short>::value) {
-    return dev_prop->pref_vec_width_short;
+    return dev_prop->preferred_vector_width_short;
   }
   if (std::is_same<T, int>::value) {
-    return dev_prop->pref_vec_width_int;
+    return dev_prop->preferred_vector_width_int;
   }
   if (std::is_same<T, int64_t>::value) {
-    return dev_prop->pref_vec_width_long;
+    return dev_prop->preferred_vector_width_long;
   }
   if (std::is_same<T, float>::value) {
-    return dev_prop->pref_vec_width_float;
+    return dev_prop->preferred_vector_width_float;
   }
   if (std::is_same<T, double>::value) {
-    return dev_prop->pref_vec_width_double;
+    return dev_prop->preferred_vector_width_double;
   }
   if (std::is_same<T, sycl::half>::value) {
-    return dev_prop->pref_vec_width_half;
+    return dev_prop->preferred_vector_width_half;
   }
   throw std::invalid_argument(
       "Invalid data type to fetch preferred vector width!");
@@ -179,27 +166,27 @@ uint32_t dpcppPrefVectorWidth(
 template <typename T>
 uint32_t dpcppNativeVectorWidth(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
+  auto* dev_prop = at::xpu::getDeviceProperties(dev_id);
   if (std::is_same<T, char>::value) {
-    return dev_prop->native_vec_width_char;
+    return dev_prop->native_vector_width_char;
   }
   if (std::is_same<T, short>::value) {
-    return dev_prop->native_vec_width_short;
+    return dev_prop->native_vector_width_short;
   }
   if (std::is_same<T, int>::value) {
-    return dev_prop->native_vec_width_int;
+    return dev_prop->native_vector_width_int;
   }
   if (std::is_same<T, int64_t>::value) {
-    return dev_prop->native_vec_width_long;
+    return dev_prop->native_vector_width_long;
   }
   if (std::is_same<T, float>::value) {
-    return dev_prop->native_vec_width_float;
+    return dev_prop->native_vector_width_float;
   }
   if (std::is_same<T, double>::value) {
-    return dev_prop->native_vec_width_double;
+    return dev_prop->native_vector_width_double;
   }
   if (std::is_same<T, sycl::half>::value) {
-    return dev_prop->native_vec_width_half;
+    return dev_prop->native_vector_width_half;
   }
   throw std::invalid_argument(
       "Invalid data type to fetch native vector width!");

@@ -35,7 +35,7 @@ static inline void quantized_matmul(
       "oneDNN input matrixes must have the same ranks");
   TORCH_CHECK(result.defined(), "oneDNN matmul result should be defined");
 
-  at::Device curDevice = at::Device(at::kXPU, current_device());
+  at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // engine index means the engine created on which device
   auto engine_index = curDevice.index();

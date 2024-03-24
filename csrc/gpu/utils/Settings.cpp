@@ -207,7 +207,7 @@ Settings::Settings() {
 } // namespace dpcpp
 
 bool Settings::has_fp64_dtype(int device_id) {
-  return dpcppGetDeviceProperties(device_id)->support_fp64;
+  return dpcppSupportFP64(device_id);
 }
 
 bool Settings::has_2d_block_array(int device_id) {
@@ -215,7 +215,7 @@ bool Settings::has_2d_block_array(int device_id) {
 }
 
 bool Settings::has_atomic64(int device_id) {
-  return dpcppGetDeviceProperties(device_id)->support_atomic64;
+  return dpcppSupportAtomic64(device_id);
 }
 
 bool Settings::has_xmx(int device_id) {
@@ -439,30 +439,6 @@ void Settings::disable_sync_mode() {
 bool Settings::is_onednn_layout_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return onednn_layout_enabled == ENV_VAL::ON;
-}
-
-bool Settings::is_tile_as_device_enabled() const {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return tile_as_device_enabled == ENV_VAL::ON;
-}
-
-void Settings::enable_tile_as_device() {
-  if (!dpcppIsDevPoolInit()) {
-    std::lock_guard<std::mutex> lock(s_mutex);
-    tile_as_device_enabled = ENV_VAL::ON;
-  }
-}
-
-void Settings::disable_tile_as_device() {
-  if (!dpcppIsDevPoolInit()) {
-    std::lock_guard<std::mutex> lock(s_mutex);
-    tile_as_device_enabled = ENV_VAL::OFF;
-  }
-}
-
-bool Settings::is_device_hierarchy_composite_enabled() const {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return device_hierarchy_mode == DEVICE_HIERARCHY::COMPOSITE;
 }
 
 void Settings::enable_onednn_layout() {

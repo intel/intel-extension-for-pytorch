@@ -111,8 +111,9 @@ void get_group_param(
   int64_t maxWGSize = dpcppMaxWorkGroupSize(dev_id);
   auto max_group = dpcppMaxWorkItemsPerTile(dev_id) / maxWGSize;
 
-  auto* dev_prop = dpcppGetDeviceProperties(dev_id);
-  auto sub_group_size = dev_prop->subgroup_sizes;
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  auto sub_group_size = dev_prop->sub_group_sizes;
   int SIMD = sub_group_size[1];
   if ((SIMD == SIMD32) && (K <= 16)) {
     SIMD = SIMD16;

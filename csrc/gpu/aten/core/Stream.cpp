@@ -62,7 +62,7 @@ static void initDPCPPStreamsOnce() {
     return;
   }
 
-  num_devices = torch_ipex::xpu::dpcpp::device_count();
+  num_devices = at::xpu::device_count();
   TORCH_CHECK(
       num_devices > 0, "Number of XPU devices should be greater than zero!");
 
@@ -148,7 +148,7 @@ DPCPPStream getStreamFromPool(
     DeviceId device_index) {
   initDPCPPStreamsOnce();
   if (device_index == -1)
-    device_index = torch_ipex::xpu::dpcpp::current_device();
+    device_index = at::xpu::current_device();
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
   return DPCPPStreamForId(
@@ -161,7 +161,7 @@ DPCPPStream getStreamFromPool(
 DPCPPStream getCurrentDPCPPStream(DeviceId device_index) {
   initDPCPPStreamsOnce();
   if (device_index == -1)
-    device_index = torch_ipex::xpu::dpcpp::current_device();
+    device_index = at::xpu::current_device();
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
   return DPCPPStreamForId(device_index, current_streams[device_index]);
@@ -179,7 +179,7 @@ std::ostream& operator<<(std::ostream& stream, const DPCPPStream& s) {
 void deviceSynchronize(DeviceIndex device_index) {
   initDPCPPStreamsOnce();
   if (device_index == -1)
-    device_index = torch_ipex::xpu::dpcpp::current_device();
+    device_index = at::xpu::current_device();
   check_device_index(device_index);
   dpcppInitDeviceQueueOnce(device_index);
 

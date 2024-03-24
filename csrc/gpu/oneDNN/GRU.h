@@ -32,7 +32,7 @@ static inline Tensor gru_forward(
     bool has_bias,
     bool train,
     bool bidirectional) {
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 
@@ -264,7 +264,7 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
   Tensor diff_dst_iter = src_layer.dtype() == at::ScalarType::BFloat16
       ? diff_dst_iter_ori.to(at::ScalarType::Float)
       : diff_dst_iter_ori;
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   auto strm = GpuStreamManager::Instance().get_stream();
 

@@ -36,8 +36,7 @@ static std::deque<std::atomic<uint32_t>> reserved_counters;
 
 // Warning: this function must only be called once!
 static void initGlobalQueueState() {
-  int num_devices;
-  AT_DPCPP_CHECK(dpcppGetDeviceCount(&num_devices));
+  auto num_devices = at::xpu::device_count();
   TORCH_CHECK(
       num_devices > 0, "Number of XPU devices should be greater than zero!");
 
@@ -52,8 +51,8 @@ static void initDeviceQueue(DeviceId device_index) {
   for (auto i = 0; i < kQueuesPerPool; i++) {
     reserved_queues[device_index][i] =
         std::make_unique<sycl::queue>(sycl::queue(
-            dpcppGetDeviceContext(device_index),
-            dpcppGetRawDevice(device_index),
+            at::xpu::get_device_context(),
+            at::xpu::get_raw_device(device_index),
             dpcppAsyncHandler,
             {sycl::property::queue::in_order(),
              sycl::property::queue::enable_profiling()}));

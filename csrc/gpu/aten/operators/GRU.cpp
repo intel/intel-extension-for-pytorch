@@ -681,8 +681,7 @@ bool is_xetla_gru_available(
     const int input_size,
     const int hidden_size,
     const ScalarType dtype) {
-  DeviceIndex curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceIndex curDevID = at::xpu::current_device();
   // TODO: XeTLA will proive a general API to check supported platform
   if (Settings::I().has_2d_block_array(curDevID)) {
     if (dtype == ScalarType::BFloat16) { // TODO: support fp16

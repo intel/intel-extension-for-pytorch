@@ -644,8 +644,7 @@ static inline int get_memory_layout_for_conv(
     const at::Tensor& src,
     const at::Tensor& weight,
     bool is_transpose) {
-  DeviceIndex curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceIndex curDevID = at::xpu::current_device();
 
   if (!src.defined() || src.is_sparse()) {
     // suggest channels_first

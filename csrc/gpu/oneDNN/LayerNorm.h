@@ -25,8 +25,8 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
     const Tensor& wgh,
     const Tensor& bia,
     double epsilon) {
-  auto engine =
-      GpuEngineManager::Instance().get_engine(Device(kXPU, current_device()));
+  auto engine = GpuEngineManager::Instance().get_engine(
+      Device(kXPU, at::xpu::current_device()));
   auto strm = GpuStreamManager::Instance().get_stream();
 
   // FP16 Data Type only support forward_inference
@@ -147,8 +147,8 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
     const Tensor& rstd,
     const Tensor& wgh,
     double epsilon) {
-  auto engine =
-      GpuEngineManager::Instance().get_engine(Device(kXPU, current_device()));
+  auto engine = GpuEngineManager::Instance().get_engine(
+      Device(kXPU, at::xpu::current_device()));
   auto strm = GpuStreamManager::Instance().get_stream();
 
   normalization_flags flags = wgh.defined()

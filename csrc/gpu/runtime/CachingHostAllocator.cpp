@@ -23,7 +23,7 @@ void* CachingHostAllocator::Block::getPtr() const {
 }
 
 sycl::context& CachingHostAllocator::Block::getContext() const {
-  return dpcppGetDeviceContext(mDevId);
+  return at::xpu::get_device_context();
 }
 
 bool CachingHostAllocator::BlockState::hasEvent() {
@@ -71,21 +71,8 @@ void CachingHostAllocator::processEvents() {
 }
 
 bool CachingHostAllocator::isHostPtr(const void* ptr) {
-#if defined(USE_MULTI_CONTEXT)
-  int count;
-  AT_DPCPP_CHECK(dpcppGetDeviceCount(&count));
-  // We can NOT guarantee the ptr is allocated with the current device context.
-  for (auto i = 0; i < count; i++) {
-    if (sycl::usm::alloc::host ==
-        sycl::get_pointer_type(ptr, dpcppGetDeviceContext(i))) {
-      return true;
-    }
-  }
-  return false;
-#else
   return sycl::usm::alloc::host ==
-      sycl::get_pointer_type(ptr, dpcppGetDeviceContext());
-#endif
+      sycl::get_pointer_type(ptr, at::xpu::get_device_context());
 }
 
 void CachingHostAllocator::emptyCache() {
@@ -123,12 +110,12 @@ int CachingHostAllocator::malloc(void** ptr, size_t size) {
     return DPCPP_SUCCESS;
   }
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  DeviceId curDevID = at::xpu::current_device();
 
   Block block_search(curDevID, size);
   auto it = mAvailable.lower_bound(block_search);
-  if (it != mAvailable.end() && it->getContext() == dpcppGetDeviceContext()) {
+  if (it != mAvailable.end() &&
+      it->getContext() == at::xpu::get_device_context()) {
     auto& block = mBlocks.at(it->getPtr());
     AT_ASSERT(!block.isAllocated() && !block.hasEvent());
     block.setAllocated(true);
@@ -137,11 +124,11 @@ int CachingHostAllocator::malloc(void** ptr, size_t size) {
     return DPCPP_SUCCESS;
   }
 
-  *ptr =
-      sycl::aligned_alloc_host(kHostAlignment, size, dpcppGetDeviceContext());
+  *ptr = sycl::aligned_alloc_host(
+      kHostAlignment, size, at::xpu::get_device_context());
   if (*ptr == NULL) {
-    *ptr =
-        sycl::aligned_alloc_host(kHostAlignment, size, dpcppGetDeviceContext());
+    *ptr = sycl::aligned_alloc_host(
+        kHostAlignment, size, at::xpu::get_device_context());
     if (*ptr == NULL) {
       return DPCPP_FAILURE;
     }

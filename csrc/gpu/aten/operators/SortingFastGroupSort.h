@@ -188,8 +188,9 @@ inline void fast_group_radix_sort_impl(
     ValueT* value_out,
     int nsegments,
     int nsort) {
-  auto* dev_prop = dpcppGetDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
-  switch (dev_prop->subgroup_sizes[0] * 2) {
+  auto* dev_prop =
+      at::xpu::getDeviceProperties(dpcppGetDeviceIdOfCurrentQueue());
+  switch (dev_prop->sub_group_sizes[0] * 2) {
     // TODO: Fixed subgroup size is used currently for performance consideration
     // however, runtime acquisition is better for scalability
     case 32:
@@ -232,9 +233,9 @@ inline std::tuple<int, int, int> get_sorting_workload() {
   constexpr int ITEM_WORK_SIZE = 4;
   constexpr int MERGE_CHUNK_BOUND = 4;
   auto q = dpcppGetDeviceIdOfCurrentQueue();
-  auto* dev_prop = dpcppGetDeviceProperties(q);
+  auto* dev_prop = at::xpu::getDeviceProperties(q);
   auto max_group_size = dpcppMaxWorkGroupSize(q);
-  switch (dev_prop->subgroup_sizes[0] * 2) {
+  switch (dev_prop->sub_group_sizes[0] * 2) {
     case 32:
       return std::make_tuple(max_group_size, ITEM_WORK_SIZE, MERGE_CHUNK_BOUND);
     default:

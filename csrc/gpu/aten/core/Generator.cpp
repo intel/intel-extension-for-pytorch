@@ -14,7 +14,7 @@ static std::deque<std::once_flag> dpcpp_gens_init_flag;
 static std::vector<Generator> default_gens_dpcpp;
 
 static void initDPCPPGenVector() {
-  num_gpus = device_count();
+  num_gpus = at::xpu::device_count();
   dpcpp_gens_init_flag.resize(num_gpus);
   default_gens_dpcpp.resize(num_gpus);
 }
@@ -23,7 +23,7 @@ const Generator& getDefaultDPCPPGenerator(DeviceIndex device_index) {
   std::call_once(num_gpu_init_flag, initDPCPPGenVector);
   DeviceIndex idx = device_index;
   if (idx == -1) {
-    idx = current_device();
+    idx = at::xpu::current_device();
   } else {
     TORCH_CHECK(idx >= 0 && idx < num_gpus);
   }
@@ -38,7 +38,7 @@ Generator createDPCPPGenerator(DeviceIndex device_index) {
   std::call_once(num_gpu_init_flag, initDPCPPGenVector);
   DeviceIndex idx = device_index;
   if (idx == -1) {
-    idx = current_device();
+    idx = at::xpu::current_device();
   }
   TORCH_CHECK(idx >= 0 && idx < num_gpus, "The device_index is invalid.");
   auto gen = make_generator<DPCPPGeneratorImpl>(idx);

@@ -87,7 +87,7 @@ static void resample(
     const double& scales_h = 0.0,
     const double& scales_d = 0.0) {
   auto strm = GpuStreamManager::Instance().get_stream();
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   auto eng = GpuEngineManager::Instance().get_engine(curDevice);
 
   bool is_customer_scales =
@@ -183,7 +183,7 @@ static void resample_backward(
     const double& scales_h = 0.0,
     const double& scales_d = 0.0) {
   auto strm = GpuStreamManager::Instance().get_stream();
-  Device curDevice = Device(kXPU, current_device());
+  Device curDevice = Device(kXPU, at::xpu::current_device());
   auto eng = GpuEngineManager::Instance().get_engine(curDevice);
 
   bool is_customer_scales =
