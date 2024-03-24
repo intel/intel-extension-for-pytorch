@@ -5,10 +5,11 @@ import torch
 from torch._inductor import codecache  # noqa
 from torch._dynamo.device_interface import register_interface_for_device
 
+from ...utils.utils import has_xpu
 from .device_interface import XPUInterface
 from .register import _register_module_function_to_dynamo
 
-if torch.xpu.is_available():
+if torch.xpu._is_compiled() and has_xpu():
     # Register XPU device interfaces in PyTorch Dynamo.
     register_interface_for_device("xpu", XPUInterface)
 

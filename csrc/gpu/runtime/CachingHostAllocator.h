@@ -17,13 +17,6 @@ class CachingHostAllocator final {
         : mDevId(device), mSize(size), mPtr(ptr) {}
 
     static bool Comparator(const Block& ablock, const Block& bblock) {
-      // If USE_MULTI_CONTEXT=OFF, all the devices share a default context. So
-      // there is no need to use device id to represent the same context.
-#if defined(USE_MULTI_CONTEXT)
-      if (ablock.mDevId != bblock.mDevId) {
-        return ablock.mDevId < bblock.mDevId;
-      }
-#endif
       if (ablock.mSize != bblock.mSize) {
         return ablock.mSize < bblock.mSize;
       }
@@ -41,12 +34,7 @@ class CachingHostAllocator final {
     // To guarantee the same context is used when memory is allocated
     // and deallocated, we need to record the specified context used by
     // sycl::aligned_alloc_host.
-    // Fortunately, we can use device id to retrieve the specified context:
-    //   1) USE_MULTI_CONTEXT is OFF, all the devices share a default context.
-    // we can find the specified context via any device id.
-    //   2) USE_MULTI_CONTEXT is ON, in our design, only one context exists per
-    // one device. So we can find the specified context via the corresponding
-    // device id.
+
     // For code readability and maintainability, we decide to use device id,
     // which is contained in DeviceGuard's lifetime scope, to represent the
     // specified context.

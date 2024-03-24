@@ -72,7 +72,5 @@ class TestTorchMethod(TestCase):
             p.join(120)
             return p.exitcode
 
-        self.assertEqual(torch.xpu.is_available(), torch.xpu.device_count() > 0)
-        torch.xpu.has_fp64_dtype()  # call here to check lazy init.
         self.assertEqual(test_multi_process(), 0)
         self.assertEqual(test_multi_process(), 0)

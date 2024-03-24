@@ -13,7 +13,8 @@ import intel_extension_for_pytorch
 from torch import serialization
 from torch.storage import _StorageBase, _LegacyStorage, _warn_typed_storage_removal
 from torch import device as _device
-from torch._utils import classproperty, _get_device_index
+from torch._utils import classproperty
+from torch.xpu._utils import _get_device_index
 
 from .lazy_init import (
     _lazy_init,
@@ -32,6 +33,7 @@ from .deterministics import *
 from .memory import *
 from ..utils.channels_last_1d import is_contiguous_channels_last_1d, to_channels_last_1d
 from ..utils.capsule import get_pointer_from_capsule
+from ..utils.utils import has_xpu
 
 from .overrides import (
     override_tensor_totype,
@@ -51,26 +53,6 @@ default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
 
 
-def _is_compiled() -> bool:
-    r"""Returns true if compile with XPU support."""
-    return hasattr(intel_extension_for_pytorch._C, "_getDeviceCount")
-
-
-if _is_compiled():
-    _exchange_device = intel_extension_for_pytorch._C._exchangeDevice
-else:
-
-    def _exchange_device(device: int) -> int:
-        if device < 0:
-            return -1
-        raise RuntimeError(
-            "Intel® Extension for PyTorch* was compiled without XPU support"
-        )
-
-
-_maybe_exchange_device = _exchange_device
-
-
 def init():
     r"""Initialize the XPU's state. This is a Python API about lazy initialization
     that avoids initializing XPU until the first time it is accessed. You may need
@@ -80,182 +62,6 @@ def init():
     Does nothing if call this function repeatedly.
     """
     _lazy_init()
-
-
-def _raw_device_count() -> int:
-    status, count = intel_extension_for_pytorch._C._prefetchDeviceCount()
-    if status != 0:
-        return -1
-    return count
-
-
-# This API call _raw_device_count() if _lazy_init() has not been called such
-# that this API can be used before forking a child process.
-@lru_cache(maxsize=1)
-def device_count() -> int:
-    r"""Returns the number of XPUs device available."""
-    if not _is_compiled():
-        return 0
-    if _is_initialized():
-        return intel_extension_for_pytorch._C._getDeviceCount()
-    else:
-        count = _raw_device_count()
-        return intel_extension_for_pytorch._C._getDeviceCount() if count < 0 else count
-
-
-# This API can be used before forking process if _lazy_init() has not been called.
-def is_available() -> bool:
-    r"""Returns a bool indicating if XPU is currently available."""
-    # This function device_count() never throws and returns 0 if driver is missing
-    # or can't be initialized
-    return device_count() > 0
-
-
-def is_bf16_supported() -> bool:
-    r"""Returns a bool indicating if the current xpu device supports dtype bfloat16"""
-    # currently, add device support bf16 dtype
-    return True
-
-
-class _DeviceGuard:
-    def __init__(self, index: int):
-        self.idx = index
-        self.prev_idx = -1
-
-    def __enter__(self):
-        self.prev_idx = torch.xpu._exchange_device(self.idx)
-
-    def __exit__(self, type: Any, value: Any, traceback: Any):
-        torch.xpu._maybe_exchange_device(self.prev_idx)
-        return False
-
-
-class device(object):
-    r"""Context-manager that changes the selected device and a wrapper encapsules
-    the sycl device from runtime.
-
-    Arguments:
-        device (torch.device or int): device index to select. It's a no-op if
-            this argument is a negative integer or ``None``.
-    """
-
-    def __init__(self, device: Any):
-        self.idx = _get_device_index(device, optional=True)
-        self.prev_idx = -1
-
-    def __enter__(self):
-        self.prev_idx = torch.xpu._exchange_device(self.idx)
-
-    def __exit__(self, type: Any, value: Any, traceback: Any):
-        torch.xpu._maybe_exchange_device(self.prev_idx)
-        return False
-
-    @property
-    def sycl_device(self):
-        r"""sycl_device(self): -> PyCapsule
-
-        Returns the sycl device of the selected device in a ``PyCapsule``, which encapsules
-        a void pointer address. Its capsule name is ``torch.xpu.device.sycl_device``.
-        """
-        return intel_extension_for_pytorch._C.sycl_device(self.idx)
-
-    @property
-    def _as_parameter_(self):
-        r"""Return the sycl device void pointer address. Make it be easily used in
-        C/C++ code.
-        """
-        return ctypes.c_void_p(
-            get_pointer_from_capsule(
-                intel_extension_for_pytorch._C.sycl_device(self.idx)
-            )
-        )
-
-
-class device_of(device):
-    r"""Context-manager that changes the current device to that of given object.
-
-    You can use both tensors and storages as arguments. If a given object is
-    not allocated on a GPU, this is a no-op.
-
-    Arguments:
-        obj (Tensor or Storage): object allocated on the selected device.
-    """
-
-    def __init__(self, obj):
-        idx = obj.get_device() if obj.is_xpu else -1
-        super(device_of, self).__init__(idx)
-
-
-def set_device(device: _device_t) -> None:
-    r"""Sets the current device.
-
-    Usage of this function is discouraged in favor of :any:`device`. In most
-    cases it's better to use ``ZE_AFFINITY_MASK`` environmental variable to restrict
-    which devices are visible.
-
-    Arguments:
-        device (torch.device or int): selected device. This function is a no-op
-            if this argument is negative.
-    """
-    device = _get_device_index(device)
-    if device >= 0:
-        intel_extension_for_pytorch._C._setDevice(device)
-
-
-def get_device_name(device: Optional[_device_t] = None) -> str:
-    r"""Gets the name of a device.
-
-    Arguments:
-        device (torch.device or int, optional): device for which to return the
-            name. This function is a no-op if this argument is a negative
-            integer. It uses the current device, given by :func:`~torch.xpu.current_device`,
-            if :attr:`device` is ``None`` (default).
-    """
-    return get_device_properties(device).name
-
-
-@lru_cache(None)
-def get_device_capability(device: Optional[_device_t] = None) -> Dict[str, Any]:
-    r"""Gets the xpu capability of a device.
-
-    Args:
-        device (torch.device or int, optional): device for which to return the
-            device capability. It uses the current device, given by
-            :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
-            (default).
-
-    Returns:
-        Dict[str, Any]: the xpu capability dictionary of the device
-    """
-    props = get_device_properties(device)
-    return {
-        prop: getattr(props, prop) for prop in dir(props) if not prop.startswith("__")
-    }
-
-
-def get_device_properties(device: _device_t):
-    r"""Gets the xpu properties of a device.
-
-    Arguments:
-        device (torch.device or int, optional): device for which to return the
-            device properties. It uses the current device, given by
-            :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
-            (default).
-
-    Returns:
-        _DeviceProperties: the properties of the device
-    """
-    _lazy_init()  # will define _get_device_properties
-    device = _get_device_index(device, optional=True)
-    if device < 0 or device >= device_count():
-        raise AssertionError("Invalid device id")
-    return intel_extension_for_pytorch._C._get_device_properties(device)
-
-
-def current_device() -> int:
-    r"""Returns the index of a currently selected device."""
-    # lazy initialization occurs in _getDevice
-    return intel_extension_for_pytorch._C._getDevice()
 
 
 def synchronize(device: _device_t = None) -> None:
@@ -413,7 +219,7 @@ def _get_generator(device: torch.device) -> torch._C.Generator:
 
     idx = device.index
     if idx is None:
-        idx = current_device()
+        idx = torch.xpu.current_device()
     return torch.xpu.default_generators[idx]
 
 
@@ -707,19 +513,15 @@ def _xpu(self, device=None, non_blocking=False, **kwargs):
 
 def _xpu_deserialize(obj, location):
     if location.startswith("xpu"):
-        device_id = validate_xpu_device(location)
+        device = validate_xpu_device(location)
         if getattr(obj, "_torch_load_uninitialized", False):
             with torch.xpu.device(device):
                 return torch.UntypedStorage(obj.nbytes(), device=torch.device(location))
         else:
-            return _xpu(obj, device=device_id)
+            return _xpu(obj, device=device)
 
 
-def get_device_type() -> str:
-    return "xpu"
-
-
-if _is_compiled():
+if utils.has_xpu():
     _StorageBase.xpu = _xpu
 
     serialization.register_package(30, _xpu_tag, _xpu_deserialize)
@@ -729,13 +531,10 @@ if _is_compiled():
     # post initial
     intel_extension_for_pytorch._C._postInitExtension()
 
-    if is_available():
-        if not has_fp64_dtype():
-            override_tensor_totype()
-
-            exec_path = sys.argv[0].split("/")
-            if len(exec_path) > 0 and "pytest" in exec_path:
-                override_assert_equal()
+    override_tensor_totype()
+    exec_path = sys.argv[0].split("/")
+    if len(exec_path) > 0 and "pytest" in exec_path:
+        override_assert_equal()
 
 
 # XXX: this is a temporary work-around to replace torch's _prepare_profiler method

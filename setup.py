@@ -62,7 +62,6 @@
 # USE_PRIMITIVE_CACHE   - to Cache oneDNN primitives by framework
 # USE_QUEUE_BARRIER     - to use queue submit_barrier API
 # USE_SCRATCHPAD_MODE   - to trun on oneDNN scratchpad user mode
-# USE_MULTI_CONTEXT     - to create DPC++ runtime context per device
 # USE_AOT_DEVLIST       - to set device list for AOT build option, for example, bdw,tgl,ats,..."
 # USE_SYCL_ASSERT       - to enable assert in sycl kernel
 # USE_ITT_ANNOTATION    - to enable ITT annotation in sycl kernel

@@ -46,51 +46,6 @@ static void poison_fork() {
 #endif
 }
 
-PyObject* THPModule_setDevice_wrap(PyObject* self, PyObject* arg) {
-  HANDLE_TH_ERRORS
-  THPUtils_assert(THPUtils_checkLong(arg), "invalid argument to setDevice");
-  int64_t device = THPUtils_unpackLong(arg);
-
-  // at::xpu::set_device(static_cast<c10::DeviceIndex>(device));
-
-  Py_RETURN_NONE;
-  END_HANDLE_TH_ERRORS
-}
-
-PyObject* THPModule_exchangeDevice(PyObject* self, PyObject* arg) {
-  HANDLE_TH_ERRORS
-  THPUtils_assert(
-      THPUtils_checkLong(arg), "invalid argument to exchangeDevice");
-  int64_t device = THPUtils_unpackLong(arg);
-  if (device < 0) {
-    return THPUtils_packInt32(-1);
-  }
-
-  auto current_device = 0;
-  if (current_device != device) {
-    // at::xpu::set_device(static_cast<c10::DeviceIndex>(device));
-  }
-
-  return THPUtils_packInt32(static_cast<int>(current_device));
-  END_HANDLE_TH_ERRORS
-}
-
-PyObject* THPModule_getDevice_wrap(PyObject* self, PyObject* noargs) {
-  HANDLE_TH_ERRORS
-  // auto device = static_cast<int>(at::xpu::current_device());
-  return THPUtils_packInt32(0);
-  END_HANDLE_TH_ERRORS
-}
-
-// Because dpcpp::device_count could call poison_fork in lazy_init,
-// it is not necessary to add poison_fork here repeatedly.
-PyObject* THPModule_getDeviceCount_wrap(PyObject* self, PyObject* noargs) {
-  HANDLE_TH_ERRORS
-  // return THPUtils_packUInt64(at::xpu::device_count());
-  return THPUtils_packUInt64(0);
-  END_HANDLE_TH_ERRORS
-}
-
 static PyObject* THPModule_isInBadFork(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
   return PyBool_FromLong(in_bad_fork);
@@ -468,13 +423,6 @@ static struct PyMethodDef _THPModule_methods[] = {
      (PyCFunction)THPModule_postInitExtension,
      METH_NOARGS,
      nullptr},
-    {"_setDevice", (PyCFunction)THPModule_setDevice_wrap, METH_O, nullptr},
-    {"_exchangeDevice", (PyCFunction)THPModule_exchangeDevice, METH_O, nullptr},
-    {"_getDevice", (PyCFunction)THPModule_getDevice_wrap, METH_NOARGS, nullptr},
-    {"_getDeviceCount",
-     (PyCFunction)THPModule_getDeviceCount_wrap,
-     METH_NOARGS,
-     nullptr},
     {"_xpu_isInBadFork",
      (PyCFunction)THPModule_isInBadFork,
      METH_NOARGS,
@@ -546,10 +494,6 @@ void init_xpu_module(pybind11::module& m) {
 
   m.def(
       "_is_onemkl_enabled", []() { return Settings::I().is_onemkl_enabled(); });
-
-  m.def("_is_multi_context_enabled", []() {
-    return Settings::I().is_multi_context_enabled();
-  });
 
   m.def("_is_channels_last_1d_enabled", []() {
     return Settings::I().is_channels_last_1d_enabled();

@@ -10,10 +10,18 @@ def override_tensor_totype():
         @wraps(f)
         def wrapper(*args, **kwargs):
             for arg in args:
-                if torch.is_tensor(arg) and arg.is_xpu:
+                if (
+                    torch.is_tensor(arg)
+                    and arg.is_xpu
+                    and not torch.xpu.has_fp64_dtype(arg.device.index)
+                ):
                     return arg.to(torch.float)
             for k, kwarg in kwargs.items():
-                if torch.is_tensor(kwarg) and kwarg.is_xpu:
+                if (
+                    torch.is_tensor(kwarg)
+                    and kwarg.is_xpu
+                    and not torch.xpu.has_fp64_dtype(arg.device.index)
+                ):
                     return kwarg.to(torch.float)
             return f(*args, **kwargs)
 
@@ -28,7 +36,11 @@ def override_assert_equal():
     r"""Override assertEqual to avoid triggering fp64 error on tensor comparison in test case"""
 
     def args_to_xpu(args):
-        if torch.is_tensor(args) and args.is_xpu:
+        if (
+            torch.is_tensor(args)
+            and args.is_xpu
+            and not torch.xpu.has_fp64_dtype(args.device.index)
+        ):
             return args.to("cpu")
         elif isinstance(args, (tuple, list)):
             args_list = list(args)

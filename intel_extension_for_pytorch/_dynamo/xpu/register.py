@@ -65,9 +65,7 @@ def _find_torch_objects(module):
 # the container `_allowed_container` and `_disallowed_container` uses the python id to identify
 # torch module and function. The register policy here is aligned with torch.cuda.
 def _register_module_function_to_dynamo(obj):
-    assert (
-        torch.xpu.is_available() and has_xpu()
-    ), "register modules to dynamo should have xpu available"
+    assert has_xpu(), "register modules to dynamo should have xpu compiled"
 
     # disallowed function for dynamo
     remove = [
