@@ -521,12 +521,31 @@ def _xpu_deserialize(obj, location):
             return _xpu(obj, device=device)
 
 
+def _register_torch_device_module(device_type, module):
+    device_type = torch.device(device_type).type
+    torch_module = sys.modules["torch"]
+    registered_module = getattr(torch_module, device_type, None)
+    if registered_module:
+        for sub_module_key in dir(registered_module):
+            if not hasattr(module, sub_module_key):
+                setattr(
+                    module,
+                    sub_module_key,
+                    getattr(registered_module, sub_module_key),
+                )
+        setattr(torch_module, device_type, module)
+        torch_module_name = ".".join(["torch", device_type])
+        sys.modules[torch_module_name] = module
+    else:
+        torch._register_device_module(device_type, module)
+
+
 if utils.has_xpu():
     _StorageBase.xpu = _xpu
 
     serialization.register_package(30, _xpu_tag, _xpu_deserialize)
 
-    torch._register_device_module("xpu", current_module)
+    _register_torch_device_module("xpu", current_module)
 
     # post initial
     intel_extension_for_pytorch._C._postInitExtension()
