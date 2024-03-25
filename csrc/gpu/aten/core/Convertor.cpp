@@ -1,5 +1,4 @@
 #include <core/Convertor.h>
-#include <core/PreInitHook.h>
 #include <runtime/Device.h>
 
 namespace torch_ipex::xpu {

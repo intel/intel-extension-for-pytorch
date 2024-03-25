@@ -1,7 +1,7 @@
 import torch
 from typing import cast, Iterable, List, Union
 from torch import Tensor
-from .lazy_init import _lazy_init, _lazy_call
+from torch.xpu import _lazy_init, _lazy_call
 
 import contextlib
 from typing import Generator

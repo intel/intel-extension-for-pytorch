@@ -13,7 +13,6 @@
 #include <profiler/profiler_kineto.h>
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
-#include "LazyInit.h"
 #include "Module.h"
 #include "Stream.h"
 
@@ -26,30 +25,6 @@
 namespace torch_ipex::xpu {
 
 PyObject* module;
-
-static bool in_bad_fork = false; // True for children forked after xpu init
-
-#ifndef _WIN32
-// Called in the forked child if xpu has already been initialized
-static void forked_child() {
-  in_bad_fork = true;
-  torch_ipex::xpu::set_run_yet_variable_to_false();
-}
-#endif
-
-// Should be called before the first xpu call. It will be invoked in lazy_init.
-static void poison_fork() {
-#ifndef _WIN32
-  static std::once_flag flag;
-  std::call_once(flag, [] { pthread_atfork(nullptr, nullptr, forked_child); });
-#endif
-}
-
-static PyObject* THPModule_isInBadFork(PyObject* self, PyObject* noargs) {
-  HANDLE_TH_ERRORS
-  return PyBool_FromLong(in_bad_fork);
-  END_HANDLE_TH_ERRORS
-}
 
 static PyObject* THPModule_postInitExtension(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
@@ -77,39 +52,7 @@ static PyObject* THPModule_postInitExtension(PyObject* self, PyObject* noargs) {
 
 static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
-  TORCH_INTERNAL_ASSERT(!in_bad_fork); // Handled at python level
-  poison_fork();
-
-  auto module =
-      THPObjectPtr(PyImport_ImportModule("intel_extension_for_pytorch.xpu"));
-  if (!module)
-    throw python_error();
-
-  auto set_module_attr = [&](const char* name, PyObject* v) {
-    // PyObject_SetAttrString doesn't steal reference. So no need to incref.
-    if (PyObject_SetAttrString(module, name, v) < 0) {
-      throw python_error();
-    }
-  };
-
-  // Here is thread safety. Set run_yet TRUE before device_count() to avoid
-  // circular calls.
-  // Put set_run_yet_variable_to_true() here instead of in C++ API's lazy_init()
-  // to avoid circular calls when directly call Python API's _lazy_init().
-  torch_ipex::xpu::set_run_yet_variable_to_true();
-  // call device_count() for getting gpu amounts
-  auto num_gpus = 0;
-  auto default_dpcpp_generators =
-      PyTuple_New(static_cast<Py_ssize_t>(num_gpus));
-  for (int i = 0; i < num_gpus; i++) {
-    auto gen = torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator(i);
-    // auto cast_gen = (THPGenerator*)DPCPPGenerator_initDefaultGenerator(gen);
-    auto cast_gen = (THPGenerator*)THPGenerator_initDefaultGenerator(gen);
-    // This reference is meant to be given away, so no need to incref here.
-    PyTuple_SetItem(default_dpcpp_generators, i, (PyObject*)cast_gen);
-  }
-  set_module_attr("default_generators", default_dpcpp_generators);
-
+  // initialize ipex module
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -420,10 +363,6 @@ static struct PyMethodDef _THPModule_methods[] = {
      nullptr},
     {"_postInitExtension",
      (PyCFunction)THPModule_postInitExtension,
-     METH_NOARGS,
-     nullptr},
-    {"_xpu_isInBadFork",
-     (PyCFunction)THPModule_isInBadFork,
      METH_NOARGS,
      nullptr},
     {"_getCurrentStream",

@@ -15,13 +15,9 @@ from torch.storage import _StorageBase, _LegacyStorage, _warn_typed_storage_remo
 from torch import device as _device
 from torch._utils import classproperty
 from torch.xpu._utils import _get_device_index
-
-from .lazy_init import (
+from torch.xpu import (
     _lazy_init,
     _lazy_call,
-    _is_initialized,
-    is_initialized,
-    _is_in_bad_fork,
 )
 from .streams import Stream, Event
 from .intrinsic import *
