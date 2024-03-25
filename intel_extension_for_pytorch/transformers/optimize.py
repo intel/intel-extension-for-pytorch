@@ -87,6 +87,34 @@ def _set_optimized_model_for_generation(
     return model
 
 
+def check_transformers_for_llm_support():
+    installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
+    min_version = "4.28.1"
+    validated_version = "4.38.2"
+    if "transformers" not in installed_pkg:
+        raise RuntimeError(
+            "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
+                min_version
+            )
+        )
+
+    import transformers
+    from packaging import version
+
+    trans_version = transformers.__version__
+    if version.parse(trans_version) < version.parse(min_version):
+        raise RuntimeError(
+            "ipex.llm.optimize requires transformers: at least {} while but your transformers== {}, fallback".format(
+                min_version, trans_version
+            )
+        )
+    if version.parse(trans_version) > version.parse(validated_version):
+        logger.warning(
+            f"The transformers version is {trans_version}, bigger than validated {validated_version}, may have risks",
+            _type=WarningType.MissingDependency,
+        )
+
+
 def model_convert_reference(_model):
     import transformers
     from packaging import version
@@ -1041,9 +1069,14 @@ def optimize(
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
     This API focus on transformers models, especially for generation tasks inference.
-    Well supported model family:
+
+    Well supported model family with full functionalities:
     Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
     T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava.
+
+    For the model that is not in the scope of supported model family above, will try to
+    apply default ipex.optimize transparently to get benifits (not include quantizations,
+    only works for dtypes of torch.bfloat16 and torch.float).
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
@@ -1104,65 +1137,42 @@ def optimize(
     validate_device_avaliable(device)
 
     try:
-        installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
-        min_version = "4.28.1"
-        validated_version = "4.38.2"
-        if "transformers" not in installed_pkg:
-            raise RuntimeError(
-                "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
-                    min_version
+        well_supported_model = False
+        if hasattr(model, "config") and hasattr(model.config, "architectures"):
+            well_supported_model = model.config.architectures[0] in [
+                "GPTJForCausalLM",
+                "LlamaForCausalLM",
+                "GPTNeoXForCausalLM",
+                "OPTForCausalLM",
+                "FalconForCausalLM",
+                "RWForCausalLM",
+                "BloomForCausalLM",
+                "CodeGenForCausalLM",
+                "BaichuanForCausalLM",
+                "ChatGLMModel",
+                "GPTBigCodeForCausalLM",
+                "T5ForConditionalGeneration",
+                "MistralForCausalLM",
+                "MixtralForCausalLM",
+                "MptForCausalLM",
+                "StableLmForCausalLM",
+                "QWenLMHeadModel",
+                "GitForCausalLM",
+                "LlavaLlamaForCausalLM",
+            ]
+
+        if well_supported_model:
+            check_transformers_for_llm_support()
+        else:
+            if quantization_config is not None:
+                logger.warning(
+                    "ipex.llm.optimize supports quantizations on Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen,"
+                    + " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, and Llava,"
+                    + "fallback to origin model"
                 )
-            )
-
-        import transformers
-        from packaging import version
-
-        trans_version = transformers.__version__
-        if version.parse(trans_version) < version.parse(min_version):
-            raise RuntimeError(
-                "ipex.llm.optimize requires transformers: at least {} while but your transformers== {}, fallback".format(
-                    min_version, trans_version
-                )
-            )
-        if version.parse(trans_version) > version.parse(validated_version):
-            logger.warning(
-                f"The transformers version is {trans_version}, bigger than validated {validated_version}, may have risks",
-                _type=WarningType.MissingDependency,
-            )
-        if not hasattr(model, "config"):
-            logger.warning(
-                "Can not check transformers model config to detect its model family, fallback to origin model",
-                _type=WarningType.NotSupported,
-            )
-            return model
-
-        well_supported_model = model.config.architectures[0] in [
-            "GPTJForCausalLM",
-            "LlamaForCausalLM",
-            "GPTNeoXForCausalLM",
-            "OPTForCausalLM",
-            "FalconForCausalLM",
-            "RWForCausalLM",
-            "BloomForCausalLM",
-            "CodeGenForCausalLM",
-            "BaichuanForCausalLM",
-            "ChatGLMModel",
-            "GPTBigCodeForCausalLM",
-            "T5ForConditionalGeneration",
-            "MistralForCausalLM",
-            "MixtralForCausalLM",
-            "MptForCausalLM",
-            "StableLmForCausalLM",
-            "QWenLMHeadModel",
-            "GitForCausalLM",
-            "LlavaLlamaForCausalLM",
-        ]
-        if not well_supported_model:
-            logger.warning(
-                "ipex.llm.optimize supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen, Baichuan, ChatGLM, "
-                + "GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, and Llava, fallback to origin model"
-            )
-            return model
+                return model
+            _model = ipex.optimize(model.eval(), dtype=dtype, inplace=inplace)
+            return _model
 
         if not inplace:
             _model = copy.deepcopy(model)
