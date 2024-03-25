@@ -13,6 +13,7 @@
 #include "Loops.h"
 #include "LoopsTemplates.h"
 #include "Resize.h"
+#include "utils/logging.h"
 
 using namespace xpu::dpcpp;
 

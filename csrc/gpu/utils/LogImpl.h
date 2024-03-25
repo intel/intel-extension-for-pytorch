@@ -259,7 +259,6 @@ inline void log_result_with_args(
       std::back_inserter(out), fmt_message, std::forward<Args>(args)...);
 
   std::string s = std::string{out.begin(), out.end()};
-
   switch (log_level) {
     case 0:
       spdlog::trace(s);

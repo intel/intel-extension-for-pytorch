@@ -95,6 +95,16 @@ target_compile_options(intel-ext-pt-gpu PRIVATE ${IPEX_SYCL_KERNEL_FLAGS})
 target_link_directories(intel-ext-pt-gpu PUBLIC ${SYCL_LIBRARY_DIR})
 target_link_options(intel-ext-pt-gpu PRIVATE ${IPEX_SYCL_LINK_FLAGS})
 
+if(BUILD_SYNGRAPH)
+  find_package(hl_logger CONFIG REQUIRED PATHS "$ENV{HL_LOGGER_BINARIES_ROOT}")
+  target_link_libraries(intel-ext-pt-gpu PRIVATE hl_logger::hl_logger)
+  target_compile_definitions(intel-ext-pt-gpu PUBLIC HLLOG_FMT_EXTERNAL
+                                                     FMT_HEADER_ONLY
+                                                     FMT_DEPRECATED_OSTREAM
+  )
+  message(STATUS "hl_logger library has been found at ${hl_logger_CONFIG}.")
+endif()
+
 add_dependencies(intel-ext-pt-gpu IPEX_GPU_GEN_TARGET)
 include(${PROJECT_SOURCE_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
