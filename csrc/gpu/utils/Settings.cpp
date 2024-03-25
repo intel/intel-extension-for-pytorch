@@ -189,6 +189,10 @@ Settings::Settings() {
   DPCPP_INIT_ENV_VAL(
       "IPEX_TILE_AS_DEVICE", tile_as_device_enabled, ENV_VAL, show_opt);
 
+  legacy_triton_api = ENV_VAL::OFF;
+  DPCPP_INIT_ENV_VAL(
+      "TRITON_XPU_USE_LEGACY_API", legacy_triton_api, ENV_VAL, show_opt);
+
   device_hierarchy_mode = DEVICE_HIERARCHY::FLAT;
   DPCPP_INIT_ENV_VAL(
       "ZE_FLAT_DEVICE_HIERARCHY",
@@ -443,6 +447,10 @@ void Settings::disable_sync_mode() {
 bool Settings::is_onednn_layout_enabled() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return onednn_layout_enabled == ENV_VAL::ON;
+}
+
+bool Settings::is_triton_legacy_api_enabled() const {
+  return legacy_triton_api == ENV_VAL::ON;
 }
 
 bool Settings::is_tile_as_device_enabled() const {

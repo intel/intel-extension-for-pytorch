@@ -4,6 +4,7 @@
 
 #include "Stream.h"
 
+#include <utils/Settings.h>
 #include <core/Device.h>
 #include <core/Stream.h>
 #include <structmember.h>
@@ -72,7 +73,22 @@ static PyObject* THDPStream_get_device(THDPStream* self, void* unused) {
 
 static PyObject* THDPStream_get_sycl_queue(THDPStream* self, void* unused) {
   HANDLE_TH_ERRORS
-  return PyLong_FromVoidPtr(self->dpcpp_stream.queue());
+  if (Settings::I().is_triton_legacy_api_enabled())
+    return PyCapsule_New(
+        self->dpcpp_stream.queue(),
+        "torch.xpu.Stream.sycl_queue",
+        nullptr);
+  else
+    return PyLong_FromVoidPtr(self->dpcpp_stream.queue());
+  END_HANDLE_TH_ERRORS
+}
+
+static PyObject* THDPStream_get_sycl_queue_as_capsule(THDPStream* self, void* unused) {
+  HANDLE_TH_ERRORS
+  // NOTE: Here is a high dependency on the implementation of queue pool using
+  // smart pointer in runtime.
+  return PyCapsule_New(
+      self->dpcpp_stream.queue(), "torch.xpu.Stream.sycl_queue", nullptr);
   END_HANDLE_TH_ERRORS
 }
 
@@ -119,6 +135,11 @@ static struct PyMemberDef THDPStream_members[] = {{nullptr}};
 static struct PyGetSetDef THDPStream_properties[] = {
     {"sycl_queue",
      (getter)THDPStream_get_sycl_queue,
+     nullptr,
+     nullptr,
+     nullptr},
+    {"sycl_queue_as_capsule",
+     (getter)THDPStream_get_sycl_queue_as_capsule,
      nullptr,
      nullptr,
      nullptr},

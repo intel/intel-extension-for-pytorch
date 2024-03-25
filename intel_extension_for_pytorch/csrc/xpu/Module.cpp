@@ -207,7 +207,13 @@ PyObject* THPModule_getCurrentRawStream(
       THPUtils_checkLong(device_index),
       "invalid argument to getCurrentRawStream");
   int64_t device = THPUtils_unpackLong(device_index);
-  return PyLong_FromVoidPtr(xpu::dpcpp::getCurrentDPCPPStream(device).queue());
+  if (Settings::I().is_triton_legacy_api_enabled())
+    return PyCapsule_New(
+        xpu::dpcpp::getCurrentDPCPPStream(device).queue(),
+        "torch.xpu.Stream.sycl_queue",
+        nullptr);
+  else
+    return PyLong_FromVoidPtr(xpu::dpcpp::getCurrentDPCPPStream(device).queue());
   END_HANDLE_TH_ERRORS
 }
 

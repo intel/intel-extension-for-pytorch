@@ -130,6 +130,8 @@ class IPEX_API Settings final {
   bool is_kineto_enabled() const;
   bool is_onetrace_enabled() const;
 
+  bool is_triton_legacy_api_enabled() const;
+
  private:
   VERBOSE_LEVEL verbose_level;
   LOG_LEVEL log_level;
@@ -146,6 +148,8 @@ class IPEX_API Settings final {
   ENV_VAL tile_as_device_enabled;
   ENV_VAL onednn_layout_enabled;
   ENV_VAL onednn_deterministic;
+
+  ENV_VAL legacy_triton_api;
 
 #ifdef BUILD_SIMPLE_TRACE
   ENV_VAL simple_trace_enabled;

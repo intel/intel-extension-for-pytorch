@@ -142,6 +142,15 @@ class device(object):
         torch.xpu._maybe_exchange_device(self.prev_idx)
         return False
 
+    @property
+    def sycl_device(self):
+        r"""sycl_device(self): -> PyCapsule
+
+        Returns the sycl device of the selected device in a ``PyCapsule``, which encapsules
+        a void pointer address. Its capsule name is ``torch.xpu.device.sycl_device``.
+        """
+        return intel_extension_for_pytorch._C.sycl_device(self.idx)
+
 
 class device_of(device):
     r"""Context-manager that changes the current device to that of given object.
