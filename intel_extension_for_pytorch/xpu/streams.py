@@ -1,5 +1,5 @@
 import ctypes
-from torch._streambase import _EventBase, _StreamBase
+from torch._streambase import  _StreamBase
 import intel_extension_for_pytorch
 from ..utils.capsule import get_pointer_from_capsule
 
@@ -75,7 +75,9 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase, _StreamBase):
             Recorded event.
         """
         if event is None:
-            event = Event()
+            #TODO: [Rebase] Should delete this after rebasing stream.
+            pass
+            # event = Event()
         event.record(self)
         return event
 
@@ -84,58 +86,3 @@ class Stream(intel_extension_for_pytorch._C._XPUStreamBase, _StreamBase):
         super(Stream, self).synchronize()
 
 
-class Event(intel_extension_for_pytorch._C._XPUEventBase, _EventBase):
-    def __new__(cls, **kwargs):
-        return super(Event, cls).__new__(cls, **kwargs)
-
-    def record(self, stream=None):
-        r"""Records the event in a given stream.
-
-        Uses ``torch.xpu.current_stream()`` if no stream is specified.
-        """
-        if stream is None:
-            stream = intel_extension_for_pytorch.xpu.current_stream()
-        super(Event, self).record(stream)
-
-    def wait(self, stream=None):
-        r"""Makes all future work submitted to the given stream wait for this
-        event.
-
-        Use ``torch.xpu.current_stream()`` if no stream is specified.
-        """
-        if stream is None:
-            stream = intel_extension_for_pytorch.xpu.current_stream()
-        super(Event, self).wait(stream)
-
-    def query(self):
-        r"""Checks if all work currently captured by event has completed.
-
-        Returns:
-            A boolean indicating if all work currently captured by event has
-            completed.
-        """
-        return super(Event, self).query()
-
-    def elapsed_time(self, end_event):
-        r"""Returns the time elapsed in milliseconds after the event was
-        recorded and before the end_event was recorded.
-        """
-        return super(Event, self).elapsed_time(end_event)
-
-    def synchronize(self):
-        r"""Waits for the event to complete.
-
-        Waits until the completion of all work currently captured in this event.
-        This prevents the CPU thread from proceeding until the event completes.
-        """
-        super(Event, self).synchronize()
-
-    @property
-    def _as_parameter_(self):
-        return ctypes.c_void_p(self.dpcpp_event)
-
-    def __repr__(self):
-        if self.dpcpp_event:
-            return "<torch.xpu.Event {0:#x}>".format(self._as_parameter_.value)
-        else:
-            return "<torch.xpu.Event uninitialized>"

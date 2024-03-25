@@ -1,6 +1,6 @@
 #include <torch/csrc/distributed/c10d/reducer_timer.hpp>
 
-#include <aten/core/Event.h>
+#include <ATen/xpu/XPUEvent.h>
 #include <c10/core/DeviceGuard.h>
 
 namespace c10d {
@@ -12,18 +12,18 @@ class XPUTimer : public Timer {
  private:
   c10::Device device;
 
-  torch_ipex::xpu::dpcpp::DPCPPEvent forward_start =
-      torch_ipex::xpu::dpcpp::DPCPPEvent();
-  torch_ipex::xpu::dpcpp::DPCPPEvent backward_compute_start =
-      torch_ipex::xpu::dpcpp::DPCPPEvent();
-  torch_ipex::xpu::dpcpp::DPCPPEvent backward_compute_end =
-      torch_ipex::xpu::dpcpp::DPCPPEvent();
-  torch_ipex::xpu::dpcpp::DPCPPEvent backward_comm_start =
-      torch_ipex::xpu::dpcpp::DPCPPEvent();
-  torch_ipex::xpu::dpcpp::DPCPPEvent backward_comm_end =
-      torch_ipex::xpu::dpcpp::DPCPPEvent();
+  at::xpu::XPUEvent forward_start =
+      at::xpu::XPUEvent();
+  at::xpu::XPUEvent backward_compute_start =
+      at::xpu::XPUEvent();
+  at::xpu::XPUEvent backward_compute_end =
+      at::xpu::XPUEvent();
+  at::xpu::XPUEvent backward_comm_start =
+      at::xpu::XPUEvent();
+  at::xpu::XPUEvent backward_comm_end =
+      at::xpu::XPUEvent();
 
-  torch_ipex::xpu::dpcpp::DPCPPEvent& getEvent(Event event) {
+  at::xpu::XPUEvent& getEvent(Event event) {
     switch (event) {
       case Event::kForwardStart:
         return forward_start;
@@ -52,8 +52,8 @@ class XPUTimer : public Timer {
 
   c10::optional<int64_t> measureDifference(Event start, Event end) override {
     c10::DeviceGuard g(device);
-    torch_ipex::xpu::dpcpp::DPCPPEvent& start_event = getEvent(start);
-    torch_ipex::xpu::dpcpp::DPCPPEvent& end_event = getEvent(end);
+    at::xpu::XPUEvent& start_event = getEvent(start);
+    at::xpu::XPUEvent& end_event = getEvent(end);
     // It is possible users did not call backward or run codes in
     // no-sync mode, in this case, some Events like "backward_compute_end"
     // or "backward_comm_start" or "backward_comm_end" will not be recorded.

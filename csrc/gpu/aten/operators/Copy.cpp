@@ -8,7 +8,8 @@
 #include <ATen/native/Resize.h>
 #include <ATen/DeviceGuard.h>
 #include <c10/core/ScalarType.h>
-#include <core/Event.h>
+#include <ATen/xpu/XPUEvent.h>
+
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/detail/TensorInfo.h>
@@ -277,12 +278,13 @@ void copy_device_to_device(
     // write-after-read dependencies on the destination side are handled, so
     // that no one is operating on the dst memory when we perform the copy.
     // src waits on dst barrier (src already waits on src)
-    DPCPPEvent dst_ready;
+    at::xpu::XPUEvent dst_ready;
     device_guard.reset_device(dst_device);
-    dst_ready.record(getCurrentDPCPPStream(dst_device.index()));
+     // TODO [Stream] : Enable this after stream ported
+    // dst_ready.record(getCurrentDPCPPStream(dst_device.index()));
 
     device_guard.reset_device(src_device);
-    dst_ready.block(copy_stream);
+    // dst_ready.block(copy_stream);
   }
 
   if (memcpy_eligible) {
@@ -310,11 +312,13 @@ void copy_device_to_device(
     // dst waits on src barrier (dst already waits on dst). We cannot
     // operate on dst's copy until the copy is complete.
     // Still on src_device, record stream event
-    DPCPPEvent src_ready;
-    src_ready.record(copy_stream);
+    at::xpu::XPUEvent src_ready;
+    // TODO [Stream] : Enable this after stream ported
+    // src_ready.record(copy_stream);
 
     device_guard.reset_device(dst_device);
-    src_ready.block(getCurrentDPCPPStream(dst_device.index()));
+    // TODO [Stream] : Enable this after stream ported
+    // src_ready.block(getCurrentDPCPPStream(dst_device.index()));
   }
 }
 

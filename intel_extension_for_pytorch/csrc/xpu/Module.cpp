@@ -13,7 +13,6 @@
 #include <profiler/profiler_kineto.h>
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
-#include "Event.h"
 #include "LazyInit.h"
 #include "Module.h"
 #include "Stream.h"
@@ -654,7 +653,6 @@ void init_xpu_module(pybind11::module& m) {
 
   auto module = m.ptr();
   THDPStream_init(module);
-  THDPEvent_init(module);
   PyModule_AddFunctions(module, _THPModule_methods);
 }
 
