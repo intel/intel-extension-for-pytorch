@@ -14,6 +14,7 @@ import sys
 import glob
 import ctypes
 import platform
+import builtins
 
 ################################################################################
 # Load the extension module
@@ -181,6 +182,9 @@ if has_cpu():
     from .cpu.utils import _cpu_isa, _custom_fx_tracer
 
     _cpu_isa.check_minimal_isa_support()
+
+# def use_deterministic_algorithms(mode: builtins.bool, *, warn_only: builtins.bool=False):
+#     _C._set_deterministic_algorithms(mode, warn_only=warn_only)
 
 
 def version():

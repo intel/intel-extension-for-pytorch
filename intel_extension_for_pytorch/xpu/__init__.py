@@ -28,6 +28,7 @@ from .cpp_extension import *
 from .amp import *
 from .utils import *
 from .random import *
+from .deterministics import *
 from .memory import *
 from ..utils.channels_last_1d import is_contiguous_channels_last_1d, to_channels_last_1d
 from ..utils.capsule import get_pointer_from_capsule

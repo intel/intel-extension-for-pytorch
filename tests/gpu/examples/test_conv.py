@@ -89,6 +89,28 @@ class TestNNMethod(TestCase):
         self.assertEqual(y_fp16, y_fp32, atol=1e-3, rtol=1e-3)
         self.assertEqual(y_gw, y_fp16_gw, atol=1e-3, rtol=1e-3)
 
+    def test_Conv2d_deterministic(self, dtype=torch.float32):
+        device = "xpu"
+        torch.xpu.enable_onednn_deterministic()
+        inputs = torch.randn(
+            2, 2064, 32, 32, device=device, dtype=dtype, requires_grad=True
+        )
+        conv1 = torch.nn.Conv2d(2064, 3, 3).to(device, dtype)
+        conv2 = torch.nn.Conv2d(2064, 3, 3).to(device, dtype)
+        conv2.bias.data.copy_(conv1.bias.data)
+        conv2.weight.data.copy_(conv1.weight.data)
+        out1 = conv1(inputs)
+        out2 = conv2(inputs)
+        self.assertEqual(out1, out2, atol=0.0, rtol=0)
+        y = torch.randn(out1.size(), device=device, dtype=dtype)
+        out1.backward(y)
+        out2.backward(y)
+        torch.xpu.disable_onednn_deterministic()
+        self.assertEqual(conv1.bias.grad.data, conv2.bias.grad.data, atol=0.0, rtol=0)
+        self.assertEqual(
+            conv1.weight.grad.data, conv2.weight.grad.data, atol=0.0, rtol=0
+        )
+
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )

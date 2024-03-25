@@ -251,6 +251,10 @@ sycl::event convolution(
 
   lru_key_t key_primitive;
 
+  bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
+  bool onednn_deterministic_enabled =
+      Settings::I().is_onednn_deterministic_enabled();
+
 #ifdef USE_PRIMITIVE_CACHE
   create_key(
       key_primitive,
@@ -270,6 +274,8 @@ sycl::event convolution(
       _padding_back_bottom_right,
       is_onednn_layout_suggested,
       memory_layout_for_conv,
+      use_deterministic_algorithm,
+      onednn_deterministic_enabled,
       attr);
 #endif
 
@@ -293,6 +299,9 @@ sycl::event convolution(
     post_ops po;
     attr.extract_post_ops(po, dst);
     pattr.set_post_ops(po);
+
+    if (use_deterministic_algorithm || onednn_deterministic_enabled)
+      pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
@@ -432,6 +441,10 @@ sycl::event convolution_backward_weights(
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
 
+  bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
+  bool onednn_deterministic_enabled =
+      Settings::I().is_onednn_deterministic_enabled();
+
   lru_key_t key_primitive;
 
 #ifdef USE_PRIMITIVE_CACHE
@@ -448,7 +461,9 @@ sycl::event convolution_backward_weights(
       _padding_front_top_left,
       _padding_back_bottom_right,
       memory_layout_for_conv,
-      is_onednn_layout_suggested);
+      is_onednn_layout_suggested,
+      use_deterministic_algorithm,
+      onednn_deterministic_enabled);
 #endif
 
   convolution_backward_weights::primitive_desc conv_bwd_w_pd;
@@ -474,6 +489,9 @@ sycl::event convolution_backward_weights(
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+
+    if (use_deterministic_algorithm || onednn_deterministic_enabled)
+      pattr.set_deterministic(true);
 
     memory::desc src_md, wgh_md, dst_md;
     std::tie(src_md, wgh_md, dst_md) =
@@ -629,6 +647,10 @@ sycl::event convolution_backward_data(
       ? memory::desc({diff_dst.size(1)}, wgh_data_t, bia_fmt)
       : memory::desc();
 
+  bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
+  bool onednn_deterministic_enabled =
+      Settings::I().is_onednn_deterministic_enabled();
+
   memory::dims _stride = stride.vec();
   memory::dims _dilation = compatible_dilation(dilation);
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
@@ -650,7 +672,9 @@ sycl::event convolution_backward_data(
       _padding_front_top_left,
       _padding_back_bottom_right,
       memory_layout_for_conv,
-      is_onednn_layout_suggested);
+      is_onednn_layout_suggested,
+      use_deterministic_algorithm,
+      onednn_deterministic_enabled);
 #endif
 
   convolution_backward_data::primitive_desc conv_bwd_data_pd;
@@ -678,6 +702,9 @@ sycl::event convolution_backward_data(
     if (dst_usr_md.get_data_type() == memory::data_type::f32) {
       pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
     }
+
+    if (use_deterministic_algorithm || onednn_deterministic_enabled)
+      pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE
     pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
