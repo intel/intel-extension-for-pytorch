@@ -47,6 +47,8 @@ DEFAULT_IMAGE_PATCH_TOKEN = "<im_patch>"
 DEFAULT_IM_START_TOKEN = "<im_start>"
 DEFAULT_IM_END_TOKEN = "<im_end>"
 
+curpath = os.path.abspath(os.path.dirname(__file__))
+
 
 class CLIPVisionTower(nn.Module):
     def __init__(self, vision_tower, args, delay_load=False):
@@ -61,13 +63,19 @@ class CLIPVisionTower(nn.Module):
         if not delay_load:
             self.load_model()
         else:
-            self.cfg_only = CLIPVisionConfig.from_pretrained(self.vision_tower_name)
+            self.cfg_only = CLIPVisionConfig.from_pretrained(
+                f"{curpath}/vision_tower.json"
+            )
 
     def load_model(self):
-        self.image_processor = CLIPImageProcessor.from_pretrained(
-            self.vision_tower_name
-        )
-        self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name)
+        if hasattr(self, "cfg_only"):
+            self.image_processor = CLIPImageProcessor()
+            self.vision_tower = CLIPVisionModel(self.cfg_only).eval()
+        else:
+            self.image_processor = CLIPImageProcessor.from_pretrained(
+                self.vision_tower_name
+            )
+            self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name)
         self.vision_tower.requires_grad_(False)
 
         self.is_loaded = True
