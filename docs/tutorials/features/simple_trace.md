@@ -1,4 +1,4 @@
-Simple Trace Tool (Experimental)
+Simple Trace Tool (Prototype)
 ================================
 
 ## Introduction
@@ -101,3 +101,4 @@ The meanings of each field are shown as below:
 - `indent`: the indent ahead of every behavior shows the nested relationship between operators. The operator call-in line with more indent should be a child of what was called above it.
 
 With this output, you can see the calling stack of the traced script without using complicated debug tools such as gdb.
+

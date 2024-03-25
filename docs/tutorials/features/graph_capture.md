@@ -1,4 +1,4 @@
-Graph Capture (Experimental)
+Graph Capture (Prototype)
 ============================
 
 ### Feature Description
@@ -9,3 +9,4 @@ This feature automatically applies a combination of TorchScript trace technique 
 
 [//]: # (marker_feature_graph_capture)
 [//]: # (marker_feature_graph_capture)
+

@@ -1,4 +1,4 @@
-Compute Engine (Experimental feature for debug)
+Compute Engine (Prototype feature for debug)
 ===============================================
 
 ## Introduction
@@ -58,3 +58,4 @@ Step4: If the compute engine designated by user is not implemented/available, ex
 `UpsampleNearest`: `ONEDNN`, `BASIC` [Recommend] 
     
     The `ONEDNN` engine is always chosen if output shape is divisible by the input shape.
+

@@ -1,4 +1,4 @@
-Codeless Optimization (Experimental)
+Codeless Optimization (Prototype)
 ====================================
 
 This feature aims to get inference performance benefits from Intel® Extension for PyTorch\* without changing code in your python scripts, which can raise Out-of-Box (OOB) experience to get started with Intel® Extension for PyTorch\* easily. Users who already known how to apply optimizations with Intel® Extension for PyTorch\* APIs are not targeted for this feature, due to the inevitable overhead and limitations we mentioned below.
@@ -104,3 +104,4 @@ with torch.no_grad():
 For 2 reasons:
 * The auto graph mode support has already been included in `ipex.optimize` with graph first API in 1.13.
 * Extra launch parameters and Monkey patches are needed to support above case. We will focus on the feasibility of first use case in TorchVision and HuggingFace workloads. 
+

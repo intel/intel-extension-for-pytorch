@@ -41,10 +41,12 @@ git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch* from source
+
 docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') --build-arg COMPILE=ON -t ipex-llm:2.1.20 .
 
 # Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch* prebuilt wheel files
 docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t ipex-llm:2.1.20 .
+
 
 # Run the container with command below
 docker run --privileged -it --rm --device /dev/dri:/dev/dri -v /dev/dri/by-path:/dev/dri/by-path \
@@ -94,7 +96,6 @@ source ./tools/env_activate.sh
 where <br />
 - `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. Check [tutorial](../../../../../docs/tutorials/technical_details/AOT.md) for details.<br />
 
-
  
 ## Run Models Generation
 
@@ -140,7 +141,7 @@ mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchma
 
 ## Advanced Usage
 
-### Weight only quantization with low precision checkpoint (Experimental)
+### Weight only quantization with low precision checkpoint (Prototype)
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 may result in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset for specified tasks by such algorithms. The results are saved as a `state_dict` in a `.pt` file. We provide the script here to run GPT-J .
 
@@ -185,3 +186,4 @@ bash run_accuracy_ds.sh
 # float16
 LLM_ACC_TEST=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py -m ${model} --ipex --dtype float16 --accuracy-only --acc-tasks ${task} 2>&1
 ```
+

@@ -1,4 +1,4 @@
-Float8 Data Type Support [GPU] (Experimental)
+Float8 Data Type Support [GPU] (Prototype)
 ============================================
 
 ## Float8 Data Type
@@ -42,3 +42,4 @@ with torch.xpu.amp.autocast(enabled=True, dtype=optimize_dtype):
                         labels=masked_lm_labels,
                         next_sentence_label=next_sentence_labels)
 ```
+

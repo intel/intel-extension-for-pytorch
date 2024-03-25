@@ -48,3 +48,4 @@ IPEX_VERBOSE=1 python ResNet50.py
 ```bash
 IPEX_VERBOSE=1 IPEX_FP32_MATH_MODE=TF32 python ResNet50.py
 ```
+

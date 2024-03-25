@@ -1208,7 +1208,7 @@ def block(model):
 
 def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     r"""
-    Use TPP to speedup training/inference. fast_bert API is still a experimental
+    Use TPP to speedup training/inference. fast_bert API is still a prototype
     feature and now only optimized for bert model.
 
     Args:
@@ -1364,3 +1364,4 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
                 group["params"][i] = new_param
 
     return new_model, new_optimizer
+

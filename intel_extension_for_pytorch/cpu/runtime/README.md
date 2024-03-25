@@ -1,4 +1,4 @@
-Runtime Extension (Experimental)
+Runtime Extension (Prototype)
 ==========================
 
 Intel® Extension for PyTorch\* Runtime Extension provides a runtime CPU pool API to bind threads to cores. It also features async tasks. Please **note**: Intel® Extension for PyTorch\* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.html).
@@ -225,3 +225,4 @@ Task is an abstraction of computation based on PyTorch module and is scheduled a
 Since Runtime Extension rely on the APIs from IOMP, we need to preload IOMP before executing the application. And we want Intel® Extension for PyTorch\* default build with Runtime API enabled, which means it should work fine w/o loading IOMP if user didn't use the runtime API.
 
 Here we choose to `dlopen` IOMP library during runtime. And we ensure the IOMP symbols initialized once globally.
+

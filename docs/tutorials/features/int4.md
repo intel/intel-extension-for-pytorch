@@ -1,4 +1,4 @@
-INT4 inference [GPU] (Experimental)
+INT4 inference [GPU] (Prototype)
 =====================================
 
 ## INT4 Data Type
@@ -39,3 +39,4 @@ model.eval()
 
 ipex.quantization._gptq(model, dataset, 'quantized_weight.pt', wbits=4)
 ```
+

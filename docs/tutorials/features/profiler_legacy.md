@@ -1,4 +1,4 @@
-Legacy Profiler Tool (Experimental)
+Legacy Profiler Tool (Prototype)
 ===================================
 
 ## Introduction
@@ -90,4 +90,5 @@ In Chrome trace viewer, you may find the result shows like:
 ![Legacy_profiler_result_3](../../images/profiler_legacy/Legacy_profiler_result_3.png)
 
 For more example results, please refer to [PyTorch\*'s tutorial page](https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
+
 

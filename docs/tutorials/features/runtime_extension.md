@@ -7,7 +7,7 @@ Intel® Extension for PyTorch\* Runtime Extension provides a couple of PyTorch f
 2. Spawn asynchronous tasks via the Python frontend module `ipex.cpu.runtime.Task`.
 3. Program core bindings for OpenMP threads via the Python frontend `ipex.cpu.runtime.pin`.
 
-**note**: Intel® Extension for PyTorch\* Runtime extension is in the **experimental** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.rst).
+**note**: Intel® Extension for PyTorch\* Runtime extension is in the **prototype** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.rst).
 
 ## Requirements
 
@@ -172,3 +172,4 @@ Task is an abstraction of computation based on PyTorch module and is scheduled a
 ### IOMP preload or load during the runtime
 
 Since Runtime Extension relies on the APIs from IOMP, we need to preload IOMP before executing the application. We want Intel® Extension for PyTorch\* built with Runtime API enabled. This means it should work fine without loading IOMP if the user didn't use the runtime API. Here we choose to `dlopen` IOMP library during runtime and we ensure the IOMP symbols are initialized once globally.
+

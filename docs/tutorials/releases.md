@@ -9,7 +9,7 @@ Intel® Extension for PyTorch\* v2.1.10+xpu is the new Intel® Extension for PyT
 
 This release provides the following features:
 
-- Large Language Model (LLM) optimizations for FP16 inference on Intel® Data Center GPU Max Series (Experimental): Intel® Extension for PyTorch* provides a lot of specific optimizations for LLM workloads on Intel® Data Center GPU Max Series in this release. In operator level, we provide highly efficient GEMM kernel to speedup Linear layer and customized fused operators to reduce HBM access and kernel launch overhead. To reduce memory footprint, we define a segment KV Cache policy to save device memory and improve the throughput. To better trade-off the performance and accuracy, low-precision solution e.g., weight-only-quantization for INT4 is enabled. Besides, tensor parallel can also be adopted to get lower latency for LLMs.
+- Large Language Model (LLM) optimizations for FP16 inference on Intel® Data Center GPU Max Series (Prototype): Intel® Extension for PyTorch* provides a lot of specific optimizations for LLM workloads on Intel® Data Center GPU Max Series in this release. In operator level, we provide highly efficient GEMM kernel to speedup Linear layer and customized fused operators to reduce HBM access and kernel launch overhead. To reduce memory footprint, we define a segment KV Cache policy to save device memory and improve the throughput. To better trade-off the performance and accuracy, low-precision solution e.g., weight-only-quantization for INT4 is enabled. Besides, tensor parallel can also be adopted to get lower latency for LLMs.
 
   - A new API function, `ipex.optimize_transformers`, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on LLMs. It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the `ipex.optimize_transformers` API instead of the `ipex.optimize` API to apply all optimizations transparently. More detailed information can be found at [Large Language Model optimizations overview](https://intel.github.io/intel-extension-for-pytorch/xpu/2.1.10+xpu/tutorials/llm.html).
   - A typical usage of this new feature is quite simple as below:
@@ -20,13 +20,13 @@ This release provides the following features:
     model = ipex.optimize_transformers(model, dtype=dtype)
     ```
 
-- `Torch.compile` functionality on Intel® Data Center GPU Max Series (Experimental): Extends Intel® Extension for PyTorch* capabilities to support [torch.compile](https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile) APIs on Intel® Data Center GPU Max Series. And provides Intel GPU support on top of [Triton*](https://github.com/openai/triton) compiler to reach competitive performance speed-up over eager mode by default "inductor" backend of Intel® Extension for PyTorch*.
+- `Torch.compile` functionality on Intel® Data Center GPU Max Series (Beta): Extends Intel® Extension for PyTorch* capabilities to support [torch.compile](https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile) APIs on Intel® Data Center GPU Max Series. And provides Intel GPU support on top of [Triton*](https://github.com/openai/triton) compiler to reach competitive performance speed-up over eager mode by default "inductor" backend of Intel® Extension for PyTorch*.
   
 - Intel® Arc™ A-Series Graphics on WSL2, native Windows and native Linux are officially supported in this release. Intel® Arc™ A770 Graphic card has been used as primary verification vehicle for product level test.
   
 - Other features are listed as following, more detailed information can be found in [public documentation](https://intel.github.io/intel-extension-for-pytorch/xpu/2.1.10+xpu/):
-  - FP8 datatype support (Experimental): Add basic data type and FP8 Linear operator support based on emulation kernel.
-  - Kineto Profiling (Experimental): An extension of PyTorch* profiler for profiling operators on Intel® GPU devices.
+  - FP8 datatype support (Prototype): Add basic data type and FP8 Linear operator support based on emulation kernel.
+  - Kineto Profiling (Prototype): An extension of PyTorch* profiler for profiling operators on Intel® GPU devices.
   - Fully Sharded Data Parallel (FSDP):  Support new PyTorch* [FSDP](https://pytorch.org/docs/stable/fsdp.html) API which provides an industry-grade solution for large-scale model training.
   - Asymmetric INT8 quantization: Support asymmetric quantization to align with stock PyTorch* and provide better accuracy in INT8.
 
@@ -47,7 +47,7 @@ This release introduces specific XPU solution optimizations on Intel discrete GP
 This release provides the following features:
 - oneDNN 3.3 API integration and adoption
 - Libtorch support
-- ARC support on Windows, WSL2 and Ubuntu (Experimental)
+- ARC support on Windows, WSL2 and Ubuntu (Prototype)
 - OOB models improvement
   - More fusion patterns enabled for optimizing OOB models
 - CPU support is merged in this release:
@@ -100,7 +100,7 @@ This release introduces specific XPU solution optimizations on Intel discrete GP
 This release provides the following features:
 - Distributed Training on GPU:
   - support of distributed training with DistributedDataParallel (DDP) on Intel GPU hardware
-  - support of distributed training with Horovod (experimental feature) on Intel GPU hardware
+  - support of distributed training with Horovod (prototype feature) on Intel GPU hardware
 - Automatic channels last format conversion on GPU:
   - Automatic channels last format conversion is enabled. Models using `torch.xpu.optimize` API running on Intel® Data Center GPU Max Series will be converted to channels last memory format, while models running on Intel® Data Center GPU Flex Series will choose oneDNN block format.
 - CPU support is merged in this release:
@@ -228,4 +228,5 @@ This release supports the following fusion patterns in PyTorch\* JIT mode:
     ```
     
     If you continue seeing similar issues for other shared object files, add the corresponding files under ${MKL\_DPCPP\_ROOT}/lib/intel64/ by `LD_PRELOAD`. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.
+
 

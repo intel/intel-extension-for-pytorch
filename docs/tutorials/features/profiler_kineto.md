@@ -1,4 +1,4 @@
-Kineto Supported Profiler Tool (Experimental)
+Kineto Supported Profiler Tool (Prototype)
 =============================================
 
 ## Introduction
@@ -168,3 +168,4 @@ prof.export_chrome_trace("trace_file.json")
 You can examine the sequence of profiled operators, runtime functions and XPU kernels in these trace viewers. Here shows a trace result for ResNet50 run on XPU backend viewed by Perfetto viewer:
 
 ![profiler_kineto_result_perfetto_viewer](../../images/profiler_kineto/profiler_kineto_result_perfetto_viewer.png)
+

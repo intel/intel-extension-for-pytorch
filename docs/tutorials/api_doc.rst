@@ -115,14 +115,14 @@ Miscellaneous
 .. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: enable_onednn_fusion
 
-Quantization
+Quantization (Prototype)
 ============
 
 .. automodule:: intel_extension_for_pytorch.quantization
 .. autofunction:: prepare
 .. autofunction:: convert
 
-Experimental API, introduction is avaiable at `feature page <./features/int8_recipe_tuning_api.md>`_.
+Introduction is avaiable at `feature page <./features/int8_recipe_tuning_api.md>`_.
 
 .. autofunction:: autotune
 
@@ -140,3 +140,4 @@ CPU Runtime
 
 .. .. automodule:: intel_extension_for_pytorch.quantization
 ..    :members:
+

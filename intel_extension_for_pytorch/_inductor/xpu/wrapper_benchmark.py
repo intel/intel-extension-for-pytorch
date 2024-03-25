@@ -122,7 +122,7 @@ def parse_profile_event_list(benchmark_name, event_list, wall_time_ms, nruns):
 
 def benchmark_all_kernels(benchmark_name, benchmark_all_configs):
     """
-    An experimental API used only when config.benchmark_kernel is true.
+    An prototype API used only when config.benchmark_kernel is true.
 
     Run the kernel benchmarks for all the kernels cached in PyCodeCache.
     Used in the compiled modules.
@@ -268,3 +268,4 @@ def compiled_module_main(benchmark_name, benchmark_compiled_module_fn):
         parse_profile_event_list(
             benchmark_name, event_list, wall_time_ms, times * repeat
         )
+

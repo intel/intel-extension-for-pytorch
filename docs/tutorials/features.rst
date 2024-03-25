@@ -48,7 +48,7 @@ Quantization
 
 Intel® Extension for PyTorch* provides built-in INT8 quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models on CPU side. On top of that, if users would like to tune for a higher accuracy than what the default recipe provides, a recipe tuning API powered by Intel® Neural Compressor is provided for users to try.
 
-Check more detailed information for `INT8 Quantization [CPU] <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Experimental, *NEW feature in 1.13.0* on CPU) <features/int8_recipe_tuning_api.md>`_ on CPU side.
+Check more detailed information for `INT8 Quantization [CPU] <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Prototype, *NEW feature in 1.13.0* on CPU) <features/int8_recipe_tuning_api.md>`_ on CPU side.
 
 Check more detailed information for `INT8 Quantization [XPU] <features/int8_overview_xpu.md>`_. 
 
@@ -68,9 +68,9 @@ On Intel® GPUs, Intel® Extension for PyTorch* also provides INT4 and FP8 Quant
 Distributed Training
 --------------------
 
-To meet demands of large scale model training over multiple devices, distributed training on Intel® GPUs and CPUs are supported. Two alternative methodologies are available. Users can choose either to use PyTorch native distributed training module, `Distributed Data Parallel (DDP) <https://pytorch.org/docs/stable/notes/ddp.html>`_, with `Intel® oneAPI Collective Communications Library (oneCCL) <https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html>`_ support via `Intel® oneCCL Bindings for PyTorch (formerly known as torch_ccl) <https://github.com/intel/torch-ccl>`_ or use Horovod with `Intel® oneAPI Collective Communications Library (oneCCL) <https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html>`_ support (Experimental).
+To meet demands of large scale model training over multiple devices, distributed training on Intel® GPUs and CPUs are supported. Two alternative methodologies are available. Users can choose either to use PyTorch native distributed training module, `Distributed Data Parallel (DDP) <https://pytorch.org/docs/stable/notes/ddp.html>`_, with `Intel® oneAPI Collective Communications Library (oneCCL) <https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html>`_ support via `Intel® oneCCL Bindings for PyTorch (formerly known as torch_ccl) <https://github.com/intel/torch-ccl>`_ or use Horovod with `Intel® oneAPI Collective Communications Library (oneCCL) <https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html>`_ support (Prototype).
 
-For more detailed information, check `DDP <features/DDP.md>`_ and `Horovod (Experimental) <features/horovod.md>`_.
+For more detailed information, check `DDP <features/DDP.md>`_ and `Horovod (Prototype) <features/horovod.md>`_.
 
 .. toctree::
    :hidden:
@@ -149,7 +149,7 @@ For more detailed information, check `Inductor <features/torch_compile_gpu.md>`_
 
    features/torch_compile_gpu
 
-Legacy Profiler Tool (Experimental)
+Legacy Profiler Tool (Prototype)
 -----------------------------------
 
 The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators' overhead on XPU devices. With this tool, you can get the information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch* with profiler support as default and enable this tool by adding a `with` statement before the code segment.
@@ -162,7 +162,7 @@ For more detailed information, check `Legacy Profiler Tool <features/profiler_le
 
    features/profiler_legacy
 
-Simple Trace Tool (Experimental)
+Simple Trace Tool (Prototype)
 --------------------------------
 
 Simple Trace is a built-in debugging tool that lets you control printing out the call stack for a piece of code. Once enabled, it can automatically print out verbose messages of called operators in a stack format with indenting to distinguish the context. 
@@ -175,7 +175,7 @@ For more detailed information, check `Simple Trace Tool <features/simple_trace.m
 
    features/simple_trace
 
-Kineto Supported Profiler Tool (Experimental)
+Kineto Supported Profiler Tool (Prototype)
 ---------------------------------------------
 
 The Kineto supported profiler tool is an extension of PyTorch\* profiler for profiling operators' executing time cost on GPU devices. With this tool, you can get information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch\* with Kineto support as default and enable this tool using the `with` statement before the code segment.
@@ -189,10 +189,10 @@ For more detailed information, check `Profiler Kineto <features/profiler_kineto.
    features/profiler_kineto
 
 
-Compute Engine (Experimental feature for debug)
+Compute Engine (Prototype feature for debug)
 -----------------------------------------------
 
-Compute engine is a experimental feature which provides the capacity to choose specific backend for operators with multiple implementations.
+Compute engine is a prototype feature which provides the capacity to choose specific backend for operators with multiple implementations.
 
 For more detailed information, check `Compute Engine <features/compute_engine.md>`_.
 
@@ -228,7 +228,7 @@ Intel® Extension for PyTorch* Runtime Extension provides PyTorch frontend APIs 
 - Spawn asynchronous tasks from both Python and C++ frontend.
 - Program core bindings for OpenMP threads from both Python and C++ frontend.
 
-.. note:: Intel® Extension for PyTorch* Runtime extension is still in the experimental stage. The API is subject to change. More detailed descriptions are available in the `API Documentation <api_doc.html>`_.
+.. note:: Intel® Extension for PyTorch* Runtime extension is still in the prototype stage. The API is subject to change. More detailed descriptions are available in the `API Documentation <api_doc.html>`_.
 
 For more detailed information, check `Runtime Extension <features/runtime_extension.md>`_.
 
@@ -239,7 +239,7 @@ For more detailed information, check `Runtime Extension <features/runtime_extens
    features/runtime_extension
 
 
-Codeless Optimization (Experimental, *NEW feature in 1.13.\**)
+Codeless Optimization (Prototype, *NEW feature in 1.13.\**)
 --------------------------------------------------------------
 
 This feature enables users to get performance benefits from Intel® Extension for PyTorch* without changing Python scripts. It hopefully eases the usage and has been verified working well with broad scope of models, though in few cases there could be small overhead comparing to applying optimizations with Intel® Extension for PyTorch* APIs.
@@ -253,7 +253,7 @@ For more detailed information, check `Codeless Optimization <features/codeless_o
    features/codeless_optimization.md
 
 
-Graph Capture (Experimental, *NEW feature in 1.13.0\**)
+Graph Capture (Prototype, *NEW feature in 1.13.0\**)
 -------------------------------------------------------
 
 Since graph mode is key for deployment performance, this feature automatically captures graphs based on set of technologies that PyTorch supports, such as TorchScript and TorchDynamo. Users won't need to learn and try different PyTorch APIs to capture graphs, instead, they can turn on a new boolean flag `--graph_mode` (default off) in `ipex.optimize` to get the best of graph optimization.
@@ -267,10 +267,10 @@ For more detailed information, check `Graph Capture <features/graph_capture.md>`
    features/graph_capture
 
 
-HyperTune (Experimental, *NEW feature in 1.13.0\**)
+HyperTune (Prototype, *NEW feature in 1.13.0\**)
 ---------------------------------------------------
 
-HyperTune is an experimental feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the `launcher <performance_tuning/launch_script.md>`_ and Intel® Extension for PyTorch*.
+HyperTune is an prototype feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the `launcher <performance_tuning/launch_script.md>`_ and Intel® Extension for PyTorch*.
 
 For more detailed information, check `HyperTune <features/hypertune.md>`_.
 
@@ -279,3 +279,4 @@ For more detailed information, check `HyperTune <features/hypertune.md>`_.
    :maxdepth: 1
 
    features/hypertune
+
