@@ -6,9 +6,9 @@
 #include <ATen/quantized/Quantizer.h>
 
 #include <ATen/native/Resize.h>
+#include <ATen/DeviceGuard.h>
 #include <c10/core/ScalarType.h>
 #include <core/Event.h>
-#include <core/Guard.h>
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <core/detail/TensorInfo.h>
@@ -264,7 +264,7 @@ void copy_device_to_device(
   Device dst_device = iter.device(0);
   Device src_device = iter.device(1);
 
-  DPCPPGuard device_guard(src_device);
+  at::DeviceGuard device_guard(src_device);
 
   // We always perform the copy on the source device, using the current stream
   // on the source device, and we fully synchronize on both src and dst's
@@ -278,10 +278,10 @@ void copy_device_to_device(
     // that no one is operating on the dst memory when we perform the copy.
     // src waits on dst barrier (src already waits on src)
     DPCPPEvent dst_ready;
-    device_guard.set_device(dst_device);
+    device_guard.reset_device(dst_device);
     dst_ready.record(getCurrentDPCPPStream(dst_device.index()));
 
-    device_guard.set_device(src_device);
+    device_guard.reset_device(src_device);
     dst_ready.block(copy_stream);
   }
 
@@ -313,7 +313,7 @@ void copy_device_to_device(
     DPCPPEvent src_ready;
     src_ready.record(copy_stream);
 
-    device_guard.set_device(dst_device);
+    device_guard.reset_device(dst_device);
     src_ready.block(getCurrentDPCPPStream(dst_device.index()));
   }
 }
@@ -393,13 +393,13 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   }
 
   // Copy between CPU and GPU
-  OptionalDPCPPGuard device_guard;
+  at::OptionalDeviceGuard device_guard;
   dpcppMemcpyKind kind;
   if (dst_device.type() == c10::DeviceType::XPU && src_device.is_cpu()) {
-    device_guard.set_device(dst_device);
+    device_guard.reset_device(dst_device);
     kind = HostToDevice;
   } else if (dst_device.is_cpu() && src_device.type() == c10::DeviceType::XPU) {
-    device_guard.set_device(src_device);
+    device_guard.reset_device(src_device);
     kind = DeviceToHost;
   } else {
     TORCH_INTERNAL_ASSERT(false, "unsupported devices in GPU copy_()");

@@ -2,9 +2,9 @@
 #include <ATen/Functions.h>
 #include <ATen/native/Activation.h>
 #include <ATen/record_function.h>
+#include <ATen/DeviceGuard.h>
 #include <torch/library.h>
 
-#include <core/Guard.h>
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
@@ -159,7 +159,7 @@ at::Tensor nms_kernel(
       " and ",
       scores.size(0))
 
-  DPCPPGuard device_guard(dets.device());
+  at::DeviceGuard device_guard(dets.device());
 
   if (dets.numel() == 0) {
     return at::empty({0}, dets.options().dtype(at::kLong));

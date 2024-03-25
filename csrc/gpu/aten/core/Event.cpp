@@ -16,7 +16,7 @@ namespace dpcpp {
   DPCPPEvent(
       DeviceIndex device_index, const xpuIpcEventHandle_t* handle) {
       device_index_ = device_index;
-      DPCPPGuard guard(device_index_);
+      //DPCPPGuard guard(device_index_);
 
       AT_CHECK(xpuIpcOpenEventHandle(&event_, *handle));
       is_created_ = true;

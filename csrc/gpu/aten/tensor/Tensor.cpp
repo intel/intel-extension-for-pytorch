@@ -1,9 +1,9 @@
 #include <ATen/native/Resize.h>
 #include <ATen/quantized/QTensorImpl.h>
+#include <ATen/DeviceGuard.h>
 #include <c10/core/DeviceType.h>
 #include <core/Allocator.h>
 #include <core/Device.h>
-#include <core/Guard.h>
 #include <core/Memory.h>
 #include <core/detail/TensorInfo.h>
 #include <quantized/Quantizer.h>
@@ -52,9 +52,9 @@ TensorImpl* resize_impl(
     return self;
   }
 
-  OptionalDPCPPGuard guard;
+  at::OptionalDeviceGuard guard;
   if (device_guard) {
-    guard.set_index(self->storage().device().index());
+    guard.reset_device(self->storage().device());
   }
 
   int64_t storage_size = 1;
