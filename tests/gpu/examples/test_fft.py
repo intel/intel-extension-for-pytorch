@@ -6,6 +6,24 @@ import intel_extension_for_pytorch  # noqa
 import pytest
 
 
+def generate_fftn_test_param(dtype=torch.float):
+    from itertools import islice, combinations
+
+    fft_functions = [(torch.fft.fftn, torch.fft.ifftn)]
+
+    lft, rgh = [5, 11]
+    input_dims = [list(range(lft, rgh + 1))[:i] for i in range(3, (rgh + 1) - lft + 1)]
+
+    for input_dim in input_dims:
+        signal_dim = list(range(-len(input_dim), 0))
+        signal_dims = [None]
+
+        for r in islice(reversed(range(1, len(signal_dim))), 3):
+            signal_dims.extend(islice(combinations(signal_dim, r=r), 3))
+
+        yield input_dim, signal_dims, fft_functions
+
+
 @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="ipex build w/o oneMKL support")
 @pytest.mark.skipif(not torch.has_mkl, reason="torch build w/o mkl support")
 class TestNNMethod(TestCase):
@@ -30,17 +48,20 @@ class TestNNMethod(TestCase):
         self.assertEqual(y3, y3_dpcpp.cpu())
 
     def test_fftn(self, dtype=torch.float):
-        x = torch.randn(5, 6, 7)
-        x_dpcpp = x.to("xpu")
+        from itertools import product
 
-        for dim in range(-len(x.size()), 0):
-            y1 = torch.fft.fftn(x, dim=dim)
-            y2 = torch.fft.ifftn(y1, dim=dim)
+        for input_dim, signal_dims, fft_functions in generate_fftn_test_param(dtype):
+            x = torch.randn(*input_dim, dtype=dtype)
+            x_dpcpp = x.to("xpu")
 
-            y1_dpcpp = torch.fft.fftn(x, dim=dim)
-            y2_dpcpp = torch.fft.ifftn(y1_dpcpp, dim=dim)
+            for dim, (fwd, bwd) in product(signal_dims, fft_functions):
+                y1 = fwd(x, dim=dim)
+                y2 = bwd(y1, dim=dim)
 
-            self.assertEqual(y2, y2_dpcpp.cpu())
+                y1_dpcpp = fwd(x_dpcpp, dim=dim)
+                y2_dpcpp = bwd(y1_dpcpp, dim=dim)
+
+                self.assertEqual(y2, y2_dpcpp.cpu())
 
     def test_irfft(self, dtype=torch.float):
         x1 = torch.randn(5, 5)

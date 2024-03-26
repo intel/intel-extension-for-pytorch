@@ -416,6 +416,48 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 #ifdef USE_ONEMKL
+constexpr int64_t mkl_max_ndim = 3;
+
+double _mkl_dft_scale(
+    IntArrayRef dim,
+    IntArrayRef input_sizes,
+    IntArrayRef out_sizes,
+    int64_t normalization) {
+  const auto norm = static_cast<native::fft_norm_mode>(normalization);
+  double double_scale = 1.0;
+  if (norm == native::fft_norm_mode::none) {
+    return double_scale;
+  }
+
+  const int64_t signal_ndim = dim.size();
+  int64_t signal_numel = 1;
+  for (int64_t i = 0; i < signal_ndim; ++i) {
+    auto in_size = input_sizes[dim[i]];
+    auto out_size = out_sizes[dim[i]];
+    auto signal_size = std::max(in_size, out_size);
+    signal_numel *= signal_size;
+    TORCH_INTERNAL_ASSERT(
+        in_size == signal_size || in_size == (signal_size / 2) + 1);
+    TORCH_INTERNAL_ASSERT(
+        out_size == signal_size || out_size == (signal_size / 2) + 1);
+  }
+  if (norm == native::fft_norm_mode::by_root_n) {
+    double_scale = 1.0 / Numerics<double>::sqrt(signal_numel);
+  } else {
+    double_scale = 1.0 / static_cast<double>(signal_numel);
+  }
+  return double_scale;
+}
+
+const Tensor& _fft_apply_normalization(
+    const Tensor& self,
+    int64_t normalization,
+    IntArrayRef sizes,
+    IntArrayRef dims) {
+  auto scale = _mkl_dft_scale(dims, sizes, self.sizes(), normalization);
+  return (scale == 1.0) ? self : self.mul_(scale);
+}
+
 template <precision prec, domain signal_type, typename scalar_t>
 void _mkl_dft(
     const Tensor& input,
@@ -425,7 +467,6 @@ void _mkl_dft(
     bool complex_output,
     bool inverse,
     IntArrayRef checked_signal_sizes,
-    int64_t normalization,
     bool onesided,
     int64_t batch) {
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
@@ -454,27 +495,6 @@ void _mkl_dft(
   if (!complex_input || !complex_output) {
     desc_config->set_value(
         config_param::CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
-  }
-
-  // rescale if requested
-  const auto norm = static_cast<native::fft_norm_mode>(normalization);
-  if (norm != native::fft_norm_mode::none) {
-    int64_t signal_numel = c10::multiply_integers(
-        IntArrayRef(checked_signal_sizes.data() + 1, signal_ndim));
-    double double_scale;
-    if (norm == native::fft_norm_mode::by_root_n) {
-      double_scale = 1.0 / Numerics<double>::sqrt(signal_numel);
-    } else {
-      double_scale = 1.0 / static_cast<double>(signal_numel);
-    }
-
-    auto config_inverse =
-        inverse ? config_param::BACKWARD_SCALE : config_param::FORWARD_SCALE;
-    if (prec == precision::DOUBLE) {
-      desc_config->set_value(config_inverse, double_scale);
-    } else {
-      desc_config->set_value(config_inverse, static_cast<float>(double_scale));
-    }
   }
 
   lru_key_t key;
@@ -516,7 +536,6 @@ void _fft_with_size(
     bool complex_output,
     bool inverse,
     IntArrayRef checked_signal_sizes,
-    int64_t normalization,
     bool onesided,
     IntArrayRef output_sizes) {
 #ifdef USE_ONEMKL
@@ -553,7 +572,6 @@ void _fft_with_size(
           complex_output,
           inverse,
           checked_signal_sizes,
-          normalization,
           onesided,
           batch);
     } else {
@@ -565,7 +583,6 @@ void _fft_with_size(
           complex_output,
           inverse,
           checked_signal_sizes,
-          normalization,
           onesided,
           batch);
     }
@@ -581,7 +598,6 @@ void _fft_with_size(
           complex_output,
           inverse,
           checked_signal_sizes,
-          normalization,
           onesided,
           batch);
     } else {
@@ -593,7 +609,6 @@ void _fft_with_size(
           complex_output,
           inverse,
           checked_signal_sizes,
-          normalization,
           onesided,
           batch);
     }
@@ -612,7 +627,6 @@ static Tensor& _exec_fft(
     Tensor self,
     IntArrayRef out_sizes,
     IntArrayRef dim,
-    int64_t normalization,
     bool onesided,
     bool forward) {
   const auto ndim = self.dim();
@@ -679,7 +693,6 @@ static Tensor& _exec_fft(
       out.is_complex(),
       !forward,
       signal_size,
-      normalization,
       onesided,
       out_sizes);
   // Inplace reshaping to original batch shape and inverting the dimension
@@ -705,14 +718,6 @@ Tensor& _fft_r2c_out(
     int64_t normalization,
     bool onesided,
     Tensor& out) {
-  // TODO: n-dimension (n>3) support, fallback to CPU temporarily
-  if (dim.size() > 3) {
-    Tensor out_cpu = out.to(Device(at::kCPU));
-    at::_fft_r2c_out(
-        out_cpu, self.to(Device(at::kCPU)), dim, normalization, onesided);
-    out.copy_(out_cpu);
-    return out;
-  }
   auto result = at::AtenIpexTypeXPU::_fft_r2c(
       self, dim, normalization, /*onesided=*/true);
   if (onesided) {
@@ -759,35 +764,33 @@ Tensor _fft_c2r(
     IntArrayRef dim,
     int64_t normalization,
     int64_t last_dim_size) {
-  // TODO: n-dimension (n>3) support, fallback to CPU temporarily
-  if (dim.size() > 3) {
-    Tensor out_cpu = at::_fft_c2r(
-        self.to(Device(at::kCPU)), dim, normalization, last_dim_size);
-    return out_cpu.to(Device(at::kXPU));
-  }
   TORCH_CHECK(self.is_complex());
   auto input = self;
-  if (dim.size() > 1) {
-    auto c2c_dims = dim.slice(0, dim.size() - 1);
-    input = at::AtenIpexTypeXPU::_fft_c2c(
-        self, c2c_dims, normalization, /*forward=*/false);
-    dim = dim.slice(dim.size() - 1);
-  }
 
   auto in_sizes = input.sizes();
   DimVector out_sizes(in_sizes.begin(), in_sizes.end());
   out_sizes[dim.back()] = last_dim_size;
+
+  if (dim.size() > 1) {
+    auto c2c_dims = dim.slice(0, dim.size() - 1);
+    input = at::AtenIpexTypeXPU::_fft_c2c(
+        self,
+        c2c_dims,
+        static_cast<int64_t>(native::fft_norm_mode::none),
+        /*forward=*/false);
+  }
+
   auto out = at::empty(
       out_sizes,
       self.options().dtype(c10::toRealValueType(self.scalar_type())));
-  return impl::_exec_fft(
+  impl::_exec_fft(
       out,
       input,
       out_sizes,
-      dim,
-      normalization,
+      (dim.size() > 1) ? dim.slice(dim.size() - 1) : dim,
       /*onesided=*/true,
       /*forward=*/false);
+  return impl::_fft_apply_normalization(out, normalization, in_sizes, dim);
 }
 
 Tensor _fft_r2c(
@@ -795,13 +798,6 @@ Tensor _fft_r2c(
     IntArrayRef dim,
     int64_t normalization,
     bool onesided) {
-  // TODO: n-dimension (n>3) support, fallback to CPU temporarily
-  if (dim.size() > 3) {
-    Tensor out_cpu =
-        at::_fft_r2c(self.to(Device(at::kCPU)), dim, normalization, onesided);
-    return out_cpu.to(Device(at::kXPU));
-  }
-
   TORCH_CHECK(self.is_floating_point());
   auto input_sizes = self.sizes();
   DimVector out_sizes(input_sizes.begin(), input_sizes.end());
@@ -814,14 +810,37 @@ Tensor _fft_r2c(
   auto sorted_dims = impl::_sort_dims(self, dim, /*exclude_last=*/true);
   auto out = at::empty(
       out_sizes, self.options().dtype(c10::toComplexType(self.scalar_type())));
-  impl::_exec_fft(
-      out,
-      self,
-      out_sizes,
-      sorted_dims,
-      normalization,
-      onesided,
-      /*forward=*/true);
+  {
+    auto working_tensor = self;
+    while (!sorted_dims.empty()) {
+      const auto max_dims =
+          std::min(static_cast<size_t>(impl::mkl_max_ndim), sorted_dims.size());
+      auto fft_dims = IntArrayRef(sorted_dims)
+                          .slice(sorted_dims.size() - max_dims, max_dims);
+      impl::_exec_fft(
+          out,
+          working_tensor,
+          out_sizes,
+          fft_dims,
+          onesided,
+          /*forward=*/true);
+      sorted_dims.resize(sorted_dims.size() - max_dims);
+
+      if (sorted_dims.empty()) {
+        break;
+      }
+      sorted_dims = impl::_sort_dims(self, sorted_dims);
+
+      if (working_tensor.is_same(self)) {
+        working_tensor = std::move(out);
+        out = at::empty(
+            out_sizes,
+            self.options().dtype(c10::toComplexType(self.scalar_type())));
+      } else {
+        std::swap(out, working_tensor);
+      }
+    }
+  }
 
   // Only need to normalize the onesided slice since data in the other half is
   // overwritten
@@ -835,30 +854,47 @@ Tensor _fft_r2c(
     }
     impl::_fft_fill_with_conjugate_symmetry_(out, dim);
   }
-  return out;
+  return impl::_fft_apply_normalization(out, normalization, input_sizes, dim);
 }
 Tensor _fft_c2c(
     const Tensor& self,
     IntArrayRef dim,
     int64_t normalization,
     bool forward) {
-  // TODO: n-dimension (n>3) support, fallback to CPU temporarily
-  if (dim.size() > 3) {
-    Tensor out_cpu =
-        at::_fft_c2c(self.to(Device(at::kCPU)), dim, normalization, forward);
-    return out_cpu.to(Device(at::kXPU));
-  }
   TORCH_CHECK(self.is_complex());
-  const auto sorted_dims = impl::_sort_dims(self, dim);
-  auto out = at::empty(self.sizes(), self.options());
-  return impl::_exec_fft(
-      out,
-      self,
-      self.sizes(),
-      sorted_dims,
-      normalization,
-      /*onesided=*/true,
-      forward);
+  auto sorted_dims = impl::_sort_dims(self, dim);
+  auto out_sizes = self.sizes();
+  auto out = at::empty(out_sizes, self.options());
+  auto input_sizes = self.sizes();
+  auto working_tensor = self;
+  while (!sorted_dims.empty()) {
+    // do normalization exactly once, and before the loop break
+    const auto max_dims =
+        std::min(static_cast<size_t>(impl::mkl_max_ndim), sorted_dims.size());
+    auto fft_dims =
+        IntArrayRef(sorted_dims).slice(sorted_dims.size() - max_dims, max_dims);
+    impl::_exec_fft(
+        out,
+        working_tensor,
+        out_sizes,
+        fft_dims,
+        /*onesided=*/false,
+        forward);
+    sorted_dims.resize(sorted_dims.size() - max_dims);
+
+    if (sorted_dims.empty()) {
+      break;
+    }
+    sorted_dims = impl::_sort_dims(self, sorted_dims);
+
+    if (working_tensor.is_same(self)) {
+      working_tensor = std::move(out);
+      out = at::empty(out_sizes, self.options());
+    } else {
+      std::swap(out, working_tensor);
+    }
+  }
+  return impl::_fft_apply_normalization(out, normalization, input_sizes, dim);
 }
 
 } // namespace AtenIpexTypeXPU
