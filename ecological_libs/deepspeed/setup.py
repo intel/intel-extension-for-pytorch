@@ -25,35 +25,61 @@ def get_csrc_dir():
     return os.path.abspath(project_root_dir)
 
 
-def create_ext_modules():
-    cpp_files = []
-    include_dirs = []
+def get_module_csrc_dir(module_name):
+    module_csrc_dir = get_csrc_dir()
+    if module_name == "quantization":
+        module_csrc_dir = os.path.join(module_csrc_dir, "quantization")
+    if module_name == "transformer_inference":
+        module_csrc_dir = os.path.join(module_csrc_dir,
+                                       "transformer/inference/csrc")
+    return os.path.abspath(module_csrc_dir)
 
-    for path, dir_list, file_list in os.walk(get_csrc_dir()):
-        for file_name in file_list:
-            if file_name.endswith('.cpp'):
-                cpp_files += [os.path.join(path, file_name)]
-            if file_name.endswith('.hpp') or file_name.endswith('.h'):
-                include_dirs += [path]
-                break
-    cxx_flags = [
-        '-fsycl', '-fsycl-targets=spir64_gen', '-g', '-gdwarf-4', '-O3',
-        '-std=c++17', '-fPIC', '-DMKL_ILP64', '-fno-strict-aliasing',
-        '-DBF16_AVAILABLE'
-    ]
-    extra_ldflags = [
-        '-fPIC', '-fsycl', '-fsycl-targets=spir64_gen',
-        '-fsycl-max-parallel-link-jobs=8',
-        '-Xs "-options -cl-poison-unsupported-fp64-kernels,cl-intel-enable-auto-large-GRF-mode"',
-        '-Xs "-device pvc"', '-Wl,-export-dynamic'
-    ]
-    ext_modules = [
-        DPCPPExtension(name="deepspeed_ops",
-                       sources=cpp_files,
-                       include_dirs=include_dirs,
-                       extra_compile_args={'cxx': cxx_flags},
-                       extra_link_args=extra_ldflags)
-    ]
+
+def get_module_include_dir(module_name):
+    module_inc_dirs = []
+    module_inc_dirs.append(
+        os.path.abspath(os.path.join(get_csrc_dir(), "includes")))
+    module_inc_dirs.append(
+        os.path.abspath(os.path.join(get_csrc_dir(), "includes/dpct")))
+    if module_name == "transformer_inference":
+        module_inc_dirs.append(
+            os.path.abspath(
+                os.path.join(get_csrc_dir(),
+                             "transformer/inference/includes")))
+    return module_inc_dirs
+
+
+def create_ext_modules():
+    modules_names = ['quantization', 'transformer_inference']
+    ext_modules = []
+
+    for module_name in modules_names:
+        cxx_flags = [
+            '-fsycl', '-fsycl-targets=spir64_gen', '-g', '-gdwarf-4', '-O3',
+            '-std=c++17', '-fPIC', '-DMKL_ILP64', '-fno-strict-aliasing',
+            '-DBF16_AVAILABLE'
+        ]
+        extra_ldflags = [
+            '-fPIC', '-fsycl', '-fsycl-targets=spir64_gen',
+            '-fsycl-max-parallel-link-jobs=8',
+            '-Xs "-options -cl-poison-unsupported-fp64-kernels,cl-intel-enable-auto-large-GRF-mode"',
+            '-Xs "-device pvc"', '-Wl,-export-dynamic'
+        ]
+        cpp_files = []
+        include_dirs = get_module_include_dir(module_name)
+
+        for path, _, file_list in os.walk(get_module_csrc_dir(module_name)):
+            for file_name in file_list:
+                if file_name.endswith('.cpp'):
+                    cpp_files += [os.path.join(path, file_name)]
+
+        ext_modules.append(
+            DPCPPExtension(name=module_name,
+                           sources=cpp_files,
+                           include_dirs=include_dirs,
+                           extra_compile_args={'cxx': cxx_flags},
+                           extra_link_args=extra_ldflags))
+
     return ext_modules
 
 
@@ -68,6 +94,7 @@ def _build_installation_dependency():
 
 
 ext_modules = create_ext_modules()
+print(ext_modules)
 cmdclass = {'build_ext': DpcppBuildExtension}
 
 long_description = ""
