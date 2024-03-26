@@ -515,10 +515,10 @@ def check_cpu_llm_support(model):
 
 def check_xpu_llm_support(model):
     # If the XPU platform has XMX and 2D load instructions, such as PVC1100, PVC1100c, and PVC1550,
-    # ipex.optimize_transformers supports GPT-J, Llama, OPT, Bloom, Falcon, QWen
+    # ipex.optimize_transformers supports GPT-J, Llama, OPT, Bloom, Falcon, QWen, Baichuan, ChatGLM
     if ipex._C._has_2d_block_array(0) and ipex._C._has_xmx(0):
         xpu_2d_load_and_xmx_supported_pattern = (
-            r"GPTJ|llama|OPT|Bloom|Falcon|QWen|Baichuan"
+            r"GPTJ|llama|OPT|Bloom|Falcon|QWen|Baichuan|ChatGLM"
         )
         xpu_supported_model = re.search(
             xpu_2d_load_and_xmx_supported_pattern,
@@ -707,7 +707,7 @@ def optimize_transformers(
                 " If the XPU platform does not have XMX, such as PVC1550vg, "
                 " ipex.optimize_transformers is not supported. "
                 " If the XPU platform has XMX and 2D load instructions, such as PVC1100, PVC1100c, and PVC1550,"
-                " ipex.optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen, "
+                " ipex.optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen/Baichuan/ChatGLM, "
                 " and BasicTransformerBlock of diffusers. "
                 " If the XPU platform has XMX but no 2D load instructions, such as ATS-M and ARC, "
                 " ipex.optimize_transformers supports GPT-J/Llama/QWen, "

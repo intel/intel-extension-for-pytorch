@@ -7,7 +7,7 @@ from typing import Optional, Tuple, Union, List, Dict
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
 from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive
 import time
-from .utils import pad_for_gptj_lm_head, is_int4
+from .utils import pad_for_gptj_lm_head, is_int4, pad_for_chatglm_output_layer
 
 
 class IPEXLLMResourceContrainer:
@@ -55,6 +55,11 @@ def falcon_forward_hook(model):
 def baichuan_forward_hook(model):
     if model.__class__.__name__ == "BaichuanForCausalLM":
         pad_for_gptj_lm_head(model, is_int4(model))
+
+
+def chatglm_forward_hook(model):
+    if model.__class__.__name__ == "ChatGLMModel":
+        pad_for_chatglm_output_layer(model, is_int4(model))
 
 
 def bloom_forward_hook(model):

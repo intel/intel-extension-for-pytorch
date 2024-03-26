@@ -160,3 +160,72 @@ class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
             self.runtime_cache.value_prompt, self.num_kv_group
         )
         return key, value, key_prompt, value_prompt
+
+
+class IPEXTransformerAttnOptimizedFp16GroupedChatGLM(
+    IPEXTransformerAttnOptimizedFp16Grouped
+):
+    def __init__(self, config: IPEXTransformerConfig) -> None:
+        super().__init__(config)
+
+    def load_parameter(self, qkv_proj=None, out_proj=None):
+        embed_dim = self.embed_dim
+        num_head = self.num_attn_head
+        num_kv_head = self.num_kv_head
+        head_dim = self.head_dim
+        group = num_head // num_kv_head + 2
+        query_weight_size = head_dim * num_head
+        key_weight_size = value_weight_size = head_dim * num_kv_head
+
+        def helper(proj, begin, end, g):
+            weight = proj.weight[begin:end, ...].view(
+                num_kv_head, g, head_dim, embed_dim
+            )
+            if proj.bias is not None:
+                bias = proj.bias[begin:end, ...].view(num_kv_head, g, head_dim)
+            else:
+                bias = None
+            return weight, bias
+
+        wq, bq = helper(qkv_proj, 0, query_weight_size, group - 2)
+        wk, bk = helper(
+            qkv_proj, query_weight_size, query_weight_size + key_weight_size, 1
+        )
+        wv, bv = helper(
+            qkv_proj, query_weight_size + key_weight_size, qkv_proj.weight.shape[0], 1
+        )
+
+        del qkv_proj.weight
+        del qkv_proj.bias
+
+        self.qkv_proj.weight = torch.concat([wq, wk, wv], dim=1).contiguous()
+        if bq is not None:
+            self.qkv_proj.bias = torch.concat([bq, bk, bv], dim=1).contiguous()
+        else:
+            self.qkv_proj.bias = None
+
+        self.out_proj.weight = out_proj.weight
+        self.out_proj.bias = out_proj.bias
+
+        self.position_embed = self.config.rotary_embedding_class(
+            self.config, self.qkv_proj.weight.dtype
+        )
+
+    def post_qkv(self, query, key, value, rotary_pos_emb, layer_past, **kwargs):
+        bs_beam, seq, _ = self.get_runtime_shape(query)
+        seq = seq if layer_past is None else layer_past[0].size(2) + 1
+        query, key = self.position_embed(query, key, rotary_pos_emb)
+        query, key, value = self.combine_kv_cache_interface(query, key, value)
+        return query, key, value
+
+    def prepare_sdp_input(self, query, key, value, attention_mask, alibi):
+        (
+            dropout,
+            alpha,
+            beta,
+            is_casual,
+            blocked_attn_mask,
+            blocked_alibi,
+        ) = super().prepare_sdp_input(query, key, value, attention_mask, alibi)
+        is_causal = True if self.is_1st_token() else False
+        return dropout, alpha, beta, is_causal, blocked_attn_mask, blocked_alibi

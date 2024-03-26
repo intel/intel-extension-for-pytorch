@@ -4,10 +4,11 @@
 // clang-format off
 
 #define HGEMM_COMMA ,
-#define HGEMM_NUM_POLICIES_ 28
+#define HGEMM_NUM_POLICIES_ 29
 #define HGEMM_NUM_POLICIES (2 * HGEMM_NUM_POLICIES_)
 #define HGEMM_ENUMERATE_POLICIES_(_, B_ROW_MAJOR, T) \
   _(8, 64, 8, 16, 32, 8, B_ROW_MAJOR)T      \
+  _(8, 64, 8, 16, 16, 4, B_ROW_MAJOR)T      \
   _(8, 32, 8, 16, 16, 8, B_ROW_MAJOR)T      \
   _(8, 128, 8, 16, 16, 2, B_ROW_MAJOR)T     \
   _(8, 128, 8, 16, 32, 4, B_ROW_MAJOR)T     \
@@ -322,6 +323,26 @@ static std::unordered_map<GemmShapeT, int, GemmShapeT> hgemm_special_table = {
     {{1, 5120, 125696}, hgemm_policy::_32x128_8x16x32_1_true_},
     {{4, 125696, 5120}, hgemm_policy::_256x256_32x64x16_1_true_},
     {{4, 5120, 125696}, hgemm_policy::_32x128_8x16x32_1_true_},
+    {{32, 4608, 4096}, hgemm_policy::_32x128_32x16x16_4_true_},
+    {{32, 4096, 4608}, hgemm_policy::_128x64_16x16x64_1_true_},
+    {{32, 4096, 13696}, hgemm_policy::_128x64_16x16x64_1_true_},
+    {{32, 13696, 4096}, hgemm_policy::_128x256_64x16x16_1_true_},
+    {{1024, 4608, 4096}, hgemm_policy::_256x256_32x64x32_1_true_},
+    {{1024, 4096, 4608}, hgemm_policy::_256x256_32x64x32_1_true_},
+    {{1024, 4096, 13696}, hgemm_policy::_256x256_32x64x32_1_true_},
+    {{1024, 13696, 4096}, hgemm_policy::_256x256_32x64x32_1_true_},
+    {{1, 65024, 4096}, hgemm_policy::_256x256_32x64x16_1_true_},
+    {{1, 4096, 65024}, hgemm_policy::_128x128_16x32x64_1_true_},
+    {{1, 4608, 4096}, hgemm_policy::_8x128_8x16x32_4_true_},
+    {{1, 4096, 4608}, hgemm_policy::_128x64_16x16x64_1_true_},
+    {{1, 13696, 4096}, hgemm_policy::_128x256_64x16x16_1_true_},
+    {{1, 4096, 13696}, hgemm_policy::_128x64_16x16x64_1_true_},
+    {{4, 65024, 4096}, hgemm_policy::_256x256_32x64x16_1_true_},
+    {{4, 4096, 65024}, hgemm_policy::_128x128_16x32x64_1_true_},
+    {{4, 4608, 4096}, hgemm_policy::_32x128_32x16x16_4_true_},
+    {{4, 4096, 4608}, hgemm_policy::_128x64_16x16x64_1_true_},
+    {{4, 13696, 4096}, hgemm_policy::_128x256_64x16x16_1_true_},
+    {{4, 4096, 13696}, hgemm_policy::_128x64_16x16x64_1_true_},
 };
 
 static std::unordered_map<GemmShapeT, int, GemmShapeT> hgemm_qkv_special_table =
@@ -528,7 +549,14 @@ static std::unordered_map<GemmShapeT, int, GemmShapeT> hgemm_qkv_special_table =
         {{1, 5120, 125696}, hgemm_policy::_32x128_8x16x32_1_true_},
         {{4, 125696, 5120}, hgemm_policy::_256x256_32x64x16_1_true_},
         {{4, 5120, 125696}, hgemm_policy::_32x128_8x16x32_1_true_},
-
+        {{32, 128, 4096}, hgemm_policy::_8x64_8x16x32_8_true_},
+        {{32, 4096, 128}, hgemm_policy::_32x128_8x16x32_1_true_},
+        {{1024, 128, 4096}, hgemm_policy::_32x64_32x16x16_8_true_},
+        {{1024, 4096, 128}, hgemm_policy::_256x256_64x32x16_1_true_},
+        {{1, 128, 4096}, hgemm_policy::_8x64_8x16x32_8_true_},
+        {{1, 4096, 128}, hgemm_policy::_8x64_8x16x16_4_true_},
+        {{4, 128, 4096}, hgemm_policy::_8x64_8x16x32_8_true_},
+        {{4, 4096, 128}, hgemm_policy::_8x64_8x16x16_4_true_},
 };
 
 inline int hgemm_find_policy_id_(

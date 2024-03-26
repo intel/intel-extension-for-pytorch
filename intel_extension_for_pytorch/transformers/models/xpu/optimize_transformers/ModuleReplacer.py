@@ -10,6 +10,7 @@ from .modules.Functions import (
     falcon_forward_hook,
     baichuan_forward_hook,
     qwen_forward_hook,
+    chatglm_forward_hook,
     ipex_build_bloom_alibi_tensor,
 )
 from .modules.utils import is_int4
@@ -28,6 +29,7 @@ from .modules.llama import NewIPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
 from .modules.falcon import NewIPEXFalconBlock
 from .modules.qwen import NewIPEXQWENBlock
+from .modules.chatglm import NewIPEXCHATGLMBlock, prepare_inputs_for_generation
 from .modules.DiffusersTransformer import NewIPEXBasicTransformerBlock
 
 import os
@@ -78,6 +80,7 @@ def default_override_function_list() -> List:
         falcon_forward_hook,
         baichuan_forward_hook,
         qwen_forward_hook,
+        chatglm_forward_hook,
         ipex_build_bloom_alibi_tensor,
     ]
     return default_fn_list
@@ -167,6 +170,21 @@ class ModuleReplacer:
                 if new_module is not None:
                     setattr(model, name, new_module)
                     is_replace_success = True
+            # GLMBlock is a customized model in transformers
+            elif child.__class__.__name__ == "GLMBlock":
+                new_module = NewIPEXCHATGLMBlock(
+                    child,
+                    config,
+                    dtype=dtype,
+                    device="xpu",
+                    module_name=module_name + name,
+                    impl_mode=impl_mode,
+                    tp_size=self.tp_size,
+                    tp_group=self.tp_group,
+                )
+                if new_module is not None:
+                    setattr(model, name, new_module)
+                    is_replace_success = True
             else:
                 is_replace_success = is_replace_success or self.replace_module(
                     child, dtype, config, module_name + name
@@ -174,11 +192,16 @@ class ModuleReplacer:
         return is_replace_success
 
     def replace_op(self, model):
+        if model.__class__.__name__ == "ChatGLMForConditionalGeneration":
+            model.prepare_inputs_for_generation = prepare_inputs_for_generation.__get__(
+                model, model.__class__
+            )
         for name, child in model.named_children():
             if (
                 type(child) in self.module_dict.keys()
                 or child.__class__.__name__ == "BaichuanLayer"
                 or child.__class__.__name__ == "QWenBlock"
+                or child.__class__.__name__ == "GLMBlock"
             ):
                 continue
             if name == "lm_head" and (not is_int4(model)):
@@ -188,6 +211,8 @@ class ModuleReplacer:
                     )
                 else:
                     setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
+            elif name == "ChatGLMModel" and (not is_int4(model)):
+                setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
             elif type(child) in self.layer_dict.keys():
                 new_layer = self.layer_dict[type(child)](child)
                 setattr(model, name, new_layer)

@@ -325,6 +325,24 @@ class IPEXTransformerMLPOptimizedFp16SiluBaichuan(
         super().__init__(config)
 
 
+class IPEXTransformerMLPOptimizedFp16SiluChatGLM(
+    IPEXTransformerMLPOptimizedFp16SiluLlama
+):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def load_parameter(self, fc_in, fc_out):
+        weight = torch.chunk(fc_in.weight, 2, dim=0)
+        self.fc_in.weight = weight[0]
+        self.up_proj.weight = weight[1]
+        if fc_in.bias is not None:
+            bias = torch.chunk(fc_in.bias, 2, dim=0)
+            self.fc_in.bias = bias[0]
+            self.up_proj.bias = bias[1]
+        self.fc_out.weight = fc_out.weight
+        self.fc_out.bias = fc_out.bias
+
+
 class IPEXTransformerMLPOptimizedFp16SiluQwen(IPEXTransformerMLPOptimizedFp16Silu):
     def __init__(self, config):
         super().__init__(config)

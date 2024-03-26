@@ -93,6 +93,20 @@ def pad_for_gptj_lm_head(model, is_int4=False):
             model.lm_head.weight.data, _ = gemm_padding(model.lm_head.weight)
 
 
+def pad_for_chatglm_output_layer(model, is_int4=False):
+    if hasattr(model, "slicing_pad"):
+        return
+    else:
+        setattr(model, "slicing_pad", True)  # noqa
+
+    if hasattr(model.output_layer, "bias") and model.output_layer.bias is not None:
+        model.output_layer.weight.data, model.output_layer.bias.data = gemm_padding(
+            model.output_layer.weight, model.output_layer.bias
+        )
+    else:
+        model.output_layer.weight.data, _ = gemm_padding(model.output_layer.weight)
+
+
 class TransformerFallbackController:
     fallback_attn = os.environ.get("FALLBACK_ATTN", "IPEXTransformerAttnNaive")
     fallback_mlp = os.environ.get("FALLBACK_MLP", "IPEXTransformerMLP")

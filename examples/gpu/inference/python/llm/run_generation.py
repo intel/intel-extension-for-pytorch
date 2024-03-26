@@ -28,6 +28,7 @@ MODEL_CLASSES = {
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
     "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm3": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -342,7 +343,7 @@ if args.accuracy_only:
 current_path = pathlib.Path(__file__).parent.resolve()
 with open(str(current_path) + "/prompt.json") as f:
     prompt_pool = json.load(f)
-        
+
 def run_generate(num_tokens, num_input_tokens, num_beams):
     print(f"*** Starting to generate {num_tokens} tokens for {num_input_tokens} tokens with num_beams={num_beams}")
     if args.prompt is not None:
@@ -361,7 +362,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
 
     input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
     print("---- Prompt size:", input_size)
-    
+
     if args.token_latency:
         generate_kwargs["token_latency"] = True
 
@@ -379,7 +380,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         except Exception:
             pass
     acc_pass = 0
-  
+
     # start
     total_time = 0.0
     num_iter = args.num_iter
@@ -408,7 +409,6 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
                 torch.save(prof.key_averages(group_by_input_shape=True).table(), "./profile_detail.pt")
                 prof.export_chrome_trace("./trace.json")
             toc = time.time()
-            print("")
             input_tokens_lengths = [x.shape[0] for x in input_ids]
             output_tokens_lengths = [x.shape[0] for x in gen_ids]
             total_new_tokens = [
@@ -444,7 +444,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         print("Average 2... latency: %.3f sec." % average_2n_latency)
         #print("P90 2... latency: %.3f sec." % p90_latency)
         #print("P99 2... latency: %.3f sec." % p99_latency)
-        
+
     if ref_prompt is None:
         print("Accuracy check skip")
     elif acc_pass==args.num_iter:
@@ -457,7 +457,7 @@ def to_list(obj):
         return [obj]
     else:
         return obj
-      
+
 for o, i, g in zip(to_list(args.max_new_tokens), to_list(args.input_tokens), to_list(args.num_beams)):
     run_generate(o, i, g)
 

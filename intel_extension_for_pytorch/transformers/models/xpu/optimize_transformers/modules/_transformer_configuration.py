@@ -58,6 +58,13 @@ class IPEXTransformerConfig:
 
 
 @dataclass
+class IPEXTransformerConfigChatGLM(IPEXTransformerConfig):
+    apply_residual_connection_post_layernorm: bool = False
+    multi_query_attention: bool = True
+    rmsnorm: bool = True
+
+
+@dataclass
 class IPEXDiffusersTransformerConfig:
     num_attention_heads: int
     attention_head_dim: int

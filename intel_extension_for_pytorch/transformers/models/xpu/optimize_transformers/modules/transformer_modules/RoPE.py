@@ -641,3 +641,65 @@ def apply_rotary_pos_emb(query, key, rotary_pos_emb_list):
         query = torch.cat(query_list, dim=0)
         key = torch.cat(key_list, dim=0)
     return query, key
+
+
+class ChatGLMRotaryEmbedding(PositionalEmbedding):
+    def __init__(self, config: IPEXTransformerConfig, dtype):
+        super().__init__(config, dtype)
+
+    def apply_rotary_pos_emb(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        rotary_pos_emb: torch.Tensor,
+    ):
+        rotary_pos_emb = torch.repeat_interleave(rotary_pos_emb, 2, -2)
+
+        sin = rotary_pos_emb[..., 1]
+        cos = rotary_pos_emb[..., 0]
+
+        if query.shape == key.shape:
+            cos = cos.expand(query.shape)
+            sin = sin.expand(query.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_two_qk(
+                query, key, sin, cos, query, key
+            )
+        else:
+            cos_q = cos.expand(query.shape)
+            sin_q = sin.expand(query.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_two(query, sin_q, cos_q, query)
+            cos_k = cos.expand(key.shape)
+            sin_k = sin.expand(key.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_two(key, sin_k, cos_k, key)
+
+        return query, key
+
+    def apply_rotary_pos_emb_ref(
+        self, x: torch.Tensor, rope_cache: torch.Tensor
+    ) -> torch.Tensor:
+        # x: [sq, b, np, hn]
+        sq, b, np, hn = x.size(0), x.size(1), x.size(2), x.size(3)
+        rot_dim = rope_cache.shape[-2] * 2
+        x, x_pass = x[..., :rot_dim], x[..., rot_dim:]
+        # truncate to support variable sizes
+        rope_cache = rope_cache[:sq]
+        xshaped = x.reshape(sq, -1, np, rot_dim // 2, 2)
+        rope_cache = rope_cache.view(sq, -1, 1, xshaped.size(3), 2)
+        x_out2 = torch.stack(
+            [
+                xshaped[..., 0] * rope_cache[..., 0]
+                - xshaped[..., 1] * rope_cache[..., 1],
+                xshaped[..., 1] * rope_cache[..., 0]
+                + xshaped[..., 0] * rope_cache[..., 1],
+            ],
+            -1,
+        )
+        x_out2 = x_out2.flatten(3)
+        return torch.cat((x_out2, x_pass), dim=-1)
+
+    def forward(self, query, key, rotary_pos_emb):
+        rot_dim = rotary_pos_emb.shape[-2] * 2
+        query[..., :rot_dim], key[..., :rot_dim] = self.apply_rotary_pos_emb(
+            query[..., :rot_dim], key[..., :rot_dim], rotary_pos_emb
+        )
+        return query, key

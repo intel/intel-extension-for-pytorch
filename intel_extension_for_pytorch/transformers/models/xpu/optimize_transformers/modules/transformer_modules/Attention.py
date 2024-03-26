@@ -834,3 +834,49 @@ class IPEXTransformerAttnOptimizedFp16Baichuan(IPEXTransformerAttnOptimizedFp16)
 
     def cat_qkv(self):
         pass
+
+
+class IPEXTransformerAttnOptimizedFp16ChatGLM(IPEXTransformerAttnOptimizedFp16):
+    def __init__(self, config: IPEXTransformerConfig) -> None:
+        super().__init__(config)
+
+    def load_parameter(self, qkv_proj, out_proj):
+        self.qkv_proj.weight = qkv_proj.weight
+        self.out_proj.weight = out_proj.weight
+
+        self.qkv_proj.bias = qkv_proj.bias
+        self.out_proj.bias = out_proj.bias
+
+    def transpose_parameter(self):
+        self.qkv_proj.weight.data = (
+            self.qkv_proj.weight.view(
+                3, self.num_attn_head * self.head_dim, self.embed_dim
+            )
+            .permute(0, 2, 1)
+            .contiguous()
+        )
+        self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
+
+    def cat_qkv(self):
+        pass
+
+    def post_qkv(self, query, key, value, rotary_pos_emb, layer_past, **kwargs):
+        bs_beam, seq, _ = self.get_runtime_shape(query)
+        seq = seq if layer_past is None else layer_past[0].size(2) + 1
+        query, key = self.position_embed(query, key, rotary_pos_emb)
+        query, key, value = self.combine_kv_cache_interface(query, key, value)
+        return query, key, value
+
+    def prepare_sdp_input(self, query, key, value, attention_mask, alibi):
+        (
+            dropout,
+            alpha,
+            beta,
+            is_casual,
+            blocked_attn_mask,
+            blocked_alibi,
+        ) = super().prepare_sdp_input(query, key, value, attention_mask, alibi)
+        is_causal = True if self.is_1st_token() else False
+        return dropout, alpha, beta, is_causal, blocked_attn_mask, blocked_alibi
