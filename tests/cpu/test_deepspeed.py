@@ -365,7 +365,7 @@ class DeepspeedTester(JitTestCase):
                     self.assertEqual(y, jit_res)
                 _disable_tpp()
 
-    def test_llama_with_optimize_transformers(self):
+    def test_llama_with_llm_optimize(self):
         curpath = os.path.abspath(os.path.dirname(__file__))
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/llama", return_dict=False
@@ -373,7 +373,7 @@ class DeepspeedTester(JitTestCase):
         model = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
         model = self._get_ds_model(model)
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
-        model = ipex.optimize_transformers(
+        model = ipex.llm.optimize(
             model.eval(),
             dtype=torch.bfloat16,
             quantization_config=qconfig,
