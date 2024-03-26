@@ -14,7 +14,6 @@
 #include <pybind11/stl.h>
 #include <utils/Settings.h>
 #include "Module.h"
-#include "Stream.h"
 
 #include <thread>
 
@@ -53,79 +52,6 @@ static PyObject* THPModule_postInitExtension(PyObject* self, PyObject* noargs) {
 static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
   // initialize ipex module
-  Py_RETURN_NONE;
-  END_HANDLE_TH_ERRORS
-}
-
-PyObject* THPModule_getCurrentStream_wrap(
-    PyObject* /* unused */,
-    PyObject* device_index) {
-  HANDLE_TH_ERRORS
-  THPUtils_assert(
-      THPUtils_checkLong(device_index), "invalid argument to getCurrentStream");
-  int64_t device = THPUtils_unpackLong(device_index);
-  auto stream = torch_ipex::xpu::dpcpp::getCurrentDPCPPStream(device);
-  PyObject* output_tuple = PyTuple_New(3);
-  PyTuple_SetItem(
-      output_tuple, 0, THPUtils_packInt64(static_cast<int64_t>(stream.id())));
-  PyTuple_SetItem(
-      output_tuple,
-      1,
-      THPUtils_packInt64(static_cast<int64_t>(stream.device_index())));
-  PyTuple_SetItem(
-      output_tuple,
-      2,
-      THPUtils_packInt64(static_cast<int64_t>(stream.device_type())));
-  return output_tuple;
-  END_HANDLE_TH_ERRORS
-}
-
-PyObject* THPModule_getCurrentRawStream(
-    PyObject* /* unused */,
-    PyObject* device_index) {
-  HANDLE_TH_ERRORS
-  THPUtils_assert(
-      THPUtils_checkLong(device_index),
-      "invalid argument to getCurrentRawStream");
-  int64_t device = THPUtils_unpackLong(device_index);
-  // NOTE: Here is a high dependency on the implementation of queue pool using
-  // smart pointer in runtime.
-  return PyCapsule_New(
-      torch_ipex::xpu::dpcpp::getCurrentDPCPPStream(device).queue(),
-      "torch.xpu.Stream.sycl_queue",
-      nullptr);
-  END_HANDLE_TH_ERRORS
-}
-
-PyObject* THPModule_setCurrentStream_wrap(
-    PyObject* self,
-    PyObject* args,
-    PyObject* kwargs) {
-  HANDLE_TH_ERRORS
-  int64_t stream_id = 0;
-  int64_t device_index = 0;
-  int64_t device_type = 0;
-
-  constexpr const char* kwlist[] = {
-      "stream_id", "device_index", "device_type", nullptr};
-  if (!PyArg_ParseTupleAndKeywords(
-          args,
-          kwargs,
-          "|LLL",
-          const_cast<char**>(kwlist),
-          &stream_id,
-          &device_index,
-          &device_type)) {
-  }
-
-  auto stream = torch_ipex::xpu::dpcpp::DPCPPStream::unpack3(
-      stream_id, device_index, static_cast<c10::DeviceType>(device_type));
-
-  auto device = 0;
-  if (device != stream.device_index()) {
-    // at::xpu::set_device(stream.device_index());
-  }
-  torch_ipex::xpu::dpcpp::setCurrentDPCPPStream(stream);
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -365,18 +291,6 @@ static struct PyMethodDef _THPModule_methods[] = {
      (PyCFunction)THPModule_postInitExtension,
      METH_NOARGS,
      nullptr},
-    {"_getCurrentStream",
-     (PyCFunction)THPModule_getCurrentStream_wrap,
-     METH_O,
-     nullptr},
-    {"_getCurrentRawStream",
-     (PyCFunction)THPModule_getCurrentRawStream,
-     METH_O,
-     nullptr},
-    {"_setCurrentStream",
-     castPyCFunctionWithKeywords(THPModule_setCurrentStream_wrap),
-     METH_VARARGS | METH_KEYWORDS,
-     nullptr},
     {"_emptyCache", (PyCFunction)THPModule_emptyCache, METH_NOARGS, nullptr},
     {"_memoryStats", (PyCFunction)THPModule_memoryStats, METH_O, nullptr},
     {"_resetAccumulatedMemoryStats",
@@ -422,10 +336,7 @@ at::Scalar scalar_slow(PyObject* object) {
 
 void init_xpu_module(pybind11::module& m) {
   // For Runtime API, still use pybind
-  m.def("_synchronize", [](const int& device_index) {
-    torch_ipex::xpu::dpcpp::deviceSynchronize(device_index);
-  });
-
+  using namespace torch_ipex::xpu::dpcpp;
   m.def("dump_memory_stat", [](const int& device_index) {
     return torch_ipex::xpu::dpcpp::dumpMemoryStatusFromDevAlloc(device_index);
   });
@@ -591,7 +502,6 @@ void init_xpu_module(pybind11::module& m) {
   m.def("_prepare_profiler", torch_ipex::xpu::dpcpp::profiler::prepareProfiler);
 
   auto module = m.ptr();
-  THDPStream_init(module);
   PyModule_AddFunctions(module, _THPModule_methods);
 }
 

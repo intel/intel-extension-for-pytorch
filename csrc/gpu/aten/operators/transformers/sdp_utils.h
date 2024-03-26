@@ -22,6 +22,8 @@ using namespace torch_ipex::xpu::xetla;
 #endif
 
 using namespace at;
+using namespace torch_ipex::xpu::dpcpp;
+
 namespace sdp {
 
 // This helper function creates a constexpr std::array

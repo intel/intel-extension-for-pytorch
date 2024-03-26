@@ -5,13 +5,12 @@
 #include <ATen/quantized/QTensorImpl.h>
 #include <ATen/quantized/Quantizer.h>
 
-#include <ATen/native/Resize.h>
 #include <ATen/DeviceGuard.h>
-#include <c10/core/ScalarType.h>
+#include <ATen/native/Resize.h>
 #include <ATen/xpu/XPUEvent.h>
+#include <c10/core/ScalarType.h>
 
 #include <core/Memory.h>
-#include <core/Stream.h>
 #include <core/detail/TensorInfo.h>
 #include <quantized/QTensor.h>
 #include <runtime/Exception.h>
@@ -165,12 +164,8 @@ static bool maybe_enable_p2p_access(Device dst_device, Device src_device) {
     return false;
   }
 
-  auto dst_queue =
-      (sycl::queue*)getCurrentDPCPPStream(dst_device.index()).queue();
-  auto src_queue =
-      (sycl::queue*)getCurrentDPCPPStream(src_device.index()).queue();
-  auto dst_dev = dst_queue->get_device();
-  auto src_dev = src_queue->get_device();
+  auto& dst_dev = at::xpu::get_raw_device(dst_device.index());
+  auto& src_dev = at::xpu::get_raw_device(src_device.index());
   return src_dev.ext_oneapi_can_access_peer(
       dst_dev, sycl::ext::oneapi::peer_access::access_supported);
 }
@@ -209,7 +204,7 @@ struct memcpyAsync_functor {
 
 void memcpyAsync(
     TensorIteratorBase& iter,
-    DPCPPStream& copy_stream,
+    at::xpu::XPUStream& copy_stream,
     bool p2p_enabled) {
   Device dst_device = iter.device(0);
   Device src_device = iter.device(1);
@@ -240,8 +235,7 @@ void memcpyAsync(
     auto dst = (char*)iter.data_ptr(0);
     auto src = (char*)iter.data_ptr(1);
     size_t size = iter.numel() * iter.element_size(0);
-    auto q = (sycl::queue*)copy_stream.queue();
-    q->copy(src, dst, size);
+    copy_stream.queue().copy(src, dst, size);
   }
 }
 
@@ -270,7 +264,8 @@ void copy_device_to_device(
   // We always perform the copy on the source device, using the current stream
   // on the source device, and we fully synchronize on both src and dst's
   // current streams for completion of the copy.
-  DPCPPStream copy_stream = getCurrentDPCPPStream(src_device.index());
+  at::xpu::XPUStream copy_stream =
+      at::xpu::getCurrentXPUStream(src_device.index());
   if (src_device != dst_device) {
     // This is a cross-device copy on the src current stream and dst current
     // stream. We perform a two-way barrier between both devices' streams
@@ -280,11 +275,10 @@ void copy_device_to_device(
     // src waits on dst barrier (src already waits on src)
     at::xpu::XPUEvent dst_ready;
     device_guard.reset_device(dst_device);
-     // TODO [Stream] : Enable this after stream ported
-    // dst_ready.record(getCurrentDPCPPStream(dst_device.index()));
+    dst_ready.record(at::xpu::getCurrentXPUStream(dst_device.index()));
 
     device_guard.reset_device(src_device);
-    // dst_ready.block(copy_stream);
+    dst_ready.block(copy_stream);
   }
 
   if (memcpy_eligible) {
@@ -313,12 +307,10 @@ void copy_device_to_device(
     // operate on dst's copy until the copy is complete.
     // Still on src_device, record stream event
     at::xpu::XPUEvent src_ready;
-    // TODO [Stream] : Enable this after stream ported
-    // src_ready.record(copy_stream);
+    src_ready.record(copy_stream);
 
     device_guard.reset_device(dst_device);
-    // TODO [Stream] : Enable this after stream ported
-    // src_ready.block(getCurrentDPCPPStream(dst_device.index()));
+    src_ready.block(at::xpu::getCurrentXPUStream(dst_device.index()));
   }
 }
 

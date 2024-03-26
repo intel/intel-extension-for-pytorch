@@ -12,6 +12,8 @@
 #define GRID_DIM_Y 16
 #define BLOCK_DIM 1024
 
+using namespace torch_ipex::xpu::dpcpp;
+
 namespace at {
 namespace AtenIpexTypeNestedTensorXPU {
 

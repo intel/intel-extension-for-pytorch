@@ -1,4 +1,3 @@
-#include <core/Stream.h>
 #include <runtime/CachingDeviceAllocator.h>
 #include <runtime/Device.h>
 #include <runtime/Exception.h>
@@ -385,7 +384,7 @@ void CachingDeviceAllocator::emptyCache() {
    */
   auto count = at::xpu::device_count();
   for (auto i = 0; i < count; i++) {
-    torch_ipex::xpu::dpcpp::deviceSynchronize(i);
+    at::xpu::syncStreamsOnDevice(i);
   }
 
   free_blocks(large_blocks, large_blocks.begin(), large_blocks.end());
@@ -627,7 +626,7 @@ void CachingDeviceAllocator::free_cached_blocks(DeviceId di) {
   /*
    * See Note [Safe to Free Blocks on BlockPool]
    */
-  torch_ipex::xpu::dpcpp::deviceSynchronize(di);
+  at::xpu::syncStreamsOnDevice(di);
 
   BlockPool::iterator begin;
   BlockPool::iterator end;

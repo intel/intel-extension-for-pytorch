@@ -470,7 +470,7 @@ void _mkl_dft(
     bool onesided,
     int64_t batch) {
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto queue_id = dpcppGetCurrentQueueId();
+  auto queue_id = at::xpu::getCurrentXPUStream().id();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   std::vector<int64_t> mkl_signal_sizes(
       checked_signal_sizes.begin() + 1, checked_signal_sizes.end());

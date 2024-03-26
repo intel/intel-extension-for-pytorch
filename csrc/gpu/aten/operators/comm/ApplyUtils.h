@@ -10,7 +10,6 @@
 
 #include <ATen/TensorUtils.h>
 
-#include <core/Stream.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <math.h>

@@ -98,7 +98,3 @@ C++ API
 .. doxygenenum:: xpu::FP32_MATH_MODE
 
 .. doxygenfunction:: xpu::set_fp32_math_mode
-
-.. doxygenfunction:: xpu::get_queue_from_stream
-
-

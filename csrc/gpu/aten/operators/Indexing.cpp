@@ -4,7 +4,6 @@
 #include <ATen/ceil_div.h>
 #include <ATen/native/TensorIterator.h>
 #include <core/Memory.h>
-#include <core/Stream.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>

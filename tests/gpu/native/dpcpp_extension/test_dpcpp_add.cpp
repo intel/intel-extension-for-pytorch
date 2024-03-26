@@ -16,10 +16,8 @@ void add_kernel_dpcpp(
   sycl::range<2> gws(height_pad, width_pad);
   sycl::range<2> lws(BLOCKHEIGHT, BLOCKWIDTH);
 
-  auto device_type = c10::DeviceType::XPU;
-  c10::impl::VirtualGuardImpl impl(device_type);
-  c10::Stream xpu_stream = impl.getStream(c10::Device(device_type));
-  auto& queue = xpu::get_queue_from_stream(xpu_stream);
+  c10::xpu::XPUStream stream = c10::xpu::getCurrentXPUStream();
+  auto& queue = stream.queue();
 
   queue.submit([&](sycl::handler& cgh) {
     cgh.parallel_for(sycl::nd_range<2>(gws, lws), [=](sycl::nd_item<2> item) {

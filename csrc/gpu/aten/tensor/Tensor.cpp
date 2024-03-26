@@ -1,6 +1,6 @@
+#include <ATen/DeviceGuard.h>
 #include <ATen/native/Resize.h>
 #include <ATen/quantized/QTensorImpl.h>
-#include <ATen/DeviceGuard.h>
 #include <c10/core/DeviceType.h>
 #include <core/Allocator.h>
 #include <core/Device.h>

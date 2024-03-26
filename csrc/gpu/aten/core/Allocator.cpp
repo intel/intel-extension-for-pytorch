@@ -1,5 +1,4 @@
 #include <core/Allocator.h>
-#include <core/Stream.h>
 #include <runtime/CachingDeviceAllocator.h>
 #include <runtime/CachingHostAllocator.h>
 #include <runtime/Exception.h>
@@ -22,8 +21,8 @@ DataPtr DeviceAllocator::allocate(size_t size) const {
   DeviceIndex curDevID = at::xpu::current_device();
   void* r = nullptr;
   if (size != 0) {
-    auto stream = getCurrentDPCPPStream(curDevID);
-    Instance()->alloc()->malloc(&r, size, &dpcppGetQueueFromStream(stream));
+    auto stream = at::xpu::getCurrentXPUStream(curDevID);
+    Instance()->alloc()->malloc(&r, size, &stream.queue());
   }
   auto ctx = new at::AtenIpexTypeXPU::DPCPPTensorContext(r);
   return {r, ctx, &deleter, Device(DeviceType::XPU, curDevID)};
@@ -50,8 +49,8 @@ void* DeviceAllocator::raw_allocate(size_t size) {
   DeviceIndex curDevID = at::xpu::current_device();
   void* r = nullptr;
   if (size != 0) {
-    auto stream = getCurrentDPCPPStream(curDevID);
-    Instance()->alloc()->malloc(&r, size, &dpcppGetQueueFromStream(stream));
+    auto stream = at::xpu::getCurrentXPUStream(curDevID);
+    Instance()->alloc()->malloc(&r, size, &stream.queue());
   }
   return r;
 }
@@ -75,7 +74,9 @@ void* DeviceAllocator::getBaseAllocation(void* ptr, size_t* size) {
   return alloc()->getBaseAllocation(ptr, size);
 }
 
-void DeviceAllocator::recordStream(const at::DataPtr& ptr, DPCPPStream stream) {
+void DeviceAllocator::recordStream(
+    const at::DataPtr& ptr,
+    at::xpu::XPUStream stream) {
   if (!ptr.get()) {
     return;
   }
@@ -84,7 +85,7 @@ void DeviceAllocator::recordStream(const at::DataPtr& ptr, DPCPPStream stream) {
     return;
   }
 
-  alloc()->recordQueue(ptr.get(), &dpcppGetQueueFromStream(stream));
+  alloc()->recordQueue(ptr.get(), &stream.queue());
 }
 
 std::mutex* DeviceAllocator::getFreeMutex() {
@@ -143,7 +144,7 @@ void* getBaseAllocationFromDevAlloc(void* ptr, size_t* size) {
   return DeviceAllocator::Instance()->getBaseAllocation(ptr, size);
 }
 
-void recordStreamInDevAlloc(const DataPtr& ptr, DPCPPStream stream) {
+void recordStreamInDevAlloc(const DataPtr& ptr, at::xpu::XPUStream stream) {
   DeviceAllocator::Instance()->recordStream(ptr, stream);
 }
 

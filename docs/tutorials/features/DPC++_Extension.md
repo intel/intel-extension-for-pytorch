@@ -127,33 +127,29 @@ $ python
 >>> import lltm_xpu
 ```
 
-### Requesting the current c10::Stream
+### Requesting the current c10::xpu::XPUStream
 
-If you need to get the current `c10::Stream` on the current XPU device to do synchronization. You can implement it as below.
+If you need to get the current `c10::xpu::XPUStream` on the current XPU device to do synchronization. You can implement it as below.
 ```cpp
-auto device_type = c10::DeviceType::XPU;
-c10::impl::VirtualGuardImpl impl(device_type);
-c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
-c10_stream.synchronize();
+c10::xpu::XPUStream stream = c10::xpu::getCurrentXPUStream();
+stream.synchronize();
 ```
 
 ### Fetching the corresponding sycl::queue
 
 We provide some APIs to fetch the corresponding `sycl::queue` associated with the
-current `c10::Stream`.
+current `c10::xpu::XPUStream`.
 In C++ code, you can fetch a `sycl::queue` reference as below.
 ```cpp
-auto device_type = c10::DeviceType::XPU;
-c10::impl::VirtualGuardImpl impl(device_type);
-c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
-auto& queue = xpu::get_queue_from_stream(c10_stream);
+c10::xpu::XPUStream stream = c10::xpu::getCurrentXPUStream();
+auto& queue = stream.queue();
 ```
-In python code, you can use the below codes to get a `sycl::queue` pointer, which is encapsuled by a ``PyCapsule``.
+In python code, you can use the below codes to get a `void*`, which can cast to a `sycl::queue` pointer.
 ```python
 import torch
 import intel_extension_for_pytorch
 stream = torch.xpu.current_stream()
-queue = stream.sycl_queue # queue is a ``PyCapsule`` which encapsuled a sycl::queue pointer
+queue = stream.sycl_queue # queue is a ``void*`` which can cast to a sycl::queue pointer
 ```
 Subsequently, you can submit a customized kernel via `sycl::queue` by yourself. Refer to [Writing the DPC++ Op](#writing-the-dpc-op) for more details.
 
@@ -379,12 +375,8 @@ void lltm_xpu_forward_kernel(
   };
 
   // submit kernel
-  auto device_type = c10::DeviceType::XPU;
-  c10::impl::VirtualGuardImpl impl(device_type);
-  c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
-  auto& queue = xpu::get_queue_from_stream(c10_stream);
-
-  queue.submit(cgf);
+  c10::xpu::XPUStream stream = c10::xpu::getCurrentXPUStream();
+  stream.queue().submit(cgf);
 }
 ```
 
@@ -455,12 +447,8 @@ void lltm_xpu_backward_kernel(
   };
 
   // submit kernel
-  auto device_type = c10::DeviceType::XPU;
-  c10::impl::VirtualGuardImpl impl(device_type);
-  c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
-  auto& queue = xpu::get_queue_from_stream(c10_stream);
-
-  queue.submit(cgf);
+  c10::xpu::XPUStream stream = c10::xpu::getCurrentXPUStream();
+  stream.queue().submit(cgf);
 }
 
 std::vector<torch::Tensor> lltm_xpu_backward(

@@ -4,7 +4,6 @@
 
 #include <core/Device.h>
 #include <core/Memory.h>
-#include <core/Stream.h>
 #include <runtime/Utils.h>
 
 #include <oneapi/dnnl/dnnl.hpp>
@@ -83,7 +82,7 @@ struct GpuStreamManager {
     TORCH_INTERNAL_ASSERT(device_index < at::xpu::device_count());
     return dnnl::sycl_interop::make_stream(
         GpuEngineManager::Instance().get_engine({kXPU, device_index}),
-        dpcppGetQueueFromStream(getCurrentDPCPPStream(device_index)));
+        at::xpu::getCurrentXPUStream(device_index).queue());
   }
 #endif
 

@@ -5,7 +5,6 @@
 #include <mutex>
 
 #include <core/AllocationInfo.h>
-#include <core/Stream.h>
 #include <utils/Macros.h>
 
 namespace torch_ipex::xpu {

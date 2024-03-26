@@ -19,7 +19,6 @@ from torch.xpu import (
     _lazy_init,
     _lazy_call,
 )
-from .streams import Stream, Event
 from .intrinsic import *
 from .cpp_extension import *
 from .amp import *
@@ -27,7 +26,6 @@ from .utils import *
 from .deterministics import *
 from .memory import *
 from ..utils.channels_last_1d import is_contiguous_channels_last_1d, to_channels_last_1d
-from ..utils.capsule import get_pointer_from_capsule
 from ..utils.utils import has_xpu
 
 from .overrides import (
@@ -56,139 +54,6 @@ def init():
     Does nothing if call this function repeatedly.
     """
     _lazy_init()
-
-
-def synchronize(device: _device_t = None) -> None:
-    r"""Waits for all kernels in all streams on a XPU device to complete.
-
-    Arguments:
-        device (torch.device or int, optional): device for which to synchronize.
-            It uses the current device, given by :func:`~torch.xpu.current_device`,
-            if :attr:`device` is ``None`` (default).
-    """
-    _lazy_init()
-    idx = _get_device_index(device, optional=True)
-    return intel_extension_for_pytorch._C._synchronize(idx)
-
-
-class StreamContext(object):
-    r"""Context-manager that selects a given stream.
-
-    All XPU kernels queued within its context will be enqueued on a selected
-    stream.
-
-    Args:
-        Stream (Stream): selected stream. This manager is a no-op if it's
-            ``None``.
-    .. note:: Streams are per-device.
-    """
-
-    cur_stream: Optional["Stream"]
-
-    def __init__(self, stream: Optional["Stream"]):
-        self.stream = stream
-        self.idx = _get_device_index(None, True)
-        if not torch.jit.is_scripting():
-            if self.idx is None:
-                self.idx = -1
-
-        self.src_prev_stream = None
-        self.dst_prev_stream = None
-
-    def __enter__(self):
-        # Local cur_stream variable for type refinement
-        cur_stream = self.stream
-        # Return if stream is None or XPU device not available
-        if cur_stream is None or self.idx == -1:
-            return
-        self.src_prev_stream = current_stream(None)
-
-        # If the stream is not on the current device, then
-        # set the current stream on the device
-        if self.src_prev_stream.device != cur_stream.device:
-            with device(cur_stream.device):
-                self.dst_prev_stream = current_stream(cur_stream.device)
-        set_stream(cur_stream)
-
-    def __exit__(self, type: Any, value: Any, traceback: Any):
-        # Local cur_stream variable for type refinement
-        cur_stream = self.stream
-        # If stream is None or no XPU device available, return
-        if cur_stream is None or self.idx == -1:
-            return
-
-        # Reset the stream on the original device
-        # and destination device
-        if self.src_prev_stream.device != cur_stream.device:
-            set_stream(self.dst_prev_stream)
-        set_stream(self.src_prev_stream)
-
-
-def stream(stream: Optional["Stream"]) -> StreamContext:
-    r"""Wrapper around the Context-manager StreamContext that
-    selects a given stream.
-
-    Arguments:
-        stream (Stream): selected stream. This manager is a no-op if it's
-            ``None``.
-
-    .. note:: Streams are per-device. If the selected stream is not on the
-        current device, this function will also change the current device to
-        match the stream.
-    """
-    return StreamContext(stream)
-
-
-def _set_stream_by_id(stream_id, device_index, device_type):
-    r"""set stream specified by the stream id, device index and device type
-
-    Args:
-        stream_id (int): not visible to the user, used to assigned to the
-            specific stream.
-        device_index (int): selected device index.
-        device_type (int): selected device type.
-    """
-    intel_extension_for_pytorch._C._setCurrentStream(
-        stream_id=stream_id,
-        device_index=device_index,
-        device_type=device_type,
-    )
-
-
-def set_stream(stream: Stream):
-    r"""Sets the current stream.This is a wrapper API to set the stream.
-        Usage of this function is discouraged in favor of the ``stream``
-        context manager.
-
-    Args:
-        stream (Stream): selected stream. This function is a no-op
-            if this argument is ``None``.
-    """
-    if stream is None:
-        return
-    _set_stream_by_id(
-        stream_id=stream.stream_id,
-        device_index=stream.device_index,
-        device_type=stream.device_type,
-    )
-
-
-def current_stream(device: Optional[_device_t] = None) -> Stream:
-    r"""Returns the currently selected :class:`Stream` for a given device.
-
-    Arguments:
-        device (torch.device or int, optional): selected device. Returns
-            the currently selected :class:`Stream` for the current device, given
-            by :func:`~torch.xpu.current_device`, if :attr:`device` is ``None``
-            (default).
-    """
-    _lazy_init()
-    streamdata = intel_extension_for_pytorch._C._getCurrentStream(
-        _get_device_index(device, optional=True)
-    )
-    return Stream(
-        stream_id=streamdata[0], device_index=streamdata[1], device_type=streamdata[2]
-    )
 
 
 def _get_device(device: Union[int, str, torch.device]) -> torch.device:

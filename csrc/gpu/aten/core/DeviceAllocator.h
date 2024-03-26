@@ -1,12 +1,12 @@
 #pragma once
 #include <c10/core/Allocator.h>
 #include <c10/core/Device.h>
+#include <c10/xpu/XPUStream.h>
 #include <runtime/CachingDeviceAllocator.h>
 #include <sycl/sycl.hpp>
 #include <mutex>
 
 #include <core/AllocationInfo.h>
-#include <core/Stream.h>
 #include <utils/Macros.h>
 
 namespace torch_ipex::xpu {
@@ -18,8 +18,8 @@ class DeviceAllocator final : public at::Allocator {
 
   static void deleter(void* ptr);
 
-  DataPtr allocate(size_t size) const override;
-  DataPtr allocate(const sycl::queue& queue, size_t size) const;
+  at::DataPtr allocate(size_t size) const override;
+  at::DataPtr allocate(const sycl::queue& queue, size_t size) const;
 
   /*
     `raw_allocate` is an IPEX private malloc utils. It is expected to be
@@ -40,17 +40,17 @@ class DeviceAllocator final : public at::Allocator {
 
   void* getBaseAllocation(void* ptr, size_t* size);
 
-  void recordStream(const at::DataPtr& ptr, DPCPPStream stream);
+  void recordStream(const at::DataPtr& ptr, at::xpu::XPUStream stream);
 
   std::mutex* getFreeMutex();
 
-  DeviceStats getDeviceStats(DeviceIndex device_index);
+  DeviceStats getDeviceStats(at::DeviceIndex device_index);
 
-  void resetAccumulatedStats(DeviceIndex device_index);
+  void resetAccumulatedStats(at::DeviceIndex device_index);
 
-  void resetPeakStats(DeviceIndex device_index);
+  void resetPeakStats(at::DeviceIndex device_index);
 
-  void dumpMemoryStatus(DeviceIndex device_index);
+  void dumpMemoryStatus(at::DeviceIndex device_index);
 
   std::vector<SegmentInfo> snapshot();
 
@@ -59,3 +59,5 @@ class DeviceAllocator final : public at::Allocator {
 };
 } // namespace dpcpp
 } // namespace torch_ipex::xpu
+
+void recordStreamInDevAlloc(const at::DataPtr& ptr, at::xpu::XPUStream stream);

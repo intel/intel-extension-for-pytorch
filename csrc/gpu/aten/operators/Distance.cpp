@@ -2,7 +2,6 @@
 #include <ATen/native/Distance.h>
 
 #include <core/Memory.h>
-#include <core/Stream.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include "BatchKernel.h"

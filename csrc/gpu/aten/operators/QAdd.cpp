@@ -99,7 +99,7 @@ Tensor q_add_impl(
   q_add_impl_func<T> func(
       oscale, ascale, azp, bscale, bzp, with_relu, zero_point);
 
-  auto& dpcpp_queue = torch_ipex::xpu::dpcpp::dpcppGetCurrentQueue();
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto cgf = DPCPP_Q_CGF(cgh) {
     T* qa_ptr = (T*)qa_.data_ptr();
     T* qb_ptr = (T*)qb_.data_ptr();

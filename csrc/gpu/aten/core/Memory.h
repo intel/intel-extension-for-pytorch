@@ -1,6 +1,5 @@
 #pragma once
 
-#include <core/Stream.h>
 #include <utils/DPCPP.h>
 
 namespace torch_ipex::xpu {

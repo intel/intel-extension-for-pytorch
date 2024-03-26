@@ -1,10 +1,8 @@
 #pragma once
 
 #include <ATen/xpu/XPUContext.h>
-#include <core/Stream.h>
 #include <runtime/Device.h>
 #include <runtime/Exception.h>
-#include <runtime/Queue.h>
 #include <stdexcept>
 #include <type_traits>
 
@@ -19,16 +17,8 @@ static inline DeviceId dpcppGetDeviceIdOfCurrentQueue() {
   return at::xpu::current_device();
 }
 
-static inline sycl::queue& dpcppGetQueueFromStream(DPCPPStream stream) {
-  return dpcppGetRawQueue(stream.device_index(), stream.queue_index());
-}
-
 static inline sycl::queue& dpcppGetCurrentQueue() {
-  return dpcppGetQueueFromStream(getCurrentDPCPPStream());
-}
-
-static inline QueueIndex dpcppGetCurrentQueueId() {
-  return getCurrentDPCPPStream().queue_index();
+  return at::xpu::getCurrentXPUStream().queue();
 }
 
 static inline int64_t dpcppMaxWorkGroupSize(

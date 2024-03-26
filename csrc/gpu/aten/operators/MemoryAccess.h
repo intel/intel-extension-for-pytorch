@@ -564,7 +564,7 @@ struct multi_outputs_unroll {
 
 } // namespace policies
 
-static inline int preferred_vector_width(DeviceId dev_id, int elem_sz) {
+static inline int preferred_vector_width(at::DeviceIndex dev_id, int elem_sz) {
   size_t ret;
   switch (elem_sz) {
     case 1:
@@ -594,7 +594,7 @@ static inline int preferred_vector_width(DeviceId dev_id, int elem_sz) {
 // which is , so we have to make this
 // in order to compile
 template <typename scalar_t>
-inline int can_vectorize_up_to(DeviceId dev_id, char* pointer) {
+inline int can_vectorize_up_to(at::DeviceIndex dev_id, char* pointer) {
   int elem_size = sizeof(scalar_t);
   int preferred_width = preferred_vector_width(dev_id, elem_size);
   uint64_t address = reinterpret_cast<uint64_t>(pointer);
@@ -621,7 +621,11 @@ inline int can_vectorize_up_to(DeviceId dev_id, char* pointer) {
 template <int i>
 struct can_vectorize_up_to_helper {
   template <typename array_t, typename traits>
-  static void apply(int& result, DeviceId dev_id, array_t pointers, traits _) {
+  static void apply(
+      int& result,
+      at::DeviceIndex dev_id,
+      array_t pointers,
+      traits _) {
     using arg_t = typename traits::template arg<i>::type;
     // `pointers` hold the data_ptr for tensors [output, input0, input1, ...],
     // so we need a +1 offset to get the input
@@ -631,7 +635,7 @@ struct can_vectorize_up_to_helper {
 };
 
 template <typename func_t, typename array_t>
-inline int can_vectorize_up_to(DeviceId dev_id, array_t pointers) {
+inline int can_vectorize_up_to(at::DeviceIndex dev_id, array_t pointers) {
   using traits = function_traits<func_t>;
   using return_t = typename traits::result_type;
   constexpr int arity = traits::arity;
@@ -647,7 +651,7 @@ inline int can_vectorize_up_to(DeviceId dev_id, array_t pointers) {
 // which is , so we have to make this
 // in order to compile
 template <typename scalar_t>
-inline int can_vectorize_up_to_loop(DeviceId dev_id, char* pointer) {
+inline int can_vectorize_up_to_loop(at::DeviceIndex dev_id, char* pointer) {
   int elem_size = sizeof(scalar_t);
   int preferred_width = preferred_vector_width(dev_id, elem_size);
   uint64_t address = reinterpret_cast<uint64_t>(pointer);
@@ -674,7 +678,11 @@ inline int can_vectorize_up_to_loop(DeviceId dev_id, char* pointer) {
 template <int i>
 struct can_vectorize_up_to_helper_loop {
   template <typename array_t, typename traits>
-  static void apply(int& result, DeviceId dev_id, array_t pointers, traits _) {
+  static void apply(
+      int& result,
+      at::DeviceIndex dev_id,
+      array_t pointers,
+      traits _) {
     using arg_t = typename traits::template arg<i>::type;
     // `pointers` hold the data_ptr for tensors [output, input0, input1, ...],
     // so we need a +1 offset to get the input
@@ -684,7 +692,7 @@ struct can_vectorize_up_to_helper_loop {
 };
 
 template <typename func_t, typename array_t>
-inline int can_vectorize_up_to_loop(DeviceId dev_id, array_t pointers) {
+inline int can_vectorize_up_to_loop(at::DeviceIndex dev_id, array_t pointers) {
   using traits = function_traits<func_t>;
   using return_t = typename traits::result_type;
   constexpr int arity = traits::arity;

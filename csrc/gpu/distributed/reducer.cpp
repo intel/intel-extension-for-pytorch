@@ -12,16 +12,11 @@ class XPUTimer : public Timer {
  private:
   c10::Device device;
 
-  at::xpu::XPUEvent forward_start =
-      at::xpu::XPUEvent();
-  at::xpu::XPUEvent backward_compute_start =
-      at::xpu::XPUEvent();
-  at::xpu::XPUEvent backward_compute_end =
-      at::xpu::XPUEvent();
-  at::xpu::XPUEvent backward_comm_start =
-      at::xpu::XPUEvent();
-  at::xpu::XPUEvent backward_comm_end =
-      at::xpu::XPUEvent();
+  at::xpu::XPUEvent forward_start = at::xpu::XPUEvent();
+  at::xpu::XPUEvent backward_compute_start = at::xpu::XPUEvent();
+  at::xpu::XPUEvent backward_compute_end = at::xpu::XPUEvent();
+  at::xpu::XPUEvent backward_comm_start = at::xpu::XPUEvent();
+  at::xpu::XPUEvent backward_comm_end = at::xpu::XPUEvent();
 
   at::xpu::XPUEvent& getEvent(Event event) {
     switch (event) {

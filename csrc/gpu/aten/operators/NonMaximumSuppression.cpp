@@ -1,8 +1,8 @@
 #include <ATen/ATen.h>
+#include <ATen/DeviceGuard.h>
 #include <ATen/Functions.h>
 #include <ATen/native/Activation.h>
 #include <ATen/record_function.h>
-#include <ATen/DeviceGuard.h>
 #include <torch/library.h>
 
 #include <core/Memory.h>
