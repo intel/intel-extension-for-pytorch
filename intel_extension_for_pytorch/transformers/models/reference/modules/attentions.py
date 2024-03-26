@@ -1907,6 +1907,9 @@ class _IPEXAttentionRef(nn.Module):
                 hasattr(module, "q_proj")
                 and hasattr(module, "k_proj")
                 and hasattr(module, "v_proj")
+                and isinstance(module.q_proj, torch.nn.Linear)
+                and isinstance(module.k_proj, torch.nn.Linear)
+                and isinstance(module.v_proj, torch.nn.Linear)
             ) and not (hasattr(self, "use_qk_layernorm") and self.use_qk_layernorm):
 
                 def get_weight_shape(mod):

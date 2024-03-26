@@ -32,7 +32,6 @@ torch.manual_seed(128)
 curpath = os.path.abspath(os.path.dirname(__file__))
 
 
-@unittest.skip("oneccl can't works in docker")
 class TensorParallelTester(TestCase):
     def _shard_model(self, model):
         rank = ipex_comm.get_rank()
@@ -87,8 +86,6 @@ class TensorParallelTester(TestCase):
         return model
 
     def tensor_parallel_with_optimize_transformers(self, model):
-        ref_m = copy.deepcopy(model)
-        ipex_model = ipex.optimize_transformers(model)
         input_ids = torch.ones(10).to(torch.long)
         attention_mask = torch.ones(len(input_ids))
         position_ids = torch.arange(len(input_ids))
@@ -98,8 +95,9 @@ class TensorParallelTester(TestCase):
             "use_cache": True,
         }
         input_dict["position_ids"] = position_ids.unsqueeze(0)
-
+        ref_m = copy.deepcopy(model)
         for dtype in [torch.float32, torch.bfloat16]:
+            ipex_model = ipex.optimize_transformers(model, dtype=dtype)
             with torch.no_grad(), torch.cpu.amp.autocast(
                 enabled=True if dtype is torch.bfloat16 else False
             ):
