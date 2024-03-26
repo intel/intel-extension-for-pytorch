@@ -4,7 +4,7 @@
 #include <ATen/native/Resize.h>
 #include "ATen/OpMathType.h"
 
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
 #include <utils/Macros.h>
@@ -187,8 +187,8 @@ inline void _rrelu_with_noise_train(
   auto num_groups = std::get<1>(execution_policy);
   auto group_size = std::get<2>(execution_policy);
 
-  auto gen = at::get_generator_or_default<DPCPPGeneratorImpl>(
-      generator, getDefaultDPCPPGenerator());
+  auto gen = at::get_generator_or_default<at::XPUGeneratorImpl>(
+      generator, at::xpu::detail::getDefaultXPUGenerator());
   std::pair<uint64_t, uint64_t> seeds;
   {
     // See Note [Acquire lock when using random generators]

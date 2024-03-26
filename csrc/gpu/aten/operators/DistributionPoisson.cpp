@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
@@ -191,8 +191,8 @@ void poisson_sycl_kernel(
 
 Tensor poisson(const Tensor& lambda, c10::optional<Generator> gen_) {
   auto gen =
-      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
-          gen_, torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+      get_generator_or_default<at::XPUGeneratorImpl>(
+          gen_, at::xpu::detail::getDefaultXPUGenerator());
   std::pair<uint64_t, uint64_t> seeds;
   {
     std::lock_guard<std::mutex> lock(gen->mutex_);

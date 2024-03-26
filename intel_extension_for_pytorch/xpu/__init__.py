@@ -24,7 +24,6 @@ from .intrinsic import *
 from .cpp_extension import *
 from .amp import *
 from .utils import *
-from .random import *
 from .deterministics import *
 from .memory import *
 from ..utils.channels_last_1d import is_contiguous_channels_last_1d, to_channels_last_1d
@@ -45,7 +44,6 @@ from intel_extension_for_pytorch._version import (
     __build_type__,
 )
 
-default_generators: Tuple[torch._C.Generator] = ()
 _device_t = Union[_device, str, int]
 
 
@@ -206,52 +204,6 @@ def _get_device(device: Union[int, str, torch.device]) -> torch.device:
     return device
 
 
-def _get_generator(device: torch.device) -> torch._C.Generator:
-    r"""Return the XPU Generator object for the given device.
-
-    Args:
-        device (torch.device): selected device.
-    """
-
-    idx = device.index
-    if idx is None:
-        idx = torch.xpu.current_device()
-    return torch.xpu.default_generators[idx]
-
-
-def _set_rng_state_offset(
-    offset: int, device: Union[int, str, torch.device] = "xpu"
-) -> None:
-    r"""Sets the random number generator state offset of the specified GPU.
-
-    Args:
-        offset (int): The desired offset
-        device (torch.device or int, optional): The device to set the RNG state.
-            Default: ``'xpu'`` (i.e., ``torch.device('xpu')``, the current XPU device).
-    """
-    final_device = _get_device(device)
-
-    def cb():
-        default_generator = _get_generator(final_device)
-        default_generator.set_offset(offset)
-
-    _lazy_call(cb)
-
-
-def _get_rng_state_offset(device: Union[int, str, torch.device] = "xpu") -> int:
-    r"""Returns the random number generator state offset of the specified GPU.
-
-    Args:
-        device (torch.device or int, optional): The device to return the RNG state offset of.
-            Default: ``'xpu'`` (i.e., ``torch.device('xpu')``, the current XPU device).
-
-    .. warning::
-        This function eagerly initializes XPU.
-    """
-    _lazy_init()
-    final_device = _get_device(device)
-    default_generator = _get_generator(final_device)
-    return default_generator.get_offset()
 
 
 @staticmethod  # type: ignore[misc]

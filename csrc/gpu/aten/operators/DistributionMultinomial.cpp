@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
@@ -247,9 +247,9 @@ void multinomial_with_replacement_kernel_impl(
     c10::optional<Generator> generator) {
   auto& sycl_queue = dpcppGetCurrentQueue();
   auto gen =
-      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+      get_generator_or_default<at::XPUGeneratorImpl>(
           generator,
-          torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+          at::xpu::detail::getDefaultXPUGenerator());
 
   int inputSize = self.dim();
   int64_t numDist = inputSize == 1 ? 1 : self.size(0);

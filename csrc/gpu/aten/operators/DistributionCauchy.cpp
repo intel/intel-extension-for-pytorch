@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
@@ -40,9 +40,9 @@ Tensor& cauchy_(
       sigma_ > 0.0, "cauchy_ expects sigma > 0.0, but found sigma=", sigma_);
   auto iter = TensorIterator::nullary_op(self);
   auto gen =
-      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+      get_generator_or_default<at::XPUGeneratorImpl>(
           generator,
-          torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+          at::xpu::detail::getDefaultXPUGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

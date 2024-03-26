@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 
 #include <ATen/record_function.h>
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <runtime/Utils.h>
 
 #include "../DistributionTemplates.h"
@@ -10,8 +10,8 @@
 #include <aten/operators/MemoryAccess.h>
 
 using namespace at;
-using namespace xpu::dpcpp::detail;
-using namespace xpu::dpcpp;
+using namespace torch_ipex::xpu::dpcpp::detail;
+using namespace torch_ipex::xpu::dpcpp;
 
 const int UNROLL = 4;
 namespace at {
@@ -185,8 +185,8 @@ struct DropoutMaskOnlyKernelFunctor1 {
 template <typename mask_t>
 Tensor& dropout_mask_only(Tensor& mask, double p) {
   TORCH_CHECK(mask.is_contiguous(), "Only generate contiguous mask tensor");
-  auto gen = get_generator_or_default<xpu::dpcpp::DPCPPGeneratorImpl>(
-      c10::nullopt, xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      c10::nullopt, at::xpu::detail::getDefaultXPUGenerator());
   int64_t nelem = mask.numel();
   int vec_size = get_vector_size<mask_t>(mask);
   uint64_t counter_offset;

@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include "comm/ATDispatch.h"
 #include "comm/AccumulateType.h"
 #include "comm/RegistrationDeclarations.h"
@@ -66,8 +66,8 @@ struct bernoulli_functor_2 {
 Tensor& bernoulli_(Tensor& self, double p_, c10::optional<Generator> gen_) {
   auto iter = TensorIterator::nullary_op(self);
   auto gen =
-      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
-          gen_, torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+      get_generator_or_default<at::XPUGeneratorImpl>(
+          gen_, at::xpu::detail::getDefaultXPUGenerator());
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

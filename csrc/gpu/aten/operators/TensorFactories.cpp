@@ -7,7 +7,6 @@
 #include <c10/util/Exception.h>
 #include <core/Allocator.h>
 #include <core/Device.h>
-#include <core/Generator.h>
 #include <core/detail/ListUtils.h>
 #include <quantized/Quantizer.h>
 #include <runtime/Utils.h>

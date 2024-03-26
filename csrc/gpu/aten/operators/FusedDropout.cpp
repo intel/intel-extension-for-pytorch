@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 
 #include <ATen/record_function.h>
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <runtime/Utils.h>
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
@@ -328,7 +328,7 @@ struct DropoutTemplateKernelFunctor3 {
 
 template <typename mask_t>
 std::tuple<Tensor, Tensor> dropout_template(
-    DPCPPGeneratorImpl* gen,
+    at::XPUGeneratorImpl* gen,
     const Tensor& self,
     double p) {
   Tensor mask = at::empty_like(
@@ -536,9 +536,9 @@ std::tuple<Tensor, Tensor> native_dropout(
   }
 
   auto gen =
-      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+      get_generator_or_default<at::XPUGeneratorImpl>(
           c10::nullopt,
-          torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+          at::xpu::detail::getDefaultXPUGenerator());
   double p1m = 1. - p;
   return impl::dropout_template<bool>(gen, self, p1m);
 }
@@ -549,8 +549,8 @@ std::tuple<Tensor, Tensor> _fused_dropout(
     double p,
     c10::optional<Generator> gen_) {
   auto gen =
-      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
-          gen_, torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+      get_generator_or_default<at::XPUGeneratorImpl>(
+          gen_, at::xpu::detail::getDefaultXPUGenerator());
   return impl::dropout_template<uint8_t>(gen, self, p);
 }
 

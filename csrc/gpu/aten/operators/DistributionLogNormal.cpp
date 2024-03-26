@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
@@ -37,8 +37,8 @@ Tensor& log_normal_(
       std_ > 0.0, "log_normal_ expects std > 0.0, but found std=", std_);
   auto iter = TensorIterator::nullary_op(self);
   auto gen =
-      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
-          gen_, torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+      get_generator_or_default<at::XPUGeneratorImpl>(
+          gen_, at::xpu::detail::getDefaultXPUGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

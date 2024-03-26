@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
@@ -32,8 +32,8 @@ void geometric_scalar_dpcpp(
     double p_,
     c10::optional<Generator> gen_) {
   auto gen =
-      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
-          gen_, torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+      get_generator_or_default<at::XPUGeneratorImpl>(
+          gen_, at::xpu::detail::getDefaultXPUGenerator());
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

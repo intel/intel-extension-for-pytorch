@@ -2,7 +2,7 @@
 #include <ATen/native/TensorIterator.h>
 #include "comm/AccumulateType.h"
 
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
@@ -53,8 +53,8 @@ Tensor& exponential_(
       lambda >= 0.0,
       "exponential_ expects lambda >= 0.0, but found lambda=",
       lambda);
-  auto gen = get_generator_or_default<DPCPPGeneratorImpl>(
-      generator, getDefaultDPCPPGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      generator, at::xpu::detail::getDefaultXPUGenerator());
   auto iter = TensorIterator::nullary_op(self);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,

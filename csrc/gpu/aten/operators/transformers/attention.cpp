@@ -5,7 +5,7 @@
 #include <ATen/native/transformers/attention.h>
 #include <ATen/record_function.h>
 #include <CL/sycl.hpp>
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <torch/autograd.h>
@@ -396,9 +396,9 @@ _scaled_dot_product_efficient_attention(
   int64_t N = key.size(-2);
 
   auto gen =
-      get_generator_or_default<torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl>(
+      get_generator_or_default<at::XPUGeneratorImpl>(
           c10::nullopt,
-          torch_ipex::xpu::dpcpp::detail::getDefaultDPCPPGenerator());
+          at::xpu::detail::getDefaultXPUGenerator());
   std::pair<uint64_t, uint64_t> philox_state;
   {
     // See Note [Acquire lock when using random generators]

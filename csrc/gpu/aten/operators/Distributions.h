@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <core/Generator.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <runtime/Utils.h>
 #include "Loops.h"
 #include "Random.h"
@@ -215,7 +215,7 @@ template <
     typename transform_t>
 void distribution_nullary_kernel(
     at::TensorIterator& iter,
-    torch_ipex::xpu::dpcpp::DPCPPGeneratorImpl* gen,
+    at::XPUGeneratorImpl* gen,
     const dist_t& dist_func,
     const transform_t transform_func) {
   int64_t numel = iter.numel();
