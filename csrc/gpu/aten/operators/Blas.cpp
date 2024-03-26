@@ -214,14 +214,22 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
 #endif
   }
 
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
+
 #if defined(USE_XETLA)
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::XETLA, self, mat2);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::XETLA);
+  bool xetla_valid = fp64_valid && compute_eng_valid;
   if (dpcppGetDeviceHasXMX()) {
     auto policy = HGEMM_XETLA()
                       .add_matrix_c(result)
                       .add_matrix_a(self)
                       .add_matrix_b(mat2)
                       .build();
-    if (policy.valid()) {
+    if (xetla_valid && policy.valid()) {
       auto status = policy.run();
       if (status == xpu::xetla::GemmStatus::kSuccess)
         return result;
