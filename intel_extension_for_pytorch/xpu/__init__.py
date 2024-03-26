@@ -2,8 +2,6 @@
 r"""
 This package is lazily initialized, so you can always import it.
 """
-import ctypes
-from functools import lru_cache
 import sys
 from typing import List, Optional, Tuple, Union, Dict
 
@@ -12,13 +10,9 @@ import intel_extension_for_pytorch
 
 from torch import serialization
 from torch.storage import _StorageBase, _LegacyStorage, _warn_typed_storage_removal
-from torch import device as _device
 from torch._utils import classproperty
 from torch.xpu._utils import _get_device_index
-from torch.xpu import (
-    _lazy_init,
-    _lazy_call,
-)
+from torch.xpu import _lazy_init, _lazy_call
 from .intrinsic import *
 from .cpp_extension import *
 from .amp import *
@@ -42,217 +36,14 @@ from intel_extension_for_pytorch._version import (
     __build_type__,
 )
 
-_device_t = Union[_device, str, int]
-
 
 def init():
-    r"""Initialize the XPU's state. This is a Python API about lazy initialization
-    that avoids initializing XPU until the first time it is accessed. You may need
-    to call this function explicitly in very rare cases, since IPEX could call
-    this initialization automatically when XPU functionality is on-demand.
-
-    Does nothing if call this function repeatedly.
-    """
-    _lazy_init()
+    intel_extension_for_pytorch._C._initExtension()
 
 
-def _get_device(device: Union[int, str, torch.device]) -> torch.device:
-    r"""Return the torch.device type object from the passed in device.
-
-    Args:
-        device (torch.device or int): selected device.
-    """
-    if isinstance(device, str):
-        device = torch.device(device)
-    elif isinstance(device, int):
-        device = torch.device("xpu", device)
-    return device
-
-
-@staticmethod  # type: ignore[misc]
-def _lazy_new(cls, *args, **kwargs):
-    _lazy_init()
-    # We may need to call lazy init again if we are a forked child
-    # del _XPUBase.__new__
-    return super(_XPUBase, cls).__new__(cls, *args, **kwargs)
-
-
-class _XPUBase(object):
-    is_xpu = True
-    is_sparse = False
-
-    def type(self, *args, **kwargs):
-        # We could use a Protocol here to tell mypy that self has `get_device` method
-        # but it is only available in the typing module on Python >= 3.8
-        # or on typing_extensions module on Python >= 3.6
-        with device(self.get_device()):  # type: ignore[attr-defined]
-            return super(_XPUBase, self).type(*args, **kwargs)  # type: ignore[misc]
-
-    __new__ = _lazy_new
-
-
-class _XPULegacyStorage(_LegacyStorage):
-    @classmethod
-    def from_buffer(cls, *args, **kwargs):
-        _warn_typed_storage_removal()
-        raise RuntimeError("from_buffer: Not available for XPU storage")
-
-    @classmethod
-    def _new_with_weak_ptr(cls, *args, **kwargs):
-        raise RuntimeError("_new_with_weak_ptr: Not available for XPU storage")
-
-    @classmethod
-    def _new_shared_filename(cls, manager, obj, size, *, device=None, dtype=None):
-        raise RuntimeError("_new_shared_filename: Not available for XPU storage")
-
-
-class ByteStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.uint8
-
-
-class DoubleStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.double
-
-
-class FloatStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.float
-
-
-class HalfStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.half
-
-
-class LongStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.long
-
-
-class IntStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.int
-
-
-class ShortStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.short
-
-
-class CharStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.int8
-
-
-class BoolStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.bool
-
-
-class BFloat16Storage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.bfloat16
-
-
-class ComplexDoubleStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.cdouble
-
-
-class ComplexFloatStorage(_XPULegacyStorage):
-    @classproperty
-    def dtype(self):
-        _warn_typed_storage_removal()
-        return self._dtype
-
-    @classproperty
-    def _dtype(self):
-        return torch.cfloat
-
-
-del _LegacyStorage
-del _XPULegacyStorage
-
-torch._storage_classes.add(DoubleStorage)
-torch._storage_classes.add(FloatStorage)
-torch._storage_classes.add(LongStorage)
-torch._storage_classes.add(IntStorage)
-torch._storage_classes.add(ShortStorage)
-torch._storage_classes.add(CharStorage)
-torch._storage_classes.add(ByteStorage)
-torch._storage_classes.add(HalfStorage)
-torch._storage_classes.add(BoolStorage)
-torch._storage_classes.add(BFloat16Storage)
-torch._storage_classes.add(ComplexDoubleStorage)
-torch._storage_classes.add(ComplexFloatStorage)
+def is_initialized() -> bool:
+    # for sphinx build
+    return True
 
 
 def _xpu_tag(obj):
@@ -358,8 +149,8 @@ if has_xpu():
 
     _register_torch_device_module("xpu", current_module)
 
-    # post initial
-    intel_extension_for_pytorch._C._postInitExtension()
+    # lazy init IPEX.
+    _lazy_call(intel_extension_for_pytorch._C._initExtension)
 
     override_tensor_totype()
     exec_path = sys.argv[0].split("/")

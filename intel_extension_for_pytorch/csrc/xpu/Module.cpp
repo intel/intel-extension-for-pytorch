@@ -25,30 +25,6 @@ namespace torch_ipex::xpu {
 
 PyObject* module;
 
-static PyObject* THPModule_postInitExtension(PyObject* self, PyObject* noargs) {
-  HANDLE_TH_ERRORS
-  std::vector<c10::Backend> backends = {c10::Backend::XPU};
-  std::vector<c10::ScalarType> scalar_types = {
-      c10::ScalarType::Byte,
-      c10::ScalarType::Char,
-      c10::ScalarType::Double,
-      c10::ScalarType::Float,
-      c10::ScalarType::Int,
-      c10::ScalarType::Long,
-      c10::ScalarType::Short,
-      c10::ScalarType::Half,
-      c10::ScalarType::Bool,
-      c10::ScalarType::BFloat16};
-  for (auto& backend : backends) {
-    for (auto& scalar_type : scalar_types) {
-      torch::tensors::register_python_tensor_type(backend, scalar_type);
-    }
-  }
-
-  Py_RETURN_NONE;
-  END_HANDLE_TH_ERRORS
-}
-
 static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
   HANDLE_TH_ERRORS
   // initialize ipex module
@@ -285,10 +261,6 @@ PyObject* THPModule_toUSM(PyObject* _unused, PyObject* data) {
 static struct PyMethodDef _THPModule_methods[] = {
     {"_initExtension",
      (PyCFunction)THPModule_initExtension,
-     METH_NOARGS,
-     nullptr},
-    {"_postInitExtension",
-     (PyCFunction)THPModule_postInitExtension,
      METH_NOARGS,
      nullptr},
     {"_emptyCache", (PyCFunction)THPModule_emptyCache, METH_NOARGS, nullptr},
