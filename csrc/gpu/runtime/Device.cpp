@@ -342,6 +342,9 @@ static void initDeviceProperty(DeviceId device_id) {
   dev_info.dev_type = convert_dev_type();
   dev_info.dev_name = device_prop.dev_name;
   dev_info.platform_name = device_prop.platform_name;
+  dev_info.vendor = device_prop.vendor;
+  dev_info.driver_version = device_prop.driver_version;
+  dev_info.version = device_prop.version;
   dev_info.global_mem_size = device_prop.global_mem_size;
   dev_info.max_compute_units = device_prop.max_compute_units;
   dev_info.gpu_eu_count = device_prop.gpu_eu_count;
