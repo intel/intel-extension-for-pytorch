@@ -190,9 +190,8 @@ void poisson_sycl_kernel(
 }
 
 Tensor poisson(const Tensor& lambda, c10::optional<Generator> gen_) {
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   std::pair<uint64_t, uint64_t> seeds;
   {
     std::lock_guard<std::mutex> lock(gen->mutex_);

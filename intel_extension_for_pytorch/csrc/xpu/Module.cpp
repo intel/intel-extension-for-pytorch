@@ -6,9 +6,9 @@
 
 #include <ATen/autocast_mode.h>
 
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <core/Allocator.h>
 #include <core/Convertor.h>
-#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <include/xpu/Settings.h>
 #include <profiler/profiler_kineto.h>
 #include <pybind11/stl.h>

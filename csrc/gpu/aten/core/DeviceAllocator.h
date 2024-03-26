@@ -57,7 +57,8 @@ class DeviceAllocator final : public at::Allocator {
  private:
   CachingDeviceAllocator* alloc();
 };
-} // namespace dpcpp
-} // namespace torch_ipex::xpu
 
 void recordStreamInDevAlloc(const at::DataPtr& ptr, at::xpu::XPUStream stream);
+
+} // namespace dpcpp
+} // namespace torch_ipex::xpu

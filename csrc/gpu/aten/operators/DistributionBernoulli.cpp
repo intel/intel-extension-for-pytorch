@@ -65,9 +65,8 @@ struct bernoulli_functor_2 {
 
 Tensor& bernoulli_(Tensor& self, double p_, c10::optional<Generator> gen_) {
   auto iter = TensorIterator::nullary_op(self);
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

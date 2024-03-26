@@ -93,9 +93,8 @@ void normal_dpcpp(
     double mean_,
     double std_,
     c10::optional<Generator> gen_) {
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,

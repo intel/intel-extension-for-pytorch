@@ -535,10 +535,8 @@ std::tuple<Tensor, Tensor> native_dropout(
     return std::tuple<Tensor, Tensor>(ret, mask);
   }
 
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          c10::nullopt,
-          at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      c10::nullopt, at::xpu::detail::getDefaultXPUGenerator());
   double p1m = 1. - p;
   return impl::dropout_template<bool>(gen, self, p1m);
 }
@@ -548,9 +546,8 @@ std::tuple<Tensor, Tensor> _fused_dropout(
     const Tensor& self,
     double p,
     c10::optional<Generator> gen_) {
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   return impl::dropout_template<uint8_t>(gen, self, p);
 }
 

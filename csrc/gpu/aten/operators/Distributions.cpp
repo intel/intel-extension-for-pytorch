@@ -174,9 +174,8 @@ Tensor binomial(
     const Tensor& count,
     const Tensor& prob,
     c10::optional<Generator> gen_) {
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   std::pair<uint64_t, uint64_t> engine_inputs;
   {
     // See Note [Acquire lock when using random generators]
@@ -195,9 +194,8 @@ Tensor binomial(
 }
 
 Tensor _standard_gamma(const Tensor& alpha, c10::optional<Generator> gen_) {
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   std::pair<uint64_t, uint64_t> engine_inputs;
   {
     // See Note [Acquire lock when using random generators]
@@ -219,9 +217,8 @@ Tensor _standard_gamma(const Tensor& alpha, c10::optional<Generator> gen_) {
 }
 
 Tensor _sample_dirichlet(const Tensor& alpha, c10::optional<Generator> gen_) {
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   // auto gen = get_generator_or_default<CUDAGeneratorImpl>(gen_,
   // cuda::detail::getDefaultCUDAGenerator());
   Tensor ret = at::empty(alpha.sizes(), alpha.options());

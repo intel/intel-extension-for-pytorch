@@ -4,8 +4,8 @@
 #include <ATen/native/nested/NestedTensorUtils.h>
 #include <ATen/native/transformers/attention.h>
 #include <ATen/record_function.h>
-#include <CL/sycl.hpp>
 #include <ATen/xpu/XPUGeneratorImpl.h>
+#include <CL/sycl.hpp>
 #include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <torch/autograd.h>
@@ -395,10 +395,8 @@ _scaled_dot_product_efficient_attention(
   int64_t M = query.size(-2);
   int64_t N = key.size(-2);
 
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          c10::nullopt,
-          at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      c10::nullopt, at::xpu::detail::getDefaultXPUGenerator());
   std::pair<uint64_t, uint64_t> philox_state;
   {
     // See Note [Acquire lock when using random generators]

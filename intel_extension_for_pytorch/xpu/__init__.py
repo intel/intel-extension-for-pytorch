@@ -69,8 +69,6 @@ def _get_device(device: Union[int, str, torch.device]) -> torch.device:
     return device
 
 
-
-
 @staticmethod  # type: ignore[misc]
 def _lazy_new(cls, *args, **kwargs):
     _lazy_init()
@@ -353,7 +351,7 @@ def _register_torch_device_module(device_type, module):
         torch._register_device_module(device_type, module)
 
 
-if utils.has_xpu():
+if has_xpu():
     _StorageBase.xpu = _xpu
 
     serialization.register_package(30, _xpu_tag, _xpu_deserialize)

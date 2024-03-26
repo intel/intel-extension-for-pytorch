@@ -246,10 +246,8 @@ void multinomial_with_replacement_kernel_impl(
     const int64_t n_sample,
     c10::optional<Generator> generator) {
   auto& sycl_queue = dpcppGetCurrentQueue();
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          generator,
-          at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      generator, at::xpu::detail::getDefaultXPUGenerator());
 
   int inputSize = self.dim();
   int64_t numDist = inputSize == 1 ? 1 : self.size(0);

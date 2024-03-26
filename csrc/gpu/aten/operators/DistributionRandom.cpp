@@ -40,9 +40,8 @@ struct random_kernel_random_state_functor_2 {
 
 template <typename RNG>
 void random_kernel(TensorIterator& iter, c10::optional<RNG> gen_) {
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   if (isFloatingType(iter.dtype())) {
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
@@ -116,9 +115,8 @@ void random_from_to_kernel(
     uint64_t range,
     int64_t base,
     c10::optional<RNG> gen_) {
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Bool,
       at::ScalarType::Half,
@@ -164,9 +162,8 @@ template <typename RNG>
 void random_full_64_bits_range_kernel(
     TensorIterator& iter,
     c10::optional<RNG> gen_) {
-  auto gen =
-      get_generator_or_default<at::XPUGeneratorImpl>(
-          gen_, at::xpu::detail::getDefaultXPUGenerator());
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::BFloat16,
       iter.dtype(),
