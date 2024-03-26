@@ -21,6 +21,10 @@ struct DeviceInfo {
   device_type dev_type;
   std::string dev_name;
   std::string platform_name;
+  std::string vendor;
+  std::string driver_version;
+  std::string version;
+  uint32_t device_id;
   uint64_t global_mem_size;
   uint32_t max_compute_units;
   uint32_t gpu_eu_count;
