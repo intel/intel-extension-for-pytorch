@@ -10,6 +10,7 @@ from ..fusions.linear_fusion import (
     _IPEXConcatLinearRef,
 )
 from torch.nn import functional as F
+from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
 
 
 def _GPTJAttention_forward(
@@ -1907,9 +1908,18 @@ class _IPEXAttentionRef(nn.Module):
                 hasattr(module, "q_proj")
                 and hasattr(module, "k_proj")
                 and hasattr(module, "v_proj")
-                and isinstance(module.q_proj, torch.nn.Linear)
-                and isinstance(module.k_proj, torch.nn.Linear)
-                and isinstance(module.v_proj, torch.nn.Linear)
+                and (
+                    isinstance(module.q_proj, torch.nn.Linear)
+                    or isinstance(module.q_proj, WeightOnlyQuantizedLinear)
+                )
+                and (
+                    isinstance(module.k_proj, torch.nn.Linear)
+                    or isinstance(module.k_proj, WeightOnlyQuantizedLinear)
+                )
+                and (
+                    isinstance(module.v_proj, torch.nn.Linear)
+                    or isinstance(module.v_proj, WeightOnlyQuantizedLinear)
+                )
             ) and not (hasattr(self, "use_qk_layernorm") and self.use_qk_layernorm):
 
                 def get_weight_shape(mod):
