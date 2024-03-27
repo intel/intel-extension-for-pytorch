@@ -451,6 +451,23 @@ void fuseLinearMulAdd(std::shared_ptr<Graph>& graph) {
         %res = ipex_prepack::linear_mul_run(%input, %operand, %packed_weight)
         return (%res))";
 
+  auto filter_scalar = [](const Match& match,
+                          const std::unordered_map<std::string, Value*>& vmap) {
+    Node* node = match.anchor;
+    if (utils::is_scalar(node->input(1)) || utils::is_scalar(node->input(0))) {
+      return false;
+    }
+    if (node->input(1)->type()->cast<TensorType>()->dim().has_value() &&
+        node->input(1)->type()->cast<TensorType>()->dim().value() == 0) {
+      return false;
+    }
+    if (node->input(0)->type()->cast<TensorType>()->dim().has_value() &&
+        node->input(0)->type()->cast<TensorType>()->dim().value() == 0) {
+      return false;
+    }
+    return true;
+  };
+
   for (const auto& mul : mul_operators) {
     TemplateEnv env;
     env.s("mul", mul);
@@ -460,8 +477,8 @@ void fuseLinearMulAdd(std::shared_ptr<Graph>& graph) {
         linear_mul_operand_on_the_left_rstring.format(env), linear_mul_fused);
   }
 
-  rewriter_mul_operand_on_the_right.runOnGraph(graph);
-  rewriter_mul_operand_on_the_left.runOnGraph(graph);
+  rewriter_mul_operand_on_the_right.runOnGraph(graph, filter_scalar);
+  rewriter_mul_operand_on_the_left.runOnGraph(graph, filter_scalar);
 
   // linear + mul + add
   // linear_mul   Y

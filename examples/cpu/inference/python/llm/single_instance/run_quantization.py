@@ -653,6 +653,7 @@ if args.ipex_smooth_quant:
                 op_type_dict=op_type_dict,
                 smoothquant_args=smoothquant_args
             )
+            pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
             prepared_model.save_qconf_summary(args.output_dir + "/best_configure.json")
 
         else:

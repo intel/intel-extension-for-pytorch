@@ -815,6 +815,19 @@ class LinearMulAdd(nn.Module):
         return x_l
 
 
+class LinearMulAdd_v2(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(LinearMulAdd_v2, self).__init__()
+        self.linear = torch.nn.Linear(in_features, out_features, bias=False)
+        self.mul_tensor = torch.tensor(1)
+        self.mul_scalar = 0.5
+
+    def forward(self, input):
+        x_add = input
+        result = self.mul_tensor * self.linear(input) * self.mul_scalar
+        return result + (x_add).to(result.dtype)
+
+
 class LinearMul(nn.Module):
     def __init__(self, in_features, num_layers, low_rank):
         super(LinearMul, self).__init__()
@@ -839,6 +852,17 @@ class LinearMul(nn.Module):
             x_l_w = self.linears_w[layer](x_l_v)
             x_l = x_0 * x_l_w
         return x_l
+
+
+class LinearMul_v2(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(LinearMul_v2, self).__init__()
+        self.linear = torch.nn.Linear(in_features, out_features, bias=False)
+        self.mul_tensor = torch.tensor(1)
+        self.mul_scalar = 0.5
+
+    def forward(self, input):
+        return self.mul_scalar * self.linear(input) * self.mul_tensor
 
 
 class Linear_Reshape_Relu(nn.Module):
@@ -4536,6 +4560,25 @@ class Tester(TestCase):
             prec=5e-2,
         )
 
+    def test_output_linear_mul_add_v2(self):
+        m = LinearMulAdd_v2(4, 4)
+        x = torch.ones(2, 4)
+        self._test_output(
+            m,
+            x,
+            kind_in_graph="aten::linear",
+            kind_not_in_graph="ipex_prepack::linear_mul_add_run",
+        )
+        self._test_mkl_fp32(m, x, kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_dnnl_fp32(m, x, kind_in_graph="ipex_prepack::linear_run")
+        self._test_output_lowp(
+            m,
+            x,
+            kind_in_graph="ipex_prepack::linear_run",
+            kind_not_in_graph="ipex_prepack::linear_mul_add_run",
+            prec=5e-2,
+        )
+
     def test_output_linear_mul(self):
         m = LinearMul(4, 2, 8)
         x = torch.ones(2, 4)
@@ -4546,6 +4589,25 @@ class Tester(TestCase):
             m,
             x,
             kind_in_graph="ipex_prepack::linear_mul_run",
+            prec=5e-2,
+        )
+
+    def test_output_linear_mul_v2(self):
+        m = LinearMul_v2(4, 4)
+        x = torch.ones(2, 4)
+        self._test_output(
+            m,
+            x,
+            kind_in_graph="aten::linear",
+            kind_not_in_graph="ipex_prepack::linear_mul_run",
+        )
+        self._test_mkl_fp32(m, x, kind_in_graph="ipex_prepack::mkl_sgemm_run")
+        self._test_dnnl_fp32(m, x, kind_in_graph="ipex_prepack::linear_run")
+        self._test_output_lowp(
+            m,
+            x,
+            kind_in_graph="ipex_prepack::linear_run",
+            kind_not_in_graph="ipex_prepack::linear_mul_run",
             prec=5e-2,
         )
 
