@@ -11,7 +11,7 @@
 
 ${namespace_prologue}
 
-struct ${class_name} {
+namespace ${class_name} {
 
 ${dispatch_declarations}
 
