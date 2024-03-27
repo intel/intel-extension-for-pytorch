@@ -403,32 +403,46 @@ def _FalconAttention_forward(
     num_kv_heads = (
         self.num_heads if self.new_decoder_architecture else self.num_kv_heads
     )
-
-    (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
-    batch_size, query_length, _, _ = query_layer.shape
+    if self.new_decoder_architecture or not self.rotary:
+        (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
+        batch_size, query_length, _, _ = query_layer.shape
+    else:
+        batch_size, query_length, _ = fused_qkv.shape
 
     past_kv_length = 0 if layer_past is None else layer_past[0].shape[1]
 
     if self.rotary:
         seq_len = query_length + past_kv_length
-        key_layer = self._IPEXROPE(
-            key_layer,
-            torch.tensor(past_kv_length),
-            num_kv_heads,
-            self.head_dim,
-            self.head_dim // 2,
-            self.head_dim,
-            seq_len,
-        )
-        query_layer = self._IPEXROPE(
-            query_layer,
-            torch.tensor(past_kv_length),
-            self.num_heads,
-            self.head_dim,
-            self.head_dim // 2,
-            self.head_dim,
-            seq_len,
-        )
+        if self.new_decoder_architecture:
+            key_layer = self._IPEXROPE(
+                key_layer,
+                torch.tensor(past_kv_length),
+                num_kv_heads,
+                self.head_dim,
+                self.head_dim // 2,
+                self.head_dim,
+                seq_len,
+            )
+            query_layer = self._IPEXROPE(
+                query_layer,
+                torch.tensor(past_kv_length),
+                self.num_heads,
+                self.head_dim,
+                self.head_dim // 2,
+                self.head_dim,
+                seq_len,
+            )
+        else:
+            query_layer, key_layer, value_layer = self._IPEXROPE(
+                fused_qkv,
+                torch.tensor(past_kv_length),
+                self.num_heads,
+                self.head_dim,
+                self.head_dim // 2,
+                self.head_dim,
+                seq_len,
+                3,
+            )
     attention_mask_float = (
         (attention_mask * 1.0)
         .masked_fill(attention_mask.to(torch.bool), float("-1e9"))

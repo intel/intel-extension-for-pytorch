@@ -8,6 +8,21 @@ namespace torch_ipex {
 namespace cpu {
 
 namespace {
+bool is_fused_qkv(at::Tensor& t_in, int64_t hidden_size) {
+  auto in_stride_s = t_in.stride(1);
+  if (t_in.stride(0) * t_in.size(0) != t_in.numel()) {
+    if (t_in.dim() == 4) {
+      in_stride_s = t_in.size(2) * t_in.size(3);
+    } else if (t_in.dim() == 3) {
+      in_stride_s = t_in.size(2);
+    }
+  }
+  if (in_stride_s > hidden_size) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Applies the Rotary Position Embedding Kernel to the input tensors.
  *
@@ -48,7 +63,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ApplyROPEKernel(
   auto N_KV = N; // GQA/MQA, N_KV: number of head for key/value
   auto concat_qkv = in_stride_s > N * H;
 
-  if (in_stride_s > N * H) {
+  if (is_fused_qkv(t_in, N * H)) {
     TORCH_CHECK(
         in_stride_s == HS,
         "The shape of input tensor of rotary_position_embedding should be in (batch, seq_len, qkv_hidden_size) when using fused qkv)");
