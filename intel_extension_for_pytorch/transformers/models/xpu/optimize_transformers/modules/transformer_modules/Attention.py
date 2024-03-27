@@ -69,12 +69,12 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
     def prepare_kv_cache(self, hidden_states, kv_head):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
+        if self.is_1st_token():
+            self.prompt_len = seq_len
         if (
             self.runtime_cache.key_cache is None
             or self.runtime_cache.key_cache.shape[1] != bs_beam
         ):
-            if self.is_1st_token():
-                self.prompt_len = seq_len
             cache_len = (
                 self.runtime_cache_size
                 if self.is_beam_search()
