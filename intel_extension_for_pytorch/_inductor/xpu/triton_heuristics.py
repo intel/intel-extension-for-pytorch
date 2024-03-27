@@ -212,7 +212,7 @@ class XPUCachingAutotuner(CachingAutotuner):
         launcher.config = cfg
         launcher.n_regs = getattr(binary, "n_regs", None)
         launcher.n_spills = getattr(binary, "n_spills", None)
-        launcher.shared = getattr(binary, "shared", None)
+        launcher.shared = scope["shared"]
         launcher.store_cubin = False
         # store this global varible to avoid the high overhead of reading it when calling run
         if launcher.store_cubin:
