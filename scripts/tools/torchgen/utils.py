@@ -26,6 +26,8 @@ from typing import (
     Union,
 )
 
+from typing_extensions import Self
+
 from torchgen.code_template import CodeTemplate
 
 
@@ -115,10 +117,8 @@ def _read_template(template_fn: str) -> CodeTemplate:
 
 # String hash that's stable across different executions, unlike builtin hash
 def string_stable_hash(s: str) -> int:
-    # Avoid failing in Coverity Security Scan since sha1 is a weak hash algorithm.
-    # It is recommended to use an SHA-2 family hash like SHA-256. This code is ported
-    # from PyTorch and we won't use it. So we remove this code to pass the scan report.
-    assert False
+    sha1 = hashlib.sha1(s.encode("latin1")).digest()
+    return int.from_bytes(sha1, byteorder="little")
 
 
 # A small abstraction for writing out generated files and keeping track
@@ -187,7 +187,7 @@ class FileManager:
     def write(
         self,
         filename: str,
-        env_callable: Callable[[], Union[str, Union[str, Dict[str, Any]]]],
+        env_callable: Callable[[], Union[str, Dict[str, Any]]],
     ) -> None:
         self.write_with_template(filename, filename, env_callable)
 
@@ -459,7 +459,7 @@ class OrderedSet(Generic[T]):
         if iterable is None:
             self.storage = {}
         else:
-            self.storage = {k: None for k in iterable}
+            self.storage = dict.fromkeys(iterable)
 
     def __contains__(self, item: T) -> bool:
         return item in self.storage
@@ -488,7 +488,7 @@ class OrderedSet(Generic[T]):
     def __or__(self, other: "OrderedSet[T]") -> "OrderedSet[T]":
         return OrderedSet.union(self, other)
 
-    def __ior__(self, other: "OrderedSet[T]") -> "OrderedSet[T]":
+    def __ior__(self, other: "OrderedSet[T]") -> Self:
         self.update(other)
         return self
 

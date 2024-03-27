@@ -3,7 +3,7 @@ import os
 import pathlib
 import re
 from collections import Counter, defaultdict, namedtuple
-from typing import Any, Dict, List, Iterable, Optional, Sequence, Set, TypeVar, Union
+from typing import Dict, List, Optional, Sequence, Set, Union
 
 import yaml
 
@@ -25,8 +25,6 @@ from torchgen.selective_build.selector import SelectiveBuilder
 from torchgen.utils import concatMap, context, FileManager, NamespaceHelper, Target
 from torchgen.yaml_utils import YamlLoader
 
-T = TypeVar("T")
-S = TypeVar("S")
 
 # Parses the external backend's yaml, and adds a new BackendIndex for the backend's dispatch key.
 # Returns a Tuple of (backend_key, autograd_key, cpp_namespace, updated BackendIndex mapping)
@@ -349,43 +347,9 @@ def main() -> None:
         default=None,
         help="path to the source C++ file containing kernel definitions",
     )
-    parser.add_argument(
-        "--generate-impl",
-        "--generate_impl",
-        action='store_true',
-        default=False,
-        help="generate the kernel implementation of directly calling at::native::func",
-    )
-    parser.add_argument(
-        "--header_file",
-        "--header-file",
-        default=None,
-        help="the header file for the output kernel implementation",
-    )
-    parser.add_argument(
-        "--output-impl-file",
-        "--output_impl_file",
-        default=None,
-        help="the output file for the kernel implementation",
-    )
-    parser.add_argument(
-        '--simple_trace',
-        action='store_true',
-        default=False,
-        help='simple trace the entry to ipex',
-    )
     options = parser.parse_args()
 
-    run(
-        options.source_yaml,
-        options.output_dir,
-        options.dry_run,
-        options.simple_trace,
-        options.impl_path,
-        options.generate_impl,
-        options.header_file,
-        options.output_impl_file
-    )
+    run(options.source_yaml, options.output_dir, options.dry_run, options.impl_path)
 
 
 def gen_dispatchkey_nativefunc_headers(
@@ -445,142 +409,6 @@ def gen_dispatchkey_nativefunc_headers(
     )
 
 
-def gen_implementation(
-    output_impl_file: str,
-    header_file: str,
-    impl_ns: str,
-    native_yaml_file: str,
-    search_dispatch_key: str,
-    class_name: str,
-    cpp_namespace: str,
-    backend_indices: Dict[DispatchKey, BackendIndex],
-    grouped_native_functions: Sequence[Union[NativeFunction, NativeFunctionsGroup]],
-    backend_dispatch_key: DispatchKey,
-) -> None:
-    # impl_file is the needed generated file
-    impl_file = open(output_impl_file, "w")
-    yaml_file = open(native_yaml_file, "r").read()
-
-    # for namespace
-    ns_helper = NamespaceHelper(cpp_namespace)
-    class_prologue = 'namespace ' + class_name + ' {\n'
-    class_epilogue = '} // namespace ' + class_name + '\n'
-
-    def collect_schema_args(
-        g: Union[NativeFunctionsGroup, NativeFunction], backend_index: BackendIndex
-    ) -> List[Any]:
-        from .dest.native_functions import gen_unstructured
-
-        def collect_arg_func_mapping(r: str, x: NativeFunction) -> Dict[str, Dict[str, List[str]]]:
-            # {schema name : {schema: [arguments]}}
-            collect_all: Dict[str, Dict[str, List[str]]] = defaultdict(dict)
-            schema_name = x.func.name.name.base
-
-            # check schema overload
-            if x.func.name.name.inplace:
-                schema_name += '_'
-            if len(x.func.name.overload_name):
-                schema_name += '.'
-                schema_name += x.func.name.overload_name
-
-            # set the schema name, for example, div.Tensor
-            collect_all[schema_name] = {r : []}
-
-            # collect arg, pre + arg + post + out
-            args = x.func.arguments
-            if hasattr(args, 'pre_self_positional'):
-                for kwarg in args.pre_self_positional:
-                    collect_all[schema_name][r].append(kwarg.name)
-            if hasattr(args, 'self_arg') and args.self_arg is not None:
-                collect_all[schema_name][r].append(args.self_arg.argument.name)
-            if hasattr(args, 'post_self_positional'):
-                for other_arg in args.post_self_positional:
-                    collect_all[schema_name][r].append(other_arg.name)
-            if hasattr(args, 'pre_tensor_options_kwarg_only'):
-                for kwarg in args.pre_tensor_options_kwarg_only:
-                    collect_all[schema_name][r].append(kwarg.name)
-            if hasattr(args, 'tensor_options'):
-                tensor_args = args.tensor_options
-                for key in ['dtype', 'layout', 'device', 'pin_memory']:
-                    if hasattr(tensor_args, key):
-                        collect_all[schema_name][r].append(getattr(tensor_args, key).name)
-            if hasattr(args, 'post_tensor_options_kwarg_only'):
-                for kwarg in args.post_tensor_options_kwarg_only:
-                    collect_all[schema_name][r].append(kwarg.name)
-            if hasattr(args, 'out'):
-                for arg in args.out:
-                    collect_all[schema_name][r].append(arg.name)
-            return collect_all
-
-        def map_collect(groups_func: Iterable[T]):
-            collect_all = []
-            for func in groups_func:
-                r = gen_unstructured(func, backend_index)
-                if r is not None:
-                    collect_all.append(collect_arg_func_mapping(r, func))
-            return collect_all
-
-        # for functions group, it should be iterated for each function
-        if isinstance(g, NativeFunctionsGroup):
-            return map_collect(g.functions())
-        else:
-            r = gen_unstructured(g, backend_index)
-            if r is not None:
-                return [collect_arg_func_mapping(r, g)]
-
-    # {schema_name : {schema; : [arguments(str)]}}
-    collected_signature_args: List[Dict[str, Dict[str, List[str]]]] = []
-    for g in grouped_native_functions:
-        func_signature_args = collect_schema_args(g, backend_indices[backend_dispatch_key])
-        if func_signature_args is not None and len(func_signature_args) > 0:
-            for elem in func_signature_args:
-                collected_signature_args.append(elem)
-
-    # write the header file to the output file
-    header_native_function = '#include <ATen/NativeFunctions.h>'
-    impl_file.write(header_native_function + '\n')
-    if header_file is not None:
-        header_file = '#include "' + header_file + '"'
-        impl_file.write(header_file + '\n')
-    impl_file.write(ns_helper.prologue + '\n')
-    impl_file.write(class_prologue)
-
-    # find the target kernel func name to make it as callee
-    def generate_impl_func_name(func: str):
-        func_index = yaml_file.find('- func: ' + func + '(')
-        assert func_index != -1, 'Cannot find the func {}'.format(func)
-        target = yaml_file[func_index:]
-        target_index = target.find(search_dispatch_key)
-        target = target[target_index:target_index + target[target_index:].find('\n')]
-        return target.replace(search_dispatch_key + ': ', '')
-
-    def generate_func(elem: Dict[str, Dict[str, List[str]]]):
-        for func, shcema_args in elem.items():
-            for schema, args in shcema_args.items():
-                func_head = schema.lstrip().replace(';', ' {\n')
-
-                # generate func args
-                func_arg = ''
-                for arg in args:
-                    arg += ', '
-                    func_arg += arg
-
-                # remove the tail arg ','
-                if len(func_arg) > 0:
-                    func_arg = func_arg[:-2]
-                func_name = generate_impl_func_name(func) + '('
-                func_body = '    return ' + cpp_namespace + '::' + impl_ns + '::' + func_name + func_arg + ');\n}\n\n'
-                full_func = func_head + func_body
-                return full_func
-
-    for elem in collected_signature_args:
-        impl_file.write(generate_func(elem))
-
-    # write the epilogue
-    impl_file.write(class_epilogue)
-    impl_file.write(ns_helper.epilogue + '\n')
-
-
 def gen_dispatcher_registrations(
     fm: FileManager,
     output_dir: str,
@@ -588,7 +416,6 @@ def gen_dispatcher_registrations(
     backend_indices: Dict[DispatchKey, BackendIndex],
     grouped_native_functions: Sequence[Union[NativeFunction, NativeFunctionsGroup]],
     backend_dispatch_key: DispatchKey,
-    simple_trace: bool,
     dispatch_key: DispatchKey,
     selector: "SelectiveBuilder",
     # build_in_tree is true for lazy TS backend and affects include paths, not used for external backends
@@ -616,7 +443,6 @@ def gen_dispatcher_registrations(
                 selector,
                 rocm=False,
                 symint=True,
-                simple_trace=simple_trace,
                 class_method_name=f"{class_name}",
                 skip_dispatcher_op_registration=False,
             ),
@@ -685,7 +511,6 @@ TORCH_API void Register${backend_name}${dispatch_key}NativeFunctions() {
                                 selector,
                                 rocm=False,
                                 symint=True,
-                                simple_trace=simple_trace,
                                 class_method_name=f"{class_name}",
                                 skip_dispatcher_op_registration=False,
                             ),
@@ -699,18 +524,11 @@ TORCH_API void Register${backend_name}${dispatch_key}NativeFunctions() {
 
 
 def run(
-    source_yaml: str,
-    output_dir: str,
-    dry_run: bool,
-    simple_trace: bool,
-    impl_path: Optional[str] = None,
-    generate_impl: Optional[bool] = False,
-    header_file: Optional[str] = None,
-    output_impl_file: Optional[str] = None,
+    source_yaml: str, output_dir: str, dry_run: bool, impl_path: Optional[str] = None
 ) -> None:
     # Assumes that this file lives at PYTORCH_ROOT/torchgen/gen_backend_stubs.py
     pytorch_root = pathlib.Path(__file__).parent.parent.absolute()
-    template_dir = os.path.join(pytorch_root, "torchgen/packaged/ATen/templates")
+    template_dir = os.path.join(pytorch_root, "aten/src/ATen/templates")
 
     def make_file_manager(install_dir: str) -> FileManager:
         return FileManager(
@@ -720,9 +538,9 @@ def run(
     fm = make_file_manager(output_dir)
 
     native_yaml_path = os.path.join(
-        pytorch_root, "torchgen/packaged/ATen/native/native_functions.yaml"
+        pytorch_root, "aten/src/ATen/native/native_functions.yaml"
     )
-    tags_yaml_path = os.path.join(pytorch_root, "torchgen/packaged/ATen/native/tags.yaml")
+    tags_yaml_path = os.path.join(pytorch_root, "aten/src/ATen/native/tags.yaml")
     parsed_yaml = parse_native_yaml(native_yaml_path, tags_yaml_path)
     native_functions, backend_indices = (
         parsed_yaml.native_functions,
@@ -762,49 +580,29 @@ def run(
             impl_path,
         )
 
-    if generate_impl:
-        assert output_impl_file is not None, "No file path is passed for implementation"
-        # for native implementation, so the search key is CPU + CUDA
-        # for example, NestedTensorCPU, NestedTensorCUDA for NestedTensorXPU
-        search_key = backend_key.name.replace('XPU', 'CPU') + ', ' + backend_key.name.replace('XPU', 'CUDA')
-        impl_ns = 'native'
-        native_yaml_file = './torchgen/packaged/ATen/native/native_functions.yaml'
-        assert os.path.isfile(native_yaml_file), "Can not find the native_functions.yaml in {}".format(native_yaml_file)
-        gen_implementation(output_impl_file,
-                           header_file,
-                           impl_ns,
-                           native_yaml_file,
-                           search_key,
-                           class_name,
-                           cpp_namespace,
-                           backend_indices,
-                           grouped_native_functions,
-                           backend_key)
-    else:
-        gen_dispatchkey_nativefunc_headers(
+    gen_dispatchkey_nativefunc_headers(
+        fm,
+        class_name,
+        cpp_namespace,
+        backend_indices,
+        grouped_native_functions,
+        backend_key,
+        autograd_key,
+    )
+
+    for dispatch_key in (
+        [backend_key] if autograd_key is None else [backend_key, autograd_key]
+    ):
+        gen_dispatcher_registrations(
             fm,
+            output_dir,
             class_name,
-            cpp_namespace,
             backend_indices,
             grouped_native_functions,
             backend_key,
-            autograd_key,
+            dispatch_key,
+            selector,
         )
-
-        for dispatch_key in (
-            [backend_key] if autograd_key is None else [backend_key, autograd_key]
-        ):
-            gen_dispatcher_registrations(
-                fm,
-                output_dir,
-                class_name,
-                backend_indices,
-                grouped_native_functions,
-                backend_key,
-                simple_trace,
-                dispatch_key,
-                selector,
-            )
 
 
 if __name__ == "__main__":
