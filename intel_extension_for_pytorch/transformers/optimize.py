@@ -724,7 +724,7 @@ def optimize_transformers(
 
         is_quantization = False
         is_woq = False
-        if quantization_config is not None:
+        if device == "cpu" and quantization_config is not None:
             is_quantization = True
             if _is_woq_qconfig(quantization_config):
                 is_woq = True
@@ -769,6 +769,8 @@ def optimize_transformers(
                 state_dict = low_precision_checkpoint
             convert_qmodel(_model, dtype, checkpoint_config["groups"])
             _model.load_state_dict(state_dict)
+            xpu_woq = True
+        elif device == "xpu" and quantization_config is not None:
             xpu_woq = True
 
         # model reference conversion

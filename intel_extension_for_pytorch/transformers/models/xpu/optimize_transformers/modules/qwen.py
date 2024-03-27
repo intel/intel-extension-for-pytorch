@@ -7,6 +7,10 @@ from .transformer_modules.Norm import QWenRMSNorm
 
 from ._transformers import MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
+from .transformer_modules.Mlp import (  # noqa F401
+    IPEXTransformerBaseMLP,
+    IPEXTransformerMLPOptimizedFp16,
+)
 from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
 from .transformer_modules.QuantizedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16,
@@ -18,11 +22,15 @@ from .transformer_modules.GroupedAttention import (  # noqa F401
 )
 from .transformer_modules.Decoderblock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
-
-# from .transformer_modules.QuantizedMlp import *  # noqa
-from .transformer_modules.model_utils import qwen_post_qkv, qwen_sdp
-
-# from intel_extension_for_pytorch.nn.utils._quantize_convert import WeightOnlyLinear
+from .transformer_modules.QuantizedMlp import *  # noqa
+from .transformer_modules.model_utils import (
+    qwen_post_qkv,
+    qwen_sdp,
+    qwen_load_attn_params_fp16,
+    qwen_transpose_attn_params_fp16,
+    qwen_load_attn_params_int4,
+    qwen_transpose_attn_params_int4,
+)
 import sys
 
 import os
@@ -144,35 +152,7 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
         )
 
     def port_attn_parameter(self):
-        embed_dim = self.ipex_config.embedding_dim  # 4096
-        dtype = self.ipex_config.dtype
-        # if dtype == "int4":
-        #     qkv_weight = self.module.attn.c_attn.qweight  # [3*4096, 4096]
-        #     qkv_bias = self.module.attn.c_attn.bias
-        #     qkv_scale = self.module.attn.c_attn.scales
-        #     qkv_zp = None
-        #     if hasattr(self.module.attn.c_attn, "qzeros"):
-        #         qkv_zp = self.module.attn.c_attn.qzeros
-        #     gs = self.module.attn.c_attn.blocksize
-
-        #     q_weight, k_weight, v_weight = qkv_weight.split(int(embed_dim / 2), dim=0)
-        #     q_bias, k_bias, v_bias = qkv_bias.view(3, embed_dim).split(1, dim=0)
-        #     q_scale, k_scale, v_scale = qkv_scale.split(embed_dim, dim=0)
-        #     if qkv_zp is not None:
-        #         q_zp, k_zp, v_zp = qkv_zp.split(int(embed_dim / 2), dim=0)
-
-        #     q_proj = IPEXTransformerWOQLinear(q_weight, q_bias, q_scale, q_zp, gs)
-        #     k_proj = IPEXTransformerWOQLinear(k_weight, k_bias, k_scale, k_zp, gs)
-        #     v_proj = IPEXTransformerWOQLinear(v_weight, v_bias, v_scale, v_zp, gs)
-        # else:
-        qkv_weight = self.module.attn.c_attn.weight  # [3*4096, 4096]
-        qkv_bias = self.module.attn.c_attn.bias
-        q_weight, k_weight, v_weight = qkv_weight.split(embed_dim, dim=0)
-        q_bias, k_bias, v_bias = qkv_bias.view(3, embed_dim).split(1, dim=0)
-        q_proj = IPEXTransformerLinear(q_weight, q_bias)
-        k_proj = IPEXTransformerLinear(k_weight, k_bias)
-        v_proj = IPEXTransformerLinear(v_weight, v_bias)
-        self.attn.load_parameter(q_proj, k_proj, v_proj, self.module.attn.c_proj)
+        self.attn.load_parameter(self.module.attn.c_attn, self.module.attn.c_proj)
 
     def port_mlp_parameter(self):
         # IPEXTransformerMLPOptimizedFp16SiluQwen
@@ -191,19 +171,21 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
         self.mlp.transpose_parameter()
 
     def port_all_parameters_to_new_module(self):
+        dtype = self.ipex_config.dtype
+        if dtype == "fp16":
+            self.attn.load_parameter = partial(qwen_load_attn_params_fp16, self.attn)
+            self.attn.transpose_parameter = partial(
+                qwen_transpose_attn_params_fp16, self.attn
+            )
+        elif dtype == "int4":
+            self.attn.load_parameter = partial(qwen_load_attn_params_int4, self.attn)
+            self.attn.transpose_parameter = partial(
+                qwen_transpose_attn_params_int4, self.attn
+            )
         super().port_all_parameters_to_new_module()
         if self.ipex_config.transpose:
             self.transpose_parameter()
-        self.attn.cat_qkv()
-        # if isinstance(self.module.attn.c_attn, WeightOnlyLinear):
-        #     self.module.attn.c_attn.qweight.data = self.attn.qkv_proj_quant.weight.data
-        #     self.module.attn.c_attn.bias.data = self.attn.qkv_proj_quant.bias.data
-        #     self.module.attn.c_attn.scales.data = self.attn.qkv_proj_quant.scale.data
-        #     if hasattr(self.module.attn.c_attn, "qzeros"):
-        #         self.module.attn.c_attn.qzeros.data = self.attn.qkv_proj_quant.zp.data
-        # else:
-        self.module.attn.c_attn.weight.data = self.attn.qkv_proj.weight.data
-        self.module.attn.c_attn.bias.data = self.attn.qkv_proj.bias.data
+        # self.attn.cat_qkv()
 
     def forward(
         self,

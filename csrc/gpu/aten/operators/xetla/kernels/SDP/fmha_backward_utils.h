@@ -329,8 +329,8 @@ struct bias_add_op_t<dtype_bias_, gpu_arch::Xe> {
   using base_t = typename mem_desc_bias_t::base_t;
 
   struct arguments_t {
-    shape_t shape;
     base_t base;
+    shape_t shape;
     inline arguments_t() = default;
     inline arguments_t(base_t base_, shape_t shape_)
         : base(base_), shape(shape_) {}

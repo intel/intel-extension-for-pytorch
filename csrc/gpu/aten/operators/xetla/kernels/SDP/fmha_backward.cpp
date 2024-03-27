@@ -45,14 +45,13 @@ class fmha_backward_t {
     uint32_t uH;
     uint32_t uF;
     uint32_t uT;
-    uint32_t uMT;
-    // Softmax scale is the reciprocal square root of head size by default
-    accum_t sm_scale;
 
     uint32_t bias_strideB;
     uint32_t bias_strideN;
     uint32_t bias_strideF;
-
+    uint32_t uMT;
+    // Softmax scale is the reciprocal square root of head size by default
+    accum_t sm_scale;
     // seed/offset used to generate dropout mask
     uint64_t seed;
     uint64_t offset;

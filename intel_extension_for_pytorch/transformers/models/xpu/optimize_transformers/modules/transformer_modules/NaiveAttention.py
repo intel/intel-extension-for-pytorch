@@ -4,7 +4,7 @@ import torch.distributed as dist
 
 # from intel_extension_for_pytorch.nn.utils._transformer_configuration import IPEXTransformerConfig
 from .._transformer_configuration import IPEXTransformerConfig
-from .Linear import IPEXTransformerLinear, IPEXTransformerQLinear  # noqa
+from .Linear import IPEXTransformerLinear  # noqa
 from .BaseAttention import IPEXTransformerAttn, IPEXRuntimeAttnCache
 import os
 

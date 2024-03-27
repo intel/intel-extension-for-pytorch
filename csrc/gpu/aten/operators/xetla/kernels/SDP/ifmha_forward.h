@@ -54,12 +54,10 @@ class ifmha_forward_t {
     scalar_t* A_ptr = nullptr; // [B,Bm,N,1,T] - alibi
     scalar_t* B_ptr = nullptr; // [B,Bm,N,F,PT] - bias
     uint8_t* Dp_ptr = nullptr; // [B,Bm,N,F,T] - dropout mask
-    scalar_t* O_ptr; // [B,Bm,1,N,H] - output
-
     accum_t dp_prob; // Dropout prob
     accum_t dp_scale; // Dropout scale is computed from dropout prob
     accum_t sm_scale; // Softmax scale
-
+    scalar_t* O_ptr; // [B,Bm,1,N,H] - output
     // Dimension size
     uint32_t uB;
     uint32_t uN;

@@ -49,13 +49,12 @@ class fmha_forward_t {
     uint32_t uH;
     uint32_t uF;
     uint32_t uT;
-    // Softmax scale is the reciprocal square root of head size by default
-    accum_t sm_scale;
 
     uint32_t bias_strideB;
     uint32_t bias_strideN;
     uint32_t bias_strideF;
-
+    // Softmax scale is the reciprocal square root of head size by default
+    accum_t sm_scale;
     // Dropout scale is computed from dropout prob
     accum_t dp_prob;
     accum_t dp_scale;

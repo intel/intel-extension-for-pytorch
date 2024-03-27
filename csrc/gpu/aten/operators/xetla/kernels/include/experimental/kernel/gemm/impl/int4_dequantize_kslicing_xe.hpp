@@ -308,26 +308,25 @@ class gemm_universal_t<
     /// k x n).
     uint32_t matrix_n;
     /// @brief Is the leading dimension (pitch) size of the matrix A in memory.
-    uint32_t matA_ld;
-    /// @brief Is the leading dimension (pitch) size of the matrix B in memory.
-    uint32_t matB_ld;
-    /// @brief Is the leading dimension (pitch) size of the matrix C in memory.
-    uint32_t matC_ld;
-    /// @brief Is the base address of matrix A.
     matA_base_t matA_base;
     /// @brief Is the base address of matrix B.
+    uint32_t matA_ld;
+    /// @brief Is the leading dimension (pitch) size of the matrix B in memory.
     matB_base_t matB_base;
     /// @brief Is the base address of matrix C.
+    uint32_t matB_ld;
+    /// @brief Is the leading dimension (pitch) size of the matrix C in memory.
     matC_base_t matC_base;
     /// @brief Is the base address of accumulation buffer.
+    uint32_t matC_ld;
+    /// @brief Is the base address of matrix A.
+    scale_base_t scale_base;
+    uint32_t scale_ld;
     acc_base_t acc_base;
     /// @brief Is the base address of counter buffer.
     cnt_base_t cnt_base;
     /// @brief Is the epilogue arguments.
     epilogue_args_t epilogue_args;
-
-    scale_base_t scale_base;
-    uint32_t scale_ld;
 
     /// @brief Constructs arguments with default method.
     inline arguments_t() = default;

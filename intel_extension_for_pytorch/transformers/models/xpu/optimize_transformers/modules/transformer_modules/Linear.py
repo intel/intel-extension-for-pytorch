@@ -12,22 +12,6 @@ class IPEXTransformerLinear(nn.Module):
         return torch.ops.torch_ipex.matmul_bias_out(input, self.weight, self.bias)
 
 
-class IPEXTransformerQLinear(nn.Module):
-    def __init__(self, weight=None, bias=None, scale=None, zp=None, gs=None):
-        super(IPEXTransformerQLinear, self).__init__()
-        # we set the weight and bias to None to avoid any possible memory presure
-        self.weight = None
-        self.bias = None
-        self.scale = None
-        self.zp = None
-        self.gs = None
-
-    def forward(self, input):
-        return torch.ops.torch_ipex.mm_int4(
-            input, self.weight, self.scale, self.zp, self.gs
-        )
-
-
 def matmul_add_add(attn_output, weight, tp_size=1, bias=None, residual=None):
     seq_len, bs, _ = attn_output.size()
     if residual is None:

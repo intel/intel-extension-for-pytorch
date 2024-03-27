@@ -192,8 +192,8 @@ struct gelu_fwd_w_op_t<
   using base_t = typename mem_desc_w_t::base_t;
 
   struct arguments_t {
-    shape_t shape;
     base_t base;
+    shape_t shape;
     inline arguments_t() = default;
     inline arguments_t(base_t base_, shape_t shape_)
         : base(base_), shape(shape_) {}
@@ -323,8 +323,8 @@ struct gelu_bwd_op_t<
   using coord_t = typename mem_desc_x_t::coord_t;
   using base_t = typename mem_desc_x_t::base_t;
   struct arguments_t {
-    shape_t shape;
     base_t base;
+    shape_t shape;
     inline arguments_t() = default;
     inline arguments_t(base_t base_, shape_t shape_)
         : base(base_), shape(shape_) {}
@@ -430,8 +430,8 @@ struct bias_add_op_t<
   using base_t = typename mem_desc_bias_t::base_t;
 
   struct arguments_t {
-    shape_t shape;
     base_t base;
+    shape_t shape;
     inline arguments_t() = default;
     inline arguments_t(base_t base_, shape_t shape_)
         : base(base_), shape(shape_) {}
@@ -788,8 +788,8 @@ struct elemwise_reduce_op_t<
   static constexpr reduce_op reduce_kind = reduce_kind_;
 
   struct arguments_t {
-    shape_t shape;
     base_t base;
+    shape_t shape;
     inline arguments_t() = default;
     inline arguments_t(base_t base_, shape_t shape_)
         : base(base_), shape(shape_) {}
@@ -913,8 +913,8 @@ struct elemwise_reduce_op_stream_k_t<reduce_kind_, dtype_in_, gpu_arch::Xe> {
   static constexpr reduce_op reduce_kind = reduce_kind_;
 
   struct arguments_t {
-    shape_t shape;
     base_t base;
+    shape_t shape;
     inline arguments_t() = default;
     inline arguments_t(base_t base_, shape_t shape_)
         : base(base_), shape(shape_) {}

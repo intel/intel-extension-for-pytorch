@@ -11,6 +11,7 @@ from .transformer_modules.QuantizedAttention import (  # noqa F401
 from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
 from .transformer_modules.Mlp import *  # noqa
+from .transformer_modules.QuantizedMlp import *  # noqa
 from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
 from .transformer_modules.Decoderblock import IPEXTransformerBlock
 import sys

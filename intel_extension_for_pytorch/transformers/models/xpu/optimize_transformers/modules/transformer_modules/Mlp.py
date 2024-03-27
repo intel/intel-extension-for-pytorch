@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.distributed as dist
 
 from .Activation import ACT2FN
-from .Linear import IPEXTransformerLinear, IPEXTransformerQLinear, matmul_add_add
+from .Linear import IPEXTransformerLinear, matmul_add_add
 
 
 class IPEXTransformerBaseMLP(nn.Module):
@@ -151,130 +151,6 @@ class IPEXTransformerMLPOptimizedFp16GeluGptj(IPEXTransformerMLPOptimizedFp16Gel
             1.0 / self.tp_size,
             residual,
             1.0 / self.tp_size,
-        )
-        hidden_states = self.all_reduce_if_necessary(hidden_states)
-        return hidden_states
-
-
-class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
-    def __init__(self, config) -> None:
-        super().__init__(config)
-        self.fc_in_quant = IPEXTransformerQLinear()
-        self.fc_out_quant = IPEXTransformerQLinear()
-
-    # TODO(ganyi): int4 load data
-    def load_parameter(self, fc_in, fc_out):
-        self.fc_in_quant.weight = fc_in.qweight
-        self.fc_out_quant.weight = fc_out.qweight
-
-        self.fc_in_quant.bias = fc_in.bias
-        self.fc_out_quant.bias = fc_out.bias
-
-        self.fc_in_quant.scale = fc_in.scales
-        self.fc_out_quant.scale = fc_out.scales
-
-        self.fc_in_quant.zp = fc_in.qzeros
-        self.fc_out_quant.zp = fc_out.qzeros
-
-        self.fc_in_quant.gs = fc_in.group_size
-        self.fc_out_quant.gs = fc_out.group_size
-
-    def transpose_parameter(self):
-        pass
-
-    def inter_mm(self, hidden_states):
-        if self.fc_in_quant.bias is None:
-            hidden_states = torch.ops.torch_ipex.mm_int4(
-                hidden_states,
-                self.fc_in_quant.weight,
-                self.fc_in_quant.scale,
-                self.fc_in_quant.zp,
-                self.fc_in_quant.gs,
-            )
-        else:
-            hidden_states = torch.ops.torch_ipex.mm_bias_int4(
-                hidden_states,
-                self.fc_in_quant.weight,
-                self.fc_in_quant.bias,
-                self.fc_in_quant.scale,
-                self.fc_in_quant.zp,
-                self.fc_in_quant.gs,
-            )
-
-        return self.act(hidden_states)
-
-    def out_mm(self, hidden_states, residual=None):
-        if self.fc_out_quant.bias is None:
-            hidden_states = torch.ops.torch_ipex.mm_int4(
-                hidden_states,
-                self.fc_out_quant.weight,
-                self.fc_out_quant.scale,
-                self.fc_out_quant.zp,
-                self.fc_out_quant.gs,
-            )
-        else:
-            hidden_states = torch.ops.torch_ipex.mm_bias_int4(
-                hidden_states,
-                self.fc_out_quant.weight,
-                self.fc_out_quant.bias,
-                self.fc_out_quant.scale,
-                self.fc_out_quant.zp,
-                self.fc_out_quant.gs,
-            )
-
-        if residual is not None:
-            hidden_states += residual
-
-        hidden_states = self.all_reduce_if_necessary(hidden_states)
-        return hidden_states
-
-
-class IPEXTransformerMLPOptimizedInt4Gelu(IPEXTransformerMLPOptimizedInt4):
-    def __init__(self, config) -> None:
-        super().__init__(config)
-
-    def inter_mm(self, hidden_states):
-        if self.fc_in_quant.bias is None:
-            hidden_states = torch.ops.torch_ipex.mm_int4(
-                hidden_states,
-                self.fc_in_quant.weight,
-                self.fc_in_quant.scale,
-                self.fc_in_quant.zp,
-                self.fc_in_quant.gs,
-            )
-            hidden_states = self.act(hidden_states)
-        else:
-            hidden_states = torch.ops.torch_ipex.mm_bias_gelu_int4(
-                hidden_states,
-                self.fc_in_quant.weight,
-                self.fc_in_quant.scale,
-                self.fc_in_quant.zp,
-                self.fc_in_quant.bias,
-                self.fc_in_quant.gs,
-                "tanh",
-            )
-        return hidden_states
-
-
-class IPEXTransformerMLPOptimizedInt4GeluGptj(IPEXTransformerMLPOptimizedInt4Gelu):
-    def __init__(self, config) -> None:
-        super().__init__(config)
-
-    def forward(self, hidden_states, attn_output, residual):
-        inter_out = self.inter_mm(hidden_states)
-        out = self.out_mm(inter_out, attn_output, residual)
-        return out
-
-    def out_mm(self, inter_out, attn_out, residual):
-        hidden_states = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(
-            inter_out,
-            self.fc_out_quant.weight,
-            self.fc_out_quant.bias,
-            attn_out,
-            residual,
-            self.fc_out_quant.scale,
-            self.fc_out_quant.zp,
-            self.fc_out_quant.gs,
         )
         hidden_states = self.all_reduce_if_necessary(hidden_states)
         return hidden_states

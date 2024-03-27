@@ -211,9 +211,9 @@ struct mem_desc_t<dtype_, layout_, space_, alignment_, 2> {
         base.base, width, height, pitch, coord_x, coord_y);
   }
 
+  base_t base;
   shape_t shape;
   coord_t coord;
-  base_t base;
 };
 
 } // namespace gpu::xetla

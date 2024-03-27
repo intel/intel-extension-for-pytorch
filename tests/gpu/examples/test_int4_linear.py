@@ -20,8 +20,8 @@ class TestTorchMethod(TestCase):
         scales = scales.reshape([gemm_num, group_num, n])
         zero_points = zero_points.reshape([gemm_num, group_num, int(n / 2)])
 
-        weight_even = (weight & 0x0F).to(torch.int8)
-        weight_odd = (weight >> 4).to(torch.int8)
+        weight_even = (((weight & 0x0F).to(torch.int8) << 4) >> 4).to(torch.int8)
+        weight_odd = (weight.to(torch.int8) >> 4).to(torch.int8)
 
         zp_even = (zero_points & 0x0F).to(torch.int8)
         zp_even += 1
@@ -56,7 +56,7 @@ class TestTorchMethod(TestCase):
         scales = torch.reshape(scales, [gemm_num, k, n])
         zp_fp16 = torch.reshape(zp_fp16, [gemm_num, k, n])
 
-        weight_fp16 = ((weight_fp16 - zp_fp16).to(torch.float16)) * scales
+        weight_fp16 = (weight_fp16.to(torch.float16)) * scales
         if gemm_num == 1:
             weight_fp16 = weight_fp16.reshape([k, n])
         return weight_fp16

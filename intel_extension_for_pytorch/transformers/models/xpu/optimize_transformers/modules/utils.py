@@ -1,6 +1,9 @@
 import torch
 import os
 from ._transformers import IPEXEmptyINT4LinearWithPadding
+from intel_extension_for_pytorch.nn.utils._quantize_convert import (
+    WeightOnlyQuantizedLinear,
+)
 
 
 def is_int4(model):
@@ -64,7 +67,7 @@ def pad_for_gptj_lm_head(model, is_int4=False):
         return
     else:
         setattr(model, "slicing_pad", True)  # noqa
-    if is_int4:
+    if is_int4 and isinstance(model.lm_head, WeightOnlyQuantizedLinear):
         n = model.lm_head.out_features
 
         lm_head_new = IPEXEmptyINT4LinearWithPadding(n)
@@ -73,13 +76,23 @@ def pad_for_gptj_lm_head(model, is_int4=False):
             model.lm_head.bias if model.lm_head.bias is not None else None
         )
         lm_head_new.scales = model.lm_head.scales
-        lm_head_new.qzeros = model.lm_head.qzeros
-        lm_head_new.group_size = model.lm_head.group_size
+        if hasattr(model.lm_head, "qzeros"):
+            lm_head_new.qzeros = model.lm_head.qzeros
+        else:
+            lm_head_new.qzeros = None
+        lm_head_new.group_size = model.lm_head.blocksize
         model.lm_head = lm_head_new
 
+        model.lm_head.qweight.data = model.lm_head.qweight.transpose(0, 1).contiguous()
+        model.lm_head.scales.data = model.lm_head.scales.transpose(0, 1).contiguous()
+        if hasattr(model.lm_head, "qzeros"):
+            model.lm_head.qzeros.data = model.lm_head.qzeros.transpose(
+                0, 1
+            ).contiguous()
         model.lm_head.qweight.data = int4_gemm_padding(model.lm_head.qweight)
         model.lm_head.scales.data = int4_gemm_scale_padding(model.lm_head.scales)
-        model.lm_head.qzeros.data = int4_gemm_padding(model.lm_head.qzeros)
+        if model.lm_head.qzeros is not None:
+            model.lm_head.qzeros.data = int4_gemm_padding(model.lm_head.qzeros)
 
         if model.lm_head.bias is not None:
             model.lm_head.bias.data = int4_gemm_bias_padding(model.lm_head.bias)

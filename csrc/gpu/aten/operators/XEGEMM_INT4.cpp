@@ -58,6 +58,8 @@ static void mm_qkv_out_wint4(
     const Tensor& out2_,
     int64_t calib_gz) {
   auto input = input_.flatten(0, -2);
+  if (input.scalar_type() == ScalarType::Float)
+    input = input.to(at::kHalf);
   auto out0 = out0_.flatten(0, -2);
   auto out1 = out1_.flatten(0, -2);
   auto out2 = out2_.flatten(0, -2);
@@ -85,7 +87,8 @@ static void mm_qkv_out_wint4(
   TORCH_CHECK(is_a_contiguous && is_b_row_major);
   TORCH_CHECK(
       input.scalar_type() == kHalf &&
-      (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte));
+      (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
+       weight.scalar_type() == kChar));
 
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
@@ -103,6 +106,8 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
     const Tensor& weight_zp,
     int64_t calib_gz) {
   auto input_flat = input.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
   int m = input_flat.sizes()[0];
   int k = input_flat.sizes()[1];
   int n = weight.sizes()[2] * 2;
@@ -128,6 +133,8 @@ static Tensor mm_bias_int4(
     int64_t calib_gz) {
   auto input_flat = input.flatten(0, -2);
   auto weight_flat = weight.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
 
   int m = input_flat.sizes()[0];
   int k = input_flat.sizes()[1];
@@ -164,6 +171,8 @@ static Tensor mm_int4(
     int64_t calib_gz) {
   auto input_flat = input.flatten(0, -2);
   auto weight_flat = weight.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
 
   int m = input_flat.sizes()[0];
   int k = input_flat.sizes()[1];
@@ -198,6 +207,8 @@ static Tensor mm_silu_int4(
     int64_t calib_gz) {
   auto input_flat = input.flatten(0, -2);
   auto weight_flat = weight.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   int m = input_flat.sizes()[0];
@@ -233,6 +244,8 @@ static Tensor mm_resmul_int4(
   auto input_flat = input.flatten(0, -2);
   auto weight_flat = weight.flatten(0, -2);
   auto res_flat = res.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   int m = input_flat.sizes()[0];
@@ -269,6 +282,8 @@ static Tensor mm_bias_gelu_int4(
   auto input_flat = input.flatten(0, -2);
   auto weight_flat = weight.flatten(0, -2);
   auto bias_flat = bias.flatten();
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
   TORCH_CHECK(approximate == "tanh");
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
@@ -311,6 +326,8 @@ static Tensor mm_bias_resadd_resadd_int4(
   auto bias = bias_.flatten();
   auto res0 = res0_.flatten(0, -2);
   auto res1 = res1_.flatten(0, -2);
+  if (input.scalar_type() == ScalarType::Float)
+    input = input.to(at::kHalf);
   // a: m x k, b: k x n, bias: n, res0/1: m x n
   TORCH_CHECK(
       input.dim() == 2 && weight.dim() == 2 && bias.dim() == 1 &&
@@ -341,6 +358,186 @@ static Tensor mm_bias_resadd_resadd_int4(
   return resize_as_mat1(input_, output);
 }
 
+static Tensor mm_low_bits(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    const Tensor& bias,
+    bool has_bias,
+    const std::string& compute_dtype,
+    const std::string& weight_dtype,
+    int64_t calib_gz) {
+  return has_bias
+      ? mm_bias_int4(input, weight, bias, weight_scl, weight_zp, calib_gz)
+      : mm_int4(input, weight, weight_scl, weight_zp, calib_gz);
+}
+
+static Tensor mm_silu_mul_int4(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t calib_gz,
+    const Tensor& res) {
+  auto input_flat = input.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
+  auto weight_flat = weight.flatten(0, -2);
+  auto res_flat = res.flatten(0, -2);
+  // a: m x k, b: k x n
+  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  int m = input_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
+  int k = input_flat.sizes()[1];
+  auto output = at::empty({m, n}, input.options());
+
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t is_2d_block =
+      static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
+  auto policy =
+      HGEMMXetla_INT4()
+          .add_matrix_out(output)
+          .add_matrix_inp(input_flat)
+          .add_matrix_wei(weight_flat)
+          .add_matrix_scl(weight_scl)
+          .add_matrix_zp(weight_zp)
+          .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
+          .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
+          .add_calib_gz(calib_gz)
+          .add_arch(is_2d_block)
+          .build();
+  TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
+  policy.run();
+  return resize_as_mat1(input, output);
+}
+
+static Tensor mm_bias_silu_mul_int4(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t calib_gz,
+    const Tensor& res) {
+  auto input_flat = input.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
+  auto weight_flat = weight.flatten(0, -2);
+  auto res_flat = res.flatten(0, -2);
+  auto bias_flat = bias.flatten();
+  // a: m x k, b: k x n
+  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  int m = input_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
+  int k = input_flat.sizes()[1];
+  auto output = at::empty({m, n}, input.options());
+
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t is_2d_block =
+      static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
+  auto policy =
+      HGEMMXetla_INT4()
+          .add_matrix_out(output)
+          .add_matrix_inp(input_flat)
+          .add_matrix_wei(weight_flat)
+          .add_matrix_scl(weight_scl)
+          .add_matrix_zp(weight_zp)
+          .add_epilogue(bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS)
+          .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
+          .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
+          .add_calib_gz(calib_gz)
+          .add_arch(is_2d_block)
+          .build();
+  TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
+  policy.run();
+  return resize_as_mat1(input, output);
+}
+
+static Tensor mm_add_int4(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t calib_gz,
+    const Tensor& res) {
+  auto input_flat = input.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
+  auto weight_flat = weight.flatten(0, -2);
+  auto res_flat = res.flatten(0, -2);
+  // a: m x k, b: k x n
+  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  int m = input_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
+  int k = input_flat.sizes()[1];
+  auto output = at::empty({m, n}, input.options());
+
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t is_2d_block =
+      static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
+  auto policy =
+      HGEMMXetla_INT4()
+          .add_matrix_out(output)
+          .add_matrix_inp(input_flat)
+          .add_matrix_wei(weight_flat)
+          .add_matrix_scl(weight_scl)
+          .add_matrix_zp(weight_zp)
+          .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD)
+          .add_calib_gz(calib_gz)
+          .add_arch(is_2d_block)
+          .build();
+  TORCH_CHECK(policy.fallback() == false, "mm add int4: invalid gemm shape");
+  policy.run();
+  return resize_as_mat1(input, output);
+}
+
+static Tensor mm_bias_add_int4(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t calib_gz,
+    const Tensor& res) {
+  auto input_flat = input.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
+  auto weight_flat = weight.flatten(0, -2);
+  auto res_flat = res.flatten(0, -2);
+  auto bias_flat = bias.flatten();
+  // a: m x k, b: k x n
+  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  int m = input_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
+  int k = input_flat.sizes()[1];
+  auto output = at::empty({m, n}, input.options());
+
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t is_2d_block =
+      static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
+  auto policy =
+      HGEMMXetla_INT4()
+          .add_matrix_out(output)
+          .add_matrix_inp(input_flat)
+          .add_matrix_wei(weight_flat)
+          .add_matrix_scl(weight_scl)
+          .add_matrix_zp(weight_zp)
+          .add_epilogue(bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS)
+          .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD)
+          .add_calib_gz(calib_gz)
+          .add_arch(is_2d_block)
+          .build();
+  TORCH_CHECK(
+      policy.fallback() == false, "mm bias add int4: invalid gemm shape");
+  policy.run();
+  return resize_as_mat1(input, output);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -358,6 +555,14 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER(
       "mm_bias_resadd_resadd_int4.xpu",
       at::AtenIpexTypeXPU::mm_bias_resadd_resadd_int4);
+  IPEX_OP_REGISTER("mm_low_bits.xpu", at::AtenIpexTypeXPU::mm_low_bits);
+  IPEX_OP_REGISTER(
+      "mm_silu_mul_int4.xpu", at::AtenIpexTypeXPU::mm_silu_mul_int4);
+  IPEX_OP_REGISTER(
+      "mm_bias_silu_mul_int4.xpu", at::AtenIpexTypeXPU::mm_bias_silu_mul_int4);
+  IPEX_OP_REGISTER("mm_add_int4.xpu", at::AtenIpexTypeXPU::mm_add_int4);
+  IPEX_OP_REGISTER(
+      "mm_bias_add_int4.xpu", at::AtenIpexTypeXPU::mm_bias_add_int4);
 }
 } // namespace
 #endif

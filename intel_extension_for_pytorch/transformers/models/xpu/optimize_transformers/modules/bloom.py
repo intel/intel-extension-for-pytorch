@@ -17,7 +17,6 @@ from .transformer_modules.Mlp import *  # noqa
 from .transformer_modules.Decoderblock import IPEXTransformerBlock
 from .transformer_modules.Linear import (  # noqa F401
     IPEXTransformerLinear,
-    IPEXTransformerQLinear,
 )  # noqa
 
 import os

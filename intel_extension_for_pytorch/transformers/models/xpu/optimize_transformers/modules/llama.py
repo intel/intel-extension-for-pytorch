@@ -7,10 +7,6 @@ from .transformer_modules.Norm import LlamaRMSNorm
 
 from ._transformers import MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
-from .transformer_modules.Mlp import (  # noqa F401
-    IPEXTransformerBaseMLP,
-    IPEXTransformerMLPOptimizedFp16,
-)
 from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
 from .transformer_modules.QuantizedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16,
@@ -19,9 +15,11 @@ from .transformer_modules.QuantizedAttention import (  # noqa F401
 from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
 from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
+    IPEXTransformerAttnOptimizedInt4Grouped,
 )
 from .transformer_modules.Decoderblock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
+from .transformer_modules.QuantizedMlp import *  # noqa
 import sys
 
 import os

@@ -3,6 +3,81 @@ import intel_extension_for_pytorch as ipex
 from .RoPE import apply_rotary_pos_emb
 
 
+def qwen_load_attn_params_fp16(self, qkv_layer, out_layer):
+    self.qkv_proj.weight = qkv_layer.weight
+    if qkv_layer.bias is not None:
+        self.qkv_proj.bias = qkv_layer.bias
+        self.qkv_proj.bias.data = self.qkv_proj.bias.reshape(3, -1).contiguous()
+
+    self.out_proj.weight = out_layer.weight
+    self.out_proj.bias = out_layer.bias
+
+
+def qwen_transpose_attn_params_fp16(self):
+    self.qkv_proj.weight.data = (
+        self.qkv_proj.weight.reshape(3, -1, self.embed_dim)
+        .permute(0, 2, 1)
+        .contiguous()
+    )
+    self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
+    torch.xpu.synchronize()
+
+
+def qwen_load_attn_params_int4(self, qkv_layer, out_layer):
+    self.qkv_proj_quant.set_weights_bias(qkv_layer.qweight, qkv_layer.bias)
+    self.qkv_proj_quant.set_scales_zps_gidx(qkv_layer.scales, qkv_layer.qzeros)
+    self.qkv_proj_quant.blocksize = qkv_layer.blocksize
+
+    if qkv_layer.bias is not None:
+        self.qkv_proj_quant.bias.data = self.qkv_proj_quant.bias.data.reshape(
+            3, -1
+        ).contiguous()
+
+    self.out_proj_quant.set_weights_bias(out_layer.qweight, out_layer.bias)
+    self.out_proj_quant.set_scales_zps_gidx(out_layer.scales, out_layer.qzeros)
+    self.out_proj_quant.blocksize = out_layer.blocksize
+
+    qkv_layer.qweight = None
+    qkv_layer.bias = None
+    qkv_layer.scales = None
+    qkv_layer.qzeros = None
+
+    out_layer.qweight = None
+    out_layer.bias = None
+    out_layer.scales = None
+    out_layer.qzeros = None
+
+
+def qwen_transpose_attn_params_int4(self):
+    self.qkv_proj_quant.qweight.data = (
+        self.qkv_proj_quant.qweight.reshape(3, -1, self.embed_dim)
+        .permute(0, 2, 1)
+        .contiguous()
+    )
+    self.qkv_proj_quant.scales.data = (
+        self.qkv_proj_quant.scales.reshape(3, self.embed_dim, -1)
+        .permute(0, 2, 1)
+        .contiguous()
+        .view(3, -1, self.embed_dim // 2)
+    )
+    self.qkv_proj_quant.qzeros.data = (
+        self.qkv_proj_quant.qzeros.reshape(3, self.embed_dim // 2, -1)
+        .permute(0, 2, 1)
+        .contiguous()
+    )
+
+    self.out_proj_quant.qweight.data = self.out_proj_quant.qweight.transpose(
+        0, 1
+    ).contiguous()
+    self.out_proj_quant.scales.data = self.out_proj_quant.scales.transpose(
+        0, 1
+    ).contiguous()
+    self.out_proj_quant.qzeros.data = self.out_proj_quant.qzeros.transpose(
+        0, 1
+    ).contiguous()
+    torch.xpu.synchronize()
+
+
 def qwen_post_qkv(self, query, key, value, position_ids, layer_past, **kwargs):
     bs_beam, seq, _ = self.get_runtime_shape(query)
     seq = seq if layer_past is None else layer_past[0].size(2) + 1
