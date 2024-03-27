@@ -85,7 +85,7 @@ static inline c10::ScalarType toAccumulateType(c10::ScalarType type) {
   case ScalarType::TypeNum:            \
     return CppTypeToScalarType<at::AtenIpexTypeXPU::acc_type<scalar_t>>::value;
 
-    IPEX_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(DEFINE_CASE)
+    IPEX_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF_F8NZ(DEFINE_CASE)
 #undef DEFINE_CASE
 
     default:
