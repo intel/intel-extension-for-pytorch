@@ -185,8 +185,7 @@ $(document).ready(function() {
         ret += "</div>";
         indexb += 1;
       }
-      if(data.system_requirements.software != null &&
-         !$.pkgInArray(data.package, ["docker"])) {
+      if(data.system_requirements.software != null) {
         ret += "<div class=\"simple\">";
         ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Software</h3>";
 
@@ -194,39 +193,41 @@ $(document).ready(function() {
           ret += $.table_2d_gen(data.system_requirements.software.driver);
         }
 
-        var items = [];
-        if(data.system_requirements.software.os != null) {
-          var item = {};
-          item["Software"] = "OS";
-          item["Version"] = data.system_requirements.software.os.join(", ");
-          items.push(item);
+        if(!$.pkgInArray(data.package, ["docker"])) {
+          var items = [];
+          if(data.system_requirements.software.os != null) {
+            var item = {};
+            item["Software"] = "OS";
+            item["Version"] = data.system_requirements.software.os.join(", ");
+            items.push(item);
+          }
+          if(data.system_requirements.software.basekit != null) {
+            var item = {};
+            item["Software"] = "Intel® oneAPI Base Toolkit";
+            item["Version"] = data.system_requirements.software.basekit;
+            items.push(item);
+          }
+          if(data.system_requirements.software.basekit_hotfix != null) {
+            var item = {};
+            item["Software"] = "Intel® oneAPI Base Toolkit Hotfix";
+            item["Version"] = data.system_requirements.software.basekit_hotfix;
+            items.push(item);
+          }
+          if(data.system_requirements.software.python != null) {
+            var item = {};
+            item["Software"] = "Python";
+            item["Version"] = data.system_requirements.software.python.join(", ");
+            items.push(item);
+          }
+          if(data.system_requirements.software.compiler != null &&
+             $.pkgInArray(data.package, ["source", "cppsdk"])) {
+            var item = {};
+            item["Software"] = "Compiler";
+            item["Version"] = data.system_requirements.software.compiler;
+            items.push(item);
+          }
+          ret += $.table_2d_gen(items);
         }
-        if(data.system_requirements.software.basekit != null) {
-          var item = {};
-          item["Software"] = "Intel® oneAPI Base Toolkit";
-          item["Version"] = data.system_requirements.software.basekit;
-          items.push(item);
-        }
-        if(data.system_requirements.software.basekit_hotfix != null) {
-          var item = {};
-          item["Software"] = "Intel® oneAPI Base Toolkit Hotfix";
-          item["Version"] = data.system_requirements.software.basekit_hotfix;
-          items.push(item);
-        }
-        if(data.system_requirements.software.python != null) {
-          var item = {};
-          item["Software"] = "Python";
-          item["Version"] = data.system_requirements.software.python.join(", ");
-          items.push(item);
-        }
-        if(data.system_requirements.software.compiler != null &&
-           $.pkgInArray(data.package, ["source", "cppsdk"])) {
-          var item = {};
-          item["Software"] = "Compiler";
-          item["Version"] = data.system_requirements.software.compiler;
-          items.push(item);
-        }
-        ret += $.table_2d_gen(items);
 
         ret += "</div>";
         indexb += 1;
@@ -256,6 +257,14 @@ $(document).ready(function() {
           ret += "</div>";
           indexb += 1;
         }
+        if(data.preparation.msvc_redist != null &&
+           !$.pkgInArray(data.package, ["source", "cppsdk"])) {
+          ret += "<div class=\"simple\">";
+          ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Install Microsoft Visual C++ Redistributable</h3>";
+          ret += "<p>" + data.preparation.msvc_redist + "</p>";
+          ret += "</div>";
+          indexb += 1;
+        }
         if(data.preparation.basekit != null) {
           ret += "<div class=\"simple\">";
           ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Install Intel® oneAPI Base Toolkit</h3>";
@@ -265,7 +274,13 @@ $(document).ready(function() {
           //   note += $.ul_gen(data.preparation.basekit.notinstall);
           //   notes.push(note);
           // }
-          var note = "<p>Recommend to use individual component-specific activation scripts to activate required components listed below one-by-one. Check the <i>Sanity Test</i> section below for a usage example.</p>";
+          var activate_script = "servars.sh";
+          if(data.os == "Windows")
+            activate_script = "servars.bat";
+          var note = "<p>Use either individual component-specific activation scripts to activate required components listed below one-by-one, or use the oneAPI bundle script <code>" + activate_script + "</code> to activate the whole oneAPI environment. Check the <i>Sanity Test</i> section below for a usage example.</p>";
+          if($.pkgInArray(data.package, ["source"])) {
+            var note = "<p>Use individual component-specific activation scripts to activate required components listed below one-by-one. Check the <i>Sanity Test</i> section below for a usage example.</p>";
+          }
           notes.push(note);
           if(data.preparation.msvc != null &&
              $.pkgInArray(data.package, ["source", "cppsdk"]))
@@ -278,7 +293,10 @@ $(document).ready(function() {
             ret += "<p>The following Intel® oneAPI Base Toolkit components are required:</p>";
             var components = [];
             $.each(data.preparation.basekit.install, function(index, value) {
-              components.push(value.name + " (Placeholder <cite>" + value.placeholder + "</cite> as its installation path)");
+              placeholder_example = "";
+              if(value.placeholder_example != null)
+                placeholder_example = ", <i>e.g. " + value.placeholder_example + "</i>";
+              components.push(value.name + " (Placeholder <cite>" + value.placeholder + "</cite> as its installation path" + placeholder_example + ")");
             });
             ret += $.ul_gen(components);
 
@@ -294,7 +312,7 @@ $(document).ready(function() {
                 }
               });
               if(linux_dist.length > 0) {
-                ret += "<p>Recommend to use a package manager like apt, yum or dnf to install the packages above. Follow instructions at <a href=\"https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html?operatingsystem=linux\">Intel® oneAPI Base Toolkit Download page</a> to setup the package manager repository.</p>";
+                ret += "<p>Recommend using a <b>package manager</b> like apt, yum or dnf to install the packages above. <b>Follow instructions at <a href=\"https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html?operatingsystem=linux\">Intel® oneAPI Base Toolkit Download page</a> to setup the package manager repository.</b></p>";
                 ret += "<p>Take reference to commands below to install the packages on individual Linux distributions.</p>";
                 $.each(linux_dist, function(index0, value0) {
                   var packages = [];
@@ -646,6 +664,15 @@ $(document).ready(function() {
   }
 
   $.ajax_query = function(query) {
+    query_json = JSON.parse(query);
+    var hashes = [];
+    for(var key in query_json) {
+        if(query_json.hasOwnProperty(key)) {
+            var pair = encodeURIComponent(key) + "=" + encodeURIComponent(query_json[key]);
+            hashes.push(pair.toLowerCase());
+        }
+	}
+    window.location.hash = "#installation?" + hashes.join("&");
     var formdata = new FormData();
     formdata.append("query", query);
     $.ajax({
