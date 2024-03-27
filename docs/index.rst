@@ -27,7 +27,7 @@ Intel® Extension for PyTorch* has been released as an open–source project at 
 You can find more information about the product at:
 
 - `Features <https://intel.github.io/intel-extension-for-pytorch/gpu/latest/tutorials/features>`_
-- `Performance <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance>`_ 
+- `Performance <./tutorials/performance.html>`_ 
 
 Architecture
 ------------
@@ -59,6 +59,7 @@ The team tracks bugs and enhancement requests using `GitHub issues <https://gith
    tutorials/introduction
    tutorials/features
    Large Language Models (LLM)<tutorials/llm>
+   tutorials/performance
    tutorials/technical_details
    tutorials/releases
    tutorials/performance_tuning/known_issues
@@ -81,15 +82,6 @@ The team tracks bugs and enhancement requests using `GitHub issues <https://gith
    :hidden:
 
    tutorials/api_doc
-   
-.. toctree::
-   :maxdepth: 3
-   :caption: PERFORMANCE TUNING
-   :hidden:
-
-   tutorials/performance_tuning/tuning_guide
-   tutorials/performance_tuning/launch_script
-   tutorials/performance_tuning/torchserve   
    
 .. toctree::
    :maxdepth: 3
