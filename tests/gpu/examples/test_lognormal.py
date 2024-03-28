@@ -3,14 +3,13 @@ from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
 
-import pytest
+import pytest  # noqa
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
 class TestLogNormal(TestCase):
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
     def test_lognormal(self, dtype=torch.float):
         lognormal = torch.ones(1000000, device=dpcpp_device)
         torch.xpu.manual_seed(100)  # manually set seed

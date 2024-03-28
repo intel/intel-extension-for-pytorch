@@ -1093,6 +1093,117 @@ static void apply_orgqr_dpcpp_(
 #endif
 }
 
+// do nothing here, only for template specialization
+template <typename scalar>
+void apply_ungqr_dpcpp_(
+    Tensor& self_,
+    const Tensor& tau_,
+    int64_t m_,
+    int64_t n_columns_,
+    int64_t k_,
+    std::vector<int32_t>& infos_) {}
+
+// ungqr is a complex version for orgqr
+template <>
+void apply_ungqr_dpcpp_<c10::complex<float>>(
+    Tensor& self_,
+    const Tensor& tau_,
+    int64_t m_,
+    int64_t n_columns_,
+    int64_t k_,
+    std::vector<int32_t>& infos_) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  int64_t batch_size = native::batchCount(self_);
+
+  int64_t m = m_;
+  int64_t n = n_columns_;
+  int64_t k = k_;
+  int64_t lda = self_.size(-2);
+  int64_t stride_a = native::matrixStride(self_);
+  int64_t stride_tau = tau_.size(-1);
+
+  auto a = static_cast<std::complex<float>*>(self_.data_ptr());
+  auto tau = static_cast<std::complex<float>*>(tau_.data_ptr());
+
+  int64_t scratchpadsize =
+      oneapi::mkl::lapack::ungqr_batch_scratchpad_size<std::complex<float>>(
+          dpcpp_queue, m, n, k, lda, stride_a, stride_tau, batch_size);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
+  try {
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::ungqr_batch,
+        dpcpp_queue,
+        m,
+        n,
+        k,
+        a,
+        lda,
+        stride_a,
+        tau,
+        stride_tau,
+        batch_size,
+        static_cast<std::complex<float>*>(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  } catch (oneapi::mkl::lapack::batch_error be) {
+    error_handle(infos_, be);
+  }
+#else
+  AT_ERROR("ungqr: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+void apply_ungqr_dpcpp_<c10::complex<double>>(
+    Tensor& self_,
+    const Tensor& tau_,
+    int64_t m_,
+    int64_t n_columns_,
+    int64_t k_,
+    std::vector<int32_t>& infos_) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  int64_t batch_size = native::batchCount(self_);
+
+  int64_t m = m_;
+  int64_t n = n_columns_;
+  int64_t k = k_;
+  int64_t lda = self_.size(-2);
+  int64_t stride_a = native::matrixStride(self_);
+  int64_t stride_tau = tau_.size(-1);
+
+  auto a = static_cast<std::complex<double>*>(self_.data_ptr());
+  auto tau = static_cast<std::complex<double>*>(tau_.data_ptr());
+
+  int64_t scratchpadsize =
+      oneapi::mkl::lapack::ungqr_batch_scratchpad_size<std::complex<double>>(
+          dpcpp_queue, m, n, k, lda, stride_a, stride_tau, batch_size);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, self_.options());
+  try {
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::ungqr_batch,
+        dpcpp_queue,
+        m,
+        n,
+        k,
+        a,
+        lda,
+        stride_a,
+        tau,
+        stride_tau,
+        batch_size,
+        static_cast<std::complex<double>*>(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  } catch (oneapi::mkl::lapack::batch_error be) {
+    error_handle(infos_, be);
+  }
+#else
+  AT_ERROR("ungqr: oneMKL library not found in compilation");
+#endif
+}
+
 template <typename scalar_t>
 static void apply_ormqr_dpcpp_(
     const Tensor& a_,
@@ -1148,6 +1259,139 @@ static void apply_ormqr_dpcpp_(
   }
 #else
   AT_ERROR("lu: oneMKL library not found in compilation");
+#endif
+}
+
+// do nothing here, only for template specialization
+template <typename scalar_t>
+void apply_unmqr_dpcpp_(
+    const Tensor& a_,
+    const Tensor& tau_,
+    Tensor& c_,
+    const int64_t m_,
+    const int64_t n_,
+    const int64_t k_,
+    const bool left_,
+    const bool transpose_,
+    int64_t& info_) {}
+
+// unmqr is the complex support for ormqr
+template <>
+void apply_unmqr_dpcpp_<c10::complex<float>>(
+    const Tensor& a_,
+    const Tensor& tau_,
+    Tensor& c_,
+    const int64_t m_,
+    const int64_t n_,
+    const int64_t k_,
+    const bool left_,
+    const bool transpose_,
+    int64_t& info_) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto left_right =
+      (left_ ? oneapi::mkl::side::left : oneapi::mkl::side::right);
+  auto trans =
+      (transpose_ ? oneapi::mkl::transpose::trans
+                  : oneapi::mkl::transpose::nontrans);
+  int64_t m = m_;
+  int64_t n = n_;
+  int64_t k = k_;
+  int64_t lda = (left_ ? m : n);
+  int64_t ldc = m;
+  auto a = static_cast<std::complex<float>*>(a_.data_ptr());
+  auto tau = static_cast<std::complex<float>*>(tau_.data_ptr());
+  auto c = static_cast<std::complex<float>*>(c_.data_ptr());
+
+  int64_t scratchpadsize =
+      oneapi::mkl::lapack::unmqr_scratchpad_size<std::complex<float>>(
+          dpcpp_queue, left_right, trans, m, n, k, lda, ldc);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, c_.options());
+  try {
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::unmqr,
+        dpcpp_queue,
+        left_right,
+        trans,
+        m,
+        n,
+        k,
+        a,
+        lda,
+        tau,
+        c,
+        ldc,
+        static_cast<std::complex<float>*>(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  } catch (oneapi::mkl::lapack::exception e) {
+    std::cout << "Cathed lapack exception:"
+              << "\nWhat: " << e.what() << "\nInfo: " << e.info()
+              << "\nDetail: " << e.detail() << std::endl;
+    info_ = e.info();
+  }
+#else
+  AT_ERROR("unmqr: oneMKL library not found in compilation");
+#endif
+}
+
+// unmqr is the complex support for ormqr
+template <>
+void apply_unmqr_dpcpp_<c10::complex<double>>(
+    const Tensor& a_,
+    const Tensor& tau_,
+    Tensor& c_,
+    const int64_t m_,
+    const int64_t n_,
+    const int64_t k_,
+    const bool left_,
+    const bool transpose_,
+    int64_t& info_) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto left_right =
+      (left_ ? oneapi::mkl::side::left : oneapi::mkl::side::right);
+  auto trans =
+      (transpose_ ? oneapi::mkl::transpose::trans
+                  : oneapi::mkl::transpose::nontrans);
+  int64_t m = m_;
+  int64_t n = n_;
+  int64_t k = k_;
+  int64_t lda = (left_ ? m : n);
+  int64_t ldc = m;
+  auto a = static_cast<std::complex<double>*>(a_.data_ptr());
+  auto tau = static_cast<std::complex<double>*>(tau_.data_ptr());
+  auto c = static_cast<std::complex<double>*>(c_.data_ptr());
+
+  int64_t scratchpadsize =
+      oneapi::mkl::lapack::unmqr_scratchpad_size<std::complex<double>>(
+          dpcpp_queue, left_right, trans, m, n, k, lda, ldc);
+  Tensor scratchpad_at = at::empty({scratchpadsize}, c_.options());
+  try {
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::unmqr,
+        dpcpp_queue,
+        left_right,
+        trans,
+        m,
+        n,
+        k,
+        a,
+        lda,
+        tau,
+        c,
+        ldc,
+        static_cast<std::complex<double>*>(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  } catch (oneapi::mkl::lapack::exception e) {
+    std::cout << "Cathed lapack exception:"
+              << "\nWhat: " << e.what() << "\nInfo: " << e.info()
+              << "\nDetail: " << e.detail() << std::endl;
+    info_ = e.info();
+  }
+#else
+  AT_ERROR("unmqr: oneMKL library not found in compilation");
 #endif
 }
 
@@ -1419,6 +1663,102 @@ static void apply_symeig(
         n,
         w,
         (scalar_t*)(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  }
+#else
+  AT_ERROR("symeig: oneMKL library not found in compilation");
+#endif
+}
+
+template <typename scalar_t>
+static void apply_heevd(
+    Tensor& self,
+    Tensor& eigvals,
+    bool eigenvectors,
+    bool upper,
+    std::vector<int32_t>& infos) {}
+
+template <>
+static void apply_heevd<c10::complex<float>>(
+    Tensor& self,
+    Tensor& eigvals,
+    bool eigenvectors,
+    bool upper,
+    std::vector<int32_t>& infos) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto n = self.size(-1);
+  auto batch_size = native::batchCount(self);
+
+  auto a_stride = native::matrixStride(self);
+  auto w_stride = eigvals.size(-1);
+
+  auto jobz = eigenvectors ? oneapi::mkl::job::vec : oneapi::mkl::job::novec;
+  auto uplo = upper ? oneapi::mkl::uplo::upper : oneapi::mkl::uplo::lower;
+  std::int64_t scratchpadsize =
+      oneapi::mkl::lapack::heevd_scratchpad_size<std::complex<float>>(
+          dpcpp_queue, jobz, uplo, n, n);
+
+  for (const auto i : c10::irange(batch_size)) {
+    Tensor scratchpad_at = at::empty({scratchpadsize}, self.options());
+    std::complex<float>* a = reinterpret_cast<std::complex<float>*>(
+        &(self.data_ptr<c10::complex<float>>()[i * a_stride]));
+    float* w = &(eigvals.data_ptr<float>()[i * w_stride]);
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::heevd,
+        dpcpp_queue,
+        jobz,
+        uplo,
+        n,
+        a,
+        n,
+        w,
+        static_cast<std::complex<float>*>(scratchpad_at.data_ptr()),
+        scratchpadsize);
+  }
+#else
+  AT_ERROR("symeig: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+static void apply_heevd<c10::complex<double>>(
+    Tensor& self,
+    Tensor& eigvals,
+    bool eigenvectors,
+    bool upper,
+    std::vector<int32_t>& infos) {
+#ifdef USE_ONEMKL
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto n = self.size(-1);
+  auto batch_size = native::batchCount(self);
+
+  auto a_stride = native::matrixStride(self);
+  auto w_stride = eigvals.size(-1);
+
+  auto jobz = eigenvectors ? oneapi::mkl::job::vec : oneapi::mkl::job::novec;
+  auto uplo = upper ? oneapi::mkl::uplo::upper : oneapi::mkl::uplo::lower;
+  std::int64_t scratchpadsize =
+      oneapi::mkl::lapack::heevd_scratchpad_size<std::complex<double>>(
+          dpcpp_queue, jobz, uplo, n, n);
+
+  for (const auto i : c10::irange(batch_size)) {
+    Tensor scratchpad_at = at::empty({scratchpadsize}, self.options());
+    std::complex<double>* a = reinterpret_cast<std::complex<double>*>(
+        &(self.data_ptr<c10::complex<double>>()[i * a_stride]));
+    double* w = &(eigvals.data_ptr<double>()[i * w_stride]);
+    DPCPP_ONEMKL_SUBMIT(
+        dpcpp_queue,
+        oneapi::mkl::lapack::heevd,
+        dpcpp_queue,
+        jobz,
+        uplo,
+        n,
+        a,
+        n,
+        w,
+        static_cast<std::complex<double>*>(scratchpad_at.data_ptr()),
         scratchpadsize);
   }
 #else
@@ -1784,6 +2124,174 @@ void trans_and_apply_triangular_solve<c10::complex<double>>(
 }
 
 template <typename scalar_t>
+int64_t mkl_potrs_batch_scratchpad(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    int64_t nrhs,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size) {
+#ifdef USE_ONEMKL
+  return oneapi::mkl::lapack::potrs_batch_scratchpad_size<scalar_t>(
+      queue, uplo, n, nrhs, lda, stride_a, ldb, stride_b, batch_size);
+#else
+  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+int64_t mkl_potrs_batch_scratchpad<c10::complex<float>>(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    int64_t nrhs,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size) {
+#ifdef USE_ONEMKL
+  return oneapi::mkl::lapack::potrs_batch_scratchpad_size<std::complex<float>>(
+      queue, uplo, n, nrhs, lda, stride_a, ldb, stride_b, batch_size);
+#else
+  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+int64_t mkl_potrs_batch_scratchpad<c10::complex<double>>(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    int64_t nrhs,
+    int64_t lda,
+    int64_t stride_a,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size) {
+#ifdef USE_ONEMKL
+  return oneapi::mkl::lapack::potrs_batch_scratchpad_size<std::complex<double>>(
+      queue, uplo, n, nrhs, lda, stride_a, ldb, stride_b, batch_size);
+#else
+  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
+#endif
+}
+
+template <typename scalar_t>
+void mkl_potrs_batch(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    int64_t nrhs,
+    scalar_t* a,
+    int64_t lda,
+    int64_t stride_a,
+    scalar_t* b,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size,
+    scalar_t* scratchpad,
+    int scratchpadsize) {
+#ifdef USE_ONEMKL
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::potrs_batch,
+      queue,
+      uplo,
+      n,
+      nrhs,
+      a,
+      lda,
+      stride_a,
+      b,
+      ldb,
+      stride_b,
+      batch_size,
+      scratchpad,
+      scratchpadsize);
+#else
+  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+void mkl_potrs_batch<c10::complex<float>>(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    int64_t nrhs,
+    c10::complex<float>* a,
+    int64_t lda,
+    int64_t stride_a,
+    c10::complex<float>* b,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size,
+    c10::complex<float>* scratchpad,
+    int scratchpadsize) {
+#ifdef USE_ONEMKL
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::potrs_batch,
+      queue,
+      uplo,
+      n,
+      nrhs,
+      reinterpret_cast<std::complex<float>*>(a),
+      lda,
+      stride_a,
+      reinterpret_cast<std::complex<float>*>(b),
+      ldb,
+      stride_b,
+      batch_size,
+      reinterpret_cast<std::complex<float>*>(scratchpad),
+      scratchpadsize);
+#else
+  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
+#endif
+}
+
+template <>
+void mkl_potrs_batch<c10::complex<double>>(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    int64_t nrhs,
+    c10::complex<double>* a,
+    int64_t lda,
+    int64_t stride_a,
+    c10::complex<double>* b,
+    int64_t ldb,
+    int64_t stride_b,
+    int64_t batch_size,
+    c10::complex<double>* scratchpad,
+    int scratchpadsize) {
+#ifdef USE_ONEMKL
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::potrs_batch,
+      queue,
+      uplo,
+      n,
+      nrhs,
+      reinterpret_cast<std::complex<double>*>(a),
+      lda,
+      stride_a,
+      reinterpret_cast<std::complex<double>*>(b),
+      ldb,
+      stride_b,
+      batch_size,
+      reinterpret_cast<std::complex<double>*>(scratchpad),
+      scratchpadsize);
+#else
+  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
+#endif
+}
+
+template <typename scalar_t>
 static void apply_cholesky_solve_dpcpp_(
     const Tensor& b_,
     const Tensor& A_,
@@ -1804,14 +2312,11 @@ static void apply_cholesky_solve_dpcpp_(
   scalar_t* a = (scalar_t*)(A_.data_ptr());
   scalar_t* b = (scalar_t*)(b_.data_ptr());
 
-  int64_t scratchpadsize =
-      oneapi::mkl::lapack::potrs_batch_scratchpad_size<scalar_t>(
-          dpcpp_queue, uplo, n, nrhs, lda, stride_a, ldb, stride_b, batch_size);
+  int64_t scratchpadsize = mkl_potrs_batch_scratchpad<scalar_t>(
+      dpcpp_queue, uplo, n, nrhs, lda, stride_a, ldb, stride_b, batch_size);
   Tensor scratchpad_at = at::empty({scratchpadsize}, b_.options());
   try {
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::lapack::potrs_batch,
+    mkl_potrs_batch<scalar_t>(
         dpcpp_queue,
         uplo,
         n,
@@ -1823,7 +2328,7 @@ static void apply_cholesky_solve_dpcpp_(
         ldb,
         stride_b,
         batch_size,
-        (scalar_t*)(scratchpad_at.data_ptr()),
+        scratchpad_at.data_ptr<scalar_t>(),
         scratchpadsize);
   } catch (oneapi::mkl::lapack::batch_error be) {
     error_handle(infos_, be);
@@ -1979,11 +2484,6 @@ void apply_linalg_qr_out_dpcpp(
   TORCH_INTERNAL_ASSERT(input.scalar_type() == R.scalar_type());
   TORCH_INTERNAL_ASSERT(input.device() == R.device());
 
-  TORCH_CHECK(
-      input.scalar_type() != at::ScalarType::ComplexDouble &&
-          input.scalar_type() != at::ScalarType::ComplexFloat,
-      "MKL GPU does not support linalg_qr with complex inputs currently.")
-
   auto m = input.size(-2);
   auto n = input.size(-1);
   auto mn = std::min(m, n);
@@ -2059,15 +2559,29 @@ void apply_linalg_qr_out_dpcpp(
 
   // Next perform orgqr for Q using the result from geqrf
   if (reduced_mode) {
-    IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
-      impl::apply_orgqr_dpcpp_<scalar_t>(
-          const_cast<Tensor&>(Q), tau, m, mn, mn, infos);
-    });
+    if (input.is_complex()) {
+      IPEX_DISPATCH_COMPLEX_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
+        impl::apply_ungqr_dpcpp_<scalar_t>(
+            const_cast<Tensor&>(Q), tau, m, mn, mn, infos);
+      });
+    } else {
+      IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
+        impl::apply_orgqr_dpcpp_<scalar_t>(
+            const_cast<Tensor&>(Q), tau, m, mn, mn, infos);
+      });
+    }
   } else {
-    IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
-      impl::apply_orgqr_dpcpp_<scalar_t>(
-          const_cast<Tensor&>(Q), tau, m, m, mn, infos);
-    });
+    if (input.is_complex()) {
+      IPEX_DISPATCH_COMPLEX_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
+        impl::apply_ungqr_dpcpp_<scalar_t>(
+            const_cast<Tensor&>(Q), tau, m, m, mn, infos);
+      });
+    } else {
+      IPEX_DISPATCH_FLOATING_TYPES(input.scalar_type(), "qr_dpcpp", [&] {
+        impl::apply_orgqr_dpcpp_<scalar_t>(
+            const_cast<Tensor&>(Q), tau, m, m, mn, infos);
+      });
+    }
   }
 }
 
@@ -2314,14 +2828,15 @@ Tensor _lu_solve_helper(
   if (self.numel() == 0 || LU_data.numel() == 0) {
     return at::zeros_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   }
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "lu_solve_dpcpp", [&] {
-    impl::apply_lu_solve_dpcpp_<scalar_t>(
-        self_working_copy,
-        LU_data_working_copy,
-        LU_pivots_working_copy,
-        infos,
-        TransposeType::NoTranspose);
-  });
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      self.scalar_type(), "lu_solve_dpcpp", [&] {
+        impl::apply_lu_solve_dpcpp_<scalar_t>(
+            self_working_copy,
+            LU_data_working_copy,
+            LU_pivots_working_copy,
+            infos,
+            TransposeType::NoTranspose);
+      });
 
   std::copy(
       infos.begin(), infos.end(), infos_tensor.template data_ptr<int32_t>());
@@ -2537,10 +3052,11 @@ std::tuple<Tensor, Tensor> geqrf(const Tensor& self) {
   Tensor self_working_copy = native::cloneBatchedColumnMajor(self);
   Tensor tau_working_copy = at::empty(req_size, self.options());
 
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "geqrf_dpcpp", [&] {
-    impl::apply_geqrf_dpcpp_<scalar_t>(
-        self_working_copy, tau_working_copy, m, n, infos);
-  });
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      self.scalar_type(), "geqrf_dpcpp", [&] {
+        impl::apply_geqrf_dpcpp_<scalar_t>(
+            self_working_copy, tau_working_copy, m, n, infos);
+      });
   return std::tuple<Tensor, Tensor>(self_working_copy, tau_working_copy);
 }
 
@@ -2556,6 +3072,7 @@ std::tuple<Tensor&, Tensor&> geqrf_out(
   TORCH_CHECK(self.numel() != 0, "input must not be empty");
 
   Tensor a_tmp, tau_tmp;
+  std::cout << "inside geqrf\n";
   std::tie(a_tmp, tau_tmp) = at::AtenIpexTypeXPU::geqrf(self);
   a.resize_as_(a_tmp).copy_(a_tmp);
   tau.resize_as_(tau_tmp).copy_(tau_tmp);
@@ -2627,6 +3144,7 @@ Tensor ormqr(
     const Tensor& input3,
     bool left,
     bool transpose) {
+  std::cout << "inside ormqr\n";
   TORCH_CHECK(
       self.dim() >= 2, "torch.ormqr: input must have at least 2 dimensions.");
   TORCH_CHECK(
@@ -2704,19 +3222,33 @@ Tensor ormqr(
       self.scalar_type(),
       " and result has dtype ",
       c_working_copy.scalar_type());
-
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "ormqr_dpcpp", [&] {
-    impl::apply_ormqr_dpcpp_<scalar_t>(
-        self,
-        input2,
-        c_working_copy,
-        m,
-        n,
-        std::min(m, k),
-        left,
-        transpose,
-        infos);
-  });
+  if (self.is_complex()) {
+    IPEX_DISPATCH_COMPLEX_TYPES(self.scalar_type(), "ormqr_dpcpp", [&] {
+      impl::apply_unmqr_dpcpp_<scalar_t>(
+          self,
+          input2,
+          c_working_copy,
+          m,
+          n,
+          std::min(m, k),
+          left,
+          transpose,
+          infos);
+    });
+  } else {
+    IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "ormqr_dpcpp", [&] {
+      impl::apply_ormqr_dpcpp_<scalar_t>(
+          self,
+          input2,
+          c_working_copy,
+          m,
+          n,
+          std::min(m, k),
+          left,
+          transpose,
+          infos);
+    });
+  }
 
   return c_working_copy;
 }
@@ -3055,10 +3587,11 @@ Tensor _cholesky_solve_helper(
       native::batchCount(self),
       self.options().dtype(kInt).device(DeviceType::CPU));
   std::vector<int32_t> infos(native::batchCount(self), 0);
-  IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "cholesky_solve_dpcpp", [&] {
-    impl::apply_cholesky_solve_dpcpp_<scalar_t>(
-        self_working_copy, input2_working_copy, upper, infos);
-  });
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      self.scalar_type(), "cholesky_solve_dpcpp", [&] {
+        impl::apply_cholesky_solve_dpcpp_<scalar_t>(
+            self_working_copy, input2_working_copy, upper, infos);
+      });
 
   std::copy(
       infos.begin(), infos.end(), infos_tensor.template data_ptr<int32_t>());
@@ -3215,10 +3748,25 @@ void linalg_eigh_impl(
   self_sizes.pop_back();
 
   auto self_working_copy = at::native::cloneBatchedColumnMajor(eigenvectors);
-  IPEX_DISPATCH_FLOATING_TYPES(eigenvectors.scalar_type(), "symeig", [&] {
-    impl::apply_symeig<scalar_t>(
-        self_working_copy, eigenvalues, compute_eigenvectors, upper, infos_vec);
-  });
+  if (eigenvectors.is_complex()) {
+    IPEX_DISPATCH_COMPLEX_TYPES(eigenvectors.scalar_type(), "heevd", [&] {
+      impl::apply_heevd<scalar_t>(
+          self_working_copy,
+          eigenvalues,
+          compute_eigenvectors,
+          upper,
+          infos_vec);
+    });
+  } else {
+    IPEX_DISPATCH_FLOATING_TYPES(eigenvectors.scalar_type(), "symeig", [&] {
+      impl::apply_symeig<scalar_t>(
+          self_working_copy,
+          eigenvalues,
+          compute_eigenvectors,
+          upper,
+          infos_vec);
+    });
+  }
 
   Tensor infos_tensor = from_blob(infos_vec.data(), {1, infos_vec.size()});
   infos_tensor = infos_tensor.to(kInt);

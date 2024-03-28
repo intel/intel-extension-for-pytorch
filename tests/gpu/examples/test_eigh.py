@@ -33,13 +33,17 @@ class TestTorchMethod(TestCase):
         }
     )
     def test_linalg_eigh(self, dtype=torch.float64):
-        matrix_cpu = random_hermitian_matrix(3, 1, dtype=dtype, device=cpu_device)
-        matrix_gpu = matrix_cpu.clone().detach().to(dpcpp_device)
+        def _test(dtype):
+            matrix_cpu = random_hermitian_matrix(3, 1, dtype=dtype, device=cpu_device)
+            matrix_gpu = matrix_cpu.clone().detach().to(dpcpp_device)
 
-        L, V = np.linalg.eigh(matrix_cpu.cpu().numpy(), UPLO="L")
-        L_xpu, V_xpu = torch.linalg.eigh(matrix_gpu, "L")
-        self.assertEqual(L, L_xpu.to(cpu_device))
-        self.assertEqual(abs(V), abs(V_xpu.to(cpu_device)))
+            L, V = np.linalg.eigh(matrix_cpu.cpu().numpy(), UPLO="L")
+            L_xpu, V_xpu = torch.linalg.eigh(matrix_gpu, "L")
+            self.assertEqual(L, L_xpu.to(cpu_device))
+            self.assertEqual(abs(V), abs(V_xpu.to(cpu_device)))
+
+        _test(torch.float32)
+        _test(torch.cfloat)
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     @pytest.mark.skipif(

@@ -325,47 +325,138 @@ void addr_kernel(
       });
 }
 
+#ifdef USE_ONEMKL
+template <typename scalar_t>
+int64_t mkl_potri_scratchpad(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    int64_t lda) {
+  return oneapi::mkl::lapack::potri_scratchpad_size<scalar_t>(
+      queue, uplo, n, lda);
+}
+
+template <>
+int64_t mkl_potri_scratchpad<c10::complex<float>>(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    int64_t lda) {
+  return oneapi::mkl::lapack::potri_scratchpad_size<std::complex<float>>(
+      queue, uplo, n, lda);
+}
+
+template <>
+int64_t mkl_potri_scratchpad<c10::complex<double>>(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    int64_t lda) {
+  return oneapi::mkl::lapack::potri_scratchpad_size<std::complex<double>>(
+      queue, uplo, n, lda);
+}
+
+template <typename scalar_t>
+void mkl_potri(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    scalar_t* out_ptr,
+    int64_t lda,
+    scalar_t* scratchpad,
+    int scratchpadsize) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::potri,
+      queue,
+      uplo,
+      n,
+      static_cast<scalar_t*>(out_ptr),
+      lda,
+      static_cast<scalar_t*>(scratchpad),
+      scratchpadsize);
+}
+
+template <>
+void mkl_potri<c10::complex<float>>(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    c10::complex<float>* out_ptr,
+    int64_t lda,
+    c10::complex<float>* scratchpad,
+    int scratchpadsize) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::potri,
+      queue,
+      uplo,
+      n,
+      reinterpret_cast<std::complex<float>*>(out_ptr),
+      lda,
+      reinterpret_cast<std::complex<float>*>(scratchpad),
+      scratchpadsize);
+}
+
+template <>
+void mkl_potri<c10::complex<double>>(
+    sycl::queue& queue,
+    oneapi::mkl::uplo uplo,
+    int64_t n,
+    c10::complex<double>* out_ptr,
+    int64_t lda,
+    c10::complex<double>* scratchpad,
+    int scratchpadsize) {
+  DPCPP_ONEMKL_SUBMIT(
+      queue,
+      oneapi::mkl::lapack::potri,
+      queue,
+      uplo,
+      n,
+      reinterpret_cast<std::complex<double>*>(out_ptr),
+      lda,
+      reinterpret_cast<std::complex<double>*>(scratchpad),
+      scratchpadsize);
+}
+#else
+AT_ERROR("potri dpcpp: oneMKL library not found in compilation");
+#endif
+
 } // namespace impl
 
 Tensor& cholesky_inverse_out(const Tensor& self, bool upper, Tensor& out) {
 #ifdef USE_ONEMKL
-  TORCH_CHECK(
-      self.dim() == 2, "input must be 2-d matrix. input shape=", self.sizes());
-  TORCH_CHECK(
-      self.size(0) == self.size(1),
-      "input should be square. input shape=",
-      self.sizes());
+  native::squareCheckInputs(self, "cholesky_inverse");
+  native::checkSameDevice("cholesky_inverse", out, self);
+  native::checkLinalgCompatibleDtype("cholesky_inverse", out, self);
 
   int64_t n = self.size(0);
   int64_t lda = n;
   if (n == 0)
     return out;
 
-  out = native::cloneBatchedColumnMajor(self);
-
-  IPEX_DISPATCH_FLOATING_TYPES(out.scalar_type(), "potri_dpcpp_out", [&] {
-    dnnl::primitive_attr attr;
-    assert(attr.get_scratchpad_mode() == dnnl::scratchpad_mode::library);
-    attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-    auto& dpcpp_queue = dpcppGetCurrentQueue();
-    auto upper_lower =
-        upper ? (oneapi::mkl::uplo::upper) : (oneapi::mkl::uplo::lower);
-    std::int64_t scratchpadsize =
-        oneapi::mkl::lapack::potri_scratchpad_size<scalar_t>(
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      out.scalar_type(), "potri_dpcpp_out", [&] {
+        dnnl::primitive_attr attr;
+        assert(attr.get_scratchpad_mode() == dnnl::scratchpad_mode::library);
+        attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+        auto& dpcpp_queue = dpcppGetCurrentQueue();
+        auto upper_lower =
+            upper ? (oneapi::mkl::uplo::upper) : (oneapi::mkl::uplo::lower);
+        std::int64_t scratchpadsize = impl::mkl_potri_scratchpad<scalar_t>(
             dpcpp_queue, upper_lower, n, lda);
-    Tensor scratchpad_at = at::empty({scratchpadsize}, out.options());
-    DPCPP_ONEMKL_SUBMIT(
-        dpcpp_queue,
-        oneapi::mkl::lapack::potri,
-        dpcpp_queue,
-        upper_lower,
-        n,
-        (scalar_t*)out.data_ptr(),
-        lda,
-        (scalar_t*)scratchpad_at.data_ptr(),
-        scratchpadsize);
-    impl::copy_triangle_symmetric_template<scalar_t>(out, upper);
-  });
+        Tensor scratchpad_at = at::empty({scratchpadsize}, out.options());
+        impl::mkl_potri<scalar_t>(
+            dpcpp_queue,
+            upper_lower,
+            n,
+            out.data_ptr<scalar_t>(),
+            lda,
+            scratchpad_at.data_ptr<scalar_t>(),
+            scratchpadsize);
+
+        impl::copy_triangle_symmetric_template<scalar_t>(out, upper);
+      });
 
   return out;
 #else
@@ -374,13 +465,8 @@ Tensor& cholesky_inverse_out(const Tensor& self, bool upper, Tensor& out) {
 }
 
 Tensor cholesky_inverse(const Tensor& self, bool upper) {
-  TORCH_CHECK(
-      self.dim() == 2, "input must be 2-d matrix. input shape=", self.sizes());
-  TORCH_CHECK(
-      self.size(0) == self.size(1),
-      "input should be square. input shape=",
-      self.sizes());
-  Tensor out;
+  Tensor out = native::cloneBatchedColumnMajor(self);
+  ;
   return AtenIpexTypeXPU::cholesky_inverse_out(self, upper, out);
 }
 
