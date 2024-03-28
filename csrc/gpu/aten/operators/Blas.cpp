@@ -1284,7 +1284,7 @@ Tensor matmul_bias_out(
   // See [Note: hacky wrapper removal for optional tensor]
   auto bias = bias_opt.has_value()
       ? c10::MaybeOwned<Tensor>::borrowed(*bias_opt)
-      : c10::MaybeOwned<Tensor>::owned(c10::in_place);
+      : c10::MaybeOwned<Tensor>::owned(std::in_place);
 
   if (input.dim() == 2 && bias->defined()) {
     // Fused op is marginally faster.

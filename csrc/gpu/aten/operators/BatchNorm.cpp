@@ -1578,7 +1578,7 @@ void batch_norm_mean_var(
             });
         return;
       }
-      C10_FALLTHROUGH;
+      [[fallthrough]];
     }
     case Impl::General: {
       const int64_t ndim = self.dim();
