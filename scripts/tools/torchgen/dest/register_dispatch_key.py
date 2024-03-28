@@ -741,7 +741,7 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
 
                 simple_trace_code = ''
                 if self.simple_trace:
-                    simple_trace_code = f'xpu::dpcpp::SimpleTrace trace(\"{name} -> {impl_name}\");'
+                    simple_trace_code = f'torch_ipex::xpu::dpcpp::SimpleTrace trace(\"{name} -> {impl_name}\");'
 
                 # lazy_reorder
                 lazy_reorder = "  // no lazy reorder"
