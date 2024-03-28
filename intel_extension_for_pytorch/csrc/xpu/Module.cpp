@@ -313,9 +313,9 @@ void init_xpu_module(pybind11::module& m) {
     return torch_ipex::xpu::dpcpp::dumpMemoryStatusFromDevAlloc(device_index);
   });
 
-  m.def(
-      "_is_onemkl_enabled", []() { return Settings::I().is_onemkl_enabled(); });
-
+  m.def("_is_onemkl_enabled", []() {
+    return Settings::I().is_onemkl_enabled();
+  });
   m.def("_is_channels_last_1d_enabled", []() {
     return Settings::I().is_channels_last_1d_enabled();
   });

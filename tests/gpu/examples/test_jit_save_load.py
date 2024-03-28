@@ -11,12 +11,9 @@ class Conv2dRelu(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super(Conv2dRelu, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, **kwargs)
-        self.linear = nn.Linear(in_channels, out_channels)
-        self.conv3d = nn.Conv3d(in_channels, out_channels, **kwargs)
 
     def forward(self, x, a):
-        res = F.relu(self.conv(x) + a, inplace=True)
-        return res
+        return F.relu(self.conv(x) + a, inplace=True)
 
 
 class TestJitSaveLoadMethod(TestCase):
