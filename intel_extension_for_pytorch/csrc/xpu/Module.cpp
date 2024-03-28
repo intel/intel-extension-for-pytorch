@@ -60,7 +60,7 @@ PyObject* THPModule_xpu_CachingAllocator_delete(
 
 PyObject* THPModule_resetPeakMemoryStats(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
-  THPUtils_assert(
+  TORCH_CHECK(
       THPUtils_checkLong(arg), "invalid argument to reset_peak_memory_stats");
   const int device = (int)THPUtils_unpackLong(arg);
   torch_ipex::xpu::dpcpp::resetPeakStatsInDevAlloc(device);
@@ -72,7 +72,7 @@ PyObject* THPModule_resetAccumulatedMemoryStats(
     PyObject* _unused,
     PyObject* arg) {
   HANDLE_TH_ERRORS
-  THPUtils_assert(
+  TORCH_CHECK(
       THPUtils_checkLong(arg),
       "invalid argument to reset_accumulated_memory_stats");
   const int device = (int)THPUtils_unpackLong(arg);
@@ -90,7 +90,7 @@ PyObject* THPModule_emptyCache(PyObject* _unused, PyObject* noargs) {
 
 PyObject* THPModule_memoryStats(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
-  THPUtils_assert(
+  TORCH_CHECK(
       THPUtils_checkLong(arg), "invalid argument to memory_allocated");
   const int device = (int)THPUtils_unpackLong(arg);
 
@@ -224,15 +224,15 @@ PyObject* THPModule_fromUSM(PyObject* _unused, PyObject* args) {
   using namespace torch::autograd;
   HANDLE_TH_ERRORS
   Py_ssize_t num_args = args ? (Py_ssize_t)PyTuple_Size(args) : 0;
-  THPUtils_assert(num_args == 5, "expected exactly 5 arguments");
+  TORCH_CHECK(num_args == 5, "expected exactly 5 arguments");
 
   PyObject* arg0 = PyTuple_GET_ITEM(args, 0);
   PyObject* arg1 = PyTuple_GET_ITEM(args, 1);
-  THPUtils_assert(THPDtype_Check(arg1), "expected a torch.dtype as argument 1");
+  TORCH_CHECK(THPDtype_Check(arg1), "expected a torch.dtype as argument 1");
   PyObject* arg2 = PyTuple_GET_ITEM(args, 2);
   PyObject* arg3 = PyTuple_GET_ITEM(args, 3);
   PyObject* arg4 = PyTuple_GET_ITEM(args, 4);
-  THPUtils_assert(THPUtils_checkLong(arg4), "expected a int as argument 4");
+  TORCH_CHECK(THPUtils_checkLong(arg4), "expected a int as argument 4");
 
   void* src = PyCapsule_GetPointer(arg0, "USMtensor");
   auto stype = reinterpret_cast<THPDtype*>(arg1)->scalar_type;
@@ -252,7 +252,7 @@ PyObject* THPModule_fromUSM(PyObject* _unused, PyObject* args) {
 
 PyObject* THPModule_toUSM(PyObject* _unused, PyObject* data) {
   HANDLE_TH_ERRORS
-  THPUtils_assert(THPVariable_Check(data), "data must be a Tensor");
+  TORCH_CHECK(THPVariable_Check(data), "data must be a Tensor");
   auto usm = torch_ipex::xpu::dpcpp::toUSM(THPVariable_Unpack(data));
   return PyCapsule_New(usm, "USMtensor", NULL);
   END_HANDLE_TH_ERRORS

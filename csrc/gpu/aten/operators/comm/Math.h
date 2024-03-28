@@ -12,7 +12,6 @@
 #include <c10/macros/Macros.h>
 #include <c10/util/MathConstants.h>
 #include <c10/util/complex.h>
-#include <c10/util/math_compat.h>
 #include "AccumulateType.h"
 #include "General.h"
 #include "Numerics.h"

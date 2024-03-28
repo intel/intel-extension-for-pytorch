@@ -12,7 +12,6 @@
 #include <ATen/NumericUtils.h>
 #include <c10/util/MathConstants.h>
 #include <c10/util/complex.h>
-#include <c10/util/math_compat.h>
 
 namespace at {
 namespace AtenIpexTypeXPU {
