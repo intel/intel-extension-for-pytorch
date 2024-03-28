@@ -17,7 +17,7 @@ void DeviceAllocator::deleter(void* ptr) {
   delete ctx;
 }
 
-DataPtr DeviceAllocator::allocate(size_t size) const {
+DataPtr DeviceAllocator::allocate(size_t size) {
   DeviceIndex curDevID = at::xpu::current_device();
   void* r = nullptr;
   if (size != 0) {
@@ -112,6 +112,11 @@ std::vector<SegmentInfo> DeviceAllocator::snapshot() {
   return alloc()->snapshot();
 }
 
+void DeviceAllocator::copy_data(void* dest, const void* src, std::size_t count) 
+  const {
+  at::xpu::getCurrentXPUStream().queue().memcpy(dest, src, count);
+}
+
 CachingDeviceAllocator* DeviceAllocator::alloc() {
   return CachingDeviceAllocator::Instance();
 }
@@ -182,7 +187,7 @@ void HostAllocator::deleter(void* ptr) {
   Instance()->release(ptr);
 }
 
-at::DataPtr HostAllocator::allocate(size_t size) const {
+at::DataPtr HostAllocator::allocate(size_t size) {
   void* ptr = nullptr;
   Instance()->alloc()->malloc(&ptr, size);
   return {ptr, ptr, &deleter, at::DeviceType::CPU};
@@ -216,6 +221,11 @@ CachingHostAllocator* HostAllocator::alloc() {
 
 void HostAllocator::release(void* ptr) {
   alloc()->release(ptr);
+}
+
+void HostAllocator::copy_data(void* dest, const void* src, std::size_t count) 
+  const {
+  at::xpu::getCurrentXPUStream().queue().memcpy(dest, src, count);
 }
 
 Allocator* getHostAllocator() {

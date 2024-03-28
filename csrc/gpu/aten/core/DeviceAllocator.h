@@ -18,7 +18,7 @@ class DeviceAllocator final : public at::Allocator {
 
   static void deleter(void* ptr);
 
-  at::DataPtr allocate(size_t size) const override;
+  at::DataPtr allocate(size_t size) override;
   at::DataPtr allocate(const sycl::queue& queue, size_t size) const;
 
   /*
@@ -53,6 +53,9 @@ class DeviceAllocator final : public at::Allocator {
   void dumpMemoryStatus(at::DeviceIndex device_index);
 
   std::vector<SegmentInfo> snapshot();
+
+  void copy_data(void* dest, const void* src, std::size_t count) 
+    const final override;
 
  private:
   CachingDeviceAllocator* alloc();

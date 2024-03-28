@@ -16,7 +16,7 @@ class HostAllocator final : public at::Allocator {
 
   static void deleter(void* ptr);
 
-  at::DataPtr allocate(size_t size) const override;
+  at::DataPtr allocate(size_t size) override;
 
   at::DeleterFnPtr raw_deleter() const override;
 
@@ -28,6 +28,9 @@ class HostAllocator final : public at::Allocator {
   void recordEvent(void* ptr, sycl::event& e);
 
   void release(void* ptr);
+
+  void copy_data(void* dest, const void* src, std::size_t count) 
+    const final override;
 
  private:
   CachingHostAllocator* alloc();
