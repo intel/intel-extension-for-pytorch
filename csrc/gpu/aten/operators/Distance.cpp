@@ -1218,15 +1218,11 @@ Tensor _cdist_backward(
     const Tensor& x2,
     double p,
     const Tensor& cdist) {
-  TORCH_CHECK(
-      x1.is_contiguous(), "_cdist_backward requires X1 to be contiguous");
-  TORCH_CHECK(
-      x2.is_contiguous(), "_cdist_backward requires X2 to be contiguous");
-  TORCH_CHECK(
-      cdist.is_contiguous(), "_cdist_backward requires dist to be contiguous");
-  TORCH_CHECK(
-      grad.is_contiguous(), "_cdist_backward requires grad to be contiguous");
-  return impl::cdist_backward(grad, x1, x2, p, cdist);
+  auto grad_ = grad.contiguous();
+  auto x1_ = x1.contiguous();
+  auto x2_ = x2.contiguous();
+  auto cdist_ = cdist.contiguous();
+  return impl::cdist_backward(grad_, x1_, x2_, p, cdist_);
 }
 
 Tensor cdist(
