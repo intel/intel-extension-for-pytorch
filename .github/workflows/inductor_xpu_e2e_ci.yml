@@ -12,7 +12,7 @@ permissions: read-all
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true1
+  cancel-in-progress: true
 
 jobs:
   Inductor-XPU-E2E-CI-Tests:
