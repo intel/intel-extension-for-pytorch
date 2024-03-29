@@ -1,0 +1,18 @@
+!!omap
+- PASSED: []
+- FAILED: []
+- ERROR: []
+- SKIPPED:
+  - test_autograd.py::TestAutogradDeviceTypeXPU::test_inputbuffer_add_multidevice_xpu
+  - test_foreach.py::TestForeachXPU::test_tensors_grouping_xpu
+  - test_nn.py::TestNNDeviceTypeXPU::test_clip_grad_norm_multi_device_foreach_False_xpu
+  - test_nn.py::TestNNDeviceTypeXPU::test_clip_grad_norm_multi_device_foreach_True_xpu
+  - test_tensor_creation_ops.py::TestLikeTensorCreationXPU::test_ones_like_multiple_device_xpu
+  - test_tensor_creation_ops.py::TestLikeTensorCreationXPU::test_zeros_like_multiple_device_xpu
+  - test_torch.py::TestDevicePrecisionXPU::test_multidevice_serialization_xpu
+  - test_torch.py::TestTorchDeviceTypeXPU::test_multinomial_gpu_device_constrain_xpu
+  - test_torch.py::TestTorchDeviceTypeXPU::test_tensor_set_errors_multigpu_xpu
+  - test_linalg.py::TestLinalgXPU::test_det_logdet_slogdet_xpu_float64
+- XFAIL: []
+- XPASS: []
+- NO_RESULT: []

@@ -6,6 +6,7 @@ from .collector import collect_detailed_issues, collect_fatal_error
 tool_path = os.path.dirname(os.path.abspath(__file__))
 ref_file = os.path.join(tool_path, "../config/reference_list.yaml")
 weekly_ref_file = os.path.join(tool_path, "../config/weekly_reference_list.yaml")
+ci_file = os.path.join(tool_path, "../config/ci_list.yaml")
 
 def check_reference(cosim_cases):
     def _lookup_reference_list(cur_case):
@@ -34,6 +35,8 @@ def check_reference(cosim_cases):
 def check_ci_pass(cases_result, logfile):
     global ref_file
     ref_dict = load_from_yaml(ref_file)
+    global ci_file
+    ci_dict = load_from_yaml(ci_file)
 
     issued_cases = []
     short_details = []
@@ -52,7 +55,10 @@ def check_ci_pass(cases_result, logfile):
         if tag == "PASSED":
             continue
         for case in cases:
-            if case in ref_dict["PASSED"]:
+            if tag == "SKIPPED":
+                if case in ci_dict["SKIPPED"]:
+                    continue
+            elif case in ref_dict["PASSED"]:
                 issued_cases.append(case)
     if issued_cases:
         short_details, details = collect_detailed_issues(issued_cases, logfile, with_short=True)
