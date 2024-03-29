@@ -40,7 +40,7 @@ class RotaryEmbedding(nn.Module):
         >>> position_ids  = torch.arange(32).unsqueeze(0)
         >>> query_rotery = rope_module(query, position_ids, 16, 256, 1, 64)
 
-    [Direct function call] This module also provides a `.apply` function call to be used on query and key
+    [Direct function call] This module also provides a `.apply_function` function call to be used on query and key
                            at the same time without initializing the module (assume rotary embedding
                            sin/cos values are provided).
     Args:
@@ -120,7 +120,7 @@ class RotaryEmbedding(nn.Module):
         )
 
     @classmethod
-    def apply(
+    def apply_function(
         cls,
         query: torch.Tensor,
         key: torch.Tensor,
@@ -168,7 +168,7 @@ class FastLayerNorm(nn.Module):
         >>> input = torch.randn(1, 32, 4096)
         >>> result = layernorm_module(input)
 
-    [Direct function call] This module also provides a `.apply` function call to apply fast layernorm
+    [Direct function call] This module also provides a `.apply_function` function call to apply fast layernorm
                            without initializing the module.
     Args:
     - hidden_states(torch.Tensor) : the input tensor to apply normalization.
@@ -195,10 +195,10 @@ class FastLayerNorm(nn.Module):
         self.bias = bias
 
     @classmethod
-    def apply(cls, hidden_states, normalized_shape, weight, bias, eps):
+    def apply_function(cls, hidden_states, normalized_shape, weight, bias, eps):
         return cls.runtime_ops.get_module_from_device(
             hidden_states.device.type, IPEXCustomOpType.FAST_LAYERNORM, False
-        ).apply(hidden_states, normalized_shape, weight, bias, eps)
+        ).apply_function(hidden_states, normalized_shape, weight, bias, eps)
 
     def forward(self, hidden_states: torch.Tensor):
         runtime_module = self.runtime_ops.get_module_from_device(
@@ -235,7 +235,8 @@ class RMSNorm(nn.Module):
         >>> input = torch.randn(1, 32, 4096)
         >>> result = rmsnorm_module(input)
 
-    [Direct function call] This module also provides a `.apply` function call to apply RMSNorm without initializing the module.
+    [Direct function call] This module also provides a `.apply_function` function call to apply RMSNorm without
+                            initializing the module.
     Args:
     - hidden_states(torch.Tensor) : the input tensor to apply RMSNorm.
     - weight (torch.Tensor): the weight to apply RMSnorm.
@@ -255,10 +256,10 @@ class RMSNorm(nn.Module):
         )
 
     @classmethod
-    def apply(cls, hidden_states, weight, eps):
+    def apply_function(cls, hidden_states, weight, eps):
         return cls.runtime_ops.get_module_from_device(
             hidden_states.device.type, IPEXCustomOpType.RMS_NORM, False
-        ).apply(hidden_states, weight, eps)
+        ).apply_function(hidden_states, weight, eps)
 
     def forward(self, x: torch.Tensor):
         runtime_module = self.runtime_ops.get_module_from_device(
@@ -304,7 +305,7 @@ class VarlenAttention(nn.Module):
         >>> softmax_scale  = 0.5
         >>> varlenAttention_module(query, key, value, out, seqlen_q, seqlen_k, max_seqlen_q, max_seqlen_k, pdropout, softmax_scale)
 
-    [Direct function call] This module also provides a `.apply` function call to apply VarlenAttention without
+    [Direct function call] This module also provides a `.apply_function` function call to apply VarlenAttention without
                            initializing the module.
     Args:
     - The parameters are the same as the forward call.
@@ -317,7 +318,7 @@ class VarlenAttention(nn.Module):
         super().__init__()
 
     @classmethod
-    def apply(
+    def apply_function(
         cls,
         query: torch.Tensor,
         key: torch.Tensor,
@@ -336,7 +337,7 @@ class VarlenAttention(nn.Module):
     ):
         return cls.runtime_ops.get_module_from_device(
             query.device.type, IPEXCustomOpType.VARLEN_ATTENTION, False
-        ).apply(
+        ).apply_function(
             query,
             key,
             value,
@@ -551,7 +552,7 @@ class IndirectAccessKVCache(nn.Module):
                     layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
                 return past_key_values
 
-    [Direct function call] This module also provides a `.apply` function call to apply IndirectAccessKVCache
+    [Direct function call] This module also provides a `.apply_function` function call to apply IndirectAccessKVCache
                            without initializing the module.
     Args:
     - The parameters are the same as the forward call.
@@ -565,7 +566,7 @@ class IndirectAccessKVCache(nn.Module):
         self.text_max_length = text_max_length
 
     @classmethod
-    def apply(
+    def apply_function(
         cls,
         query: torch.Tensor,
         key: torch.Tensor,
@@ -581,7 +582,7 @@ class IndirectAccessKVCache(nn.Module):
     ):
         return cls.runtime_ops.get_module_from_device(
             query.device.type, IPEXCustomOpType.INDIRECTACCESS_KVCACHE, False
-        ).apply(
+        ).apply_function(
             query,
             key,
             value,
