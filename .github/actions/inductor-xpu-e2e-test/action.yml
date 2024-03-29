@@ -40,10 +40,32 @@ runs:
         source activate e2e_ci
         cp .github/scripts/inductor_xpu_test.sh ../pytorch
         cd ../pytorch
-        TRANSFORMERS_COMMIT=$(cat .ci/docker/ci_commit_pins/huggingface.txt)
-        pip install --force-reinstall git+https://github.com/huggingface/transformers@${TRANSFORMERS_COMMIT}
+        if [[ ${{ input.suite}} == "timm_models" ]]; then
+            pip install --no-deps "git+https://github.com/rwightman/pytorch-image-models@b9d43c7dcac1fe05e851dd7be7187b108af593d2"
+        elif [[ ${{ input.suite}} == "torchbench" ]]; then
+            pip install transformers==4.38.1 --no-deps
+            pip install timm==0.9.7 --no-deps
+            apt-get update -y
+            apt install libgl1-mesa-glx -y
+            conda install -y git-lfs pyyaml pandas scipy psutil
+            pip install tqdm pandas pyre-extensions torchrec tensorboardX dalle2_pytorch torch_geometric scikit-image matplotlib  gym fastNLP doctr matplotlib opacus python-doctr higher opacus dominate kaldi-io librosa effdet pycocotools diffusers
+            pip uninstall -y pyarrow pandas
+            pip install pyarrow pandas
+            
+            cd ${{ github.workspace }}
+            git clone https://github.com/facebookresearch/detectron2.git
+            python -m pip install -e detectron2
+
+            git clone --recursive https://github.com/facebookresearch/multimodal.git multimodal
+            pushd multimodal
+            pip install -e .
+            popd
+        fi
+
+        #TRANSFORMERS_COMMIT=$(cat .ci/docker/ci_commit_pins/huggingface.txt)
+        #pip install --force-reinstall git+https://github.com/huggingface/transformers@${TRANSFORMERS_COMMIT}
         source /opt/intel/oneapi/compiler/latest/env/vars.sh
-        export PYTORCH_ENABLE_XPU_FALLBACK=1
+        #export PYTORCH_ENABLE_XPU_FALLBACK=1
         rm -rf inductor_log
         bash inductor_xpu_test.sh ${{ inputs.suite }} ${{ inputs.dt }} ${{ inputs.mode }} ${{ inputs.scenario }} xpu 3 & \
     - name: Test Results Overview (${{ inputs.suite }} ${{ inputs.dt }} ${{ inputs.mode }} ${{ inputs.scenario }})

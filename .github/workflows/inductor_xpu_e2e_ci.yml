@@ -23,6 +23,7 @@ jobs:
       - name: Prepare Conda ENV
         run: |
           which conda
+          conda remove -yn e2e_ci --all
           if conda env list | grep -q "^e2e_ci "; then source activate e2e_ci; else conda create -n e2e_ci python=3.9 cmake ninja -y; fi
           conda install intel::mkl-static intel::mkl-include -y
           pip install pandas scipy tqdm
@@ -37,14 +38,15 @@ jobs:
           pip install pyyaml
           pip install -r requirements.txt
           python setup.py develop
-          python -c "import torch;print(f'torch version {torch.__version__}')"
 
       - name: Prepare IPEX
         run: |
           source activate e2e_ci
           source /opt/intel/oneapi/compiler/latest/env/vars.sh
+          python -c "import torch;print(f'torch version {torch.__version__}')"
           python -m pip uninstall intel_extension_for_pytorch -y
           export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
+          cd ${{ github.workspace }}/intel-extension-for-pytorch
           python setup.py bdist_wheel
           pip install --force-reinstall dist/*.whl
 

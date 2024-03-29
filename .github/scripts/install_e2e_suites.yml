@@ -6,10 +6,9 @@ run:
         shell:
         run: |
             source activate e2e_ci
-            cd ../pytorch
+            cd ${{ github.workspace }}/pytorch
             TORCH_VISION_PIN_COMMIT=$(cat .github/ci_commit_pins/vision.txt)
-            TORCH_TEXT_PIN_COMMIT=$(cat .github/ci_commit_pins/text.txt)
-            TORCH_AUDIO_PIN_COMMIT=$(cat .github/ci_commit_pins/audio.txt)
+            cd ${{ github.workspace }}
             if [ ! -d "${{ github.workspace }}/vision" ]; then
                 git clone --recursive https://github.com/pytorch/vision.git
             fi
@@ -24,6 +23,9 @@ run:
         shell:
         run: |
             source activate e2e_ci
+            cd ${{ github.workspace }}/pytorch
+            TORCH_TEXT_PIN_COMMIT=$(cat .github/ci_commit_pins/text.txt)
+            cd ${{ github.workspace }}
             if [ ! -d "${{ github.workspace }}/text" ]; then
                 git clone --recursive https://github.com/pytorch/text.git
             fi
@@ -36,6 +38,9 @@ run:
         shell:
         run: |
             source activate e2e_ci
+            cd ${{ github.workspace }}/pytorch
+            TORCH_AUDIO_PIN_COMMIT=$(cat .github/ci_commit_pins/audio.txt)
+            cd ${{ github.workspace }}
             # Torch audio
             if [ ! -d "${{ github.workspace }}/audio" ]; then
                 git clone --recursive https://github.com/pytorch/audio.git
