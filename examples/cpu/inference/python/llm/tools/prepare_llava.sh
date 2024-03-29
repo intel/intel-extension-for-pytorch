@@ -9,3 +9,6 @@ pip install einops pillow sentencepiece protobuf --no-deps
 git checkout intel
 git apply ../llava.patch
 pip install -e . --no-deps
+
+pip install tenacity hf_transfer lmms-eval --no-deps
+conda install -y openjdk=8
