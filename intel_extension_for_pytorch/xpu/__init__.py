@@ -126,18 +126,17 @@ def _xpu_deserialize(obj, location):
 def _register_torch_device_module(device_type, module):
     device_type = torch.device(device_type).type
     torch_module = sys.modules["torch"]
-    registered_module = getattr(torch_module, device_type, None)
-    if registered_module:
-        for sub_module_key in dir(registered_module):
-            if not hasattr(module, sub_module_key):
+    torch_device_module = getattr(torch_module, device_type, None)
+    if torch_device_module:
+        for sub_module_key in dir(module):
+            if not hasattr(torch_device_module, sub_module_key):
                 setattr(
-                    module,
+                    torch_device_module,
                     sub_module_key,
-                    getattr(registered_module, sub_module_key),
+                    getattr(module, sub_module_key),
                 )
-        setattr(torch_module, device_type, module)
         torch_module_name = ".".join(["torch", device_type])
-        sys.modules[torch_module_name] = module
+        sys.modules[torch_module_name] = torch_device_module
     else:
         torch._register_device_module(device_type, module)
 

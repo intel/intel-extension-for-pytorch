@@ -120,7 +120,8 @@ from . import nn
 from . import jit
 from . import optim
 from . import fx
-from . import _dynamo
+# from . import _dynamo
+# TODO: Update outdated import
 from . import _inductor
 from . import llm
 
