@@ -430,10 +430,16 @@ sycl::event convolution_backward_weights(
   auto diff_dst_data_t = get_onednn_dtype_include_double(diff_dst);
   auto src_data_t = get_onednn_dtype_include_double(src);
 
-  memory::format_tag bia_fmt = memory::format_tag::x;
-  auto bia_md = diff_bia.defined()
-      ? memory::desc({diff_dst.size(1)}, src_data_t, bia_fmt)
-      : memory::desc();
+  memory::dims bia_dims;
+  memory::data_type bia_data_t;
+  memory::desc bia_md;
+
+  if (diff_bia.defined()) {
+    bia_dims = diff_bia.sizes().vec();
+    bia_data_t = get_onednn_dtype_include_double(diff_bia);
+    bia_md =
+        memory::desc({diff_dst.size(1)}, src_data_t, memory::format_tag::x);
+  }
 
   // create fwd primitive hint
   memory::dims _stride = stride.vec();
@@ -453,8 +459,10 @@ sycl::event convolution_backward_weights(
       engine_index,
       diff_dst_dims,
       src_dims,
+      bia_dims,
       diff_dst_data_t,
       src_data_t,
+      bia_data_t,
       groups,
       _stride,
       _dilation,
@@ -741,7 +749,7 @@ sycl::event convolution_backward_data(
     conv_bwd_data = create_and_fetch_m<dnnl::convolution_backward_data>(
         key_primitive, conv_bwd_data_pd);
 #else
-    conv_bwd_data = dnnl::convolution_backward_weights(conv_bwd_data_pd);
+    conv_bwd_data = dnnl::convolution_backward_data(conv_bwd_data_pd);
 #endif
   }
 
