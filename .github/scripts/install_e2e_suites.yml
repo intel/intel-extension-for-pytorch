@@ -1,0 +1,61 @@
+name: install-e2e-suites
+
+run:
+    steps:
+      - name: Torchvision Install
+        shell:
+        run: |
+            source activate e2e_ci
+            cd ../pytorch
+            TORCH_VISION_PIN_COMMIT=$(cat .github/ci_commit_pins/vision.txt)
+            TORCH_TEXT_PIN_COMMIT=$(cat .github/ci_commit_pins/text.txt)
+            TORCH_AUDIO_PIN_COMMIT=$(cat .github/ci_commit_pins/audio.txt)
+            if [ ! -d "${{ github.workspace }}/vision" ]; then
+                git clone --recursive https://github.com/pytorch/vision.git
+            fi
+            cd vision
+            git checkout ${TORCH_VISION_PIN_COMMIT}
+            conda install -y libpng jpeg
+            # TODO: We use an older version ffmpeg to avoid the vision capability issue.
+            conda install -y -c conda-forge 'ffmpeg<4.4'
+            python setup.py install
+            cd ..
+      - name: Torchtext Install
+        shell:
+        run: |
+            source activate e2e_ci
+            if [ ! -d "${{ github.workspace }}/text" ]; then
+                git clone --recursive https://github.com/pytorch/text.git
+            fi
+            # Torchtext
+            cd text
+            git checkout ${TORCH_TEXT_PIN_COMMIT}
+            python setup.py clean install
+            cd ..
+      - name: Torchaudio Install
+        shell:
+        run: |
+            source activate e2e_ci
+            # Torch audio
+            if [ ! -d "${{ github.workspace }}/audio" ]; then
+                git clone --recursive https://github.com/pytorch/audio.git
+            fi
+            cd audio
+            # Optionally `git checkout {pinned_commit}`
+            # git checkout ${TORCH_AUDIO_PIN_COMMIT} break in pinned_commit
+            python setup.py install
+            cd ..
+      -name: Benchmark Install
+        shell:
+        run: |
+            source activate e2e_ci
+            if [ ! -d "${{ github.workspace }}/benchmark" ]; then
+                git clone --recursive https://github.com/weishi-deng/benchmark
+            fi
+            cd benchmark
+            BENCHMARK_PINNED_COMMIT=$(cat .github/ci_commit_pins/benchmark.txt)
+            git checkout ${BENCHMARK_PINNED_COMMIT}
+            python install.py
+            pip install -e .
+
+
