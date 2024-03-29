@@ -26,8 +26,8 @@ namespace dpcpp {
 
 /*
  * The namespace at::AtenIpexTypeXPU only serves as operator/kernel
- * implementation. We export operators here under torch_ipex::xpu::dpcpp namespace for
- * frontend usage.
+ * implementation. We export operators here under torch_ipex::xpu::dpcpp
+ * namespace for frontend usage.
  */
 EXPORT_TO_XPU_ALIAS(dpcpp_q_barrier, queue_barrier);
 

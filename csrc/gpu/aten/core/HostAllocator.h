@@ -29,8 +29,8 @@ class HostAllocator final : public at::Allocator {
 
   void release(void* ptr);
 
-  void copy_data(void* dest, const void* src, std::size_t count) 
-    const final override;
+  void copy_data(void* dest, const void* src, std::size_t count)
+      const final override;
 
  private:
   CachingHostAllocator* alloc();

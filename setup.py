@@ -103,6 +103,8 @@ import errno
 # FIXME: always set BUILD_WITH_XPU = ON in XPU repo
 os.environ["BUILD_WITH_XPU"] = "ON"
 os.environ["BUILD_STATIC_ONEMKL"] = "OFF"
+# FIXME: always turn off cpu build as it has not rebased to 2.3 yet.
+os.environ["BUILD_WITH_CPU"] = "OFF"
 
 PACKAGE_NAME = "intel_extension_for_pytorch"
 

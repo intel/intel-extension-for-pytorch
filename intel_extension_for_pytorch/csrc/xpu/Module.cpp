@@ -90,8 +90,7 @@ PyObject* THPModule_emptyCache(PyObject* _unused, PyObject* noargs) {
 
 PyObject* THPModule_memoryStats(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
-  TORCH_CHECK(
-      THPUtils_checkLong(arg), "invalid argument to memory_allocated");
+  TORCH_CHECK(THPUtils_checkLong(arg), "invalid argument to memory_allocated");
   const int device = (int)THPUtils_unpackLong(arg);
 
   using torch_ipex::xpu::dpcpp::DeviceStats;
@@ -313,9 +312,8 @@ void init_xpu_module(pybind11::module& m) {
     return torch_ipex::xpu::dpcpp::dumpMemoryStatusFromDevAlloc(device_index);
   });
 
-  m.def("_is_onemkl_enabled", []() {
-    return Settings::I().is_onemkl_enabled();
-  });
+  m.def(
+      "_is_onemkl_enabled", []() { return Settings::I().is_onemkl_enabled(); });
   m.def("_is_channels_last_1d_enabled", []() {
     return Settings::I().is_channels_last_1d_enabled();
   });

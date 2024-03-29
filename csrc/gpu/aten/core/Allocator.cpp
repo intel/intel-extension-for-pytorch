@@ -112,8 +112,8 @@ std::vector<SegmentInfo> DeviceAllocator::snapshot() {
   return alloc()->snapshot();
 }
 
-void DeviceAllocator::copy_data(void* dest, const void* src, std::size_t count) 
-  const {
+void DeviceAllocator::copy_data(void* dest, const void* src, std::size_t count)
+    const {
   at::xpu::getCurrentXPUStream().queue().memcpy(dest, src, count);
 }
 
@@ -223,8 +223,8 @@ void HostAllocator::release(void* ptr) {
   alloc()->release(ptr);
 }
 
-void HostAllocator::copy_data(void* dest, const void* src, std::size_t count) 
-  const {
+void HostAllocator::copy_data(void* dest, const void* src, std::size_t count)
+    const {
   at::xpu::getCurrentXPUStream().queue().memcpy(dest, src, count);
 }
 

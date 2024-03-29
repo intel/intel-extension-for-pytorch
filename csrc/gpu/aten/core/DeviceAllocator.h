@@ -54,8 +54,8 @@ class DeviceAllocator final : public at::Allocator {
 
   std::vector<SegmentInfo> snapshot();
 
-  void copy_data(void* dest, const void* src, std::size_t count) 
-    const final override;
+  void copy_data(void* dest, const void* src, std::size_t count)
+      const final override;
 
  private:
   CachingDeviceAllocator* alloc();
