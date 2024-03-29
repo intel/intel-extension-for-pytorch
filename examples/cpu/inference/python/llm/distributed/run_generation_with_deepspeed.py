@@ -339,7 +339,11 @@ if args.benchmark:
 
 # For now, Falcon, baichuan, baichuan2, and gptbigcode have accuracy issue with from_config with deepspeed meta device load.
 # TODO: we will change the scope once deepspeed providing the support
-if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode", "git", "qwen"]:
+
+if model_type in ["llava"]:
+    tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_id)
+    model.config = config
+elif world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode", "git", "qwen"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
@@ -347,9 +351,6 @@ if world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigc
         torch_dtype=load_dtype,
         trust_remote_code=True,
     )
-elif model_type in ["llava"]:
-    tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_id)
-    model.config = config
 else: # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
     with deepspeed.OnDevice(dtype=load_dtype, device="meta"):
         if  model_type in ["t5"]:
@@ -529,7 +530,7 @@ elif model_type == "llava":
     conv.append_message(conv.roles[0], prompt)
     conv.append_message(conv.roles[1], None)
     prompt = conv.get_prompt()
-    prompt = [prompt] * args.batch_size
+    inputs = [prompt] * args.batch_size
 else:
     # input tokens
     input_sentences = []
@@ -573,7 +574,7 @@ def generate():
         input_tokens = tokenizer(images=inputs, return_tensors="pt")
         input_ids = input_tokens.pixel_values
     elif model_type == "llava":
-        input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in prompt])
+        input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in inputs])
         image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(infer_dtype) for img in image]
         input_tokens = {"input_ids": input_ids, "images": image_tensor}
     else:

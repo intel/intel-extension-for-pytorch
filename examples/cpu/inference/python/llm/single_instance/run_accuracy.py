@@ -13,6 +13,7 @@ from transformers import (
     AutoTokenizer,
     LlamaTokenizer,
     T5ForConditionalGeneration,
+    AutoProcessor,
 )
 
 MODEL_CLASSES = {
@@ -32,12 +33,14 @@ MODEL_CLASSES = {
     "mpt": (AutoModelForCausalLM, AutoTokenizer),
     "stablelm": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
+    "git": (AutoModelForCausalLM, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", nargs="?", default="EleutherAI/gpt-j-6b")
 parser.add_argument("--output_dir", nargs="?", default="./saved_results")
+parser.add_argument("--output_path", nargs="?", default="./logs")
 parser.add_argument("--device", default="cpu", type=str, help="cpu")
 parser.add_argument(
     "--dtype", default="bfloat16", type=str, help="float32 or bfloat16 or int8 or int4 or nf4"
@@ -57,7 +60,7 @@ parser.add_argument(
 parser.add_argument("--torch-compile", action="store_true")
 parser.add_argument("--backend", default="ipex", type=str, help="backend of torch.compile")
 parser.add_argument("--quant-with-amp", action="store_true", help="by default static quant is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)")
-parser.add_argument("--quantized-model-path", default="./saved_result/best_model.pt")
+parser.add_argument("--quantized-model-path", default="./saved_results/best_model.pt")
 parser.add_argument(
     "--tasks",
     nargs="+",
@@ -81,6 +84,22 @@ from lm_eval.base import BaseLM
 from typing import Union, List, Optional, Tuple
 from transformers import BatchEncoding
 import transformers
+try:
+    from llava.model.language_model.llava_llama import LlavaLlamaForCausalLM
+    from llava.model.builder import load_pretrained_model
+    from llava.conversation import conv_templates
+    from llava.mm_utils import get_model_name_from_path, process_images, tokenizer_image_token
+    from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+    import lmms_eval
+    from lmms_eval.api.instance import Instance
+    from lmms_eval.api.model import lmms
+    from lmms_eval.api.registry import register_model
+    from lmms_eval import evaluator as lmms_evaluator
+    from lmms_eval import utils as lmms_utils
+    from lmms_eval.api.registry import ALL_TASKS
+    from lmms_eval.tasks import initialize_tasks
+except ImportError:
+    pass
 
 TokenSequence = Union[List[int], torch.LongTensor, torch.Tensor, BatchEncoding]
 
@@ -540,37 +559,495 @@ class T5ModelLambada(HuggingFaceSeq2SeqModel):
                     self.cache_hook.add_partial("loglikelihood", cache_key, answer)
         return results
 
-task_dict = lm_eval.tasks.get_task_dict(args.tasks)
-torch._C._jit_set_texpr_fuser_enabled(False)
-if args.model in ["google/flan-t5-xl"]:
-    hfmodel = T5ModelLambada(
-        pretrained=args.model,
-        device="cpu",
-        batch_size=args.batch_size,
-        with_ipex=args.ipex,
-        with_jit=not args.disable_jit,
-        dtype=args.dtype,
-        config=args.config_file,
-        add_special_tokens=True,
+
+@register_model("test")
+class LMMS(lmms):
+    def __init__(
+        self,
+        pretrained: str,
+        device: Optional[str] = "cpu",
+        with_ipex=True,
+        with_jit=True,
         with_greedy=False,
-    )
-else:
-    hfmodel = HuggingFaceModel(
-        pretrained=args.model,
-        device="cpu",
-        batch_size=args.batch_size,
-        with_ipex=args.ipex,
-        with_jit=not args.disable_jit,
-        dtype=args.dtype,
-        config=args.config_file,
-        add_special_tokens=False
-    )
+        batch_size=1,
+        dtype: Optional[Union[str, torch.dtype]] = "auto",
+        config=None,
+        add_special_tokens = True,
+    ) -> None:
+        super().__init__()
+        self._device = torch.device(device)
+        self._batch_size = int(batch_size)
+        self._with_jit = with_jit
+        self._with_ipex = with_ipex
+        self._with_greedy = with_greedy
+        self._dtype = dtype
+        self.add_special_tokens = add_special_tokens
+        load_dtype = torch.float32
+        infer_dtype = torch.float32
+        if dtype == "float16":
+            load_dtype = torch.half
+            infer_dtype = torch.half
+        elif dtype == "bfloat16":
+            load_dtype = torch.bfloat16
+            infer_dtype = torch.bfloat16
+        elif dtype in ["int8", "int4", "nf4"]:
+            load_dtype = torch.float32
+            infer_dtype = torch.int8
+        self.amp_dtype = torch.bfloat16 if args.quant_with_amp or self._dtype == "bfloat16" else torch.float32
+        if re.search("llava", pretrained, re.IGNORECASE):
+            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, get_model_name_from_path(pretrained))
+            model_name = get_model_name_from_path(pretrained)
+            if 'llama-2' in model_name.lower():
+                conv_mode = "llava_llama_2"
+            elif "v1" in model_name.lower():
+                conv_mode = "llava_v1"
+            elif "mpt" in model_name.lower():
+                conv_mode = "mpt"
+            else:
+                conv_mode = "llava_v0"
+            self.conv_template = conv_mode
+        elif re.search("git", pretrained, re.IGNORECASE):
+            model_class = MODEL_CLASSES["git"]
+            self._image_processor = model_class[1].from_pretrained(
+                pretrained, trust_remote_code=True
+            )
+            self._tokenizer = self._image_processor.tokenizer
+            self._config = AutoConfig.from_pretrained(
+                pretrained if config is None else config, torchscript=with_jit, trust_remote_code=True
+            )
+            self._model = model_class[0].from_pretrained(
+                pretrained,
+                low_cpu_mem_usage=True,
+                config=self.config,
+                torch_dtype=load_dtype,
+                trust_remote_code=True,
+            )
+        self._config = self._model.config
+        self._config.torchscript = self._with_jit
+        self._model.eval()
+        if with_ipex and dtype not in ["int8", "int4", "nf4"]:
+            self._model = ipex.llm.optimize(
+                self._model.eval(),
+                dtype=infer_dtype,
+                inplace=True,
+                deployment_mode=False,
+            )
 
-results = evaluator.evaluate(
-    hfmodel,
-    task_dict,
-    #        bootstrap_iters=1000,
-    #        limit=100
-)
+        if args.torch_compile:
+            if dtype in ["int8", "int4", "nf4"]:
+                raise SystemExit("[ERROR] Currently this script does not support torch.compile with int8/int4/nf4 datatype, please set dtype to float32 or bfloat16 if want to use torch.compile.")
+            if with_jit:
+                raise SystemExit("[ERROR] JIT cannot co-work with torch.compile, please set jit to False if want to use torch.compile.")
+            self._model.forward = torch.compile(self._model.forward, dynamic=True, backend=args.backend)
 
-print(evaluator.make_table(results))
+        self._base_model = self._model
+
+        self.iter = 0
+        self.num_beams = 1 if with_greedy else 4
+        self.tp_number = 1
+        if self._with_jit:
+            input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
+            attention_mask = torch.ones_like(input_ids)
+            past_key_values = tuple(
+                [
+                    (
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros(1, 4, dtype=torch.long),
+                        )
+                    )
+                    for i in range(self.model.config.num_hidden_layers)
+                ]
+            )
+            sample_inputs = {
+                "attention_mask": attention_mask,
+                "past_key_values": past_key_values,
+            }
+            if re.search("llava", pretrained, re.IGNORECASE):
+                sample_inputs["inputs_embeds"] = torch.zeros(batch_size, 1, 4096).to(self.amp_dtype)
+            elif re.search("git", pretrained, re.IGNORECASE):
+                sample_inputs["input_ids"] = input_ids.repeat(self.batch_size, 1)
+                sample_inputs["attention_mask"] = attention_mask.repeat(self.batch_size, 1)
+                sample_inputs["pixel_values"] = torch.zeros(batch_size, 3, 224, 224)
+                num_head = self.model.config.num_attention_heads
+                head_dim = int(self.model.config.hidden_size / num_head)
+                past_key_values = tuple(
+                    [
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([batch_size, num_head, 1, head_dim]).contiguous(),
+                            torch.zeros([batch_size, num_head, 1, head_dim]).contiguous(),
+                            torch.zeros(1, 4, dtype=torch.long),
+                        )
+                        for i in range(self.model.config.num_hidden_layers)
+                    ]
+                )
+                sample_inputs["past_key_values"] = past_key_values
+            with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if self.amp_dtype == torch.bfloat16 else False,):
+                if self._dtype != "int8":
+                    traced_model = torch.jit.trace(
+                        self._model.eval(),
+                        example_kwarg_inputs=sample_inputs,
+                        strict=False,
+                        check_trace=False,
+                    )
+                    traced_model = torch.jit.freeze(traced_model.eval())
+                else:
+                    traced_model = torch.jit.load(args.quantized_model_path)
+                    traced_model = torch.jit.freeze(traced_model.eval())
+
+                traced_model(**sample_inputs)
+                traced_model(**sample_inputs)
+            ipex._set_optimized_model_for_generation(self._model, optimized_model=traced_model)
+
+
+    @property
+    def config(self):
+        # return the associated transformers.AutoConfig for the given pretrained model.
+        return self._config
+
+    @property
+    def tokenizer(self):
+        return self._tokenizer
+
+    @property
+    def model(self):
+        return self._model
+
+    @property
+    def eot_token_id(self):
+        # we use EOT because end of *text* is more accurate for what we're doing than end of *sentence*
+        return self.tokenizer.eos_token_id
+
+    @property
+    def max_length(self):
+        return self._max_length
+
+    def pad_sequence(self, input_ids, batch_first, padding_value):
+        if self.tokenizer.padding_side == "left":
+            input_ids = [torch.flip(_input_ids, [0]) for _input_ids in input_ids]
+        input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=batch_first, padding_value=padding_value)
+        if self.tokenizer.padding_side == "left":
+            input_ids = torch.flip(input_ids, [1])
+        return input_ids
+
+    @property
+    def batch_size(self):
+        return self._batch_size
+
+    @property
+    def device(self):
+        return self._device
+
+    @property
+    def rank(self):
+        return self._rank
+
+    @property
+    def world_size(self):
+        return self._world_size
+
+    def tok_encode(self, string: str, left_truncate_len=None, add_special_tokens=None) -> List[int]:
+        """ """
+        add_special_tokens = False if add_special_tokens is None else add_special_tokens
+        encoding = self.tokenizer.encode(string, add_special_tokens=add_special_tokens)
+        # left-truncate the encoded context to be at most `left_truncate_len` tokens long
+        if left_truncate_len:
+            encoding = encoding[-left_truncate_len:]
+        return encoding
+
+    def tok_decode(self, tokens):
+        return self.tokenizer.decode(tokens)
+
+    def loglikelihood(self, requests: List[Instance]) -> List[Tuple[float, bool]]:
+        # TODO
+        res = []
+        pbar = tqdm(total=len(requests), disable=(self.rank != 0), desc="Model Responding")
+
+        for contexts, doc_to_target, doc_to_visual, doc_id, task, split in [reg.args for reg in requests]:
+            # encode, pad, and truncate contexts for this batch
+            if type(doc_to_target) == str:
+                continuation = doc_to_target
+            else:
+                continuation = doc_to_target(self.task_dict[task][split][doc_id])
+            visuals = [doc_to_visual(self.task_dict[task][split][doc_id])]
+            visuals = self.flatten(visuals)
+            if visuals:
+                image = process_images(visuals, self._image_processor, self._config)
+                if type(image) is list:
+                    image = [_image.to(dtype=torch.float16, device=self.device) for _image in image]
+                else:
+                    image = image.to(dtype=torch.float16, device=self.device)
+            else:
+                image = None
+
+            prompts_input = contexts[0]
+
+            if image is not None and len(image) != 0 and DEFAULT_IMAGE_TOKEN not in prompts_input:
+                """
+                Three senarios:
+                1. No image, and there for, no image token should be added.
+                2. image token is already specified in the context, so we don't need to add it.
+                3. image token is not specified in the context and there is image inputs, so we need to add it. In this case, we add the image token at the beginning of the context and add a new line.
+                """
+                image_tokens = [DEFAULT_IMAGE_TOKEN] * len(visuals)
+                image_tokens = " ".join(image_tokens)
+                prompts_input = image_tokens + "\n" + contexts[0]
+
+            conv = conv_templates[self.conv_template].copy()
+            conv.append_message(conv.roles[0], prompts_input)
+            conv.append_message(conv.roles[1], None)
+            prompt = conv.get_prompt()
+            pad_token_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
+            contxt_id = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
+            # Add the answer of the second role
+            conv.messages[1][1] = continuation
+
+            prompt = conv.get_prompt()
+            input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
+            labels = input_ids.clone()
+            # Context part no need to calculate for loss
+            labels[0, : contxt_id.shape[1]] = -100
+            with torch.inference_mode():
+                outputs = self.model(input_ids=input_ids, labels=labels, images=image, use_cache=True)
+            loss = outputs["loss"]
+            # loss = torch.exp(loss)
+            logits = outputs["logits"]
+            greedy_tokens = logits.argmax(dim=-1)
+            cont_toks = input_ids[:, contxt_id.shape[1] :]  # [1, seq]
+            greedy_tokens = greedy_tokens[:, contxt_id.shape[1] : input_ids.shape[1]]  # [1, seq]
+            max_equal = (greedy_tokens == cont_toks).all()
+            res.append((float(loss.item()), bool(max_equal)))
+            pbar.update(1)
+        pbar.close()
+        return res
+
+    def flatten(self, input):
+        new_list = []
+        for i in input:
+            for j in i:
+                new_list.append(j)
+        return new_list
+
+    def generate_until(self, requests: List[Instance]) -> List[str]:
+        res = []
+
+        def _collate(x):
+            # the negative sign on len(toks) sorts descending - this has a few advantages:
+            # - time estimates will always be over not underestimates, which is more useful for planning
+            # - to know the size of a batch when going through the list, you know the first one is always the batch
+            #   padded context length. this is useful to simplify the batching logic and more importantly to make
+            #   automatic adaptive batches much much easier to implement
+            # - any OOMs will happen right away rather than near the end
+            toks = self.tok_encode(x[0])
+            return -len(toks), x[0]
+
+        # we group requests by their generation_kwargs,
+        # so that we don't try to execute e.g. greedy sampling and temp=0.8 sampling
+        # in the same batch.
+        re_ords = lmms_utils.Collator([reg.args for reg in requests], _collate, grouping=True)
+        chunks = re_ords.get_batched(n=self.batch_size, batch_fn=None)
+        num_iters = len(requests) // self.batch_size if len(requests) % self.batch_size == 0 else len(requests) // self.batch_size + 1
+        pbar = tqdm(total=num_iters, disable=(self.rank != 0), desc="Model Responding")
+        for chunk in chunks:
+            contexts, all_gen_kwargs, doc_to_visual, doc_id, task, split = zip(*chunk)
+            task = task[0]
+            split = split[0]
+            visuals = [doc_to_visual[0](self.task_dict[task][split][ids]) for ids in doc_id]
+            visuals = self.flatten(visuals)
+            # we assume all gen kwargs in the batch are the same
+            # this is safe to assume because the `grouper` object ensures it.
+            gen_kwargs = all_gen_kwargs[0]
+            if re.search("llava", self.model.config.architectures[0], re.IGNORECASE):
+                # Set default values for until and max_new_tokens
+                until = [self.tok_decode(self.eot_token_id)]
+
+                # Update values from gen_kwargs if present
+                if "until" in gen_kwargs:
+                    until = gen_kwargs.pop("until")
+                    if isinstance(until, str):
+                        until = [until]
+                    elif not isinstance(until, list):
+                        raise ValueError(f"Expected `gen_kwargs['until']` to be of type Union[str,list] but got {type(until)}")
+
+                if "image_aspect_ratio" in gen_kwargs.keys() and "image_aspect_ratio" not in self._config.__dict__:
+                    # here we should pop it out of gen_kwargs so that it doesn't get passed to the model for next step of generation
+                    self._config.image_aspect_ratio = gen_kwargs.pop("image_aspect_ratio")
+                # encode, pad, and truncate contexts for this batch
+                if visuals:
+                    image_tensor = process_images(visuals, self._image_processor, self._config)
+                else:
+                    image_tensor = None
+
+                # prompts_input = contexts[0]
+
+                question_input = []
+
+                for visual, context in zip(visuals, contexts):
+                    if image_tensor is not None and len(image_tensor) != 0 and DEFAULT_IMAGE_TOKEN not in context:
+                        """
+                        Three senarios:
+                        1. No image, and there for, no image token should be added.
+                        2. image token is already specified in the context, so we don't need to add it.
+                        3. image token is not specified in the context and there is image inputs, so we need to add it. In this case, we add the image token at the beginning of the context and add a new line.
+                        """
+                        image_tokens = [DEFAULT_IMAGE_TOKEN] * len(visual) if isinstance(visual, list) else [DEFAULT_IMAGE_TOKEN]
+                        image_tokens = " ".join(image_tokens)
+                        question = image_tokens + "\n" + context
+                    else:
+                        question = context
+
+                    conv = conv_templates[self.conv_template].copy()
+                    conv.append_message(conv.roles[0], question)
+                    conv.append_message(conv.roles[1], None)
+                    prompt_question = conv.get_prompt()
+                    question_input.append(prompt_question)
+
+                # The above for loop has bugs. When there is no visuals, e.g. pure text,
+                # there will be no for loop execute resulting in an empty question_input (because no visuals)
+                # Scenario 1 won't even be execute
+                if len(visuals) == 0:
+                    for context in contexts:
+                        question = context
+                        conv = conv_templates[self.conv_template].copy()
+                        conv.append_message(conv.roles[0], question)
+                        conv.append_message(conv.roles[1], None)
+                        prompt_question = conv.get_prompt()
+                        question_input.append(prompt_question)
+
+                # input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
+                # preconfigure gen_kwargs with defaults
+                gen_kwargs["image_sizes"] = [visuals[idx].size for idx in range(len(visuals))]
+                if "max_new_tokens" not in gen_kwargs:
+                    gen_kwargs["max_new_tokens"] = 1024
+                if "temperature" not in gen_kwargs:
+                    gen_kwargs["temperature"] = 0
+                if "top_p" not in gen_kwargs:
+                    gen_kwargs["top_p"] = None
+                if "num_beams" not in gen_kwargs:
+                    gen_kwargs["num_beams"] = 1
+
+                input_ids_list = [tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt") for prompt in question_input]
+                pad_token_ids = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
+                input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device)
+                attention_masks = input_ids.ne(pad_token_ids).to(self.device)
+                input_dict = {
+                    "input_ids":input_ids,
+                    "attention_mask": attention_masks,
+                    "pad_token_id": pad_token_ids,
+                    "images": image_tensor.to(self.amp_dtype),
+                    "do_sample": True if gen_kwargs["temperature"] > 0 else False,
+                    "temperature": gen_kwargs["temperature"],
+                    "top_p": gen_kwargs["top_p"],
+                    "num_beams": gen_kwargs["num_beams"],
+                    "max_new_tokens": gen_kwargs["max_new_tokens"],
+                }
+            elif re.search("git", self.model.config.architectures[0], re.IGNORECASE):
+                input_ids=self._image_processor(images=visuals, return_tensors="pt").pixel_values
+                gen_kwargs.pop("until", None)
+                input_dict = {
+                    "pixel_values": input_ids.to(self.amp_dtype),
+                    **gen_kwargs,
+                }
+            try:
+                with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+                    enabled=True if self.amp_dtype == torch.bfloat16 else False,):
+                    cont = self.model.generate(**input_dict)
+                    text_outputs = self.tokenizer.batch_decode(
+                        cont[:, input_ids.shape[1]:] if re.search("llava", self.model.config.architectures[0], re.IGNORECASE) else cont,
+                        skip_special_tokens=True)
+            except Exception as e:
+                print(f"Error {e} in generating")
+                cont = ""
+                text_outputs = [""]
+            res.extend(text_outputs)
+            # self.cache_hook.add_partial("generate_until", (context, gen_kwargs), text_outputs)
+            pbar.update(1)
+        res = re_ords.get_original(res)
+
+        pbar.close()
+        return res
+    
+lm_tasks = []
+lmms_tasks = []
+lm_all_tasks = lm_eval.tasks.ALL_TASKS
+try:
+    initialize_tasks()
+except Exception as e:
+    print(e)
+for task in args.tasks:
+    if task in lm_all_tasks:
+        lm_tasks.append(task)
+    elif task in ALL_TASKS:
+        lmms_tasks.append(task)
+    else:
+        print(f"Task {task} in not supported by lm_eval and lmms_eval")
+        exit(0)
+torch._C._jit_set_texpr_fuser_enabled(False)
+
+if len(lm_tasks) != 0:
+    lm_task_dict = lm_eval.tasks.get_task_dict(lm_tasks)
+    if args.model in ["google/flan-t5-xl"]:
+        hfmodel = T5ModelLambada(
+            pretrained=args.model,
+            device="cpu",
+            batch_size=args.batch_size,
+            with_ipex=args.ipex,
+            with_jit=not args.disable_jit,
+            dtype=args.dtype,
+            config=args.config_file,
+            add_special_tokens=True,
+            with_greedy=False,
+        )
+    else:
+        hfmodel = HuggingFaceModel(
+            pretrained=args.model,
+            device="cpu",
+            batch_size=args.batch_size,
+            with_ipex=args.ipex,
+            with_jit=not args.disable_jit,
+            dtype=args.dtype,
+            config=args.config_file,
+            add_special_tokens=False
+        )
+
+    results = evaluator.evaluate(
+        hfmodel,
+        lm_task_dict,
+        #        bootstrap_iters=1000,
+        #        limit=100
+    )
+    print(evaluator.make_table(results))
+elif len(lmms_tasks) != 0:
+    task_names = lmms_utils.pattern_match(lmms_tasks, ALL_TASKS)
+    lm = LMMS(pretrained=args.model, device="cpu", 
+            batch_size=args.batch_size,
+            with_ipex=args.ipex,
+            with_jit=not args.disable_jit,
+            dtype=args.dtype,
+            config=args.config_file,
+            add_special_tokens=False
+        )
+
+    task_dict = lmms_eval.tasks.get_task_dict(task_names, model_name="test")
+    for task_name in task_dict.keys():
+        task_obj = task_dict[task_name]
+        if type(task_obj) == tuple:
+            group, task_obj = task_obj
+            if task_obj is None:
+                continue
+        lm.task_dict[task_name] = task_obj.dataset
+
+        config = task_obj._config
+
+    results = lmms_evaluator.evaluate(
+        lm=lm,
+        task_dict=task_dict,
+        # limit=10,
+        # bootstrap_iters=100,
+        cli_args=args
+    )
+    print(lmms_evaluator.make_table(results))
