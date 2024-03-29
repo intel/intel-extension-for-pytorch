@@ -142,7 +142,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
         self.text_max_length = text_max_length
 
     @classmethod
-    def apply(
+    def apply_function(
         cls,
         query: torch.Tensor,
         key: torch.Tensor,
@@ -278,7 +278,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
         cutoff: Optional[torch.Tensor] = None,
         vision: Optional[torch.Tensor] = False,
     ):
-        return self.apply(
+        return self.apply_function(
             query,
             key,
             value,
@@ -312,7 +312,7 @@ class _IPEXRMSNormCPU(nn.Module):
         )
 
     @classmethod
-    def apply(cls, hidden_states, weight, eps):
+    def apply_function(cls, hidden_states, weight, eps):
         return torch.ops.torch_ipex.rmsnorm(hidden_states, weight=weight, eps=eps)
 
 
@@ -327,7 +327,7 @@ class _IPEXFastLayerNormCPU(nn.Module):
         return self.module(hidden_states)
 
     @classmethod
-    def apply(cls, hidden_states, normalized_shape, weight, bias, eps):
+    def apply_function(cls, hidden_states, normalized_shape, weight, bias, eps):
         return torch.nn.functional.layer_norm(
             hidden_states, normalized_shape, weight=weight, bias=bias, eps=eps
         )
@@ -375,7 +375,7 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         super().__init__()
 
     @classmethod
-    def apply(
+    def apply_functions(
         cls,
         query,  # [total_q, num_head, head_size]
         key,  # [total_k, num_head_k, head_size]
@@ -471,7 +471,7 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         return_softmax,
         gen_,
     ):
-        self.apply(
+        self.apply_function(
             query,
             key,
             value,

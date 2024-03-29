@@ -263,7 +263,7 @@ class TestLLMModules(TestCase):
             target_m = ipex.llm.modules.RMSNorm(4096).to(dtype)
             ref_out = ref_m(x1.to(dtype))
             out = target_m(x2.to(dtype))
-            out_2 = ipex.llm.modules.RMSNorm.apply(
+            out_2 = ipex.llm.functional.rms_norm(
                 x2.to(dtype), ref_m.weight, ref_m.variance_epsilon
             )
             self.assertEqual(out, ref_out)
@@ -272,16 +272,22 @@ class TestLLMModules(TestCase):
     def test_modules_naming(self):
         # below ipex.llm modeules has thier own UTs, here only test their access of naming from ipex.llm.modules
         assert ipex.llm.modules.RotaryEmbedding is not None
-        assert ipex.llm.modules.RotaryEmbedding.apply is not None
+        assert ipex.llm.modules.RotaryEmbedding.apply_function is not None
         assert ipex.llm.modules.PagedAttention is not None
         assert ipex.llm.modules.IndirectAccessKVCache is not None
-        assert ipex.llm.modules.IndirectAccessKVCache.apply is not None
+        assert ipex.llm.modules.IndirectAccessKVCache.apply_function is not None
         assert ipex.llm.modules.VarlenAttention is not None
-        assert ipex.llm.modules.VarlenAttention.apply is not None
+        assert ipex.llm.modules.VarlenAttention.apply_function is not None
         assert ipex.llm.modules.FastLayerNorm is not None
-        assert ipex.llm.modules.FastLayerNorm.apply is not None
+        assert ipex.llm.modules.FastLayerNorm.apply_function is not None
         assert ipex.llm.modules.RMSNorm is not None
-        assert ipex.llm.modules.RMSNorm.apply is not None
+        assert ipex.llm.modules.RMSNorm.apply_function is not None
+        # below only test their access of naming from ipex.llm functional
+        assert ipex.llm.functional.rotary_embedding is not None
+        assert ipex.llm.functional.rms_norm is not None
+        assert ipex.llm.functional.fast_layer_norm is not None
+        assert ipex.llm.functional.indirect_access_kv_cache is not None
+        assert ipex.llm.functional.varlen_attention is not None
 
     def test_rotary_embedding_tgi(self):
         test_tensor_size = [
@@ -299,7 +305,7 @@ class TestLLMModules(TestCase):
             ref_q = apply(q, cos, sin)
             ref_k = apply(k, cos, sin)
 
-            ipex_q, ipex_k = ipex.llm.modules.RotaryEmbedding.apply(
+            ipex_q, ipex_k = ipex.llm.functional.rotary_embedding(
                 q, k, sin, cos, rotary_dim, True
             )
 
