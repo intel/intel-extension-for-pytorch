@@ -6,7 +6,7 @@ Troubleshooting
 ### General Usage
 
 - **Problem**: FP64 data type is unsupported on current platform.
-  - **Cause**: FP64 is not natively supported by the [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html) platform. 
+  - **Cause**: FP64 is not natively supported by the [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html) and [Intel® Arc™ A-Series Graphics](https://www.intel.com/content/www/us/en/products/details/discrete-gpus/arc.html) platforms. 
     If you run any AI workload on that platform and receive this error message, it means a kernel requires FP64 instructions that are not supported and the execution is stopped.
 - **Problem**: Runtime error `invalid device pointer` if `import horovod.torch as hvd` before `import intel_extension_for_pytorch`
   - **Cause**: Intel® Optimization for Horovod\* uses utilities provided by Intel® Extension for PyTorch\*. The improper import order causes Intel® Extension for PyTorch\* to be unloaded before Intel®
@@ -25,9 +25,9 @@ Troubleshooting
   - **Solution**: Pass `export GLIBCXX_USE_CXX11_ABI=1` and compile PyTorch\* with particular compiler which supports `_GLIBCXX_USE_CXX11_ABI=1`. We recommend using prebuilt wheels 
     in [download server](https:// developer.intel.com/ipex-whl-stable-xpu) to avoid this issue.
 - **Problem**: Bad termination after AI model execution finishes when using Intel MPI.
-  - **Cause**: This is a random issue when the AI model (e.g. RN50 training) execution finishes in an Intel MPI environment. It is not user-friendly as the model execution ends ungracefully.
+  - **Cause**: This is a random issue when the AI model (e.g. RN50 training) execution finishes in an Intel MPI environment. It is not user-friendly as the model execution ends ungracefully. It has been fixed in PyTorch* 2.3 ([#116312](https://github.com/pytorch/pytorch/commit/f657b2b1f8f35aa6ee199c4690d38a2b460387ae)). 
   - **Solution**: Add `dist.destroy_process_group()` during the cleanup stage in the model script, as described 
-    in [Getting Started with Distributed Data Parallel](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html).
+    in [Getting Started with Distributed Data Parallel](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html), before Intel® Extension for PyTorch* supports PyTorch* 2.3.
 - **Problem**: `-997 runtime error` when running some AI models on Intel® Arc™ A-Series GPUs.
   - **Cause**:  Some of the `-997 runtime error` are actually out-of-memory errors. As Intel® Arc™ A-Series GPUs have less device memory than Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU 
     Max  Series, running some AI models on them may trigger out-of-memory errors and cause them to report failure such as `-997 runtime error` most likely. This is expected. Memory usage optimization is a work in progress to allow Intel® Arc™ A-Series GPUs to support more AI models.
@@ -38,21 +38,13 @@ Troubleshooting
 - **Problem**: Some workloads terminate with an error `CL_DEVICE_NOT_FOUND` after some time on WSL2.
   - **Cause**:  This issue is due to the [TDR feature](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-registry-keys#tdrdelay) on Windows.
   - **Solution**: Try increasing TDRDelay in your Windows Registry to a large value, such as 20 (it is 2 seconds, by default), and reboot.
-- **Problem**: Runtime error `Unable to find TSan function` might be raised when running some CPU AI workloads in certain scenarios.
-  - **Cause**:  This issue is probably caused by the compatibility issue of OMP tool libraries.
-  - **Solution**: Please try the workaround: disable OMP tool libraries by `export OMP_TOOL="disabled"`, to unblock your workload. We are working on the final solution and will release it as soon as possible.
-- **Problem**: The profiled data on GPU operators using legacy profiler is not accurate sometimes.
-  - **Cause**: Compiler in 2024.0 oneAPI basekit optimizes barrier implementation which brings negative impact on legacy profiler.
-  - **Solution**: Use Kineto profiler instead. Or use legacy profiler with `export UR_L0_IN_ORDER_BARRIER_BY_SIGNAL=0` to workaround this issue.
 - **Problem**: Random bad termination after AI model convergence test (>24 hours) finishes.
   - **Cause**: This is a random issue when some AI model convergence test execution finishes. It is not user-friendly as the model execution ends ungracefully.
   - **Solution**: Kill the process after the convergence test finished, or use checkpoints to divide the convergence test into several phases and execute separately.
-- **Problem**: Random GPU hang issue when executing the first allreduce in LLM inference workloads on 1 Intel® Data Center GPU Max 1550 card.
-  - **Cause**: Race condition happens between oneDNN kernels and oneCCL Bindings for Pytorch\* allreduce primitive. 
-  - **Solution**: Use `TORCH_LLM_ALLREDUCE=0` to workaround this issue.
-- **Problem**: GPU hang issue when executing LLM inference workloads on multi Intel® Data Center GPU Max series cards over PCIe communication.
-  - **Cause**: oneCCL Bindings for Pytorch\* allreduce primitive does not support PCIe for cross-cards communication.
-  - **Solution**: Enable XeLink for cross-cards communication, or use `TORCH_LLM_ALLREDUCE=0` for the PCIe only environments.
+- **Problem**: Random instability issues such as page fault or atomic access violation when executing LLM inference workloads on Intel® Data Center GPU Max series cards.
+  - **Cause**:  This issue is reported on LTS driver [803.29](https://dgpu-docs.intel.com/releases/LTS_803.29_20240131.html). The root cause is under investigation.
+  - **Solution**: Use active rolling stable release driver [775.20](https://dgpu-docs.intel.com/releases/stable_775_20_20231219.html) or latest driver version to workaround.
+
 ### Library Dependencies
 
 - **Problem**: Cannot find oneMKL library when building Intel® Extension for PyTorch\* without oneMKL.
@@ -104,6 +96,8 @@ Troubleshooting
   The following unit test fails on Intel® Data Center GPU Flex Series 170 but the same test case passes on Intel® Data Center GPU Max Series. The root cause of the failure is under investigation.
     - `test_weight_norm.py::TestNNMethod::test_weight_norm_differnt_type`
 
+- Unit test failures on Intel® Arc™ A770
+  
   The following unit tests fail in Windows environment on Intel® Arc™ A770 Graphic card. The root cause of the failures is under investigation.
      - `test_foreach.py::TestTorchMethod::test_foreach_cos`
      - `test_foreach.py::TestTorchMethod::test_foreach_sin`

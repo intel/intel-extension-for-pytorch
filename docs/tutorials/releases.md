@@ -1,6 +1,31 @@
 Releases
 =============
 
+## 2.1.20+xpu
+
+Intel® Extension for PyTorch\* v2.1.20+xpu is a minor release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.1.0.
+
+### Highlights
+
+- Intel® oneAPI Base Toolkit 2024.1 compatibility
+- Intel® oneDNN v3.4 integration
+- LLM inference scaling optimization based on Intel® oneCCL 2021.12 (Prototype)
+- Bug fixing and other optimization
+  - Uplift XeTLA to v0.3.4.1 [#3696](https://github.com/intel/intel-extension-for-pytorch/commit/dc0f6d39739404d38226ccf444c421706f14f2de)
+  - [SDP] Fallback unsupported bias size to native impl [#3706](https://github.com/intel/intel-extension-for-pytorch/commit/d897ebd585da05a90295165584efc448e265a38d)
+  - Error handling enhancement [#3788](https://github.com/intel/intel-extension-for-pytorch/commit/bd034e7a37822f84706f0068ec85d989fb766529), [#3841](https://github.com/intel/intel-extension-for-pytorch/commit/7d4f297ecb4c076586a22908ecadf4689cb2d5ef)
+  - Fix beam search accuracy issue in workgroup reduce [#3796](https://github.com/intel/intel-extension-for-pytorch/commit/f2f20a523ee85ed1f44c7fa6465b8e5e1e2edfea)
+  - Support int32 index tensor in index operator [#3808](https://github.com/intel/intel-extension-for-pytorch/commit/f7bb4873c0416a9f56d1f7ecfbcdbe7ad58b47cd)
+  - Add deepspeed in LLM dockerfile [#3829](https://github.com/intel/intel-extension-for-pytorch/commit/6266f89833f8010d6c683f9b45cfb2031575ad92)
+  - Fix batch norm accuracy issue [#3882](https://github.com/intel/intel-extension-for-pytorch/commit/a1e2271717ff61dc3ea7d8d471c2356b3e469b93)
+  - Prebuilt wheel dockerfile update [#3887](https://github.com/intel/intel-extension-for-pytorch/commit/8d5d71522910c1f622dac6a52cb0025e469774b2#diff-022fb5910f470cc5c44ab38cb20586d014f37c06ac8f3378e146ed35ee202a46), [#3970](https://github.com/intel/intel-extension-for-pytorch/commit/54b8171940cd694ba91c928c99acc440c9993881)
+  - Fix windows build failure with Intel® oneMKL 2024.1 in torch_patches [#18](https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.1.20/torch_patches/0018-use-ONEMKL_LIBRARIES-for-mkl-libs-in-torch-to-not-ov.patch)
+  - Fix FFT core dump issue with Intel® oneMKL 2024.1 in torch_patches [#20](https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.1.20/torch_patches/0020-Hide-MKL-symbols-211-212.patch), [#21](https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.1.20/torch_patches/0021-Fix-Windows-Build-214-215.patch)
+
+### Known Issues
+
+Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+
 ## 2.1.10+xpu
 
 Intel® Extension for PyTorch\* v2.1.10+xpu is the new Intel® Extension for PyTorch\* release supports both CPU platforms and GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.1.0. It extends PyTorch\* 2.1.0 with up-to-date features and optimizations on `xpu` for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* `xpu` device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.
