@@ -1,7 +1,8 @@
 #pragma once
 
 #include <ATen/Config.h>
-
+#include <c10/util/flat_hash_map.h>
+#include <c10/xpu/XPUStream.h>
 #include <core/Device.h>
 #include <core/Memory.h>
 #include <runtime/Utils.h>
@@ -12,6 +13,8 @@
 
 using namespace dnnl;
 using namespace torch_ipex::xpu::dpcpp;
+using stream_map =
+    ska::flat_hash_map<c10::xpu::XPUStream, std::shared_ptr<dnnl::stream>>;
 
 namespace torch_ipex::xpu {
 namespace oneDNN {
@@ -67,14 +70,17 @@ struct GpuStreamManager {
   dnnl::stream& get_stream() {
     int device_index = at::xpu::current_device();
     TORCH_INTERNAL_ASSERT(device_index < at::xpu::device_count());
-    int queue_id = getCurrentDPCPPStream(device_index).queue_index();
-    if (stream_pool[device_index][queue_id] == nullptr) {
-      stream_pool[device_index][queue_id] =
+    auto stream = c10::xpu::getCurrentXPUStream(device_index);
+    auto priority = stream.priority();
+    if (stream_pool[device_index][priority].find(stream) ==
+        stream_pool[device_index][priority].end()) {
+      stream_pool[device_index][priority].emplace(
+          stream,
           std::make_shared<dnnl::stream>(dnnl::sycl_interop::make_stream(
               GpuEngineManager::Instance().get_engine({kXPU, device_index}),
-              dpcppGetRawQueue(device_index, queue_id)));
+              stream.queue())));
     }
-    return *(stream_pool[device_index][queue_id].get());
+    return *(stream_pool[device_index][priority].at(stream));
   }
 #else
   dnnl::stream get_stream() {
@@ -96,19 +102,14 @@ struct GpuStreamManager {
     TORCH_INTERNAL_ASSERT(deviceCount > 0);
     stream_pool.clear();
     stream_pool.resize(deviceCount);
-    for (DeviceIndex dev = 0; dev < deviceCount; dev++) {
-      for (QueueIndex qid = 0; qid < kQueuesPerPool; qid++) {
-        stream_pool[dev][qid] = nullptr;
-      }
-    }
 #endif
   }
   ~GpuStreamManager() {}
 
  private:
 #ifdef USE_PERSIST_STREAM
-  // For each device, we have kQueuesPerPool(32) reserved queues.
-  std::vector<std::array<std::shared_ptr<dnnl::stream>, kQueuesPerPool>>
+  std::vector<
+      std::array<stream_map, c10::xpu::max_compile_time_stream_priorities>>
       stream_pool;
 #endif
 };
