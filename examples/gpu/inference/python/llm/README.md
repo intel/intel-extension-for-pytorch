@@ -49,10 +49,7 @@ docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_REN
 
 
 # Run the container with command below
-docker run --privileged -it --rm --device /dev/dri:/dev/dri -v /dev/dri/by-path:/dev/dri/by-path \
---ipc=host --net=host --cap-add=ALL -v /lib/modules:/lib/modules --workdir /workspace  \
---volume `pwd`/examples/gpu/inference/python/llm/:/workspace/llm ipex-llm:2.1.20 /bin/bash
-
+docker run --privileged -it --rm --device /dev/dri:/dev/dri -v /dev/dri/by-path:/dev/dri/by-path --ipc=host --net=host --cap-add=ALL -v /lib/modules:/lib/modules --workdir /workspace  --volume `pwd`/examples/gpu/inference/python/llm/:/workspace/llm ipex-llm:2.1.20 /bin/bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -83,9 +80,9 @@ conda activate llm
 conda install pkg-config
 # Setup the environment with the provided script
 cd examples/gpu/inference/python/llm
-# If you want to install Intel® Extension for PyTorch\* from prebuilt wheel files, use the command below:
+# If you want to install Intel® Extension for PyTorch* from prebuilt wheel files, use the command below:
 bash ./tools/env_setup.sh 7
-# If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
+# If you want to install Intel® Extension for PyTorch* from source, use the commands below:
 bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <AOT>
 export LD_PRELOAD=$(bash ../../../../../tools/get_libstdcpp_lib.sh)
 export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}

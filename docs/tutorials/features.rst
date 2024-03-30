@@ -1,8 +1,8 @@
 Features
 ========
 
-Device-Agnostic
-***************
+GPU-Specific
+************
 
 Easy-to-use Python API
 ----------------------
@@ -46,16 +46,15 @@ Quantization
 
 Intel® Extension for PyTorch* currently supports imperative mode and TorchScript mode for post-training static quantization on GPU. This section illustrates the quantization workflow on Intel GPUs.
 
-Check more detailed information for `INT8 Quantization [XPU] <features/int8_overview_xpu.md>`_. 
+Check more detailed information for `INT8 Quantization <features/int8_overview_xpu.md>`_. 
 
-On Intel® GPUs, Intel® Extension for PyTorch* also provides INT4 and FP8 Quantization.  Check more detailed information for `FP8 Quantization <./features/float8.md>`_ and `INT4 Quantization <./features/int4.md>`_ 
+On Intel® GPUs, Intel® Extension for PyTorch* also provides FP8 Quantization.  Check more detailed information for `FP8 Quantization <./features/float8.md>`_.
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
    features/int8_overview_xpu
-   features/int4
    features/float8
 
 
@@ -73,9 +72,6 @@ For more detailed information, check `DDP <features/DDP.md>`_ and `Horovod (Prot
    features/DDP
    features/horovod
 
-
-GPU-Specific
-************
 
 DLPack Solution
 ---------------
@@ -131,11 +127,12 @@ For more detailed information, check `FSDP <features/FSDP.md>`_.
 
    features/FSDP
 
-Inductor
---------
+torch.compile for GPU (Beta)
+----------------------------
+
 Intel® Extension for PyTorch\* now empowers users to seamlessly harness graph compilation capabilities for optimal PyTorch model performance on Intel GPU via the flagship `torch.compile <https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile>`_ API through the default "inductor" backend (`TorchInductor <https://dev-discuss.pytorch.org/t/torchinductor-a-pytorch-native-compiler-with-define-by-run-ir-and-symbolic-shapes/747/1>`_ ). 
 
-For more detailed information, check `Inductor <features/torch_compile_gpu.md>`_.
+For more detailed information, check `torch.compile for GPU <features/torch_compile_gpu.md>`_.
 
 .. toctree::
    :hidden:
@@ -144,7 +141,7 @@ For more detailed information, check `Inductor <features/torch_compile_gpu.md>`_
    features/torch_compile_gpu
 
 Legacy Profiler Tool (Prototype)
------------------------------------
+--------------------------------
 
 The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators' overhead on XPU devices. With this tool, you can get the information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch* with profiler support as default and enable this tool by adding a `with` statement before the code segment.
 
@@ -157,7 +154,7 @@ For more detailed information, check `Legacy Profiler Tool <features/profiler_le
    features/profiler_legacy
 
 Simple Trace Tool (Prototype)
---------------------------------
+-----------------------------
 
 Simple Trace is a built-in debugging tool that lets you control printing out the call stack for a piece of code. Once enabled, it can automatically print out verbose messages of called operators in a stack format with indenting to distinguish the context. 
 
@@ -170,7 +167,7 @@ For more detailed information, check `Simple Trace Tool <features/simple_trace.m
    features/simple_trace
 
 Kineto Supported Profiler Tool (Prototype)
----------------------------------------------
+------------------------------------------
 
 The Kineto supported profiler tool is an extension of PyTorch\* profiler for profiling operators' executing time cost on GPU devices. With this tool, you can get information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch\* with Kineto support as default and enable this tool using the `with` statement before the code segment.
 

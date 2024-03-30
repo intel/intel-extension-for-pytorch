@@ -8,7 +8,7 @@ set -eo pipefail
 VER_IPEX=v2.1.20+xpu
 
 if [[ $# -lt 3 ]]; then
-    echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> <CCLROOT> <AOT>"
+    echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> <CCLROOT> <MPIROOT> <AOT>"
     echo "DPCPPROOT, MKLROOT and CCLROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler, oneMKL and oneCCL respectively."
     echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT."
     exit 1
@@ -16,7 +16,8 @@ fi
 DPCPP_ROOT=$1
 ONEMKL_ROOT=$2
 ONECCL_ROOT=$3
-AOT=$4
+MPI_ROOT=$4
+AOT=$5
 if [[ ${AOT} == "none" ]]; then
     AOT=""
 fi
@@ -33,10 +34,10 @@ fi
 #           └--------------- Undefined
 MODE=0x07
 if [ $# -gt 4 ]; then
-    if [[ ! $5 =~ ^[0-9]+$ ]] && [[ ! $5 =~ ^0x[0-9a-fA-F]+$ ]]; then
+    if [[ ! $6 =~ ^[0-9]+$ ]] && [[ ! $6 =~ ^0x[0-9a-fA-F]+$ ]]; then
         echo "Warning: Unexpected argument. Using default value."
     else
-        MODE=$5
+        MODE=$6
     fi
 fi
 
@@ -53,8 +54,15 @@ if [ ! -f ${ONEMKL_ENV} ]; then
     exit 3
 fi
 
+CCL_ENV=${ONECCL_ROOT}/env/vars.sh
 if [ ! -f ${ONECCL_ROOT}/env/vars.sh ]; then
     echo "oneCCL environment ${ONECCL_ROOT} doesn't seem to exist."
+    exit 6
+fi
+
+MPI_ENV=${MPI_ROOT}/env/vars.sh
+if [ ! -f ${MPI_ROOT}/env/vars.sh ]; then
+    echo "oneCCL environment ${MPI_ROOT} doesn't seem to exist."
     exit 6
 fi
 ONEAPIROOT=${ONEMKL_ROOT}/../..
@@ -264,8 +272,8 @@ cd pytorch
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
 python -m pip install -r requirements.txt
 conda install --force-reinstall intel::mkl-static intel::mkl-include -y
-mv version.txt version.txt.bk
-echo "${COMMIT_TORCH:1}a0" > version.txt
+export PYTORCH_BUILD_VERSION="${COMMIT_TORCH:1}.post0+cxx11.abi"
+export PYTORCH_BUILD_NUMBER=0
 # Ensure cmake can find python packages when using conda or virtualenv
 if [ -n "${CONDA_PREFIX-}" ]; then
     export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(command -v conda))/../"}
@@ -286,7 +294,8 @@ unset USE_NUMA
 unset _GLIBCXX_USE_CXX11_ABI
 unset USE_STATIC_MKL
 unset CMAKE_PREFIX_PATH
-mv version.txt.bk version.txt
+unset PYTORCH_BUILD_NUMBER
+unset PYTORCH_BUILD_VERSION
 conda remove mkl-static mkl-include -y
 python -m pip install dist/*.whl
 cd ..
@@ -304,6 +313,8 @@ fi
 # don't fail on external scripts
 source ${DPCPP_ENV}
 source ${ONEMKL_ENV}
+source ${CCL_ENV}
+source ${MPI_ENV}
 #  TorchAudio
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd audio

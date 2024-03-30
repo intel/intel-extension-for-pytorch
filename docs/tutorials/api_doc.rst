@@ -9,7 +9,7 @@ Device-Agnostic
 .. autofunction:: optimize_transformers
 .. autofunction:: get_fp32_math_mode
 .. autofunction:: set_fp32_math_mode
-.. autoclass:: verbose
+
 
 GPU-Specific
 ************
@@ -43,8 +43,7 @@ Miscellaneous
 
 .. currentmodule:: intel_extension_for_pytorch.xpu.fp8.fp8
 .. autofunction:: fp8_autocast
-.. currentmodule:: intel_extension_for_pytorch.quantization
-.. autofunction:: _gptq
+
 
 Random Number Generator
 =======================

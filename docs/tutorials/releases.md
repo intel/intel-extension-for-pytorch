@@ -24,7 +24,7 @@ Intel® Extension for PyTorch\* v2.1.20+xpu is a minor release which supports In
 
 ### Known Issues
 
-Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+Please refer to [Known Issues webpage](./known_issues.md).
 
 ## 2.1.10+xpu
 
@@ -59,7 +59,7 @@ This release provides the following features:
 
 ### Known Issues
 
-Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+Please refer to [Known Issues webpage](./known_issues.md).
 
 ## 2.0.110+xpu
 
@@ -84,7 +84,7 @@ This release adds the following fusion patterns in PyTorch\* JIT mode for Intel 
 
 ### Known Issues
 
-Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+Please refer to [Known Issues webpage](./known_issues.md).
 
 ## 1.13.120+xpu
 
@@ -112,7 +112,7 @@ This release adds the following fusion patterns in PyTorch\* JIT mode for Intel 
 
 ### Known Issues
 
-Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+Please refer to [Known Issues webpage](./known_issues.md).
 
 ## 1.13.10+xpu
 
@@ -137,7 +137,7 @@ This release adds the following fusion patterns in PyTorch\* JIT mode for Intel 
 
 ### Known Issues
 
-Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+Please refer to [Known Issues webpage](./known_issues.md).
 
 ## 1.10.200+gpu
 
