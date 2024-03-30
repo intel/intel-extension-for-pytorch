@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kineto Supported Profiler Tool (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.20+xpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Compute Engine (Prototype feature for debug)" href="compute_engine.html" />
+    <link rel="prev" title="Simple Trace Tool (Prototype)" href="simple_trace.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.1.20+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#gpu-specific">GPU-Specific</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#legacy-profiler-tool-prototype">Legacy Profiler Tool (Prototype)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#simple-trace-tool-prototype">Simple Trace Tool (Prototype)</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Kineto Supported Profiler Tool (Prototype)</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#use-case">Use Case</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#build-tool">Build Tool</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#use-tool">Use Tool</a><ul>
+<li class="toctree-l7"><a class="reference internal" href="#set-environment-variable">Set Environment Variable</a></li>
+<li class="toctree-l7"><a class="reference internal" href="#add-profiler-into-script">Add Profiler Into Script</a></li>
+<li class="toctree-l7"><a class="reference internal" href="#disable-tool-in-model-script">Disable Tool in Model Script</a></li>
+<li class="toctree-l7"><a class="reference internal" href="#disable-tool-partly-for-xpu-backend">Disable Tool Partly for XPU Backend</a></li>
+<li class="toctree-l7"><a class="reference internal" href="#profile-on-multi-device-application">Profile on Multi-device Application</a></li>
+</ul>
+</li>
+<li class="toctree-l6"><a class="reference internal" href="#result">Result</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#export-to-chrome-trace">Export to Chrome Trace</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">Kineto Supported Profiler Tool (Prototype)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/profiler_kineto.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="kineto-supported-profiler-tool-prototype">
+<h1>Kineto Supported Profiler Tool (Prototype)<a class="headerlink" href="#kineto-supported-profiler-tool-prototype" title="Permalink to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
+<p>The Kineto supported profiler tool is an extension of PyTorch* profiler for profiling operators’ executing time cost on GPU devices. With this tool, you can get information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch* with Kineto support as default and enable this tool using the <code class="docutils literal notranslate"><span class="pre">with</span></code> statement before the code segment.</p>
+</section>
+<section id="use-case">
+<h2>Use Case<a class="headerlink" href="#use-case" title="Permalink to this heading"></a></h2>
+<p>To use the Kineto supported profiler tool, you need to build Intel® Extension for PyTorch* from source or install it via prebuilt wheel. You also have various methods to disable this tool.</p>
+<section id="build-tool">
+<h3>Build Tool<a class="headerlink" href="#build-tool" title="Permalink to this heading"></a></h3>
+<p>The build option <code class="docutils literal notranslate"><span class="pre">USE_KINETO</span></code> is switched on by default but you can switch it off via setting <code class="docutils literal notranslate"><span class="pre">USE_KINETO=OFF</span></code> while building Intel® Extension for PyTorch* from source. Besides, an affiliated build option <code class="docutils literal notranslate"><span class="pre">USE_ONETRACE</span></code> will be automatically switched on following the build option <code class="docutils literal notranslate"><span class="pre">USE_KINETO</span></code>. With <code class="docutils literal notranslate"><span class="pre">USE_KINETO=OFF</span></code>, no Kineto related profiler code will be compiled and all python scripts using Kineto supported profiler with XPU backend will not work. In this case, you can still keep using profiler on CPU backend.</p>
+<p>Some affiliated build options are defined for choosing different tracing tools. Currently, only onetrace tool is supported. Configure <code class="docutils literal notranslate"><span class="pre">USE_KINETO=ON</span></code> and <code class="docutils literal notranslate"><span class="pre">USE_ONETRACE=OFF</span></code> will not enable Kineto support in Intel® Extension for PyTorch* on GPU.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="o">[</span><span class="nv">USE_KINETO</span><span class="o">=</span>ON<span class="o">]</span><span class="w"> </span>python<span class="w"> </span>setup.py<span class="w"> </span>install<span class="w">     </span><span class="c1"># build from source with Kineto supported profiler tool</span>
+<span class="nv">USE_KINETO</span><span class="o">=</span>OFF<span class="w"> </span>python<span class="w"> </span>setup.py<span class="w"> </span>install<span class="w">      </span><span class="c1"># build from source without Kineto supported profiler tool</span>
+</pre></div>
+</div>
+</section>
+<section id="use-tool">
+<h3>Use Tool<a class="headerlink" href="#use-tool" title="Permalink to this heading"></a></h3>
+<section id="set-environment-variable">
+<h4>Set Environment Variable<a class="headerlink" href="#set-environment-variable" title="Permalink to this heading"></a></h4>
+<p>Set global environment variable <code class="docutils literal notranslate"><span class="pre">IPEX_ZE_TRACING=1</span></code> to enable the level zero tracing layer for tracing kernels and runtime functions. You must export this environment variable ahead of all the run.</p>
+</section>
+<section id="add-profiler-into-script">
+<h4>Add Profiler Into Script<a class="headerlink" href="#add-profiler-into-script" title="Permalink to this heading"></a></h4>
+<p>All the usages are aligned with the official PyTorch* suggested. Please refer to <a class="reference external" href="https://pytorch.org/tutorials/recipes/recipes/profiler_recipe.html">PyTorch*’s tutorial page</a> for the first step.</p>
+<p>In your model script, write <code class="docutils literal notranslate"><span class="pre">with</span></code> statement to enable the Kineto supported profiler tool ahead of your code snippets, as shown in the following example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># import all necessary libraries</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch.profiler</span> <span class="kn">import</span> <span class="n">profile</span><span class="p">,</span> <span class="n">ProfilerActivity</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+
+<span class="c1"># these lines won&#39;t be profiled before enabling profiler tool</span>
+<span class="n">input_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;xpu:0&#39;</span><span class="p">)</span>
+
+<span class="c1"># enable Kineto supported profiler tool with a `with` statement</span>
+<span class="k">with</span> <span class="n">profile</span><span class="p">(</span><span class="n">activities</span><span class="o">=</span><span class="p">[</span><span class="n">ProfilerActivity</span><span class="o">.</span><span class="n">CPU</span><span class="p">,</span>
+                         <span class="n">ProfilerActivity</span><span class="o">.</span><span class="n">XPU</span><span class="p">])</span> <span class="k">as</span> <span class="n">prof</span><span class="p">:</span>
+    <span class="c1"># do what you want to profile here after the `with` statement with proper indent</span>
+    <span class="n">output_tensor_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">)</span>
+    <span class="n">output_tensor_2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">)</span>
+
+<span class="c1"># print the result table formatted by the profiler tool as your wish</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">prof</span><span class="o">.</span><span class="n">key_averages</span><span class="p">()</span><span class="o">.</span><span class="n">table</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>In your model script, you can also assign a schedule for profile loops of iterations, as shown in the following example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">torch.profiler</span> <span class="kn">import</span> <span class="n">schedule</span>
+
+<span class="c1"># assign a customized schedule</span>
+<span class="n">my_schedule</span> <span class="o">=</span> <span class="n">schedule</span><span class="p">(</span>
+    <span class="n">skip_first</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">wait</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">warmup</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">active</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">repeat</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># also define a handler for outputing results</span>
+<span class="k">def</span> <span class="nf">trace_handler</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">key_averages</span><span class="p">()</span><span class="o">.</span><span class="n">table</span><span class="p">(</span><span class="n">sort_by</span><span class="o">=</span><span class="s2">&quot;self_xpu_time_total&quot;</span><span class="p">,</span> <span class="n">row_limit</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s2">&quot;/tmp/trace_&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">step_num</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># pass customized schedule and trace handler to profiler outside the for-loop</span>
+<span class="k">with</span> <span class="n">profile</span><span class="p">(</span><span class="n">activities</span><span class="o">=</span><span class="p">[</span><span class="n">ProfilerActivity</span><span class="o">.</span><span class="n">CPU</span><span class="p">,</span>
+                         <span class="n">ProfilerActivity</span><span class="o">.</span><span class="n">XPU</span><span class="p">],</span>
+             <span class="n">schedule</span><span class="o">=</span><span class="n">my_schedule</span><span class="p">,</span>
+             <span class="n">on_trace_ready</span><span class="o">=</span><span class="n">trace_handler</span><span class="p">)</span> <span class="k">as</span> <span class="n">prof</span><span class="p">:</span>
+    <span class="k">for</span> <span class="nb">iter</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">dataloader</span><span class="p">)):</span>
+        <span class="n">model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+        <span class="c1"># don&#39;t forget a step() at the end of each loop</span>
+        <span class="n">prof</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>There are a number of useful parameters defined in <code class="docutils literal notranslate"><span class="pre">torch.profiler.profile</span></code>. Many of them are aligned with usages defined in PyTorch*’s official profiler, such as <code class="docutils literal notranslate"><span class="pre">record_shapes</span></code>, a very useful parameter to control whether to record the shape of input tensors for each operator. To enable Kineto supported profiler on XPU backend, remember to add <code class="docutils literal notranslate"><span class="pre">torch.profiler.ProfilerActivity.XPU</span></code> into the list of activities. For the usage of more parameters, please refer to <a class="reference external" href="https://pytorch.org/docs/stable/profiler.html#module-torch.profiler">PyTorch*’s API reference</a>.</p>
+</section>
+<section id="disable-tool-in-model-script">
+<h4>Disable Tool in Model Script<a class="headerlink" href="#disable-tool-in-model-script" title="Permalink to this heading"></a></h4>
+<p>To disable this profiler tool in your model script, you must remove those profiler related code as PyTorch* doesn’t offer a switch in <code class="docutils literal notranslate"><span class="pre">torch.profiler.profile</span></code> API. To reduce effort to switch the profiler on and off, it is suggested to use <code class="docutils literal notranslate"><span class="pre">contextlib</span></code> for control like below:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">contextlib</span>
+
+<span class="k">def</span> <span class="nf">profiler_setup</span><span class="p">(</span><span class="n">profiling</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">profiling</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">profile</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">nullcontext</span><span class="p">()</span>
+
+<span class="c1"># you can pass official arguments as normal</span>
+<span class="k">with</span> <span class="n">profiler_setup</span><span class="p">(</span><span class="n">profiling</span><span class="o">=</span><span class="n">should_profile</span><span class="p">,</span>
+                    <span class="n">activities</span><span class="o">=</span><span class="p">[</span><span class="n">ProfileActivity</span><span class="o">.</span><span class="n">XPU</span><span class="p">],</span>
+                    <span class="n">schedule</span><span class="o">=</span><span class="n">my_schedule</span><span class="p">,</span>
+                    <span class="n">on_trace_ready</span><span class="o">=</span><span class="n">trace_handler</span><span class="p">)</span> <span class="k">as</span> <span class="n">prof</span><span class="p">:</span>
+    <span class="k">for</span> <span class="nb">iter</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">dataloader</span><span class="p">)):</span>
+        <span class="n">model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">should_profile</span><span class="p">:</span>
+            <span class="n">prof</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="disable-tool-partly-for-xpu-backend">
+<h4>Disable Tool Partly for XPU Backend<a class="headerlink" href="#disable-tool-partly-for-xpu-backend" title="Permalink to this heading"></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">unset</span> <span class="pre">IPEX_ZE_TRACING</span></code> to disable the Level-Zero tracing layer which tracing kernels and runtime functions. This operation will not completely disable the profiler on other backend such as CPU or CUDA, but only stops tracing on XPU backend.</p>
+</section>
+<section id="profile-on-multi-device-application">
+<h4>Profile on Multi-device Application<a class="headerlink" href="#profile-on-multi-device-application" title="Permalink to this heading"></a></h4>
+<p>Follow typical usages for profiling multi-device application. Explicitly call <code class="docutils literal notranslate"><span class="pre">torch.xpu.synchronize(device_id)</span></code> for all involved devices. Such as:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run this example, please make sure you have more than one device.</span>
+<span class="k">assert</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">device_count</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;This example need more than one device existed.&quot;</span>
+
+<span class="c1"># put first input on device &quot;xpu:0&quot;</span>
+<span class="n">a_0</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;xpu:0&quot;</span><span class="p">))</span>
+<span class="c1"># put second input on device &quot;xpu:1&quot;</span>
+<span class="n">a_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;xpu:1&quot;</span><span class="p">))</span>
+
+<span class="c1"># Start profiler as normal</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">profile</span><span class="p">(</span><span class="n">activities</span><span class="o">=</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">ProfilerActivity</span><span class="o">.</span><span class="n">XPU</span><span class="p">])</span> <span class="k">as</span> <span class="n">prof</span><span class="p">:</span>
+    <span class="c1"># run kernel on &quot;xpu:0&quot;</span>
+    <span class="n">b_0</span> <span class="o">=</span> <span class="n">a_0</span> <span class="o">+</span> <span class="n">a_0</span>
+    <span class="c1"># run kernel on &quot;xpu:1&quot;</span>
+    <span class="n">b_1</span> <span class="o">=</span> <span class="n">a_1</span> <span class="o">+</span> <span class="n">a_1</span>
+    <span class="c1"># explicitly synchronize all involved devices</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;xpu:0&quot;</span><span class="p">))</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;xpu:1&quot;</span><span class="p">))</span>
+
+<span class="c1"># You may check kernels on difference devices from chrome trace</span>
+<span class="n">prof</span><span class="o">.</span><span class="n">export_chrome_trace</span><span class="p">(</span><span class="s2">&quot;trace_example_on_multi_device.json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="result">
+<h3>Result<a class="headerlink" href="#result" title="Permalink to this heading"></a></h3>
+<p>Using the first script shown above in <strong>Use Tool</strong> part, you’ll see the result table printed out to the console as below:</p>
+<p><img alt="Kiento_profiler_result_console" src="../../_images/profiler_kineto_result_console.png" /></p>
+<p>In this result, you can find several fields including:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Name</span></code>: the name of run operators, runtime functions or kernels.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">CPU</span> <span class="pre">%</span></code>, <code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">CPU</span></code>: the time consumed by the operator itself at host excluded its children operator call. The column marked with percentage sign shows the propotion of time to total self cpu time. While an operator calls more than once in a run, the self cpu time may increase in this field.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">total</span> <span class="pre">%</span></code>, <code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">total</span></code>: the time consumed by the operator at host included its children operator call. The column marked with percentasge sign shows the propotion of time to total cpu time. While an operator calls more than once in a run, the cpu time may increase in this field.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">time</span> <span class="pre">avg</span></code>: the average time consumed by each once call of the operator at host. This average is calculated on the cpu total time.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">XPU</span></code>, <code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">XPU</span> <span class="pre">%</span></code>: similar to <code class="docutils literal notranslate"><span class="pre">Self</span> <span class="pre">CPU</span> <span class="pre">(%)</span></code> but shows the time consumption on XPU devices.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">XPU</span> <span class="pre">total</span></code>: similar to <code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">total</span></code> but shows the time consumption on XPU devices.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">XPU</span> <span class="pre">time</span> <span class="pre">avg</span></code>: similar to <code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">time</span> <span class="pre">avg</span></code> but shows average time sonsumption on XPU devices. This average is calculated on the XPU total time.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">#</span> <span class="pre">of</span> <span class="pre">Calls</span></code>: number of call for each operators in a run.</p></li>
+</ul>
+</section>
+<section id="export-to-chrome-trace">
+<h3>Export to Chrome Trace<a class="headerlink" href="#export-to-chrome-trace" title="Permalink to this heading"></a></h3>
+<p>You can export the result to a json file and then load it in the Chrome trace viewer (<code class="docutils literal notranslate"><span class="pre">chrome://tracing</span></code>) or Perfetto viewer (<code class="docutils literal notranslate"><span class="pre">ui.perfetto.dev</span></code>) by adding this line in your model script:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">prof</span><span class="o">.</span><span class="n">export_chrome_trace</span><span class="p">(</span><span class="s2">&quot;trace_file.json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You can examine the sequence of profiled operators, runtime functions and XPU kernels in these trace viewers. Here shows a trace result for ResNet50 run on XPU backend viewed by Perfetto viewer:</p>
+<p><img alt="profiler_kineto_result_perfetto_viewer" src="../../_images/profiler_kineto_result_perfetto_viewer.png" /></p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="simple_trace.html" class="btn btn-neutral float-left" title="Simple Trace Tool (Prototype)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="compute_engine.html" class="btn btn-neutral float-right" title="Compute Engine (Prototype feature for debug)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f68e0eef6d0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

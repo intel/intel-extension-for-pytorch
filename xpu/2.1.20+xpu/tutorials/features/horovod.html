@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Horovod with PyTorch (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.20+xpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="DLPack Solution" href="DLPack.html" />
+    <link rel="prev" title="DistributedDataParallel (DDP)" href="DDP.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.1.20+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#gpu-specific">GPU-Specific</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="DDP.html">DistributedDataParallel (DDP)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Horovod with PyTorch (Prototype)</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#install-horovod-with-pytorch">Install Horovod with PyTorch</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#horovod-with-pytorch-usage">Horovod with PyTorch Usage</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#legacy-profiler-tool-prototype">Legacy Profiler Tool (Prototype)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#simple-trace-tool-prototype">Simple Trace Tool (Prototype)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">Horovod with PyTorch (Prototype)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/horovod.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="horovod-with-pytorch-prototype">
+<h1>Horovod with PyTorch (Prototype)<a class="headerlink" href="#horovod-with-pytorch-prototype" title="Permalink to this heading"></a></h1>
+<p>Horovod is a distributed deep learning training framework for TensorFlow, Keras, PyTorch, and Apache MXNet. The goal of Horovod is to make distributed deep learning fast and easy to use. Horovod core principles are based on MPI concepts such as size, rank, local rank, allreduce, allgather, broadcast, and alltoall. To use Horovod with PyTorch, you need to install Horovod with Pytorch first, and make specific change for Horovod in your training script.</p>
+<section id="install-horovod-with-pytorch">
+<h2>Install Horovod with PyTorch<a class="headerlink" href="#install-horovod-with-pytorch" title="Permalink to this heading"></a></h2>
+<p>You can use normal pip command to install <a class="reference external" href="https://pypi.org/project/intel-optimization-for-horovod/">Intel® Optimization for Horovod*</a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>intel-optimization-for-horovod
+</pre></div>
+</div>
+<p><strong>Note:</strong> Make sure you already install oneAPI basekit. You need to activate the environment when use Horovod.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/intel/oneapi/ccl/latest/env/vars.sh
+</pre></div>
+</div>
+</section>
+<section id="horovod-with-pytorch-usage">
+<h2>Horovod with PyTorch Usage<a class="headerlink" href="#horovod-with-pytorch-usage" title="Permalink to this heading"></a></h2>
+<p>To use Horovod with PyTorch for XPU backend, make the following modifications to your training script:</p>
+<ol>
+<li><p>Initialize Horovod.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="kn">import</span> <span class="nn">torch</span>
+ <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+ <span class="kn">import</span> <span class="nn">horovod.torch</span> <span class="k">as</span> <span class="nn">hvd</span>
+ <span class="n">hvd</span><span class="o">.</span><span class="n">init</span><span class="p">()</span>
+</pre></div>
+</div>
+</li>
+<li><p>Pin each GPU to a single process.</p>
+<p>With the typical setup of one GPU per process, set this to <em>local rank</em>. The first process on
+the server will be allocated the first GPU, the second process will be allocated the second GPU, and so forth.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">devid</span> <span class="o">=</span> <span class="n">hvd</span><span class="o">.</span><span class="n">local_rank</span><span class="p">()</span>
+ <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">set_device</span><span class="p">(</span><span class="n">devid</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p>Scale the learning rate by the number of workers.</p>
+<p>Effective batch size in synchronous distributed training is scaled by the number of workers.
+An increase in learning rate compensates for the increased batch size.</p>
+</li>
+<li><p>Wrap the optimizer in <code class="docutils literal notranslate"><span class="pre">hvd.DistributedOptimizer</span></code>.</p>
+<p>The distributed optimizer delegates gradient computation to the original optimizer, averages gradients using <em>allreduce</em> or <em>allgather</em>, and then applies those averaged gradients.</p>
+</li>
+<li><p>Broadcast the initial variable states from rank 0 to all other processes:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">hvd</span><span class="o">.</span><span class="n">broadcast_parameters</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="n">root_rank</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+ <span class="n">hvd</span><span class="o">.</span><span class="n">broadcast_optimizer_state</span><span class="p">(</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">root_rank</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This is necessary to ensure consistent initialization of all workers when training is started with random weights or restored from a checkpoint.</p>
+</li>
+<li><p>Modify your code to save checkpoints only on worker 0 to prevent other workers from corrupting them.</p>
+<p>Accomplish this by guarding model checkpointing code with <code class="docutils literal notranslate"><span class="pre">hvd.rank()</span> <span class="pre">!=</span> <span class="pre">0</span></code>.</p>
+</li>
+</ol>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+<span class="kn">import</span> <span class="nn">horovod.torch</span> <span class="k">as</span> <span class="nn">hvd</span>
+
+<span class="c1"># Initialize Horovod</span>
+<span class="n">hvd</span><span class="o">.</span><span class="n">init</span><span class="p">()</span>
+
+<span class="c1"># Pin GPU to be used to process local rank (one GPU per process)</span>
+<span class="n">devid</span> <span class="o">=</span> <span class="n">hvd</span><span class="o">.</span><span class="n">local_rank</span><span class="p">()</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">set_device</span><span class="p">(</span><span class="n">devid</span><span class="p">)</span>
+<span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;xpu:</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">devid</span><span class="p">)</span>
+
+<span class="c1"># Define dataset...</span>
+<span class="n">train_dataset</span> <span class="o">=</span> <span class="o">...</span>
+
+<span class="c1"># Partition dataset among workers using DistributedSampler</span>
+<span class="n">train_sampler</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">DistributedSampler</span><span class="p">(</span>
+    <span class="n">train_dataset</span><span class="p">,</span> <span class="n">num_replicas</span><span class="o">=</span><span class="n">hvd</span><span class="o">.</span><span class="n">size</span><span class="p">(),</span> <span class="n">rank</span><span class="o">=</span><span class="n">hvd</span><span class="o">.</span><span class="n">rank</span><span class="p">())</span>
+
+<span class="n">train_loader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">train_dataset</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=...</span><span class="p">,</span> <span class="n">sampler</span><span class="o">=</span><span class="n">train_sampler</span><span class="p">)</span>
+
+<span class="c1"># Build model...</span>
+<span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span>
+
+<span class="c1"># Add Horovod Distributed Optimizer</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">hvd</span><span class="o">.</span><span class="n">DistributedOptimizer</span><span class="p">(</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">named_parameters</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">())</span>
+
+<span class="c1"># Broadcast parameters from rank 0 to all other processes.</span>
+<span class="n">hvd</span><span class="o">.</span><span class="n">broadcast_parameters</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="n">root_rank</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+   <span class="k">for</span> <span class="n">batch_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">train_loader</span><span class="p">):</span>
+       <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+       <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+       <span class="n">loss</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">nll_loss</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+       <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+       <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+       <span class="k">if</span> <span class="n">batch_idx</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">log_interval</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+           <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Train Epoch: </span><span class="si">{}</span><span class="s1"> [</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">]</span><span class="se">\t</span><span class="s1">Loss: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+               <span class="n">epoch</span><span class="p">,</span> <span class="n">batch_idx</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">train_sampler</span><span class="p">),</span> <span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">()))</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="DDP.html" class="btn btn-neutral float-left" title="DistributedDataParallel (DDP)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="DLPack.html" class="btn btn-neutral float-right" title="DLPack Solution" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f68e0f57e20> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

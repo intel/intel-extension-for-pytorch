@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Float8 Data Type Support [GPU] (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.20+xpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="DistributedDataParallel (DDP)" href="DDP.html" />
+    <link rel="prev" title="Intel® Extension for PyTorch* Optimizations for Quantization [GPU]" href="int8_overview_xpu.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.1.20+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#gpu-specific">GPU-Specific</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../features.html#quantization">Quantization</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="int8_overview_xpu.html">Intel® Extension for PyTorch* Optimizations for Quantization [GPU]</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Float8 Data Type Support [GPU] (Prototype)</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#float8-data-type">Float8 Data Type</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#fp8-quantization">FP8 Quantization</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#supported-running-mode">Supported running mode</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#supported-operators">Supported operators</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#fp8-usage-example">FP8 usage example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#legacy-profiler-tool-prototype">Legacy Profiler Tool (Prototype)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#simple-trace-tool-prototype">Simple Trace Tool (Prototype)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">Float8 Data Type Support [GPU] (Prototype)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/float8.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="float8-data-type-support-gpu-prototype">
+<h1>Float8 Data Type Support [GPU] (Prototype)<a class="headerlink" href="#float8-data-type-support-gpu-prototype" title="Permalink to this heading"></a></h1>
+<section id="float8-data-type">
+<h2>Float8 Data Type<a class="headerlink" href="#float8-data-type" title="Permalink to this heading"></a></h2>
+<p>Float8 (FP8) is a 8-bit floating point data type, which is used to reduce memory footprint, improve the computation efficiency and save power in Deep Learning domain.</p>
+<p>Two formats are used in FP8 training and inference, in order to meet the required value range and precision of activation, weight and gradient in Deep Neural Network (DNN). One is E4M3 (sign-exponent-mantissa) for activation and weight, the other is E5M2 for gradients. These two formats are defined in <a class="reference external" href="https://arxiv.org/pdf/2209.05433.pdf">FP8 FORMATS FOR DEEP LEARNING</a>.</p>
+<p>FP8 data type is used for memory storage only in current stage. It will be converted to the BFloat16 data type for computation.</p>
+</section>
+<section id="fp8-quantization">
+<h2>FP8 Quantization<a class="headerlink" href="#fp8-quantization" title="Permalink to this heading"></a></h2>
+<p>On GPU, online Dynamic Quantization is used for FP8 data compression and decompression. Delayed Scaling algorithm is used for accelerating the quantizaiton process.</p>
+</section>
+<section id="supported-running-mode">
+<h2>Supported running mode<a class="headerlink" href="#supported-running-mode" title="Permalink to this heading"></a></h2>
+<p>Both DNN Training and Inference are supported with the FP8 data type.</p>
+</section>
+<section id="supported-operators">
+<h2>Supported operators<a class="headerlink" href="#supported-operators" title="Permalink to this heading"></a></h2>
+<p>FP8 Linear operator is supported.</p>
+</section>
+<section id="fp8-usage-example">
+<h2>FP8 usage example<a class="headerlink" href="#fp8-usage-example" title="Permalink to this heading"></a></h2>
+<p>BERT model is supported as a FP8 training showcase, see the following example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">intel_extension_for_pytorch.xpu.fp8.fp8</span> <span class="kn">import</span> <span class="n">fp8_autocast</span>
+<span class="kn">from</span> <span class="nn">intel_extension_for_pytorch.xpu.fp8.recipe</span> <span class="kn">import</span> <span class="n">DelayedScaling</span>
+<span class="kn">from</span> <span class="nn">intel_extension_for_pytorch.nn.utils._fp8_convert</span> <span class="kn">import</span> <span class="n">convert_fp8_model</span>
+
+<span class="c1">## AMP is optionally to be used for FP8</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">optimize_dtype</span><span class="p">):</span>
+    <span class="c1">## &#39;fp8_autocase&#39; is the handler of FP8</span>
+    <span class="k">with</span> <span class="n">fp8_autocast</span><span class="p">(</span><span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fp8_recipe</span><span class="o">=</span><span class="n">DelayedScaling</span><span class="p">()):</span>
+        <span class="c1">## The original model will be automatically converted to a new model with FP8 operators with &#39;convert_fp8_model&#39;</span>
+        <span class="n">convert_fp8_model</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_ids</span><span class="o">=</span><span class="n">input_ids</span><span class="p">,</span>
+                        <span class="n">token_type_ids</span><span class="o">=</span><span class="n">segment_ids</span><span class="p">,</span>
+                        <span class="n">attention_mask</span><span class="o">=</span><span class="n">input_mask</span><span class="p">,</span>
+                        <span class="n">labels</span><span class="o">=</span><span class="n">masked_lm_labels</span><span class="p">,</span>
+                        <span class="n">next_sentence_label</span><span class="o">=</span><span class="n">next_sentence_labels</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="int8_overview_xpu.html" class="btn btn-neutral float-left" title="Intel® Extension for PyTorch* Optimizations for Quantization [GPU]" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="DDP.html" class="btn btn-neutral float-right" title="DistributedDataParallel (DDP)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f68e0f20940> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
