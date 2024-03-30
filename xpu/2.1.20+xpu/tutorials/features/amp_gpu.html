@@ -55,47 +55,44 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="../features.html#gpu-specific">GPU-Specific</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
-<li class="toctree-l3 current"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a><ul class="current">
-<li class="toctree-l4 current"><a class="current reference internal" href="#">Auto Mixed Precision (AMP) on GPU</a><ul>
-<li class="toctree-l5"><a class="reference internal" href="#introduction">Introduction</a></li>
-<li class="toctree-l5"><a class="reference internal" href="#use-case">Use Case</a><ul>
-<li class="toctree-l6"><a class="reference internal" href="#default-precision">Default Precision</a></li>
-<li class="toctree-l6"><a class="reference internal" href="#inference-with-imperative-path">Inference with Imperative Path</a></li>
-<li class="toctree-l6"><a class="reference internal" href="#inference-with-torchscript-path">Inference with TorchScript Path</a></li>
-<li class="toctree-l6"><a class="reference internal" href="#training-support">Training Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Auto Mixed Precision (AMP) on GPU</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#use-case">Use Case</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#default-precision">Default Precision</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#inference-with-imperative-path">Inference with Imperative Path</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#inference-with-torchscript-path">Inference with TorchScript Path</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#training-support">Training Support</a></li>
 </ul>
 </li>
-<li class="toctree-l5"><a class="reference internal" href="#autocast-op-reference">Autocast Op Reference</a><ul>
-<li class="toctree-l6"><a class="reference internal" href="#op-eligibility">Op Eligibility</a></li>
-<li class="toctree-l6"><a class="reference internal" href="#op-specific-behavior">Op-Specific Behavior</a><ul>
-<li class="toctree-l7"><a class="reference internal" href="#ops-that-can-autocast-to-bfloat16">Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code></a></li>
-<li class="toctree-l7"><a class="reference internal" href="#ops-that-can-autocast-to-float16">Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">float16</span></code></a></li>
-<li class="toctree-l7"><a class="reference internal" href="#ops-that-can-autocast-to-float32">Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">float32</span></code></a></li>
-<li class="toctree-l7"><a class="reference internal" href="#ops-that-promote-to-the-widest-input-type">Ops that promote to the widest input type</a></li>
-</ul>
-</li>
+<li class="toctree-l4"><a class="reference internal" href="#autocast-op-reference">Autocast Op Reference</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#op-eligibility">Op Eligibility</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#op-specific-behavior">Op-Specific Behavior</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#ops-that-can-autocast-to-bfloat16">Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#ops-that-can-autocast-to-float16">Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">float16</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#ops-that-can-autocast-to-float32">Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">float32</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#ops-that-promote-to-the-widest-input-type">Ops that promote to the widest input type</a></li>
 </ul>
 </li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#legacy-profiler-tool-prototype">Legacy Profiler Tool (Prototype)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#simple-trace-tool-prototype">Simple Trace Tool (Prototype)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#legacy-profiler-tool-prototype">Legacy Profiler Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#simple-trace-tool-prototype">Simple Trace Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
@@ -262,7 +259,7 @@ are allowed in autocast-enabled regions, but won’t go through autocasting. For
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f68e0e657c0> 
+   <jinja2.runtime.BlockReference object at 0x7ff68fb57df0> 
 <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 

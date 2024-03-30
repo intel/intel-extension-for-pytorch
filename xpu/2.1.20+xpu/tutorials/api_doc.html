@@ -72,79 +72,76 @@
 <p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#device-agnostic">Device-Agnostic</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general">General</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#ipex.optimize"><code class="docutils literal notranslate"><span class="pre">optimize()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#ipex.optimize_transformers"><code class="docutils literal notranslate"><span class="pre">optimize_transformers()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#ipex.get_fp32_math_mode"><code class="docutils literal notranslate"><span class="pre">get_fp32_math_mode()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#ipex.set_fp32_math_mode"><code class="docutils literal notranslate"><span class="pre">set_fp32_math_mode()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#gpu-specific">GPU-Specific</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#miscellaneous">Miscellaneous</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.current_device"><code class="docutils literal notranslate"><span class="pre">current_device()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.current_stream"><code class="docutils literal notranslate"><span class="pre">current_stream()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.device"><code class="docutils literal notranslate"><span class="pre">device</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.device_count"><code class="docutils literal notranslate"><span class="pre">device_count()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.device_of"><code class="docutils literal notranslate"><span class="pre">device_of</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.get_device_name"><code class="docutils literal notranslate"><span class="pre">get_device_name()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.get_device_properties"><code class="docutils literal notranslate"><span class="pre">get_device_properties()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.init"><code class="docutils literal notranslate"><span class="pre">init()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.is_available"><code class="docutils literal notranslate"><span class="pre">is_available()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.is_initialized"><code class="docutils literal notranslate"><span class="pre">is_initialized()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.set_device"><code class="docutils literal notranslate"><span class="pre">set_device()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.stream"><code class="docutils literal notranslate"><span class="pre">stream()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.synchronize"><code class="docutils literal notranslate"><span class="pre">synchronize()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.fp8.fp8.fp8_autocast"><code class="docutils literal notranslate"><span class="pre">fp8_autocast()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#miscellaneous">Miscellaneous</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.current_device"><code class="docutils literal notranslate"><span class="pre">current_device()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.current_stream"><code class="docutils literal notranslate"><span class="pre">current_stream()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.device"><code class="docutils literal notranslate"><span class="pre">device</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.device_count"><code class="docutils literal notranslate"><span class="pre">device_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.device_of"><code class="docutils literal notranslate"><span class="pre">device_of</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.get_device_name"><code class="docutils literal notranslate"><span class="pre">get_device_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.get_device_properties"><code class="docutils literal notranslate"><span class="pre">get_device_properties()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.init"><code class="docutils literal notranslate"><span class="pre">init()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.is_available"><code class="docutils literal notranslate"><span class="pre">is_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.is_initialized"><code class="docutils literal notranslate"><span class="pre">is_initialized()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.set_device"><code class="docutils literal notranslate"><span class="pre">set_device()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.stream"><code class="docutils literal notranslate"><span class="pre">stream()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.synchronize"><code class="docutils literal notranslate"><span class="pre">synchronize()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.fp8.fp8.fp8_autocast"><code class="docutils literal notranslate"><span class="pre">fp8_autocast()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#random-number-generator">Random Number Generator</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.get_rng_state"><code class="docutils literal notranslate"><span class="pre">get_rng_state()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.get_rng_state_all"><code class="docutils literal notranslate"><span class="pre">get_rng_state_all()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.set_rng_state"><code class="docutils literal notranslate"><span class="pre">set_rng_state()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.set_rng_state_all"><code class="docutils literal notranslate"><span class="pre">set_rng_state_all()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.manual_seed"><code class="docutils literal notranslate"><span class="pre">manual_seed()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.manual_seed_all"><code class="docutils literal notranslate"><span class="pre">manual_seed_all()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.seed"><code class="docutils literal notranslate"><span class="pre">seed()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.seed_all"><code class="docutils literal notranslate"><span class="pre">seed_all()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.initial_seed"><code class="docutils literal notranslate"><span class="pre">initial_seed()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#random-number-generator">Random Number Generator</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.get_rng_state"><code class="docutils literal notranslate"><span class="pre">get_rng_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.get_rng_state_all"><code class="docutils literal notranslate"><span class="pre">get_rng_state_all()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.set_rng_state"><code class="docutils literal notranslate"><span class="pre">set_rng_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.set_rng_state_all"><code class="docutils literal notranslate"><span class="pre">set_rng_state_all()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.manual_seed"><code class="docutils literal notranslate"><span class="pre">manual_seed()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.manual_seed_all"><code class="docutils literal notranslate"><span class="pre">manual_seed_all()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.seed"><code class="docutils literal notranslate"><span class="pre">seed()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.seed_all"><code class="docutils literal notranslate"><span class="pre">seed_all()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.initial_seed"><code class="docutils literal notranslate"><span class="pre">initial_seed()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#streams-and-events">Streams and events</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Stream"><code class="docutils literal notranslate"><span class="pre">Stream</span></code></a><ul>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Stream.record_event"><code class="docutils literal notranslate"><span class="pre">Stream.record_event()</span></code></a></li>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Stream.sycl_queue"><code class="docutils literal notranslate"><span class="pre">Stream.sycl_queue</span></code></a></li>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Stream.synchronize"><code class="docutils literal notranslate"><span class="pre">Stream.synchronize()</span></code></a></li>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Stream.wait_event"><code class="docutils literal notranslate"><span class="pre">Stream.wait_event()</span></code></a></li>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Stream.wait_stream"><code class="docutils literal notranslate"><span class="pre">Stream.wait_stream()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#streams-and-events">Streams and events</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.Stream"><code class="docutils literal notranslate"><span class="pre">Stream</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Stream.record_event"><code class="docutils literal notranslate"><span class="pre">Stream.record_event()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Stream.sycl_queue"><code class="docutils literal notranslate"><span class="pre">Stream.sycl_queue</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Stream.synchronize"><code class="docutils literal notranslate"><span class="pre">Stream.synchronize()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Stream.wait_event"><code class="docutils literal notranslate"><span class="pre">Stream.wait_event()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Stream.wait_stream"><code class="docutils literal notranslate"><span class="pre">Stream.wait_stream()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Event"><code class="docutils literal notranslate"><span class="pre">Event</span></code></a><ul>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Event.elapsed_time"><code class="docutils literal notranslate"><span class="pre">Event.elapsed_time()</span></code></a></li>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Event.query"><code class="docutils literal notranslate"><span class="pre">Event.query()</span></code></a></li>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Event.record"><code class="docutils literal notranslate"><span class="pre">Event.record()</span></code></a></li>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Event.synchronize"><code class="docutils literal notranslate"><span class="pre">Event.synchronize()</span></code></a></li>
-<li class="toctree-l5"><a class="reference internal" href="#torch.xpu.Event.wait"><code class="docutils literal notranslate"><span class="pre">Event.wait()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.Event"><code class="docutils literal notranslate"><span class="pre">Event</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Event.elapsed_time"><code class="docutils literal notranslate"><span class="pre">Event.elapsed_time()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Event.query"><code class="docutils literal notranslate"><span class="pre">Event.query()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Event.record"><code class="docutils literal notranslate"><span class="pre">Event.record()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Event.synchronize"><code class="docutils literal notranslate"><span class="pre">Event.synchronize()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.Event.wait"><code class="docutils literal notranslate"><span class="pre">Event.wait()</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#memory-management">Memory management</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.empty_cache"><code class="docutils literal notranslate"><span class="pre">empty_cache()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.memory_stats"><code class="docutils literal notranslate"><span class="pre">memory_stats()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.memory_summary"><code class="docutils literal notranslate"><span class="pre">memory_summary()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.memory_snapshot"><code class="docutils literal notranslate"><span class="pre">memory_snapshot()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.memory_allocated"><code class="docutils literal notranslate"><span class="pre">memory_allocated()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.max_memory_allocated"><code class="docutils literal notranslate"><span class="pre">max_memory_allocated()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.memory_reserved"><code class="docutils literal notranslate"><span class="pre">memory_reserved()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.max_memory_reserved"><code class="docutils literal notranslate"><span class="pre">max_memory_reserved()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.reset_peak_memory_stats"><code class="docutils literal notranslate"><span class="pre">reset_peak_memory_stats()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.memory_stats_as_nested_dict"><code class="docutils literal notranslate"><span class="pre">memory_stats_as_nested_dict()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#torch.xpu.reset_accumulated_memory_stats"><code class="docutils literal notranslate"><span class="pre">reset_accumulated_memory_stats()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#memory-management">Memory management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.empty_cache"><code class="docutils literal notranslate"><span class="pre">empty_cache()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_stats"><code class="docutils literal notranslate"><span class="pre">memory_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_summary"><code class="docutils literal notranslate"><span class="pre">memory_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_snapshot"><code class="docutils literal notranslate"><span class="pre">memory_snapshot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_allocated"><code class="docutils literal notranslate"><span class="pre">memory_allocated()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.max_memory_allocated"><code class="docutils literal notranslate"><span class="pre">max_memory_allocated()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_reserved"><code class="docutils literal notranslate"><span class="pre">memory_reserved()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.max_memory_reserved"><code class="docutils literal notranslate"><span class="pre">max_memory_reserved()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.reset_peak_memory_stats"><code class="docutils literal notranslate"><span class="pre">reset_peak_memory_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.memory_stats_as_nested_dict"><code class="docutils literal notranslate"><span class="pre">memory_stats_as_nested_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#torch.xpu.reset_accumulated_memory_stats"><code class="docutils literal notranslate"><span class="pre">reset_accumulated_memory_stats()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#c-api">C++ API</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="#c-api">C++ API</a></li>
 </ul>
 </li>
 </ul>
@@ -179,8 +176,8 @@
              
   <section id="api-documentation">
 <h1>API Documentation<a class="headerlink" href="#api-documentation" title="Permalink to this heading"></a></h1>
-<section id="device-agnostic">
-<h2>Device-Agnostic<a class="headerlink" href="#device-agnostic" title="Permalink to this heading"></a></h2>
+<section id="general">
+<h2>General<a class="headerlink" href="#general" title="Permalink to this heading"></a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="ipex.optimize">
 <span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'O1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linear_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights_prepack</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace_dropout_with_identity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimize_lstm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">split_master_weight_for_bf16</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuse_update_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_kernel_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_input</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">graph_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">concat_linear</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.optimize" title="Permalink to this definition"></a></dt>
@@ -458,10 +455,8 @@ to unify the coding style in user scripts base on <code class="docutils literal 
 </dd></dl>
 
 </section>
-<section id="gpu-specific">
-<h2>GPU-Specific<a class="headerlink" href="#gpu-specific" title="Permalink to this heading"></a></h2>
 <section id="miscellaneous">
-<h3>Miscellaneous<a class="headerlink" href="#miscellaneous" title="Permalink to this heading"></a></h3>
+<h2>Miscellaneous<a class="headerlink" href="#miscellaneous" title="Permalink to this heading"></a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="torch.xpu.current_device">
 <span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">current_device</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#torch.xpu.current_device" title="Permalink to this definition"></a></dt>
@@ -636,7 +631,7 @@ if <a class="reference internal" href="#torch.xpu.device" title="torch.xpu.devic
 
 </section>
 <section id="random-number-generator">
-<h3>Random Number Generator<a class="headerlink" href="#random-number-generator" title="Permalink to this heading"></a></h3>
+<h2>Random Number Generator<a class="headerlink" href="#random-number-generator" title="Permalink to this heading"></a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="torch.xpu.get_rng_state">
 <span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">get_rng_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">device</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'xpu'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="headerlink" href="#torch.xpu.get_rng_state" title="Permalink to this definition"></a></dt>
@@ -749,7 +744,7 @@ case, it is silently ignored.</p>
 
 </section>
 <section id="streams-and-events">
-<h3>Streams and events<a class="headerlink" href="#streams-and-events" title="Permalink to this heading"></a></h3>
+<h2>Streams and events<a class="headerlink" href="#streams-and-events" title="Permalink to this heading"></a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="torch.xpu.Stream">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">Stream</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">priority</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#torch.xpu.Stream" title="Permalink to this definition"></a></dt>
@@ -867,7 +862,7 @@ event.</p>
 
 </section>
 <section id="memory-management">
-<h3>Memory management<a class="headerlink" href="#memory-management" title="Permalink to this heading"></a></h3>
+<h2>Memory management<a class="headerlink" href="#memory-management" title="Permalink to this heading"></a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="torch.xpu.empty_cache">
 <span class="sig-prename descclassname"><span class="pre">torch.xpu.</span></span><span class="sig-name descname"><span class="pre">empty_cache</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#torch.xpu.empty_cache" title="Permalink to this definition"></a></dt>
@@ -1121,7 +1116,7 @@ management.</p>
 
 </section>
 <section id="c-api">
-<h3>C++ API<a class="headerlink" href="#c-api" title="Permalink to this heading"></a></h3>
+<h2>C++ API<a class="headerlink" href="#c-api" title="Permalink to this heading"></a></h2>
 <dl class="cpp enum">
 <dt class="sig sig-object cpp" id="_CPPv4N3xpu14FP32_MATH_MODEE">
 <span id="_CPPv3N3xpu14FP32_MATH_MODEE"></span><span id="_CPPv2N3xpu14FP32_MATH_MODEE"></span><span class="target" id="Settings_8h_1a56c4815fc689c4fd441dc8163a205ac5"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">xpu</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">FP32_MATH_MODE</span></span></span><a class="headerlink" href="#_CPPv4N3xpu14FP32_MATH_MODEE" title="Permalink to this definition"></a><br /></dt>
@@ -1175,7 +1170,6 @@ management.</p>
 
 </section>
 </section>
-</section>
 
 
            </div>
@@ -1194,7 +1188,7 @@ management.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f68e399dcd0> 
+   <jinja2.runtime.BlockReference object at 0x7ff6925df0d0> 
 <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 

@@ -1,9 +1,6 @@
 Features
 ========
 
-GPU-Specific
-************
-
 Easy-to-use Python API
 ----------------------
 
