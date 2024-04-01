@@ -31,7 +31,7 @@ struct clamp_max_out_functor {
 };
 
 Tensor& clamp_max_out(const Tensor& self, const Scalar& max, Tensor& out) {
-  auto iter = TensorIterator::unary_op(out, self);
+  auto iter = TensorIterator::unary_op(out, self.to(out.scalar_type()));
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -61,7 +61,7 @@ struct clamp_min_out_functor {
 };
 
 Tensor& clamp_min_out(const Tensor& self, const Scalar& min, Tensor& out) {
-  auto iter = TensorIterator::unary_op(out, self);
+  auto iter = TensorIterator::unary_op(out, self.to(out.scalar_type()));
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -110,7 +110,7 @@ Tensor& clamp_min_max(
     const Scalar& min,
     const Scalar& max,
     Tensor& out) {
-  auto iter = TensorIterator::unary_op(out, self);
+  auto iter = TensorIterator::unary_op(out, self.to(out.scalar_type()));
   IPEX_DISPATCH_ALL_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -196,6 +196,7 @@ Tensor& clamp_out(
           clamp_out_functor<scalar_t> f;
           dpcpp_kernel_for_tensor_iter(iter, f);
         });
+    result = iter.output();
   } else if (max) {
     at::clamp_max_outf(self, *max, result);
   } else if (min) {
@@ -218,7 +219,8 @@ Tensor clamp(
     const Tensor& self,
     const c10::optional<Tensor>& min,
     const c10::optional<Tensor>& max) {
-  Tensor result = at::empty({0}, self.options());
+  // for type promotion, result tensor need to be undefined.
+  Tensor result;
   return at::clamp_outf(self, min, max, result);
 }
 
@@ -248,6 +250,7 @@ Tensor& clamp_max_out(const Tensor& self, const Tensor& max, Tensor& result) {
         clamp_max_out_dpcpp_functor<scalar_t> f;
         dpcpp_kernel_for_tensor_iter(iter, f);
       });
+  result = iter.output();
   return result;
 }
 
@@ -277,6 +280,7 @@ Tensor& clamp_min_out(const Tensor& self, const Tensor& min, Tensor& result) {
         clamp_min_out_dpcpp_functor<scalar_t> f;
         dpcpp_kernel_for_tensor_iter(iter, f);
       });
+  result = iter.output();
   return result;
 }
 
