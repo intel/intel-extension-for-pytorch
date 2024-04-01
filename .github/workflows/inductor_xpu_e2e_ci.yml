@@ -47,6 +47,7 @@ jobs:
           python -m pip uninstall intel_extension_for_pytorch -y
           export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
           cd ${{ github.workspace }}
+          git submodule sync && git submodule update --init --recursive --jobs 0
           python -m pip install -r requirements.txt
           python setup.py bdist_wheel
           pip install --force-reinstall dist/*.whl
