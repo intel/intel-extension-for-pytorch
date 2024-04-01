@@ -280,6 +280,10 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().is_channels_last_1d_enabled();
   });
 
+  m.def("_is_jit_quantization_save_enabled", []() {
+    return Settings::I().is_jit_quantization_save_enabled();
+  });
+
   m.def("_has_fp64_dtype", [](int device) {
     return Settings::I().has_fp64_dtype(device);
   });

@@ -82,6 +82,7 @@ def run_binary_fn(info, fn, dtype, dynamiccast=False, runs=10):
             tensor1_, tensor2_ = tensor1.xpu(), tensor2.xpu()
             with torch.profiler.profile(
                 activities=[
+                    torch.profiler.ProfilerActivity.CPU,
                     torch.profiler.ProfilerActivity.XPU,
                 ]
             ) as prof:

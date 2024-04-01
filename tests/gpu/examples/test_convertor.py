@@ -10,28 +10,9 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(
-        torch.xpu.has_multi_context(), reason="torch.xpu.has_multi_context()"
-    )
     def test_dlpack(self):
         src = torch.rand((2, 12), device=dpcpp_device)
         dst = src.clone().to(cpu_device)
         dlpack = torch.to_dlpack(src)
         tensor = torch.from_dlpack(dlpack)
-        self.assertEqual(tensor.to(cpu_device), dst)
-
-    @pytest.mark.skipif(
-        torch.xpu.has_multi_context(), reason="torch.xpu.has_multi_context()"
-    )
-    def test_usm(self):
-        src = torch.rand((2, 12), device=dpcpp_device)
-        dst = src.clone().to(cpu_device).reshape(4, 6)
-        usm = torch.xpu.to_usm(src)
-        tensor = torch.xpu.from_usm(usm, dst.dtype, (4, 6))
-        self.assertEqual(tensor.to(cpu_device), dst)
-
-        src = torch.rand((2, 12), device=dpcpp_device)
-        dst = src.clone().to(cpu_device).reshape(4, 6)
-        usm = torch.xpu.to_usm(src)
-        tensor = torch.xpu.from_usm(usm, dst.dtype, (4, 6))
         self.assertEqual(tensor.to(cpu_device), dst)

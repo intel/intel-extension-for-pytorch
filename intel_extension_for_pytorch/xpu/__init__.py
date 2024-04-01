@@ -123,13 +123,19 @@ def _xpu_deserialize(obj, location):
             return _xpu(obj, device=device)
 
 
+_register_white_list = {"empty_cache"}
+
+
 def _register_torch_device_module(device_type, module):
+    global _register_white_list
     device_type = torch.device(device_type).type
     torch_module = sys.modules["torch"]
     torch_device_module = getattr(torch_module, device_type, None)
     if torch_device_module:
         for sub_module_key in dir(module):
-            if not hasattr(torch_device_module, sub_module_key):
+            if sub_module_key in _register_white_list or not hasattr(
+                torch_device_module, sub_module_key
+            ):
                 setattr(
                     torch_device_module,
                     sub_module_key,
