@@ -46,7 +46,7 @@ jobs:
           python -c "import torch;print(f'torch version {torch.__version__}')"
           python -m pip uninstall intel_extension_for_pytorch -y
           export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
-          cd ${{ github.workspace }}/intel-extension-for-pytorch
+          cd ${{ github.workspace }}
           python setup.py bdist_wheel
           pip install --force-reinstall dist/*.whl
 

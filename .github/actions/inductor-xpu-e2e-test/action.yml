@@ -53,6 +53,7 @@ runs:
             pip install pyarrow pandas
             
             cd ${{ github.workspace }}
+            cd ..
             git clone https://github.com/facebookresearch/detectron2.git
             python -m pip install -e detectron2
 
@@ -90,7 +91,7 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: Inductor-XPU-E2E-CI-Data-${{ inputs.suite }}-${{ inputs.dt }}-${{ inputs.mode }}-${{ inputs.scenario }}-${{ github.event.pull_request.number || github.ref }}
-        path: ${{ github.workspace }}/inductor_log
+        path: ${{ github.workspace }}/../pytorch/inductor_log
     - name: Test Results Check (${{ inputs.suite }} ${{ inputs.dt }} ${{ inputs.mode }} ${{ inputs.scenario }})
       if: ${{ inputs.expected_pass_num }}
       shell: bash
