@@ -277,3 +277,16 @@ class TestNNMethod(TestCase):
                 self.assertEqual(output_cpu, output_xpu.cpu())
                 self.assertEqual(input_cpu.grad, input_xpu.grad.cpu())
                 self.assertEqual(grad_wei, grad_wei_xpu.cpu(), rtol=10e-4, atol=10e-4)
+
+    def test_layer_norm_bwd_corner_scenario(self, dtype=torch.float):
+        x_i = torch.randn(64, requires_grad=True, dtype=dtype, device=cpu_device)
+        x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
+
+        layernorm = torch.nn.LayerNorm(64, elementwise_affine=False, eps=1e-6)
+        y_cpu = layernorm(x_i)
+        layernorm.to(dpcpp_device).to(dtype)
+        y_dpcpp = layernorm(x_dpcpp_i)
+
+        z_cpu = y_cpu.mean().backward()
+        z_dpcpp = y_dpcpp.mean().backward()
+        self.assertEqual(z_cpu, z_dpcpp, atol=1e-5, rtol=1e-5)
