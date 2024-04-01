@@ -3,7 +3,7 @@ import time
 
 import torch
 from torch.testing._internal.common_utils import TestCase
-
+from torch._dynamo.testing import rand_strided
 from functools import partial
 import intel_extension_for_pytorch  # noqa
 from torch.testing import make_tensor
@@ -451,3 +451,19 @@ class TestTorchMethod(TestCase):
         for b, n, k in itertools.product(bs, ns, ks):
             for A, B, left, upper, uni in gen_inputs((b, n, k), dtype, device):
                 self._test_linalg_solve_triangular(A, B, upper, left, uni)
+
+    def test_lu_unpack(self):
+        assert_size_stride = torch._C._dynamo.guards.assert_size_stride
+        aten = torch.ops.aten
+        primals_1 = rand_strided(
+            (3, 5), (1, 3), device=dpcpp_device, dtype=torch.float32
+        )
+        primals_2 = rand_strided((3,), (1,), device=dpcpp_device, dtype=torch.int32)
+
+        buf0 = aten.lu_unpack(primals_1, primals_2)
+        buf1 = buf0[0]
+        assert_size_stride(buf1, (3, 3), (3, 1))
+        buf2 = buf0[1]
+        assert_size_stride(buf2, (3, 3), (3, 1))
+        buf3 = buf0[2]
+        assert_size_stride(buf3, (3, 5), (5, 1))

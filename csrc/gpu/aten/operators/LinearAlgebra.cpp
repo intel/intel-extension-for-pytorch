@@ -909,15 +909,26 @@ std::tuple<Tensor, Tensor, Tensor> lu_unpack(
 
   if (unpack_data) {
     U = LU_data.triu();
-    if (m != k) {
-      U = U.narrow(-2, 0, k);
-    }
-
     L = LU_data.tril();
-    if (k != n) {
-      L = L.narrow(-1, 0, k);
+    if (m > n || LU_data.is_same(L)) {
+      // The order of triu and tril is important as we may have
+      // LU_data.is_same(L)
+      at::triu_out(
+          const_cast<Tensor&>(U),
+          m == n ? LU_data : LU_data.narrow(-2, 0, n),
+          0);
+      at::tril_out(const_cast<Tensor&>(L), LU_data, -1);
+      L.diagonal(0, -2, -1).fill_(1.);
+    } else {
+      // The order of triu and tril is important as we may have
+      // LU_data.is_same(U)
+      at::tril_out(
+          const_cast<Tensor&>(L),
+          m == n ? LU_data : LU_data.narrow(-1, 0, m),
+          -1);
+      L.diagonal(0, -2, -1).fill_(1.);
+      at::triu_out(const_cast<Tensor&>(U), LU_data, 0);
     }
-    L.diagonal(/*offset=*/0, /*dim1=*/-2, /*dim2=*/-1).fill_(1);
   }
 
   if (!unpack_pivots) {

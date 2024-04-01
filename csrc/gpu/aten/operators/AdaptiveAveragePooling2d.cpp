@@ -175,21 +175,21 @@ void adaptive_avg_pool2d_out_template(
     Tensor& output,
     const Tensor& input,
     IntArrayRef output_size) {
-  for (int64_t i = 0; i < input.ndimension(); i++) {
+  int64_t ndim = input.dim();
+  for (const auto i : {-2, -1}) {
     TORCH_CHECK(
         input.size(i) > 0,
-        "adaptive_average_pool2d_dpcpp(): expected input to have non-empty spatial "
-        "dimensions, "
+        "adaptive_average_pool2d_dpcpp(): Expected input to have non-zero size for non-batch dimensions, "
         "but input has sizes ",
         input.sizes(),
         " with dimension ",
-        i,
+        i + ndim,
         " being "
         "empty");
   }
 
   TORCH_CHECK(
-      (input.ndimension() == 3 || input.ndimension() == 4),
+      (ndim == 3 || ndim == 4),
       "non-empty 3D or 4D (batch mode) tensor expected for input");
 
   TORCH_CHECK(
@@ -218,7 +218,18 @@ void adaptive_avg_pool2d_out_template(
   const auto nInputPlane = input.size(-3);
   const auto inputHeight = input.size(-2);
   const auto inputWidth = input.size(-1);
-
+  Tensor input_;
+  if (input.ndimension() == 3) {
+    input_ = input.contiguous();
+    output.resize_({nInputPlane, outputHeight, outputWidth});
+  } else {
+    auto smf = input.suggest_memory_format();
+    input_ = contiguous_if_needed(input, smf);
+    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
+  }
+  if (output.numel() == 0) {
+    return;
+  }
   int dH = std::floor((float)2 * inputHeight / outputHeight) -
       (inputHeight / outputHeight);
   int dW = std::floor((float)2 * inputWidth / outputWidth) -
@@ -237,16 +248,6 @@ void adaptive_avg_pool2d_out_template(
   int padH = (dH * (outputHeight - 1) + kH - inputHeight) / 2;
   int padW = (dW * (outputWidth - 1) + kW - inputWidth) / 2;
   std::vector<int64_t> padding_vec = {padH, padW};
-
-  Tensor input_;
-  if (input.ndimension() == 3) {
-    input_ = input.contiguous();
-    output.resize_({nInputPlane, outputHeight, outputWidth});
-  } else {
-    auto smf = input.suggest_memory_format();
-    input_ = contiguous_if_needed(input, smf);
-    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
-  }
 
   if (xpu::oneDNN::is_valid_pooling(
           {inputHeight, inputWidth},
