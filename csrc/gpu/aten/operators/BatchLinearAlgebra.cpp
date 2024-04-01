@@ -3657,6 +3657,19 @@ std::tuple<Tensor&, Tensor&> linalg_eig_out(
   return std::tuple<Tensor&, Tensor&>(values, vectors);
 }
 
+Tensor _linalg_eigvals(const Tensor& input) {
+  ScalarType complex_dtype = toComplexType(input.scalar_type());
+  Tensor values = at::empty({0}, input.options().dtype(complex_dtype));
+  linalg_eigvals_out(input, values);
+  return values;
+}
+
+Tensor& linalg_eigvals_out(const Tensor& input, Tensor& values) {
+  Tensor vectors;
+  std::tie(values, std::ignore) = linalg_eig_out(input, values, vectors);
+  return vectors;
+}
+
 Tensor _det_lu_based_helper_backward_helper(
     const Tensor& det_grad,
     const Tensor& det,
