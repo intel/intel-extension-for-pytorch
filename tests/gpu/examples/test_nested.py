@@ -1,5 +1,6 @@
 import torch
-import pytest
+import pytest  # noqa
+
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
@@ -25,6 +26,76 @@ def random_nt(device, dtype, num_tensors, max_dims, min_dims=None):
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_transform_bias_rescale_qkv_nested(self, device="xpu", dtype=torch.float32):
+        tests = [
+            (64, 4, 16, 8),
+            (24, 2, 4, 2),
+            (2, 2, 2, 2),
+            (24, 4, 4, 2),
+            (48, 4, 16, 8),
+        ]
+        for embed_dim, num_heads, bs, sl in tests:
+            dense_x = x = torch.randn(
+                bs, sl, 3 * embed_dim, device="cpu", dtype=torch.float32
+            )
+            xs = list(torch.unbind(x))
+            x = torch.nested.nested_tensor(xs, device="cpu", dtype=torch.float32)
+            x_xpu = x.to("xpu")
+
+            qkv = torch.nn.Linear(
+                embed_dim, 3 * embed_dim, device="cpu", dtype=torch.float32
+            )
+            bias = qkv.bias
+            bias_xpu = bias.to("xpu")
+
+            self.assertEqual(x.to(cpu_device), x_xpu.to(cpu_device))
+            self.assertEqual(bias.to(cpu_device), bias_xpu.to(cpu_device))
+
+            (q, k, v) = torch._transform_bias_rescale_qkv(x, bias, num_heads=num_heads)
+            (q_xpu, k_xpu, v_xpu) = torch._transform_bias_rescale_qkv(
+                x_xpu, bias_xpu, num_heads=num_heads
+            )
+
+            self.assertEqual(q.to(cpu_device), q_xpu.to(cpu_device))
+            self.assertEqual(k.to(cpu_device), k_xpu.to(cpu_device))
+            self.assertEqual(v.to(cpu_device), v_xpu.to(cpu_device))
+
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_transform_bias_rescale_qkv_non_nested(
+        self, device="xpu", dtype=torch.float32
+    ):
+        tests = [
+            (64, 4, 16, 8),
+            (24, 2, 1, 1),
+            (2, 2, 2, 2),
+            (24, 4, 4, 2),
+            (48, 4, 16, 8),
+        ]
+        for embed_dim, num_heads, bs, seq_len in tests:
+            x = torch.randn(bs, seq_len, 3 * embed_dim, device="cpu", dtype=dtype)
+            x_xpu = x.to("xpu")
+
+            qkv = torch.nn.Linear(embed_dim, 3 * embed_dim, device="cpu", dtype=dtype)
+            bias = qkv.bias
+            xpu_bias = bias.to("xpu")
+
+            self.assertEqual(x.to(cpu_device), x_xpu.to(cpu_device))
+            self.assertEqual(bias.to(cpu_device), xpu_bias.to(cpu_device))
+
+            (q, k, v) = torch._transform_bias_rescale_qkv(x, bias, num_heads=num_heads)
+            (q_xpu, k_xpu, v_xpu) = torch._transform_bias_rescale_qkv(
+                x_xpu, xpu_bias, num_heads=num_heads
+            )
+
+            self.assertEqual(q.to(cpu_device), q_xpu.to(cpu_device))
+            self.assertEqual(k.to(cpu_device), k_xpu.to(cpu_device))
+            self.assertEqual(v.to(cpu_device), v_xpu.to(cpu_device))
+
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
