@@ -42,11 +42,12 @@ jobs:
       - name: Prepare IPEX
         run: |
           source activate e2e_ci
-          source /opt/intel/oneapi/compiler/latest/env/vars.sh
+          source /opt/intel/oneapi/setvars.sh
           python -c "import torch;print(f'torch version {torch.__version__}')"
           python -m pip uninstall intel_extension_for_pytorch -y
           export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
           cd ${{ github.workspace }}
+          python -m pip install -r requirements.txt
           python setup.py bdist_wheel
           pip install --force-reinstall dist/*.whl
 
