@@ -1,6 +1,5 @@
 # coding: utf-8
 from enum import Enum
-import warnings
 from functools import lru_cache
 
 import torch
@@ -8,49 +7,6 @@ from .. import _C
 from .. import frontend
 import intel_extension_for_pytorch  # noqa F401
 from .intrinsic import clip_grad_norm_  # noqa F401
-
-
-def from_usm(src, dtype, shape, stride=None, device_id: int = -1) -> torch.Tensor:
-    """from_usm(src, dtype, shape, stride=None, device_d=-1) -> Tensor
-
-    Converts a tensor allocated in USM(United Shared Memory) into a ``torch.Tensor``.
-
-    The returned PyTorch tensor will share the memory with the input tensor
-    (which may have come from another library). Note that in-place operations
-    will therefore also affect the data of the input tensor. And this API doesn't
-    manage USM tensor src's lifetime. Please take care it carefully.
-
-    Args:
-        src: A capsule of USM pointer to convert, the name stored in the capsule
-            is 'USMtensor'.
-        dtype: the desired data type of returned tensor.
-        shape: the desired shape of returned tensor.
-        stride: the desired stride of returned tensor. Default: if None,
-            returned tensor is contiguous.
-        device_id: the device id where the USM pointer is allocated. Default: -1,
-            if the user is not sure.
-
-    Warning: This is deprecated. Please use torch.from_dlpack instead.
-    """
-
-    warnings.warn("from_usm is deprecated. Please use torch.from_dlpack instead.")
-    return _C._from_usm(src, dtype, shape, stride, device_id)
-
-
-def to_usm(src: torch.Tensor):
-    """to_usm(src: torch.Tensor): -> PyCapsule
-
-    Converts a torch tensor allocated in USM(United Shared Memory) into a ``PyCapsule``,
-    which encapsules a USM data pointer address.
-
-    Args:
-        src: a torch tensor.
-
-    Warning: This is deprecated. Please use torch.to_dlpack instead.
-    """
-
-    warnings.warn("to_usm is deprecated. Please use torch.to_dlpack instead.")
-    return _C._to_usm(src)
 
 
 def has_onemkl():

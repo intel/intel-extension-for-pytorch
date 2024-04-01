@@ -8,7 +8,6 @@
 
 #include <ATen/xpu/XPUGeneratorImpl.h>
 #include <core/Allocator.h>
-#include <core/Convertor.h>
 #include <include/xpu/Settings.h>
 #include <profiler/profiler_kineto.h>
 #include <pybind11/stl.h>
@@ -180,9 +179,11 @@ PyObject* THPModule_memorySnapshot(PyObject* _unused, PyObject* noargs) {
 
 static PyObject* set_autocast_xpu_enabled(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
-  if (!PyBool_Check(arg)) {
-    throw TypeError("enabled must be a bool (got %s)", Py_TYPE(arg)->tp_name);
-  }
+  TORCH_CHECK_TYPE(
+      PyBool_Check(arg),
+      "enabled must be a bool (got ",
+      Py_TYPE(arg)->tp_name,
+      ")");
   at::autocast::set_xpu_enabled(arg == Py_True);
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -200,10 +201,11 @@ static PyObject* is_autocast_xpu_enabled(PyObject* _unused, PyObject* arg) {
 
 static PyObject* set_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
-  if (!THPDtype_Check(arg)) {
-    throw TypeError(
-        "dtype must be a torch.dtype (got %s)", Py_TYPE(arg)->tp_name);
-  }
+  TORCH_CHECK_TYPE(
+      THPDtype_Check(arg),
+      "dtype must be a torch.dtype (got ",
+      Py_TYPE(arg)->tp_name,
+      ")");
   at::ScalarType targetType = reinterpret_cast<THPDtype*>(arg)->scalar_type;
   at::autocast::set_autocast_xpu_dtype(targetType);
   Py_RETURN_NONE;
@@ -216,44 +218,6 @@ static PyObject* get_autocast_xpu_dtype(PyObject* _unused, PyObject* arg) {
   auto dtype = (PyObject*)torch::getTHPDtype(current_dtype);
   Py_INCREF(dtype);
   return dtype;
-  END_HANDLE_TH_ERRORS
-}
-
-PyObject* THPModule_fromUSM(PyObject* _unused, PyObject* args) {
-  using namespace torch::autograd;
-  HANDLE_TH_ERRORS
-  Py_ssize_t num_args = args ? (Py_ssize_t)PyTuple_Size(args) : 0;
-  TORCH_CHECK(num_args == 5, "expected exactly 5 arguments");
-
-  PyObject* arg0 = PyTuple_GET_ITEM(args, 0);
-  PyObject* arg1 = PyTuple_GET_ITEM(args, 1);
-  TORCH_CHECK(THPDtype_Check(arg1), "expected a torch.dtype as argument 1");
-  PyObject* arg2 = PyTuple_GET_ITEM(args, 2);
-  PyObject* arg3 = PyTuple_GET_ITEM(args, 3);
-  PyObject* arg4 = PyTuple_GET_ITEM(args, 4);
-  TORCH_CHECK(THPUtils_checkLong(arg4), "expected a int as argument 4");
-
-  void* src = PyCapsule_GetPointer(arg0, "USMtensor");
-  auto stype = reinterpret_cast<THPDtype*>(arg1)->scalar_type;
-  auto shape = THPUtils_unpackLongs(arg2);
-  auto strides = (arg3 != Py_None)
-      ? c10::optional<IntArrayRef>(THPUtils_unpackLongs(arg3))
-      : c10::nullopt;
-  auto device_id = (int)THPUtils_unpackLong(arg4);
-
-  // Here, it is not necessary to add lazy_init repeatedly. It will be called
-  // automatically.
-  auto tensor = torch_ipex::xpu::dpcpp::fromUSM(
-      (void*)src, stype, shape, strides, device_id);
-  return THPVariable_Wrap(tensor);
-  END_HANDLE_TH_ERRORS
-}
-
-PyObject* THPModule_toUSM(PyObject* _unused, PyObject* data) {
-  HANDLE_TH_ERRORS
-  TORCH_CHECK(THPVariable_Check(data), "data must be a Tensor");
-  auto usm = torch_ipex::xpu::dpcpp::toUSM(THPVariable_Unpack(data));
-  return PyCapsule_New(usm, "USMtensor", NULL);
   END_HANDLE_TH_ERRORS
 }
 
@@ -280,8 +244,6 @@ static struct PyMethodDef _THPModule_methods[] = {
     {"is_autocast_xpu_enabled", is_autocast_xpu_enabled, METH_NOARGS, nullptr},
     {"set_autocast_xpu_dtype", set_autocast_xpu_dtype, METH_O, nullptr},
     {"get_autocast_xpu_dtype", get_autocast_xpu_dtype, METH_NOARGS, nullptr},
-    {"_from_usm", THPModule_fromUSM, METH_VARARGS, nullptr},
-    {"_to_usm", THPModule_toUSM, METH_O, nullptr},
     {nullptr}};
 
 at::Scalar scalar_slow(PyObject* object) {

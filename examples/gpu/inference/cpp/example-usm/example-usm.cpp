@@ -1,11 +1,11 @@
 #include <iostream>
 #include <memory>
 #include <torch/script.h>
-#include <ipex.h>
+#include <c10/xpu/XPUStream.h>
+#include <ATen/ATen.h>
 #include <CL/sycl.hpp>
 
 using namespace sycl;
-using namespace torch_ipex::xpu::dpcpp;
 
 int main(int argc, const char* argv[]) {
   torch::jit::script::Module module;
@@ -22,7 +22,12 @@ int main(int argc, const char* argv[]) {
   std::vector<torch::jit::IValue> inputs;
   c10::xpu::XPUStream stream = c10::xpu::getCurrentXPUStream();
   float *input_ptr = malloc_device<float>(224 * 224 * 3, stream);
-  auto input = fromUSM(input_ptr, at::ScalarType::Float, {1, 3, 224, 224}, c10::nullopt, -1).to(at::kXPU);
+  auto input = torch::from_blob(
+      input_ptr,
+      {1, 3, 224, 224},
+      nullptr,
+      stream.device().dtype(at::kFloat),
+      {stream.device()});
   std::cout << "input tensor created from usm " << std::endl;
   inputs.push_back(input);
 
