@@ -57,6 +57,8 @@ jobs:
           source activate e2e_ci
           TRITON_PINNED_COMMIT=$(cat .github/ci_commit_pins/triton.txt)
           echo ${TRITON_REPO}@${TRITON_PINNED_COMMIT}
+          cd ${{ github.workspace }} 
+          cd ..
           git clone -b llvm-target https://github.com/intel/intel-xpu-backend-for-triton
           cd intel-xpu-backend-for-triton
           git checkout ${TRITON_PINNED_COMMIT}
