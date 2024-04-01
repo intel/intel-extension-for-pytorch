@@ -37,10 +37,10 @@ supported:
   - _adaptive_avg_pool3d_backward
   - _adaptive_avg_pool3d_backward.out
   - _add_batch_dim
-  - _add_relu.out
   - _add_relu.Scalar
   - _add_relu.Scalar_out
   - _add_relu.Tensor
+  - _add_relu.out
   - _add_relu_.Scalar
   - _add_relu_.Tensor
   - _addmm_activation
@@ -57,6 +57,7 @@ supported:
   - _amp_update_scale_
   - _assert_async
   - _assert_async.msg
+  - _assert_scalar
   - _assert_tensor_metadata
   - _autocast_to_full_precision
   - _autocast_to_reduced_precision
@@ -78,7 +79,8 @@ supported:
   - _cholesky_solve_helper
   - _cholesky_solve_helper.out
   - _choose_qparams_per_tensor
-  - _chunk_grad_outputs_efficient_attention
+  - _chunk_cat
+  - _chunk_cat.out
   - _coalesce
   - _coalesce.out
   - _coalesced
@@ -97,6 +99,7 @@ supported:
   - _convert_indices_from_coo_to_csr.out
   - _convert_indices_from_csr_to_coo
   - _convert_indices_from_csr_to_coo.out
+  - _convert_weight_to_int4pack
   - _convolution
   - _convolution.deprecated
   - _convolution.out
@@ -108,16 +111,17 @@ supported:
   - _copy_from_and_resize.out
   - _cslt_compress
   - _cslt_sparse_mm
+  - _cslt_sparse_mm_search
   - _ctc_loss
-  - _ctc_loss.out
   - _ctc_loss.Tensor
   - _ctc_loss.Tensor_out
+  - _ctc_loss.out
   - _ctc_loss_backward
-  - _ctc_loss_backward.out
   - _ctc_loss_backward.Tensor
+  - _ctc_loss_backward.out
   - _cudnn_ctc_loss
-  - _cudnn_ctc_loss.out
   - _cudnn_ctc_loss.Tensor
+  - _cudnn_ctc_loss.out
   - _cudnn_init_dropout_state
   - _cudnn_init_dropout_state.out
   - _cudnn_rnn
@@ -133,9 +137,9 @@ supported:
   - _cummax_helper
   - _cummin_helper
   - _debug_has_internal_overlap
-  - _dim_arange
   - _dimI
   - _dimV
+  - _dim_arange
   - _dirichlet_grad
   - _dirichlet_grad.out
   - _efficient_attention_backward
@@ -186,25 +190,28 @@ supported:
   - _foreach_add.List
   - _foreach_add.List_out
   - _foreach_add.Scalar
-  - _foreach_add.Scalar_out
   - _foreach_add.ScalarList
   - _foreach_add.ScalarList_out
+  - _foreach_add.Scalar_out
+  - _foreach_add.Tensor
+  - _foreach_add.Tensor_out
   - _foreach_add_.List
   - _foreach_add_.Scalar
   - _foreach_add_.ScalarList
+  - _foreach_add_.Tensor
   - _foreach_addcdiv.Scalar
-  - _foreach_addcdiv.Scalar_out
   - _foreach_addcdiv.ScalarList
   - _foreach_addcdiv.ScalarList_out
+  - _foreach_addcdiv.Scalar_out
   - _foreach_addcdiv.Tensor
   - _foreach_addcdiv.Tensor_out
   - _foreach_addcdiv_.Scalar
   - _foreach_addcdiv_.ScalarList
   - _foreach_addcdiv_.Tensor
   - _foreach_addcmul.Scalar
-  - _foreach_addcmul.Scalar_out
   - _foreach_addcmul.ScalarList
   - _foreach_addcmul.ScalarList_out
+  - _foreach_addcmul.Scalar_out
   - _foreach_addcmul.Tensor
   - _foreach_addcmul.Tensor_out
   - _foreach_addcmul_.Scalar
@@ -222,18 +229,18 @@ supported:
   - _foreach_clamp_max.List
   - _foreach_clamp_max.List_out
   - _foreach_clamp_max.Scalar
-  - _foreach_clamp_max.Scalar_out
   - _foreach_clamp_max.ScalarList
   - _foreach_clamp_max.ScalarList_out
+  - _foreach_clamp_max.Scalar_out
   - _foreach_clamp_max_.List
   - _foreach_clamp_max_.Scalar
   - _foreach_clamp_max_.ScalarList
   - _foreach_clamp_min.List
   - _foreach_clamp_min.List_out
   - _foreach_clamp_min.Scalar
-  - _foreach_clamp_min.Scalar_out
   - _foreach_clamp_min.ScalarList
   - _foreach_clamp_min.ScalarList_out
+  - _foreach_clamp_min.Scalar_out
   - _foreach_clamp_min_.List
   - _foreach_clamp_min_.Scalar
   - _foreach_clamp_min_.ScalarList
@@ -249,12 +256,15 @@ supported:
   - _foreach_div.List
   - _foreach_div.List_out
   - _foreach_div.Scalar
-  - _foreach_div.Scalar_out
   - _foreach_div.ScalarList
   - _foreach_div.ScalarList_out
+  - _foreach_div.Scalar_out
+  - _foreach_div.Tensor
+  - _foreach_div.Tensor_out
   - _foreach_div_.List
   - _foreach_div_.Scalar
   - _foreach_div_.ScalarList
+  - _foreach_div_.Tensor
   - _foreach_erf
   - _foreach_erf.out
   - _foreach_erf_
@@ -284,7 +294,6 @@ supported:
   - _foreach_lgamma_
   - _foreach_log
   - _foreach_log.out
-  - _foreach_log_
   - _foreach_log10
   - _foreach_log10.out
   - _foreach_log10_
@@ -294,30 +303,31 @@ supported:
   - _foreach_log2
   - _foreach_log2.out
   - _foreach_log2_
+  - _foreach_log_
   - _foreach_maximum.List
   - _foreach_maximum.List_out
   - _foreach_maximum.Scalar
-  - _foreach_maximum.Scalar_out
   - _foreach_maximum.ScalarList
   - _foreach_maximum.ScalarList_out
+  - _foreach_maximum.Scalar_out
   - _foreach_maximum_.List
   - _foreach_maximum_.Scalar
   - _foreach_maximum_.ScalarList
   - _foreach_minimum.List
   - _foreach_minimum.List_out
   - _foreach_minimum.Scalar
-  - _foreach_minimum.Scalar_out
   - _foreach_minimum.ScalarList
   - _foreach_minimum.ScalarList_out
+  - _foreach_minimum.Scalar_out
   - _foreach_minimum_.List
   - _foreach_minimum_.Scalar
   - _foreach_minimum_.ScalarList
   - _foreach_mul.List
   - _foreach_mul.List_out
   - _foreach_mul.Scalar
-  - _foreach_mul.Scalar_out
   - _foreach_mul.ScalarList
   - _foreach_mul.ScalarList_out
+  - _foreach_mul.Scalar_out
   - _foreach_mul.Tensor
   - _foreach_mul.Tensor_out
   - _foreach_mul_.List
@@ -332,10 +342,10 @@ supported:
   - _foreach_pow.List
   - _foreach_pow.List_out
   - _foreach_pow.Scalar
-  - _foreach_pow.Scalar_out
   - _foreach_pow.ScalarAndTensor
   - _foreach_pow.ScalarList
   - _foreach_pow.ScalarList_out
+  - _foreach_pow.Scalar_out
   - _foreach_pow_.List
   - _foreach_pow_.Scalar
   - _foreach_pow_.ScalarList
@@ -363,9 +373,9 @@ supported:
   - _foreach_sub.List
   - _foreach_sub.List_out
   - _foreach_sub.Scalar
-  - _foreach_sub.Scalar_out
   - _foreach_sub.ScalarList
   - _foreach_sub.ScalarList_out
+  - _foreach_sub.Scalar_out
   - _foreach_sub_.List
   - _foreach_sub_.Scalar
   - _foreach_sub_.ScalarList
@@ -382,6 +392,7 @@ supported:
   - _foreach_zero.out
   - _foreach_zero_
   - _functional_assert_async.msg
+  - _functional_assert_scalar
   - _functional_sym_constrain_range
   - _functional_sym_constrain_range_for_size
   - _fused_adam
@@ -402,6 +413,12 @@ supported:
   - _fused_moving_avg_obs_fq_helper.out
   - _fused_moving_avg_obs_fq_helper_functional
   - _fused_sdp_choice
+  - _fused_sgd
+  - _fused_sgd.out
+  - _fused_sgd.tensor_lr
+  - _fused_sgd.tensor_lr_out
+  - _fused_sgd_
+  - _fused_sgd_.tensor_lr
   - _fw_primal
   - _fw_primal_copy
   - _fw_primal_copy.out
@@ -428,11 +445,13 @@ supported:
   - _is_all_true
   - _is_any_true
   - _is_zerotensor
+  - _lazy_clone
   - _linalg_check_errors
   - _linalg_det
   - _linalg_det.result
   - _linalg_eigh
   - _linalg_eigh.eigenvalues
+  - _linalg_eigvals
   - _linalg_slogdet
   - _linalg_slogdet.sign
   - _linalg_solve_ex
@@ -463,6 +482,7 @@ supported:
   - _masked_softmax.out
   - _masked_softmax_backward
   - _masked_softmax_backward.out
+  - _mixed_dtypes_linear
   - _mkldnn_reshape
   - _mkldnn_reshape.out
   - _mkldnn_transpose
@@ -479,8 +499,6 @@ supported:
   - _native_batch_norm_legit_functional
   - _native_batch_norm_legit_no_training
   - _native_batch_norm_legit_no_training.out
-  - _native_decoder_only_multi_head_attention
-  - _native_decoder_only_multi_head_attention.out
   - _native_multi_head_attention
   - _native_multi_head_attention.out
   - _neg_view
@@ -497,7 +515,6 @@ supported:
   - _nested_tensor_from_mask_left_aligned
   - _nested_tensor_from_tensor_list
   - _nested_tensor_from_tensor_list.out
-  - _nested_tensor_offsets
   - _nested_tensor_size
   - _nested_tensor_size.out
   - _nested_tensor_softmax_with_shape
@@ -528,6 +545,7 @@ supported:
   - _pin_memory.out
   - _prelu_kernel
   - _prelu_kernel_backward
+  - _print
   - _propagate_xla_data
   - _remove_batch_dim
   - _reshape_alias
@@ -542,12 +560,14 @@ supported:
   - _sample_dirichlet
   - _sample_dirichlet.out
   - _saturate_weight_to_fp16
-  - _scaled_dot_product_attention
   - _scaled_dot_product_attention_math
+  - _scaled_dot_product_cudnn_attention
   - _scaled_dot_product_efficient_attention
   - _scaled_dot_product_efficient_attention_backward
   - _scaled_dot_product_flash_attention
   - _scaled_dot_product_flash_attention_backward
+  - _scaled_dot_product_flash_attention_for_cpu
+  - _scaled_dot_product_flash_attention_for_cpu_backward
   - _scaled_mm
   - _scaled_mm.out
   - _segment_reduce_backward
@@ -638,6 +658,7 @@ supported:
   - _test_optional_floatlist.out
   - _test_optional_intlist
   - _test_optional_intlist.out
+  - _test_parallel_materialize
   - _test_serialization_subcmul
   - _test_string_default
   - _test_warn_in_autograd
@@ -673,8 +694,6 @@ supported:
   - _to_sparse_semi_structured
   - _transform_bias_rescale_qkv
   - _transform_bias_rescale_qkv.out
-  - _transformer_decoder_only_layer_fwd
-  - _transformer_decoder_only_layer_fwd.out
   - _transformer_encoder_layer_fwd
   - _transformer_encoder_layer_fwd.out
   - _trilinear
@@ -731,6 +750,8 @@ supported:
   - _values_copy
   - _values_copy.out
   - _version
+  - _weight_int4pack_mm
+  - _weight_int8pack_mm
   - _weight_norm
   - _weight_norm_differentiable_backward
   - _weight_norm_interface
@@ -764,10 +785,10 @@ supported:
   - adaptive_max_pool3d.out
   - adaptive_max_pool3d_backward
   - adaptive_max_pool3d_backward.grad_input
-  - add.out
   - add.Scalar
   - add.Scalar_out
   - add.Tensor
+  - add.out
   - add_.Scalar
   - add_.Tensor
   - addbmm
@@ -804,6 +825,8 @@ supported:
   - all.dim
   - all.dimname
   - all.dimname_out
+  - all.dims
+  - all.dims_out
   - all.out
   - allclose
   - alpha_dropout
@@ -821,6 +844,8 @@ supported:
   - any.dim
   - any.dimname
   - any.dimname_out
+  - any.dims
+  - any.dims_out
   - any.out
   - arange
   - arange.out
@@ -841,10 +866,10 @@ supported:
   - arcsinh_
   - arctan
   - arctan.out
-  - arctan_
   - arctan2
   - arctan2.out
   - arctan2_
+  - arctan_
   - arctanh
   - arctanh.out
   - arctanh_
@@ -871,10 +896,10 @@ supported:
   - asinh_
   - atan
   - atan.out
-  - atan_
   - atan2
   - atan2.out
   - atan2_
+  - atan_
   - atanh
   - atanh.out
   - atanh_
@@ -916,13 +941,13 @@ supported:
   - batch_norm_update_stats
   - batch_norm_update_stats.out
   - bernoulli
+  - bernoulli.Tensor
+  - bernoulli.Tensor_out
   - bernoulli.float_out
   - bernoulli.out
   - bernoulli.p
-  - bernoulli.Tensor
-  - bernoulli.Tensor_out
-  - bernoulli_.float
   - bernoulli_.Tensor
+  - bernoulli_.float
   - bilinear
   - binary_cross_entropy
   - binary_cross_entropy.out
@@ -935,9 +960,9 @@ supported:
   - binomial
   - binomial.out
   - bitwise_and.Scalar
-  - bitwise_and.Scalar_out
   - bitwise_and.Scalar_Tensor
   - bitwise_and.Scalar_Tensor_out
+  - bitwise_and.Scalar_out
   - bitwise_and.Tensor
   - bitwise_and.Tensor_out
   - bitwise_and_.Scalar
@@ -945,18 +970,18 @@ supported:
   - bitwise_left_shift.Scalar_Tensor
   - bitwise_left_shift.Scalar_Tensor_out
   - bitwise_left_shift.Tensor
-  - bitwise_left_shift.Tensor_out
   - bitwise_left_shift.Tensor_Scalar
   - bitwise_left_shift.Tensor_Scalar_out
+  - bitwise_left_shift.Tensor_out
   - bitwise_left_shift_.Tensor
   - bitwise_left_shift_.Tensor_Scalar
   - bitwise_not
   - bitwise_not.out
   - bitwise_not_
   - bitwise_or.Scalar
-  - bitwise_or.Scalar_out
   - bitwise_or.Scalar_Tensor
   - bitwise_or.Scalar_Tensor_out
+  - bitwise_or.Scalar_out
   - bitwise_or.Tensor
   - bitwise_or.Tensor_out
   - bitwise_or_.Scalar
@@ -964,15 +989,15 @@ supported:
   - bitwise_right_shift.Scalar_Tensor
   - bitwise_right_shift.Scalar_Tensor_out
   - bitwise_right_shift.Tensor
-  - bitwise_right_shift.Tensor_out
   - bitwise_right_shift.Tensor_Scalar
   - bitwise_right_shift.Tensor_Scalar_out
+  - bitwise_right_shift.Tensor_out
   - bitwise_right_shift_.Tensor
   - bitwise_right_shift_.Tensor_Scalar
   - bitwise_xor.Scalar
-  - bitwise_xor.Scalar_out
   - bitwise_xor.Scalar_Tensor
   - bitwise_xor.Scalar_Tensor_out
+  - bitwise_xor.Scalar_out
   - bitwise_xor.Tensor
   - bitwise_xor.Tensor_out
   - bitwise_xor_.Scalar
@@ -1024,37 +1049,37 @@ supported:
   - choose_qparams_optimized
   - chunk
   - clamp
-  - clamp.out
   - clamp.Tensor
   - clamp.Tensor_out
+  - clamp.out
   - clamp_
   - clamp_.Tensor
   - clamp_max
-  - clamp_max.out
   - clamp_max.Tensor
   - clamp_max.Tensor_out
+  - clamp_max.out
   - clamp_max_
   - clamp_max_.Tensor
   - clamp_min
-  - clamp_min.out
   - clamp_min.Tensor
   - clamp_min.Tensor_out
+  - clamp_min.out
   - clamp_min_
   - clamp_min_.Tensor
   - clip
-  - clip.out
   - clip.Tensor
   - clip.Tensor_out
+  - clip.out
   - clip_
   - clip_.Tensor
   - clone
   - clone.out
   - coalesce
+  - col2im
+  - col2im.out
   - col_indices
   - col_indices_copy
   - col_indices_copy.out
-  - col2im
-  - col2im.out
   - column_stack
   - column_stack.out
   - combinations
@@ -1075,6 +1100,12 @@ supported:
   - constant_pad_nd
   - constant_pad_nd.out
   - contiguous
+  - conv1d
+  - conv1d.padding
+  - conv2d
+  - conv2d.padding
+  - conv3d
+  - conv3d.padding
   - conv_depthwise3d
   - conv_depthwise3d.out
   - conv_tbc
@@ -1083,12 +1114,6 @@ supported:
   - conv_transpose1d
   - conv_transpose2d.input
   - conv_transpose3d.input
-  - conv1d
-  - conv1d.padding
-  - conv2d
-  - conv2d.padding
-  - conv3d
-  - conv3d.padding
   - convolution
   - convolution.out
   - convolution_backward
@@ -1103,10 +1128,10 @@ supported:
   - copy_sparse_to_sparse
   - copy_sparse_to_sparse.out
   - copy_sparse_to_sparse_
-  - copysign.out
   - copysign.Scalar
   - copysign.Scalar_out
   - copysign.Tensor
+  - copysign.out
   - copysign_.Scalar
   - copysign_.Tensor
   - corrcoef
@@ -1210,24 +1235,24 @@ supported:
   - digamma_
   - dist
   - dist.out
-  - div.out
-  - div.out_mode
   - div.Scalar
   - div.Scalar_mode
   - div.Scalar_mode_out
   - div.Scalar_out
   - div.Tensor
   - div.Tensor_mode
+  - div.out
+  - div.out_mode
   - div_.Scalar
   - div_.Scalar_mode
   - div_.Tensor
   - div_.Tensor_mode
-  - divide.out
-  - divide.out_mode
   - divide.Scalar
   - divide.Scalar_mode
   - divide.Tensor
   - divide.Tensor_mode
+  - divide.out
+  - divide.out_mode
   - divide_.Scalar
   - divide_.Scalar_mode
   - divide_.Tensor
@@ -1287,10 +1312,10 @@ supported:
   - erfinv_
   - exp
   - exp.out
-  - exp_
   - exp2
   - exp2.out
   - exp2_
+  - exp_
   - expand
   - expand_as
   - expand_copy
@@ -1399,8 +1424,9 @@ supported:
   - floor.out
   - floor_
   - floor_divide
-  - floor_divide.out
   - floor_divide.Scalar
+  - floor_divide.Scalar_out
+  - floor_divide.out
   - floor_divide_.Scalar
   - floor_divide_.Tensor
   - fmax
@@ -1552,8 +1578,8 @@ supported:
   - histogram.bins_tensor
   - histogram.bins_tensor_out
   - histogramdd
-  - histogramdd.int_bins
   - histogramdd.TensorList_bins
+  - histogramdd.int_bins
   - hsplit.array
   - hsplit.int
   - hspmm
@@ -1673,8 +1699,8 @@ supported:
   - lcm
   - lcm.out
   - lcm_
-  - ldexp.out
   - ldexp.Tensor
+  - ldexp.out
   - ldexp_
   - le.Scalar
   - le.Scalar_out
@@ -1816,9 +1842,24 @@ supported:
   - linear_backward
   - linear_backward.out
   - linspace
+  - linspace.Scalar_Tensor
+  - linspace.Scalar_Tensor_out
+  - linspace.Tensor_Scalar
+  - linspace.Tensor_Scalar_out
+  - linspace.Tensor_Tensor
+  - linspace.Tensor_Tensor_out
   - linspace.out
   - log
   - log.out
+  - log10
+  - log10.out
+  - log10_
+  - log1p
+  - log1p.out
+  - log1p_
+  - log2
+  - log2.out
+  - log2_
   - log_
   - log_normal
   - log_normal.out
@@ -1832,15 +1873,6 @@ supported:
   - log_softmax.Dimname
   - log_softmax.int
   - log_softmax.int_out
-  - log10
-  - log10.out
-  - log10_
-  - log1p
-  - log1p.out
-  - log1p_
-  - log2
-  - log2.out
-  - log2_
   - logaddexp
   - logaddexp.out
   - logaddexp2
@@ -1868,6 +1900,12 @@ supported:
   - logit_backward
   - logit_backward.grad_input
   - logspace
+  - logspace.Scalar_Tensor
+  - logspace.Scalar_Tensor_out
+  - logspace.Tensor_Scalar
+  - logspace.Tensor_Scalar_out
+  - logspace.Tensor_Tensor
+  - logspace.Tensor_Tensor_out
   - logspace.out
   - logsumexp
   - logsumexp.names
@@ -1888,6 +1926,8 @@ supported:
   - lu_solve.out
   - lu_unpack
   - lu_unpack.out
+  - mH
+  - mT
   - margin_ranking_loss
   - masked_fill.Scalar
   - masked_fill.Scalar_out
@@ -1898,6 +1938,7 @@ supported:
   - masked_scatter
   - masked_scatter.out
   - masked_scatter_
+  - masked_scatter_backward
   - masked_select
   - masked_select.out
   - masked_select_backward
@@ -1905,9 +1946,9 @@ supported:
   - matmul.out
   - matmul_backward
   - matmul_backward.out
+  - matrix_H
   - matrix_exp
   - matrix_exp_backward
-  - matrix_H
   - matrix_power
   - matrix_power.out
   - max
@@ -1951,7 +1992,6 @@ supported:
   - median.out
   - meshgrid
   - meshgrid.indexing
-  - mH
   - min
   - min.dim
   - min.dim_min
@@ -2032,11 +2072,10 @@ supported:
   - mse_loss_backward.grad_input
   - msort
   - msort.out
-  - mT
-  - mul.out
   - mul.Scalar
   - mul.Scalar_out
   - mul.Tensor
+  - mul.out
   - mul_.Scalar
   - mul_.Tensor
   - multi_margin_loss
@@ -2051,9 +2090,9 @@ supported:
   - multilabel_margin_loss_forward.output
   - multinomial
   - multinomial.out
-  - multiply.out
   - multiply.Scalar
   - multiply.Tensor
+  - multiply.out
   - multiply_.Scalar
   - multiply_.Tensor
   - mv
@@ -2100,9 +2139,9 @@ supported:
   - native_layer_norm_backward
   - native_layer_norm_backward.out
   - native_norm
-  - native_norm.out
   - native_norm.ScalarOpt_dim_dtype
   - native_norm.ScalarOpt_dim_dtype_out
+  - native_norm.out
   - ne.Scalar
   - ne.Scalar_out
   - ne.Tensor
@@ -2131,44 +2170,44 @@ supported:
   - nextafter_
   - nll_loss
   - nll_loss.out
-  - nll_loss_backward
-  - nll_loss_backward.grad_input
-  - nll_loss_forward
-  - nll_loss_forward.output
-  - nll_loss_nd
   - nll_loss2d
   - nll_loss2d.out
   - nll_loss2d_backward
   - nll_loss2d_backward.grad_input
   - nll_loss2d_forward
   - nll_loss2d_forward.output
+  - nll_loss_backward
+  - nll_loss_backward.grad_input
+  - nll_loss_forward
+  - nll_loss_forward.output
+  - nll_loss_nd
   - nonzero
   - nonzero.out
   - nonzero_numpy
   - nonzero_static
   - nonzero_static.out
-  - norm.dtype_out
-  - norm.names_dtype_out
-  - norm.names_out
-  - norm.names_ScalarOpt_dim
-  - norm.names_ScalarOpt_dim_dtype
-  - norm.out
   - norm.Scalar
-  - norm.Scalar_out
   - norm.ScalarOpt_dim
   - norm.ScalarOpt_dim_dtype
   - norm.ScalarOpt_dtype
   - norm.ScalarOpt_dtype_out
+  - norm.Scalar_out
+  - norm.dtype_out
+  - norm.names_ScalarOpt_dim
+  - norm.names_ScalarOpt_dim_dtype
+  - norm.names_dtype_out
+  - norm.names_out
+  - norm.out
   - norm_except_dim
-  - normal.float_float
-  - normal.float_float_out
-  - normal.float_Tensor
-  - normal.float_Tensor_out
-  - normal.out
-  - normal.Tensor_float
-  - normal.Tensor_float_out
   - normal.Tensor_Tensor
   - normal.Tensor_Tensor_out
+  - normal.Tensor_float
+  - normal.Tensor_float_out
+  - normal.float_Tensor
+  - normal.float_Tensor_out
+  - normal.float_float
+  - normal.float_float_out
+  - normal.out
   - normal_
   - normal_functional
   - not_equal.Scalar
@@ -2228,9 +2267,9 @@ supported:
   - pow_.Tensor
   - prelu
   - prod
+  - prod.Dimname_out
   - prod.dim_Dimname
   - prod.dim_int
-  - prod.Dimname_out
   - prod.int_out
   - prod.out
   - promote_types
@@ -2354,13 +2393,13 @@ supported:
   - reflection_pad3d_backward.grad_input
   - relu
   - relu.out
-  - relu_
   - relu6
   - relu6_
+  - relu_
   - remainder.Scalar
-  - remainder.Scalar_out
   - remainder.Scalar_Tensor
   - remainder.Scalar_Tensor_out
+  - remainder.Scalar_out
   - remainder.Tensor
   - remainder.Tensor_out
   - remainder_.Scalar
@@ -2372,10 +2411,10 @@ supported:
   - renorm_
   - repeat
   - repeat.out
-  - repeat_interleave.self_int
-  - repeat_interleave.self_Tensor
   - repeat_interleave.Tensor
   - repeat_interleave.Tensor_out
+  - repeat_interleave.self_Tensor
+  - repeat_interleave.self_int
   - replication_pad1d
   - replication_pad1d.out
   - replication_pad1d_backward
@@ -2531,10 +2570,15 @@ supported:
   - slice_backward.out
   - slice_copy.Tensor
   - slice_copy.Tensor_out
+  - slice_inverse
   - slice_scatter
   - slice_scatter.out
   - slogdet
   - slogdet.out
+  - slow_conv3d
+  - slow_conv3d.out
+  - slow_conv3d_forward
+  - slow_conv3d_forward.output
   - slow_conv_dilated2d
   - slow_conv_dilated2d.out
   - slow_conv_dilated3d
@@ -2543,10 +2587,6 @@ supported:
   - slow_conv_transpose2d.out
   - slow_conv_transpose3d
   - slow_conv_transpose3d.out
-  - slow_conv3d
-  - slow_conv3d.out
-  - slow_conv3d_forward
-  - slow_conv3d_forward.output
   - smm
   - smooth_l1_loss
   - smooth_l1_loss.out
@@ -2690,11 +2730,11 @@ supported:
   - special_legendre_polynomial_p.out
   - special_legendre_polynomial_p.x_scalar
   - special_legendre_polynomial_p.x_scalar_out
+  - special_log1p
+  - special_log1p.out
   - special_log_ndtr
   - special_log_ndtr.out
   - special_log_softmax
-  - special_log1p
-  - special_log1p.out
   - special_logit
   - special_logit.out
   - special_logsumexp
@@ -2770,8 +2810,8 @@ supported:
   - special_zeta.out
   - special_zeta.self_scalar
   - special_zeta.self_scalar_out
-  - split.sizes
   - split.Tensor
+  - split.sizes
   - split_copy.Tensor
   - split_copy.Tensor_out
   - split_with_sizes
@@ -2820,22 +2860,22 @@ supported:
   - stft.center
   - stride.Dimname
   - stride.int
-  - sub.out
   - sub.Scalar
   - sub.Scalar_out
   - sub.Tensor
+  - sub.out
   - sub_.Scalar
   - sub_.Tensor
-  - subtract.out
   - subtract.Scalar
   - subtract.Tensor
+  - subtract.out
   - subtract_.Scalar
   - subtract_.Tensor
   - sum
-  - sum.dim_DimnameList
-  - sum.dim_IntList
   - sum.DimnameList_out
   - sum.IntList_out
+  - sum.dim_DimnameList
+  - sum.dim_IntList
   - sum.out
   - sum_to_size
   - svd
@@ -2891,17 +2931,11 @@ supported:
   - to_padded_tensor
   - to_padded_tensor.out
   - to_sparse
-  - to_sparse.out
   - to_sparse.sparse_dim
-  - to_sparse.sparse_dim_out
   - to_sparse_bsc
-  - to_sparse_bsc.out
   - to_sparse_bsr
-  - to_sparse_bsr.out
   - to_sparse_csc
-  - to_sparse_csc.out
   - to_sparse_csr
-  - to_sparse_csr.out
   - topk
   - topk.values
   - trace
@@ -2929,9 +2963,9 @@ supported:
   - triu_
   - triu_indices
   - triu_indices.out
-  - true_divide.out
   - true_divide.Scalar
   - true_divide.Tensor
+  - true_divide.out
   - true_divide_.Scalar
   - true_divide_.Tensor
   - trunc
@@ -3065,7 +3099,7 @@ supported:
   - zeros.out
   - zeros_like
   - zeros_like.out
-# autograd:
+autograd:
   - cdist
   - lstm.input
   - gru.input
