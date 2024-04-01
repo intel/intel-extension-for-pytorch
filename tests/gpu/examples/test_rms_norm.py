@@ -39,7 +39,7 @@ class TestNNMethod(TestCase):
                 input_case = input_case.xpu()
                 w = model.weight.xpu()
                 output = torch.ops.torch_ipex.rms_norm(input_case, [hsz], w, 1e-5)
-                output1 = ipex.llm.modules.RMSNorm.apply(input_case, w, 1e-5)
+                output1 = ipex.llm.functional.rms_norm(input_case, w, 1e-5)
                 # diff = (output.cpu() - output_ref).abs().max().item()
                 # print('diff', diff)
                 # assert diff < 1e-2
