@@ -14,6 +14,17 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
+template <typename scalar_t>
+bool is_lerp_weight_small(scalar_t weight) {
+  return std::abs(weight) < scalar_t(0.5);
+}
+
+template <typename scalar_t>
+bool is_lerp_weight_small(c10::complex<scalar_t> weight) {
+  // Avoid the sqrt in abs(weight)
+  return (weight.real() * weight.real() + weight.imag() * weight.imag()) <
+      scalar_t(0.25);
+}
 template <typename scalar_t, typename opmath_t>
 struct lerp_tensor_kernel_functor {
   scalar_t operator()(scalar_t self_val, scalar_t end_val, scalar_t weight_val)
@@ -21,9 +32,9 @@ struct lerp_tensor_kernel_functor {
     opmath_t self_val_f = self_val;
     opmath_t end_val_f = end_val;
     opmath_t weight_val_f = weight_val;
-    return (Numerics<scalar_t>::abs(weight_val_f) < 0.5f)
+    return (is_lerp_weight_small(weight_val_f))
         ? self_val_f + weight_val_f * (end_val_f - self_val_f)
-        : end_val_f - (end_val_f - self_val_f) * (opmath_t{1} - weight_val_f);
+        : end_val_f - (end_val_f - self_val_f) * (opmath_t(1) - weight_val_f);
   }
 };
 
@@ -45,9 +56,9 @@ struct LerpScalarKernelFunctor {
   scalar_t operator()(scalar_t self_val, scalar_t end_val) const {
     opmath_t self_val_f = self_val;
     opmath_t end_val_f = end_val;
-    return (Numerics<scalar_t>::abs(weight_val) < 0.5f)
+    return (is_lerp_weight_small(weight_val))
         ? self_val_f + weight_val * (end_val_f - self_val_f)
-        : end_val_f - (end_val_f - self_val_f) * (opmath_t{1} - weight_val);
+        : end_val_f - (end_val_f - self_val_f) * (opmath_t(1) - weight_val);
   }
 
   LerpScalarKernelFunctor(opmath_t weight_val_) : weight_val(weight_val_) {}

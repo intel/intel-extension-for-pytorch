@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/AdaptivePooling.h>
 #include <ATen/native/Pool.h>
 
@@ -49,7 +50,7 @@ struct AdaptiveAvgPool2dKernelFunctor {
       int64_t _ib = _ob;
       int64_t _ic = _oc;
 
-      accscalar_t sum = 0;
+      accscalar_t sum = static_cast<accscalar_t>(0);
       for (int _ih = _ih0; _ih < _ih1; _ih++) {
         for (int _iw = _iw0; _iw < _iw1; _iw++) {
           if constexpr (is_quantized) {
@@ -259,8 +260,8 @@ void adaptive_avg_pool2d_out_template(
        1. 3D: Input (C, H, W),  Output (C, H0, W0), Kernel (kH, kW)
        This case does not support channel last format. For a 3-dim tensor,
        the suggest_memory_format can only be Contiguous or ChannelsLast1D
-       (nwc), the ChannelsLast1D (nwc) does not match the sementics of Input (C,
-       H, W) case. Then the suggest_memory_format can only be Contiguous.
+       (nwc), the ChannelsLast1D (nwc) does not match the sementics of Input
+       (C, H, W) case. Then the suggest_memory_format can only be Contiguous.
        2. 4D: Input (N, C, H, W),  Output (N, C, H0, W0), Kernel (kH, kW)
        This case supports Contiguous and ChannelsLast2D memory_format. */
     xpu::oneDNN::pooling<xpu::oneDNN::alg::pooling_avg_exclude_padding>(
@@ -315,7 +316,7 @@ void adaptive_avg_pool2d_out_template(
           input_.scalar_type(),
           "aten::adaptive_avg_pool2d",
           [&]() {
-            using accscalar_t = acc_type<scalar_t>;
+            using accscalar_t = at::opmath_type<scalar_t>;
             auto iacc = input_.packed_accessor64<scalar_t, 4>();
             auto oacc = output.packed_accessor64<scalar_t, 4>();
             if (is_smf_channels_last(output)) {
@@ -752,7 +753,7 @@ void adaptive_avg_pool2d_backward_out_template(
         gradOutput_.scalar_type(),
         "aten::adaptive_avg_pool2d_backward",
         [&]() {
-          using accscalar_t = acc_type<scalar_t>;
+          using accscalar_t = at::opmath_type<scalar_t>;
           auto gyacc = gradOutput_.packed_accessor64<scalar_t, 4>();
           auto gxacc = gradInput.packed_accessor64<scalar_t, 4>();
 

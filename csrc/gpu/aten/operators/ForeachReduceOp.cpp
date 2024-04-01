@@ -66,9 +66,9 @@ struct LpNormFunctor {
         load_store(r_x, x, 0, i_start);
 #pragma unroll
         for (int ii = 0; ii < kILP; ii++) {
-          T next = r_x[ii];
+          opmath_t next = static_cast<opmath_t>(r_x[ii]);
           vals[ii] += NormType == 1
-              ? static_cast<opmath_t>(Numerics<T>::fabs(next))
+              ? static_cast<opmath_t>(Numerics<opmath_t>::fabs(next))
               : static_cast<opmath_t>(next * next);
         }
       }
@@ -79,9 +79,9 @@ struct LpNormFunctor {
         for (int ii = 0; ii < kILP; ii++) {
           int i = i_start + item_idx + ii * item_range;
           if (i < n && i < chunk_size) {
-            T next = r_x[ii];
+            opmath_t next = static_cast<opmath_t>(r_x[ii]);
             vals[ii] += NormType == 1
-                ? static_cast<opmath_t>(Numerics<T>::fabs(next))
+                ? static_cast<opmath_t>(Numerics<opmath_t>::fabs(next))
                 : static_cast<opmath_t>(next * next);
           }
         }
@@ -102,7 +102,7 @@ struct LpNormFunctor {
   }
 };
 
-template <typename T, int NormType, typename opmath_t = acc_type<T>>
+template <typename T, int NormType, typename opmath_t = at::opmath_type<T>>
 struct lpnormChunkReduceKernelFunctor {
   void operator()(sycl::nd_item<1> item_id) const {
     auto lid = item_id.get_local_linear_id();
@@ -138,7 +138,7 @@ struct lpnormChunkReduceKernelFunctor {
   int wg_size;
 };
 
-template <typename T, int NormType, typename opmath_t = acc_type<T>>
+template <typename T, int NormType, typename opmath_t = at::opmath_type<T>>
 void lpnorm_chunk_reduce_kernel(
     const opmath_t* output_per_tensor,
     T* ret_per_tensor,
@@ -203,7 +203,7 @@ std::vector<Tensor> _foreach_norm(TensorList tensors, const Scalar& ord) {
         tensor_lists[0][0].scalar_type(),
         "foreach_norm",
         [&]() {
-          using opmath_t = acc_type<scalar_t>;
+          using opmath_t = typename at::opmath_type<scalar_t>;
           // sum temp val for each chunk
           multi_tensor_apply<1>(
               tensor_lists,
@@ -224,7 +224,7 @@ std::vector<Tensor> _foreach_norm(TensorList tensors, const Scalar& ord) {
         tensor_lists[0][0].scalar_type(),
         "foreach_norm",
         [&]() {
-          using opmath_t = acc_type<scalar_t>;
+          using opmath_t = typename at::opmath_type<scalar_t>;
           multi_tensor_apply<1>(
               tensor_lists,
               LpNormFunctor<scalar_t, 2>(),

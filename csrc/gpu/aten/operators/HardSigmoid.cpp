@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
 #include <core/Memory.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
@@ -21,9 +22,7 @@ template <typename scalar_t, typename accscalar_t>
 struct hardsigmoid_out_functor {
   scalar_t operator()(scalar_t self_val) const {
     accscalar_t x = static_cast<accscalar_t>(self_val);
-    return Numerics<accscalar_t>::min(
-               Numerics<accscalar_t>::max(x + three, zero), six) *
-        one_sixth;
+    return std::min(std::max(x + three, zero), six) * one_sixth;
   }
 
   hardsigmoid_out_functor(
@@ -49,10 +48,10 @@ Tensor& hardsigmoid_out(const Tensor& self, Tensor& out) {
         IPEX_DISPATCH_FLOATING_TYPES_AND2(
             at::ScalarType::Half,
             at::ScalarType::BFloat16,
-            iter.common_dtype(),
+            iter.dtype(),
             "hardsigmoid_out",
             [&]() {
-              using accscalar_t = acc_type<scalar_t>;
+              using accscalar_t = at::opmath_type<scalar_t>;
               const accscalar_t zero(0.0f);
               const accscalar_t one_sixth(1.0f / 6.0f);
               const accscalar_t three(3.0f);
@@ -106,7 +105,7 @@ Tensor& hardsigmoid_backward_out(
       self.scalar_type(),
       "hardsigmoid_backward_out",
       [&]() {
-        using accscalar_t = acc_type<scalar_t>;
+        using accscalar_t = at::opmath_type<scalar_t>;
         const accscalar_t zero(0.0f);
         const accscalar_t three(3.0f);
         const accscalar_t neg_three(-3.0f);

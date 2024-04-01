@@ -20,7 +20,7 @@ namespace AtenIpexTypeXPU {
 template <typename scalar_t>
 struct sqrt_kernel_xpu_functor {
   scalar_t operator()(scalar_t a) const {
-    return Numerics<scalar_t>::sqrt(a);
+    return std::sqrt(a);
   }
 };
 

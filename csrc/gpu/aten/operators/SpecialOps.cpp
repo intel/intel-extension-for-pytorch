@@ -1,6 +1,8 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
+
 #include <core/Generator.h>
 #include <core/Memory.h>
 #include <runtime/Utils.h>
@@ -41,7 +43,7 @@ Tensor& i0_out(const Tensor& self, Tensor& out) {
       iter.common_dtype(),
       "i0_out",
       [&]() {
-        using accscalar_t = acc_type<scalar_t>;
+        using accscalar_t = at::opmath_type<scalar_t>;
         i0_out_functor<scalar_t, accscalar_t> f;
         dpcpp_kernel_for_tensor_iter(iter, f);
       });
@@ -84,7 +86,7 @@ Tensor& special_i0e_out(const Tensor& self, Tensor& out) {
       iter.common_dtype(),
       "i0e",
       [&]() {
-        using accscalar_t = acc_type<scalar_t>;
+        using accscalar_t = at::opmath_type<scalar_t>;
         special_i0e_out_functor<scalar_t, accscalar_t> f;
         dpcpp_kernel_for_tensor_iter(iter, f);
       });

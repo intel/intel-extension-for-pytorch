@@ -1,4 +1,5 @@
 #include <ATen/Context.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/PointwiseOps.h>
 #include <ATen/native/TensorIterator.h>
 
@@ -15,14 +16,16 @@ namespace impl {
 
 template <typename scalar_t>
 struct addcmul_kernel_functor {
+  using opmath_t = at::opmath_type<scalar_t>;
   scalar_t operator()(scalar_t a, scalar_t b, scalar_t c) const {
-    return a + alpha * b * c;
+    return static_cast<opmath_t>(a) +
+        alpha * static_cast<opmath_t>(b) * static_cast<opmath_t>(c);
   }
 
-  addcmul_kernel_functor(scalar_t alpha) : alpha(alpha) {}
+  addcmul_kernel_functor(opmath_t alpha) : alpha(alpha) {}
 
  private:
-  scalar_t alpha;
+  opmath_t alpha;
 };
 
 static void addcmul_kernel(TensorIterator& iter, Scalar value) {
@@ -32,7 +35,8 @@ static void addcmul_kernel(TensorIterator& iter, Scalar value) {
       iter.dtype(),
       "addcmul_dpcpp",
       [&]() {
-        auto alpha = value.to<scalar_t>();
+        using opmath_t = at::opmath_type<scalar_t>;
+        auto alpha = value.to<opmath_t>();
         addcmul_kernel_functor<scalar_t> f(alpha);
         dpcpp_kernel_for_tensor_iter(iter, f);
       });
@@ -40,14 +44,16 @@ static void addcmul_kernel(TensorIterator& iter, Scalar value) {
 
 template <typename scalar_t>
 struct addcdiv_kernel_functor {
+  using opmath_t = at::opmath_type<scalar_t>;
   scalar_t operator()(scalar_t a, scalar_t b, scalar_t c) const {
-    return a + alpha * (b / c);
+    return static_cast<opmath_t>(a) +
+        alpha * (static_cast<opmath_t>(b) / static_cast<opmath_t>(c));
   }
 
-  addcdiv_kernel_functor(scalar_t alpha) : alpha(alpha) {}
+  addcdiv_kernel_functor(opmath_t alpha) : alpha(alpha) {}
 
  private:
-  scalar_t alpha;
+  opmath_t alpha;
 };
 
 static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
@@ -57,7 +63,8 @@ static void addcdiv_kernel(TensorIterator& iter, Scalar value) {
       iter.dtype(),
       "addcdiv_dpcpp",
       [&]() {
-        auto alpha = value.to<scalar_t>();
+        using opmath_t = at::opmath_type<scalar_t>;
+        auto alpha = value.to<opmath_t>();
         addcdiv_kernel_functor<scalar_t> f(alpha);
         dpcpp_kernel_for_tensor_iter(iter, f);
       });

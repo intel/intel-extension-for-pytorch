@@ -1,4 +1,6 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
+
 #include <core/Memory.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
@@ -21,8 +23,9 @@ namespace AtenIpexTypeXPU {
 template <typename scalar_t>
 struct sigmoid_out_functor {
   scalar_t operator()(scalar_t a) const {
-    scalar_t one = (scalar_t)1.0;
-    return one / (one + Numerics<scalar_t>::exp(-static_cast<scalar_t>(a)));
+    using opmath_t = at::opmath_type<scalar_t>;
+    const auto one = opmath_t{1.0};
+    return one / (one + Numerics<opmath_t>::exp(-static_cast<opmath_t>(a)));
   }
 };
 

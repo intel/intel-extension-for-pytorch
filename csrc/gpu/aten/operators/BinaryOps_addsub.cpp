@@ -1,5 +1,6 @@
 #include <ATen/Context.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/TensorIterator.h>
 
@@ -21,16 +22,17 @@ using namespace xpu::dpcpp;
 namespace at {
 namespace impl {
 
-template <typename scalar_t>
+template <typename scalar_t, typename accscalar_t>
 struct AddKernelDpcppFunctor {
-  scalar_t operator()(scalar_t a, scalar_t b) const {
+  scalar_t operator()(accscalar_t a, accscalar_t b) const {
     return a + alpha * b;
   }
 
-  AddKernelDpcppFunctor(scalar_t alpha) : alpha(alpha) {}
+  AddKernelDpcppFunctor<scalar_t, accscalar_t>(accscalar_t alpha)
+      : alpha(alpha) {}
 
  private:
-  scalar_t alpha;
+  accscalar_t alpha;
 };
 
 void add_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
@@ -41,9 +43,10 @@ void add_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
       iter.dtype(),
       "add",
       [&]() {
-        auto alpha = alpha_scalar.to<scalar_t>();
-        AddKernelDpcppFunctor<scalar_t> kfn(alpha);
-        dpcpp_fast_mode_kernel_with_scalars(iter, kfn);
+        using opmath_t = at::opmath_type<scalar_t>;
+        auto alpha = alpha_scalar.to<opmath_t>();
+        AddKernelDpcppFunctor<scalar_t, opmath_t> kfn(alpha);
+        opmath_gpu_kernel_with_scalars<scalar_t>(iter, kfn);
       });
 }
 

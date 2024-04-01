@@ -324,6 +324,9 @@ inline Tensor threshold_out(
 
 template <typename scalar_t>
 inline scalar_t relu_forward(scalar_t self) {
+  if (at::_isnan(self)) {
+    return self;
+  }
   return self > 0 ? self : static_cast<scalar_t>(0);
 }
 
@@ -374,7 +377,7 @@ inline scalar_t gelu_tanh_backward(scalar_t dy, scalar_t x) {
   auto left = opmath_t(0.5) * static_cast<opmath_t>(x);
   auto right = opmath_t(1) + tanh_inner;
 
-  auto left_derivative = 0.5 * right;
+  auto left_derivative = opmath_t(0.5) * right;
 
   auto tanh_derivative = opmath_t(1) - tanh_inner * tanh_inner;
   auto inner_derivative = kBeta * (opmath_t(1) + opmath_t(3) * kKappa * x_sq);
@@ -386,7 +389,7 @@ inline scalar_t gelu_tanh_backward(scalar_t dy, scalar_t x) {
 template <typename scalar_t>
 struct SiluOutKernelDpcppFunctor {
   scalar_t operator()(scalar_t x) const {
-    using accscalar_t = acc_type<scalar_t>;
+    using accscalar_t = at::opmath_type<scalar_t>;
     const accscalar_t one = 1.0f;
     return static_cast<accscalar_t>(x) /
         (one + Numerics<accscalar_t>::exp(-static_cast<accscalar_t>(x)));
@@ -668,10 +671,7 @@ template <typename scalar_t, typename accscalar_t>
 struct HardswishOutFunctor {
   scalar_t operator()(scalar_t self_val) const {
     accscalar_t x = static_cast<accscalar_t>(self_val);
-    return x *
-        Numerics<accscalar_t>::min(
-               Numerics<accscalar_t>::max(x + three, zero), six) *
-        one_sixth;
+    return x * std::min(std::max(x + three, zero), six) * one_sixth;
   }
 
   HardswishOutFunctor(
@@ -700,7 +700,7 @@ Tensor& hardswish_out(const Tensor& self, Tensor& result) {
             iter.dtype(),
             "hardswish",
             [&]() {
-              using accscalar_t = acc_type<scalar_t>;
+              using accscalar_t = at::opmath_type<scalar_t>;
               const accscalar_t zero(0.0f);
               const accscalar_t one_sixth(1.0f / 6.0f);
               const accscalar_t three(3.0f);
@@ -760,7 +760,7 @@ Tensor hardswish_backward(const Tensor& grad_output, const Tensor& self) {
       iter.dtype(),
       "hardswish_backward",
       [&]() {
-        using accscalar_t = acc_type<scalar_t>;
+        using accscalar_t = at::opmath_type<scalar_t>;
         const accscalar_t zero(0.0f);
         const accscalar_t three(3.0f);
         const accscalar_t neg_three(-3.0f);
@@ -899,10 +899,10 @@ Tensor& silu_out(const Tensor& self, Tensor& output) {
 template <typename scalar_t>
 struct SiluBackwardOutFunctor {
   scalar_t operator()(scalar_t dy, scalar_t x) const {
-    using accscalar_t = acc_type<scalar_t>;
+    using accscalar_t = at::opmath_type<scalar_t>;
     const accscalar_t dy_acc = static_cast<accscalar_t>(dy);
     const accscalar_t x_acc = static_cast<accscalar_t>(x);
-    const accscalar_t one = 1.0f;
+    const accscalar_t one = static_cast<accscalar_t>(1);
     const accscalar_t s_acc = one / (one + Numerics<accscalar_t>::exp(-x_acc));
     return dy_acc * s_acc * (one + x_acc * (one - s_acc));
   }
@@ -939,7 +939,7 @@ Tensor silu_backward(const Tensor& grad_output, const Tensor& output) {
 template <typename scalar_t>
 struct MishOutFunctor {
   scalar_t operator()(scalar_t self) const {
-    using accscalar_t = acc_type<scalar_t>;
+    using accscalar_t = at::opmath_type<scalar_t>;
     const accscalar_t x_acc = static_cast<accscalar_t>(self);
     return x_acc *
         Numerics<accscalar_t>::tanh(
@@ -965,7 +965,7 @@ at::Tensor& mish_out(const at::Tensor& self, at::Tensor& out) {
 template <typename scalar_t>
 struct MishBackwardFunctor {
   scalar_t operator()(scalar_t dy, scalar_t x) const {
-    using accscalar_t = acc_type<scalar_t>;
+    using accscalar_t = at::opmath_type<scalar_t>;
     const accscalar_t dy_acc = static_cast<accscalar_t>(dy);
     const accscalar_t x_acc = static_cast<accscalar_t>(x);
     const accscalar_t s_acc =

@@ -27,7 +27,7 @@ IPEX_UNARY_AND_ALL_OPS_COMMON(
 template <typename scalar_t>
 struct exp_out_functor {
   scalar_t operator()(scalar_t a) const {
-    return Numerics<scalar_t>::exp(a);
+    return std::exp(a);
   }
 };
 

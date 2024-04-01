@@ -1638,7 +1638,7 @@ template <
     typename oscalar_t,
     class BinaryFunction>
 void scan(
-    Tensor& self,
+    const Tensor& self,
     const Tensor& input,
     int dimension,
     scalar_t init,

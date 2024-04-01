@@ -309,10 +309,9 @@ Tensor& logspace_dpcpp_out(
     // skip
   } else if (steps == 1) {
     if (isComplexType(r.scalar_type())) {
-      r.fill_(Numerics<c10::complex<double>>::pow(
-          base, start.to<c10::complex<double>>()));
+      r.fill_(std::pow(base, start.to<c10::complex<double>>()));
     } else {
-      r.fill_(Numerics<double>::pow(base, start.to<double>()));
+      r.fill_(std::pow(base, start.to<double>()));
     }
   } else if (isIntegralType(r.scalar_type(), /*includeBool=*/false)) {
     IPEX_DISPATCH_INTEGRAL_TYPES(r.scalar_type(), "logspace_xpu", [&]() {
@@ -456,18 +455,6 @@ Tensor& arange_dpcpp_out(
         auto xend = end.to<accscalar_t>();
         auto xstep = step.to<accscalar_t>();
 
-        double size_d;
-        if (std::is_same<scalar_t, int64_t>::value) {
-          size_d = std::ceil(
-              static_cast<double>(
-                  end.to<accscalar_t>() - start.to<accscalar_t>()) /
-              step.to<accscalar_t>());
-        } else {
-          size_d = std::ceil(
-              static_cast<double>(end.to<double>() - start.to<double>()) /
-              step.to<double>());
-        }
-
         TORCH_CHECK(xstep > 0 || xstep < 0, "step must be nonzero");
         TORCH_CHECK(
             std::isfinite(static_cast<double>(xstart)) &&
@@ -480,7 +467,15 @@ Tensor& arange_dpcpp_out(
             ((xstep > 0) && (xend >= xstart)) ||
                 ((xstep < 0) && (xend <= xstart)),
             "upper bound and larger bound inconsistent with step sign");
-
+        double size_d;
+        if (std::is_same<scalar_t, int64_t>::value) {
+          int64_t sgn = (xstep > 0) - (xstep < 0);
+          size_d = std::ceil((xend - xstart + xstep - sgn) / xstep);
+        } else {
+          size_d = std::ceil(
+              static_cast<double>(end.to<double>() - start.to<double>()) /
+              step.to<double>());
+        }
         TORCH_CHECK(
             size_d >= 0 &&
                 size_d <=
@@ -516,8 +511,12 @@ Tensor& arange_dpcpp_out(
             (size + wgroup_size_col - 1) / wgroup_size_col;
 
         // command group functions
+        bool is_contiguous = result.is_contiguous();
+        Tensor r = !is_contiguous
+            ? at::empty_like(result, LEGACY_CONTIGUOUS_MEMORY_FORMAT)
+            : result;
         auto cgf = DPCPP_Q_CGF(cgh) {
-          auto acc = result.data_ptr<scalar_t>();
+          auto acc = r.data_ptr<scalar_t>();
           dpcpp_local_acc_t<accscalar_t> slm_xstart(1, cgh);
           dpcpp_local_acc_t<accscalar_t> slm_xstep(1, cgh);
 
@@ -534,6 +533,9 @@ Tensor& arange_dpcpp_out(
 
         // submit to DPCPP queue
         DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+        if (!is_contiguous) {
+          result.copy_(r);
+        }
       });
   return result;
 }

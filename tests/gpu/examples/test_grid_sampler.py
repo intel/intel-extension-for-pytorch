@@ -28,6 +28,9 @@ class TestTorchMethod(TestCase):
         )
         self.assertEqual(outp.cpu(), outp_xpu.cpu())
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
     def test_gridSampler_3d(self, dtype=torch.float):
         N = random.randint(2, 5)
         C = random.randint(2, 4)
