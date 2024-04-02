@@ -61,12 +61,12 @@ run:
         run: |
             source activate e2e_ci
             cd ${{ github.workspace }}
+            BENCHMARK_PINNED_COMMIT=$(cat .github/ci_commit_pins/benchmark.txt)
             cd ..
             if [ ! -d "benchmark" ]; then
                 git clone --recursive https://github.com/weishi-deng/benchmark
             fi
             cd benchmark
-            BENCHMARK_PINNED_COMMIT=$(cat .github/ci_commit_pins/benchmark.txt)
             git checkout ${BENCHMARK_PINNED_COMMIT}
             python install.py
             pip install -e .
