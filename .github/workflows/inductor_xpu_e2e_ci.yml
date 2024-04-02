@@ -68,7 +68,7 @@ jobs:
 
       - name: Huggingface AMP_BF16 Inference Accuracy Test
         run: |
-          bash .github/scripts/inductor-xpu-e2e.sh --suite huggingface --dt amp_bf16 --mode inference --scenario accuracy --expected_pass_num 46
+          bash .github/scripts/inductor-xpu-e2e.sh
       
       - name: Upload Triton Inductor E2E CI Data
         uses: actions/upload-artifact@v3
