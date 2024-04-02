@@ -50,7 +50,7 @@ runs:
             # git checkout ${TORCH_AUDIO_PIN_COMMIT} break in pinned_commit
             python setup.py install
             cd ..
-      -name: Benchmark Install
+      - name: Benchmark Install
         shell: bash
         run: |
             source activate e2e_ci
