@@ -15,9 +15,10 @@ MODE=0x03
 DPCPP_ROOT=
 ONEMKL_ROOT=
 ONECCL_ROOT=
+MPI_ROOT=
 AOT=
 if [[ $# -eq 0 ]]; then
-    echo "Usage: bash $0 <MODE> [DPCPPROOT] [MKLROOT] [CCLROOT] [AOT]"
+    echo "Usage: bash $0 <MODE> [DPCPPROOT] [MKLROOT] [CCLROOT] [MPIROOT] [AOT]"
     echo "Set MODE to 7 to install from wheel files. Set it to 3 to compile from source. When compiling from source, you need to set arguments below."
     echo "DPCPPROOT, MKLROOT and CCLROOT should be absolute or relative path to the root directory of DPC++ compiler, oneMKL and oneCCL in oneAPI Base Toolkit respectively."
     echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT."
@@ -43,6 +44,10 @@ if [[ $# -gt 0 ]]; then
     shift
 fi
 if [[ $# -gt 0 ]]; then
+    MPI_ROOT=$1
+    shift
+fi
+if [[ $# -gt 0 ]]; then
     AOT=$1
     shift
 fi
@@ -64,9 +69,10 @@ if [ $((${MODE} & 0x06)) -eq 2 ] &&
    ([ -z ${DPCPP_ROOT} ] ||
    [ -z ${ONEMKL_ROOT} ] ||
    [ -z ${ONECCL_ROOT} ] ||
+   [ -z ${MPI_ROOT} ] ||
    [ -z ${AOT} ]); then
-    echo "Source code compilation is needed. Please set arguments DPCPP_ROOT, ONEMKL_ROOT, ONECCL_ROOT and AOT."
-    echo "DPCPPROOT, MKLROOT and CCLROOT should be absolute or relative path to the root directory of DPC++ compiler, oneMKL and oneCCL in oneAPI Base Toolkit respectively."
+    echo "Source code compilation is needed. Please set arguments DPCPP_ROOT, ONEMKL_ROOT, ONECCL_ROOT, MPI_ROOT and AOT."
+    echo "DPCPPROOT, MKLROOT, CCLROOT and MPIROOT should be absolute or relative path to the root directory of DPC++ compiler, oneMKL, oneCCL and MPI in oneAPI Base Toolkit respectively."
     echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT."
     exit 2
 fi
@@ -98,7 +104,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
     TRANSFORMERS_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d transformers -k commit)
     VER_PROTOBUF=$(python tools/yaml_utils.py -f dependency_version.yml -d protobuf -k version)
-    VER_LLM_EVAL=$(python tools/yaml_utils.py -f dependency_version.yml -d llm_eval -k version)
+    VER_LM_EVAL=$(python tools/yaml_utils.py -f dependency_version.yml -d lm_eval -k version)
     VER_IPEX_MAJOR=$(grep "VERSION_MAJOR" version.txt | cut -d " " -f 2)
     VER_IPEX_MINOR=$(grep "VERSION_MINOR" version.txt | cut -d " " -f 2)
     VER_IPEX_PATCH=$(grep "VERSION_PATCH" version.txt | cut -d " " -f 2)
@@ -131,10 +137,15 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             exit 6
         fi
 
+        if [ ! -f ${MPI_ROOT}/env/vars.sh ]; then
+            echo "MPI environment ${MPI_ROOT} doesn't seem to exist."
+            exit 6
+        fi
+
         # Install PyTorch and Intel® Extension for PyTorch*
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
-        bash compile_bundle.sh ${DPCPP_ROOT} ${ONEMKL_ROOT} ${ONECCL_ROOT} ${AOT} 1
+        bash compile_bundle.sh ${DPCPP_ROOT} ${ONEMKL_ROOT} ${ONECCL_ROOT}  ${MPI_ROOT} ${AOT} 1
         cp pytorch/dist/*.whl ${WHEELFOLDER}
         cp intel-extension-for-pytorch/dist/*.whl ${WHEELFOLDER}
         cp torch-ccl/dist/*.whl ${WHEELFOLDER}
@@ -144,8 +155,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
     echo "python -m pip install cpuid accelerate datasets sentencepiece diffusers protobuf==${VER_PROTOBUF} huggingface_hub mpi4py mkl" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install lm_eval==${VER_LLM_EVAL}" >> ${AUX_INSTALL_SCRIPT}
-    
+    echo "python -m pip install lm_eval==${VER_LM_EVAL}" >> ${AUX_INSTALL_SCRIPT}
 
     # Install Transformers
     if [ -d transformers ]; then

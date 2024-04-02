@@ -1,18 +1,15 @@
 API Documentation
 #################
 
-Device-Agnostic
-***************
+General
+=======
 
 .. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
 .. autofunction:: optimize_transformers
 .. autofunction:: get_fp32_math_mode
 .. autofunction:: set_fp32_math_mode
-.. autoclass:: verbose
 
-GPU-Specific
-************
 
 Miscellaneous
 =============
@@ -43,8 +40,7 @@ Miscellaneous
 
 .. currentmodule:: intel_extension_for_pytorch.xpu.fp8.fp8
 .. autofunction:: fp8_autocast
-.. currentmodule:: intel_extension_for_pytorch.quantization
-.. autofunction:: _gptq
+
 
 Random Number Generator
 =======================
@@ -106,37 +102,3 @@ C++ API
 .. doxygenfunction:: xpu::get_queue_from_stream
 
 
-CPU-Specific
-************
-
-Miscellaneous
-=============
-
-.. currentmodule:: intel_extension_for_pytorch
-.. autofunction:: enable_onednn_fusion
-
-Quantization
-============
-
-.. automodule:: intel_extension_for_pytorch.quantization
-.. autofunction:: prepare
-.. autofunction:: convert
-
-Experimental API, introduction is avaiable at `feature page <./features/int8_recipe_tuning_api.md>`_.
-
-.. autofunction:: autotune
-
-CPU Runtime
-===========
-
-.. automodule:: intel_extension_for_pytorch.cpu.runtime
-.. autofunction:: is_runtime_ext_enabled
-.. autoclass:: CPUPool
-.. autoclass:: pin
-.. autoclass:: MultiStreamModuleHint
-.. autoclass:: MultiStreamModule
-.. autoclass:: Task
-.. autofunction:: get_core_list_of_node_id
-
-.. .. automodule:: intel_extension_for_pytorch.quantization
-..    :members:

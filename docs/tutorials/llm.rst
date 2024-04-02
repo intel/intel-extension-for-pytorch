@@ -3,7 +3,7 @@ Large Language Models (LLM) Optimizations Overview
 
 In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. LLMs have emerged as the dominant models driving these GenAI applications. Most of LLMs are GPT-like architectures that consist of multiple Decoder layers. 
 The MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound because iterative decode and kv_cache require special management to reduce memory overheads. Intel® Extension for PyTorch* provides a lot of specific optimizations for these LLMs. 
-On the operator level, the extension provides highly efficient GEMM kernel to speed up Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant and weight-only-quantization are also enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.
+On the operator level, the extension provides highly efficient GEMM kernel to speed up Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant is enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.
 
 These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.optimize_transformers()`. Check `optimize_transformers <./llm/llm_optimize_transformers.md>`_ for more details.
 
@@ -35,16 +35,10 @@ Optimized Models
      - ✅
      - ✅
      - ✅
-   * - Weight only quantzation INT4
-     - ❎
-     - ✅
-     - ❎
-     - ❎
-
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp16). For other LLMs families, we are working in progress to cover those optimizations, which will expand the model list above.
 
-Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.10%2Bxpu/examples/gpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
+Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.20%2Bxpu/examples/gpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
 
 Optimization Methodologies
 --------------------------
@@ -111,9 +105,3 @@ heavier computations and places higher requirements to the underlying
 hardware. Given that, quantization becomes a more important methodology
 for inference workloads.
 
-Intel® Extension for PyTorch\* also delivers INT4 optimizations via
-4-bit weight-only quantization (WOQ). As the name indicates, WOQ
-quantizes only weights to 4-bit integers to further improve the
-computation efficiency via saved memory bandwidth utilization. This
-technique reduces text generation latency especially from the second
-token.

@@ -1,5 +1,5 @@
-Kineto Supported Profiler Tool (Experimental)
-=============================================
+Kineto Supported Profiler Tool (Prototype)
+==========================================
 
 ## Introduction
 

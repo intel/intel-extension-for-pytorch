@@ -138,7 +138,7 @@ mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchma
 
 ## Advanced Usage
 
-### Weight only quantization with low precision checkpoint (Experimental)
+### Weight only quantization with low precision checkpoint (Prototype)
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 may result in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset for specified tasks by such algorithms. The results are saved as a `state_dict` in a `.pt` file. We provide the script here to run GPT-J .
 

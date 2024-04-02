@@ -1,6 +1,31 @@
 Releases
 =============
 
+## 2.1.20+xpu
+
+Intel® Extension for PyTorch\* v2.1.20+xpu is a minor release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.1.0.
+
+### Highlights
+
+- Intel® oneAPI Base Toolkit 2024.1 compatibility
+- Intel® oneDNN v3.4 integration
+- LLM inference scaling optimization based on Intel® oneCCL 2021.12 (Prototype)
+- Bug fixing and other optimization
+  - Uplift XeTLA to v0.3.4.1 [#3696](https://github.com/intel/intel-extension-for-pytorch/commit/dc0f6d39739404d38226ccf444c421706f14f2de)
+  - [SDP] Fallback unsupported bias size to native impl [#3706](https://github.com/intel/intel-extension-for-pytorch/commit/d897ebd585da05a90295165584efc448e265a38d)
+  - Error handling enhancement [#3788](https://github.com/intel/intel-extension-for-pytorch/commit/bd034e7a37822f84706f0068ec85d989fb766529), [#3841](https://github.com/intel/intel-extension-for-pytorch/commit/7d4f297ecb4c076586a22908ecadf4689cb2d5ef)
+  - Fix beam search accuracy issue in workgroup reduce [#3796](https://github.com/intel/intel-extension-for-pytorch/commit/f2f20a523ee85ed1f44c7fa6465b8e5e1e2edfea)
+  - Support int32 index tensor in index operator [#3808](https://github.com/intel/intel-extension-for-pytorch/commit/f7bb4873c0416a9f56d1f7ecfbcdbe7ad58b47cd)
+  - Add deepspeed in LLM dockerfile [#3829](https://github.com/intel/intel-extension-for-pytorch/commit/6266f89833f8010d6c683f9b45cfb2031575ad92)
+  - Fix batch norm accuracy issue [#3882](https://github.com/intel/intel-extension-for-pytorch/commit/a1e2271717ff61dc3ea7d8d471c2356b3e469b93)
+  - Prebuilt wheel dockerfile update [#3887](https://github.com/intel/intel-extension-for-pytorch/commit/8d5d71522910c1f622dac6a52cb0025e469774b2#diff-022fb5910f470cc5c44ab38cb20586d014f37c06ac8f3378e146ed35ee202a46), [#3970](https://github.com/intel/intel-extension-for-pytorch/commit/54b8171940cd694ba91c928c99acc440c9993881)
+  - Fix windows build failure with Intel® oneMKL 2024.1 in torch_patches [#18](https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.1.20/torch_patches/0018-use-ONEMKL_LIBRARIES-for-mkl-libs-in-torch-to-not-ov.patch)
+  - Fix FFT core dump issue with Intel® oneMKL 2024.1 in torch_patches [#20](https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.1.20/torch_patches/0020-Hide-MKL-symbols-211-212.patch), [#21](https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.1.20/torch_patches/0021-Fix-Windows-Build-214-215.patch)
+
+### Known Issues
+
+Please refer to [Known Issues webpage](./known_issues.md).
+
 ## 2.1.10+xpu
 
 Intel® Extension for PyTorch\* v2.1.10+xpu is the new Intel® Extension for PyTorch\* release supports both CPU platforms and GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.1.0. It extends PyTorch\* 2.1.0 with up-to-date features and optimizations on `xpu` for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* `xpu` device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.
@@ -9,7 +34,7 @@ Intel® Extension for PyTorch\* v2.1.10+xpu is the new Intel® Extension for PyT
 
 This release provides the following features:
 
-- Large Language Model (LLM) optimizations for FP16 inference on Intel® Data Center GPU Max Series (Experimental): Intel® Extension for PyTorch* provides a lot of specific optimizations for LLM workloads on Intel® Data Center GPU Max Series in this release. In operator level, we provide highly efficient GEMM kernel to speedup Linear layer and customized fused operators to reduce HBM access and kernel launch overhead. To reduce memory footprint, we define a segment KV Cache policy to save device memory and improve the throughput. To better trade-off the performance and accuracy, low-precision solution e.g., weight-only-quantization for INT4 is enabled. Besides, tensor parallel can also be adopted to get lower latency for LLMs.
+- Large Language Model (LLM) optimizations for FP16 inference on Intel® Data Center GPU Max Series (Prototype): Intel® Extension for PyTorch* provides a lot of specific optimizations for LLM workloads on Intel® Data Center GPU Max Series in this release. In operator level, we provide highly efficient GEMM kernel to speedup Linear layer and customized fused operators to reduce HBM access and kernel launch overhead. To reduce memory footprint, we define a segment KV Cache policy to save device memory and improve the throughput. To better trade-off the performance and accuracy, low-precision solution e.g., weight-only-quantization for INT4 is enabled. Besides, tensor parallel can also be adopted to get lower latency for LLMs.
 
   - A new API function, `ipex.optimize_transformers`, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on LLMs. It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the `ipex.optimize_transformers` API instead of the `ipex.optimize` API to apply all optimizations transparently. More detailed information can be found at [Large Language Model optimizations overview](https://intel.github.io/intel-extension-for-pytorch/xpu/2.1.10+xpu/tutorials/llm.html).
   - A typical usage of this new feature is quite simple as below:
@@ -20,13 +45,13 @@ This release provides the following features:
     model = ipex.optimize_transformers(model, dtype=dtype)
     ```
 
-- `Torch.compile` functionality on Intel® Data Center GPU Max Series (Experimental): Extends Intel® Extension for PyTorch* capabilities to support [torch.compile](https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile) APIs on Intel® Data Center GPU Max Series. And provides Intel GPU support on top of [Triton*](https://github.com/openai/triton) compiler to reach competitive performance speed-up over eager mode by default "inductor" backend of Intel® Extension for PyTorch*.
+- `Torch.compile` functionality on Intel® Data Center GPU Max Series (Beta): Extends Intel® Extension for PyTorch* capabilities to support [torch.compile](https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile) APIs on Intel® Data Center GPU Max Series. And provides Intel GPU support on top of [Triton*](https://github.com/openai/triton) compiler to reach competitive performance speed-up over eager mode by default "inductor" backend of Intel® Extension for PyTorch*.
   
 - Intel® Arc™ A-Series Graphics on WSL2, native Windows and native Linux are officially supported in this release. Intel® Arc™ A770 Graphic card has been used as primary verification vehicle for product level test.
   
 - Other features are listed as following, more detailed information can be found in [public documentation](https://intel.github.io/intel-extension-for-pytorch/xpu/2.1.10+xpu/):
-  - FP8 datatype support (Experimental): Add basic data type and FP8 Linear operator support based on emulation kernel.
-  - Kineto Profiling (Experimental): An extension of PyTorch* profiler for profiling operators on Intel® GPU devices.
+  - FP8 datatype support (Prototype): Add basic data type and FP8 Linear operator support based on emulation kernel.
+  - Kineto Profiling (Prototype): An extension of PyTorch* profiler for profiling operators on Intel® GPU devices.
   - Fully Sharded Data Parallel (FSDP):  Support new PyTorch* [FSDP](https://pytorch.org/docs/stable/fsdp.html) API which provides an industry-grade solution for large-scale model training.
   - Asymmetric INT8 quantization: Support asymmetric quantization to align with stock PyTorch* and provide better accuracy in INT8.
 
@@ -34,7 +59,7 @@ This release provides the following features:
 
 ### Known Issues
 
-Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+Please refer to [Known Issues webpage](./known_issues.md).
 
 ## 2.0.110+xpu
 
@@ -47,7 +72,7 @@ This release introduces specific XPU solution optimizations on Intel discrete GP
 This release provides the following features:
 - oneDNN 3.3 API integration and adoption
 - Libtorch support
-- ARC support on Windows, WSL2 and Ubuntu (Experimental)
+- ARC support on Windows, WSL2 and Ubuntu (Prototype)
 - OOB models improvement
   - More fusion patterns enabled for optimizing OOB models
 - CPU support is merged in this release:
@@ -59,7 +84,7 @@ This release adds the following fusion patterns in PyTorch\* JIT mode for Intel 
 
 ### Known Issues
 
-Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+Please refer to [Known Issues webpage](./known_issues.md).
 
 ## 1.13.120+xpu
 
@@ -87,7 +112,7 @@ This release adds the following fusion patterns in PyTorch\* JIT mode for Intel 
 
 ### Known Issues
 
-Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+Please refer to [Known Issues webpage](./known_issues.md).
 
 ## 1.13.10+xpu
 
@@ -100,7 +125,7 @@ This release introduces specific XPU solution optimizations on Intel discrete GP
 This release provides the following features:
 - Distributed Training on GPU:
   - support of distributed training with DistributedDataParallel (DDP) on Intel GPU hardware
-  - support of distributed training with Horovod (experimental feature) on Intel GPU hardware
+  - support of distributed training with Horovod (prototype feature) on Intel GPU hardware
 - Automatic channels last format conversion on GPU:
   - Automatic channels last format conversion is enabled. Models using `torch.xpu.optimize` API running on Intel® Data Center GPU Max Series will be converted to channels last memory format, while models running on Intel® Data Center GPU Flex Series will choose oneDNN block format.
 - CPU support is merged in this release:
@@ -112,7 +137,7 @@ This release adds the following fusion patterns in PyTorch\* JIT mode for Intel 
 
 ### Known Issues
 
-Please refer to [Known Issues webpage](./performance_tuning/known_issues.md).
+Please refer to [Known Issues webpage](./known_issues.md).
 
 ## 1.10.200+gpu
 
@@ -228,4 +253,5 @@ This release supports the following fusion patterns in PyTorch\* JIT mode:
     ```
     
     If you continue seeing similar issues for other shared object files, add the corresponding files under ${MKL\_DPCPP\_ROOT}/lib/intel64/ by `LD_PRELOAD`. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.
+
 
