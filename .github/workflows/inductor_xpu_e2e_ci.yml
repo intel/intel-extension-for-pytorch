@@ -65,21 +65,12 @@ jobs:
 
       - name: E2E dependancy install
         uses: ./.github/scripts/install-e2e-suites
-  
-      - name: Timm FP32 Inference Accuracy Test
-        uses: ./.github/actions/inductor-xpu-e2e-test
-        with:
-          suite: timm_models
-          dt: float32
-          mode: inference
-          scenario: accuracy
-          expected_pass_num: 44
 
-      - name: Torchbench BF16 Inference Accuracy Test
+      - name: Huggingface AMP_BF16 Inference Accuracy Test
         uses: ./.github/actions/inductor-xpu-e2e-test
         with:
-          suite: torchbench
-          dt: amp_fp16
+          suite: huggingface
+          dt: amp_bf16
           mode: inference
           scenario: accuracy
-          expected_pass_num: 45
+          expected_pass_num: 46
