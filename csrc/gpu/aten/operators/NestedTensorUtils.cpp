@@ -9,7 +9,7 @@
 namespace at {
 namespace AtenIpexTypeNestedTensorXPU {
 
-std::vector<at::Tensor> unbind_int(const at::Tensor& self, int64_t dim) {
+std::vector<at::Tensor> unbind(const at::Tensor& self, int64_t dim) {
   TORCH_CHECK(
       dim == 0,
       "NestedTensor can only be unbound along dimension 0 ",
