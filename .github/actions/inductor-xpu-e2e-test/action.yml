@@ -52,7 +52,6 @@ runs:
             pip uninstall -y pyarrow pandas
             pip install pyarrow pandas
             
-            cd ${{ github.workspace }}
             cd ..
             git clone https://github.com/facebookresearch/detectron2.git
             python -m pip install -e detectron2
