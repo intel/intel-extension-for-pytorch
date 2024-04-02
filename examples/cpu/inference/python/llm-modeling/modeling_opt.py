@@ -155,16 +155,15 @@ class OPTDecoderLayer(nn.Module):
     def __init__(self, config: OPTConfig):
         super().__init__()
         self.embed_dim = config.hidden_size
-        self.eps = config.layer_norm_elementwise_affine
         self.self_attn = OPTAttention(config=config, is_decoder=True)
         self.do_layer_norm_before = config.do_layer_norm_before
         self.self_attn_layer_norm = nn.LayerNorm(
-            self.embed_dim, elementwise_affine=self.eps
+            self.embed_dim, elementwise_affine=config.layer_norm_elementwise_affine
         )
         self.fc1 = nn.Linear(self.embed_dim, config.ffn_dim, bias=config.enable_bias)
         self.fc2 = nn.Linear(config.ffn_dim, self.embed_dim, bias=config.enable_bias)
         self.final_layer_norm = nn.LayerNorm(
-            self.embed_dim, elementwise_affine=self.eps
+            self.embed_dim, elementwise_affine=config.layer_norm_elementwise_affine
         )
 
     def forward(
@@ -182,7 +181,7 @@ class OPTDecoderLayer(nn.Module):
 
         if self.do_layer_norm_before:
             # ==================== orignal path  ====================
-            hidden_states = self.self_attn_layer_norm(hidden_states)
+            # hidden_states = self.self_attn_layer_norm(hidden_states)
             # ==================== Changes to apply ipex.llm layers  ====================
             # option 1 : replace module
             # if not hasattr(self, "ipex_layernorm_1"):
@@ -196,7 +195,13 @@ class OPTDecoderLayer(nn.Module):
             # hidden_states = self.ipex_layernorm_1(hidden_states)
             #
             # option 2 : use function call
-            # hidden_states = ipex.llm.functional.fast_layer_norm(hidden_states, [self.embed_dim], self.self_attn_layer_norm.weight, self.self_attn_layer_norm.bias, self.eps)
+            hidden_states = ipex.llm.functional.fast_layer_norm(
+                hidden_states,
+                [self.embed_dim],
+                self.self_attn_layer_norm.weight,
+                self.self_attn_layer_norm.bias,
+                1e-05,
+            )
             # ==========================================================================
 
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
@@ -211,12 +216,13 @@ class OPTDecoderLayer(nn.Module):
         # ==================== Changes to apply ipex.llm layers  ====================
         if not hasattr(self, "ipex_fusion_0"):
             self.ipex_fusion_0 = ipex.llm.modules.LinearAdd(self.self_attn.out_proj)
+            del self.__dict__["_modules"]["self_attn"].out_proj
         hidden_states = self.ipex_fusion_0(hidden_states, residual)
         # ==========================================================================
 
         if not self.do_layer_norm_before:
             # ==================== orignal path  ====================
-            hidden_states = self.self_attn_layer_norm(hidden_states)
+            # hidden_states = self.self_attn_layer_norm(hidden_states)
             # ==================== Changes to apply ipex.llm layers  ====================
             # option 1 : replace module
             # if not hasattr(self, "ipex_layernorm_1"):
@@ -230,7 +236,13 @@ class OPTDecoderLayer(nn.Module):
             # hidden_states = self.ipex_layernorm_1(hidden_states)
             #
             # option 2 : use function call
-            # hidden_states = ipex.llm.functional.fast_layer_norm(hidden_states, [self.embed_dim], self.self_attn_layer_norm.weight, self.self_attn_layer_norm.bias, self.eps)
+            hidden_states = ipex.llm.functional.fast_layer_norm(
+                hidden_states,
+                [self.embed_dim],
+                self.self_attn_layer_norm.weight,
+                self.self_attn_layer_norm.bias,
+                1e-05,
+            )
             # ==========================================================================
 
         hidden_states_shape = hidden_states.shape
@@ -238,7 +250,7 @@ class OPTDecoderLayer(nn.Module):
 
         if self.do_layer_norm_before:
             # ==================== orignal path  ====================
-            hidden_states = self.final_layer_norm(hidden_states)
+            # hidden_states = self.final_layer_norm(hidden_states)
             # ==================== Changes to apply ipex.llm layers  ====================
             # option 1 : replace module
             # if not hasattr(self, "ipex_layernorm_2"):
@@ -252,7 +264,13 @@ class OPTDecoderLayer(nn.Module):
             # hidden_states = self.ipex_layernorm_2(hidden_states)
             #
             # option 2 : use function call
-            # hidden_states = ipex.llm.functional.fast_layer_norm(hidden_states, [self.embed_dim], self.final_layer_norm.weight, self.final_layer_norm.bias, self.eps)
+            hidden_states = ipex.llm.functional.fast_layer_norm(
+                hidden_states,
+                [self.embed_dim],
+                self.final_layer_norm.weight,
+                self.final_layer_norm.bias,
+                1e-05,
+            )
             # ==========================================================================
 
         # ==================== orignal path  ====================
@@ -260,6 +278,7 @@ class OPTDecoderLayer(nn.Module):
         # ==================== Changes to apply ipex.llm layers  ====================
         if not hasattr(self, "ipex_fusion_1"):
             self.ipex_fusion_1 = ipex.llm.modules.LinearRelu(self.fc1)
+            del self.__dict__["_modules"]["fc1"]
         hidden_states = self.ipex_fusion_1(hidden_states)
         # ==========================================================================
 
@@ -268,6 +287,7 @@ class OPTDecoderLayer(nn.Module):
         # ==================== Changes to apply ipex.llm layers  ====================
         if not hasattr(self, "ipex_fusion_2"):
             self.ipex_fusion_2 = ipex.llm.modules.LinearAdd(self.fc2)
+            del self.__dict__["_modules"]["fc2"]
         hidden_states = self.ipex_fusion_2(hidden_states, residual)
         # ==========================================================================
 
@@ -275,7 +295,7 @@ class OPTDecoderLayer(nn.Module):
 
         if not self.do_layer_norm_before:
             # ==================== orignal path  ====================
-            hidden_states = self.final_layer_norm(hidden_states)
+            # hidden_states = self.final_layer_norm(hidden_states)
             # ==================== Changes to apply ipex.llm layers  ====================
             # option 1 : replace module
             # if not hasattr(self, "ipex_layernorm_2"):
@@ -289,7 +309,13 @@ class OPTDecoderLayer(nn.Module):
             # hidden_states = self.ipex_layernorm_2(hidden_states)
             #
             # option 2 : use function call
-            # hidden_states = ipex.llm.functional.fast_layer_norm(hidden_states, [self.embed_dim], self.final_layer_norm.weight, self.final_layer_norm.bias, self.eps)
+            hidden_states = ipex.llm.functional.fast_layer_norm(
+                hidden_states,
+                [self.embed_dim],
+                self.final_layer_norm.weight,
+                self.final_layer_norm.bias,
+                1e-05,
+            )
             # ==========================================================================
 
         outputs = (hidden_states,)
@@ -297,8 +323,9 @@ class OPTDecoderLayer(nn.Module):
         if output_attentions:
             outputs += (self_attn_weights,)
 
-        if use_cache:
-            outputs += (present_key_value,)
+        # if use_cache:
+        # use cache always to be true for generation
+        outputs += (present_key_value,)
 
         return outputs
 
@@ -464,8 +491,9 @@ class OPTDecoder(OPTPreTrainedModel):
 
             hidden_states = layer_outputs[0]
 
-            if use_cache:
-                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+            # if use_cache:
+            # use cache always to be true for generation
+            next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
@@ -478,8 +506,8 @@ class OPTDecoder(OPTPreTrainedModel):
 
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
-
-        next_cache = next_decoder_cache if use_cache else None
+        # use cache always to be true for generation
+        next_cache = next_decoder_cache  # if use_cache else None
         if not return_dict:
             return tuple(
                 v
@@ -628,10 +656,28 @@ class IPEXOPTForCausalLM(OPTPreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+        hidden_states = outputs[0]
+        # ==================== for generation, lm head only needs last token as input  ====================
+        if (
+            hasattr(self, "config")
+            and hasattr(self.config, "lm_head_generation")
+            and self.config.lm_head_generation
+            and hidden_states.size(1) != 1
+        ):
+            hidden_states = hidden_states[:, -1:, :]
 
-        logits = self.lm_head(outputs[0]).contiguous()
+        logits = self.lm_head(hidden_states).contiguous()
 
         loss = None
+        if (
+            hasattr(self, "config")
+            and hasattr(self.config, "use_ipex_optimize")
+            and self.config.use_ipex_optimize
+        ):
+            # return dict is handled by ipex._set_optimized_model_for_generation
+            output = (logits,) + outputs[1:]
+            return (loss,) + output if loss is not None else output
+
         if not return_dict:
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
