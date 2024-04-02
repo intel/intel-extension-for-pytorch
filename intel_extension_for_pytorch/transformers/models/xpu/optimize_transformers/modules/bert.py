@@ -99,7 +99,7 @@ class NewIPEXBertSelfAttention(nn.Module):
         if self.is_decoder:
             past_key_value = (key_layer, value_layer)
 
-        context_layer = F.scaled_dot_product_attention(
+        context_layer = torch.xpu.IpexSDP_dropout(
             query_layer,
             key_layer,
             value_layer,

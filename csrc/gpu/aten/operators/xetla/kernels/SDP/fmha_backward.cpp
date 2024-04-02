@@ -3,8 +3,8 @@
 #include "../../../comm/AccumulateType.h"
 #include "../../mha.h"
 #include "fmha_backward_policy.h"
-#include "fmha_backward_utils.h"
 #include "fmha_forward_policy.h"
+#include "fmha_utils.h"
 
 namespace gpu::xetla {
 
@@ -28,9 +28,11 @@ class fmha_backward_t {
     scalar_t* K_ptr; // [B, T, N, H] -> key
     scalar_t* V_ptr; // [B, T, N, H] -> value
     scalar_t* B_ptr = nullptr; // [B, 1/N, F, T] - bias
+    uint8_t* Dp_ptr = nullptr; // [B, N, F, T] - dropout mask
     scalar_t* O_ptr; // [B, F, N, H] - output
     accum_t* L_ptr; // [B, N, F]
     accum_t* D_ptr; // [B, N, F]
+    accum_t* dQ_acc_ptr;
     // Dropout scale is computed from dropout prob
     accum_t dp_prob;
     accum_t dp_scale;
@@ -64,9 +66,11 @@ class fmha_backward_t {
         scalar_t* key,
         scalar_t* value,
         scalar_t* bias,
+        uint8_t* dropout,
         scalar_t* out,
         accum_t* l,
         accum_t* d,
+        accum_t* grad_q_tmp,
         accum_t dropout_prob,
         scalar_t* grad_query,
         scalar_t* grad_key,
@@ -89,9 +93,11 @@ class fmha_backward_t {
           K_ptr(key),
           V_ptr(value),
           B_ptr(bias),
+          Dp_ptr(dropout),
           O_ptr(out),
           L_ptr(l),
           D_ptr(d),
+          dQ_acc_ptr(grad_q_tmp),
           dp_prob(dropout_prob),
           dp_scale(1.f / (1.f - dropout_prob)),
           dQ_ptr(grad_query),
@@ -181,6 +187,8 @@ class fmha_backward_t {
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_dQi_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+  using mem_desc_dQi_acc_t =
+      mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_dKj_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_dVj_t =
@@ -206,8 +214,9 @@ class fmha_backward_t {
   using gemm_Sij_t = group::
       gemm_t<compute_policy, tile_shape_BrBc, mem_desc_Qi_t, mem_desc_Kj_T_t>;
   using matAcc_Sij_t = typename gemm_Sij_t::matAcc_t;
-  using dropout_t = dropout_fwd_t<matAcc_Sij_t::tile_elems>;
-
+  using dropout_fd_t = dropout_fwd_t<matAcc_Sij_t::tile_elems>;
+  using dp_mask_tile_desc_t = typename gemm_Sij_t::matAcc_tile_desc_t;
+  using dp_mask_tile_t = subgroup::tile_t<uint8_t, dp_mask_tile_desc_t>;
   // ======================== // Context // ======================= //
 
   /// @brief Used to store variables in the flash mha loops
@@ -236,11 +245,13 @@ class fmha_backward_t {
     mem_desc_Pij_L_T_t mem_desc_Pij_L_T;
     mem_desc_dSij_L_t mem_desc_dSij_L;
     mem_desc_dSij_L_T_t mem_desc_dSij_L_T;
-    mem_desc_dQi_t mem_desc_dQi, mem_desc_dQi_tile;
+    mem_desc_dQi_t mem_desc_dQi;
+    mem_desc_dQi_acc_t mem_desc_dQi_acc;
     mem_desc_dKj_t mem_desc_dKj;
     mem_desc_dVj_t mem_desc_dVj;
     mem_desc_dBij_t mem_desc_dBij;
-    dropout_t dropout_op;
+    mem_desc_Dp_Mask_t mem_desc_Dpij;
+    dropout_fd_t dropout_op;
 
     inline context_t() = default;
 
@@ -258,6 +269,31 @@ class fmha_backward_t {
       nbarrier_y.init_nbarrier(
           wg_size_y + sg_idx, nbarrier_role::producer_consumer);
       // softmax statistics
+    }
+
+    /// @brief Initialize update for dQ variables in the flash mha loop
+    inline void update_context_dQ(
+        const nd_item<3>& item,
+        const arguments_t& args,
+        uint32_t startF) {
+      // mem desc variables
+      uint32_t gid = item.get_group(0);
+      uint32_t bid = item.get_group(0) / args.uN;
+      uint32_t nid = item.get_group(0) % args.uN;
+      int32_t start_x = nid * args.uH;
+      uint32_t end_x = start_x + args.uH;
+      int32_t start_y = bid * args.uF + startF;
+      uint32_t end_y = start_y + kBr;
+      uint32_t boundary_y = (bid + 1) * args.uF;
+      end_y = end_y > boundary_y ? boundary_y : end_y;
+      uint32_t pitch = args.uH * args.uN;
+
+      mem_desc_dQi.init(args.dQ_ptr, {end_x, end_y, pitch}, {start_x, start_y});
+      mem_desc_dQi_acc.init(
+          args.dQ_acc_ptr,
+          {end_x, end_y, pitch},
+          {int32_t(start_x + sg_idx * kSgHm),
+           int32_t(start_y + sg_idy * kSgBr)});
     }
 
     /// @brief Initialize update for D variables in the flash mha loop
@@ -315,7 +351,11 @@ class fmha_backward_t {
       uint32_t pitch = args.uH * args.uN;
 
       mem_desc_Qi.init(args.Q_ptr, {end_x, end_y, pitch}, {start_x, start_y});
-      mem_desc_dQi.init(args.dQ_ptr, {end_x, end_y, pitch}, {start_x, start_y});
+      mem_desc_dQi_acc.init(
+          args.dQ_acc_ptr,
+          {end_x, end_y, pitch},
+          {int32_t(start_x + sg_idx * kSgHm),
+           int32_t(start_y + sg_idy * kSgBr)});
       mem_desc_dOi.init(args.dO_ptr, {end_x, end_y, pitch}, {start_x, start_y});
 
       int32_t start_x_ml = startF + sg_idy * kSgBr;
@@ -328,23 +368,33 @@ class fmha_backward_t {
           args.D_ptr,
           {args.uF, args.uB * args.uN, args.uF},
           {start_x_ml, start_y_ml});
-      mem_desc_dQi_tile.init(
-          args.dQ_ptr,
-          {end_x, end_y, pitch},
-          {int32_t(start_x + sg_idx * kSgHm),
-           int32_t(start_y + sg_idy * kSgBr)});
 
       mem_desc_Pij_L_T.init(Pij_slm, {kBr, kBc, kBr}, {0, 0});
       mem_desc_dSij_L.init(Sij_slm, {kBc, kBr, kBc}, {0, 0});
       mem_desc_dSij_L_T.init(Sij_slm, {kBr, kBc, kBr}, {0, 0});
 
       if constexpr (kIsDropout) {
-        int coord_y = startF + sg_idy * kSgBr;
-        int coord_x = startT + sg_idx * kSgBc;
-        uint64_t sg_subseq = uint64_t(coord_y) << 32 | uint64_t(coord_x);
-        uint32_t threshold = uint32_t(args.dp_prob * float(4294967296));
-        dropout_op.init(
-            args.seed, sg_subseq, args.offset, threshold, args.dp_scale);
+        if (args.Dp_ptr) {
+          int32_t start_x = startT;
+          uint32_t end_x = args.uT;
+          int32_t start_y = gid * args.uF + startF;
+          uint32_t end_y = start_y + kBr;
+          uint32_t boundary_y = (gid + 1) * args.uF;
+          end_y = end_y > boundary_y ? boundary_y : end_y;
+
+          mem_desc_Dpij.init(
+              args.Dp_ptr, {end_x, end_y, args.uT}, {start_x, start_y});
+          int32_t tile_offset_x = sg_idx * kSgBc;
+          int32_t tile_offset_y = sg_idy * kSgBr;
+          mem_desc_Dpij.update_coord(tile_offset_x, tile_offset_y);
+        } else {
+          int coord_y = startF + sg_idy * kSgBr;
+          int coord_x = startT + sg_idx * kSgBc;
+          uint64_t sg_subseq = uint64_t(coord_y) << 32 | uint64_t(coord_x);
+          uint32_t threshold = uint32_t(args.dp_prob * float(4294967296));
+          dropout_op.init(
+              args.seed, sg_subseq, args.offset, threshold, args.dp_scale);
+        }
       }
 
       if constexpr (kUseBias) {
@@ -461,13 +511,13 @@ class fmha_backward_t {
     uint32_t sg_startT = startT + ctx.sg_idx * kSgBc;
     uint32_t remainT = std::max(int(args.uT) - int(sg_startT), 0);
     if (remainT < kSgBc) {
-      tile_mask::padding_mask(matAcc_Sij, remainT);
+      tile_mask::padding_mask(*matAcc_Sij, remainT);
     }
 
     if constexpr (kIsCausal) {
       uint32_t sg_startF = startF + ctx.sg_idy * kSgBr;
       if (sg_startT + kSgBc > sg_startF) {
-        tile_mask::causal_mask(matAcc_Sij, sg_startT, sg_startF);
+        tile_mask::causal_mask(*matAcc_Sij, sg_startT, sg_startF);
       }
     }
   }
@@ -478,6 +528,7 @@ class fmha_backward_t {
   inline void softmax_fwd(
       matAcc_Sij_t* matAcc_Sij,
       matAcc_Sij_t* matAcc_Sij_drop,
+      dp_mask_tile_t* mask_in,
       const arguments_t& args) {
     using load_desc =
         subgroup::tile_desc_t<kSgBr, 1, kSgBr, 1, reg_layout::tiled>;
@@ -505,8 +556,23 @@ class fmha_backward_t {
     //   ctx.nbarrier.wait();
 
     if constexpr (kIsDropout) {
-      matAcc_Sij_drop->reg =
-          ctx.dropout_op.template process<float>(matAcc_Sij->reg);
+      if (args.Dp_ptr) {
+        using load_payload_mask_t = subgroup::mem_payload_t<
+            mem_desc_t<
+                uint8_t,
+                mem_desc_Dp_Mask_t::layout,
+                mem_desc_Dp_Mask_t::space>,
+            dp_mask_tile_desc_t,
+            subgroup::
+                msg_type_v<dp_mask_tile_desc_t, mem_desc_Dp_Mask_t::space>,
+            gpu_arch::Xe>;
+        load_payload_mask_t load_payload_mask(ctx.mem_desc_Dpij);
+        subgroup::tile_load(*mask_in, load_payload_mask);
+        matAcc_Sij_drop->reg = matAcc_Sij->reg * mask_in->reg * args.dp_scale;
+      } else {
+        matAcc_Sij_drop->reg =
+            ctx.dropout_op.template process<float>(matAcc_Sij->reg);
+      }
     } else {
       matAcc_Sij_drop->reg = matAcc_Sij->reg;
     }
@@ -565,7 +631,10 @@ class fmha_backward_t {
   using matAcc_dPij_t = typename gemm_dPij_t::matAcc_t;
   /// @brief gemm_dPij is used to compute dPij = dOi x Vj_T
   /// # [Br,H] x [H,Bc] = [Br,Bc]
-  inline void gemm_dPij(matAcc_dPij_t* matAcc_dPij, const arguments_t& args) {
+  inline void gemm_dPij(
+      matAcc_dPij_t* matAcc_dPij,
+      dp_mask_tile_t* mask_in,
+      const arguments_t& args) {
     using gemm_args_t = typename gemm_dPij_t::arguments_t;
 
     uint32_t loop_count = (args.uH + accum_step - 1) / accum_step;
@@ -582,8 +651,12 @@ class fmha_backward_t {
 
     // dropout bwd
     if constexpr (kIsDropout) {
-      matAcc_dPij->reg =
-          matAcc_dPij->reg * (1 - ctx.dropout_op.get_mask()) * args.dp_scale;
+      if (args.Dp_ptr) {
+        matAcc_dPij->reg = matAcc_dPij->reg * mask_in->reg * args.dp_scale;
+      } else {
+        matAcc_dPij->reg =
+            matAcc_dPij->reg * (1 - ctx.dropout_op.get_mask()) * args.dp_scale;
+      }
     }
   }
 
@@ -634,7 +707,7 @@ class fmha_backward_t {
     // Add bias if needed
     if constexpr (kUseBias) {
       // dSij = dBij
-      using epilogue_t = group::epilogue_t<
+      using epilogue_t = group::epilogue_write_back_t<
           group::epilogue_policy_default<gpu_arch::Xe>,
           tile_shape_BrBc,
           mem_desc_dBij_t>;
@@ -654,18 +727,6 @@ class fmha_backward_t {
       matAcc_dQi_t* matAcc_dQi,
       const arguments_t& args,
       uint32_t startT) {
-    using load_desc = gemm_dQi_t::matAcc_tile_desc_t;
-    using load_tile_t = subgroup::tile_t<scalar_t, load_desc>;
-    using load_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
-        load_desc,
-        msg_type::block_2d,
-        gpu_arch::Xe>;
-
-    load_tile_t mat_dQ_load;
-    load_payload_t load_payload(ctx.mem_desc_dQi_tile);
-    subgroup::tile_load(mat_dQ_load, load_payload);
-
     using gemm_args_t = typename gemm_dQi_t::arguments_t;
 
     uint32_t remainT = args.uT - startT;
@@ -681,7 +742,6 @@ class fmha_backward_t {
         gemm_args,
         0,
         /* nbarrier_base */ nbarrier_cnt);
-    matAcc_dQi->reg = args.sm_scale * matAcc_dQi->reg + mat_dQ_load.reg;
 
     xetla_fence<memory_kind::shared_local>();
     if constexpr (wg_size_x > 1)
@@ -740,12 +800,13 @@ class fmha_backward_t {
 
   /// @brief store raw dQi to global memory.
   inline void store_dQi(matAcc_dQi_t& matAcc_dQi, const arguments_t& args) {
-    using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
-        tile_shape_BrHm,
-        mem_desc_dQi_t>;
-    epilogue_t epilogue;
-    epilogue(ctx.g_brhm, matAcc_dQi, ctx.mem_desc_dQi);
+    using store_t = subgroup::mem_payload_t<
+        mem_desc_dQi_acc_t,
+        typename matAcc_dQi_t::tile_desc,
+        msg_type::atomic_add,
+        gpu_arch::Xe>;
+    store_t dQ_store(ctx.mem_desc_dQi_acc);
+    subgroup::tile_store(matAcc_dQi, dQ_store);
   }
 
   /// @brief store raw dKj to global memory.
@@ -816,7 +877,7 @@ class fmha_backward_t {
         D_slm + ctx.sg_idy * wg_size_x * kSgBr * sizeof(accum_t);
 
     wg_row_sum_t wg_row_sum(ctx.sg_idx, ctx.sg_idy, reducer_slm);
-    matD_store.reg = wg_row_sum(matAcc_D);
+    matD_store.reg = wg_row_sum(*matAcc_D);
 
     // store matD
     store_payload_t store_payload_D(ctx.mem_desc_Di);
@@ -825,9 +886,39 @@ class fmha_backward_t {
     }
   }
 
+  // ======================= // convert_dQ // ======================= //
+
+  /// @brief convert_dQ is used to convert dQ from fp32 to bf16
+  inline void convert_dQ(const arguments_t& args) {
+    // load matAcc_dQ
+    using load_payload_t = subgroup::mem_payload_t<
+        mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
+        typename gemm_dQi_t::matAcc_tile_desc_t,
+        msg_type::block_2d,
+        gpu_arch::Xe>;
+
+    matAcc_dQi_t matdQ_load;
+    // mat_dQi_t matdQ;
+
+    load_payload_t load_payload(ctx.mem_desc_dQi_acc);
+    subgroup::tile_load(matdQ_load, load_payload);
+
+    matdQ_load.reg *= args.sm_scale;
+
+    // subgroup::elemwise_cvt(matdQ, matdQ_load);
+
+    using epilogue_t = group::epilogue_t<
+        group::epilogue_policy_default<gpu_arch::Xe>,
+        tile_shape_BrHm,
+        mem_desc_dQi_t>;
+    epilogue_t epilogue;
+    epilogue(ctx.g_brhm, matdQ_load, ctx.mem_desc_dQi);
+  }
+
  public:
   /// @brief Gets named_barrier id consumption count.
-  /// Users query and get a named_barrier id consumption count in compile time.
+  /// Users query and get a named_barrier id consumption count in compile
+  /// time.
   /// @return The count of named barriers required.
   inline static constexpr uint32_t get_barrier_count() {
     constexpr uint32_t barrier_count_Sij = gemm_Sij_t::barrier_count;
@@ -901,13 +992,14 @@ class fmha_backward_t {
         apply_mask(&matAcc_Sij, args, startF, startT);
         // softmax_fwd
         matAcc_Sij_t matAcc_Sij_drop(0);
-        softmax_fwd(&matAcc_Sij, &matAcc_Sij_drop, args);
+        dp_mask_tile_t mask_in;
+        softmax_fwd(&matAcc_Sij, &matAcc_Sij_drop, &mask_in, args);
 
         // compute dVj
         gemm_dVj(&matAcc_dVj, args, startF);
         // compute dPij
         matAcc_dPij_t matAcc_dPij(0);
-        gemm_dPij(&matAcc_dPij, args);
+        gemm_dPij(&matAcc_dPij, &mask_in, args);
 
         // softmax_bwd
         matAcc_Sij_t matAcc_dSij(0);
@@ -925,6 +1017,11 @@ class fmha_backward_t {
       store_dKj(matAcc_dKj, args);
       store_dVj(matAcc_dVj, args);
     }
+
+    for (uint32_t startF = 0; startF < args.uF; startF += kBr) {
+      ctx.update_context_dQ(item, args, startF);
+      convert_dQ(args);
+    }
   }
 }; // fmha_backward_t
 
@@ -940,9 +1037,11 @@ struct FmhaBackwardKernelFunctor {
         key,
         value,
         bias,
+        dropout,
         out,
         (accscalar_t*)log_sumexp,
         (accscalar_t*)workspace,
+        (accscalar_t*)grad_q_tmp,
         (accscalar_t)dropout_prob,
         grad_query,
         grad_key,
@@ -970,9 +1069,11 @@ struct FmhaBackwardKernelFunctor {
       T* key_,
       T* value_,
       T* bias_,
+      uint8_t* dropout_,
       T* out_,
       void* log_sumexp_,
       void* workspace_,
+      void* grad_q_tmp_,
       float dropout_prob_,
       T* grad_query_,
       T* grad_key_,
@@ -995,9 +1096,11 @@ struct FmhaBackwardKernelFunctor {
         key(key_),
         value(value_),
         bias(bias_),
+        dropout(dropout_),
         out(out_),
         log_sumexp(log_sumexp_),
         workspace(workspace_),
+        grad_q_tmp(grad_q_tmp_),
         dropout_prob(dropout_prob_),
         grad_query(grad_query_),
         grad_key(grad_key_),
@@ -1022,9 +1125,11 @@ struct FmhaBackwardKernelFunctor {
   T* key;
   T* value;
   T* bias;
+  uint8_t* dropout;
   T* out;
   void* log_sumexp;
   void* workspace;
+  void* grad_q_tmp;
   float dropout_prob;
   T* grad_query;
   T* grad_key;
@@ -1058,9 +1163,11 @@ void xetla_fmha_backward_kernel(
     T* key,
     T* value,
     T* bias,
+    uint8_t* dropout,
     T* out,
     void* log_sumexp,
     void* workspace,
+    void* grad_q_tmp,
     float alpha,
     float dropout_prob,
     T* grad_query,
@@ -1109,9 +1216,11 @@ void xetla_fmha_backward_kernel(
         key,
         value,
         bias,
+        dropout,
         out,
         log_sumexp,
         workspace,
+        grad_q_tmp,
         dropout_prob,
         grad_query,
         grad_key,
@@ -1142,9 +1251,11 @@ void xetla_fmha_backward_kernel(
       key,                                                                 \
       value,                                                               \
       bias,                                                                \
+      dropout,                                                             \
       out,                                                                 \
       log_sumexp,                                                          \
       workspace,                                                           \
+      grad_q_tmp,                                                          \
       alpha,                                                               \
       dropout_prob,                                                        \
       grad_query,                                                          \
@@ -1176,9 +1287,11 @@ void fmha_backward_kernel_policy(
     T* key,
     T* value,
     T* bias,
+    uint8_t* dropout,
     T* out,
     void* log_sumexp,
     void* workspace,
+    void* grad_q_tmp,
     float alpha,
     float dropout_prob,
     T* grad_query,
@@ -1197,7 +1310,7 @@ void fmha_backward_kernel_policy(
     uint64_t seed = 0,
     uint64_t offset = 123) {
   if (head_size <= 64) {
-    CALL_IMPL_FUNC(fmha_bwd_policy_64x64x64);
+    CALL_IMPL_FUNC(fmha_bwd_policy_128x128x64);
   } else if (head_size <= 128) {
     CALL_IMPL_FUNC(fmha_bwd_policy_128x128x128);
   } else if (head_size <= 256) {
@@ -1219,9 +1332,11 @@ void dispatch_fmha_backward(
     T* key,
     T* value,
     T* bias,
+    uint8_t* dropout,
     T* out,
     void* log_sumexp,
     void* workspace,
+    void* grad_q_tmp,
     float alpha,
     float dropout_prob,
     T* grad_query,
@@ -1246,9 +1361,11 @@ void dispatch_fmha_backward(
       key,
       value,
       bias,
+      dropout,
       out,
       log_sumexp,
       workspace,
+      grad_q_tmp,
       alpha,
       dropout_prob,
       grad_query,
@@ -1277,9 +1394,11 @@ void dispatch_fmha_backward(
     T* key,
     T* value,
     T* bias,
+    uint8_t* dropout,
     T* out,
     void* log_sumexp,
     void* workspace,
+    void* grad_q_tmp,
     float alpha,
     float dropout_prob,
     T* grad_query,
@@ -1307,9 +1426,11 @@ void dispatch_fmha_backward(
         key,
         value,
         bias,
+        dropout,
         out,
         log_sumexp,
         workspace,
+        grad_q_tmp,
         alpha,
         dropout_prob,
         grad_query,
@@ -1336,9 +1457,11 @@ void dispatch_fmha_backward(
         key,
         value,
         bias,
+        dropout,
         out,
         log_sumexp,
         workspace,
+        grad_q_tmp,
         alpha,
         dropout_prob,
         grad_query,
@@ -1368,9 +1491,11 @@ void fmha_backward_kernel_impl(
     T* key,
     T* value,
     T* bias,
+    uint8_t* dropout,
     T* out,
     void* log_sumexp,
     void* workspace,
+    void* grad_q_tmp,
     float alpha,
     float dropout_prob,
     T* grad_query,
@@ -1399,9 +1524,11 @@ void fmha_backward_kernel_impl(
       key,
       value,
       bias,
+      dropout,
       out,
       log_sumexp,
       workspace,
+      grad_q_tmp,
       alpha,
       dropout_prob,
       grad_query,
@@ -1433,9 +1560,11 @@ void fmha_backward_kernel(
     void* key,
     void* value,
     void* bias,
+    void* dropout,
     void* out,
     void* log_sumexp,
     void* workspace,
+    void* grad_q_tmp,
     float alpha,
     float dropout_prob,
     void* grad_query,
@@ -1463,9 +1592,11 @@ void fmha_backward_kernel(
         (fp16*)key,
         (fp16*)value,
         (fp16*)bias,
+        (uint8_t*)dropout,
         (fp16*)out,
         log_sumexp,
         workspace,
+        grad_q_tmp,
         alpha,
         dropout_prob,
         (fp16*)grad_query,
@@ -1493,9 +1624,11 @@ void fmha_backward_kernel(
         (bf16*)key,
         (bf16*)value,
         (bf16*)bias,
+        (uint8_t*)dropout,
         (bf16*)out,
         log_sumexp,
         workspace,
+        grad_q_tmp,
         alpha,
         dropout_prob,
         (bf16*)grad_query,
