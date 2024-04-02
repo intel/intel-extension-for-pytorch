@@ -23,9 +23,17 @@ IPEX_OUT_ALL_UNARY_FUNC_OPS(floor_out, Numerics<scalar_t>::floor, Real);
 IPEX_OUT_ALL_UNARY_FUNC_OPS(ceil_out, Numerics<scalar_t>::ceil, Real);
 
 template <typename scalar_t>
+static inline scalar_t nearbyint_wrapper(scalar_t a) {
+  return static_cast<scalar_t>(::nearbyintf(static_cast<float>(a)));
+}
+static inline double nearbyint_wrapper(double a) {
+  return ::nearbyint(a);
+}
+
+template <typename scalar_t>
 struct round_out_functor {
   scalar_t operator()(scalar_t a) const {
-    return std::nearbyintf(static_cast<float>(a));
+    return nearbyint_wrapper(a);
   }
 };
 

@@ -20,7 +20,8 @@ namespace impl {
 
 template <typename scalar_t>
 struct DivKernelDpcppFunctor {
-  scalar_t operator()(scalar_t a, scalar_t b) const {
+  using opmath_t = at::opmath_type<scalar_t>;
+  scalar_t operator()(opmath_t a, opmath_t b) const {
     return a / b;
   }
 };

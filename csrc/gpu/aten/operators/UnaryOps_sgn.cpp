@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
@@ -37,8 +38,7 @@ struct sign_out_functor {
 template <typename scalar_t>
 struct sign_out_functor_2 {
   scalar_t operator()(scalar_t a) const {
-    scalar_t zero = scalar_t(0);
-    return (zero < a) - (a < zero);
+    return c10::signum(a);
   }
 };
 

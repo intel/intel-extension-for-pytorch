@@ -559,6 +559,9 @@ Tensor& randperm_out(
   TORCH_CHECK(n >= 0, "n must be non-negative, got", n);
   check_supported_max_int_with_precision(n, result);
   result.resize_({n});
+  if (n == 0) {
+    return result;
+  }
   IPEX_DISPATCH_ALL_TYPES_AND(
       at::ScalarType::Half, result.scalar_type(), "randperm", [&]() -> void {
         AtenIpexTypeXPU::impl::randperm_dpcpp<scalar_t>(result, n, generator);

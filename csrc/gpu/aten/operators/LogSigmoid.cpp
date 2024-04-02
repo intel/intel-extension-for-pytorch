@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
@@ -13,11 +14,12 @@ namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
 struct log_sigmoid_forward_out_functor {
-  scalar_t operator()(scalar_t x) const {
-    const scalar_t max = Numerics<scalar_t>::max(0, -x);
-    const scalar_t z =
-        Numerics<scalar_t>::exp(-max) + Numerics<scalar_t>::exp(-x - max);
-    return -(max + Numerics<scalar_t>::log(z));
+  scalar_t operator()(scalar_t x_) const {
+    using opmath_t = at::opmath_type<scalar_t>;
+    const opmath_t x = x_;
+    const auto min = std::min(opmath_t(0), x);
+    const auto z = std::exp(-std::abs(x));
+    return min - std::log1p(z);
   }
 };
 
@@ -36,7 +38,7 @@ std::tuple<Tensor&, Tensor&> log_sigmoid_forward_out(
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
-      iter.dtype(),
+      iter.common_dtype(),
       "log_sigmoid_forward",
       [&]() {
         log_sigmoid_forward_out_functor<scalar_t> f;
@@ -57,17 +59,16 @@ std::tuple<Tensor, Tensor> log_sigmoid_forward(const Tensor& self) {
 
 template <typename scalar_t>
 struct log_sigmoid_backward_out_functor {
-  scalar_t operator()(scalar_t grad_output, scalar_t x) const {
-    const scalar_t max = Numerics<scalar_t>::max(0, -x);
-    const scalar_t z =
-        Numerics<scalar_t>::exp(-max) + Numerics<scalar_t>::exp(-x - max);
-    scalar_t max_deriv = 0.f;
-    scalar_t sign = -1.f;
-    if (x < 0.f) {
-      max_deriv = -1.f;
-      sign = 1.f;
-    }
-    return grad_output * (-max_deriv - sign * ((z - 1.f) / z));
+  scalar_t operator()(scalar_t grad_output_, scalar_t x_) const {
+    using opmath_t = at::opmath_type<scalar_t>;
+    const opmath_t x = x_;
+    const opmath_t grad_output = grad_output_;
+
+    auto in_negative = x < opmath_t(0);
+    auto max_deriv = in_negative ? opmath_t(1) : opmath_t(0);
+    auto sign = in_negative ? opmath_t(1) : -opmath_t(1);
+    const auto z = std::exp(-std::abs(x));
+    return grad_output * (max_deriv - sign * (z / (opmath_t(1) + z)));
   }
 };
 
@@ -89,7 +90,10 @@ Tensor& log_sigmoid_backward_out(
                   .build();
 
   IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16, iter.dtype(), "log_sigmoid_backward", [&]() {
+      at::ScalarType::BFloat16,
+      iter.common_dtype(),
+      "log_sigmoid_backward",
+      [&]() {
         log_sigmoid_backward_out_functor<scalar_t> f;
         dpcpp_kernel_for_tensor_iter(iter, f);
       });

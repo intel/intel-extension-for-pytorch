@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
@@ -16,7 +17,8 @@ namespace AtenIpexTypeXPU {
 
 template <typename scalar_t, typename accscalar_t>
 struct softplus_out_functor {
-  scalar_t operator()(accscalar_t a) const {
+  scalar_t operator()(scalar_t a_) const {
+    accscalar_t a = static_cast<accscalar_t>(a_);
     return scalar_t(
         a * b > t
             ? a
@@ -43,7 +45,7 @@ Tensor& softplus_out(
       iter.dtype(),
       "softplus_forward",
       [&]() {
-        using accscalar_t = acc_type<scalar_t>;
+        using accscalar_t = at::opmath_type<scalar_t>;
         auto b = beta.to<accscalar_t>();
         auto t = threshold.to<accscalar_t>();
         softplus_out_functor<scalar_t, accscalar_t> f(b, t);
@@ -61,20 +63,21 @@ Tensor softplus(
   return at::AtenIpexTypeXPU::softplus_out(self, beta, threshold, out);
 }
 
-template <typename scalar_t>
+template <typename scalar_t, typename opmath_t>
 struct softplus_backward_out_functor {
   scalar_t operator()(scalar_t grad_output_data, scalar_t output_data) const {
-    scalar_t beta_out = b * output_data;
-    scalar_t exp_bo = Numerics<scalar_t>::exp(beta_out);
-    return beta_out > t ? grad_output_data
-                        : grad_output_data * exp_bo / (exp_bo + 1);
+    opmath_t beta_out = b * static_cast<opmath_t>(output_data);
+    opmath_t exp_bo = std::exp(beta_out);
+    return beta_out > t ? static_cast<opmath_t>(grad_output_data)
+                        : static_cast<opmath_t>(grad_output_data) * exp_bo /
+            (exp_bo + opmath_t(1.));
   }
 
-  softplus_backward_out_functor(scalar_t b, scalar_t t) : b(b), t(t) {}
+  softplus_backward_out_functor(opmath_t b, opmath_t t) : b(b), t(t) {}
 
  private:
-  scalar_t b;
-  scalar_t t;
+  opmath_t b;
+  opmath_t t;
 };
 
 Tensor& softplus_backward_out(
@@ -91,9 +94,10 @@ Tensor& softplus_backward_out(
       iter.dtype(),
       "softplus_backward",
       [&]() {
-        auto b = beta.to<scalar_t>();
-        auto t = threshold.to<scalar_t>();
-        softplus_backward_out_functor<scalar_t> f(b, t);
+        using opmath_t = at::opmath_type<scalar_t>;
+        auto b = beta.to<opmath_t>();
+        auto t = threshold.to<opmath_t>();
+        softplus_backward_out_functor<scalar_t, opmath_t> f(b, t);
         dpcpp_kernel_for_tensor_iter(iter, f);
       });
 
