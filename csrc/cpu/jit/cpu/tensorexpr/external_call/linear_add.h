@@ -45,9 +45,9 @@ struct LoweringFuncTrait<LinearFusedOp::kLinearAdd>
     constexpr int act_idx = 0; // Activation tensor
     constexpr int accumu_idx = 1; // Accumulation tensor
     constexpr int ctx_idx = 3; // Linear context
-    res.push_back(c10::get<pytnnc::BufHandle>(inputs[act_idx]));
-    res.push_back(c10::get<pytnnc::BufHandle>(inputs[accumu_idx]));
-    res.push_back(c10::get<pytnnc::BufHandle>(inputs[ctx_idx]));
+    res.push_back(std::get<pytnnc::BufHandle>(inputs[act_idx]));
+    res.push_back(std::get<pytnnc::BufHandle>(inputs[accumu_idx]));
+    res.push_back(std::get<pytnnc::BufHandle>(inputs[ctx_idx]));
     return res;
   }
 
@@ -71,7 +71,7 @@ struct LoweringFuncTrait<LinearFusedOp::kLinearAdd>
     //     2: alpha
     //     3: linear op context
     constexpr int res_idx = 1;
-    return c10::get<pytnnc::BufHandle>(inputs[res_idx]);
+    return std::get<pytnnc::BufHandle>(inputs[res_idx]);
   }
 
   static ideep::attr_t get_attr(int64_t* extra_args) {

@@ -135,9 +135,12 @@ void insertPrePackedConvOp(Block* b) {
           continue;
         }
         const auto dtype = weight_tensor_type->scalarType();
-        if (dtype.has_value() && *dtype == at::ScalarType::BFloat16 &&
-            !ideep::has_bf16_type_support()) {
-          continue;
+        if (dtype.has_value()) {
+          if (*dtype == at::ScalarType::BFloat16 &&
+              !ideep::has_bf16_type_support())
+            continue;
+          if (*dtype == at::ScalarType::Half && !ideep::has_fp16_type_support())
+            continue;
         }
         bool w_is_channels_last = false;
         if (constant_as<at::Tensor>(n->namedInput("weight")).has_value()) {

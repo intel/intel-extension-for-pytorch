@@ -307,7 +307,7 @@ class ConcatLinearLayers {
 };
 } // namespace
 
-TORCH_API bool FrozenConcatLinear(
+bool FrozenConcatLinear(
     std::shared_ptr<Graph>& graph,
     std::unordered_set<Node*>& aten_linear) {
   ConcatLinearLayers concatLayers(graph);

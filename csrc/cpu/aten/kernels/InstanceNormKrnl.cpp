@@ -837,8 +837,10 @@ std::vector<at::Tensor> InstanceNormBackwardKernelImpl(
 
 } // namespace
 
-REGISTER_DISPATCH(InstanceNormKernel, &InstanceNormKernelImpl);
-REGISTER_DISPATCH(InstanceNormBackwardKernel, &InstanceNormBackwardKernelImpl);
+IPEX_REGISTER_DISPATCH(InstanceNormKernel, &InstanceNormKernelImpl);
+IPEX_REGISTER_DISPATCH(
+    InstanceNormBackwardKernel,
+    &InstanceNormBackwardKernelImpl);
 
 } // namespace cpu
 } // namespace torch_ipex

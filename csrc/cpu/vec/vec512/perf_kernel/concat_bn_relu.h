@@ -18,6 +18,10 @@ template <>
 struct AccType<BFloat16> {
   using type = float;
 };
+template <>
+struct AccType<Half> {
+  using type = float;
+};
 
 namespace torch_ipex {
 namespace cpu {
@@ -26,7 +30,8 @@ namespace kernel {
 using Tensor = at::Tensor;
 
 template <typename T, typename ACC_T>
-static void _concat_bn_relu_kernel_channels_last(
+static typename std::enable_if<!is_reduced_floating_point_v<T>, void>::type
+_concat_bn_relu_kernel_channels_last(
     const std::vector<const T*>& in_ptr,
     const std::vector<int64_t>& in_ch,
     T* out_ptr,
@@ -60,11 +65,12 @@ static void _concat_bn_relu_kernel_channels_last(
   }
 }
 
-template <>
-void _concat_bn_relu_kernel_channels_last<at::BFloat16, float>(
-    const std::vector<const at::BFloat16*>& in_ptr,
+template <typename T, typename ACC_T>
+static typename std::enable_if<is_reduced_floating_point_v<T>, void>::type
+_concat_bn_relu_kernel_channels_last(
+    const std::vector<const T*>& in_ptr,
     const std::vector<int64_t>& in_ch,
-    at::BFloat16* out_ptr,
+    T* out_ptr,
     const float* scale_ptr,
     const float* beta_ptr,
     int64_t total_size_except_channels,
@@ -85,13 +91,13 @@ void _concat_bn_relu_kernel_channels_last<at::BFloat16, float>(
       auto concat_in_ptr = in_ptr[j] + i * in_ch[j + 1] - (i + 1) * in_ch[j];
       for (int64_t k = in_ch[j]; k < in_ch[j + 1]; k += 16) {
         auto in =
-            cvt_bf16_to_fp32(_mm256_loadu_si256((__m256i*)(concat_in_ptr + k)));
+            cvt_to_fp32<T>(_mm256_loadu_si256((__m256i*)(concat_in_ptr + k)));
         auto beta = _mm512_loadu_ps(beta_ptr + k);
         auto scale = _mm512_loadu_ps(scale_ptr + k);
         auto bn_out = _mm512_add_ps(beta, _mm512_mul_ps(scale, in));
         auto out = _mm512_max_ps(zero, bn_out);
         _mm256_storeu_si256(
-            (__m256i*)(out_ptr + i * co + k), cvt_fp32_to_bf16(out));
+            (__m256i*)(out_ptr + i * co + k), cvt_from_fp32<T>(out));
       }
     }
   }

@@ -7,7 +7,7 @@ namespace cpu {
 
 using namespace dnnl;
 
-DEFINE_DISPATCH(get_current_isa_level_kernel_stub);
+IPEX_DEFINE_DISPATCH(get_current_isa_level_kernel_stub);
 
 // get_current_isa_level_kernel_impl
 std::string get_current_isa_level() {

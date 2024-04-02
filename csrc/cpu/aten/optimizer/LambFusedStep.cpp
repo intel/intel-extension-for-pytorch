@@ -7,7 +7,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(lamb_fused_step_kernel_stub);
+IPEX_DEFINE_DISPATCH(lamb_fused_step_kernel_stub);
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
     const at::Tensor& param_,
@@ -92,7 +92,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> lamb_fused_step(
 namespace {
 
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER_DISPATCH(
+  IPEX_OP_IPEX_REGISTER_DISPATCH(
       "lamb_fused_step",
       torch_ipex::cpu::lamb_fused_step,
       at::DispatchKey::CPU);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Macros.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/ir/irparser.h>
 #include <torch/csrc/jit/ir/subgraph_matcher.h>
@@ -22,7 +23,7 @@ c10::optional<c10::IValue> getIValue(
     const std::unordered_map<const torch::jit::Value*, torch::jit::Value*>&
         match_vmap,
     const std::unordered_map<std::string, torch::jit::Value*>& vmap);
-TORCH_API void replaceConvolutionWithAtenConv(
+IPEX_API void replaceConvolutionWithAtenConv(
     std::shared_ptr<torch::jit::Graph>& graph);
 
 bool isClampFusable(

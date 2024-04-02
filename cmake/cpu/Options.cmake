@@ -6,7 +6,18 @@ set(Options_CPU_cmake_included true)
 
 # The options to build cpu
 include(CMakeDependentOption)
-option(IPEX_DISP_OP "output the extension operators name for debug purpose" OFF)
+
+option(BUILD_LIBXSMM_VIA_CMAKE "Build LIBXSMM via CMake" ON)
+option(USE_LIBXSMM "Enable LIBXSMM" ON)
+if(WIN32)
+  set(USE_LIBXSMM ON)
+endif()
+
+if(WIN32)
+  set(USE_SHM OFF)
+  set(USE_CCL OFF)
+endif()
+
 
 function (print_cpu_config_summary)
   # Fetch configurations of intel-ext-pt-cpu
@@ -40,7 +51,10 @@ function (print_cpu_config_summary)
     message(STATUS "Options:")
     message(STATUS "  BUILD_STATIC_ONEMKL   : ${BUILD_STATIC_ONEMKL}")
     message(STATUS "  IPEX_DISP_OP          : ${IPEX_DISP_OP}")
-
+    message(STATUS "  BUILD_XSMM_VIA_CMAKE  : ${BUILD_LIBXSMM_VIA_CMAKE}")
+    message(STATUS "  USE_LIBXSMM           : ${USE_LIBXSMM}")
+    message(STATUS "  USE_CCL               : ${USE_CCL}")
+    message(STATUS "  USE_SHM               : ${USE_SHM}")
     message(STATUS "")
     message(STATUS "********************************")
 endfunction()

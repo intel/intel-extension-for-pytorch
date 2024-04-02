@@ -318,7 +318,10 @@ std::vector<at::Tensor> lstm_kernel(
   }
 
   QuantizedLstmParams quantizedLstmParams(
-      {scale, zp, weights_scale_mask, weight_scales});
+      {(const float)scale,
+       (const int32_t)zp,
+       weights_scale_mask,
+       weight_scales});
   std::tie(w1_, w2_) = torch_ipex::cpu::get_lstm_packed_weight(
       weight_ih,
       weight_hh,

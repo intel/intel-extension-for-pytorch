@@ -17,17 +17,17 @@ auto t_APD_mask = inputs[i++];
 auto t_offs = inputs[i++]; // [B+1]
 auto t_offs2 = inputs[i++]; // [B+1]
 
-long B = t_offs.sizes()[0] - 1;
-long SS1 = t_offs2[B].item().to<long>();
+int64_t B = t_offs.sizes()[0] - 1;
+int64_t SS1 = t_offs2[B].item().to<int64_t>();
 auto sizes = t_dCL.sizes();
 auto S1 = sizes[0];
-long N = sizes[1];
+int64_t N = sizes[1];
 auto S2 = sizes[2];
-long H = sizes[3];
-// long NH = N*H;
+int64_t H = sizes[3];
+// int64_t NH = N*H;
 float one_by_sqrt_H = 1.0 / sqrt(H);
 const bool S2_eq_H = (S2 == H);
-constexpr long BS = 8;
+constexpr int64_t BS = 8;
 bool dt_bf16 = (t_dCL.dtype() == at::kBFloat16);
 
 auto t_dQL = t_QL_T.new_empty({S1, N, S2, H});
@@ -115,8 +115,8 @@ auto t_Wv_TV = wt_tensor_for_bwd_compact(N, H, N, H, t_Wv);
   DECL_VLA_PTR_PT(T, EHS_T, [H * S2], t_EHS_T);
   DECL_VLA_PTR_PT(T, dHS, [N][S2 * H], t_dHS);
   DECL_VLA_PTR_PT(T, dEHS, [N][S2 * H], t_dEHS);
-  auto offs = t_offs.data_ptr<long>();
-  auto offs2 = t_offs2.data_ptr<long>();
+  auto offs = t_offs.data_ptr<int64_t>();
+  auto offs2 = t_offs2.data_ptr<int64_t>();
 
   auto cw_gemm_tpp = SCOPEITGEMM((BrgemmExtTPP<T, T>(
       S2,
@@ -194,10 +194,10 @@ auto t_Wv_TV = wt_tensor_for_bwd_compact(N, H, N, H, t_Wv);
 #pragma omp parallel for collapse(2) schedule(static, 1)
       for (int b = 0; b < B; b++) {
         for (int n = 0; n < N; n++) {
-          long start = offs[b];
-          long ss1 = offs2[b];
-          long end = offs[b + 1];
-          long len = end - start;
+          int64_t start = offs[b];
+          int64_t ss1 = offs2[b];
+          int64_t end = offs[b + 1];
+          int64_t len = end - start;
           for (int s21 = start; s21 < end; s21++, ss1 += len) {
             cw_gemm_tpp(APD_T[n][ss1], dCL_V[atrans_blk(start,n)], dVL[s21][n], len);
             if (dt_bf16)
@@ -216,10 +216,10 @@ auto t_Wv_TV = wt_tensor_for_bwd_compact(N, H, N, H, t_Wv);
 #pragma omp parallel for collapse(2) schedule(static, 1)
       for (int b = 0; b < B; b++) {
         for (int n = 0; n < N; n++) {
-          long start = offs[b];
-          long ss1 = offs2[b];
-          long end = offs[b + 1];
-          long len = end - start;
+          int64_t start = offs[b];
+          int64_t ss1 = offs2[b];
+          int64_t end = offs[b + 1];
+          int64_t len = end - start;
           for (int s11 = start; s11 < end; s11++, ss1 += len) {
             float dtAPD[len][S2][S2] = {0};
             T dtAPD_bf[len][S2][S2] = {0};
@@ -242,8 +242,8 @@ auto t_Wv_TV = wt_tensor_for_bwd_compact(N, H, N, H, t_Wv);
             softmax_bwd_tpp(len, dtAPD[0][0], dtAPD[0][0], AP[n][ss1]);
             for (int s21 = start; s21 < end; s21++) {
               auto ls21 = s21 - start;
-              long l = s11 - start;
-              long ss = offs2[b];
+              int64_t l = s11 - start;
+              int64_t ss = offs2[b];
               scale_tpp(dtAPD[ls21][0], dtAPD_bf[ls21][0], one_by_sqrt_H);
               a_n2v_tpp(dtAPD_bf[ls21][0], dAPD_V[n][ss + ls21 * len + l]);
             }
@@ -263,10 +263,10 @@ auto t_Wv_TV = wt_tensor_for_bwd_compact(N, H, N, H, t_Wv);
 #pragma omp parallel for collapse(2) schedule(static, 1)
       for (int b = 0; b < B; b++) {
         for (int n = 0; n < N; n++) {
-          long start = offs[b];
-          long ss1 = offs2[b];
-          long end = offs[b + 1];
-          long len = end - start;
+          int64_t start = offs[b];
+          int64_t ss1 = offs2[b];
+          int64_t end = offs[b + 1];
+          int64_t len = end - start;
           for (int s21 = start; s21 < end; s21++, ss1 += len) {
             // dKL = (QL_T * dAPD)T
             aw_gemm_tpp(QL_T[atrans_blk(start,n)], dAPD_V[n][ss1], dKL[s21][n], len);
@@ -286,10 +286,10 @@ auto t_Wv_TV = wt_tensor_for_bwd_compact(N, H, N, H, t_Wv);
 #pragma omp parallel for collapse(2) schedule(static, 1)
       for (int b = 0; b < B; b++) {
         for (int n = 0; n < N; n++) {
-          long start = offs[b];
-          // long ss1 = offs2[b];
-          long end = offs[b + 1];
-          long len = end - start;
+          int64_t start = offs[b];
+          // int64_t ss1 = offs2[b];
+          int64_t end = offs[b + 1];
+          int64_t len = end - start;
           cw_gemm_tpp.config();
           for (int s21 = start, ss1 = offs2[b]; s21 < end; s21++, ss1 += len) {
             cw_gemm_tpp(
@@ -329,8 +329,8 @@ auto t_Wv_TV = wt_tensor_for_bwd_compact(N, H, N, H, t_Wv);
             softmax_bwd_tpp(len, dtAPD[0][0], dtAPD[0][0], AP[n][ss1]);
             for (int s21 = start; s21 < end; s21++) {
               auto ls21 = s21 - start;
-              long l = s11 - start;
-              long ss = offs2[b];
+              int64_t l = s11 - start;
+              int64_t ss = offs2[b];
               scale_tpp(dtAPD[ls21][0], dtAPD_bf[ls21][0], one_by_sqrt_H);
               a_n2v_tpp(dtAPD_bf[ls21][0], dAPD_V[n][ss + ls21 * len + l]);
             }
@@ -466,7 +466,7 @@ auto t_Wv_TV = wt_tensor_for_bwd_compact(N, H, N, H, t_Wv);
     }
 #else
     auto qkvw_loop = ThreadedLoop<3>(
-        {LoopSpecs{0, S1, BS}, LoopSpecs{N}, LoopSpecs{N}}, "aBC");
+        {LoopSpecs{0, S1, BS, true}, LoopSpecs{N}, LoopSpecs{N}}, "aBC");
     qkvw_loop(
         [&](int* ind) {
           int s1 = ind[0], nk = ind[1], nc = ind[2];

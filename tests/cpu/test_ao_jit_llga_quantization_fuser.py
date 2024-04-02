@@ -79,8 +79,8 @@ class TestOp(JitLlgaTestCase):
             module,
         ] in itertools.product(
             [7],
-            [8],
-            [7],
+            [2],
+            [3],
             [3],
             [0, 2],
             [1, 2],
@@ -177,8 +177,8 @@ class TestOp(JitLlgaTestCase):
             module,
         ] in itertools.product(
             [7],
-            [8],
-            [7],
+            [3],
+            [3],
             [3],
             [0, 2],
             [1, 2],
@@ -2189,7 +2189,9 @@ class TestFusionPattern(JitLlgaTestCase):
 
     def test_inplace_computation_accuracy(self):
         class LowRankCrossNet(nn.Module):
-            def __init__(self, in_features: int, num_layers: int, low_rank: int) -> None:
+            def __init__(
+                self, in_features: int, num_layers: int, low_rank: int
+            ) -> None:
                 super().__init__()
                 assert low_rank >= 1, "Low rank must be larger or equal to 1"
                 self._num_layers = num_layers
@@ -2200,7 +2202,9 @@ class TestFusionPattern(JitLlgaTestCase):
                     W_kernels.append(Wp)
                 V_kernels: nn.ParameterList = nn.ParameterList()
                 for i in range(self._num_layers):
-                    V_kernels.append(nn.Parameter(torch.randn(self._low_rank, in_features)))
+                    V_kernels.append(
+                        nn.Parameter(torch.randn(self._low_rank, in_features))
+                    )
                 bias: nn.ParameterList = nn.ParameterList(
                     [
                         nn.Parameter(nn.init.zeros_(torch.empty(in_features)))
@@ -2209,24 +2213,24 @@ class TestFusionPattern(JitLlgaTestCase):
                 )
                 self.MLPs = nn.ModuleDict()
                 for i in range(num_layers):
-                    self.MLPs[f'V{i}'] = nn.Linear(in_features, low_rank, bias=False)
-                    self.MLPs[f'W{i}'] = nn.Linear(low_rank, in_features, bias=True)
-                    self.MLPs[f'V{i}'].weight = V_kernels[i]
-                    self.MLPs[f'W{i}'].weight = W_kernels[i]
-                    self.MLPs[f'W{i}'].bias = bias[i]
+                    self.MLPs[f"V{i}"] = nn.Linear(in_features, low_rank, bias=False)
+                    self.MLPs[f"W{i}"] = nn.Linear(low_rank, in_features, bias=True)
+                    self.MLPs[f"V{i}"].weight = V_kernels[i]
+                    self.MLPs[f"W{i}"].weight = W_kernels[i]
+                    self.MLPs[f"W{i}"].bias = bias[i]
 
             def forward(self, input: torch.Tensor) -> torch.Tensor:
                 x_0 = input
-                x_l = x_0 #.clone()
+                x_l = x_0  # .clone()
                 for layer in range(self._num_layers):
-                    x_l_v = self.MLPs[f'V{layer}'](x_l)
-                    x_l_w = self.MLPs[f'W{layer}'](x_l_v)
+                    x_l_v = self.MLPs[f"V{layer}"](x_l)
+                    x_l_w = self.MLPs[f"W{layer}"](x_l_v)
                     x_l = x_0 * x_l_w + x_l  # (B, N)
                 return x_l, x_0
 
         class FakeQuant(nn.Module):
             def __init__(self):
-                super().__init__() 
+                super().__init__()
 
             def forward(self, x):
                 x = torch.quantize_per_tensor(x, 0.1, 0, torch.qint8)
@@ -2243,13 +2247,13 @@ class TestFusionPattern(JitLlgaTestCase):
                 out = self.cross_net(out)
                 return out
 
-
         m = TinyDLRM().eval()
         x = torch.rand(2048, 2)
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
         print(graph)
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 4)
         self.assertFused(graph, ["aten::linear", "aten::mul", "aten::add"])
+
 
 class TestShapeFallback(JitLlgaTestCase):
     @unittest.skipIf(True, "Size peephole optimization not enabled yet")

@@ -1,6 +1,9 @@
 #pragma once
 #include <ATen/ATen.h>
 #include <ATen/cpu/vec/vec512/vec512.h>
+
+#include "utils/SysUtil.h"
+
 using namespace at::vec;
 
 #include <immintrin.h>
@@ -209,7 +212,7 @@ inline void packed_bf16_add_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void add_ker(
+IPEX_FORCE_INLINE void add_ker(
     at::BFloat16* inout,
     const at::BFloat16* in,
     int64_t len) {
@@ -245,10 +248,7 @@ inline __attribute__((always_inline)) void add_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void add_ker(
-    float* inout,
-    const float* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void add_ker(float* inout, const float* in, int64_t len) {
   int64_t i = 0;
 #pragma unroll(2)
   for (i = 0; i < len - 31; i += 32) {
@@ -278,7 +278,7 @@ inline __attribute__((always_inline)) void add_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void add_ker(
+IPEX_FORCE_INLINE void add_ker(
     float* inout,
     const at::BFloat16* in,
     int64_t len) {
@@ -313,7 +313,7 @@ inline __attribute__((always_inline)) void add_ker(
 }
 
 template <>
-inline __attribute__((always_inline)) void add_ker(
+IPEX_FORCE_INLINE void add_ker(
     at::BFloat16* inout,
     const float* in,
     int64_t len) {
@@ -348,14 +348,14 @@ inline __attribute__((always_inline)) void add_ker(
   }
 }
 template <>
-inline __attribute__((always_inline)) void move_ker(
+IPEX_FORCE_INLINE void move_ker(
     at::BFloat16* out,
     const float* in,
     int64_t len) {
   cvt_fp32_to_bf16(out, in, len);
 }
 
-static inline __attribute__((always_inline)) void move_ker_load_aligned(
+static IPEX_FORCE_INLINE void move_ker_load_aligned(
     at::BFloat16* out,
     const float* in,
     int64_t len) {
@@ -382,10 +382,7 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
-    float* out,
-    const float* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void move_ker(float* out, const float* in, int64_t len) {
   int64_t i = 0;
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
@@ -400,7 +397,7 @@ inline __attribute__((always_inline)) void move_ker(
   }
 }
 
-static inline __attribute__((always_inline)) void move_ker_load_aligned(
+static IPEX_FORCE_INLINE void move_ker_load_aligned(
     float* out,
     const float* in,
     int64_t len) {
@@ -419,7 +416,7 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
+IPEX_FORCE_INLINE void move_ker(
     at::BFloat16* out,
     const at::BFloat16* in,
     int64_t len) {
@@ -437,7 +434,7 @@ inline __attribute__((always_inline)) void move_ker(
   }
 }
 
-static inline __attribute__((always_inline)) void move_ker_load_aligned(
+static IPEX_FORCE_INLINE void move_ker_load_aligned(
     at::BFloat16* out,
     const at::BFloat16* in,
     int64_t len) {
@@ -456,10 +453,7 @@ static inline __attribute__((always_inline)) void move_ker_load_aligned(
 }
 
 template <>
-inline __attribute__((always_inline)) void move_ker(
-    int32_t* out,
-    const int32_t* in,
-    int64_t len) {
+IPEX_FORCE_INLINE void move_ker(int32_t* out, const int32_t* in, int64_t len) {
   int64_t i = 0;
 #pragma unroll(4)
   for (i = 0; i < len - 15; i += 16) {
@@ -474,9 +468,7 @@ inline __attribute__((always_inline)) void move_ker(
   }
 }
 
-static inline __attribute__((always_inline)) void zero_ker(
-    float* out,
-    int64_t len) {
+static IPEX_FORCE_INLINE void zero_ker(float* out, int64_t len) {
   int64_t i = 0;
   __m512 zero_512 = _mm512_setzero_ps();
 #pragma unroll(4)
@@ -490,9 +482,7 @@ static inline __attribute__((always_inline)) void zero_ker(
   }
 }
 
-static inline __attribute__((always_inline)) void zero_ker(
-    at::BFloat16* out,
-    int64_t len) {
+static IPEX_FORCE_INLINE void zero_ker(at::BFloat16* out, int64_t len) {
   int64_t i = 0;
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)

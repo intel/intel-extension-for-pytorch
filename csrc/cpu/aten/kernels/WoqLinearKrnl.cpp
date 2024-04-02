@@ -1,3 +1,4 @@
+#ifdef USE_LIBXSMM
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <aten/Linear.h>
@@ -2658,6 +2659,16 @@ void woq_gemm_kernel_impl(
               zero_points_float_ptr);
         }
       }
+    } else {
+      auto qw = woq_linear_unpackB_impl(weight);
+      auto w = qw.dequantize().to(self_.scalar_type()).to(c10::kFloat);
+      auto x = self.to(c10::ScalarType::Float);
+      auto out = at::linear(x, w);
+      if (bias.defined()) {
+        auto b = bias.to(self_.scalar_type()).to(c10::kFloat);
+        out = at::add(out, b);
+      }
+      output = out.to(self.scalar_type());
     }
   } else { // kPerChannelAffineFloatQParams
 
@@ -2805,7 +2816,7 @@ void woq_gemm_kernel_impl(
     } else {
       at::linear_out(output, self, w);
     }
-  } else {
+  } else if (self_.scalar_type() == at::kBFloat16) {
     auto w = weight.dequantize();
     auto x = self.to(c10::ScalarType::Float);
     // This is to align with the AVX512 kernel
@@ -2816,6 +2827,15 @@ void woq_gemm_kernel_impl(
     auto out = at::linear(x, w);
     if (bias.defined()) {
       out = at::add(out, bias);
+    }
+    output = out.to(self.scalar_type());
+  } else {
+    auto w = weight.dequantize().to(self_.scalar_type()).to(c10::kFloat);
+    auto x = self.to(c10::ScalarType::Float);
+    auto out = at::linear(x, w);
+    if (bias.defined()) {
+      auto b = bias.to(self_.scalar_type()).to(c10::kFloat);
+      out = at::add(out, b);
     }
     output = out.to(self.scalar_type());
   }
@@ -2994,9 +3014,12 @@ at::Tensor woq_linear_unpackB_impl(const at::Tensor& weight) {
 }
 } // namespace
 
-REGISTER_DISPATCH(woq_gemm_kernel_stub, &woq_gemm_kernel_impl);
-REGISTER_DISPATCH(woq_gemm_eltwise_kernel_stub, &woq_gemm_eltwise_kernel_impl);
-REGISTER_DISPATCH(woq_linear_unpackB_stub, &woq_linear_unpackB_impl);
-REGISTER_DISPATCH(woq_linear_packB_stub, &woq_linear_packB_impl);
+IPEX_REGISTER_DISPATCH(woq_gemm_kernel_stub, &woq_gemm_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    woq_gemm_eltwise_kernel_stub,
+    &woq_gemm_eltwise_kernel_impl);
+IPEX_REGISTER_DISPATCH(woq_linear_unpackB_stub, &woq_linear_unpackB_impl);
+IPEX_REGISTER_DISPATCH(woq_linear_packB_stub, &woq_linear_packB_impl);
 } // namespace cpu
 } // namespace torch_ipex
+#endif

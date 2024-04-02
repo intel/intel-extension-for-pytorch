@@ -1,6 +1,12 @@
 #include "sklearn.h"
 #include <ATen/Dispatch.h>
+#ifdef _WIN32
+#include <ppl.h>
+#define IPEX_PARALLEL_SORT concurrency::parallel_sort
+#else
 #include <parallel/algorithm>
+#define IPEX_PARALLEL_SORT __gnu_parallel::sort
+#endif
 
 namespace toolkit {
 
@@ -30,10 +36,9 @@ std::vector<double> roc_auc_score_(
     v_sort[i] = std::make_pair(prediction[i], i);
   }
 
-  __gnu_parallel::sort(
-      v_sort.begin(), v_sort.end(), [](auto& left, auto& right) {
-        return left.first < right.first;
-      });
+  IPEX_PARALLEL_SORT(v_sort.begin(), v_sort.end(), [](auto& left, auto& right) {
+    return left.first < right.first;
+  });
 
   int r = 1;
   int n = 1;
@@ -64,7 +69,7 @@ std::vector<double> roc_auc_score_(
       ((double)nPos * nNeg);
   double log_loss = 0.0;
   double accuracy = 0.0;
-  if (not only_score) {
+  if (only_score == false) {
     double acc = 0.0;
     double loss = 0.0;
 #pragma omp parallel for reduction(+ : acc, loss)

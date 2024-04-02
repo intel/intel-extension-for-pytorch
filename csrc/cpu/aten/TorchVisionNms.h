@@ -22,7 +22,7 @@ at::Tensor nms_kernel_impl(
 
 using nms_kernel_fn =
     at::Tensor (*)(const at::Tensor&, const at::Tensor&, double);
-DECLARE_DISPATCH(nms_kernel_fn, nms_kernel_stub);
+IPEX_DECLARE_DISPATCH(nms_kernel_fn, nms_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

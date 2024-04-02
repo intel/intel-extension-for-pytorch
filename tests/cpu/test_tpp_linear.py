@@ -46,6 +46,16 @@ class Linear_silu(torch.nn.Module):
         return torch.nn.functional.silu(self.mlp(x))
 
 
+class Linear_Gate_Up(torch.nn.Module):
+    def __init__(self, in_feature, out_feature, bias_gate, bias_up):
+        super(Linear_Gate_Up, self).__init__()
+        self.gate_proj = torch.nn.Linear(in_feature, out_feature, bias=bias_gate)
+        self.up_proj = torch.nn.Linear(in_feature, out_feature, bias=bias_up)
+
+    def forward(self, x):
+        return torch.nn.functional.silu(self.gate_proj(x)) * self.up_proj(x)
+
+
 class Linear_relu(torch.nn.Module):
     def __init__(self):
         super(Linear_relu, self).__init__()
@@ -82,7 +92,36 @@ class Linear_add_add(torch.nn.Module):
         return self.mlp(x) + x + x
 
 
+class Linear_tpp_fallback_dnnl(torch.nn.Module):
+    def __init__(self):
+        super(Linear_tpp_fallback_dnnl, self).__init__()
+        self.mlp = torch.nn.Linear(4097, 4097)
+
+    def forward(self, x):
+        return self.mlp(x)
+
+
 class TestTPPlinear(TestCase):
+    def test_tpp_linear_fallback(self):
+        x1 = torch.rand(1, 1, 4097)
+        x2 = copy.deepcopy(x1)
+        for dtype in [torch.float, torch.bfloat16]:
+            model = Linear_tpp_fallback_dnnl().eval()
+
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if dtype is torch.bfloat16 else False
+            ):
+                ref_out = model(x1)
+
+            _enable_tpp()
+            model = ipex.optimize(model, dtype=dtype)
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if dtype is torch.bfloat16 else False
+            ):
+                out = model(x2)
+            self.assertEqual(out, ref_out)
+            _disable_tpp()
+
     def test_tpp_linear(self):
         x1 = torch.rand(1, 1, 4096)
         x2 = copy.deepcopy(x1)
@@ -106,37 +145,45 @@ class TestTPPlinear(TestCase):
             self.assertEqual(out_nb, ref_out_nb)
             _disable_tpp()
 
-    def test_tpp_linear_torchcompile(self):
-        x = torch.rand(2, 2, 4096)
+    def test_tpp_fused_gate_up_proj(self):
+        in_feature = 64
+        out_feature = 32
 
-        options = itertools.product(
-            [Linear_with_bias, Linear_without_bias],
-            [torch.float32, torch.bfloat16],
-            ["torchscript", "inductor"],
-            [True, False],
-        )
-        for (
-            Model,
-            dtype,
-            compiler_backend,
-            dynamic,
-        ) in options:
-            model = Model().to(dtype=dtype).eval()
-            x = x.to(dtype=dtype)
+        x = torch.randn(1, 4, in_feature)
+        x_tpp = copy.deepcopy(x)
 
-            _enable_tpp()
-            model = ipex.optimize(model, dtype=dtype)
-
-            with torch.no_grad():
+        with torch.no_grad():
+            for dtype, bias_gate, bias_up in itertools.product(
+                [torch.float, torch.bfloat16], [False, True], [False, True]
+            ):
+                model = Linear_Gate_Up(
+                    in_feature, out_feature, bias_gate, bias_up
+                ).eval()
+                if dtype == torch.bfloat16:
+                    x = x.to(torch.bfloat16)
+                    x_tpp = x_tpp.to(torch.bfloat16)
+                    model = model.to(torch.bfloat16)
                 ref_out = model(x)
-            torch._dynamo.reset()
-            ipex._set_compiler_backend(compiler_backend)
-            compile_model = torch.compile(model, dynamic=dynamic, backend="ipex")
-            with torch.no_grad():
-                out = compile_model(x)
-            self.assertEqual(out, ref_out)
-            self.assertTrue(out.dtype == dtype)
-            _disable_tpp()
+
+                _enable_tpp()
+                model = ipex.optimize(model, dtype=dtype)
+                out = torch.ops.torch_ipex.tpp_fused_gate_up_proj(
+                    x_tpp,
+                    model.gate_proj.weight,
+                    model.gate_proj.bias,
+                    model.up_proj.weight,
+                    model.up_proj.bias,
+                )
+
+                out_linear_silu = torch.ops.torch_ipex.tpp_linear_silu(
+                    x_tpp, model.gate_proj.weight, model.gate_proj.bias
+                )
+                out_tpp_ref = torch.ops.torch_ipex.tpp_linear_mul(
+                    x_tpp, out_linear_silu, model.up_proj.weight, model.up_proj.bias
+                )
+                self.assertEqual(out, out_tpp_ref)
+                self.assertEqual(out, ref_out)
+                _disable_tpp()
 
     def test_tpp_linear_gelu(self):
         x1 = torch.rand(1, 4, 4096)
@@ -158,41 +205,6 @@ class TestTPPlinear(TestCase):
                 self.assertEqual(out, ref_out)
                 _disable_tpp()
 
-    def test_tpp_linear_gelu_torchcompile(self):
-        x = torch.rand(2, 2, 4096)
-
-        options = itertools.product(
-            [torch.float32, torch.bfloat16],
-            ["torchscript", "inductor"],
-            [True, False],
-        )
-        for (
-            dtype,
-            compiler_backend,
-            dynamic,
-        ) in options:
-            model = Linear_gelu().to(dtype=dtype).eval()
-            x = x.to(dtype=dtype)
-
-            _enable_tpp()
-            model = ipex.optimize(model, dtype=dtype)
-
-            def fn(x):
-                return torch.ops.torch_ipex.tpp_linear_gelu(
-                    x, model.mlp.weight, model.mlp.bias, model.mlp.out_features
-                )
-
-            with torch.no_grad():
-                ref_out = fn(x)
-            torch._dynamo.reset()
-            ipex._set_compiler_backend(compiler_backend)
-            compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
-            with torch.no_grad():
-                out = compile_fn(x)
-            self.assertEqual(out, ref_out)
-            self.assertTrue(out.dtype == dtype)
-            _disable_tpp()
-
     def test_tpp_linear_silu(self):
         x1 = torch.rand(1, 4, 4096)
         x2 = copy.deepcopy(x1)
@@ -212,41 +224,6 @@ class TestTPPlinear(TestCase):
                 )
                 self.assertEqual(out, ref_out)
                 _disable_tpp()
-
-    def test_tpp_linear_silu_torchcompile(self):
-        x = torch.rand(2, 2, 4096)
-
-        options = itertools.product(
-            [torch.float32, torch.bfloat16],
-            ["torchscript", "inductor"],
-            [True, False],
-        )
-        for (
-            dtype,
-            compiler_backend,
-            dynamic,
-        ) in options:
-            model = Linear_silu().to(dtype=dtype).eval()
-            x = x.to(dtype=dtype)
-
-            _enable_tpp()
-            model = ipex.optimize(model, dtype=dtype)
-            
-            def fn(x):
-                return torch.ops.torch_ipex.tpp_linear_silu(
-                    x, model.mlp.weight, x.new_empty(0), model.mlp.out_features
-                )
-
-            with torch.no_grad():
-                ref_out = fn(x)
-            torch._dynamo.reset()
-            ipex._set_compiler_backend(compiler_backend)
-            compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
-            with torch.no_grad():
-                out = compile_fn(x)
-            self.assertEqual(out, ref_out)
-            self.assertTrue(out.dtype == dtype)
-            _disable_tpp()
 
     def test_tpp_linear_relu(self):
         x1 = torch.rand(1, 4, 4096)
@@ -268,41 +245,6 @@ class TestTPPlinear(TestCase):
                 self.assertEqual(out, ref_out)
                 _disable_tpp()
 
-    def test_tpp_linear_relu_torchcompile(self):
-        x = torch.rand(2, 2, 4096)
-
-        options = itertools.product(
-            [torch.float32, torch.bfloat16],
-            ["torchscript", "inductor"],
-            [True, False],
-        )
-        for (
-            dtype,
-            compiler_backend,
-            dynamic,
-        ) in options:
-            model = Linear_relu().to(dtype=dtype).eval()
-            x = x.to(dtype=dtype)
-
-            _enable_tpp()
-            model = ipex.optimize(model, dtype=dtype)
-            
-            def fn(x):
-                return torch.ops.torch_ipex.tpp_linear_relu(
-                    x, model.mlp.weight, x.new_empty(0), model.mlp.out_features
-                )
-
-            with torch.no_grad():
-                ref_out = fn(x)
-            torch._dynamo.reset()
-            ipex._set_compiler_backend(compiler_backend)
-            compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
-            with torch.no_grad():
-                out = compile_fn(x)
-            self.assertEqual(out, ref_out)
-            self.assertTrue(out.dtype == dtype)
-            _disable_tpp()
-
     def test_tpp_linear_mul(self):
         x1 = torch.rand(1, 4, 4096)
         x2 = copy.deepcopy(x1)
@@ -322,41 +264,6 @@ class TestTPPlinear(TestCase):
                 )
                 self.assertEqual(out, ref_out)
                 _disable_tpp()
-
-    def test_tpp_linear_mul_torchcompile(self):
-        x = torch.rand(2, 2, 4096)
-
-        options = itertools.product(
-            [torch.float32, torch.bfloat16],
-            ["torchscript", "inductor"],
-            [True, False],
-        )
-        for (
-            dtype,
-            compiler_backend,
-            dynamic,
-        ) in options:
-            model = Linear_mul().to(dtype=dtype).eval()
-            x = x.to(dtype=dtype)
-
-            _enable_tpp()
-            model = ipex.optimize(model, dtype=dtype)
-            
-            def fn(x):
-                return torch.ops.torch_ipex.tpp_linear_mul(
-                    x, x, model.mlp.weight, x.new_empty(0), model.mlp.out_features
-                )
-
-            with torch.no_grad():
-                ref_out = fn(x)
-            torch._dynamo.reset()
-            ipex._set_compiler_backend(compiler_backend)
-            compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
-            with torch.no_grad():
-                out = compile_fn(x)
-            self.assertEqual(out, ref_out)
-            self.assertTrue(out.dtype == dtype)
-            _disable_tpp()
 
     def test_tpp_linear_add(self):
         x1 = torch.rand(1, 4, 4096)
@@ -378,41 +285,6 @@ class TestTPPlinear(TestCase):
                 self.assertEqual(out, ref_out)
                 _disable_tpp()
 
-    def test_tpp_linear_add_torchcompile(self):
-        x = torch.rand(2, 2, 4096)
-
-        options = itertools.product(
-            [torch.float32, torch.bfloat16],
-            ["torchscript", "inductor"],
-            [True, False],
-        )
-        for (
-            dtype,
-            compiler_backend,
-            dynamic,
-        ) in options:
-            model = Linear_add().to(dtype=dtype).eval()
-            x = x.to(dtype=dtype)
-
-            _enable_tpp()
-            model = ipex.optimize(model, dtype=dtype)
-            
-            def fn(x):
-                return torch.ops.torch_ipex.tpp_linear_add(
-                    x, x, model.mlp.weight, x.new_empty(0), 1.0, model.mlp.out_features
-                )
-
-            with torch.no_grad():
-                ref_out = fn(x)
-            torch._dynamo.reset()
-            ipex._set_compiler_backend(compiler_backend)
-            compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
-            with torch.no_grad():
-                out = compile_fn(x)
-            self.assertEqual(out, ref_out)
-            self.assertTrue(out.dtype == dtype)
-            _disable_tpp()
-
     def test_tpp_linear_add2(self):
         x1 = torch.rand(1, 4, 4096)
         x2 = copy.deepcopy(x1)
@@ -432,41 +304,6 @@ class TestTPPlinear(TestCase):
                 )
                 self.assertEqual(out, ref_out)
                 _disable_tpp()
-                
-    def test_tpp_linear_add2_torchcompile(self):
-        x = torch.rand(2, 2, 4096)
-
-        options = itertools.product(
-            [torch.float32, torch.bfloat16],
-            ["torchscript", "inductor"],
-            [True, False],
-        )
-        for (
-            dtype,
-            compiler_backend,
-            dynamic,
-        ) in options:
-            model = Linear_add_add().to(dtype=dtype).eval()
-            x = x.to(dtype=dtype)
-
-            _enable_tpp()
-            model = ipex.optimize(model, dtype=dtype)
-            
-            def fn(x):
-                return torch.ops.torch_ipex.tpp_linear_add_add(
-                    x, x, x, model.mlp.weight, model.mlp.bias, 1.0, model.mlp.out_features
-                )
-
-            with torch.no_grad():
-                ref_out = fn(x)
-            torch._dynamo.reset()
-            ipex._set_compiler_backend(compiler_backend)
-            compile_fn = torch.compile(fn, dynamic=dynamic, backend="ipex")
-            with torch.no_grad():
-                out = compile_fn(x)
-            self.assertEqual(out, ref_out)
-            self.assertTrue(out.dtype == dtype)
-            _disable_tpp()
 
 
 if __name__ == "__main__":

@@ -530,12 +530,12 @@ void FusedTransFreeMha(std::shared_ptr<Graph>& graph) {
   sd_mha_fusion_v2.RegisterRewritePattern(
       sd_mha_pattern_v2, sd_fused_mha_pattern_v2);
   sd_mha_fusion_v2.runOnGraph(graph, sd_flash_mha_filter_v2);
-  sd_mha_fusion_v3.RegisterRewritePattern(
-      sd_mha_pattern_v3, sd_fused_mha_pattern_v3);
-  sd_mha_fusion_v3.runOnGraph(graph, sd_flash_mha_filter_v3);
-  sd_mha_fusion_v4.RegisterRewritePattern(
-      sd_mha_pattern_v4, sd_fused_mha_pattern_v4);
-  sd_mha_fusion_v4.runOnGraph(graph, sd_flash_mha_filter_v4);
+  // sd_mha_fusion_v3.RegisterRewritePattern(
+  //     sd_mha_pattern_v3, sd_fused_mha_pattern_v3);
+  // sd_mha_fusion_v3.runOnGraph(graph, sd_flash_mha_filter_v3);
+  // sd_mha_fusion_v4.RegisterRewritePattern(
+  //     sd_mha_pattern_v4, sd_fused_mha_pattern_v4);
+  // sd_mha_fusion_v4.runOnGraph(graph, sd_flash_mha_filter_v4);
 
   auto bmm_pattern = R"(
     graph(%batch1, %batch2):

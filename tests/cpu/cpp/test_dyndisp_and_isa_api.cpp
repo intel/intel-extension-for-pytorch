@@ -42,7 +42,7 @@ TEST(TestDynDispAndIsaAPI, TestIsaLevels) {
   CPUFeature::get_instance().isa_level_amx();
   CPUFeature::get_instance().isa_level_avx2();
   CPUFeature::get_instance().isa_level_avx2_vnni();
-  CPUFeature::get_instance().isa_level_avx512_core();
+  CPUFeature::get_instance().isa_level_avx512();
   CPUFeature::get_instance().isa_level_avx512_vnni();
   CPUFeature::get_instance().isa_level_avx512_bf16();
 }

@@ -60,9 +60,9 @@ class TestFunction(TestCase):
 
     def test_set_autocast_dtype(self):
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
-            self.assertEqual(core.get_autocast_dtype(), torch.bfloat16)
+            self.assertEqual(torch.get_autocast_cpu_dtype(), torch.bfloat16)
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.float16):
-            self.assertEqual(core.get_autocast_dtype(), torch.float16)
+            self.assertEqual(torch.get_autocast_cpu_dtype(), torch.float16)
 
     def test_forward_dtype(self):
         rand_seed = int(get_rand_seed())
@@ -91,8 +91,6 @@ class TestFunction(TestCase):
                 model,
                 optimizer=optimizer,
                 dtype=torch.half,
-                auto_kernel_selection=True,
-                weights_prepack=True,
             )
             optimizer.zero_grad()
             for _ in range(niters):
@@ -291,12 +289,12 @@ class TestPyTorchOps(TestCase):
             out2 = torch.bernoulli(input_bf16, 0.5)
         self.assertEqual(out1.dtype, torch.bfloat16)
         self.assertEqual(out2.dtype, torch.bfloat16)
-        # Does not support fp16 yet
+
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.float16):
             out1 = torch.bernoulli(input_fp16)
             out2 = torch.bernoulli(input_fp16, 0.5)
-        self.assertEqual(out1.dtype, torch.float32)
-        self.assertEqual(out2.dtype, torch.float32)
+        self.assertEqual(out1.dtype, torch.float16)
+        self.assertEqual(out2.dtype, torch.float16)
 
 
 class TestCustomerOps(TestCase):
@@ -572,15 +570,15 @@ class TestLSTM(TorchTestCase):
     def _lstm_params_list(self):
         params_dict = {
             "input_size": [1, 2],
-            "hidden_size": [5, 32],
-            "num_layers": [1, 3],
+            "hidden_size": [2],
+            "num_layers": [1, 2],
             "bidirectional": [False, True],
             "bias": [False, True],
             "empty_state": [False, True],
             "batch_first": [False, True],
-            "dropout": [0, 0.4, 0.7, 1],
+            "dropout": [0, 0.4, 1],
             "batch_size": [1, 2],
-            "seq_len": [1, 3],
+            "seq_len": [1, 2],
         }
 
         params_list = []
@@ -1017,11 +1015,18 @@ class TestAutocastOperations(TestCase):
         for op, args in self.autocast_lists.blacklist_non_float_output_pass_test:
             self._run_autocast_pass_test(op, args, torch.float32)
 
-    def test_autocast_torch_bf16_multi_output(self):
-        for op_with_args in self.autocast_lists.torch_bf16_multi_output:
+    def test_autocast_torch_x16_multi_output(self):
+        for op_with_args in self.autocast_lists.torch_x16_multi_output:
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
             self._run_autocast_pass_test(
                 op, args, torch.bfloat16, add_kwargs=maybe_kwargs
+            )
+            self._run_autocast_pass_test(
+                op,
+                args,
+                torch.float16,
+                autocast_type=torch.float16,
+                add_kwargs=maybe_kwargs,
             )
 
     def test_autocast_torch_bf16_fp32_multi_output(self):
@@ -1082,17 +1087,6 @@ class TestAutocastOperations(TestCase):
                 add_kwargs=maybe_kwargs,
             )
 
-    def test_autocast_torch_fp16_fp32_multi_output(self):
-        for op_with_args in self.autocast_lists.torch_fp16_fp32_multi_output:
-            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
-            self._run_autocast_pass_test(
-                op,
-                args,
-                torch.float32,
-                autocast_type=torch.float16,
-                add_kwargs=maybe_kwargs,
-            )
-
     def test_autocast_torch_fallthrough_bf16(self):
         for op_with_args in self.autocast_lists.torch_fallthrough_bf16:
             op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
@@ -1100,6 +1094,17 @@ class TestAutocastOperations(TestCase):
                 op,
                 args,
                 torch.bfloat16,
+                add_kwargs=maybe_kwargs,
+            )
+
+    def test_autocast_torch_fallthrough_fp16(self):
+        for op_with_args in self.autocast_lists.torch_fallthrough_fp16:
+            op, args, maybe_kwargs = self.args_maybe_kwargs(op_with_args)
+            self._run_autocast_outofplace(
+                op,
+                args,
+                torch.float16,
+                autocast_type=torch.float16,
                 add_kwargs=maybe_kwargs,
             )
 

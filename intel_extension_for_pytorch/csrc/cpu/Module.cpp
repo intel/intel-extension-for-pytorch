@@ -24,17 +24,19 @@
 #include "jit/auto_opt_config.h"
 #include "jit/cpu/tensorexpr/nnc_fuser_register.h"
 #include "utils/fpmath_mode.h"
+#include "utils/isa_utils.h"
+#include "utils/module_version.h"
 #include "utils/onednn_utils.h"
 
 #include <c10/core/DeviceType.h>
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/api/include/torch/python.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
-#include "autocast/autocast_kernels.h"
-#include "autocast/autocast_mode.h"
+#include "aten/GradScaler.h"
 
 #include "TaskModule.h"
 #include "aten/EmbeddingBag.h"
+#include "comm/comm.h"
 #include "runtime/CPUPool.h"
 #include "runtime/TaskExecutor.h"
 #include "toolkit/sklearn.h"
@@ -91,20 +93,34 @@ void InitIpexModuleBindings(py::module m) {
   m.def("onednn_has_fp16_support", []() {
     return torch_ipex::utils::onednn_has_fp16_type_support();
   });
+  m.def("onednn_has_fp8_support", []() {
+    return torch_ipex::utils::onednn_has_fp8_type_support();
+  });
 
-  // ipex amp autocast
-  m.def("get_autocast_dtype", []() {
-    at::ScalarType current_dtype = torch_ipex::autocast::get_autocast_dtype();
-    auto dtype = (PyObject*)torch::getTHPDtype(current_dtype);
-    Py_INCREF(dtype);
-    return py::reinterpret_steal<py::object>(dtype);
+  m.def("isa_has_amx_fp16_support", []() {
+    return torch_ipex::utils::isa_has_amx_fp16_support();
   });
-  m.def("set_autocast_dtype", [](py::object dtype) {
-    at::ScalarType target_dtype =
-        torch::python::detail::py_object_to_dtype(dtype);
-    torch_ipex::autocast::set_autocast_dtype(target_dtype);
+  m.def("isa_has_avx512_fp16_support", []() {
+    return torch_ipex::utils::isa_has_avx512_fp16_support();
   });
-  m.def("clear_autocast_cache", &torch_ipex::autocast::clear_autocast_cache);
+  m.def("isa_has_amx_support", []() {
+    return torch_ipex::utils::isa_has_amx_support();
+  });
+  m.def("isa_has_avx512_bf16_support", []() {
+    return torch_ipex::utils::isa_has_avx512_bf16_support();
+  });
+  m.def("isa_has_avx512_vnni_support", []() {
+    return torch_ipex::utils::isa_has_avx512_vnni_support();
+  });
+  m.def("isa_has_avx512_support", []() {
+    return torch_ipex::utils::isa_has_avx512_support();
+  });
+  m.def("isa_has_avx2_vnni_support", []() {
+    return torch_ipex::utils::isa_has_avx2_vnni_support();
+  });
+  m.def("isa_has_avx2_support", []() {
+    return torch_ipex::utils::isa_has_avx2_support();
+  });
 
   m.def("set_fp32_math_mode", [](FP32MathMode mode) {
     torch_ipex::setFP32MathModeCpu(mode);
@@ -112,10 +128,10 @@ void InitIpexModuleBindings(py::module m) {
 
   m.def("get_fp32_math_mode", &torch_ipex::getFP32MathModeCpu);
 
-  m.def("_amp_update_scale_", &torch_ipex::autocast::_amp_update_scale_cpu_);
+  m.def("_amp_update_scale_", &torch_ipex::cpu::_amp_update_scale_cpu_);
   m.def(
       "_amp_foreach_non_finite_check_and_unscale_",
-      &torch_ipex::autocast::_amp_foreach_non_finite_check_and_unscale_cpu_);
+      &torch_ipex::cpu::_amp_foreach_non_finite_check_and_unscale_cpu_);
 
   // llga path
   m.def(
@@ -252,6 +268,22 @@ void InitIpexModuleBindings(py::module m) {
   m.def("tpp_clip_grad_norm", &torch_ipex::tpp::clip_grad_norm);
   m.def("tpp_fused_lamb", &torch_ipex::tpp::fused_lamb);
   m.def("tpp_fused_lamb_v2", &torch_ipex::tpp::fused_lamb_v2);
+
+  // communication related
+  m.def("get_rank", &torch_ipex::cpu::get_rank);
+  m.def("get_world_size", &torch_ipex::cpu::get_world_size);
+  m.def("barrier", &torch_ipex::cpu::barrier);
+
+  // Module version
+  m.def("_get_mkl_version", []() {
+    return torch_ipex::utils::get_mkl_version();
+  });
+  m.def("_get_libxsmm_version", []() {
+    return torch_ipex::utils::get_libxsmm_version();
+  });
+  m.def("_get_ideep_version", []() {
+    return torch_ipex::utils::get_ideep_version();
+  });
 }
 } // namespace
 

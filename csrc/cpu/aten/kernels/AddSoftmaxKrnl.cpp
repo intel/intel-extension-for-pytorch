@@ -251,6 +251,8 @@ at::Tensor div_add_softmax_kernel_impl(
   } else if (
       a.scalar_type() == at::kBFloat16 && b.scalar_type() == at::kBFloat16) {
     return dil_div_add_softmax<at::BFloat16>(a, b, dim_per_head);
+  } else if (a.scalar_type() == at::kHalf && b.scalar_type() == at::kHalf) {
+    return dil_div_add_softmax<at::Half>(a, b, dim_per_head);
   }
 #endif
   a = at::div(a, dim_per_head);
@@ -271,8 +273,10 @@ at::Tensor& add_softmax_inplace_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(div_add_softmax_kernel_stub, &div_add_softmax_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
+    div_add_softmax_kernel_stub,
+    &div_add_softmax_kernel_impl);
+IPEX_REGISTER_DISPATCH(
     add_softmax_inplace_kernel_stub,
     &add_softmax_inplace_kernel_impl);
 

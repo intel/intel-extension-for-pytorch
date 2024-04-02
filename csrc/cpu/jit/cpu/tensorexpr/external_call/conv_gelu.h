@@ -44,8 +44,8 @@ struct LoweringFuncTrait<ConvFusedOp::kConvGelu> : public ConvCommonOperations {
     //     2: conv op context
     constexpr int input_idx = 0; // input tensor
     constexpr int ctx_idx = 2; // Conv context
-    res.push_back(c10::get<pytnnc::BufHandle>(inputs[input_idx]));
-    res.push_back(c10::get<pytnnc::BufHandle>(inputs[ctx_idx]));
+    res.push_back(std::get<pytnnc::BufHandle>(inputs[input_idx]));
+    res.push_back(std::get<pytnnc::BufHandle>(inputs[ctx_idx]));
     return res;
   }
 
@@ -53,7 +53,7 @@ struct LoweringFuncTrait<ConvFusedOp::kConvGelu> : public ConvCommonOperations {
       const std::vector<pytnnc::ArgValue>& inputs) {
     constexpr int approximate_idx = 1;
     std::vector<pytnnc::ExprHandle> extra_args;
-    auto approximate = c10::get_if<std::string>(&inputs[approximate_idx]);
+    auto approximate = std::get_if<std::string>(&inputs[approximate_idx]);
     if (approximate_str2int_map.find(*approximate) ==
         approximate_str2int_map.end()) {
       TORCH_CHECK(false, "conv_gelu only support tanh approximate now");

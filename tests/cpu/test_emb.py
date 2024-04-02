@@ -154,26 +154,6 @@ class TestEMB(TestCase):
         out = script_emb(input, offsets)
         self.assertEqual(out, ref_out)
 
-    def test_emb_torch_compile(self):
-        emb = Embeddingbag().eval()
-        input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
-        offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
-        for dtype, compiler_backend, dynamic in itertools.product(
-            [torch.float32, torch.bfloat16],
-            ["torchscript", "inductor"],
-            [True, False],
-        ):
-            torch._dynamo.reset()
-            ipex._set_compiler_backend(compiler_backend)
-            emb_torchcompile = torch.compile(emb, dynamic=dynamic, backend="ipex")
-            with torch.cpu.amp.autocast(
-                enabled=(dtype == torch.bfloat16)
-            ), torch.no_grad():
-                y0 = emb(input, offsets)
-                y1 = emb_torchcompile(input, offsets)
-            self.assertEqual(y0, y1)
-            self.assertEqual(y1.dtype, dtype)
-
 
 if __name__ == "__main__":
     test = unittest.main()

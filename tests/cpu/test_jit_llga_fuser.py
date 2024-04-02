@@ -166,6 +166,19 @@ class TestOp(JitLlgaTestCase):
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
+            stride = []
+            m = nn.AvgPool2d(
+                kernel_size=kernel,
+                stride=stride,
+                padding=padding,
+                ceil_mode=ceil_mode,
+                count_include_pad=count_include_pad,
+            )
+
+            x = torch.rand(1, 4, spatial, spatial)
+            graph, _ = self.checkTrace(m, [x])
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+
     @llga_fp32_bf16_test_env
     @unittest.skipIf(True, "Enable once size peephole is supported")
     def test_variable_kernel_avg_pool2d(self):
@@ -406,6 +419,21 @@ class TestOp(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
+    def test_max_two_outputs(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+
+            def forward(self, x):
+                # max is unary, and would have 2 outputs
+                return torch.max(x, dim=1)
+
+        m = M()
+        x = torch.rand(8, 12, 12, 12)
+        graph, _ = self.checkTrace(m, [x])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+
+    @llga_fp32_bf16_test_env
     def test_bmm_div(self):
         class M(nn.Module):
             def __init__(self):
@@ -421,6 +449,27 @@ class TestOp(JitLlgaTestCase):
         graph, _ = self.checkTrace(m, [x, y])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
         self.assertFused(graph, ["aten::matmul", "aten::div"])
+
+    @llga_fp32_bf16_test_env
+    def test_bmm_div_with_double_dt(self):
+        class M(nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.divisor = torch.randn(1, dtype=torch.float64)
+
+            def forward(self, x, y):
+                return x.matmul(y) / self.divisor
+
+        x = torch.randn(128, 16, 384, 64)
+        y = torch.randn(128, 16, 64, 384)
+        m = M()
+
+        graph, _ = self.checkTrace(m, [x, y])
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        # no need to do data type promotion for `Double` which llga doesn't
+        # support
+        self.assertGraphContainsExactly(graph, "aten::to", 0)
+        self.assertFused(graph, ["aten::matmul"])
 
     @llga_fp32_bf16_test_env
     def test_bmm_div_add(self):

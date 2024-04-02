@@ -20,8 +20,8 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(GroupNormKernel);
-DEFINE_DISPATCH(GroupNormBackwardKernel);
+IPEX_DEFINE_DISPATCH(GroupNormKernel);
+IPEX_DEFINE_DISPATCH(GroupNormBackwardKernel);
 
 void check_group_norm_inputs(
     const at::Tensor& input,

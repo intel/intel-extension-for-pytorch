@@ -1,16 +1,24 @@
 #define TORCH_ASSERT_ONLY_METHOD_OPERATORS
 #define _USE_MATH_DEFINES
 
-#include "autocast_kernels.h"
+#include <ATen/Dispatch.h>
+#include <ATen/OpMathType.h>
+#include <ATen/core/Tensor.h>
+#include <ATen/cpu/vec/functional.h>
+#include <ATen/native/TensorIterator.h>
+#include <ATen/native/cpu/Loops.h>
+#include <aten/GradScaler.h>
 
 namespace torch_ipex {
-namespace autocast {
+namespace cpu {
 
-void check_foreach_api_restrictions(at::TensorList tensors) {
+namespace {
+
+void check_foreach_api_restrictions(std::vector<at::Tensor> tensors) {
   TORCH_CHECK(!tensors.empty(), "Tensor list must have at least one tensor.");
 }
 
-// Follow the implements of PyTorch.
+// Follow the implementations of PyTorch.
 // Multiplies each tensor in scaled_grads by inv_scale in-place.
 // If any element of any tensor in scaled_grads is inf or NaN, sets found_inf
 // to 1.0.
@@ -23,7 +31,7 @@ void check_foreach_api_restrictions(at::TensorList tensors) {
 //             the caller.
 // inv_scale:  The inverse of the scale factor by which scaled_grads are
 // currently multiplied.
-void _amp_foreach_non_finite_check_and_unscale_cpu_(
+void _amp_foreach_non_finite_check_and_unscale_cpu_kernel(
     std::vector<at::Tensor> scaled_grads,
     at::Tensor& found_inf,
     const at::Tensor& inv_scale) {
@@ -55,29 +63,81 @@ void _amp_foreach_non_finite_check_and_unscale_cpu_(
         "one of scaled_grads was not a strided tensor.");
     auto iter = at::TensorIterator::unary_op(
         const_cast<at::Tensor&>(t), const_cast<at::Tensor&>(t));
-    AT_DISPATCH_FLOATING_TYPES_AND(
-        at::kHalf,
-        iter.dtype(),
-        "_amp_foreach_non_finite_check_and_unscale_cpu",
-        [&iter, &t, &found_inf, &inv_scale] {
-          auto* found_inf_ptr = found_inf.data_ptr<float>();
-          auto* inv_scale_ptr = inv_scale.data_ptr<float>();
+    if (at::isReducedFloatingType(iter.dtype())) {
+      AT_DISPATCH_REDUCED_FLOATING_TYPES(
+          iter.dtype(),
+          "_amp_foreach_non_finite_check_and_unscale_cpu",
+          [&iter, &found_inf, &inv_scale] {
+            auto* found_inf_ptr = found_inf.data_ptr<float>();
+            auto* inv_scale_ptr = inv_scale.data_ptr<float>();
 
-          using opmath_t = at::opmath_type<scalar_t>;
+            using opmath_t = at::opmath_type<scalar_t>;
 
-          at::native::cpu_kernel(
-              iter,
-              [found_inf_ptr, inv_scale_ptr](scalar_t val_in) -> scalar_t {
-                auto val = static_cast<opmath_t>(val_in);
-                if (!isfinite(val)) {
-                  *found_inf_ptr = 1.f;
-                }
-                // Every thread accesses inv_scale, but it will hit in cache.
-                const auto inv_scale_val = *inv_scale_ptr;
-                return static_cast<scalar_t>(
-                    inv_scale_val == 1.f ? val : val * inv_scale_val);
-              });
-        });
+            at::native::cpu_kernel_vec(
+                iter,
+                [found_inf_ptr, inv_scale_ptr](scalar_t val_in) -> scalar_t {
+                  auto val = static_cast<opmath_t>(val_in);
+                  if (!std::isfinite(val)) {
+                    *found_inf_ptr = 1.f;
+                  }
+                  // Every thread accesses inv_scale, but it will hit in cache.
+                  const auto inv_scale_val = *inv_scale_ptr;
+                  return static_cast<scalar_t>(
+                      inv_scale_val == 1.f ? val : val * inv_scale_val);
+                },
+                [found_inf_ptr,
+                 inv_scale_ptr](at::vec::Vectorized<scalar_t> val_vec)
+                    -> at::vec::Vectorized<scalar_t> {
+                  at::vec::Vectorized<opmath_t> val_vec0, val_vec1;
+                  std::tie(val_vec0, val_vec1) =
+                      at::vec::convert_to_float<scalar_t>(val_vec);
+                  if (val_vec0.has_inf_nan() || val_vec1.has_inf_nan()) {
+                    *found_inf_ptr = 1.f;
+                  }
+                  // Every thread accesses inv_scale, but it will hit in cache.
+                  const auto inv_scale_val = *inv_scale_ptr;
+                  val_vec0 = inv_scale_val == 1.f
+                      ? val_vec0
+                      : val_vec0 * at::vec::Vectorized<opmath_t>(inv_scale_val);
+                  val_vec1 = inv_scale_val == 1.f
+                      ? val_vec1
+                      : val_vec1 * at::vec::Vectorized<opmath_t>(inv_scale_val);
+                  return at::vec::convert_from_float<scalar_t>(
+                      val_vec0, val_vec1);
+                });
+          });
+    } else {
+      AT_DISPATCH_FLOATING_TYPES(
+          iter.dtype(),
+          "_amp_foreach_non_finite_check_and_unscale_cpu",
+          [&iter, &found_inf, &inv_scale] {
+            auto* found_inf_ptr = found_inf.data_ptr<float>();
+            auto* inv_scale_ptr = inv_scale.data_ptr<float>();
+            at::native::cpu_kernel_vec(
+                iter,
+                [found_inf_ptr, inv_scale_ptr](scalar_t val_in) -> scalar_t {
+                  if (!std::isfinite(val_in)) {
+                    *found_inf_ptr = 1.f;
+                  }
+                  // Every thread accesses inv_scale, but it will hit in cache.
+                  const auto inv_scale_val = *inv_scale_ptr;
+                  return static_cast<scalar_t>(
+                      inv_scale_val == 1.f ? val_in : val_in * inv_scale_val);
+                },
+                [found_inf_ptr,
+                 inv_scale_ptr](at::vec::Vectorized<scalar_t> val_vec)
+                    -> at::vec::Vectorized<scalar_t> {
+                  if (val_vec.has_inf_nan()) {
+                    *found_inf_ptr = 1.f;
+                  }
+                  // Every thread accesses inv_scale, but it will hit in cache.
+                  const auto inv_scale_val = *inv_scale_ptr;
+                  return inv_scale_val == 1.f
+                      ? val_vec
+                      : val_vec * at::vec::Vectorized<scalar_t>(inv_scale_val);
+                });
+          });
+    }
   }
 }
 
@@ -98,7 +158,7 @@ void _amp_foreach_non_finite_check_and_unscale_cpu_(
 //
 // Returns:
 // current_scale
-at::Tensor& _amp_update_scale_cpu_(
+at::Tensor& _amp_update_scale_cpu_kernel(
     at::Tensor& current_scale,
     at::Tensor& growth_tracker,
     const at::Tensor& found_inf,
@@ -136,7 +196,11 @@ at::Tensor& _amp_update_scale_cpu_(
     // so growth_tracker is incremented before comparing to growth_interval.
     auto successful = (*growth_tracker_ptr) + 1;
     if (successful == growth_interval) {
-      *current_scale_ptr = (*current_scale_ptr) * growth_factor;
+      auto new_scale = static_cast<float>((*current_scale_ptr) * growth_factor);
+      // Do not grow the scale past fp32 bounds to inf.
+      if (std::isfinite(new_scale)) {
+        *current_scale_ptr = new_scale;
+      }
       *growth_tracker_ptr = 0;
     } else {
       *growth_tracker_ptr = successful;
@@ -146,5 +210,14 @@ at::Tensor& _amp_update_scale_cpu_(
   return current_scale;
 }
 
-} // namespace autocast
+} // namespace
+
+IPEX_REGISTER_DISPATCH(
+    _amp_foreach_non_finite_check_and_unscale_cpu_stub,
+    &_amp_foreach_non_finite_check_and_unscale_cpu_kernel);
+IPEX_REGISTER_DISPATCH(
+    _amp_update_scale_cpu_stub,
+    &_amp_update_scale_cpu_kernel);
+
+} // namespace cpu
 } // namespace torch_ipex

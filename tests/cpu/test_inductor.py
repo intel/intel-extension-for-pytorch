@@ -214,7 +214,7 @@ class TestIpexInductor(TestCase):
         def fn(x: torch.Tensor, y: torch.Tensor):
             return torch.matmul(torch.softmax(x / 10 + 10, -1), y)
 
-        from intel_extension_for_pytorch._inductor.cpu.lowering import register_lowering
+        from intel_extension_for_pytorch._inductor.lowering import register_lowering
         from torch._inductor.lowering import aten
         from torch._inductor.ir import TensorBox, Reduction
         from torch._inductor.virtualized import ops, V

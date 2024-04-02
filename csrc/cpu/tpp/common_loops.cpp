@@ -358,6 +358,35 @@ static void par_nested_loops_ACb(
   }
 }
 
+static void par_nested_loops_ABCD(
+    LoopSpecs* loopSpecs,
+    std::function<void(int*)> body_func,
+    std::function<void()> init_func,
+    std::function<void()> fini_func) {
+#pragma omp parallel
+  {
+    if (init_func)
+      init_func();
+#pragma omp for collapse(4) nowait
+    for (int a0 = loopSpecs[0].start; a0 < loopSpecs[0].end;
+         a0 += loopSpecs[0].step) {
+      for (int b0 = loopSpecs[1].start; b0 < loopSpecs[1].end;
+           b0 += loopSpecs[1].step) {
+        for (int c0 = loopSpecs[2].start; c0 < loopSpecs[2].end;
+             c0 += loopSpecs[2].step) {
+          for (int d0 = loopSpecs[3].start; d0 < loopSpecs[3].end;
+               d0 += loopSpecs[3].step) {
+            int ind[4] = {a0, b0, c0, d0};
+            body_func(ind);
+          }
+        }
+      }
+    }
+    if (fini_func)
+      fini_func();
+  }
+}
+
 std::unordered_map<std::string, par_loop_kernel> pre_defined_loops = {
     {"A", par_nested_loops_A},
     {"AB", par_nested_loops_AB},
@@ -373,6 +402,7 @@ std::unordered_map<std::string, par_loop_kernel> pre_defined_loops = {
     {"ABc", par_nested_loops_ABc},
     {"CAB", par_nested_loops_CAB},
     {"ACb", par_nested_loops_ACb},
+    {"ABCD", par_nested_loops_ABCD},
 };
 } // namespace tpp
 } // namespace torch_ipex

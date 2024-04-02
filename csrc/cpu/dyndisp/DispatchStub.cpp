@@ -53,7 +53,7 @@ CPUCapability _get_highest_cpu_support_isa_level() {
     return CPUCapability::AVX512_BF16;
   } else if (CPUFeature::get_instance().isa_level_avx512_vnni()) {
     return CPUCapability::AVX512_VNNI;
-  } else if (CPUFeature::get_instance().isa_level_avx512_core()) {
+  } else if (CPUFeature::get_instance().isa_level_avx512()) {
     return CPUCapability::AVX512;
   }
   if (CPUFeature::get_instance().isa_level_avx2_vnni()) {

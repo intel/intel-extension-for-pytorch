@@ -315,8 +315,8 @@ void copy_kernel(at::TensorIterator& iter, bool /*non_blocking*/) {
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(index_select_contig_stub, &index_select_contig_kernel);
-REGISTER_DISPATCH(copy_stub, &copy_kernel);
+IPEX_REGISTER_DISPATCH(index_select_contig_stub, &index_select_contig_kernel);
+IPEX_REGISTER_DISPATCH(copy_stub, &copy_kernel);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -10,7 +10,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(nms_kernel_stub);
+IPEX_DEFINE_DISPATCH(nms_kernel_stub);
 
 at::Tensor nms_kernel(
     const at::Tensor& dets,

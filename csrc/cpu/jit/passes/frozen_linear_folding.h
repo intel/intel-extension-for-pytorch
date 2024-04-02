@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Macros.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include "graph_rewrite.h"
 #include "graph_rewrite_utils.h"
@@ -8,7 +9,7 @@ namespace torch_ipex {
 namespace jit {
 namespace graph_rewrite {
 
-struct TORCH_API LinearBNParameters {
+struct IPEX_API LinearBNParameters {
   at::Tensor linear_w;
   at::Tensor linear_b;
   at::Tensor bn_rm;
@@ -25,7 +26,7 @@ struct TORCH_API LinearBNParameters {
  *
  * The function is basically copied from torch/nn/utils/fusion.py
  */
-TORCH_API std::tuple<at::Tensor, at::Tensor> computeUpdatedLinearWeightAndBias(
+IPEX_API std::tuple<at::Tensor, at::Tensor> computeUpdatedLinearWeightAndBias(
     const LinearBNParameters& p);
 
 // Fuses Linear -> BatchNormNd into a single Linear by

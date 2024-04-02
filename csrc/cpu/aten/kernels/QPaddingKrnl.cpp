@@ -458,14 +458,18 @@ void reflection_pad3d_kernel_impl(
 } // anonymous namespace
 
 // replication padding
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     replication_pad2d_kernel_stub,
     &replication_pad2d_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     replication_pad3d_kernel_stub,
     &replication_pad3d_kernel_impl);
-REGISTER_DISPATCH(reflection_pad2d_kernel_stub, &reflection_pad2d_kernel_impl);
-REGISTER_DISPATCH(reflection_pad3d_kernel_stub, &reflection_pad3d_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    reflection_pad2d_kernel_stub,
+    &reflection_pad2d_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    reflection_pad3d_kernel_stub,
+    &reflection_pad3d_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -11,6 +11,16 @@ set(DNNL_ENABLE_PRIMITIVE_CACHE TRUE CACHE BOOL "" FORCE)
 set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 #find_package(TorchCCL REQUIRED)
+# Find OneCCL Lib
+set(DEPENDS_LIB)
+if(USE_CCL)
+  include(${IPEX_ROOT_DIR}/cmake/Modules/FindoneCCL.cmake)
+  # Find OneCCL Lib
+  link_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/oneCCL/deps/mpi/lib)
+  find_package(oneCCL REQUIRED)
+  list(APPEND DEPENDS_LIB oneCCL)
+  list(APPEND DEPENDS_LIB mpi)
+endif()   
 
 # TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX
 # use the oneDNN in llga temporarily: third_party/llga/third_party/oneDNN
@@ -29,6 +39,20 @@ add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn ${THIRD_PARTY_BU
 IF(IPEX_DISP_OP)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_DISP_OP")
 ENDIF()
+
+if(USE_LIBXSMM)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_LIBXSMM")
+endif(USE_LIBXSMM)
+
+if(USE_CCL)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_CCL") 
+endif(USE_CCL)
+
+if(USE_SHM)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_SHM")
+endif(USE_SHM)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBUILD_IPEX_MAIN_LIB")
 
 # ---[ Main build
 # include mkl-dnn before PyTorch
@@ -67,15 +91,20 @@ add_subdirectory(${IPEX_CPU_ROOT_DIR}/isa)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/toolkit)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/runtime)
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/utils)
-add_subdirectory(${IPEX_CPU_ROOT_DIR}/tpp)
+add_subdirectory(${IPEX_CPU_ROOT_DIR}/comm)
 
 add_subdirectory(${IPEX_CPU_ROOT_DIR}/jit)
 
 add_subdirectory(${IPEX_JIT_CPP_ROOT} jit_common)
 add_subdirectory(${IPEX_UTLIS_CPP_ROOT} csrc_utlis)
 
+if(USE_LIBXSMM)
+  add_subdirectory(${IPEX_CPU_ROOT_DIR}/tpp)
+endif(USE_LIBXSMM)
+
 set(IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_DYNDISP_SRCS} ${IPEX_CPU_CPP_ISA_SRCS_GEN} ${IPEX_CPU_CPP_UTILS_SRCS} ${IPEX_CPU_CPP_QUANTIZATION_SRCS} ${IPEX_CPU_CPP_JIT_SRCS} ${IPEX_JIT_COMMON_CPP_SRCS}
-    ${IPEX_CPU_CPP_ISA_SRCS} ${IPEX_CPU_CPP_IDEEP_SRCS} ${IPEX_CPU_CPP_AUTOCAST_SRCS} ${IPEX_CPU_CPP_ATEN_SRCS} ${IPEX_CPU_CPP_RUNTIME_SRCS} ${IPEX_CPU_CPP_TOOLKIT_SRCS} ${IPEX_UTLIS_CPP_SRCS} ${IPEX_CPU_CPP_TPP_SRCS})
+    ${IPEX_CPU_CPP_ISA_SRCS} ${IPEX_CPU_CPP_IDEEP_SRCS} ${IPEX_CPU_CPP_AUTOCAST_SRCS} ${IPEX_CPU_CPP_ATEN_SRCS} ${IPEX_CPU_CPP_RUNTIME_SRCS} ${IPEX_CPU_CPP_TOOLKIT_SRCS} ${IPEX_UTLIS_CPP_SRCS} 
+    ${IPEX_CPU_CPP_TPP_SRCS} ${IPEX_CPU_CPP_COMM_SRCS})
 
 list(REMOVE_ITEM IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_ISA_SRCS_ORIGIN})
 
@@ -84,21 +113,28 @@ list(REMOVE_ITEM IPEX_CPU_CPP_SRCS ${IPEX_CPU_CPP_ISA_SRCS_ORIGIN})
 
 add_library(${PLUGIN_NAME_CPU} SHARED ${IPEX_CPU_CPP_SRCS})
 
+# For IPEX_API macro
+target_compile_definitions(${PLUGIN_NAME_CPU} PUBLIC "BUILD_IPEX_MAIN_LIB")
+
 set_target_properties(${PLUGIN_NAME_CPU} PROPERTIES ONEDNN_INCLUDE_DIR "${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include")
 
 # includes
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_ROOT_DIR})
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_ROOT_DIR}/csrc/include)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR})
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/aten)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/utils)
-target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/tpp)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/jit)
 
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_JIT_CPP_ROOT})
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_UTLIS_CPP_ROOT})
 
-target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
+
+if(USE_LIBXSMM)
+  target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/tpp)
+  target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
+endif(USE_LIBXSMM)
 
 # path of oneDNN .h.in generated file
 file(RELATIVE_PATH CUR_DIR_REL_PATH "${IPEX_ROOT_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -108,6 +144,10 @@ target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${ONEDNN_GENERATED_INCLUDE}
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PYTHON_INCLUDE_DIR})
 
+if(USE_CCL)
+  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${DEPENDS_LIB})
+endif(USE_CCL)
+
 include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)
   file(GLOB_RECURSE ALL_CPU_NATIVE_CSRC_FILES ${IPEX_CPU_ROOT_DIR}/**.[ch] ${IPEX_CPU_ROOT_DIR}/**.[ch]pp)
@@ -115,24 +155,42 @@ if(CLANG_FORMAT)
   add_dependencies(${PLUGIN_NAME_CPU} CL_FORMAT_CPU_NATIVE_CSRC)
 endif()
 
-include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
-set(args
-CC=${CMAKE_C_COMPILER}
-CXX=${CMAKE_CXX_COMPILER}
-FC=${CMAKE_Fortran_COMPILER}
-)
+if(USE_LIBXSMM)
+  if(BUILD_LIBXSMM_VIA_CMAKE)
+    add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm cpu_third_party/libxsmm EXCLUDE_FROM_ALL)
+    add_definitions(-DLIBXSMM_DEFAULT_CONFIG)
+    target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
+    target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE xsmm)
+  else(BUILD_LIBXSMM_VIA_CMAKE)
+    include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
+    set(args
+    CC=${CMAKE_C_COMPILER}
+    CXX=${CMAKE_CXX_COMPILER}
+    FC=${CMAKE_Fortran_COMPILER}
+    )
 
-ExternalProject_Add(libxsmm
-  SOURCE_DIR ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm
-  BUILD_IN_SOURCE 1
-  CONFIGURE_COMMAND ""
-  BUILD_COMMAND
-    make
-    "-j"
-    ${args}
-  INSTALL_COMMAND ""
-  )
-target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
+    ExternalProject_Add(libxsmm
+      SOURCE_DIR ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm
+      BUILD_IN_SOURCE 1
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND
+        make
+        "-j"
+        ${args}
+      INSTALL_COMMAND ""
+      )
+    target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
+  endif(BUILD_LIBXSMM_VIA_CMAKE)
+endif(USE_LIBXSMM)
+
+# setup sleef options:
+set(SLEEF_BUILD_SHARED_LIBS OFF CACHE BOOL "Build sleef as static library" FORCE)
+set(SLEEF_BUILD_DFT OFF CACHE BOOL "Don't build sleef DFT lib" FORCE)
+set(SLEEF_BUILD_GNUABI_LIBS OFF CACHE BOOL "Don't build sleef gnuabi libs" FORCE)
+set(SLEEF_BUILD_TESTS OFF CACHE BOOL "Don't build sleef tests" FORCE)
+set(SLEEF_BUILD_SCALAR_LIB OFF CACHE BOOL "libsleefscalar will be built." FORCE)
+add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/sleef ${THIRD_PARTY_BUILD_PATH_NAME}/sleef EXCLUDE_FROM_ALL)
+target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE sleef)
 
 add_dependencies(${PLUGIN_NAME_CPU} dnnl)
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
@@ -160,7 +218,7 @@ endif()
 find_package(OMP QUIET)
 if(${OpenMP_FOUND})
   # It will use openmp lib of current compiler.
-  # message("!!!!!OpenMP_CXX_LIBRARIES: ${OpenMP_CXX_LIBRARIES}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
   target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC "${OpenMP_CXX_LIBRARIES}")
 endif()
 
@@ -188,12 +246,8 @@ if(BUILD_STRIPPED_BIN)
   set_target_properties(${PLUGIN_NAME_CPU} PROPERTIES LINK_FLAGS_RELEASE -s)
 endif()
 
-set(LIBRARIES_INSTALL)
 
 install(TARGETS ${PLUGIN_NAME_CPU}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-list(APPEND LIBRARIES_INSTALL ${PLUGIN_NAME_CPU})
-
-file(WRITE "${LIBRARIES_INSTALL_FILE_PREFIX}_cpu" "${LIBRARIES_INSTALL}")

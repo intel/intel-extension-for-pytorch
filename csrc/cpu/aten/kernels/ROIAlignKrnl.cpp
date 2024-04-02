@@ -786,10 +786,10 @@ at::Tensor roi_align_backward_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     roi_align_forward_kernel_stub,
     &roi_align_forward_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     roi_align_backward_kernel_stub,
     &roi_align_backward_kernel_impl);
 

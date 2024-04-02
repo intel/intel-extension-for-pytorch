@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import random
 import itertools
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from common_utils import TestCase
 import torch.autograd.functional as autogradF
 from copy import deepcopy
@@ -646,9 +647,9 @@ class CPUOPsTester(TestCase):
                 helper(input_format, grad_format)
 
     def test_groupNorm_mixed_dtype(self):
-        def helper(size, groups, memory_format):
+        def helper(size, groups, memory_format, dtype):
             channels = size[1]
-            input = torch.randn(size, dtype=torch.bfloat16).cpu()
+            input = torch.randn(size).cpu().to(dtype=dtype)
             input_bf1 = (
                 input.contiguous(memory_format=memory_format)
                 .detach()
@@ -656,7 +657,7 @@ class CPUOPsTester(TestCase):
             )
             input_bf2 = input_bf1.clone().detach().requires_grad_(True)
             input_f = input_bf1.float().detach().requires_grad_(True)
-            m_bf = nn.GroupNorm(groups, channels).cpu().bfloat16()
+            m_bf = nn.GroupNorm(groups, channels).cpu().to(dtype=dtype)
             m_f = deepcopy(m_bf).float()
             m_f2 = deepcopy(m_f)
             # bfloat16 input and bfloat16 parameters
@@ -667,7 +668,7 @@ class CPUOPsTester(TestCase):
             out3 = m_f2(input_f)
             torch.testing.assert_close(out, out2, atol=5e-3, rtol=5e-3)
             torch.testing.assert_close(out2.float(), out3, atol=5e-3, rtol=5e-3)
-            grad_out = torch.randn(out2.shape, dtype=torch.bfloat16).cpu()
+            grad_out = torch.randn(out2.shape).cpu().to(dtype=dtype)
             grad_out_bf1 = (
                 grad_out.contiguous(memory_format=memory_format)
                 .detach()
@@ -682,49 +683,59 @@ class CPUOPsTester(TestCase):
             # bfloat16 input grad and bfloat16 parameters
             out.backward(grad_out_bf1, retain_graph=True)
             torch.testing.assert_close(
-                m_f.weight.grad, m_f2.weight.grad, atol=1e-5, rtol=1e-5
-            )
-            torch.testing.assert_close(
-                input_bf2.grad.float(), input_f.grad, atol=5e-5, rtol=5e-3
+                m_f.weight.grad, m_f2.weight.grad, atol=2e-5, rtol=1e-5
             )
             torch.testing.assert_close(
                 m_f.bias.grad, m_f2.bias.grad, atol=1e-5, rtol=1e-5
             )
-            # full bf16 has lower precision compared with mixed bf16 and fp32 .
             torch.testing.assert_close(
-                m_bf.weight.grad.float(), m_f.weight.grad, atol=1e-3, rtol=1e-1
+                input_bf2.grad.float(), input_f.grad, atol=5e-5, rtol=5e-3
+            )
+            # full bf16 has lower precision compared with mixed bf16 and fp32.
+            atol = None
+            rtol = None
+            if dtype == torch.bfloat16:
+                atol = 1e-2
+                rtol = 1.3e-1
+            else:
+                assert dtype == torch.half
+                atol = 5e-3
+                rtol = 1.5e-2
+            torch.testing.assert_close(
+                m_bf.weight.grad.float(), m_f.weight.grad, atol=atol, rtol=rtol
             )
             torch.testing.assert_close(
-                m_bf.bias.grad.float(), m_f.bias.grad, atol=1e-3, rtol=1e-2
+                m_bf.bias.grad.float(), m_f.bias.grad, atol=atol, rtol=rtol
             )
             torch.testing.assert_close(
-                input_bf1.grad, input_bf2.grad, atol=1e-2, rtol=1e-2
+                input_bf1.grad, input_bf2.grad, atol=atol, rtol=rtol
             )
 
-        helper((1, 8, 4, 3), 2, torch.contiguous_format)
-        helper((1, 8, 4, 3), 2, torch.channels_last)
-        helper((1, 8, 3, 4), 4, torch.contiguous_format)
-        helper((1, 8, 3, 4), 4, torch.channels_last)
-        helper((4, 8, 40, 40), 4, torch.contiguous_format),
-        helper((4, 8, 40, 40), 4, torch.channels_last),
-        helper((4, 40, 40, 40), 2, torch.contiguous_format)
-        helper((4, 40, 40, 40), 2, torch.channels_last)
-        helper((1, 8, 40, 40), 4, torch.contiguous_format)
-        helper((1, 8, 40, 40), 2, torch.channels_last)
-        helper((1, 8, 40, 40), 2, torch.contiguous_format)
-        helper((1, 8, 50, 50), 2, torch.channels_last)
-        helper((1, 8, 50, 50), 4, torch.contiguous_format)
-        helper((1, 8, 50, 50), 4, torch.channels_last)
-        helper((1, 40, 50, 50), 2, torch.contiguous_format)
-        helper((1, 40, 50, 50), 2, torch.channels_last)
-        helper((1, 9, 3, 4, 5), 3, torch.contiguous_format)
-        helper((1, 9, 3, 4, 5), 3, torch.channels_last_3d)
-        helper((1, 60, 10, 10, 10), 3, torch.contiguous_format)
-        helper((1, 60, 10, 10, 10), 3, torch.channels_last_3d)
-        helper((1, 9, 10, 50, 50), 3, torch.contiguous_format)
-        helper((1, 9, 10, 50, 50), 3, torch.channels_last_3d)
-        helper((1, 60, 10, 50, 50), 3, torch.contiguous_format)
-        helper((1, 60, 10, 50, 50), 3, torch.channels_last_3d)
+        cl_formats = {4: torch.channels_last, 5: torch.channels_last_3d}
+        for dtype in [torch.bfloat16, torch.half]:
+            for shape, g in [
+                ((1, 8, 4, 3), 2),
+                ((1, 8, 3, 4), 4),
+                ((4, 40, 40, 40), 2),
+                ((4, 8, 40, 40), 4),
+                ((1, 8, 40, 40), 4),
+                ((1, 8, 40, 40), 2),
+                ((1, 8, 50, 50), 2),
+                ((1, 8, 50, 50), 4),
+                ((1, 40, 50, 50), 2),
+                ((1, 9, 3, 4, 5), 3),
+                ((1, 60, 10, 10, 10), 3),
+                ((1, 9, 10, 50, 50), 3),
+                ((1, 60, 10, 50, 50), 3),
+                ((1, 8, 65, 55), 2),
+                ((1, 3, 65, 55), 1),
+                ((1, 3, 20, 20), 1),
+            ]:
+                for is_cl in [False, True]:
+                    format = (
+                        cl_formats[len(shape)] if is_cl else torch.contiguous_format
+                    )
+                    helper(shape, g, format, dtype)
 
     def test_groupnorm_nhwc(self):
         def helper(self, size, groups, memory_format, dtype, is_mixed):
@@ -766,17 +777,18 @@ class CPUOPsTester(TestCase):
                 ref_out.is_contiguous(memory_format=torch.contiguous_format)
             )
             torch.testing.assert_close(out, ref_out)
-            # training: parameters in bfloat16 is not recommended
-            # if (dtype != torch.bfloat16) or is_mixed:
+            # parameters in bfloat16/Half is not recommended
+            atol = 5e-4
+            rtol = 8e-3
             torch.testing.assert_close(
-                gn.weight.grad, ref_gn.weight.grad, atol=5e-4, rtol=5e-4
+                gn.weight.grad, ref_gn.weight.grad, atol=atol, rtol=rtol
             )
             torch.testing.assert_close(
-                gn.bias.grad, ref_gn.bias.grad, atol=5e-4, rtol=5e-4
+                gn.bias.grad, ref_gn.bias.grad, atol=atol, rtol=rtol
             )
-            torch.testing.assert_close(input.grad, ref_input.grad, atol=5e-4, rtol=8e-3)
+            torch.testing.assert_close(input.grad, ref_input.grad, atol=atol, rtol=rtol)
 
-        for dtype in [torch.bfloat16, torch.float, torch.double]:
+        for dtype in [torch.float16, torch.bfloat16, torch.float, torch.double]:
             for is_mixed in [True, False]:
                 helper(self, (4, 8, 10, 10), 4, torch.channels_last, dtype, is_mixed)
                 helper(self, (2, 30, 9, 9), 3, torch.channels_last, dtype, is_mixed)
@@ -1390,6 +1402,86 @@ class CPUOPsTester(TestCase):
             y7 = torch.cat([x4, x4, x7], 0)
             self.assertTrue(y7.size() == torch.Size([8, 2]))
             self.assertTrue(y7.dtype == datatype)
+
+    def test_flash_attention(self):
+        dtypes = [torch.float, torch.double, torch.bfloat16]
+        if core.isa_has_amx_fp16_support():
+            dtypes.append(torch.float16)
+        for dtype in dtypes:
+            for causal, has_attention_mask in [
+                [False, False],
+                [True, False],
+                [False, True],
+            ]:
+                for batch_size, seq_len, n_head, head_dim in itertools.product(
+                    [2, 12], [1, 129, 267, 533, 1030], [1, 3, 4], [7, 8, 16]
+                ):
+                    atol = 1e-5
+                    rtol = 5e-6
+                    if dtype is torch.bfloat16:
+                        atol = 2e-2
+                        rtol = 2e-2
+                    if dtype is torch.float16:
+                        atol = 1e-2
+                        rtol = 1e-2
+
+                    n_embd = n_head * head_dim
+                    x = torch.randn(
+                        (batch_size, seq_len, 3 * n_head * head_dim),
+                        device="cpu",
+                        dtype=dtype,
+                        requires_grad=False,
+                    )
+                    x2 = x.clone()
+
+                    q, k, v = x.split(n_embd, dim=2)
+                    q2, k2, v2 = x2.split(n_embd, dim=2)
+
+                    if dtype in [torch.bfloat16, torch.float16]:
+                        q2 = q2.float()
+                        k2 = k2.float()
+                        v2 = v2.float()
+
+                    # (B, nh, T, hs)
+                    k = k.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    q = q.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    v = v.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    k2 = k2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    q2 = q2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+                    v2 = v2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
+
+                    mask = (
+                        torch.randn(
+                            (batch_size, 1, seq_len, seq_len),
+                            device="cpu",
+                            dtype=dtype,
+                            requires_grad=False,
+                        )
+                        if has_attention_mask
+                        else None
+                    )
+                    actual = torch.ops.torch_ipex.flash_attention(
+                        q,
+                        k,
+                        v,
+                        dropout_p=0.0,
+                        is_causal=causal,
+                        attention_mask=mask,
+                    )[0]
+                    math_ref = (
+                        torch._scaled_dot_product_attention_math(
+                            q2,
+                            k2,
+                            v2,
+                            attn_mask=mask,
+                            dropout_p=0.0,
+                            is_causal=causal,
+                        )
+                    )[0]
+
+                    if dtype in [torch.bfloat16, torch.float16]:
+                        math_ref = math_ref.to(dtype)
+                    torch.testing.assert_close(actual, math_ref, atol=atol, rtol=rtol)
 
 
 if __name__ == "__main__":

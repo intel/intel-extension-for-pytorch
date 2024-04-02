@@ -5,7 +5,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(rmsnorm_kernel_stub);
+IPEX_DEFINE_DISPATCH(rmsnorm_kernel_stub);
 
 at::Tensor dil_RMSNorm(
     const at::Tensor& input,

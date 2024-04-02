@@ -10,8 +10,8 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(roi_align_forward_kernel_stub);
-DEFINE_DISPATCH(roi_align_backward_kernel_stub);
+IPEX_DEFINE_DISPATCH(roi_align_forward_kernel_stub);
+IPEX_DEFINE_DISPATCH(roi_align_backward_kernel_stub);
 
 at::Tensor ROIAlign_forward_impl(
     const at::Tensor& input,

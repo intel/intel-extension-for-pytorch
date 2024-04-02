@@ -202,7 +202,7 @@ using avg_pool2d_kernel_fn = void (*)(
     int64_t,
     bool,
     c10::optional<int64_t>);
-DECLARE_DISPATCH(avg_pool2d_kernel_fn, avg_pool2d_kernel_stub);
+IPEX_DECLARE_DISPATCH(avg_pool2d_kernel_fn, avg_pool2d_kernel_stub);
 
 using avg_pool2d_backward_kernel_fn = void (*)(
     const at::Tensor&,
@@ -215,7 +215,7 @@ using avg_pool2d_backward_kernel_fn = void (*)(
     int,
     bool,
     c10::optional<int64_t>);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     avg_pool2d_backward_kernel_fn,
     avg_pool2d_backward_kernel_stub);
 
@@ -233,7 +233,7 @@ using avg_pool3d_kernel_fn = void (*)(
     int,
     bool,
     c10::optional<int64_t>);
-DECLARE_DISPATCH(avg_pool3d_kernel_fn, avg_pool3d_kernel_stub);
+IPEX_DECLARE_DISPATCH(avg_pool3d_kernel_fn, avg_pool3d_kernel_stub);
 
 using avg_pool3d_backward_kernel_fn = void (*)(
     const at::Tensor&,
@@ -249,7 +249,7 @@ using avg_pool3d_backward_kernel_fn = void (*)(
     int,
     bool,
     c10::optional<int64_t>);
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     avg_pool3d_backward_kernel_fn,
     avg_pool3d_backward_kernel_stub);
 

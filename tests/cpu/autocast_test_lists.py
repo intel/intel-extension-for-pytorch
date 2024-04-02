@@ -188,7 +188,7 @@ class AutocastCPUTestLists(object):
                 ),
             ),
         ]
-        self.torch_bf16_multi_output = [
+        self.torch_x16_multi_output = [
             (
                 "_native_multi_head_attention",
                 (
@@ -267,58 +267,11 @@ class AutocastCPUTestLists(object):
                 ),
             ),
         ]
-        self.torch_fp16 = []
-        self.torch_fp16_fp32_multi_output = [
-            (
-                "_native_multi_head_attention",
-                (
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
-                    768,
-                    12,
-                    torch.randn((2304, 768), device=dev, dtype=torch.float16),
-                    torch.randn((2304), device=dev, dtype=torch.float16),
-                    torch.randn((768, 768), device=dev, dtype=torch.float16),
-                    torch.randn((768), device=dev, dtype=torch.float16),
-                    None,
-                    False,
-                    True,
-                ),
-            ),
-            (
-                "_native_multi_head_attention",
-                (
-                    torch.randn((1, 2, 768), device=dev, dtype=torch.float16),
-                    torch.randn((1, 2, 768), device=dev, dtype=torch.float16),
-                    torch.randn((1, 2, 768), device=dev, dtype=torch.float16),
-                    768,
-                    12,
-                    torch.randn((2304, 768), device=dev, dtype=torch.float16),
-                    torch.randn((2304), device=dev, dtype=torch.float16),
-                    torch.randn((768, 768), device=dev, dtype=torch.float16),
-                    torch.randn((768), device=dev, dtype=torch.float16),
-                    torch.Tensor([[False, True]]),
-                    False,
-                    True,
-                    1,
-                ),
-            ),
-            (
-                "_transform_bias_rescale_qkv",
-                (
-                    torch.randn((1, 96, 1536), device=dev, dtype=torch.float16),
-                    torch.randn((1536), device=dev, dtype=torch.float16),
-                    8,
-                ),
-            ),
-        ]
-        self.nn_fp16 = []
-        self.torch_fp16_fp32 = [
-            ("conv1d", conv_args_fp16[0]),
-            ("conv2d", conv_args_fp16[1]),
-            ("conv3d", conv_args_fp16[2]),
-            ("conv_tbc", conv_args_fp16[0] + bias_fp16),
+        self.torch_fp16 = [
+            ("conv1d", conv_args_fp32[0]),
+            ("conv2d", conv_args_fp32[1]),
+            ("conv3d", conv_args_fp32[2]),
+            ("conv_tbc", conv_args_fp32[0] + bias_fp32),
             (
                 "_convolution",
                 conv_args_fp32[1]
@@ -328,32 +281,47 @@ class AutocastCPUTestLists(object):
             (
                 "bmm",
                 (
-                    torch.randn((n, n, n), device=dev, dtype=torch.float16),
-                    torch.randn((n, n, n), device=dev, dtype=torch.float16),
+                    torch.randn((n, n, n), device=dev, dtype=torch.float),
+                    torch.randn((n, n, n), device=dev, dtype=torch.float),
                 ),
             ),
-            ("mm", mat0_fp16 + mat1_fp16),
-            ("addmm", mat1_fp16 + mat2_fp16 + mat3_fp16),
+            ("mm", mat0_fp32 + mat1_fp32),
+            ("addmm", mat1_fp32 + mat2_fp32 + mat3_fp32),
             (
                 "addbmm",
-                mat0_fp16
+                mat0_fp32
                 + (
-                    torch.randn((n, n, n), device=dev, dtype=torch.float16),
-                    torch.randn((n, n, n), device=dev, dtype=torch.float16),
+                    torch.randn((n, n, n), device=dev, dtype=torch.float),
+                    torch.randn((n, n, n), device=dev, dtype=torch.float),
                 ),
             ),
             (
                 "baddbmm",
                 (
-                    torch.randn((n, n, n), device=dev, dtype=torch.float16),
-                    torch.randn((n, n, n), device=dev, dtype=torch.float16),
-                    torch.randn((n, n, n), device=dev, dtype=torch.float16),
+                    torch.randn((n, n, n), device=dev, dtype=torch.float),
+                    torch.randn((n, n, n), device=dev, dtype=torch.float),
+                    torch.randn((n, n, n), device=dev, dtype=torch.float),
                 ),
             ),
-            ("matmul", mat0_fp16 + mat1_fp16),
-            ("conv_transpose1d", conv_args_fp16[0]),
-            ("conv_transpose2d", conv_args_fp16[1]),
-            ("conv_transpose3d", conv_args_fp16[2]),
+            ("matmul", mat0_fp32 + mat1_fp32),
+            ("conv_transpose1d", conv_args_fp32[0]),
+            ("conv_transpose2d", conv_args_fp32[1]),
+            ("conv_transpose3d", conv_args_fp32[2]),
+        ]
+        self.nn_fp16 = []
+        self.torch_fp16_fp32 = [
+            ("_adaptive_avg_pool3d", dummy_fp16[3], {"output_size": (4, 4, 4)}),
+        ]
+        self.nn_fp16_fp32 = [
+            ("adaptive_avg_pool3d", dummy_fp16[3], {"output_size": (4, 4, 4)}),
+            (
+                "avg_pool3d",
+                dummy_fp16[3],
+                {"kernel_size": (3, 3, 3), "stride": (1, 1, 1)},
+            ),
+            ("adaptive_avg_pool3d", dummy_fp16[3], {"output_size": (4, 4, 4)}),
+        ]
+        self.torch_fallthrough_fp16 = [
             (
                 "group_norm",
                 (
@@ -364,20 +332,6 @@ class AutocastCPUTestLists(object):
                     1e-5,
                     True,
                 ),
-            ),
-            (
-                "batch_norm",
-                dummy_fp16[2],
-                {
-                    "weight": None,
-                    "bias": None,
-                    "running_mean": torch.rand((n), dtype=torch.float32),
-                    "running_var": torch.rand((n), dtype=torch.float32),
-                    "training": False,
-                    "momentum": 0.1,
-                    "eps": 1e-5,
-                    "cudnn_enabled": False,
-                },
             ),
             ("avg_pool1d", dummy_fp16[2], {"kernel_size": 3, "stride": 1}),
             (
@@ -392,13 +346,7 @@ class AutocastCPUTestLists(object):
                 "max_pool3d",
                 (torch.randn(10, 10, 10, 10, 10).to(torch.float16), 3, 2, 0, 1, False),
             ),
-            ("layer_norm", pointwise0_fp16 + ((pointwise0_fp16[0].numel(),),)),
             ("dropout", mat0_fp16 + (0.5,) + (False,)),
-            ("softmax", pointwise0_fp16 + (0,)),
-            ("log_softmax", pointwise0_fp16 + (0,)),
-            ("cumsum", pointwise0_fp16 + (0,)),
-            ("addcdiv", pointwise0_fp16 + pointwise1_fp16 + pointwise2_fp16),
-            ("addcmul", pointwise0_fp16 + pointwise1_fp16 + pointwise2_fp16),
             (
                 "_scaled_dot_product_attention_math",
                 (
@@ -407,27 +355,49 @@ class AutocastCPUTestLists(object):
                     torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
                 ),
             ),
-            ("topk", pointwise0_fp16 + (2,)),
-            ("_adaptive_avg_pool3d", dummy_fp16[3], {"output_size": (4, 4, 4)}),
         ]
-        self.nn_fp16_fp32 = [
-            ("linear", mat0_fp16 + mat1_fp16),
-            ("avg_pool2d", dummy_fp16[2], {"kernel_size": (3, 2), "stride": (1, 1)}),
+        self.torch_fallthrough_bf16 = [
+            ("topk", pointwise0_bf16 + (2,)),
+            ("layer_norm", pointwise0_bf16 + ((pointwise0_bf16[0].numel(),),)),
+            ("dropout", mat0_bf16 + (0.5,) + (False,)),
+            ("cumsum", pointwise0_bf16 + (0,)),
+            ("addcdiv", pointwise0_bf16 + pointwise1_bf16 + pointwise2_bf16),
+            ("addcmul", pointwise0_bf16 + pointwise1_bf16 + pointwise2_bf16),
             (
-                "avg_pool3d",
-                dummy_fp16[3],
-                {"kernel_size": (3, 3, 3), "stride": (1, 1, 1)},
-            ),
-            (
-                "scaled_dot_product_attention",
+                "_scaled_dot_product_attention_math",
                 (
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
                 ),
             ),
+        ]
+        self.torch_fallthrough_fp16 = [
+            ("topk", pointwise0_fp16 + (2,)),
+            ("softmax", pointwise0_fp16 + (0,)),
+            ("log_softmax", pointwise0_fp16 + (0,)),
+            ("cumsum", pointwise0_fp16 + (0,)),
+            ("addcdiv", pointwise0_fp16 + pointwise1_fp16 + pointwise2_fp16),
+            ("addcmul", pointwise0_fp16 + pointwise1_fp16 + pointwise2_fp16),
+            (
+                "batch_norm",
+                dummy_fp16[2],
+                {
+                    "weight": None,
+                    "bias": None,
+                    "running_mean": torch.rand((n), dtype=torch.float32),
+                    "running_var": torch.rand((n), dtype=torch.float32),
+                    "training": False,
+                    "momentum": 0.1,
+                    "eps": 1e-5,
+                    "cudnn_enabled": False,
+                },
+            ),
+            ("layer_norm", pointwise0_fp16 + ((pointwise0_fp16[0].numel(),),)),
+        ]
+        self.nn_fallthrough_fp16 = [
             ("adaptive_avg_pool2d", dummy_fp16[2], {"output_size": (4, 4)}),
-            ("adaptive_avg_pool3d", dummy_fp16[3], {"output_size": (4, 4, 4)}),
+            ("avg_pool2d", dummy_fp16[2], {"kernel_size": (3, 2), "stride": (1, 1)}),
             ("upsample_nearest1d", dummy_fp16[2], {"output_size": (n)}),
             ("upsample_nearest2d", dummy_fp16[3], {"output_size": (n, n)}),
             ("upsample_nearest3d", dummy_fp16[4], {"output_size": (n, n, n)}),
@@ -451,26 +421,17 @@ class AutocastCPUTestLists(object):
                 dummy_fp16[4],
                 {"output_size": (n, n, n), "align_corners": False},
             ),
-        ]
-        self.torch_fallthrough_bf16 = [
-            ("softmax", pointwise0_bf16 + (0,)),
-            ("log_softmax", pointwise0_bf16 + (0,)),
-            ("topk", pointwise0_bf16 + (2,)),
-            ("layer_norm", pointwise0_bf16 + ((pointwise0_bf16[0].numel(),),)),
-            ("dropout", mat0_bf16 + (0.5,) + (False,)),
-            ("cumsum", pointwise0_bf16 + (0,)),
-            ("addcdiv", pointwise0_bf16 + pointwise1_bf16 + pointwise2_bf16),
-            ("addcmul", pointwise0_bf16 + pointwise1_bf16 + pointwise2_bf16),
             (
-                "_scaled_dot_product_attention_math",
+                "scaled_dot_product_attention",
                 (
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
-                    torch.randn((1, 1, 768), device=dev, dtype=torch.bfloat16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
+                    torch.randn((1, 1, 768), device=dev, dtype=torch.float16),
                 ),
             ),
         ]
         self.nn_fallthrough_bf16 = [
+            ("linear", mat0_bf16 + mat1_bf16),
             (
                 "scaled_dot_product_attention",
                 (

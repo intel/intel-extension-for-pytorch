@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Macros.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/pass_manager.h>
 
@@ -14,20 +15,20 @@ static std::atomic<bool>& getLlgaEnabled() {
   return onednn_enabled;
 }
 
-TORCH_API bool is_llga_fp32_bf16_enabled();
+IPEX_API bool is_llga_fp32_bf16_enabled();
 
-TORCH_API void set_llga_fp32_bf16_enabled(bool new_enabled);
+IPEX_API void set_llga_fp32_bf16_enabled(bool new_enabled);
 
-TORCH_API void fuseGraph(std::shared_ptr<torch::jit::Graph>& g);
+IPEX_API void fuseGraph(std::shared_ptr<torch::jit::Graph>& g);
 
-TORCH_API void setLlgaWeightCacheEnabled(bool enabled);
+IPEX_API void setLlgaWeightCacheEnabled(bool enabled);
 
-TORCH_API bool getLlgaWeightCacheEnabled();
+IPEX_API bool getLlgaWeightCacheEnabled();
 
 } // namespace onednn
 } // namespace fuser
 
-struct TORCH_API RegisterLlgaFuseGraph
+struct IPEX_API RegisterLlgaFuseGraph
     : public torch::jit::PassManager<RegisterLlgaFuseGraph> {
   static bool setEnabled(bool enabled) {
     bool oldState = fuser::onednn::getLlgaEnabled();

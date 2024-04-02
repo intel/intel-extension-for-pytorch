@@ -16,3 +16,9 @@
 [submodule "third_party/spdlog"]
 	path = third_party/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "third_party/sleef"]
+	path = third_party/sleef
+	url = https://github.com/shibatch/sleef.git
+[submodule "third_party/oneCCL"]
+	path = third_party/oneCCL
+	url = https://github.com/oneapi-src/oneCCL.git

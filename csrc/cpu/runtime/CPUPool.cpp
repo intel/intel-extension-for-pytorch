@@ -1,5 +1,12 @@
 #include "CPUPool.h"
 
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <dlfcn.h>
+#include <unistd.h>
+#endif
+
 namespace torch_ipex {
 namespace runtime {
 
@@ -26,28 +33,57 @@ std::atomic<bool> iomp_symbol_loaded{false};
 thread_local std::vector<int32_t> current_cpu_core_list{-1};
 } // namespace
 
+void* open_iomp_library() {
+  void* handle = NULL;
+#ifdef _WIN32
+  // ToDo: need confirm search path:
+  return NULL;
+
+  handle =
+      LoadLibraryExA("libiomp5md.dll", NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
+#else
+  handle = dlopen(NULL, RTLD_NOW | RTLD_GLOBAL);
+#endif
+  return handle;
+}
+
+void* get_func_from_library(void* handle, const char* name) {
+#ifdef _WIN32
+  return GetProcAddress((HMODULE)handle, name);
+#else
+  return dlsym(handle, name);
+#endif
+}
+
 void loading_iomp_symbol() {
-  void* handle = dlopen(NULL, RTLD_NOW | RTLD_GLOBAL);
-  if (handle == NULL || dlsym(handle, "kmp_create_affinity_mask") == NULL ||
-      dlsym(handle, "kmp_set_affinity_mask_proc") == NULL ||
-      dlsym(handle, "kmp_set_affinity") == NULL ||
-      dlsym(handle, "kmp_get_affinity") == NULL ||
-      dlsym(handle, "kmp_destroy_affinity_mask") == NULL ||
-      dlsym(handle, "kmp_get_affinity_max_proc") == NULL) {
+  void* handle = open_iomp_library();
+  if (handle == NULL ||
+      get_func_from_library(handle, "kmp_create_affinity_mask") == NULL ||
+      get_func_from_library(handle, "kmp_set_affinity_mask_proc") == NULL ||
+      get_func_from_library(handle, "kmp_set_affinity") == NULL ||
+      get_func_from_library(handle, "kmp_get_affinity") == NULL ||
+      get_func_from_library(handle, "kmp_destroy_affinity_mask") == NULL ||
+      get_func_from_library(handle, "kmp_get_affinity_max_proc") == NULL) {
     iomp_symbol_loaded = false;
     return;
   }
 
   kmp_create_affinity_mask_ext =
-      (kmp_create_affinity_mask_p)dlsym(handle, "kmp_create_affinity_mask");
+      (kmp_create_affinity_mask_p)get_func_from_library(
+          handle, "kmp_create_affinity_mask");
   kmp_set_affinity_mask_proc_ext =
-      (kmp_set_affinity_mask_proc_p)dlsym(handle, "kmp_set_affinity_mask_proc");
-  kmp_set_affinity_ext = (kmp_set_affinity_p)dlsym(handle, "kmp_set_affinity");
-  kmp_get_affinity_ext = (kmp_get_affinity_p)dlsym(handle, "kmp_get_affinity");
+      (kmp_set_affinity_mask_proc_p)get_func_from_library(
+          handle, "kmp_set_affinity_mask_proc");
+  kmp_set_affinity_ext =
+      (kmp_set_affinity_p)get_func_from_library(handle, "kmp_set_affinity");
+  kmp_get_affinity_ext =
+      (kmp_get_affinity_p)get_func_from_library(handle, "kmp_get_affinity");
   kmp_destroy_affinity_mask_ext =
-      (kmp_destroy_affinity_mask_p)dlsym(handle, "kmp_destroy_affinity_mask");
+      (kmp_destroy_affinity_mask_p)get_func_from_library(
+          handle, "kmp_destroy_affinity_mask");
   kmp_get_affinity_max_proc_ext =
-      (kmp_get_affinity_max_proc_p)dlsym(handle, "kmp_get_affinity_max_proc");
+      (kmp_get_affinity_max_proc_p)get_func_from_library(
+          handle, "kmp_get_affinity_max_proc");
 
   iomp_symbol_loaded = true;
   return;
@@ -98,6 +134,12 @@ std::vector<int32_t> init_process_available_cores() {
     kmp_set_affinity_ext(&main_thread_pre_mask);
     kmp_destroy_affinity_mask_ext(&main_thread_pre_mask);
   } else {
+#ifdef _WIN32
+    int nproc_online = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+    for (int i = 0; i < nproc_online; i++) {
+      available_cpu_cores_internal.emplace_back(i);
+    }
+#else
     // When IOMP didn't preload, We support for IPEX init without preload IOMP.
     // But this information makes no sense and shouldn't be used without preload
     // IOMP.
@@ -126,6 +168,7 @@ std::vector<int32_t> init_process_available_cores() {
       throw std::runtime_error(
           "Fail to restore the main thread affinity in step3.");
     }
+#endif
   }
 
   return available_cpu_cores_internal;

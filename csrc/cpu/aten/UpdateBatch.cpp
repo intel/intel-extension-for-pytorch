@@ -11,7 +11,7 @@
 
 namespace torch_ipex {
 namespace cpu {
-DEFINE_DISPATCH(rnnt_update_batch_kernel_stub);
+IPEX_DEFINE_DISPATCH(rnnt_update_batch_kernel_stub);
 }
 } // namespace torch_ipex
 

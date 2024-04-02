@@ -336,12 +336,12 @@ class TestPrepackCases(TestCase):
                         ipex_model2 = ipex.optimize(
                             origin_model2, dtype=dtype, level="O1", inplace=True
                         )
-            if is_train or dtype == torch.float16:
+            if is_train:
                 self.assertTrue(ipex_model1.conv.weight.dtype == dtype)
                 self.assertTrue(ipex_model2.conv.weight.dtype == dtype)
 
             with torch.cpu.amp.autocast(enabled=True, dtype=dtype):
-                # original fp32 path
+                # original path
                 y1 = origin_model1(x1)
                 # ipex path with inplace=False
                 y2 = ipex_model1(x2)
@@ -1682,15 +1682,15 @@ class TestPrepackCases(TestCase):
     def _lstm_params_list(self):
         params_dict = {
             "input_size": [1, 2],
-            "hidden_size": [5, 16],
-            "num_layers": [1, 3],
+            "hidden_size": [2],
+            "num_layers": [1, 2],
             "bidirectional": [False, True],
             "bias": [False, True],
             "empty_state": [False, True],
             "batch_first": [False, True],
-            "dropout": [0, 0.4, 0.7, 1],
+            "dropout": [0, 0.4, 1],
             "batch_size": [1, 2],
-            "seq_len": [1, 3],
+            "seq_len": [1, 2],
         }
 
         params_list = []

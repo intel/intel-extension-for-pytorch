@@ -27,7 +27,7 @@ using add_swish_kernel_fn = at::Tensor (*)(
     at::Tensor&,
     const at::Tensor&,
     const at::Tensor&);
-DECLARE_DISPATCH(add_swish_kernel_fn, add_swish_kernel_stub);
+IPEX_DECLARE_DISPATCH(add_swish_kernel_fn, add_swish_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -214,7 +214,7 @@ at::Tensor cumsum_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(cumsum_kernel_stub, &cumsum_kernel_impl);
+IPEX_REGISTER_DISPATCH(cumsum_kernel_stub, &cumsum_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

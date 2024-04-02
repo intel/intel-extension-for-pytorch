@@ -55,9 +55,7 @@ static_qconfig = [
 
 dynamic_qconfig = [
     QConfig(
-        activation=PlaceholderObserver.with_args(
-            dtype=torch.float, compute_dtype=torch.quint8
-        ),
+        activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=True),
         weight=MinMaxObserver.with_args(
             dtype=torch.qint8, qscheme=torch.per_tensor_symmetric
         ),
@@ -429,7 +427,7 @@ class TestIpexOps(JitLlgaTestCase):
 
         def _lstm_params_list():
             params_dict = {
-                "input_size": [1, 32],
+                "input_size": [1],
                 "hidden_size": [16],
                 "num_layers": [3],
                 "bidirectional": [False, True],

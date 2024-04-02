@@ -1,14 +1,22 @@
 #include <aten/MultiHeadAttention.h>
+#include "csrc/cpu/tpp/woq/tla.h"
 #include "mkl.h"
 #include "vec/vec.h"
 
 namespace torch_ipex {
+using namespace tpp;
 namespace cpu {
 
 namespace {
 
-const std::vector<int64_t> qsplit_range{767, 191, 31};
-const std::vector<int64_t> qsplit_size{256, 64, 32};
+// `qsplit_ranges` and `qsplit_sizes` are for the segmented q block sizes,
+// where `qsplit_ranges` is a group of q lengths and `qsplit_sizes` is a group
+// of q block sizes. This segmented configuration is applied for all other
+// models (like BERT) except for Stable Diffusion. It is proved that Stable
+// Diffusion achieves a better performance with a fixed q block size (32).
+const std::vector<int64_t> qsplit_ranges{767, 191, 31};
+const std::vector<int64_t> qsplit_sizes{256, 64, 32};
+const int64_t qsplit_size = 32;
 const int64_t kvsplit_size = 512;
 
 #if defined(CPU_CAPABILITY_AVX512)
@@ -122,13 +130,7 @@ at::Tensor sd_mha_base_kernel(
     const double& scale) {
   at::Tensor output = at::empty({batchSize, qSize, hiddenSize}, at::kBFloat16);
 
-  int64_t qSplitSize = qSize;
-  for (int i = 0; i < qsplit_range.size(); ++i) {
-    if (qSize > qsplit_range[i]) {
-      qSplitSize = qsplit_size[i];
-      break;
-    }
-  }
+  int64_t qSplitSize = qSize >= qsplit_size ? qsplit_size : qSize;
   int64_t kvSplitSize = kvSize >= kvsplit_size ? kvsplit_size : kvSize;
 
   int64_t qSlice = (qSize - 1) / qSplitSize + 1;
@@ -147,6 +149,205 @@ at::Tensor sd_mha_base_kernel(
   at::Tensor dst_fp32 =
       at::empty({num_thread, qSplitSize, headSize}, at::kFloat);
 
+  auto output_ptr = output.data_ptr<at::BFloat16>();
+  auto qk_fp32_ptr = qk_fp32.data_ptr<float>();
+  auto qk_bf16_ptr = qk_bf16.data_ptr<at::BFloat16>();
+  auto qk_max_ptr = qk_max.data_ptr<float>();
+  auto qk_sum_ptr = qk_sum.data_ptr<float>();
+  auto dst_fp32_ptr = dst_fp32.data_ptr<float>();
+
+  // Create tpp kernels for Query @ Key
+  int qk_gemm_K = headSize % 2 == 0
+      ? headSize
+      : 2; // If K of Gemm is not even, use mkl gemm instead of tpp
+  // [qSplitSize,headSize] x [headSize,kvSplitSize] -> [qSplitSize,kvSplitSize]
+  auto qk_gemm_tpp = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
+      /*M*/ qSplitSize,
+      /*N*/ kvSplitSize,
+      /*K*/ qk_gemm_K,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ qStride,
+      /*ldb*/ kvSplitSize,
+      /*ldc*/ kvSplitSize,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1)));
+  auto qk_gemm_tpp_tail = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
+      /*M*/ qSplitSize,
+      /*N*/ kvTail,
+      /*K*/ qk_gemm_K,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ qStride,
+      /*ldb*/ kvTail,
+      /*ldc*/ kvTail,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1)));
+
+  // Create tpp transforms for Key
+  auto xform_k = XformTPP::XFORM_XPOSE_N2V_TPP;
+  auto xform_tpp_k = // [kvSplitSize,headSize] -> [headSize,kvSplitSize] with
+                     // vnni
+      SCOPEIT(
+          XformExtTPP<at::BFloat16>(
+              kvSplitSize,
+              qk_gemm_K,
+              qk_gemm_K,
+              kvSplitSize,
+              kStride,
+              kvSplitSize,
+              xform_k,
+              true),
+          XPOSE);
+  auto xform_tpp_k_tail = // [kvTail,headSize] -> [headSize,kvTail] with vnni
+      SCOPEIT(
+          XformExtTPP<at::BFloat16>(
+              kvTail,
+              qk_gemm_K,
+              qk_gemm_K,
+              kvTail,
+              kStride,
+              kvTail,
+              xform_k,
+              true),
+          XPOSE);
+
+  // Create tpp kernels for Attention @ Value
+  int av_gemm_K = kvSplitSize % 2 == 0
+      ? kvSplitSize
+      : 2; // If K of Gemm is not even, use mkl gemm instead of tpp
+  int av_gemm_K_tail = kvTail % 2 == 0
+      ? kvTail
+      : 2; // If K of Gemm is not even, use mkl gemm instead of tpp
+  // [qSplitSize,kvSplitSize] x [kvSplitSize,headSize] -> [qSplitSize,headSize]
+  auto av_gemm_tpp = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
+      /*M*/ qSplitSize,
+      /*N*/ headSize,
+      /*K*/ av_gemm_K,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ av_gemm_K,
+      /*ldb*/ headSize,
+      /*ldc*/ headSize,
+      /*beta*/ 1.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1)));
+  auto av_gemm_tpp_tail = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
+      /*M*/ qSplitSize,
+      /*N*/ headSize,
+      /*K*/ av_gemm_K_tail,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ av_gemm_K_tail,
+      /*ldb*/ headSize,
+      /*ldc*/ headSize,
+      /*beta*/ 1.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1)));
+  auto av_gemm_tpp_nobias = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
+      /*M*/ qSplitSize,
+      /*N*/ headSize,
+      /*K*/ av_gemm_K,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ av_gemm_K,
+      /*ldb*/ headSize,
+      /*ldc*/ headSize,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1)));
+  auto av_gemm_tpp_nobias_tail = SCOPEITGEMM((BrgemmTPP<at::BFloat16, float>(
+      /*M*/ qSplitSize,
+      /*N*/ headSize,
+      /*K*/ av_gemm_K_tail,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ av_gemm_K_tail,
+      /*ldb*/ headSize,
+      /*ldc*/ headSize,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1)));
+
+  // Create tpp transforms for Value
+  auto xform_v = XformTPP::XFORM_N2V_TPP;
+  auto xform_tpp_v = // [kvSplitSize,headSize] -> [kvSplitSize, headSize]
+      SCOPEIT(
+          XformExtTPP<at::BFloat16>(
+              av_gemm_K,
+              headSize,
+              av_gemm_K,
+              headSize,
+              kStride,
+              headSize,
+              xform_v,
+              true),
+          XPOSE);
+  auto xform_tpp_v_tail = // [kvTail,headSize] -> [kvTail, headSize]
+      SCOPEIT(
+          XformExtTPP<at::BFloat16>(
+              av_gemm_K_tail,
+              headSize,
+              av_gemm_K_tail,
+              headSize,
+              kStride,
+              headSize,
+              xform_v,
+              true),
+          XPOSE);
+
+  // Buffer to store Key and Value after transforms
+  at::Tensor key_t_reorder =
+      at::empty({batchSize, num_head, headSize, kvSize}, at::kBFloat16);
+  auto key_reorder_ptr = key_t_reorder.data_ptr<at::BFloat16>();
+  at::Tensor value_t_reorder =
+      at::empty({batchSize, num_head, kvSize, headSize}, at::kBFloat16);
+  auto value_reorder_ptr = value_t_reorder.data_ptr<at::BFloat16>();
+
+  // Reorder K, V
+#pragma omp parallel for collapse(3)
+  for (int i = 0; i < batchSize; ++i) {
+    for (int j = 0; j < num_head; ++j) {
+      for (int l = 0; l < kvSlice; ++l) {
+        if (l != kvSlice - 1) {
+          // main
+          if (headSize % 2 == 0) {
+            xform_tpp_k(
+                key + i * kvSize * kStride + headSize * j +
+                    l * kvSplitSize * kStride,
+                key_reorder_ptr + i * num_head * headSize * kvSize +
+                    j * headSize * kvSize + l * kvSplitSize * headSize);
+          }
+          if (kvSplitSize % 2 == 0) {
+            xform_tpp_v(
+                value + i * kvSize * vStride + headSize * j +
+                    l * kvSplitSize * vStride,
+                value_reorder_ptr + i * num_head * kvSize * headSize +
+                    j * kvSize * headSize + l * kvSplitSize * headSize);
+          }
+        } else {
+          // Tail
+          if (headSize % 2 == 0) {
+            xform_tpp_k_tail(
+                key + i * kvSize * kStride + headSize * j +
+                    l * kvSplitSize * kStride,
+                key_reorder_ptr + i * num_head * headSize * kvSize +
+                    j * headSize * kvSize + l * kvSplitSize * headSize);
+          }
+          if (kvTail % 2 == 0) {
+            xform_tpp_v_tail(
+                value + i * kvSize * vStride + headSize * j +
+                    l * kvSplitSize * vStride,
+                value_reorder_ptr + i * num_head * kvSize * headSize +
+                    j * kvSize * headSize + l * kvSplitSize * headSize);
+          }
+        }
+      }
+    }
+  }
+
 #pragma omp parallel for collapse(3)
   for (int i = 0; i < batchSize; ++i) {
     for (int j = 0; j < num_head; ++j) {
@@ -154,61 +355,119 @@ at::Tensor sd_mha_base_kernel(
         int qBlockSize = (k == qSlice - 1) ? qTail : qSplitSize;
         int ompIdx = omp_get_thread_num();
         _init_mha_buffer_kernel(
-            qk_max.data_ptr<float>() + ompIdx * qSplitSize,
-            qk_sum.data_ptr<float>() + ompIdx * qSplitSize,
+            qk_max_ptr + ompIdx * qSplitSize,
+            qk_sum_ptr + ompIdx * qSplitSize,
             qBlockSize);
 
         for (int l = 0; l < kvSlice; ++l) {
           int kvBlockSize = (l == kvSlice - 1) ? kvTail : kvSplitSize;
-          cblas_gemm_bf16bf16f32(
-              CblasRowMajor,
-              CblasNoTrans,
-              CblasTrans,
-              qBlockSize,
-              kvBlockSize,
-              headSize,
-              1.f,
-              (const MKL_BF16*)(query + i * qSize * qStride + headSize * j + k * qSplitSize * qStride),
-              qStride,
-              (const MKL_BF16*)(key + i * kvSize * kStride + headSize * j + l * kvSplitSize * kStride),
-              kStride,
-              0.f,
-              qk_fp32.data_ptr<float>() + ompIdx * qSplitSize * kvSplitSize,
-              kvBlockSize);
+          if (headSize % 2 != 0) {
+            // If K of Gemm is not even, use mkl gemm instead of tpp
+            cblas_gemm_bf16bf16f32(
+                CblasRowMajor,
+                CblasNoTrans,
+                CblasTrans,
+                qBlockSize,
+                kvBlockSize,
+                headSize,
+                1.f,
+                (const MKL_BF16*)(query + i * qSize * qStride + headSize * j + k * qSplitSize * qStride),
+                qStride,
+                (const MKL_BF16*)(key + i * kvSize * kStride + headSize * j + l * kvSplitSize * kStride),
+                kStride,
+                0.f,
+                qk_fp32_ptr + ompIdx * qSplitSize * kvSplitSize,
+                kvBlockSize);
+          } else if (l != kvSlice - 1) {
+            qk_gemm_tpp(
+                query + i * qSize * qStride + headSize * j +
+                    k * qSplitSize * qStride,
+                key_reorder_ptr + i * num_head * headSize * kvSize +
+                    j * headSize * kvSize + l * kvSplitSize * headSize,
+                qk_fp32_ptr + ompIdx * qSplitSize * kvSplitSize,
+                1); // [qSplitSize,headSize] x [headSize,kvSplitSize] ->
+                    // [qSplitSize,kvSplitSize]
+          } else {
+            // Tail
+            qk_gemm_tpp_tail(
+                query + i * qSize * qStride + headSize * j +
+                    k * qSplitSize * qStride,
+                key_reorder_ptr + i * num_head * headSize * kvSize +
+                    j * headSize * kvSize + l * kvSplitSize * headSize,
+                qk_fp32_ptr + ompIdx * qSplitSize * kvSplitSize,
+                1); // [qSplitSize,headSize] x [headSize,kvSplitSize] ->
+                    // [qSplitSize,kvSplitSize]
+          }
 
           _mha_mul_softmax_bf16_kernel<at::BFloat16>(
-              qk_fp32.data_ptr<float>() + ompIdx * qSplitSize * kvSplitSize,
-              qk_bf16.data_ptr<at::BFloat16>() +
-                  ompIdx * qSplitSize * kvSplitSize,
-              dst_fp32.data_ptr<float>() + ompIdx * qSplitSize * headSize,
-              qk_max.data_ptr<float>() + ompIdx * qSplitSize,
-              qk_sum.data_ptr<float>() + ompIdx * qSplitSize,
+              qk_fp32_ptr + ompIdx * qSplitSize * kvSplitSize,
+              qk_bf16_ptr + ompIdx * qSplitSize * kvSplitSize,
+              dst_fp32_ptr + ompIdx * qSplitSize * headSize,
+              qk_max_ptr + ompIdx * qSplitSize,
+              qk_sum_ptr + ompIdx * qSplitSize,
               scale,
               qBlockSize,
               kvBlockSize,
               headSize,
               l);
 
-          cblas_gemm_bf16bf16f32(
-              CblasRowMajor,
-              CblasNoTrans,
-              CblasNoTrans,
-              qBlockSize,
-              headSize,
-              kvBlockSize,
-              1.f,
-              (const MKL_BF16*)(qk_bf16.data_ptr<at::BFloat16>() + ompIdx * qSplitSize * kvSplitSize),
-              kvBlockSize,
-              (const MKL_BF16*)(value + i * kvSize * vStride + headSize * j + l * kvSplitSize * vStride),
-              vStride,
-              l == 0 ? 0.f : 1.f,
-              dst_fp32.data_ptr<float>() + ompIdx * qSplitSize * headSize,
-              headSize);
+          if ((l != kvSlice - 1 && kvSplitSize % 2 != 0) ||
+              (l == kvSlice - 1 && kvTail % 2 != 0)) {
+            // If K of Gemm is not even, use mkl gemm instead of tpp
+            cblas_gemm_bf16bf16f32(
+                CblasRowMajor,
+                CblasNoTrans,
+                CblasNoTrans,
+                qBlockSize,
+                headSize,
+                kvBlockSize,
+                1.f,
+                (const MKL_BF16*)(qk_bf16_ptr + ompIdx * qSplitSize * kvSplitSize),
+                kvBlockSize,
+                (const MKL_BF16*)(value + i * kvSize * vStride + headSize * j + l * kvSplitSize * vStride),
+                vStride,
+                l == 0 ? 0.f : 1.f,
+                dst_fp32_ptr + ompIdx * qSplitSize * headSize,
+                headSize);
+          } else if (l != kvSlice - 1) {
+            if (l != 0) {
+              av_gemm_tpp(
+                  qk_bf16_ptr + ompIdx * qSplitSize * kvSplitSize,
+                  value_reorder_ptr + i * num_head * kvSize * headSize +
+                      j * kvSize * headSize + l * kvSplitSize * headSize,
+                  dst_fp32_ptr + ompIdx * qSplitSize * headSize,
+                  1);
+            } else {
+              av_gemm_tpp_nobias(
+                  qk_bf16_ptr + ompIdx * qSplitSize * kvSplitSize,
+                  value_reorder_ptr + i * num_head * kvSize * headSize +
+                      j * kvSize * headSize + l * kvSplitSize * headSize,
+                  dst_fp32_ptr + ompIdx * qSplitSize * headSize,
+                  1);
+            }
+          } else {
+            // Tail
+            if (l != 0) {
+              av_gemm_tpp_tail(
+                  qk_bf16_ptr + ompIdx * qSplitSize * kvSplitSize,
+                  value_reorder_ptr + i * num_head * kvSize * headSize +
+                      j * kvSize * headSize + l * kvSplitSize * headSize,
+                  dst_fp32_ptr + ompIdx * qSplitSize * headSize,
+                  1);
+            } else {
+              av_gemm_tpp_nobias_tail(
+                  qk_bf16_ptr + ompIdx * qSplitSize * kvSplitSize,
+                  value_reorder_ptr + i * num_head * kvSize * headSize +
+                      j * kvSize * headSize + l * kvSplitSize * headSize,
+                  dst_fp32_ptr + ompIdx * qSplitSize * headSize,
+                  1);
+            }
+          }
         }
         _reorder_mha_output_kernel<at::BFloat16>(
-            dst_fp32.data_ptr<float>() + ompIdx * qSplitSize * headSize,
-            output.data_ptr<at::BFloat16>() + i * qSize * hiddenSize +
-                headSize * j + k * qSplitSize * hiddenSize,
+            dst_fp32_ptr + ompIdx * qSplitSize * headSize,
+            output_ptr + i * qSize * hiddenSize + headSize * j +
+                k * qSplitSize * hiddenSize,
             qBlockSize,
             headSize,
             hiddenSize);
@@ -238,9 +497,9 @@ at::Tensor bert_mha_kernel_impl(
 
 #if defined(CPU_CAPABILITY_AVX512)
   int64_t qSplitSize = sequenceSize;
-  for (int i = 0; i < qsplit_range.size(); ++i) {
-    if (sequenceSize > qsplit_range[i]) {
-      qSplitSize = qsplit_size[i];
+  for (int i = 0; i < qsplit_ranges.size(); ++i) {
+    if (sequenceSize > qsplit_ranges[i]) {
+      qSplitSize = qsplit_sizes[i];
       break;
     }
   }
@@ -459,9 +718,9 @@ at::Tensor sd_mha_kernel_v2_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(bert_mha_kernel_stub, &bert_mha_kernel_impl);
-REGISTER_DISPATCH(sd_mha_kernel_v1_stub, &sd_mha_kernel_v1_impl);
-REGISTER_DISPATCH(sd_mha_kernel_v2_stub, &sd_mha_kernel_v2_impl);
+IPEX_REGISTER_DISPATCH(bert_mha_kernel_stub, &bert_mha_kernel_impl);
+IPEX_REGISTER_DISPATCH(sd_mha_kernel_v1_stub, &sd_mha_kernel_v1_impl);
+IPEX_REGISTER_DISPATCH(sd_mha_kernel_v2_stub, &sd_mha_kernel_v2_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

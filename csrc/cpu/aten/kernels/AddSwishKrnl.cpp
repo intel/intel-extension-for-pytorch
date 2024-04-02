@@ -59,7 +59,7 @@ at::Tensor add_swish_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(add_swish_kernel_stub, &add_swish_kernel_impl);
+IPEX_REGISTER_DISPATCH(add_swish_kernel_stub, &add_swish_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

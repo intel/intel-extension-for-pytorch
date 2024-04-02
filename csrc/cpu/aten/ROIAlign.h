@@ -221,7 +221,9 @@ using roi_align_forward_kernel_fn = at::Tensor (*)(
     int64_t,
     int64_t,
     bool);
-DECLARE_DISPATCH(roi_align_forward_kernel_fn, roi_align_forward_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    roi_align_forward_kernel_fn,
+    roi_align_forward_kernel_stub);
 
 using roi_align_backward_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
@@ -236,7 +238,9 @@ using roi_align_backward_kernel_fn = at::Tensor (*)(
     int64_t,
     bool,
     bool);
-DECLARE_DISPATCH(roi_align_backward_kernel_fn, roi_align_backward_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    roi_align_backward_kernel_fn,
+    roi_align_backward_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

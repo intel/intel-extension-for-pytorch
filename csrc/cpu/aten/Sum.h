@@ -13,7 +13,7 @@ void sum_kernel_impl(at::TensorIterator& iter);
 }
 
 using sum_kernel_fn = void (*)(at::TensorIterator&);
-DECLARE_DISPATCH(sum_kernel_fn, sum_kernel_stub);
+IPEX_DECLARE_DISPATCH(sum_kernel_fn, sum_kernel_stub);
 
 at::Tensor sum_out_cpu(
     const at::Tensor& input,

@@ -166,7 +166,7 @@ at::Tensor packed_add_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(packed_add_kernel_stub, &packed_add_kernel_impl);
+IPEX_REGISTER_DISPATCH(packed_add_kernel_stub, &packed_add_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

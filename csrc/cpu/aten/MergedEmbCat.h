@@ -47,10 +47,11 @@ using qmerged_embeddingbag_cat_fw_fn = Tensor (*)(
     const Tensor&,
     double o_scale);
 
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     merged_embeddingbag_cat_fw_fn,
     merged_embeddingbag_cat_fw_stub);
-DECLARE_DISPATCH(
+
+IPEX_DECLARE_DISPATCH(
     qmerged_embeddingbag_cat_fw_fn,
     qmerged_embeddingbag_cat_fw_stub);
 

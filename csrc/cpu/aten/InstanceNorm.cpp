@@ -16,8 +16,8 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(InstanceNormKernel);
-DEFINE_DISPATCH(InstanceNormBackwardKernel);
+IPEX_DEFINE_DISPATCH(InstanceNormKernel);
+IPEX_DEFINE_DISPATCH(InstanceNormBackwardKernel);
 
 namespace {
 void check_dims_match_num_input_features(

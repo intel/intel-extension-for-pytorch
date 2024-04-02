@@ -57,7 +57,7 @@ using concat_bn_relu_kernel_fn = at::Tensor (*)(
     double,
     bool,
     int);
-DECLARE_DISPATCH(concat_bn_relu_kernel_fn, concat_bn_relu_kernel_stub);
+IPEX_DECLARE_DISPATCH(concat_bn_relu_kernel_fn, concat_bn_relu_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

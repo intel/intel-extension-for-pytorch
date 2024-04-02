@@ -9,6 +9,14 @@ list(APPEND IPEX_CPU_CPP_ISA_SRCS_ORIGIN ${cpu_kernel_cpp_in})
 #   message(${file_path})
 # endforeach()
 
+if(MSVC AND ("${CMAKE_CXX_COMPILER_ID}" MATCHES "MSVC"))
+  set(CXX_AVX512_VNNI_FOUND OFF)
+  set(CXX_AVX512_BF16_FOUND OFF)
+  set(CXX_AMX_FOUND OFF)
+  set(CXX_AVX2_VNNI_FOUND OFF)
+  set(CXX_AVX512_FP16_FOUND OFF)
+endif()
+
 # Some versions of GCC pessimistically split unaligned load and store
 # instructions when using the default tuning. This is a bad choice on
 # new Intel and AMD processors so we disable it when compiling with AVX2.
@@ -84,7 +92,7 @@ if(CXX_AVX512_VNNI_FOUND)
     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG}/arch:AVX512") # TODO: CHECK HERE
   else(MSVC)
     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -D__AVX512F__ ${AVX512_OPTIMIZE_FLAGS} -DCPU_CAPABILITY_AVX512 \
-     -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mfma")
+    -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mfma")
   endif(MSVC)
 else(CXX_AVX512_VNNI_FOUND)
   if(CMAKE_COMPILER_IS_GNUCXX)

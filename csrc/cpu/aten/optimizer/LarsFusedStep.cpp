@@ -2,14 +2,13 @@
 
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
-#include "csrc/utils/CustomOperatorRegistration.h"
 
 #include <cmath>
 
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(lars_norm_kernel_stub);
+IPEX_DEFINE_DISPATCH(lars_norm_kernel_stub);
 
 /**
  * LARS fused update kernel.
@@ -93,11 +92,12 @@ c10::optional<at::Tensor> lars_fused_step(
 
 namespace {
 
-IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER_DISPATCH(
-      "lars_fused_step",
-      torch_ipex::cpu::lars_fused_step,
-      at::DispatchKey::CPU);
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "lars_fused_step(Tensor param, Tensor grad, Tensor? momentum_buf, Tensor "
+      "trail, float momentum, float learning_rate, float eeta, float eps,"
+      "float weight_decay, float dampening, bool nesterov) -> Tensor?",
+      torch_ipex::cpu::lars_fused_step);
 }
 
 } // namespace

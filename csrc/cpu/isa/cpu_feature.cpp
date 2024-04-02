@@ -105,6 +105,8 @@ void CPUFeature::detect_intel_cpu_feature() {
 
       MICRO_CLASS_MEMBER(avx_vnni) = check_reg_bit(eax, 4);
       MICRO_CLASS_MEMBER(avx512_bf16) = check_reg_bit(eax, 5);
+
+      MICRO_CLASS_MEMBER(amx_fp16) = check_reg_bit(eax, 21);
     }
   }
 
@@ -338,7 +340,7 @@ bool CPUFeature::isa_level_avx2_vnni() {
   return b_is_support;
 }
 
-bool CPUFeature::isa_level_avx512_core() {
+bool CPUFeature::isa_level_avx512() {
   static bool b_is_support = isa_level_avx2() && os_avx512() &&
       cpuid_avx512_vl() && cpuid_avx512_bw() && cpuid_avx512_dq() &&
       cpuid_avx512_f();
@@ -346,7 +348,7 @@ bool CPUFeature::isa_level_avx512_core() {
 }
 
 bool CPUFeature::isa_level_avx512_vnni() {
-  static bool b_is_support = isa_level_avx512_core() && cpuid_avx512_vnni();
+  static bool b_is_support = isa_level_avx512() && cpuid_avx512_vnni();
   return b_is_support;
 }
 
@@ -373,6 +375,11 @@ bool CPUFeature::isa_level_amx() {
 
 bool CPUFeature::isa_level_avx512_fp16() {
   static bool b_is_support = isa_level_amx() && cpuid_avx512_fp16();
+  return b_is_support;
+}
+
+bool CPUFeature::isa_level_amx_fp16() {
+  static bool b_is_support = isa_level_avx512_fp16() && cpuid_amx_fp16();
   return b_is_support;
 }
 
@@ -424,6 +431,7 @@ void CPUFeature::show_features() {
   MICRO_CLASS_PRINT_BOOL_STATUS(amx_bf16);
   MICRO_CLASS_PRINT_BOOL_STATUS(amx_tile);
   MICRO_CLASS_PRINT_BOOL_STATUS(amx_int8);
+  MICRO_CLASS_PRINT_BOOL_STATUS(amx_fp16);
 
   MICRO_CLASS_PRINT_BOOL_STATUS(prefetchw);
   MICRO_CLASS_PRINT_BOOL_STATUS(prefetchwt1);

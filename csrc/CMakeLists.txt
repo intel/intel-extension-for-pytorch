@@ -1,10 +1,11 @@
-set(IPEX_CSRC_INCLUDE_DIR "${IPEX_CSRC_ROOT_DIR}/include")
-set(LIBRARIES_INSTALL_FILE_PREFIX "${CMAKE_BINARY_DIR}/../libraries_install")
+set(IPEX_CSRC_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
   add_subdirectory(${IPEX_CSRC_ROOT_DIR}/gpu)
   print_xpu_config_summary()
-elseif(BUILD_MODULE_TYPE STREQUAL "CPU")
+endif()
+
+if(BUILD_MODULE_TYPE STREQUAL "CPU")
   add_subdirectory(${IPEX_CSRC_ROOT_DIR}/cpu)
   print_cpu_config_summary()
 endif()

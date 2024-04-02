@@ -751,15 +751,17 @@ box_head_nms_cpu_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(nms_cpu_kernel_stub, &nms_cpu_kernel_impl);
+IPEX_REGISTER_DISPATCH(nms_cpu_kernel_stub, &nms_cpu_kernel_impl);
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     batch_score_nms_cpu_kernel_stub,
     &batch_score_nms_cpu_kernel_impl);
 
-REGISTER_DISPATCH(rpn_nms_cpu_kernel_stub, &rpn_nms_cpu_kernel_impl);
+IPEX_REGISTER_DISPATCH(rpn_nms_cpu_kernel_stub, &rpn_nms_cpu_kernel_impl);
 
-REGISTER_DISPATCH(box_head_nms_cpu_kernel_stub, &box_head_nms_cpu_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    box_head_nms_cpu_kernel_stub,
+    &box_head_nms_cpu_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

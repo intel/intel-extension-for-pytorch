@@ -1,4 +1,5 @@
 #pragma once
+#include <Macros.h>
 #include <math.h>
 
 #include <ATen/DeviceGuard.h>
@@ -11,12 +12,12 @@
 namespace torch_ipex {
 namespace autocast {
 
-TORCH_API void _amp_foreach_non_finite_check_and_unscale_cpu_(
+IPEX_API void _amp_foreach_non_finite_check_and_unscale_cpu_(
     std::vector<at::Tensor> scaled_grads,
     at::Tensor& found_inf,
     const at::Tensor& inv_scale);
 
-TORCH_API at::Tensor& _amp_update_scale_cpu_(
+IPEX_API at::Tensor& _amp_update_scale_cpu_(
     at::Tensor& current_scale,
     at::Tensor& growth_tracker,
     const at::Tensor& found_inf,

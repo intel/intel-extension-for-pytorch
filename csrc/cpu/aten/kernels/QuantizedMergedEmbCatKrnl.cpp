@@ -406,6 +406,7 @@ Tensor qmerged_embedding_cat_fw_impl(
     const TensorList& offsets,
     const Tensor& qdense,
     double o_scale) {
+  RECORD_FUNCTION(__FUNCTION__, c10::ArrayRef<c10::IValue>({}));
   int64_t batch_size = qdense.size(0);
   int64_t emb_dim = qdense.size(1);
   int64_t num_emb = qweights.size();
@@ -472,7 +473,7 @@ Tensor qmerged_embedding_cat_fw_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(
     qmerged_embeddingbag_cat_fw_stub,
     &qmerged_embedding_cat_fw_impl);
 

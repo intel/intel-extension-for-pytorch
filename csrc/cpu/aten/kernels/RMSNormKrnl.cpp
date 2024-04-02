@@ -76,6 +76,6 @@ at::Tensor rmsnorm_kernel_impl(
 
 } // namespace
 
-REGISTER_DISPATCH(rmsnorm_kernel_stub, &rmsnorm_kernel_impl);
+IPEX_REGISTER_DISPATCH(rmsnorm_kernel_stub, &rmsnorm_kernel_impl);
 } // namespace cpu
 } // namespace torch_ipex

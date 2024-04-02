@@ -2,6 +2,8 @@
 #include <ATen/ATen.h>
 #include <ATen/cpu/vec/vec256/vec256.h>
 
+#include "utils/SysUtil.h"
+
 using namespace at::vec;
 
 inline void cvt_bf16_to_fp32(float* dst, const at::BFloat16* src, int len) {
@@ -10,7 +12,19 @@ inline void cvt_bf16_to_fp32(float* dst, const at::BFloat16* src, int len) {
   }
 }
 
+inline void cvt_fp16_to_fp32(float* dst, const at::Half* src, int len) {
+  for (int j = 0; j < len; j++) {
+    *(dst + j) = *(src + j);
+  }
+}
+
 inline void cvt_fp32_to_bf16(at::BFloat16* dst, const float* src, int len) {
+  for (int j = 0; j < len; j++) {
+    *(dst + j) = *(src + j);
+  }
+}
+
+inline void cvt_fp32_to_fp16(at::Half* dst, const float* src, int len) {
   for (int j = 0; j < len; j++) {
     *(dst + j) = *(src + j);
   }
@@ -103,21 +117,21 @@ inline void packed_bf16_add_ker(
   }
 }
 
-static inline __attribute__((always_inline)) void move_ker_load_aligned(
+static IPEX_FORCE_INLINE void move_ker_load_aligned(
     at::BFloat16* out,
     const float* in,
     int64_t len) {
   move_ker(out, in, len);
 }
 
-static inline __attribute__((always_inline)) void move_ker_load_aligned(
+static IPEX_FORCE_INLINE void move_ker_load_aligned(
     float* out,
     const float* in,
     int64_t len) {
   move_ker(out, in, len);
 }
 
-static inline __attribute__((always_inline)) void move_ker_load_aligned(
+static IPEX_FORCE_INLINE void move_ker_load_aligned(
     at::BFloat16* out,
     const at::BFloat16* in,
     int64_t len) {

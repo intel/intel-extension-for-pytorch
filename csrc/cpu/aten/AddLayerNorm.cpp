@@ -10,7 +10,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(add_layer_norm_kernel_stub);
+IPEX_DEFINE_DISPATCH(add_layer_norm_kernel_stub);
 
 at::Tensor AddLayerNorm(
     const at::Tensor& a,

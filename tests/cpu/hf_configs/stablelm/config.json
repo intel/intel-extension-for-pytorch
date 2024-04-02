@@ -1,0 +1,25 @@
+{
+  "architectures": [
+    "StableLmForCausalLM"
+  ],
+  "bos_token_id": 100257,
+  "eos_token_id": 100257,
+  "hidden_act": "silu",
+  "hidden_size": 2048,
+  "initializer_range": 0.02,
+  "intermediate_size": 5632,
+  "max_position_embeddings": 4096,
+  "model_type": "stablelm",
+  "layer_norm_eps": 1e-05,
+  "num_attention_heads": 16,
+  "num_hidden_layers": 1,
+  "num_key_value_heads": 16,
+  "partial_rotary_factor": 0.25,
+  "rope_theta": 10000,
+  "tie_word_embeddings": false,
+  "torch_dtype": "float16",
+  "transformers_version": "4.38.0",
+  "use_cache": true,
+  "use_qkv_bias": true,
+  "vocab_size": 100352
+}

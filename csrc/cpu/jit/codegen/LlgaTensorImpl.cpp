@@ -56,6 +56,26 @@ dnnl::graph::tensor llga_from_aten_tensor(const at::Tensor& tensor) {
       tensor.data_ptr()};
 }
 
+using data_type = dnnl::graph::logical_tensor::data_type;
+data_type getLlgaDataType(at::ScalarType dt) {
+  switch (dt) {
+    case at::ScalarType::Float:
+      return data_type::f32;
+    case at::ScalarType::BFloat16:
+      return data_type::bf16;
+    case at::ScalarType::Bool:
+      return data_type::boolean;
+    case at::kInt:
+      return data_type::s32;
+    case at::ScalarType::QInt8:
+      return data_type::s8;
+    case at::ScalarType::QUInt8:
+      return data_type::u8;
+    default:
+      return data_type::undef;
+  }
+}
+
 at::Tensor LlgaTensorImpl::llga_to_aten_tensor(LlgaTensorImpl* llgaImpl) {
   auto aten_tensor = at::detail::make_tensor<TensorImpl>(
       std::move(llgaImpl->storage_),
@@ -79,27 +99,6 @@ at::Tensor LlgaTensorImpl::llga_to_aten_tensor(
   impl->set_storage_offset(llgaImpl->storage_offset_);
   impl->set_sizes_and_strides(llgaImpl->sizes(), llgaImpl->strides());
   return aten_tensor;
-}
-
-using data_type = dnnl::graph::logical_tensor::data_type;
-
-data_type LlgaTensorDesc::getLlgaDataType(at::ScalarType dt) const {
-  switch (dt) {
-    case at::ScalarType::Float:
-      return data_type::f32;
-    case at::ScalarType::BFloat16:
-      return data_type::bf16;
-    case at::ScalarType::Bool:
-      return data_type::boolean;
-    case at::kInt:
-      return data_type::s32;
-    case at::ScalarType::QInt8:
-      return data_type::s8;
-    case at::ScalarType::QUInt8:
-      return data_type::u8;
-    default:
-      return data_type::undef;
-  }
 }
 
 LlgaTensorDesc LlgaTensorDesc::supplementTensorInfo(const at::Tensor& t) const {

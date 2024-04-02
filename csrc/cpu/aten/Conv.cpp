@@ -26,24 +26,6 @@ std::vector<int64_t> calc_conv_output_size(
   return output_size;
 }
 
-c10::SymDimVector calc_conv_output_size(
-    c10::SymIntArrayRef input_size,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef padding,
-    at::IntArrayRef stride,
-    at::IntArrayRef dilation) {
-  auto dim = input_size.size();
-  c10::SymDimVector output_size(dim);
-  output_size[0] = input_size[0];
-  output_size[1] = kernel_size[0];
-  for (size_t d = 2; d < dim; ++d) {
-    auto kernel = dilation[d - 2] * (kernel_size[d] - 1) + 1;
-    output_size[d] =
-        (input_size[d] + (2 * padding[d - 2]) - kernel) / stride[d - 2] + 1;
-  }
-  return output_size;
-}
-
 void convolution_kernel_output(
     const at::Tensor& input,
     const ideep::tensor& mkldnn_weight,
@@ -227,11 +209,11 @@ at::Tensor convolution_backward_input(
   if (is_channels_last_contiguous) {
     return grad_input;
   } else {
-    return mkldnn_to_dense(
-               new_with_itensor_mkldnn(
-                   std::move(mkldnn_grad_input),
-                   optTypeMetaToScalarType(grad_output.options().dtype_opt()),
-                   grad_output.options().device_opt()))
+    return mkldnn_to_dense(new_with_itensor_mkldnn(
+                               std::move(mkldnn_grad_input),
+                               c10::optTypeMetaToScalarType(
+                                   grad_output.options().dtype_opt()),
+                               grad_output.options().device_opt()))
         .contiguous(memory_format);
   }
 }

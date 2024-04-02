@@ -406,7 +406,7 @@ void cat_contig_kernel(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(cat_contig_stub, &cat_contig_kernel);
+IPEX_REGISTER_DISPATCH(cat_contig_stub, &cat_contig_kernel);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -157,14 +157,14 @@ void convertInputTo0DTensor(
 
 void modifyDtypeOfNode(torch::jit::Node* node, at::ScalarType dtype) {
   auto existingDtype =
-      node->output()->type()->expect<TensorType>()->scalarType();
+      node->outputs()[0]->type()->expect<TensorType>()->scalarType();
   if (existingDtype.has_value()) {
     switch (existingDtype.value()) {
       case at::ScalarType::Float:
       case at::ScalarType::BFloat16:
       case at::kInt:
-        node->output()->setType(
-            node->output()->type()->expect<TensorType>()->withScalarType(
+        node->outputs()[0]->setType(
+            node->outputs()[0]->type()->expect<TensorType>()->withScalarType(
                 dtype));
         break;
       default:
@@ -189,7 +189,7 @@ void insertTypeCast(
 }
 
 void mayModifyOutputDtype(torch::jit::Node* node) {
-  if (node->output()->type()->isSubtypeOf(TensorType::get())) {
+  if (node->outputs()[0]->type()->isSubtypeOf(TensorType::get())) {
     if (node->hasAttributeS("was_float")) {
       modifyDtypeOfNode(node, at::ScalarType::Float);
       node->removeAttributeS("was_float");

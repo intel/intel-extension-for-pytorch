@@ -299,20 +299,39 @@ inline int meqn_push_ternary_op(
       op_metadata, type, dtype, flags);
 }
 
+template <int N>
+inline uint64_t string_to_hash_int(
+    const std::string& str,
+    const std::array<int, N>& params) {
+  // Using FNV-1a algorithm
+  uint64_t hash_value = 14695981039346656037ULL; // Initial hash value
+  // Hash the string
+  for (char c : str) {
+    hash_value ^= static_cast<uint64_t>(c);
+    hash_value *= 1099511628211ULL; // FNV prime
+  }
+  // Hash the vector of integers
+  for (int intValue : params) {
+    hash_value ^= static_cast<uint64_t>(intValue);
+    hash_value *= 1099511628211ULL; // FNV prime
+  }
+  return hash_value;
+}
+
 class BaseTPP {
  public:
   void* get_kernel() {
     auto& kernel_cache = get_kernel_cache();
     void* kernel = NULL;
-    if (hash == "")
-      hash = hash_str();
+    if (hash == 0)
+      hash = hash_int();
     auto search = kernel_cache.find(hash);
     if (search != kernel_cache.end())
       kernel = search->second;
     if (kernel == NULL) {
       kernel = build_kernel();
       if (kernel == NULL) {
-        fprintf(stderr, "Unable to get JIT kernel for %s\n", hash.c_str());
+        print_error();
         exit(1);
       }
       // printf("TPP: %s @ %p\n", hash.c_str(), kernel);
@@ -320,19 +339,16 @@ class BaseTPP {
     }
     return kernel;
   }
-  // We should make hash_str() public
-  std::string get_hash_str() {
-    return hash_str();
-  }
 
  protected:
-  std::unordered_map<std::string, void*>& get_kernel_cache() {
-    static std::unordered_map<std::string, void*> kernel_cache;
+  std::unordered_map<uint64_t, void*>& get_kernel_cache() {
+    static std::unordered_map<uint64_t, void*> kernel_cache;
     return kernel_cache;
   }
-  virtual std::string hash_str() = 0;
+  virtual uint64_t hash_int() = 0;
   virtual void* build_kernel() = 0;
-  std::string hash = "";
+  virtual void print_error() = 0;
+  uint64_t hash = 0;
   bool initialized = false;
 };
 
@@ -416,12 +432,21 @@ class UnaryTPP : public BaseTPP {
   }
 
  protected:
-  std::string hash_str() override {
-    char hash[200];
-    snprintf(
-        hash,
-        200,
-        "unary_r%d_c%d_i%d_o%d_di%d_do%d_dc%d_f%d_t%d",
+  uint64_t hash_int() override {
+    std::array<int, 9> params = {
+        rows, cols, ldi, ldo, dt_in, dt_out, dt_compute, (int)flags, type};
+    uint64_t hash_value = string_to_hash_int<9>("unary", params);
+    return hash_value;
+  }
+  void* build_kernel() override {
+    libxsmm_meltw_unary_shape shape = libxsmm_create_meltw_unary_shape(
+        cols, rows, ldi, ldo, dt_in, dt_out, dt_compute);
+    return (void*)libxsmm_dispatch_meltw_unary_v2(type, shape, flags);
+  }
+  void print_error() override {
+    fprintf(
+        stderr,
+        "Unable to get JIT kernel for unary. Params: rows=%d, cols=%d, ldi=%d, ldo=%d, dt_in=%d, dt_out=%d, dt_compute=%d, flags=%d, type=%d\n",
         rows,
         cols,
         ldi,
@@ -429,14 +454,8 @@ class UnaryTPP : public BaseTPP {
         dt_in,
         dt_out,
         dt_compute,
-        flags,
+        (int)flags,
         type);
-    return std::string(hash);
-  }
-  void* build_kernel() override {
-    libxsmm_meltw_unary_shape shape = libxsmm_create_meltw_unary_shape(
-        cols, rows, ldi, ldo, dt_in, dt_out, dt_compute);
-    return (void*)libxsmm_dispatch_meltw_unary_v2(type, shape, flags);
   }
 
   libxsmm_blasint rows = 0;
@@ -515,12 +534,8 @@ class BinaryTPP : public BaseTPP {
   }
 
  protected:
-  std::string hash_str() override {
-    char hash[200];
-    snprintf(
-        hash,
-        200,
-        "binary_r%d_c%d_i0%d_i1%d_o%d_di0%d_di1%d_do%d_dc%d_f%d_t%d",
+  uint64_t hash_int() override {
+    std::array<int, 11> params = {
         rows,
         cols,
         ldi0,
@@ -530,14 +545,31 @@ class BinaryTPP : public BaseTPP {
         dt_in1,
         dt_out,
         dt_compute,
-        flags,
-        type);
-    return std::string(hash);
+        (int)flags,
+        type};
+    uint64_t hash_value = string_to_hash_int<11>("binary", params);
+    return hash_value;
   }
   void* build_kernel() override {
     libxsmm_meltw_binary_shape shape = libxsmm_create_meltw_binary_shape(
         cols, rows, ldi0, ldi1, ldo, dt_in0, dt_in1, dt_out, dt_compute);
     return (void*)libxsmm_dispatch_meltw_binary_v2(type, shape, flags);
+  }
+  void print_error() override {
+    fprintf(
+        stderr,
+        "Unable to get JIT kernel for binary. Params: rows=%d, cols=%d, ldi0=%d, ldi1=%d, ldo=%d, dt_in0=%d, dt_in1=%d, dt_out=%d, dt_compute=%d, flags=%d, type=%d\n",
+        rows,
+        cols,
+        ldi0,
+        ldi1,
+        ldo,
+        dt_in0,
+        dt_in1,
+        dt_out,
+        dt_compute,
+        (int)flags,
+        type);
   }
 
   libxsmm_blasint rows = 0;
@@ -965,18 +997,11 @@ class MulReduceTPP : public BaseTPP {
   }
 
  protected:
-  std::string hash_str() override {
-    char hash[200];
-    snprintf(
-        hash,
-        200,
-        "mul_reduce_eqn_t%d_%d_%d_r%d_c%d",
-        XsmmDtype<T1>(),
-        XsmmDtype<T2>(),
-        XsmmDtype<T3>(),
-        N, //);
-        M);
-    return std::string(hash);
+  uint64_t hash_int() override {
+    std::array<int, 5> params = {
+        N, M, XsmmDtype<T1>(), XsmmDtype<T2>(), XsmmDtype<T3>()};
+    uint64_t hash_value = string_to_hash_int<5>("mul_reduce_eqn", params);
+    return hash_value;
   }
   void* build_kernel() override {
     auto dt1 = XsmmDtype<T1>();
@@ -999,6 +1024,16 @@ class MulReduceTPP : public BaseTPP {
     meqn_push_arg(my_eqn0, M, N, M, 1, 0, dt2);
     debug_print_eqn_tree(my_eqn0);
     return (void*)meqn_dispatch(1, N, &ld, dt3, my_eqn0);
+  }
+  void print_error() override {
+    fprintf(
+        stderr,
+        "Unable to get JIT kernel for mul_reduce_eqn. Params: N=%d, M=%d, dt1=%d, dt2=%d, dt3=%d\n",
+        N,
+        M,
+        XsmmDtype<T1>(),
+        XsmmDtype<T2>(),
+        XsmmDtype<T3>());
   }
 
  private:
@@ -1752,27 +1787,32 @@ class XformExtTPP {
       PCL_ASSERT(false, "Should not come here\n");
     }
   }
-  void operator()(int count, long str_in, long str_out, T* in, T* out) {
+  void operator()(int count, int64_t str_in, int64_t str_out, T* in, T* out) {
     for (int i = 0; i < count; i++) {
       this->operator()(&in[i * str_in], &out[i * str_out]);
     }
   }
-  void ref(int count, long str_in, long str_out, T* in, T* out) {
+  void ref(int count, int64_t str_in, int64_t str_out, T* in, T* out) {
     for (int i = 0; i < count; i++) {
       this->ref(&in[i * str_in], &out[i * str_out]);
     }
   }
   void operator()(
       int count,
-      long str_in,
-      long str_out,
+      int64_t str_in,
+      int64_t str_out,
       float* in,
       bfloat16* out) {
     for (int i = 0; i < count; i++) {
       this->operator()(&in[i * str_in], &out[i * str_out]);
     }
   }
-  void ref(int count, long str_in, long str_out, float* in, bfloat16* out) {
+  void ref(
+      int count,
+      int64_t str_in,
+      int64_t str_out,
+      float* in,
+      bfloat16* out) {
     for (int i = 0; i < count; i++) {
       this->ref(&in[i * str_in], &out[i * str_out]);
     }
@@ -1801,11 +1841,11 @@ class BrgemmTPP {
  public:
   BrgemmTPP() {}
   BrgemmTPP(
-      long M,
-      long N,
-      long K,
-      long str_a,
-      long str_b,
+      int64_t M,
+      int64_t N,
+      int64_t K,
+      int64_t str_a,
+      int64_t str_b,
       float beta = 1.0,
       int a_trans = 0,
       int unroll_hint = 0)
@@ -1822,14 +1862,14 @@ class BrgemmTPP {
             a_trans,
             unroll_hint) {}
   BrgemmTPP(
-      long M,
-      long N,
-      long K,
-      long str_a,
-      long str_b,
-      long lda,
-      long ldb,
-      long ldc,
+      int64_t M,
+      int64_t N,
+      int64_t K,
+      int64_t str_a,
+      int64_t str_b,
+      int64_t lda,
+      int64_t ldb,
+      int64_t ldc,
       float beta,
       int a_trans,
       int unroll_hint,
@@ -1860,7 +1900,7 @@ class BrgemmTPP {
       Tin* A,
       Tin* B,
       Tout* C,
-      unsigned long long count,
+      uint64_t count,
       bool no_tile_cfg = false) {
     libxsmm_gemm_param gemm_param;
     memset(&gemm_param, 0, sizeof(libxsmm_gemm_param));
@@ -1874,12 +1914,7 @@ class BrgemmTPP {
       k_gemm_no_tc(&gemm_param);
     }
   }
-  void ref(
-      Tin* A,
-      Tin* B,
-      Tout* C,
-      unsigned long long count,
-      bool no_tile_cfg = false) {
+  void ref(Tin* A, Tin* B, Tout* C, uint64_t count, bool no_tile_cfg = false) {
     auto dtype = XsmmDtype<Tin>();
     for (uint64_t c = 0; c < count; c++) {
       auto A_ = &A[c * str_a];
@@ -1922,7 +1957,7 @@ class BrgemmTPP {
     }
   }
 
-  long flops() {
+  int64_t flops() {
     return 2L * M * N * K;
   }
 
@@ -1932,17 +1967,20 @@ class BrgemmTPP {
     BrgemmKernel(BrgemmTPP* p, int config) : p(p), config(config) {
       auto dt_in = XsmmDtype<Tin>();
       auto dt_out = XsmmDtype<Tout>();
-      long type = -1;
+      int64_t type = -1;
       if (dt_in == LIBXSMM_DATATYPE_F32) {
         PCL_ASSERT(dt_out == LIBXSMM_DATATYPE_F32, "BRGEMM Assert\n");
         type = 0;
       } else if (dt_out == LIBXSMM_DATATYPE_F32) {
-        type = 1;
+        if (dt_in == LIBXSMM_DATATYPE_F16) {
+          type = 1;
+        } else if (dt_in == LIBXSMM_DATATYPE_BF16) {
+          type = 2;
+        }
       } else if (dt_in == LIBXSMM_DATATYPE_F16) {
-        PCL_ASSERT(dt_out == LIBXSMM_DATATYPE_F16, "BRGEMM Assert\n");
-        type = 2;
-      } else {
         type = 3;
+      } else {
+        type = 4;
       }
       // if (type != 0)
       //   PCL_ASSERT(
@@ -1958,12 +1996,8 @@ class BrgemmTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "brgemm_m%ld_n%ld_k%ld_a%ld_b%ld_t%ld_beta%d_at%d_uh%d_ld_a%ld_b%ld_c%ld_cfg%d_bv%d",
+    uint64_t hash_int() override {
+      std::array<int, 14> params = {
           p->M,
           p->N,
           p->K,
@@ -1973,12 +2007,13 @@ class BrgemmTPP {
           (int)p->beta,
           p->a_trans,
           p->unroll_hint,
-          (long)p->lda,
-          (long)p->ldb,
-          (long)p->ldc,
+          p->lda,
+          p->ldb,
+          p->ldc,
           config,
-          p->b_vnni);
-      return std::string(hash);
+          p->b_vnni};
+      uint64_t hash_value = string_to_hash_int<14>("brgemm", params);
+      return hash_value;
     }
     void* build_kernel() override {
       // float alpha = 1.0;
@@ -2041,22 +2076,41 @@ class BrgemmTPP {
 
       return (void*)l_test_jit.gemm;
     }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for brgemm. Params: M=%lld, N=%lld, K=%lld, str_a=%lld, str_b=%lld, brgemm_type=%lld, beta=%d, a_trans=%d, unroll_hint=%d, lda=%d, ldb=%d, ldc=%d, config=%d, b_vnni=%d",
+          p->M,
+          p->N,
+          p->K,
+          p->str_a,
+          p->str_b,
+          brgemm_type,
+          (int)p->beta,
+          p->a_trans,
+          p->unroll_hint,
+          p->lda,
+          p->ldb,
+          p->ldc,
+          config,
+          p->b_vnni);
+    }
 
    private:
     BrgemmTPP* p;
     int config;
     libxsmm_xmmfunction kernel;
-    long brgemm_type = -1;
+    int64_t brgemm_type = -1;
   };
 
  private:
-  long M, N, K, str_a, str_b;
+  int64_t M, N, K, str_a, str_b;
   libxsmm_blasint lda;
   libxsmm_blasint ldb;
   libxsmm_blasint ldc;
   float beta;
   int a_trans;
-  long brgemm_type = -1;
+  int64_t brgemm_type = -1;
   int unroll_hint;
   int b_vnni;
   BrgemmKernel k_gemm_with_tc;
@@ -2126,6 +2180,73 @@ class GeluFwdTPP {
   UnaryTPP kernel;
 };
 
+template <typename Tin, typename Tout = Tin>
+class GeluTanhFwdTPP {
+ public:
+  GeluTanhFwdTPP() {}
+  GeluTanhFwdTPP(int N) : GeluTanhFwdTPP(1, N) {}
+  GeluTanhFwdTPP(int M, int N) : GeluTanhFwdTPP(M, N, N, N) {}
+  GeluTanhFwdTPP(int M, int N, int ldi, int ldo)
+      : M(M), N(N), ldi(ldi), ldo(ldo) {}
+
+  void operator()(Tin* in, Tout* out) {
+#ifdef __AVX512F__
+    const __m512 c1 = _mm512_set1_ps((float)0.7978846);
+    const __m512 c2 = _mm512_set1_ps((float)0.0356814);
+    const __m512 c_half = _mm512_set1_ps((float)0.5);
+    for (int j = 0; j < M; j++) {
+      int i;
+      for (i = 0; i < ALIGNDOWN(N, 16); i += 16) {
+        auto vin = _mm512_loadu_ps_auto(&in[j * ldi + i]);
+        __m512 x_half = _mm512_mul_ps(vin, c_half);
+        __m512 x_sq = _mm512_mul_ps(vin, vin);
+        __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
+        __m512 tanh_poly_x = LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
+        __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
+        _mm512_storeu_ps_auto(&out[j * ldo + i], vout);
+      }
+      if (i < N) {
+        int rem = N - i;
+        __mmask16 mask = (1 << rem) - 1;
+        auto vin = _mm512_maskz_loadu_ps_auto(mask, &in[j * ldi + i]);
+        __m512 x_half = _mm512_mul_ps(vin, c_half);
+        __m512 x_sq = _mm512_mul_ps(vin, vin);
+        __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
+        __m512 tanh_poly_x = LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
+        __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
+        _mm512_mask_storeu_ps_auto(&out[j * ldo + i], mask, vout);
+      }
+    }
+#else
+    for (int j = 0; j < M; j++) {
+      for (int i = 0; i < N; i++) {
+        float x = in[j * ldi + i];
+        out[j * ldo + i] =
+            ((tanh(sqrt(2 / M_PI) * (x + 0.044715 * std::pow(x, 3)))) + 1) * x *
+            0.5;
+      }
+    }
+#endif
+  }
+
+  void ref(Tin* in, Tout* out) {
+    for (int j = 0; j < M; j++) {
+      for (int i = 0; i < N; i++) {
+        float x = in[j * ldi + i];
+        out[j * ldo + i] =
+            ((tanh(sqrt(2 / M_PI) * (x + 0.044715 * std::pow(x, 3)))) + 1) * x *
+            0.5;
+      }
+    }
+  }
+
+ private:
+  int M = 0;
+  int N = 0;
+  int ldi = 0;
+  int ldo = 0;
+};
+
 template <typename T1, typename T2 = T1, typename T3 = T1>
 class GeluBwdTPP : public BaseTPP {
  public:
@@ -2181,17 +2302,11 @@ class GeluBwdTPP : public BaseTPP {
   }
 
  protected:
-  std::string hash_str() override {
-    char hash[200];
-    snprintf(
-        hash,
-        200,
-        "gelu_bwd_eqn_t%d_%d_%d_i%d",
-        XsmmDtype<T1>(),
-        XsmmDtype<T2>(),
-        XsmmDtype<T3>(),
-        N);
-    return std::string(hash);
+  uint64_t hash_int() override {
+    std::array<int, 4> params = {
+        XsmmDtype<T1>(), XsmmDtype<T2>(), XsmmDtype<T3>(), N};
+    uint64_t hash_value = string_to_hash_int<4>("gelu_bwd_eqn", params);
+    return hash_value;
   }
   void* build_kernel() override {
     auto dt1 = XsmmDtype<T1>();
@@ -2205,6 +2320,15 @@ class GeluBwdTPP : public BaseTPP {
     meqn_push_arg(my_eqn0, N, 1, N, 1, 0, dt2);
     debug_print_eqn_tree(my_eqn0);
     return (void*)meqn_dispatch(N, 1, &ld, dt3, my_eqn0);
+  }
+  void print_error() override {
+    fprintf(
+        stderr,
+        "Unable to get JIT kernel for gelu_bwd_eqn. Params: dt1=%d, dt2=%d, dt3=%d, N=%d",
+        XsmmDtype<T1>(),
+        XsmmDtype<T2>(),
+        XsmmDtype<T3>(),
+        N);
   }
 
  private:
@@ -2567,10 +2691,10 @@ class SiLUBwdTPP : public BaseTPP {
   }
 
  protected:
-  std::string hash_str() override {
-    char hash[200];
-    snprintf(hash, 200, "silu_bwd_eqn_%d_%d", rows, cols);
-    return std::string(hash);
+  uint64_t hash_int() override {
+    std::array<int, 2> params = {rows, cols};
+    uint64_t hash_value = string_to_hash_int<2>("silu_bwd_eqn", params);
+    return hash_value;
   }
   void* build_kernel() override {
     libxsmm_blasint my_eqn0 = libxsmm_matrix_eqn_create();
@@ -2589,6 +2713,13 @@ class SiLUBwdTPP : public BaseTPP {
 
     auto func0 = meqn_dispatch(cols, rows, &ldo, XsmmDtype<Tout>(), my_eqn0);
     return (void*)func0;
+  }
+  void print_error() override {
+    fprintf(
+        stderr,
+        "Unable to get JIT kernel for silu_bwd_eqn. Params: rows=%d, cols=%d",
+        rows,
+        cols);
   }
 
  private:
@@ -2817,18 +2948,11 @@ class SoftMaxFwdTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "softmax_fwd_eqn0_ti%d_to%d_S1%d_S2%d_S3%d",
-          XsmmDtype<Tin>(),
-          LIBXSMM_DATATYPE_F32,
-          S1,
-          S2,
-          S3);
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 5> params = {
+          XsmmDtype<Tin>(), LIBXSMM_DATATYPE_F32, S1, S2, S3};
+      uint64_t hash_value = string_to_hash_int<5>("softmax_fwd_eqn0", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto dt_in = XsmmDtype<Tin>();
@@ -2853,6 +2977,16 @@ class SoftMaxFwdTPP {
       debug_print_eqn_tree(my_eqn0); // printf
       return (void*)meqn_dispatch(
           S3, S1, &tmp_ld, LIBXSMM_DATATYPE_F32, my_eqn0);
+    }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for softmax_fwd_eqn0. Params: dt_in=%d, dt_out=%d, S1=%d, S2=%d, S3=%d",
+          XsmmDtype<Tin>(),
+          LIBXSMM_DATATYPE_F32,
+          S1,
+          S2,
+          S3);
     }
 
    private:
@@ -2880,18 +3014,11 @@ class SoftMaxFwdTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "softmax_fwd_eqn1_ti%d_to%d_S1%d_S2%d_S3%d",
-          LIBXSMM_DATATYPE_F32,
-          XsmmDtype<Tout>(),
-          S1,
-          S2,
-          S3);
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 5> params = {
+          LIBXSMM_DATATYPE_F32, XsmmDtype<Tout>(), S1, S2, S3};
+      uint64_t hash_value = string_to_hash_int<5>("softmax_fwd_eqn1", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto dt_out = XsmmDtype<Tout>();
@@ -2915,6 +3042,16 @@ class SoftMaxFwdTPP {
       meqn_push_arg(my_eqn1, S3, S1, tmp_ld, 0, 0, LIBXSMM_DATATYPE_F32);
       /*debug_print_eqn_tree( my_eqn1 );*/
       return (void*)meqn_dispatch(S3, S1, &ld, dt_out, my_eqn1);
+    }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for softmax_fwd_eqn1. Params: dt_in=%d, dt_out=%d, S1=%d, S2=%d, S3=%d",
+          LIBXSMM_DATATYPE_F32,
+          XsmmDtype<Tout>(),
+          S1,
+          S2,
+          S3);
     }
 
    private:
@@ -3045,20 +3182,17 @@ class SoftMaxBwdTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "softmax_bwd_eqn%d_t1%d_t2%d_t3%d_S1%d_S2%d_S3%d",
+    uint64_t hash_int() override {
+      std::array<int, 7> params = {
           eqn_no,
+          XsmmDtype<T1>(),
           XsmmDtype<T2>(),
-          XsmmDtype<T3>(),
           LIBXSMM_DATATYPE_F32,
           S1,
           S2,
-          S3);
-      return std::string(hash);
+          S3};
+      uint64_t hash_value = string_to_hash_int<7>("softmax_bwd_eqn", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto dt_1 = XsmmDtype<T1>();
@@ -3117,6 +3251,18 @@ class SoftMaxBwdTPP {
         PCL_ASSERT(false, "Should not come here\n");
       }
       return (void*)func;
+    }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for softmax_bwd_eqn. Params: eqn_no=%d, dt_1=%d, dt_2=%d, dt_3=%d, S1=%d, S2=%d, S3=%d",
+          eqn_no,
+          XsmmDtype<T1>(),
+          XsmmDtype<T2>(),
+          LIBXSMM_DATATYPE_F32,
+          S1,
+          S2,
+          S3);
     }
 
    private:
@@ -3335,7 +3481,7 @@ class VarSoftMaxBwdTPP {
   VarSoftMaxBwdTPP() {}
   VarSoftMaxBwdTPP(int S2, int S3) : S2(S2), S3(S3), eqn0(S3, 0), eqn1(S3, 1) {}
   void operator()(int S1, T1* gin, T2* gout, T3* out) {
-    long S23 = S2 * S3;
+    int64_t S23 = S2 * S3;
     for (int s2 = 0; s2 < S2; s2++) {
       float tmp = 0.0f;
       libxsmm_matrix_eqn_param eqn_param;
@@ -3344,13 +3490,13 @@ class VarSoftMaxBwdTPP {
       eqn_param.inputs = arg_array;
       eqn_param.output.primary = (void*)&tmp;
       for (int s1 = 0; s1 < S1; s1++) {
-        long ind = s1 * S23 + s2 * S3;
+        int64_t ind = s1 * S23 + s2 * S3;
         arg_array[0].primary = (void*)&gout[ind];
         arg_array[1].primary = (void*)&out[ind];
         eqn0(&eqn_param);
       }
       for (int s1 = 0; s1 < S1; s1++) {
-        long ind = s1 * S23 + s2 * S3;
+        int64_t ind = s1 * S23 + s2 * S3;
         arg_array[0].primary = (void*)&gout[ind];
         arg_array[1].primary = (void*)&out[ind];
         eqn_param.output.primary = (void*)&gin[ind];
@@ -3451,18 +3597,11 @@ class VarSoftMaxBwdTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "varsoftmax_bwd_eqn%d_t1%d_t2%d_t3%d_S3%d",
-          eqn_no,
-          XsmmDtype<T1>(),
-          XsmmDtype<T2>(),
-          XsmmDtype<T3>(),
-          S3);
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 5> params = {
+          eqn_no, XsmmDtype<T1>(), XsmmDtype<T2>(), XsmmDtype<T3>(), S3};
+      uint64_t hash_value = string_to_hash_int<5>("varsoftmax_bwd_eqn", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto dt_1 = XsmmDtype<T1>();
@@ -3500,6 +3639,16 @@ class VarSoftMaxBwdTPP {
         PCL_ASSERT(false, "Should not come here\n");
       }
       return (void*)func;
+    }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for varsoftmax_bwd_eqn. Params: eqn_no=%d, dt_1=%d, dt_2=%d, dt_3=%d, S3=%d",
+          eqn_no,
+          XsmmDtype<T1>(),
+          XsmmDtype<T2>(),
+          XsmmDtype<T3>(),
+          S3);
     }
 
    private:
@@ -3619,17 +3768,10 @@ class LayerNormFwdTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "layernorm_fwd_eqn_t%d_S1%d_S2%d_S3%d",
-          XsmmDtype<T>(),
-          S1,
-          S2,
-          S3);
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 5> params = {XsmmDtype<T>(), S1, S2, S3};
+      uint64_t hash_value = string_to_hash_int<5>("layernorm_fwd_eqn", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto in_dt = XsmmDtype<T>();
@@ -3655,6 +3797,15 @@ class LayerNormFwdTPP {
       meqn_push_arg(my_eqn0, S3, S1, tmp_ld2, 4, 0, in_dt);
       debug_print_eqn_tree(my_eqn0); // printf
       return (void*)meqn_dispatch(S3, S1, &ld, out_dt, my_eqn0);
+    }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for layernorm_fwd_eqn. Params: dt_1=%dS1=%d, S2=%d, S3=%d",
+          XsmmDtype<T>(),
+          S1,
+          S2,
+          S3);
     }
 
    private:
@@ -3794,18 +3945,10 @@ class LayerNormBwdTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "layernorm_bwd_eqn%d_t%d_S1%d_S2%d_S3%d",
-          eqn_no,
-          XsmmDtype<T>(),
-          S1,
-          S2,
-          S3);
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 6> params = {eqn_no, XsmmDtype<T>(), S1, S2, S3};
+      uint64_t hash_value = string_to_hash_int<6>("layernorm_bwd_eqn", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto in_dt = XsmmDtype<T>();
@@ -3888,6 +4031,16 @@ class LayerNormBwdTPP {
         PCL_ASSERT(false, "LayerNormBwdTPP: invalid eqn. number %d\n", eqn_no);
       }
       return (void*)func;
+    }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for layernorm_bwd_eqn. Params: eqn_no=%d, dt_1=%d, S1=%d, S2=%d, S3=%d",
+          eqn_no,
+          XsmmDtype<T>(),
+          S1,
+          S2,
+          S3);
     }
 
    private:
@@ -4005,17 +4158,10 @@ class GroupNormFwdTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "group_norm_fwd_eqn_t%d_S1%d_S2%d_S3%d",
-          XsmmDtype<T>(),
-          S1,
-          S2,
-          S3);
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 4> params = {XsmmDtype<T>(), S1, S2, S3};
+      uint64_t hash_value = string_to_hash_int<4>("groupnorm_fwd_eqn", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto in_dt = XsmmDtype<T>();
@@ -4043,6 +4189,15 @@ class GroupNormFwdTPP {
       meqn_push_arg(my_eqn0, 1, S1, 1, 4, 0, in_dt);
       debug_print_eqn_tree(my_eqn0); // printf
       return (void*)meqn_dispatch(S3, S1, &ld, out_dt, my_eqn0);
+    }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for groupnorm_fwd_eqn. Params: dt_1=%d, S1=%d, S2=%d, S3=%d",
+          XsmmDtype<T>(),
+          S1,
+          S2,
+          S3);
     }
 
    private:
@@ -4175,18 +4330,10 @@ class GroupNormBwdTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "group_norm_bwd_eqn%d_t%d_S1%d_S2%d_S3%d",
-          eqn_no,
-          XsmmDtype<T>(),
-          S1,
-          S2,
-          S3);
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 5> params = {eqn_no, XsmmDtype<T>(), S1, S2, S3};
+      uint64_t hash_value = string_to_hash_int<5>("groupnorm_bwd_eqn", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto in_dt = XsmmDtype<T>();
@@ -4282,6 +4429,16 @@ class GroupNormBwdTPP {
       }
       return (void*)func;
     }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for groupnorm_bwd_eqn. Params: eqn_no=%d, dt_1=%d, S1=%d, S2=%d, S3=%d",
+          eqn_no,
+          XsmmDtype<T>(),
+          S1,
+          S2,
+          S3);
+    }
 
    private:
     int S1, S2, S3, eqn_no;
@@ -4311,7 +4468,7 @@ class SplitSGDTPP : public BaseTPP {
     arg_array[3].primary = (void*)grad;
     eqn_param.inputs = arg_array;
     eqn_param.output.primary = (void*)lo;
-    auto offset = (long long)((char*)hi - (char*)lo);
+    auto offset = (int64_t)((char*)hi - (char*)lo);
     eqn_param.output.secondary = (void*)offset;
 
     kernel(&eqn_param);
@@ -4333,9 +4490,9 @@ class SplitSGDTPP : public BaseTPP {
       out_hi[i] = bf16_hp.i[1];
     }
 #else
-    long sz = N;
+    int64_t sz = N;
     auto vlr = _mm512_set1_ps(lr);
-    long i;
+    int64_t i;
     for (i = 0; i < ALIGNDOWN(sz, 16); i += 16) {
       auto grad_i = _mm512_loadu_ps_auto(&grad[i]);
       auto data_i = _mm512_split_loadu_ps(&hi[i], &lo[i]);
@@ -4354,15 +4511,15 @@ class SplitSGDTPP : public BaseTPP {
   }
 
  protected:
-  std::string hash_str() override {
-    char hash[200];
-    snprintf(hash, 200, "split_sgd_eqn_i%d", N);
-    return std::string(hash);
+  uint64_t hash_int() override {
+    std::array<int, 1> params = {N};
+    uint64_t hash_value = string_to_hash_int<1>("split_sgd_eqn", params);
+    return hash_value;
   }
   void* build_kernel() override {
     libxsmm_blasint ld = N;
     libxsmm_blasint my_eqn0 = libxsmm_matrix_eqn_create();
-    meqn_push_unary_op(my_eqn0, LIBXSMM_MELTW_TYPE_UNARY_UNPACK_TO_BLOCKS);
+    meqn_push_unary_op(my_eqn0, LIBXSMM_MELTW_TYPE_UNARY_UNZIP);
     meqn_push_ternary_op(
         my_eqn0,
         LIBXSMM_MELTW_TYPE_TERNARY_MULADD,
@@ -4372,7 +4529,7 @@ class SplitSGDTPP : public BaseTPP {
     meqn_push_arg(my_eqn0, N, 1, ld, 3, 0, LIBXSMM_DATATYPE_BF16);
     /* This is the scalar learning rate */
     meqn_push_arg(my_eqn0, 1, 1, 1, 2, 0, LIBXSMM_DATATYPE_F32);
-    meqn_push_binary_op(my_eqn0, LIBXSMM_MELTW_TYPE_BINARY_PACK);
+    meqn_push_binary_op(my_eqn0, LIBXSMM_MELTW_TYPE_BINARY_ZIP);
     /* This is the tensor with lo bits  */
     meqn_push_arg(my_eqn0, N, 1, ld, 0, 0, LIBXSMM_DATATYPE_I16);
     /* This is the tensor with hi bits  */
@@ -4380,6 +4537,10 @@ class SplitSGDTPP : public BaseTPP {
     debug_print_eqn_tree(my_eqn0);
     auto func0 = meqn_dispatch(N, 1, &ld, LIBXSMM_DATATYPE_I16, my_eqn0);
     return (void*)func0;
+  }
+  void print_error() override {
+    fprintf(
+        stderr, "Unable to get JIT kernel for split_sgd_eqn. Params: N=%d", N);
   }
 
  private:
@@ -4404,15 +4565,15 @@ class EmbBagFwdTPP {
             (libxsmm_meltw_unary_flags)(sizeof(Tind) == 8 ? LIBXSMM_MELTW_FLAG_UNARY_IDX_SIZE_8BYTES : LIBXSMM_MELTW_FLAG_UNARY_IDX_SIZE_4BYTES),
             LIBXSMM_MELTW_TYPE_UNARY_REDUCE_COLS_IDX_OP_ADD) {}
   void operator()(Tout* output, Tin* weight, Tind* input, int N) {
-    unsigned long long _N = N;
+    uint64_t _N = N;
     kernel((void*)weight, (void*)input, (void*)&_N, (void*)output, NULL);
   }
   void ref(Tout* output, Tin* weight, Tind* input, int N) {
-    for (long v = 0; v < E; v++)
+    for (int64_t v = 0; v < E; v++)
       output[v] = 0;
-    for (long s = 0; s < N; s++) {
+    for (int64_t s = 0; s < N; s++) {
       auto ind = input[s];
-      for (long v = 0; v < E; v++)
+      for (int64_t v = 0; v < E; v++)
         output[v] += weight[ind * E + v];
     }
   }
@@ -4511,11 +4672,11 @@ class FusedAdamWTPP {
       T* exp_avg_sq,
       float step_size,
       float lr) {
-    long sz = N;
+    int64_t sz = N;
     float beta1_1 = 1.0f - beta1;
     float beta2_1 = 1.0f - beta2;
 #ifndef __AVX512F__
-    for (long i = 0; i < sz; i++) {
+    for (int64_t i = 0; i < sz; i++) {
       auto avg_i = exp_avg[i];
       auto avg_sq_i = exp_avg_sq[i];
       auto grad_i = grad[i];
@@ -4538,7 +4699,7 @@ class FusedAdamWTPP {
     auto veps = _mm512_set1_ps(eps);
     auto vstep_size = _mm512_set1_ps(step_size);
     auto vweight_decay = _mm512_set1_ps(lr * weight_decay);
-    long i;
+    int64_t i;
     for (i = 0; i < ALIGNDOWN(sz, 16); i += 16) {
       auto avg_i = _mm512_loadu_ps(&exp_avg[i]);
       auto avg_sq_i = _mm512_loadu_ps(&exp_avg_sq[i]);
@@ -4595,17 +4756,11 @@ class FusedAdamWTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "fused_adamw_eqn%d_t%d_n%d_wd%d",
-          eqn_no,
-          XsmmDtype<T>(),
-          p->N,
-          (p->weight_decay == 0.0 ? 0 : 1));
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 4> params = {
+          eqn_no, XsmmDtype<T>(), p->N, (p->weight_decay == 0.0 ? 0 : 1)};
+      uint64_t hash_value = string_to_hash_int<4>("fused_adamw_eqn", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto in_dt = XsmmDtype<T>();
@@ -4687,6 +4842,15 @@ class FusedAdamWTPP {
       }
       return (void*)func;
     }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for fused_adamw_eqn. Params: eqn_no=%d, dt_1=%d, N=%d, weight_decay=%d",
+          eqn_no,
+          XsmmDtype<T>(),
+          p->N,
+          (p->weight_decay == 0.0 ? 0 : 1));
+    }
 
    private:
     FusedAdamWTPP* p;
@@ -4755,7 +4919,7 @@ class FusedSplitAdamWTPP {
     arg_array[5].primary = (void*)hi;
     arg_array[6].primary = (void*)&lrwd_1;
     eqn_param.output.primary = (void*)lo;
-    auto offset = (long long)((char*)hi - (char*)lo);
+    auto offset = (int64_t)((char*)hi - (char*)lo);
     eqn_param.output.secondary = (void*)offset;
     eqn2(&eqn_param);
   }
@@ -4768,11 +4932,11 @@ class FusedSplitAdamWTPP {
       T* exp_avg_sq,
       float step_size,
       float lr) {
-    long sz = N;
+    int64_t sz = N;
     float beta1_1 = 1.0f - beta1;
     float beta2_1 = 1.0f - beta2;
 #ifndef __AVX512F__
-    for (long i = 0; i < sz; i++) {
+    for (int64_t i = 0; i < sz; i++) {
       union libxsmm_bfloat16_f32 data_hp;
       float avg_i = exp_avg[i];
       float avg_sq_i = exp_avg_sq[i];
@@ -4801,7 +4965,7 @@ class FusedSplitAdamWTPP {
     auto veps = _mm512_set1_ps(eps);
     auto vstep_size = _mm512_set1_ps(step_size);
     auto vweight_decay = _mm512_set1_ps(lr * weight_decay);
-    long i;
+    int64_t i;
     for (i = 0; i < ALIGNDOWN(sz, 16); i += 16) {
       auto avg_i = _mm512_loadu_ps(&exp_avg[i]);
       auto avg_sq_i = _mm512_loadu_ps(&exp_avg_sq[i]);
@@ -4858,17 +5022,12 @@ class FusedSplitAdamWTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "fused_split_adamw_eqn%d_t%d_n%d_wd%d",
-          eqn_no,
-          XsmmDtype<T>(),
-          p->N,
-          (p->weight_decay == 0.0 ? 0 : 1));
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 4> params = {
+          eqn_no, XsmmDtype<T>(), p->N, (p->weight_decay == 0.0 ? 0 : 1)};
+      uint64_t hash_value =
+          string_to_hash_int<4>("fused_split_adamw_eqn", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto in_dt = XsmmDtype<T>();
@@ -4916,7 +5075,11 @@ class FusedSplitAdamWTPP {
       } else if (eqn_no == 2) {
         // Equation for data_i (with decay)
         auto my_eqn2 = libxsmm_matrix_eqn_create();
-        meqn_push_unary_op(my_eqn2, LIBXSMM_MELTW_TYPE_UNARY_UNPACK_TO_BLOCKS);
+        meqn_push_unary_op(
+            my_eqn2,
+            LIBXSMM_MELTW_TYPE_UNARY_UNZIP,
+            LIBXSMM_MELTW_FLAG_UNARY_NONE,
+            LIBXSMM_DATATYPE_IMPLICIT);
         if (use_wd == 1) {
           meqn_push_binary_op(
               my_eqn2,
@@ -4924,11 +5087,15 @@ class FusedSplitAdamWTPP {
               LIBXSMM_MELTW_FLAG_BINARY_BCAST_SCALAR_IN_1);
         }
         meqn_push_binary_op(my_eqn2, LIBXSMM_MELTW_TYPE_BINARY_SUB);
-        meqn_push_binary_op(my_eqn2, LIBXSMM_MELTW_TYPE_BINARY_PACK);
+        meqn_push_binary_op(
+            my_eqn2,
+            LIBXSMM_MELTW_TYPE_BINARY_ZIP,
+            LIBXSMM_MELTW_FLAG_BINARY_NONE,
+            LIBXSMM_DATATYPE_IMPLICIT);
         meqn_push_arg(
-            my_eqn2, N, 1, ld, 4, 0, LIBXSMM_DATATYPE_I16); // data_i lo
+            my_eqn2, N, 1, ld, 4, 0, LIBXSMM_DATATYPE_U16); // data_i lo
         meqn_push_arg(
-            my_eqn2, N, 1, ld, 5, 0, LIBXSMM_DATATYPE_I16); // data_i hi
+            my_eqn2, N, 1, ld, 5, 0, LIBXSMM_DATATYPE_U16); // data_i hi
 
         meqn_push_binary_op(
             my_eqn2,
@@ -4950,11 +5117,20 @@ class FusedSplitAdamWTPP {
           meqn_push_arg(my_eqn2, 1, 1, 1, 6, 0, LIBXSMM_DATATYPE_F32);
         }
         debug_print_eqn_tree(my_eqn2);
-        func = meqn_dispatch(N, 1, &ld, LIBXSMM_DATATYPE_I16, my_eqn2);
+        func = meqn_dispatch(N, 1, &ld, LIBXSMM_DATATYPE_U16, my_eqn2);
       } else {
         PCL_ASSERT(false, "Should not come here\n");
       }
       return (void*)func;
+    }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for fused_split_adamw_eqn. Params: eqn_no=%d, dt_1=%d, N=%d, weight_decay=%d",
+          eqn_no,
+          XsmmDtype<T>(),
+          p->N,
+          (p->weight_decay == 0.0 ? 0 : 1));
     }
 
    private:
@@ -5038,11 +5214,11 @@ class FusedAdamStepTPP {
       float weight_decay = 0.0,
       float exp_avg_scale = 1.0,
       float exp_avg_sq_scale = 1.0) {
-    long sz = N;
+    int64_t sz = N;
     float beta1_1 = 1.0f - beta1;
     float beta2_1 = 1.0f - beta2;
 #ifndef __AVX512F__
-    for (long i = 0; i < sz; i++) {
+    for (int64_t i = 0; i < sz; i++) {
       float avg_i = exp_avg[i];
       float avg_sq_i = exp_avg_sq[i];
       float grad_i = grad[i];
@@ -5072,7 +5248,7 @@ class FusedAdamStepTPP {
     auto vweight_decay = _mm512_set1_ps(weight_decay);
     auto vexp_avg_scale = _mm512_set1_ps(exp_avg_scale);
     auto vexp_avg_sq_scale = _mm512_set1_ps(exp_avg_sq_scale);
-    long i;
+    int64_t i;
     for (i = 0; i < ALIGNDOWN(sz, 16); i += 16) {
       auto avg_i = _mm512_loadu_ps_auto(&exp_avg[i]);
       auto avg_sq_i = _mm512_loadu_ps_auto(&exp_avg_sq[i]);
@@ -5139,17 +5315,12 @@ class FusedAdamStepTPP {
     }
 
    protected:
-    std::string hash_str() override {
-      char hash[200];
-      snprintf(
-          hash,
-          200,
-          "fused_adam_step_eqn%d_t%d_n%d_wd%d",
-          eqn_no,
-          XsmmDtype<T>(),
-          p->N,
-          p->use_weight_decay);
-      return std::string(hash);
+    uint64_t hash_int() override {
+      std::array<int, 4> params = {
+          eqn_no, XsmmDtype<T>(), p->N, p->use_weight_decay};
+      uint64_t hash_value =
+          string_to_hash_int<4>("fused_adam_step_eqn", params);
+      return hash_value;
     }
     void* build_kernel() override {
       auto in_dt = XsmmDtype<T>();
@@ -5239,6 +5410,15 @@ class FusedAdamStepTPP {
         PCL_ASSERT(false, "Should not come here\n");
       }
       return (void*)func;
+    }
+    void print_error() override {
+      fprintf(
+          stderr,
+          "Unable to get JIT kernel for fused_adam_step_eqn. Params: eqn_no=%d, dt_1=%d, N=%d, weight_decay=%d",
+          eqn_no,
+          XsmmDtype<T>(),
+          p->N,
+          (p->use_weight_decay == 0.0 ? 0 : 1));
     }
 
    private:

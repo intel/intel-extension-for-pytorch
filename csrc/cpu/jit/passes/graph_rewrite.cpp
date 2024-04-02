@@ -4,6 +4,7 @@
 
 #include <ATen/code_template.h>
 #include <torch/csrc/jit/passes/remove_mutation.h>
+#include "utils/onednn_utils.h"
 
 namespace torch_ipex {
 namespace jit {
@@ -1083,7 +1084,8 @@ void FuseConcatBnRelu(std::shared_ptr<Graph>& graph) {
     auto check_type_channelsize = [](c10::TensorType tensor) {
       return (
           (tensor.scalarType().value() == at::kFloat ||
-           tensor.scalarType().value() == at::kBFloat16) &&
+           tensor.scalarType().value() == at::kBFloat16 ||
+           tensor.scalarType().value() == at::kHalf) &&
           tensor.sizes()[1].value() % 16 == 0 &&
           utils::is_channelslast(tensor));
     };
@@ -1303,7 +1305,12 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
       return false;
     }
     if (dtype_option.value() != c10::ScalarType::BFloat16 &&
-        dtype_option.value() != c10::ScalarType::Float) {
+        dtype_option.value() != c10::ScalarType::Float &&
+        dtype_option.value() != c10::ScalarType::Half) {
+      return false;
+    }
+    if (dtype_option.value() == c10::ScalarType::Half &&
+        !torch_ipex::utils::onednn_has_fp16_type_support()) {
       return false;
     }
     return true;
@@ -1313,54 +1320,82 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
 
 void simplifyAllReduce(std::shared_ptr<Graph>& graph) {
   std::string all_reduce_v1 = R"(
-    graph(%a, %weight, %out_features1, %out_features2, %reduceop, %tag, %ranks, %group_size, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+    graph(%a, %weight, %out_features1, %out_features2, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
       %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
-      %r2 = deepspeed_comm::all_reduce(%r1, %reduceop, %tag, %ranks, %group_size)
+      %r2 = deepspeed_comm::all_reduce(%r1)
       %r3 = torch_ipex::tpp_linear_gelu(%b, %fc_in_weight, %fc_in_bias, %out_features2)
       %r4 = aten::to(%r3, %idx, %no, %no, %dtype)
       %r5 = aten::contiguous(%r4, %zero)
       %r6 = torch_ipex::tpp_linear(%r5, %fc_out_weight, %out_features1)
-      %r7 = deepspeed_comm::all_reduce(%r6, %reduceop, %tag, %ranks, %group_size)
+      %r7 = deepspeed_comm::all_reduce(%r6)
       %r8 = aten::add_(%r7, %fc_out_bias, %alpha)
       %r = aten::add(%r2, %r8, %alpha)
       return (%r) )";
   std::string all_reduce_repl_v1 = R"(
-    graph(%a, %weight, %out_features1, %out_features2, %reduceop, %tag, %ranks, %group_size, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+    graph(%a, %weight, %out_features1, %out_features2, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
       %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
       %r2 = torch_ipex::tpp_linear_gelu(%b, %fc_in_weight, %fc_in_bias, %out_features2)
       %r3 = aten::to(%r2, %idx, %no, %no, %dtype)
       %r4 = aten::contiguous(%r3, %zero)
       %r5 = torch_ipex::tpp_linear(%r4, %fc_out_weight, %out_features1)
       %r6 = aten::add(%r1, %r5, %alpha)
-      %r7 = deepspeed_comm::all_reduce(%r6, %reduceop, %tag, %ranks, %group_size)
+      %r7 = deepspeed_comm::all_reduce(%r6)
       %r = aten::add_(%r7, %fc_out_bias, %alpha)
       return (%r) )";
 
   std::string all_reduce_v2 = R"(
-    graph(%a, %weight, %reduceop, %tag, %ranks, %group_size, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha):
+    graph(%a, %weight, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha):
       %r1 = ipex_prepack::linear_run(%a, %weight)
-      %r2 = deepspeed_comm::all_reduce(%r1, %reduceop, %tag, %ranks, %group_size)
+      %r2 = deepspeed_comm::all_reduce(%r1)
       %r3 = ipex_prepack::linear_gelu_run(%b, %fc_in_weight, %fc_in_bias)
       %r4 = ipex_prepack::linear_run(%r3, %fc_out_weight)
-      %r5 = deepspeed_comm::all_reduce(%r4, %reduceop, %tag, %ranks, %group_size)
+      %r5 = deepspeed_comm::all_reduce(%r4)
       %r6 = aten::add_(%r5, %fc_out_bias, %alpha)
       %r = aten::add(%r2, %r6, %alpha)
       return (%r) )";
   std::string all_reduce_repl_v2 = R"(
-    graph(%a, %weight, %reduceop, %tag, %ranks, %group_size, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha):
+    graph(%a, %weight, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha):
       %r1 = ipex_prepack::linear_run(%a, %weight)
       %r2 = ipex_prepack::linear_gelu_run(%b, %fc_in_weight, %fc_in_bias)
       %r3 = ipex_prepack::linear_run(%r2, %fc_out_weight)
       %r4 = aten::add(%r1, %r3, %alpha)
-      %r5 = deepspeed_comm::all_reduce(%r4, %reduceop, %tag, %ranks, %group_size)
+      %r5 = deepspeed_comm::all_reduce(%r4)
       %r = aten::add_(%r5, %fc_out_bias, %alpha)
       return (%r) )";
 
-  SubgraphRewriter rewriter_v1, rewriter_v2;
+  std::string all_reduce_v3 = R"(
+    graph(%a, %weight, %out_features1, %out_features2, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+      %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
+      %r2 = torch_ipex::inference_all_reduce_add(%r1)
+      %r2_1 = aten::to(%b, %idx, %no, %no, %dtype)
+      %r2_2 = aten::contiguous(%r2_1, %zero)
+      %r3 = torch_ipex::tpp_linear_gelu(%r2_2, %fc_in_weight, %fc_in_bias, %out_features2)
+      %r4 = aten::to(%r3, %idx, %no, %no, %dtype)
+      %r5 = aten::contiguous(%r4, %zero)
+      %r6 = torch_ipex::tpp_linear_bias(%r5, %fc_out_weight, %fc_out_bias, %out_features1)
+      %r7 = torch_ipex::inference_all_reduce_add(%r6)
+      %r = aten::add(%r2, %r7, %alpha)
+      return (%r) )";
+  std::string all_reduce_repl_v3 = R"(
+    graph(%a, %weight, %out_features1, %out_features2, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+      %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
+      %r2_1 = aten::to(%b, %idx, %no, %no, %dtype)
+      %r2_2 = aten::contiguous(%r2_1, %zero)
+      %r2 = torch_ipex::tpp_linear_gelu(%r2_2, %fc_in_weight, %fc_in_bias, %out_features2)
+      %r3 = aten::to(%r2, %idx, %no, %no, %dtype)
+      %r4 = aten::contiguous(%r3, %zero)
+      %scale: float = prim::Constant[value=1.0]()
+      %r5 = torch_ipex::tpp_linear_add(%r4, %r1, %fc_out_weight, %fc_out_bias, %scale, %out_features1)
+      %r6 = torch_ipex::inference_all_reduce_add(%r5)
+      return (%r6) )";
+
+  SubgraphRewriter rewriter_v1, rewriter_v2, rewriter_v3;
   rewriter_v1.RegisterRewritePattern(all_reduce_v1, all_reduce_repl_v1);
   rewriter_v2.RegisterRewritePattern(all_reduce_v2, all_reduce_repl_v2);
+  rewriter_v3.RegisterRewritePattern(all_reduce_v3, all_reduce_repl_v3);
   rewriter_v1.runOnGraph(graph);
   rewriter_v2.runOnGraph(graph);
+  rewriter_v3.runOnGraph(graph);
 }
 
 } // namespace graph_rewrite

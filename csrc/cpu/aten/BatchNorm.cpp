@@ -67,7 +67,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_forward(
       return std::make_tuple(
           mkldnn_to_dense(new_with_itensor_mkldnn(
               std::move(y),
-              optTypeMetaToScalarType(input.options().dtype_opt()),
+              c10::optTypeMetaToScalarType(input.options().dtype_opt()),
               input.options().device_opt())),
           saved_mean,
           saved_var);
@@ -97,7 +97,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_forward(
     return std::make_tuple(
         mkldnn_to_dense(new_with_itensor_mkldnn(
             std::move(y),
-            optTypeMetaToScalarType(input.options().dtype_opt()),
+            c10::optTypeMetaToScalarType(input.options().dtype_opt()),
             input.options().device_opt())),
         running_mean,
         running_var);
@@ -160,12 +160,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> batch_norm_backward(
         grad_input_mask[2] ? grad_bias : at::Tensor());
   } else {
     return std::make_tuple(
-        grad_input_mask[0]
-            ? mkldnn_to_dense(new_with_itensor_mkldnn(
-                  std::move(gradx),
-                  optTypeMetaToScalarType(grad_output.options().dtype_opt()),
-                  grad_output.options().device_opt()))
-            : at::Tensor(),
+        grad_input_mask[0] ? mkldnn_to_dense(new_with_itensor_mkldnn(
+                                 std::move(gradx),
+                                 c10::optTypeMetaToScalarType(
+                                     grad_output.options().dtype_opt()),
+                                 grad_output.options().device_opt()))
+                           : at::Tensor(),
         grad_input_mask[1] ? grad_weight : at::Tensor(),
         grad_input_mask[2] ? grad_bias : at::Tensor());
   }

@@ -73,15 +73,15 @@ std::vector<at::Tensor> constructTensors(
 }
 
 pytnnc::ExprHandle constant(const pytnnc::ArgValue& v) {
-  if (auto s = c10::get_if<pytnnc::VarHandle>(&v)) {
+  if (auto s = std::get_if<pytnnc::VarHandle>(&v)) {
     return *s;
-  } else if (auto d = c10::get_if<double>(&v)) {
+  } else if (auto d = std::get_if<double>(&v)) {
     return pytnnc::DoubleImm::make(*d);
-  } else if (auto i = c10::get_if<int64_t>(&v)) {
+  } else if (auto i = std::get_if<int64_t>(&v)) {
     return pytnnc::LongImm::make(*i);
-  } else if (auto b = c10::get_if<bool>(&v)) {
+  } else if (auto b = std::get_if<bool>(&v)) {
     return pytnnc::BoolImm::make(*b);
-  } else if (c10::get_if<pytnnc::ArgNone>(&v)) {
+  } else if (std::get_if<pytnnc::ArgNone>(&v)) {
     // This is just a placeholder so we don't throw.  None-handling
     // is operator-specific and should be handled properly in
     // the operator-specific lowering code.

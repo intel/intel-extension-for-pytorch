@@ -1,5 +1,6 @@
 #include "IDeepConversions.h"
 #include <ATen/OpaqueTensorImpl.h>
+#include <Macros.h>
 #include <c10/core/Allocator.h>
 
 namespace torch_ipex {
@@ -19,7 +20,7 @@ namespace cpu {
  * NOTE: if this is generally useful we may want to move this to its own header.
  */
 template <typename T>
-struct TORCH_API IntrusivePtrTargetWrapper : c10::intrusive_ptr_target {
+struct IPEX_API IntrusivePtrTargetWrapper : c10::intrusive_ptr_target {
  private:
   T target_;
 
@@ -107,6 +108,10 @@ ideep::tensor::data_type get_mkldnn_dtype(at::ScalarType type) {
       return ideep::tensor::data_type::bf16;
     case at::ScalarType::Half:
       return ideep::tensor::data_type::f16;
+    case at::ScalarType::Float8_e4m3fn:
+      return ideep::tensor::data_type::f8_e4m3;
+    case at::ScalarType::Float8_e5m2:
+      return ideep::tensor::data_type::f8_e5m2;
     default:
       TORCH_CHECK(false, "get_mkldnn_dtype: unsupported data type");
   }
@@ -131,7 +136,9 @@ ideep::tensor itensor_view_from_dense(const at::Tensor& tensor) {
   TORCH_CHECK(
       tensor.scalar_type() == at::ScalarType::Float ||
           tensor.scalar_type() == at::ScalarType::BFloat16 ||
-          tensor.scalar_type() == at::ScalarType::Half,
+          tensor.scalar_type() == at::ScalarType::Half ||
+          tensor.scalar_type() == at::ScalarType::Float8_e4m3fn ||
+          tensor.scalar_type() == at::ScalarType::Float8_e5m2,
       "itensor_view_from_dense expects float tensor input");
 
   return {

@@ -97,7 +97,7 @@ at::Tensor nms_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(nms_kernel_stub, &nms_kernel_impl);
+IPEX_REGISTER_DISPATCH(nms_kernel_stub, &nms_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

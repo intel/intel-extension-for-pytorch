@@ -20,7 +20,7 @@ using cumsum_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
     int64_t,
     c10::optional<at::ScalarType>);
-DECLARE_DISPATCH(cumsum_kernel_fn, cumsum_kernel_stub);
+IPEX_DECLARE_DISPATCH(cumsum_kernel_fn, cumsum_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

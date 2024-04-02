@@ -33,28 +33,6 @@ std::vector<int64_t> conv_input_size(
   return input_size;
 }
 
-c10::SymDimVector conv_input_size(
-    c10::SymIntArrayRef output_size,
-    at::IntArrayRef weight_size,
-    at::IntArrayRef padding,
-    at::IntArrayRef output_padding,
-    at::IntArrayRef stride,
-    at::IntArrayRef dilation,
-    int64_t groups) {
-  // ASSERT(output_size.size() > 2)
-  // ASSERT(output_size.size() == weight_size.size())
-  auto dim = output_size.size();
-  c10::SymDimVector input_size(dim);
-  input_size[0] = output_size[output_batch_size_dim];
-  input_size[1] = weight_size[weight_input_channels_dim] * groups;
-  for (size_t d = 2; d < dim; ++d) {
-    int kernel = dilation[d - 2] * (weight_size[d] - 1) + 1;
-    input_size[d] = (output_size[d] - 1) * stride[d - 2] -
-        (2 * padding[d - 2]) + kernel + output_padding[d - 2];
-  }
-  return input_size;
-}
-
 static inline std::vector<int64_t> padding_r(
     at::IntArrayRef padding,
     at::IntArrayRef output_padding) {
@@ -145,7 +123,7 @@ at::Tensor conv_transpose_kernel_impl(
     return mkldnn_to_dense(
                new_with_itensor_mkldnn(
                    std::move(y),
-                   optTypeMetaToScalarType(input.options().dtype_opt()),
+                   c10::optTypeMetaToScalarType(input.options().dtype_opt()),
                    input.options().device_opt()))
         .contiguous(memory_format);
   } else {
@@ -340,11 +318,11 @@ at::Tensor conv_transpose_backward_input(
       groups);
 
   if (!is_channels_last) {
-    return mkldnn_to_dense(
-               new_with_itensor_mkldnn(
-                   std::move(grad_x),
-                   optTypeMetaToScalarType(grad_output.options().dtype_opt()),
-                   grad_output.options().device_opt()))
+    return mkldnn_to_dense(new_with_itensor_mkldnn(
+                               std::move(grad_x),
+                               c10::optTypeMetaToScalarType(
+                                   grad_output.options().dtype_opt()),
+                               grad_output.options().device_opt()))
         .contiguous(memory_format);
   } else {
     return grad_input;

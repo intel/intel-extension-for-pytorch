@@ -1,5 +1,6 @@
 #pragma once
 
+#ifdef USE_LIBXSMM
 #include <dyndisp/DispatchStub.h>
 #include <libxsmm.h>
 #include <torch/all.h>
@@ -137,3 +138,5 @@ struct hash<torch_ipex::cpu::DotMicroKernelKey> {
   }
 };
 } // namespace std
+
+#endif

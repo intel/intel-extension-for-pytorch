@@ -1015,13 +1015,13 @@ void avg_pool3d_backward_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(avg_pool2d_kernel_stub, &avg_pool2d_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(avg_pool2d_kernel_stub, &avg_pool2d_kernel_impl);
+IPEX_REGISTER_DISPATCH(
     avg_pool2d_backward_kernel_stub,
     &avg_pool2d_backward_kernel_impl);
 
-REGISTER_DISPATCH(avg_pool3d_kernel_stub, &avg_pool3d_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(avg_pool3d_kernel_stub, &avg_pool3d_kernel_impl);
+IPEX_REGISTER_DISPATCH(
     avg_pool3d_backward_kernel_stub,
     &avg_pool3d_backward_kernel_impl);
 

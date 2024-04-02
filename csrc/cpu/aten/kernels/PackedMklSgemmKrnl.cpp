@@ -122,9 +122,9 @@ void mkl_prepack_sgemm_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(mkl_sgemm_packB_stub, &mkl_sgemm_packB_impl);
-REGISTER_DISPATCH(mkl_sgemm_kernel_stub, &mkl_sgemm_kernel_impl);
-REGISTER_DISPATCH(
+IPEX_REGISTER_DISPATCH(mkl_sgemm_packB_stub, &mkl_sgemm_packB_impl);
+IPEX_REGISTER_DISPATCH(mkl_sgemm_kernel_stub, &mkl_sgemm_kernel_impl);
+IPEX_REGISTER_DISPATCH(
     mkl_prepack_sgemm_kernel_stub,
     &mkl_prepack_sgemm_kernel_impl);
 

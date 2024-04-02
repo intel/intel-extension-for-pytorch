@@ -10,7 +10,7 @@
 namespace torch_ipex {
 namespace cpu {
 
-DEFINE_DISPATCH(cumsum_kernel_stub);
+IPEX_DEFINE_DISPATCH(cumsum_kernel_stub);
 
 at::Tensor cumsum(
     const at::Tensor& self,

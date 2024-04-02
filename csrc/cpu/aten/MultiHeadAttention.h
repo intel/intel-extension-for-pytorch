@@ -78,8 +78,8 @@ using sd_mha_kernel_v2_fn = at::Tensor (*)(
     const int64_t&,
     const double&);
 
-DECLARE_DISPATCH(bert_mha_kernel_fn, bert_mha_kernel_stub);
-DECLARE_DISPATCH(sd_mha_kernel_v1_fn, sd_mha_kernel_v1_stub);
-DECLARE_DISPATCH(sd_mha_kernel_v2_fn, sd_mha_kernel_v2_stub);
+IPEX_DECLARE_DISPATCH(bert_mha_kernel_fn, bert_mha_kernel_stub);
+IPEX_DECLARE_DISPATCH(sd_mha_kernel_v1_fn, sd_mha_kernel_v1_stub);
+IPEX_DECLARE_DISPATCH(sd_mha_kernel_v2_fn, sd_mha_kernel_v2_stub);
 } // namespace cpu
 } // namespace torch_ipex

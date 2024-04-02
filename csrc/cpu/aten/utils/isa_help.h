@@ -21,7 +21,7 @@ std::string get_current_isa_level_kernel_impl();
 }
 
 using get_current_isa_level_kernel_fn = std::string (*)();
-DECLARE_DISPATCH(
+IPEX_DECLARE_DISPATCH(
     get_current_isa_level_kernel_fn,
     get_current_isa_level_kernel_stub);
 

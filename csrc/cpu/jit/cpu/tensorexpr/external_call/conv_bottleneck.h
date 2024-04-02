@@ -27,7 +27,7 @@ struct LoweringFuncTrait<ConvFusedOp::kConvBottleneckV2>
     //     2: conv op context
     //     3: conv op context
     for (int i = 0; i < buf_num; i++) {
-      res.push_back(c10::get<pytnnc::BufHandle>(inputs[i]));
+      res.push_back(std::get<pytnnc::BufHandle>(inputs[i]));
     }
     return res;
   }
@@ -50,7 +50,7 @@ struct LoweringFuncTrait<ConvFusedOp::kConvBottleneckV1>
     //     2: conv op context
     //     3: conv op context
     constexpr int res_idx = 0;
-    return c10::get<pytnnc::BufHandle>(inputs[res_idx]);
+    return std::get<pytnnc::BufHandle>(inputs[res_idx]);
   }
 };
 

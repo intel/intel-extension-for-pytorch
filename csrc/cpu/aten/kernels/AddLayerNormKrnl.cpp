@@ -100,6 +100,14 @@ at::Tensor add_layer_norm_kernel_impl(
       AddLayerNormKernelImpl<at::BFloat16, float>(
           X, b, alpha, weight, bias, M, N, eps, Y);
     }
+  } else if (a.scalar_type() == at::kHalf && b.scalar_type() == at::kHalf) {
+    if (weight.defined() && weight.scalar_type() == at::kHalf) {
+      AddLayerNormKernelImpl<at::Half, at::Half>(
+          X, b, alpha, weight, bias, M, N, eps, Y);
+    } else {
+      AddLayerNormKernelImpl<at::Half, float>(
+          X, b, alpha, weight, bias, M, N, eps, Y);
+    }
   }
   return Y;
 #else
@@ -110,7 +118,7 @@ at::Tensor add_layer_norm_kernel_impl(
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(add_layer_norm_kernel_stub, &add_layer_norm_kernel_impl);
+IPEX_REGISTER_DISPATCH(add_layer_norm_kernel_stub, &add_layer_norm_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

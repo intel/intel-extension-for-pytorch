@@ -157,8 +157,8 @@ static std::vector<at::Tensor> fused_dense_gelu_bwd_unpad(
 static std::vector<at::Tensor> fused_embedding_layernorm_dropout_fwd_unpad(
     double p,
     double eps,
-    long H,
-    long pad_id,
+    int64_t H,
+    int64_t pad_id,
     std::vector<at::Tensor> inputs,
     bool training) {
   GlobalPass _gp(FWD);
@@ -189,7 +189,7 @@ static std::vector<at::Tensor> fused_embedding_layernorm_dropout_fwd_unpad(
 
 static std::vector<at::Tensor> fused_embedding_layernorm_dropout_bwd_unpad(
     double p,
-    long pad_id,
+    int64_t pad_id,
     std::vector<at::Tensor> inputs) {
   GlobalPass _gp(BWD);
   if (inputs[0].dtype() == at::kFloat && inputs[6].dtype() == at::kFloat) {

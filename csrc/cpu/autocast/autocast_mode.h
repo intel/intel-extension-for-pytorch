@@ -2,6 +2,7 @@
 
 #include <ATen/ATen.h>
 #include <ATen/autocast_mode.h>
+#include <Macros.h>
 #include <c10/core/UndefinedTensorImpl.h>
 #include <c10/core/impl/LocalDispatchKeySet.h>
 #include <c10/util/intrusive_ptr.h>
@@ -16,7 +17,7 @@ using at::Tensor;
 using at::TensorList;
 using namespace c10;
 
-enum class TORCH_API DtypeCastPolicy : uint8_t {
+enum class IPEX_API DtypeCastPolicy : uint8_t {
   user_defined_dtype = 0,
   fp32, // Cast all inputs to at::kFloat before running the op.
   fp32_set_opt_dtype, // Treats functions (like softmax) that
@@ -38,9 +39,7 @@ enum class TORCH_API DtypeCastPolicy : uint8_t {
   fallthrough, // Do not cast inputs.
 };
 
-TORCH_API at::ScalarType get_autocast_dtype();
-TORCH_API void set_autocast_dtype(at::ScalarType dtype);
-TORCH_API void clear_autocast_cache();
+IPEX_API at::ScalarType get_autocast_dtype();
 
 Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg);
 
@@ -92,15 +91,6 @@ inline T cpu_cached_cast(at::ScalarType to_type, T arg) {
   return arg;
 }
 
-/****************************************************
-Logic to apply cached casting to any Tensor argument.
-****************************************************/
-inline bool is_eligible_cpu(const Tensor& arg) {
-  return (
-      arg.defined() && arg.is_floating_point() &&
-      (arg.scalar_type() != at::kDouble));
-}
-
 // Overload to catch Tensor args.
 // If nextArg is floating-point, compare its scalar_type with our
 // current best guess for the promote type, and update if necessary.
@@ -110,15 +100,17 @@ inline at::ScalarType prioritize(
   TORCH_CHECK(
       current != at::kDouble,
       "promote type is double in at::autocast::prioritize");
-  if (is_eligible_cpu(nextArg)) {
+  at::ScalarType lower_precision_fp =
+      at::autocast::get_lower_precision_fp_from_device_type(
+          c10::DeviceType::CPU);
+  if (at::autocast::is_autocast_eligible(nextArg, c10::DeviceType::CPU)) {
     auto next = nextArg.scalar_type();
     if (next == at::kDouble) {
       return current; // ignores double tensors
     } else if (current == at::kFloat || next == at::kFloat) {
       return at::kFloat; // prioritizes float over bfloat16
-    } else if (
-        current == get_autocast_dtype() && next == get_autocast_dtype()) {
-      return get_autocast_dtype();
+    } else if (current == lower_precision_fp && next == lower_precision_fp) {
+      return lower_precision_fp;
     } else {
       AT_ERROR("Unexpected floating ScalarType in at::autocast::prioritize");
       return current;

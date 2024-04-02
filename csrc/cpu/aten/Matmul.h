@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/Tensor.h>
+#include <Macros.h>
 #include <torch/csrc/autograd/FunctionsManual.h>
 #include <torch/csrc/autograd/custom_function.h>
 #include <vector>
@@ -26,7 +27,7 @@ struct IndexRangeGenerator {
   size_t i = 0;
 };
 
-struct TORCH_API BmmBackward0 : public TraceableFunction {
+struct IPEX_API BmmBackward0 : public TraceableFunction {
   using TraceableFunction::TraceableFunction;
   variable_list apply(variable_list&& grads) override;
   void release_variables() override {
