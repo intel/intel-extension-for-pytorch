@@ -1,5 +1,5 @@
-Legacy Profiler Tool (Experimental)
-===================================
+Legacy Profiler Tool (Prototype)
+================================
 
 ## Introduction
 

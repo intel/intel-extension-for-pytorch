@@ -4,8 +4,6 @@ Examples
 These examples will help you get started using Intel® Extension for PyTorch\*
 with Intel GPUs.
 
-For examples on Intel CPUs, check the [CPU examples](../../../cpu/latest/tutorials/examples.html).
-
 **Prerequisites**:
 Before running these examples, install the `torchvision` and `transformers` Python packages.
 
@@ -27,7 +25,7 @@ Before running these examples, install the `torchvision` and `transformers` Pyth
 To use Intel® Extension for PyTorch\* on training, you need to make the following changes in your code:
 
 1. Import `intel_extension_for_pytorch` as `ipex`.
-2. Use the `ipex.optimize` function, which applies optimizations against the model object, as well as an optimizer object.
+2. Use the `ipex.optimize` function for additional performance boost, which applies optimizations against the model object, as well as an optimizer object.
 3. Use Auto Mixed Precision (AMP) with BFloat16 data type.
 4. Convert input tensors, loss criterion and model to XPU, as shown below:
 
@@ -219,18 +217,20 @@ The <LIBPYTORCH_PATH> is the absolute path of libtorch we install at the first s
 
 If *Found IPEX* is shown as dynamic library paths, the extension was linked into the binary. This can be verified with the Linux command *ldd*.
 
+The value of x, y, z in the following log will change depending on the version you choose.
+
 ```bash
 $ CC=icx CXX=icpx cmake -DCMAKE_PREFIX_PATH=/workspace/libtorch ..
--- The C compiler identification is IntelLLVM 2024.0.0
--- The CXX compiler identification is IntelLLVM 2024.0.0
+-- The C compiler identification is IntelLLVM 202x.y.z
+-- The CXX compiler identification is IntelLLVM 202x.y.z
 -- Detecting C compiler ABI info
 -- Detecting C compiler ABI info - done
--- Check for working C compiler: /workspace/intel/oneapi/compiler/2024.0.0/linux/bin/icx - skipped
+-- Check for working C compiler: /workspace/intel/oneapi/compiler/202x.y.z/linux/bin/icx - skipped
 -- Detecting C compile features
 -- Detecting C compile features - done
 -- Detecting CXX compiler ABI info
 -- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /workspace/intel/oneapi/compiler/2024.0.0/linux/bin/icpx - skipped
+-- Check for working CXX compiler: /workspace/intel/oneapi/compiler/202x.y.z/linux/bin/icpx - skipped
 -- Detecting CXX compile features
 -- Detecting CXX compile features - done
 -- Looking for pthread.h
@@ -252,16 +252,16 @@ $ ldd example-app
         libintel-ext-pt-cpu.so => /workspace/libtorch/lib/libintel-ext-pt-cpu.so (0x00007fd5a1a1b000)
         libintel-ext-pt-gpu.so => /workspace/libtorch/lib/libintel-ext-pt-gpu.so (0x00007fd5862b0000)
         ...
-        libmkl_intel_lp64.so.2 => /workspace/intel/oneapi/mkl/2024.0.0/lib/intel64/libmkl_intel_lp64.so.2 (0x00007fd584ab0000)
-        libmkl_core.so.2 => /workspace/intel/oneapi/mkl/2024.0.0/lib/intel64/libmkl_core.so.2 (0x00007fd5806cc000)
-        libmkl_gnu_thread.so.2 => /workspace/intel/oneapi/mkl/2024.0.0/lib/intel64/libmkl_gnu_thread.so.2 (0x00007fd57eb1d000)
-        libmkl_sycl.so.3 => /workspace/intel/oneapi/mkl/2024.0.0/lib/intel64/libmkl_sycl.so.3 (0x00007fd55512c000)
-        libOpenCL.so.1 => /workspace/intel/oneapi/compiler/2024.0.0/linux/lib/libOpenCL.so.1 (0x00007fd55511d000)
-        libsvml.so => /workspace/intel/oneapi/compiler/2024.0.0/linux/compiler/lib/intel64_lin/libsvml.so (0x00007fd553b11000)
-        libirng.so => /workspace/intel/oneapi/compiler/2024.0.0/linux/compiler/lib/intel64_lin/libirng.so (0x00007fd553600000)
-        libimf.so => /workspace/intel/oneapi/compiler/2024.0.0/linux/compiler/lib/intel64_lin/libimf.so (0x00007fd55321b000)
-        libintlc.so.5 => /workspace/intel/oneapi/compiler/2024.0.0/linux/compiler/lib/intel64_lin/libintlc.so.5 (0x00007fd553a9c000)
-        libsycl.so.6 => /workspace/intel/oneapi/compiler/2024.0.0/linux/lib/libsycl.so.6 (0x00007fd552f36000)
+        libmkl_intel_lp64.so.2 => /workspace/intel/oneapi/mkl/202x.y.z/lib/intel64/libmkl_intel_lp64.so.2 (0x00007fd584ab0000)
+        libmkl_core.so.2 => /workspace/intel/oneapi/mkl/202x.y.z/lib/intel64/libmkl_core.so.2 (0x00007fd5806cc000)
+        libmkl_gnu_thread.so.2 => /workspace/intel/oneapi/mkl/202x.y.z/lib/intel64/libmkl_gnu_thread.so.2 (0x00007fd57eb1d000)
+        libmkl_sycl.so.3 => /workspace/intel/oneapi/mkl/202x.y.z/lib/intel64/libmkl_sycl.so.3 (0x00007fd55512c000)
+        libOpenCL.so.1 => /workspace/intel/oneapi/compiler/202x.y.z/linux/lib/libOpenCL.so.1 (0x00007fd55511d000)
+        libsvml.so => /workspace/intel/oneapi/compiler/202x.y.z/linux/compiler/lib/intel64_lin/libsvml.so (0x00007fd553b11000)
+        libirng.so => /workspace/intel/oneapi/compiler/202x.y.z/linux/compiler/lib/intel64_lin/libirng.so (0x00007fd553600000)
+        libimf.so => /workspace/intel/oneapi/compiler/202x.y.z/linux/compiler/lib/intel64_lin/libimf.so (0x00007fd55321b000)
+        libintlc.so.5 => /workspace/intel/oneapi/compiler/202x.y.z/linux/compiler/lib/intel64_lin/libintlc.so.5 (0x00007fd553a9c000)
+        libsycl.so.6 => /workspace/intel/oneapi/compiler/202x.y.z/linux/lib/libsycl.so.6 (0x00007fd552f36000)
         ...
 ```
 
@@ -286,4 +286,4 @@ Intel® Extension for PyTorch\* provides its C++ dynamic library to allow users 
 
 ## Intel® AI Reference Models
 
-Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/v2.12.0) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [Use Cases](https://github.com/IntelAI/models/tree/v2.12.0#use-cases) section. Models verified on Intel GPUs are marked in the `Model Documentation` column. You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.
+Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/v3.1.1) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [Use Cases](https://github.com/IntelAI/models/tree/v3.1.1?tab=readme-ov-file#use-cases) section. Models verified on Intel GPUs are marked in the `Model Documentation` column. You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.

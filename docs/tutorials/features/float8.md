@@ -1,5 +1,5 @@
-Float8 Data Type Support [GPU] (Experimental)
-============================================
+Float8 Data Type Support (Prototype)
+====================================
 
 ## Float8 Data Type
 

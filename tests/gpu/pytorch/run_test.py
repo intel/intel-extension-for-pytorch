@@ -78,7 +78,7 @@ def parse_args():
         "--ipex-verbose",
         nargs="?",
         type=str,
-        help="(Experimental) output specified verbose info to the screen." \
+        help="(Prototype) output specified verbose info to the screen." \
              " Supports only onednn, onemkl and ipex verbose. When enabled two or more, use comma without space to join each other."
     )
     parser.add_argument(

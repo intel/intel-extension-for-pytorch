@@ -240,16 +240,10 @@ elif [[ ${DEVICE} == "gpu" ]]; then
     rm -rf ../csrc/include/xpu
     mv ../csrc/include/xpu_bk ../csrc/include/xpu
 fi
-cp tutorials/features/graph_capture.md tutorials/features/graph_capture.md.bk
-parse_example "../examples/cpu/features/graph_capture.py" tutorials/features/graph_capture.md "(marker_feature_graph_capture)" "python"
-cp tutorials/features/int8_recipe_tuning_api.md tutorials/features/int8_recipe_tuning_api.md.bk
-parse_example "../examples/cpu/features/int8_recipe_tuning/int8_autotune.py" tutorials/features/int8_recipe_tuning_api.md "(marker_feature_int8_autotune)" "python"
 
 make clean
 make html
 
-mv tutorials/features/graph_capture.md.bk tutorials/features/graph_capture.md
-mv tutorials/features/int8_recipe_tuning_api.md.bk tutorials/features/int8_recipe_tuning_api.md
 mv tutorials/examples.md.bk tutorials/examples.md
 if [[ ${DEVICE} == "cpu" ]]; then
     mv tutorials/features/fast_bert.md.bk tutorials/features/fast_bert.md

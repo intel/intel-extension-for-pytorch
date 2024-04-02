@@ -1,4 +1,4 @@
-Runtime Extension (Experimental)
+Runtime Extension (Prototype)
 ==========================
 
 Intel® Extension for PyTorch\* Runtime Extension provides a runtime CPU pool API to bind threads to cores. It also features async tasks. Please **note**: Intel® Extension for PyTorch\* Runtime extension is still in the **POC** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.html).
