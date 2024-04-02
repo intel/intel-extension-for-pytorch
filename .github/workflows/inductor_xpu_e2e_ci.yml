@@ -64,10 +64,10 @@ jobs:
           pip install --force-reinstall "git+${TRITON_REPO}@${TRITON_PINNED_COMMIT}#subdirectory=python"
 
       - name: E2E dependancy install
-        uses: ./.github/scripts/install-e2e-suites
+        uses: .github/scripts/install-e2e-suites
 
       - name: Huggingface AMP_BF16 Inference Accuracy Test
-        uses: ./.github/actions/inductor-xpu-e2e-test
+        uses: .github/actions/inductor-xpu-e2e-test
         with:
           suite: huggingface
           dt: amp_bf16

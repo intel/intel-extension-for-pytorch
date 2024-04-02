@@ -38,6 +38,7 @@ runs:
       shell: bash
       run: |
         source activate e2e_ci
+        cd ${{ github.workspace }}
         cp .github/scripts/inductor_xpu_test.sh ../pytorch
         cd ../pytorch
         if [[ ${{ input.suite}} == "timm_models" ]]; then
@@ -73,6 +74,7 @@ runs:
       shell: bash
       run: |
         set +e
+        cd ${{ github.workspace }}
         cd ../pytorch/inductor_log/${{ inputs.suite }}
         cd ${{ inputs.dt }}
         echo -e "============ Summary for ${{ inputs.suite }} ${{ inputs.dt }} ${{ inputs.mode }} ${{ inputs.scenario }} ============" | tee -a ./${{ inputs.suite }}_${{ inputs.dt }}_${{ inputs.mode }}_${{ inputs.scenario }}_e2e_summary.log
@@ -96,6 +98,7 @@ runs:
       if: ${{ inputs.expected_pass_num }}
       shell: bash
       run: |
+        cd ${{ github.workspace }}
         cd ../pytorch/inductor_log/${{ inputs.suite }}
         cd ${{ inputs.dt }}
         num_passed=$(grep "num_passed:" ${{ inputs.suite }}_${{ inputs.dt }}_${{ inputs.mode }}_${{ inputs.scenario }}_e2e_summary.log | sed -e 's/.*://;s/[^0-9.]//')
