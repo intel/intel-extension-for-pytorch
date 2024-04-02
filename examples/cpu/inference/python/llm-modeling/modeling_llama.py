@@ -216,8 +216,9 @@ class LlamaDecoderLayer(nn.Module):
         if output_attentions:
             outputs += (self_attn_weights,)
 
-        if use_cache:
-            outputs += (present_key_value,)
+        # if use_cache:
+        # use cache always to be true for generation
+        outputs += (present_key_value,)
 
         return outputs
 
@@ -346,8 +347,9 @@ class LlamaModel(PreTrainedModel):
 
             hidden_states = layer_outputs[0]
 
-            if use_cache:
-                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+            # if use_cache:
+            # use cache always to be true for generation
+            next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
@@ -357,7 +359,9 @@ class LlamaModel(PreTrainedModel):
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
-        next_cache = next_decoder_cache if use_cache else None
+        next_cache = next_decoder_cache  # if use_cache else None
+        # use cache always to be true for generation
+
         if not return_dict:
             return tuple(
                 v
@@ -440,16 +444,32 @@ class IPEXLlamaForCausalLM(LlamaPreTrainedModel):
         )
 
         hidden_states = outputs[0]
+        # ==================== for generation, lm head only needs last token as input  ====================
+        if (
+            hasattr(self, "config")
+            and hasattr(self.config, "lm_head_generation")
+            and self.config.lm_head_generation
+            and hidden_states.size(1) != 1
+        ):
+            hidden_states = hidden_states[:, -1:, :]
 
         logits = self.lm_head(hidden_states)
         logits = logits.float()
 
         loss = None
 
-        if not return_dict:
+        if (
+            hasattr(self, "config")
+            and hasattr(self.config, "use_ipex_optimize")
+            and self.config.use_ipex_optimize
+        ):
+            # return dict is handled by ipex._set_optimized_model_for_generation
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
+        if not return_dict:
+            output = (logits,) + outputs[1:]
+            return (loss,) + output if loss is not None else output
         return CausalLMOutputWithPast(
             loss=loss,
             logits=logits,
@@ -458,7 +478,7 @@ class IPEXLlamaForCausalLM(LlamaPreTrainedModel):
             attentions=outputs.attentions,
         )
 
-    # ==================== rewrite to prepare_inputs_for_generation to work with ipex.llm.modules.IndirectAccessKVCache  ====================
+    # ======== rewrite to prepare_inputs_for_generation to work with ipex.llm.modules.IndirectAccessKVCache  =========
     def prepare_inputs_for_generation(
         self,
         input_ids,

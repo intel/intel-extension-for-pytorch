@@ -226,10 +226,11 @@ class GPTJBlock(nn.Module):
         )
         # ==========================================================================
 
-        if use_cache:
-            outputs = (hidden_states,) + outputs
-        else:
-            outputs = (hidden_states,) + outputs[1:]
+        # use cache always to be true for generation
+        # if use_cache:
+        outputs = (hidden_states,) + outputs
+        # else:
+        #     outputs = (hidden_states,) + outputs[1:]
 
         return outputs
 
@@ -354,8 +355,9 @@ class GPTJModel(GPTJPreTrainedModel):
             )
 
             hidden_states = outputs[0]
-            if use_cache is True:
-                presents = presents + (outputs[1],)
+            # use cache always to be true for generation
+            # if use_cache is True:
+            presents = presents + (outputs[1],)
 
             if output_attentions:
                 all_self_attentions = all_self_attentions + (
@@ -466,10 +468,10 @@ class IPEXGPTJForCausalLM(GPTJPreTrainedModel):
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
         attention_mask: Optional[torch.FloatTensor] = None,
-        token_type_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
         position_ids: Optional[torch.LongTensor] = None,
+        token_type_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
@@ -496,10 +498,25 @@ class IPEXGPTJForCausalLM(GPTJPreTrainedModel):
             return_dict=return_dict,
         )
         hidden_states = transformer_outputs[0]
-
+        # ==================== for generation, lm head only needs last token as input  ====================
+        if (
+            hasattr(self, "config")
+            and hasattr(self.config, "lm_head_generation")
+            and self.config.lm_head_generation
+            and hidden_states.size(1) != 1
+        ):
+            hidden_states = hidden_states[:, -1:, :]
         lm_logits = self.lm_head(hidden_states).to(torch.float32)
 
         loss = None
+        if (
+            hasattr(self, "config")
+            and hasattr(self.config, "use_ipex_optimize")
+            and self.config.use_ipex_optimize
+        ):
+            # return dict is handled by ipex._set_optimized_model_for_generation
+            output = (lm_logits,) + transformer_outputs[1:]
+            return ((loss,) + output) if loss is not None else output
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
