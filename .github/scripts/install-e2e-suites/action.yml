@@ -3,7 +3,7 @@ name: install-e2e-suites
 run:
     steps:
       - name: Torchvision Install
-        shell:
+        shell: bash
         run: |
             source activate e2e_ci
             cd ../pytorch
@@ -20,7 +20,7 @@ run:
             python setup.py install
             cd ..
       - name: Torchtext Install
-        shell:
+        shell: bash
         run: |
             source activate e2e_ci
             cd ../pytorch
@@ -35,7 +35,7 @@ run:
             python setup.py clean install
             cd ..
       - name: Torchaudio Install
-        shell:
+        shell: bash
         run: |
             source activate e2e_ci
             cd ../pytorch
@@ -51,7 +51,7 @@ run:
             python setup.py install
             cd ..
       -name: Benchmark Install
-        shell:
+        shell: bash
         run: |
             source activate e2e_ci
             BENCHMARK_PINNED_COMMIT=$(cat .github/ci_commit_pins/benchmark.txt)
