@@ -1,6 +1,7 @@
 name: install-e2e-suites
 
 runs:
+    using: composite
     steps:
       - name: Torchvision Install
         shell: bash
