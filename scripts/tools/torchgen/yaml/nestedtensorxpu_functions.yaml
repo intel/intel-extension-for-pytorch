@@ -70,7 +70,7 @@ supported:
  - zero_
  - sub.Tensor
  - values
-#  - unbind.int # not supported now in torch 2.1
+ - unbind.int
  - _to_copy
  - masked_fill.Scalar
  - view
