@@ -67,10 +67,15 @@ jobs:
         uses: ./.github/scripts/install-e2e-suites
 
       - name: Huggingface AMP_BF16 Inference Accuracy Test
-        uses: ./.github/actions/inductor-xpu-e2e-test
+        run: |
+          bash .github/scripts/inductor-xpu-e2e.sh --suite huggingface --dt amp_bf16 --mode inference --scenario accuracy --expected_pass_num 46
+      
+      - name: Upload Triton Inductor E2E CI Data
+        uses: actions/upload-artifact@v3
         with:
-          suite: huggingface
-          dt: amp_bf16
-          mode: inference
-          scenario: accuracy
-          expected_pass_num: 46
+          name: Triton-Inductor-E2E-CI-Data
+          path: /home/ipex/actions-runner/_work/intel-extension-for-pytorch/pytorch/inductor_log/
+
+      - name: Test Result Check
+        run: |
+          bash .github/scripts/results-check.sh
