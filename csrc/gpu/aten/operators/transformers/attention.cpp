@@ -1,28 +1,51 @@
 #include <ATen/ATen.h>
 #include <ATen/TensorSubclassLikeUtils.h>
+#include <ATen/cpp_custom_type_hack.h>
+#include <ATen/native/nested/NestedTensorUtils.h>
 #include <ATen/record_function.h>
 #include <CL/sycl.hpp>
 #include <core/Generator.h>
 #include <runtime/Device.h>
 #include <runtime/Utils.h>
+#include <torch/autograd.h>
+#include <torch/custom_class.h>
 #include <utils/DPCPP.h>
+#include <utils/SimpleTrace.h>
 #include "../Blas.h"
 #include "../DistributionTemplates.h"
 #include "../RandomEngine.h"
 #include "../comm/ATDispatch.h"
+#include "../comm/AccumulateType.h"
+#include "dropout.h"
 #include "sdp_utils.h"
 #include "utils/CustomOperatorRegistration.h"
 
+using namespace torch::autograd;
 namespace at {
 namespace AtenIpexTypeXPU {
+
+std::tuple<Tensor, Tensor, Tensor, Tensor> ipex_sdp_dropout_backward(
+    const Tensor& grad_out,
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<Tensor>& attn_bias,
+    const Tensor& out,
+    const Tensor& logsumexp,
+    const Tensor& dropout_mask,
+    double dropout_p,
+    bool grad_input_mask,
+    bool causal,
+    c10::optional<double> scale);
 
 inline Tensor _scaled_dot_product_efficient_attention_impl(
     const Tensor& _query,
     const Tensor& _key,
     const Tensor& _value,
     const c10::optional<Tensor>& attn_mask,
-    Tensor& seed_t,
-    Tensor& offset_t,
+    const c10::optional<at::Tensor>& dropout_mask,
+    const c10::optional<at::Tensor>& seed_t,
+    const c10::optional<at::Tensor>& offset_t,
     Tensor& softmax_lse,
     bool is_causal,
     bool is_training,
@@ -65,7 +88,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
       value.data_ptr(),
       /* alibi */ nullptr,
       attn_mask.has_value() ? attn_mask->data_ptr() : (void*)nullptr,
-      /* dropout_mask */ nullptr,
+      dropout_mask.has_value() ? dropout_mask->data_ptr() : (void*)nullptr,
       output.data_ptr(),
       softmax_lse.data_ptr(),
       softmax_scale,
@@ -86,8 +109,9 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
       false,
       is_training,
       use_dropout,
-      (uint64_t)*seed_t.data_ptr<int64_t>(),
-      (uint64_t)*offset_t.data_ptr<int64_t>());
+      seed_t.has_value() ? (uint64_t)*seed_t.value().data_ptr<int64_t>() : -1,
+      offset_t.has_value() ? (uint64_t)*offset_t.value().data_ptr<int64_t>()
+                           : -1);
 
   return output;
 #else
@@ -396,6 +420,7 @@ _scaled_dot_product_efficient_attention(
       key,
       value,
       attn_bias,
+      c10::nullopt,
       seed_t,
       offset_t,
       softmax_lse,
@@ -408,6 +433,228 @@ _scaled_dot_product_efficient_attention(
       std::move(softmax_lse),
       std::move(seed_t),
       std::move(offset_t));
+}
+
+std::tuple<Tensor, Tensor, Tensor> ipex_sdp_dropout_forward(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<at::Tensor>& attn_bias,
+    bool compute_log_sumexp,
+    double dropout_p,
+    bool is_causal,
+    c10::optional<double> scale) {
+  RECORD_FUNCTION("ipex_sdp_dropout_forward", {});
+  int64_t B = query.size(0);
+  int64_t num_heads = query.size(1);
+  int64_t M = query.size(-2);
+  int64_t N = key.size(-2);
+  const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
+  Tensor dropout_mask = at::empty(
+      {B, num_heads, M, N},
+      query.options().dtype(c10::CppTypeToScalarType<uint8_t>::value));
+  if (use_dropout) {
+    dropout_mask = at::AtenIpexTypeXPU::dropout_mask_only<uint8_t>(
+        dropout_mask, dropout_p);
+  }
+  auto softmax_lse = at::empty(
+      {query.size(0), query.size(1), query.size(2)},
+      query.options().dtype(at::kFloat));
+
+  auto out = _scaled_dot_product_efficient_attention_impl(
+      query,
+      key,
+      value,
+      attn_bias,
+      dropout_mask,
+      c10::nullopt,
+      c10::nullopt,
+      softmax_lse,
+      is_causal,
+      compute_log_sumexp,
+      dropout_p,
+      scale);
+  return std::make_tuple(
+      std::move(out), std::move(softmax_lse), std::move(dropout_mask));
+}
+
+class IPEXSDPDropoutOp : public Function<IPEXSDPDropoutOp> {
+ public:
+  static variable_list forward(
+      AutogradContext* ctx,
+      const Tensor& query,
+      const Tensor& key,
+      const Tensor& value,
+      const c10::optional<at::Tensor>& attn_bias,
+      bool compute_log_sumexp,
+      double dropout_p,
+      bool is_causal,
+      c10::optional<double> scale) {
+#ifdef BUILD_SIMPLE_TRACE
+    SimpleTrace trace(
+        "IPEXSDPDropoutOp forward -> at::AtenIpexTypeXPU::IPEXSDPDropoutOp::forward");
+#endif
+    ctx->saved_data["dropout_p"] = dropout_p;
+    ctx->saved_data["is_causal"] = is_causal;
+    ctx->saved_data["scale"] = scale;
+    ctx->saved_data["attn_bias"] = attn_bias;
+    ctx->saved_data["attn_bias_requires_grad"] =
+        attn_bias.has_value() ? attn_bias.value().requires_grad() : false;
+
+    auto outputs = ipex_sdp_dropout_forward(
+        query,
+        key,
+        value,
+        attn_bias,
+        compute_log_sumexp,
+        dropout_p,
+        is_causal,
+        scale);
+    ctx->save_for_backward(
+        {query,
+         key,
+         value,
+         std::get<0>(outputs),
+         std::get<1>(outputs),
+         std::get<2>(outputs)});
+    variable_list result = {
+        std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)};
+    return result;
+  }
+
+  static variable_list backward(
+      AutogradContext* ctx,
+      variable_list grad_outputs) {
+#ifdef BUILD_SIMPLE_TRACE
+    SimpleTrace trace(
+        "IPEXSDPDropoutOp backward -> at::AtenIpexTypeXPU::IPEXSDPDropoutOp::backward");
+#endif
+    auto attn_bias = ctx->saved_data["attn_bias"].toOptional<at::Tensor>();
+    auto dropout_p = ctx->saved_data["dropout_p"].toDouble();
+    auto is_causal = ctx->saved_data["is_causal"].toBool();
+    auto scale = ctx->saved_data["scale"].toOptional<double>();
+    auto compute_grad = ctx->saved_data["attn_bias_requires_grad"].toBool();
+    auto saved = ctx->get_saved_variables();
+    Tensor query = saved[0];
+    Tensor key = saved[1];
+    Tensor value = saved[2];
+    Tensor output = saved[3];
+    Tensor logsumexp = saved[4];
+    Tensor dropout_mask = saved[5];
+
+    auto grad_inputs = ipex_sdp_dropout_backward(
+        grad_outputs[0],
+        query,
+        key,
+        value,
+        attn_bias,
+        output,
+        logsumexp,
+        dropout_mask,
+        dropout_p,
+        compute_grad,
+        is_causal,
+        scale);
+    return {
+        std::get<0>(grad_inputs),
+        std::get<1>(grad_inputs),
+        std::get<2>(grad_inputs),
+        std::get<3>(grad_inputs),
+        Tensor(),
+        Tensor(),
+        Tensor(),
+        Tensor()};
+  }
+};
+
+template <int alignment>
+bool is_aligned(const SymInt& size) {
+  return size % alignment == 0;
+}
+
+template <int alignment>
+at::Tensor pad_bias(const at::Tensor& attn_bias) {
+  auto last_dim_size = attn_bias.sym_size(-1);
+  auto pad_count = alignment - (last_dim_size % alignment);
+  auto padded_bias = at::pad_symint(attn_bias, {c10::SymInt(0), pad_count});
+  return padded_bias.slice_symint(-1, 0, last_dim_size);
+}
+
+Tensor preprocess_mask(
+    const Tensor& mask,
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value) {
+  constexpr int mem_eff_alignment = 16;
+  // Expand to 4d case
+  at::Tensor attn_mask = mask.expand_symint(
+      {query.sym_size(0),
+       query.sym_size(1),
+       query.sym_size(2),
+       key.sym_size(2)});
+
+  bool aligned_last_dim = is_aligned<mem_eff_alignment>(attn_mask.sym_size(-1));
+  // Apply pad_bias and store the result in attn_mask
+  if (!aligned_last_dim) {
+    return pad_bias<mem_eff_alignment>(attn_mask);
+  }
+  // Check and make the tensor contiguous if needed
+  if (attn_mask.sym_stride(0) % 16 != 0 || attn_mask.sym_stride(1) % 16 != 0 ||
+      attn_mask.sym_stride(2) % 16 != 0) {
+    return attn_mask.contiguous();
+  }
+
+  return attn_mask;
+}
+
+// We compute dropout mask tensor then pass to forward, and save for backward
+Tensor xetla_sdp_dropout(
+    const Tensor& query_,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<at::Tensor>& attn_mask_,
+    double dropout_p,
+    bool is_causal,
+    c10::optional<double> scale) {
+  c10::optional<Tensor> attn_mask =
+      sdp::convert_boolean_attn_mask(attn_mask_, query_.dtype());
+  bool compute_logsumexp =
+      (query_.requires_grad() || key.requires_grad() || value.requires_grad());
+  if (attn_mask.has_value()) {
+    attn_mask.value() = preprocess_mask(attn_mask.value(), query_, key, value);
+    ;
+  }
+  auto out_and_lse = IPEXSDPDropoutOp::apply(
+      query_,
+      key,
+      value,
+      attn_mask,
+      compute_logsumexp,
+      dropout_p,
+      is_causal,
+      scale);
+  return out_and_lse[0];
+}
+
+inline bool xetla_supported(
+    Tensor q,
+    Tensor k,
+    Tensor v,
+    const c10::optional<Tensor>& b) {
+  bool is_supported = false;
+#if defined(USE_XETLA)
+  if (dpcppGetDeviceHasXMX()) {
+    DeviceId curDevID;
+    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+    if ((q.dtype() == at::kHalf || q.dtype() == at::kBFloat16) &&
+        Settings::I().has_2d_block_array(curDevID)) {
+      if ((q.sym_size(-1) * q.itemsize() % 128 == 0) &&
+          (v.sym_size(-1) * v.itemsize() % 128 == 0))
+        is_supported = true;
+    }
+  }
+#endif
+  return is_supported;
 }
 
 int64_t _fused_sdp_choice(
@@ -936,5 +1183,12 @@ IPEX_LIBRARY_FRAGMENT() {
       "xetla_fsdp_index_forward.xpu",
       at::AtenIpexTypeXPU::xetla_fsdp_index_forward,
       c10::DispatchKey::XPU);
+}
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "xetla_sdp_dropout",
+      at::AtenIpexTypeXPU::xetla_sdp_dropout,
+      c10::DispatchKey::AutogradXPU);
 }
 } // namespace

@@ -31,6 +31,7 @@ from .modules.falcon import NewIPEXFalconBlock
 from .modules.qwen import NewIPEXQWENBlock
 from .modules.chatglm import NewIPEXCHATGLMBlock, prepare_inputs_for_generation
 from .modules.DiffusersTransformer import NewIPEXBasicTransformerBlock
+from .modules.bert import NewIPEXBertSelfAttention
 
 import os
 
@@ -46,6 +47,7 @@ def default_replaced_module_dict():
         transformers.models.bloom.modeling_bloom.BloomBlock: NewIPEXBloomBlock,
         # only support transformers version model, not in-library model
         transformers.models.falcon.modeling_falcon.FalconDecoderLayer: NewIPEXFalconBlock,
+        transformers.models.bert.modeling_bert.BertSelfAttention: NewIPEXBertSelfAttention,
         BasicTransformerBlock: NewIPEXBasicTransformerBlock,
     }
     return default_replace_modules
@@ -186,8 +188,9 @@ class ModuleReplacer:
                     setattr(model, name, new_module)
                     is_replace_success = True
             else:
-                is_replace_success = is_replace_success or self.replace_module(
-                    child, dtype, config, module_name + name
+                is_replace_success = (
+                    self.replace_module(child, dtype, config, module_name + name)
+                    or is_replace_success
                 )
         return is_replace_success
 
@@ -201,6 +204,8 @@ class ModuleReplacer:
                 type(child) in self.module_dict.keys()
                 or child.__class__.__name__ == "BaichuanLayer"
                 or child.__class__.__name__ == "QWenBlock"
+                or child.__class__.__name__ == "BertPreTrainingHeads"
+                or child.__class__.__name__ == "BertModel"
                 or child.__class__.__name__ == "GLMBlock"
             ):
                 continue

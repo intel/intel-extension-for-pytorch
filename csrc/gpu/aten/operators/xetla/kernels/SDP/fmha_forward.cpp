@@ -173,6 +173,9 @@ class fmha_forward_t {
   using mem_desc_Li_t =
       mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>;
 
+  using mem_desc_Dp_Mask_t =
+      mem_desc_t<uint8_t, mem_layout::row_major, mem_space::global>;
+
   // ------------------- // Slm and nbarrier // ------------------- //
   static constexpr uint32_t slm_size_Qi = kBr * kHm * sizeof(scalar_t);
   static constexpr uint32_t slm_size_Pij = kBr * kBc * sizeof(scalar_t);
@@ -190,8 +193,9 @@ class fmha_forward_t {
       mem_desc_Qi_L_t,
       mem_desc_Kj_T_t>;
   using matAccSij_t = typename gemm_Sij_t::matAcc_t;
-  using dropout_t = dropout_fwd_t<matAccSij_t::tile_elems>;
-
+  using dropout_fd_t = dropout_fwd_t<matAccSij_t::tile_elems>;
+  using dp_mask_tile_desc_t = typename gemm_Sij_t::matAcc_tile_desc_t;
+  using dp_mask_tile_t = subgroup::tile_t<uint8_t, dp_mask_tile_desc_t>;
   // ======================== // Context // ======================= //
 
   /// @brief Used to store variables in the flash mha loops
@@ -215,7 +219,8 @@ class fmha_forward_t {
     mem_desc_Oi_t mem_desc_Oi;
     mem_desc_Ai_t mem_desc_Ai;
     mem_desc_Li_t mem_desc_Li;
-    dropout_t dropout_op;
+    mem_desc_Dp_Mask_t mem_desc_Dpij;
+    dropout_fd_t dropout_op;
 
     inline context_t() = default;
 
@@ -386,12 +391,27 @@ class fmha_forward_t {
       }
 
       if constexpr (kIsDropout) {
-        int coord_y = item.get_group(1) * kBr + sg_idy * kSgBr;
-        int coord_x = startT + sg_idx * kSgBc;
-        uint64_t sg_subseq = uint64_t(coord_y) << 32 | uint64_t(coord_x);
-        uint32_t threshold = uint32_t(args.dp_prob * float(4294967296));
-        dropout_op.init(
-            args.seed, sg_subseq, args.offset, threshold, args.dp_scale);
+        if (args.Dp_ptr) {
+          int32_t start_x = startT;
+          uint32_t end_x = args.uT;
+          int32_t start_y = gid * args.uF + item.get_group(1) * kBr;
+          uint32_t end_y = start_y + kBr;
+          uint32_t boundary_y = (gid + 1) * args.uF;
+          end_y = end_y > boundary_y ? boundary_y : end_y;
+
+          mem_desc_Dpij.init(
+              args.Dp_ptr, {end_x, end_y, args.uT}, {start_x, start_y});
+          int32_t tile_offset_x = sg_idx * kSgBc;
+          int32_t tile_offset_y = sg_idy * kSgBr;
+          mem_desc_Dpij.update_coord(tile_offset_x, tile_offset_y);
+        } else {
+          int coord_y = item.get_group(1) * kBr + sg_idy * kSgBr;
+          int coord_x = startT + sg_idx * kSgBc;
+          uint64_t sg_subseq = uint64_t(coord_y) << 32 | uint64_t(coord_x);
+          uint32_t threshold = uint32_t(args.dp_prob * float(4294967296));
+          dropout_op.init(
+              args.seed, sg_subseq, args.offset, threshold, args.dp_scale);
+        }
       }
     }
   };
@@ -524,6 +544,7 @@ class fmha_forward_t {
   inline void softmax_fwd(
       matAccSij_t& matAccSij,
       matAccOi_t& matAccOi,
+      dp_mask_tile_t& mask_in,
       arguments_t& args) {
     using wg_row_max_t =
         group_row_reduce_t<matAccSij_t, wg_size_x, reduce_op::max>;
@@ -579,7 +600,22 @@ class fmha_forward_t {
     }
 
     if constexpr (kIsDropout) {
-      matAccSij.reg = ctx.dropout_op.template process<float>(matAccSij.reg);
+      if (args.Dp_ptr) {
+        using load_payload_mask_t = subgroup::mem_payload_t<
+            mem_desc_t<
+                uint8_t,
+                mem_desc_Dp_Mask_t::layout,
+                mem_desc_Dp_Mask_t::space>,
+            dp_mask_tile_desc_t,
+            subgroup::
+                msg_type_v<dp_mask_tile_desc_t, mem_desc_Dp_Mask_t::space>,
+            gpu_arch::Xe>;
+        load_payload_mask_t load_payload_mask(ctx.mem_desc_Dpij);
+        subgroup::tile_load(mask_in, load_payload_mask);
+        matAccSij.reg = matAccSij.reg * mask_in.reg * args.dp_scale;
+      } else {
+        matAccSij.reg = ctx.dropout_op.template process<float>(matAccSij.reg);
+      }
     }
 
     // save Pij to local memory
@@ -784,7 +820,8 @@ class fmha_forward_t {
       // apply mask
       apply_mask(matAccSij, args, startF, startT);
       // softmax
-      softmax_fwd(matAccSij, matAccOi, args);
+      dp_mask_tile_t mask_in;
+      softmax_fwd(matAccSij, matAccOi, mask_in, args);
       // compute Oi
       gemm_Oi(matAccOi, args, startT);
     }
@@ -1077,7 +1114,7 @@ void fmha_forward_kernel_policy(
     uint64_t seed_t,
     uint64_t offset_t) {
   // Xetla dropout requires the same policy for fwd and bwd
-  if (kIsTraining && kIsDropout) {
+  if (kIsTraining && kIsDropout && !dropout) {
     if (head_size <= 64) {
       CALL_IMPL_FUNC(fmha_policy_64x64x64);
     } else if (head_size <= 128) {

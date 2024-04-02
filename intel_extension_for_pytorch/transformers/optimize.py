@@ -662,9 +662,11 @@ def optimize_transformers(
     if isinstance(model, torch.jit.ScriptModule):
         return model
     if model.training or optimizer is not None:
-        warnings.warn(
-            "fail to apply optimize_transformers, this API supports inference for now, fallback to default path"
-        )
+        from .models.xpu.optimize_transformers.ModuleReplacer import ModuleReplacer
+
+        module_replacer = ModuleReplacer()
+        module_replacer.replace_module(model, dtype, config=None)
+        warnings.warn("this API only supports replace_module in training mode for now.")
         return model, optimizer
 
     try:
