@@ -99,6 +99,12 @@ try:
     from lmms_eval.api.registry import ALL_TASKS
     from lmms_eval.tasks import initialize_tasks
 except ImportError:
+    def register_model(name):
+        def decorator(func):
+            return func
+        return decorator
+    from abc import ABC as lmms
+    Instance = None
     pass
 
 TokenSequence = Union[List[int], torch.LongTensor, torch.Tensor, BatchEncoding]
