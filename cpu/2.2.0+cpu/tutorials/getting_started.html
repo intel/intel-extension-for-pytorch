@@ -66,7 +66,6 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quick Start</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#generic-model-quick-start">Generic Model Quick Start</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#llm-quick-start">LLM Quick Start</a></li>
 </ul>
 </li>
@@ -119,18 +118,15 @@
 <ol class="simple">
 <li><p>Import the extension with <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">intel_extension_for_pytorch</span> <span class="pre">as</span> <span class="pre">ipex</span></code>.</p></li>
 <li><p>Invoke the <code class="docutils literal notranslate"><span class="pre">optimize()</span></code> function to apply optimizations.</p></li>
-<li><p>Convert the imperative model to a graph model.</p>
+<li><p>Convert the eager mode model to a graph mode model.</p>
 <ul class="simple">
 <li><p>For TorchScript, invoke <code class="docutils literal notranslate"><span class="pre">torch.jit.trace()</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.jit.freeze()</span></code></p></li>
-<li><p>For TorchDynamo, invoke <code class="docutils literal notranslate"><span class="pre">torch.compile(model,</span> <span class="pre">backend=&quot;ipex&quot;)</span></code>(<em>Experimental feature</em>)</p></li>
+<li><p>For TorchDynamo, invoke <code class="docutils literal notranslate"><span class="pre">torch.compile(model,</span> <span class="pre">backend=&quot;ipex&quot;)</span></code>(<em>Beta feature</em>)</p></li>
 </ul>
 </li>
 </ol>
 <p><strong>Important:</strong> It is highly recommended to <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">intel_extension_for_pytorch</span></code> right after <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">torch</span></code>, prior to importing other packages.</p>
-<p>The example below demostrates how to use the Intel® Extension for PyTorch*:</p>
-<section id="generic-model-quick-start">
-<h2>Generic Model Quick Start<a class="headerlink" href="#generic-model-quick-start" title="Permalink to this heading"></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> coworks with <span class="pre">TorchScript</span>.</p>
+<p>The example below demostrates how to use the Intel® Extension for PyTorch* with TorchScript:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="c1">############## import ipex ###############</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
@@ -150,8 +146,7 @@
 <span class="c1">##########################################</span>
 </pre></div>
 </div>
-<p></p>
-<p><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> coworks with <span class="pre">TorchDynamo</span>.</p>
+<p>The example below demostrates how to use the Intel® Extension for PyTorch* with TorchDynamo:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="c1">############## import ipex ###############</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
@@ -172,7 +167,6 @@
 </div>
 <p>More examples, including training and usage of low precision data types are available in the <a class="reference internal" href="examples.html"><span class="doc">Examples</span></a> section.</p>
 <p>In <a class="reference internal" href="cheat_sheet.html"><span class="doc">Cheat Sheet</span></a>, you can find more commands that can help you start using the Intel® Extension for PyTorch*.</p>
-</section>
 <section id="llm-quick-start">
 <h2>LLM Quick Start<a class="headerlink" href="#llm-quick-start" title="Permalink to this heading"></a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> is used for Large Language Models (LLM).</p>
@@ -251,7 +245,7 @@
 <span class="n">prompt</span> <span class="o">=</span> <span class="p">[</span><span class="n">prompt</span><span class="p">]</span> <span class="o">*</span> <span class="n">args</span><span class="o">.</span><span class="n">batch_size</span>
 
 <span class="c1"># inference</span>
-<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">(),</span> <span class="n">torch</span><span class="o">.</span><span class="n">inference_mode</span><span class="p">(),</span> <span class="n">torch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">enabled</span><span class="o">=</span><span class="n">amp_enabled</span><span class="p">):</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">inference_mode</span><span class="p">(),</span> <span class="n">torch</span><span class="o">.</span><span class="n">cpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">enabled</span><span class="o">=</span><span class="n">amp_enabled</span><span class="p">):</span>
     <span class="n">input_ids</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">input_ids</span>
     <span class="n">gen_ids</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
         <span class="n">input_ids</span><span class="p">,</span>
@@ -288,8 +282,8 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7fc0e368d820> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f0fc1f6eaf0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

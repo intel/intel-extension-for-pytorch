@@ -112,16 +112,90 @@
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading"></a></h2>
 <p>IPEX dyndisp is forked from <strong>PyTorch:</strong> <code class="docutils literal notranslate"><span class="pre">ATen/native/DispatchStub.h</span></code> and <code class="docutils literal notranslate"><span class="pre">ATen/native/DispatchStub.cpp</span></code>. IPEX adds additional CPU ISA level support, such as <code class="docutils literal notranslate"><span class="pre">AVX512_VNNI</span></code>, <code class="docutils literal notranslate"><span class="pre">AVX512_BF16</span></code> and <code class="docutils literal notranslate"><span class="pre">AMX</span></code>.</p>
-<p>PyTorch &amp; IPEX CPU ISA support statement:
-| | DEFAULT | AVX2 | AVX2_VNNI | AVX512 | AVX512_VNNI | AVX512_BF16 | AMX | AVX512_FP16
-| —- | —- | —- | —- | —- | —- | —- | —- | —- |
-| PyTorch | ✔ | ✔ | ✘ | ✔ | ✘ | ✘ | ✘ | ✘ |
-| IPEX-1.11 | ✘ | ✔ | ✘ | ✔ | ✘ | ✘ | ✘ | ✘ |
-| IPEX-1.12 | ✘ | ✔ | ✘ | ✔ | ✔ | ✔ | ✔ | ✘ |
-| IPEX-1.13 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✘ |
-| IPEX-2.1 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
-| IPEX-2.2 | ✘ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |</p>
-<p>* Current IPEX DEFAULT level implemented as same as AVX2 level.</p>
+<p>PyTorch &amp; IPEX CPU ISA support statement:</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th></th>
+<th>DEFAULT</th>
+<th>AVX2</th>
+<th>AVX2_VNNI</th>
+<th>AVX512</th>
+<th>AVX512_VNNI</th>
+<th>AVX512_BF16</th>
+<th>AMX</th>
+<th>AVX512_FP16</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PyTorch</td>
+<td>✔</td>
+<td>✔</td>
+<td>✘</td>
+<td>✔</td>
+<td>✘</td>
+<td>✘</td>
+<td>✘</td>
+<td>✘</td>
+</tr>
+<tr>
+<td>IPEX-1.11</td>
+<td>✘</td>
+<td>✔</td>
+<td>✘</td>
+<td>✔</td>
+<td>✘</td>
+<td>✘</td>
+<td>✘</td>
+<td>✘</td>
+</tr>
+<tr>
+<td>IPEX-1.12</td>
+<td>✘</td>
+<td>✔</td>
+<td>✘</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✘</td>
+</tr>
+<tr>
+<td>IPEX-1.13</td>
+<td>✘</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✘</td>
+</tr>
+<tr>
+<td>IPEX-2.1</td>
+<td>✘</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+</tr>
+<tr>
+<td>IPEX-2.2</td>
+<td>✘</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+<td>✔</td>
+</tr>
+</tbody>
+</table><p>* Current IPEX DEFAULT level implemented as same as AVX2 level.</p>
 <section id="cpu-isa-build-compiler-requirement">
 <h3>CPU ISA build compiler requirement<a class="headerlink" href="#cpu-isa-build-compiler-requirement" title="Permalink to this heading"></a></h3>
 <p>| ISA Level | GCC requirement |
@@ -601,8 +675,8 @@ prefetchwt1:<span class="w">                    </span><span class="nb">false</s
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7fc0e3636a00> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f0fc43b17c0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

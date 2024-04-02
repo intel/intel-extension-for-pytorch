@@ -1,5 +1,5 @@
 Releases
-========
+=============
 
 ## 2.2.0
 
@@ -117,7 +117,7 @@ We are pleased to announce the release of Intel® Extension for PyTorch\* 2.0.0-
 - **MHA optimization with Flash Attention**: Intel optimized MHA module with Flash Attention technique as inspired by [Stanford paper](https://arxiv.org/abs/2205.14135). This brings less memory consumption for LLM, and also provides better inference performance for models like BERT, Stable Diffusion, etc.
 
 - **Work with torch.compile as an backend (Experimental)**: PyTorch 2.0 introduces a new feature, `torch.compile`, to speed up PyTorch execution. We've enabled Intel® Extension for PyTorch as a backend of torch.compile, which can leverage this new PyTorch API's power of graph capture and provide additional optimization based on these graphs.
-The usage of this new feature is quite simple as below:
+The usage of this new feature is quite simple as below: 
 
 ```python
 import torch
@@ -132,7 +132,7 @@ model = torch.compile(model, backend='ipex')
   - Supported [RMSNorm](https://arxiv.org/abs/1910.07467) which is widely used in the t5 model of huggingface [#1341](https://github.com/intel/intel-extension-for-pytorch/commit/d1de1402a8d6b9ca49b9c9a45a92899f7566866a)
   - Optimized InstanceNorm [#1330](https://github.com/intel/intel-extension-for-pytorch/commit/8b97d2998567cc2fda6eb008194cd64f624e857f)
   - Fixed the quantization of LSTM [#1414](https://github.com/intel/intel-extension-for-pytorch/commit/a4f93c09855679d2b424ca5be81930e3a4562cef) [#1473](https://github.com/intel/intel-extension-for-pytorch/commit/5b44996dc0fdb5c45995d403e18a44f2e1a11b3d)
-  - Fixed the correctness issue of unpacking non-contiguous Linear weight [#1419](https://github.com/intel/intel-extension-for-pytorch/commit/84d413d6c10e16c025c407b68652b1769597e016)
+  - Fixed the correctness issue of unpacking non-contiguous Linear weight [#1419](https://github.com/intel/intel-extension-for-pytorch/commit/84d413d6c10e16c025c407b68652b1769597e016) 
   - oneDNN update [#1488](https://github.com/intel/intel-extension-for-pytorch/commit/fd5c10b664d19c87f8d94cf293077f65f78c3937)
 
 ### Known Issues
@@ -188,7 +188,7 @@ We are pleased to announce the release of Intel® Extension for PyTorch\* 1.13.0
     --model_name_or_path bert-base-uncased --dataset_name squad --do_eval \
     --per_device_train_batch_size 12 --learning_rate 3e-5 --num_train_epochs 2 \
     --max_seq_length 384 --doc_stride 128 --output_dir /tmp/debug_squad/
-
+  
   # automatically apply bfloat16 optimization (--auto-ipex --dtype bfloat16)
   ipexrun --use_default_allocator --ninstance 2 --ncore_per_instance 28 --auto_ipex --dtype bfloat16 run_qa.py \
     --model_name_or_path bert-base-uncased --dataset_name squad --do_eval \
@@ -278,7 +278,7 @@ Highlights include:
   </tr>
   <tr>
   <td valign="top">
-
+  
   ```python
   import intel_extension_for_pytorch as ipex
   # Calibrate the model
@@ -291,17 +291,17 @@ Highlights include:
   conf = ipex.quantization.QuantConf('qconfig.json')
   with torch.no_grad():
       traced_model = ipex.quantization.convert(model, conf, example_input)
-  # Do inference
+  # Do inference 
   y = traced_model(x)
   ```
-
+  
   </td>
   <td valign="top">
-
+  
   ```python
   import intel_extension_for_pytorch as ipex
   # Calibrate the model
-  qconfig = ipex.quantization.default_static_qconfig # Histogram calibration algorithm and
+  qconfig = ipex.quantization.default_static_qconfig # Histogram calibration algorithm and 
   calibrated_model = ipex.quantization.prepare(model_to_be_calibrated, qconfig, example_inputs=example_inputs)
   for data in calibration_data_set:
       calibrated_model(data)
@@ -310,10 +310,10 @@ Highlights include:
   with torch.no_grad():
       traced_model = torch.jit.trace(quantized_model, example_input)
       traced_model = torch.jit.freeze(traced_model)
-  # Do inference
+  # Do inference 
   y = traced_model(x)
   ```
-
+  
   </td>
   </tr>
   </tbody>
@@ -329,7 +329,7 @@ Highlights include:
   </tr>
   <tr>
   <td valign="top">
-
+  
   ```python
   import intel_extension_for_pytorch as ipex
   # Create CPU pool
@@ -337,10 +337,10 @@ Highlights include:
   # Create multi-stream model
   multi_Stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=2, cpu_pool=cpu_pool)
   ```
-
+  
   </td>
   <td valign="top">
-
+  
   ```python
   import intel_extension_for_pytorch as ipex
   # Create CPU pool
@@ -353,7 +353,7 @@ Highlights include:
     multi_stream_input_hint,   # optional
     multi_stream_output_hint ) # optional
   ```
-
+  
   </td>
   </tr>
   </tbody>
@@ -369,7 +369,7 @@ Highlights include:
   </tr>
   <tr>
   <td valign="top">
-
+  
   ```python
   import intel_extension_for_pytorch as ipex
   model = ...
@@ -377,10 +377,10 @@ Highlights include:
   model.eval()
   optimized_model = ipex.optimize(model, dtype=torch.bfloat16)
   ```
-
+  
   </td>
   <td valign="top">
-
+  
   ```python
   import intel_extension_for_pytorch as ipex
   model = ...
@@ -388,7 +388,7 @@ Highlights include:
   model.eval()
   optimized_model = ipex.optimize(model, dtype=torch.bfloat16, sample_input=input)
   ```
-
+  
   </td>
   </tr>
   </tbody>
@@ -492,7 +492,7 @@ We are excited to announce Intel® Extension for PyTorch\* 1.11.0-cpu release by
 ### Highlights
 - Combine the AVX2 and AVX512 binary as a single binary and automatically dispatch to different implementations based on hardware ISA detection at runtime. The typical case is to serve the data center that mixtures AVX2-only and AVX512 platforms. It does not need to deploy the different ISA binary now compared to the previous version
 
-    ***NOTE***:  The extension uses the oneDNN library as the backend. However, the BF16 and INT8 operator sets and features are different between AVX2 and AVX512. Refer to [oneDNN document](https://oneapi-src.github.io/oneDNN/dev_guide_int8_computations.html#processors-with-the-intel-avx2-or-intel-avx-512-support) for more details.
+    ***NOTE***:  The extension uses the oneDNN library as the backend. However, the BF16 and INT8 operator sets and features are different between AVX2 and AVX512. Refer to [oneDNN document](https://oneapi-src.github.io/oneDNN/dev_guide_int8_computations.html#processors-with-the-intel-avx2-or-intel-avx-512-support) for more details. 
 
     > When one input is of type u8, and the other one is of type s8, oneDNN assumes the user will choose the quantization parameters so no overflow/saturation occurs. For instance, a user can use u7 [0, 127] instead of u8 for the unsigned input, or s7 [-64, 63] instead of the s8 one. It is worth mentioning that this is required only when the Intel AVX2 or Intel AVX512 Instruction Set is used.
 
@@ -521,7 +521,7 @@ pip install intel_extension_for_pytorch
 </tbody>
 </table>
 
-- Compared to the previous version, this release provides a dedicated installation file for the C++ SDK. The installation file automatically detects the PyTorch C++ SDK location and installs the extension C++ SDK files to the PyTorch C++ SDK. The user does not need to manually add the extension C++ SDK source files and CMake to the PyTorch SDK. In addition to that, the installation file reduces the C++ SDK binary size from ~220MB to ~13.5MB.
+- Compared to the previous version, this release provides a dedicated installation file for the C++ SDK. The installation file automatically detects the PyTorch C++ SDK location and installs the extension C++ SDK files to the PyTorch C++ SDK. The user does not need to manually add the extension C++ SDK source files and CMake to the PyTorch SDK. In addition to that, the installation file reduces the C++ SDK binary size from ~220MB to ~13.5MB. 
 
 <table align="center">
 <tbody>

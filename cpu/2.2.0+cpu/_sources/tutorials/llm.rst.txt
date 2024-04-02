@@ -32,7 +32,8 @@ Verified for distributed inference mode via DeepSpeed
 
 *Note*: The accuracy drop issue in distributed inference mode for "tiiuae/falcon-40b" has been fixed by DeepSpeed in a recent patch release `v0.13.1 <https://github.com/microsoft/DeepSpeed/tree/v0.13.1>`_.
 
-Please check `LLM best known practice <../../examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
+Please check `LLM best known practice <../../examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts.
+
 
 Demos
 -----
@@ -106,7 +107,7 @@ The section below provides a brief introduction to LLM optimization methodologie
 Linear Operator Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Linear operator is the most obvious hotspot in LLMs inference. There are three backend to speedup linear GEMM kernels in Intel® Extension for PyTorch*. They are oneDNN, Tensor Processing Primitives (TPP), which are used by `Fast BERT feature <./features/fast_bert.md>`_, and customized linear kernels for weight only quantization. All of them use specific block format to utilize hardware resources in a highly efficient way. 
+Linear operator is the most obvious hotspot in LLMs inference. Intel® Extension for PyTorch* provides dedicated optimization to speedup linear GEMM kernels, through oneDNN, customized linear kernels for weight only quantization, and some other specific tuning. All of them use specific block format to utilize hardware resources in a highly efficient way. 
 
 Low Precision Data Types
 ~~~~~~~~~~~~~~~~~~~~~~~~

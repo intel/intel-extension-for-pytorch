@@ -127,8 +127,8 @@
   <section id="transformers-optimization-frontend-api">
 <h1>Transformers Optimization Frontend API<a class="headerlink" href="#transformers-optimization-frontend-api" title="Permalink to this heading"></a></h1>
 <p>The new API function, <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code>, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> function instead of the <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> function to apply all optimizations transparently.</p>
-<p>This API currently works for inference workloads. Support for training is undergoing. Currently, this API supports certain models. Supported model list can be found at <a class="reference external" href="../llm.html#ipexllm-optimized-model-list">Overview</a>.</p>
-<p>API documentation is available at <a class="reference external" href="../api_doc.html#ipex.llm.optimize">API Docs page</a>.</p>
+<p>This API currently works for inference workloads. Support for training is undergoing. Currently, this API supports certain models. Supported model list can be found at <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/llm.html#ipexllm-optimized-model-list">Overview</a>.</p>
+<p>API documentation is available at <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/api_doc.html#ipex.llm.optimize">API Docs page</a>.</p>
 <section id="pseudocode-of-common-usage-scenarios">
 <h2>Pseudocode of Common Usage Scenarios<a class="headerlink" href="#pseudocode-of-common-usage-scenarios" title="Permalink to this heading"></a></h2>
 <p>The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch* APIs to work with LLM models. Complete examples can be found at <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/v2.2.0%2Bcpu/examples/cpu/inference/python/llm">the Example directory</a>.</p>
@@ -178,7 +178,7 @@
 <span class="n">prepared_model</span><span class="o">.</span><span class="n">save_qconf_summary</span><span class="p">(</span><span class="n">qconf_summary</span><span class="o">=</span><span class="n">qconfig_summary_file_path</span><span class="p">)</span>
 
 <span class="c1"># stage 2: quantization</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">ptimize</span><span class="p">(</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span>
   <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">(),</span>
   <span class="n">quantization_config</span><span class="o">=</span><span class="n">qconfig</span><span class="p">,</span>
   <span class="n">qconfig_summary_file</span><span class="o">=</span><span class="n">qconfig_summary_file_path</span><span class="p">,</span>
@@ -201,7 +201,7 @@
 <span class="n">model</span><span class="o">=</span> <span class="n">transformers</span><span class="o">.</span><span class="n">AutoModelForCausalLM</span><span class="p">(</span><span class="n">model_name_or_path</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 
 <span class="n">qconfig</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">get_weight_only_quant_qconfig_mapping</span><span class="p">(</span>
-  <span class="n">weight_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">qint8</span><span class="p">,</span> <span class="c1"># or torch.quint4x2</span>
+  <span class="n">weight_dtype</span><span class="o">=</span><span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">WoqWeightDtype</span><span class="o">.</span><span class="n">INT8</span><span class="p">,</span> <span class="c1"># or INT4/NF4</span>
   <span class="n">lowp_mode</span><span class="o">=</span><span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">WoqLowpMode</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span> <span class="c1"># or FP16, BF16, INT8</span>
 <span class="p">)</span>
 
@@ -265,8 +265,8 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7fc0e369c670> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f0fc1fd36d0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

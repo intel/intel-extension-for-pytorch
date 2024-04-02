@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Transformers Optimization Frontend API" href="llm/llm_optimize.html" />
-    <link rel="prev" title="Fast BERT (Experimental)" href="features/fast_bert.html" /> 
+    <link rel="prev" title="Fast BERT (Prototype)" href="features/fast_bert.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -465,7 +465,7 @@ On the operator level, the extension provides highly efficient GEMM kernel to sp
 </ul>
 <p><em>Note</em>: The above verified models (including other models in the same model family, like “codellama/CodeLlama-7b-hf” from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.</p>
 <p><em>Note</em>: The accuracy drop issue in distributed inference mode for “tiiuae/falcon-40b” has been fixed by DeepSpeed in a recent patch release <a class="reference external" href="https://github.com/microsoft/DeepSpeed/tree/v0.13.1">v0.13.1</a>.</p>
-<p>Please check <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/main/tutorials/../../examples/cpu/inference/python/llm">LLM best known practice</a> for instructions to install/setup environment and example scripts..</p>
+<p>Please check <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/main/tutorials/../../examples/cpu/inference/python/llm">LLM best known practice</a> for instructions to install/setup environment and example scripts.</p>
 </section>
 </section>
 <section id="demos">
@@ -544,7 +544,7 @@ On the operator level, the extension provides highly efficient GEMM kernel to sp
 <p>The section below provides a brief introduction to LLM optimization methodologies:</p>
 <section id="linear-operator-optimization">
 <h3>Linear Operator Optimization<a class="headerlink" href="#linear-operator-optimization" title="Permalink to this heading"></a></h3>
-<p>Linear operator is the most obvious hotspot in LLMs inference. There are three backend to speedup linear GEMM kernels in Intel® Extension for PyTorch*. They are oneDNN, Tensor Processing Primitives (TPP), which are used by <a class="reference external" href="./features/fast_bert.html">Fast BERT feature</a>, and customized linear kernels for weight only quantization. All of them use specific block format to utilize hardware resources in a highly efficient way.</p>
+<p>Linear operator is the most obvious hotspot in LLMs inference. Intel® Extension for PyTorch* provides dedicated optimization to speedup linear GEMM kernels, through oneDNN, customized linear kernels for weight only quantization, and some other specific tuning. All of them use specific block format to utilize hardware resources in a highly efficient way.</p>
 </section>
 <section id="low-precision-data-types">
 <h3>Low Precision Data Types<a class="headerlink" href="#low-precision-data-types" title="Permalink to this heading"></a></h3>
@@ -575,7 +575,7 @@ On the operator level, the extension provides highly efficient GEMM kernel to sp
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="features/fast_bert.html" class="btn btn-neutral float-left" title="Fast BERT (Experimental)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="features/fast_bert.html" class="btn btn-neutral float-left" title="Fast BERT (Prototype)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="llm/llm_optimize.html" class="btn btn-neutral float-right" title="Transformers Optimization Frontend API" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
@@ -588,8 +588,8 @@ On the operator level, the extension provides highly efficient GEMM kernel to sp
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7fc0e3761370> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f0fc1fd3730> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

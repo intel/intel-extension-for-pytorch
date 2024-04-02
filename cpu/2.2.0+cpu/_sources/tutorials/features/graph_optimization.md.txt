@@ -3,7 +3,7 @@ Graph Optimization
 
 Most Deep Learning models could be described as a DAG (directed acyclic graph). Optimizing a deep learning model from a graph perspective is straight forward. Compared to the operator optimization and algorithm optimization, the graph optimization is at a higher level. It covers not only the graph but also the runtime. From the operator perspective, the graph optimization contains the operator fusing and constant folding. From the runtime perspective, the graph optimization contains the operator scheduling, computation resources management, and memory management.
 
-The Intel® Extension for PyTorch\* focuses on operator related graph optimizations. The extension also provides some experimental features for the related runtime optimizations. Refer to the runtime extension for more details about runtime optimization.
+The Intel® Extension for PyTorch\* focuses on operator related graph optimizations. The extension also provides some prototype features for the related runtime optimizations. Refer to the runtime extension for more details about runtime optimization.
 
 ## Ease-of-use graph optimization API
 The graph optimizations of Intel® Extension for PyTorch\* are enabled by default. Users can disable it by calling:

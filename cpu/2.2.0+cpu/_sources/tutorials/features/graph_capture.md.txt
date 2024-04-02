@@ -1,4 +1,4 @@
-Graph Capture (Experimental)
+Graph Capture (Prototype)
 ============================
 
 ### Feature Description

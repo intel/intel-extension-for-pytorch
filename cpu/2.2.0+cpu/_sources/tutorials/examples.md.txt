@@ -5,7 +5,7 @@ These examples will guide you through using the Intel® Extension for PyTorch\* 
 
 You can also refer to the [Features](./features.rst) section to get the examples and usage instructions related to particular features.
 
-The source code for these examples, as well as the feature examples, can be found in the GitHub source tree under the `examples` directory.
+The source code for these examples, as well as the feature examples, can be found in the GitHub source tree under the [examples](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu) directory.
 
 - [Python](#python) examples demonstrate usage of Python APIs:
 
@@ -46,7 +46,7 @@ model.train()
 model, optimizer = ipex.optimize(model, optimizer=optimizer)
 # For BFloat16
 model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
-# Invoke the code below to enable experimental feature torch.compile
+# Invoke the code below to enable beta feature torch.compile
 model = torch.compile(model, backend="ipex")
 ...
 optimizer.zero_grad()
@@ -92,7 +92,7 @@ optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.9)
 model.train()
 
 model, optimizer = ipex.optimize(model, optimizer=optimizer)
-# Uncomment the code below to enable experimental feature torch.compile
+# Uncomment the code below to enable beta feature `torch.compile`
 # model = torch.compile(model, backend="ipex")
 
 for batch_idx, (data, target) in enumerate(train_loader):
@@ -148,7 +148,7 @@ optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.9)
 model.train()
 
 model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
-# Uncomment the code below to enable experimental feature torch.compile
+# Uncomment the code below to enable beta feature `torch.compile`
 # model = torch.compile(model, backend="ipex")
 
 for batch_idx, (data, target) in enumerate(train_loader):
@@ -188,6 +188,16 @@ LR = 0.001
 DOWNLOAD = True
 DATA = 'datasets/cifar10/'
 
+os.environ['MASTER_ADDR'] = '127.0.0.1'
+os.environ['MASTER_PORT'] = '29500'
+os.environ['RANK'] = os.environ.get('PMI_RANK', 0)
+os.environ['WORLD_SIZE'] = os.environ.get('PMI_SIZE', 1)
+dist.init_process_group(
+backend='ccl',
+init_method='env://'
+)
+rank = os.environ['RANK']
+
 transform = torchvision.transforms.Compose([
     torchvision.transforms.Resize((224, 224)),
     torchvision.transforms.ToTensor(),
@@ -199,18 +209,11 @@ train_dataset = torchvision.datasets.CIFAR10(
         transform=transform,
         download=DOWNLOAD,
 )
+dist_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
 train_loader = torch.utils.data.DataLoader(
         dataset=train_dataset,
-        batch_size=128
-)
-
-os.environ['MASTER_ADDR'] = '127.0.0.1'
-os.environ['MASTER_PORT'] = '29500'
-os.environ['RANK'] = os.environ.get('PMI_RANK', 0)
-os.environ['WORLD_SIZE'] = os.environ.get('PMI_SIZE', 1)
-dist.init_process_group(
-backend='ccl',
-init_method='env://'
+        batch_size=128,
+        sampler=dist_sampler
 )
 
 model = torchvision.models.resnet50()
@@ -228,10 +231,15 @@ for batch_idx, (data, target) in enumerate(train_loader):
     loss.backward()
     optimizer.step()
     print('batch_id: {}'.format(batch_idx))
-torch.save({
-     'model_state_dict': model.state_dict(),
-     'optimizer_state_dict': optimizer.state_dict(),
-     }, 'checkpoint.pth')
+
+if rank == 0:
+    torch.save({
+         'model_state_dict': model.state_dict(),
+         'optimizer_state_dict': optimizer.state_dict(),
+         }, 'checkpoint.pth')
+
+dist.destroy_process_group()
+print("Execution finished")
 ```
 [//]: # (marker_train_ddp_complete)
 
@@ -241,7 +249,7 @@ The `optimize` function of Intel® Extension for PyTorch\* applies optimizations
 
 #### Float32
 
-##### Imperative Mode
+##### Eager Mode
 
 ###### Resnet50
 
@@ -363,7 +371,7 @@ print("Execution finished")
 ```
 [//]: # (marker_inf_bert_ts_fp32)
 
-##### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
+##### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
 
 ###### Resnet50
 
@@ -378,7 +386,7 @@ model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
 model.eval()
 data = torch.rand(128, 3, 224, 224)
 
-# Experimental Feature
+# Beta Feature
 #################### code changes ####################  # noqa F401
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model, weights_prepack=False)
@@ -409,7 +417,7 @@ batch_size = 128
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-# Experimental Feature
+# Beta Feature
 #################### code changes ####################  # noqa F401
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model, weights_prepack=False)
@@ -423,14 +431,14 @@ print("Execution finished")
 ```
 [//]: # (marker_inf_bert_dynamo_fp32)
 
-*Note:* In TorchDynamo mode, since the native PyTorch operators like `aten::convolution` and `aten::linear` are well supported and optimized in `ipex` backend, we need to disable weights prepacking by setting `weights_prepack=False` in `ipex.optimize()`.
+**Note:** In TorchDynamo mode, since the native PyTorch operators like `aten::convolution` and `aten::linear` are well supported and optimized in `ipex` backend, we need to disable weights prepacking by setting `weights_prepack=False` in `ipex.optimize()`.
 
 #### BFloat16
 
 The `optimize` function works for both Float32 and BFloat16 data type. For BFloat16 data type, set the `dtype` parameter to `torch.bfloat16`.
 We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.
 
-##### Imperative Mode
+##### Eager Mode
 
 ###### Resnet50
 
@@ -551,7 +559,7 @@ print("Execution finished")
 ```
 [//]: # (marker_inf_bert_ts_bf16)
 
-##### TorchDynamo Mode (Experimental, _NEW feature from 2.0.0_)
+##### TorchDynamo Mode (Beta, _NEW feature from 2.0.0_)
 
 ###### Resnet50
 
@@ -566,7 +574,7 @@ model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
 model.eval()
 data = torch.rand(128, 3, 224, 224)
 
-# Experimental Feature
+# Beta Feature
 #################### code changes ####################  # noqa F401
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model, dtype=torch.bfloat16, weights_prepack=False)
@@ -597,7 +605,7 @@ batch_size = 128
 seq_length = 512
 data = torch.randint(vocab_size, size=[batch_size, seq_length])
 
-# Experimental Feature
+# Beta Feature
 #################### code changes ####################  # noqa F401
 import intel_extension_for_pytorch as ipex
 model = ipex.optimize(model, dtype=torch.bfloat16, weights_prepack=False)
@@ -611,7 +619,7 @@ print("Execution finished")
 ```
 [//]: # (marker_inf_bert_dynamo_bf16)
 
-#### Fast Bert (*Experimental*)
+#### Fast Bert (*Prototype*)
 
 **Note:** You need to install `transformers` Python package to run the following example.
 
@@ -645,11 +653,11 @@ print("Execution finished")
 
 Starting from Intel® Extension for PyTorch\* 1.12.0, quantization feature supports both static and dynamic modes.
 
-##### Calibration
+##### Static Quantization
 
-###### Static Quantization
+###### Calibration
 
-Please follow the steps below to perform static calibration:
+Please follow the steps below to perform calibration for static quantization:
 
 1. Import `intel_extension_for_pytorch` as `ipex`.
 2. Import `prepare` and `convert` from `intel_extension_for_pytorch.quantization`.
@@ -717,15 +725,44 @@ with torch.no_grad():
     traced_model = torch.jit.trace(converted_model, data)
     traced_model = torch.jit.freeze(traced_model)
 
-traced_model.save("quantized_model.pt")
+traced_model.save("static_quantized_model.pt")
 
-print("Execution finished")
+print("Saved model to: static_quantized_model.pt")
 ```
 [//]: # (marker_int8_static)
 
-###### Dynamic Quantization
+###### Deployment
 
-Please follow the steps below to perform static calibration:
+For deployment, the INT8 model is loaded from the local file and can be used directly for sample inference.
+
+Follow the steps below:
+
+1. Import `intel_extension_for_pytorch` as `ipex`.
+2. Load the INT8 model from the saved file.
+3. Run inference.
+
+[//]: # (marker_int8_deploy)
+```python
+import torch
+#################### code changes ####################  # noqa F401
+import intel_extension_for_pytorch as ipex              # noqa F401
+######################################################  # noqa F401
+
+model = torch.jit.load('static_quantized_model.pt')
+model.eval()
+model = torch.jit.freeze(model)
+data = torch.rand(128, 3, 224, 224)
+
+with torch.no_grad():
+    model(data)
+
+print("Execution finished")
+```
+[//]: # (marker_int8_deploy)
+
+##### Dynamic Quantization
+
+Please follow the steps below to perform dynamic quantization:
 
 1. Import `intel_extension_for_pytorch` as `ipex`.
 2. Import `prepare` and `convert` from `intel_extension_for_pytorch.quantization`.
@@ -771,49 +808,525 @@ with torch.no_grad():
     traced_model = torch.jit.trace(converted_model, (data,), check_trace=False, strict=False)
     traced_model = torch.jit.freeze(traced_model)
 
-traced_model.save("quantized_model.pt")
+traced_model.save("dynamic_quantized_model.pt")
 
-print("Execution finished")
+print("Saved model to: dynamic_quantized_model.pt")
 ```
 [//]: # (marker_int8_dynamic)
 
-##### Deployment
+### Large Language Model (LLM)
 
-For deployment, the INT8 model is loaded from the local file and can be used directly on the inference.
+Intel® Extension for PyTorch\* provides dedicated optimization for running Large Language Models (LLM) faster.
+A set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (prototype).
 
-Follow the steps below:
+**Note:** You need to install `transformers==4.38.1` Python package to run the following example.
+In addition, you may need to log in your HuggingFace account to access the pretrained model files. 
+Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
-1. Import `intel_extension_for_pytorch` as `ipex`.
-2. Load the INT8 model from the saved file.
-3. Run inference.
+#### FP32/BF16
 
-[//]: # (marker_int8_deploy)
+[//]: # (marker_llm_optimize)
 ```python
 import torch
 #################### code changes ####################  # noqa F401
-import intel_extension_for_pytorch as ipex              # noqa F401
+import intel_extension_for_pytorch as ipex
+######################################################  # noqa F401
+import argparse
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+)
+
+# args
+parser = argparse.ArgumentParser("Generation script (fp32/bf16 path)", add_help=False)
+parser.add_argument(
+    "--dtype",
+    type=str,
+    choices=["float32", "bfloat16"],
+    default="float32",
+    help="choose the weight dtype and whether to enable auto mixed precision or not",
+)
+parser.add_argument(
+    "--max-new-tokens", default=32, type=int, help="output max new tokens"
+)
+parser.add_argument(
+    "--prompt", default="What are we having for dinner?", type=str, help="input prompt"
+)
+parser.add_argument("--greedy", action="store_true")
+parser.add_argument("--batch-size", default=1, type=int, help="batch size")
+args = parser.parse_args()
+print(args)
+
+# dtype
+amp_enabled = True if args.dtype != "float32" else False
+amp_dtype = getattr(torch, args.dtype)
+
+# load model
+model_id = "facebook/opt-125m"
+config = AutoConfig.from_pretrained(
+    model_id, torchscript=True, trust_remote_code=True
+)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    torch_dtype=amp_dtype,
+    config=config,
+    low_cpu_mem_usage=True,
+    trust_remote_code=True,
+)
+tokenizer = AutoTokenizer.from_pretrained(
+    model_id,
+    trust_remote_code=True
+)
+model = model.eval()
+model = model.to(memory_format=torch.channels_last)
+
+# Intel(R) Extension for PyTorch*
+#################### code changes ####################  # noqa F401
+model = ipex.llm.optimize(
+    model,
+    dtype=amp_dtype,
+    inplace=True,
+    deployment_mode=True,
+)
 ######################################################  # noqa F401
 
-model = torch.jit.load('quantized_model.pt')
-model.eval()
-model = torch.jit.freeze(model)
-data = torch.rand(128, 3, 224, 224)
+# generate args
+num_beams = 1 if args.greedy else 4
+generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
 
-with torch.no_grad():
-    model(data)
+# input prompt
+prompt = args.prompt
+input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
+print("---- Prompt size:", input_size)
+prompt = [prompt] * args.batch_size
 
-print("Execution finished")
+# inference
+with torch.no_grad(), torch.inference_mode(), torch.cpu.amp.autocast(enabled=amp_enabled):
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+    gen_ids = model.generate(
+        input_ids,
+        max_new_tokens=args.max_new_tokens,
+        **generate_kwargs
+    )
+    gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+    input_tokens_lengths = [x.shape[0] for x in input_ids]
+    output_tokens_lengths = [x.shape[0] for x in gen_ids]
+    total_new_tokens = [
+        o - i for i, o in zip(input_tokens_lengths, output_tokens_lengths)
+    ]
+    print(gen_text, total_new_tokens, flush=True)
 ```
-[//]: # (marker_int8_deploy)
-
-oneDNN provides [oneDNN Graph Compiler](https://github.com/oneapi-src/oneDNN/tree/dev-graph-preview4/doc#onednn-graph-compiler) as a prototype feature that could boost performance for selective topologies. No code change is required. Install <a class="reference external" href="installation.md#installation_onednn_graph_compiler">a binary</a> with this feature enabled. We verified this feature with `Bert-large`, `bert-base-cased`, `roberta-base`, `xlm-roberta-base`, `google-electra-base-generator` and `google-electra-base-discriminator`.
-
-### Large Language Model (LLM)
-
-**Note:** You need to install `transformers==4.35.2` Python package to run the following example.
-
 [//]: # (marker_llm_optimize)
-[//]: # (marker_llm_optimize)
+
+#### Smooth Quantization INT8
+
+The typical steps shown in the example are:
+
+1. Calibration process: Run the example script specifying `--calibration`, along with other related arguments.
+When the calibration process is completed, the quantization summary files would be generated.
+
+2. Model inference process: Run the example script without specifying `--calibration`. In this process the quantized model 
+will be generated via the original model and the quantization config and summary files, and will
+generate results for the input prompt.
+
+[//]: # (marker_llm_optimize_sq)
+```python
+import torch
+#################### code changes ####################  # noqa F401
+import intel_extension_for_pytorch as ipex
+######################################################  # noqa F401
+import argparse
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+)
+
+# args
+parser = argparse.ArgumentParser("Generation script (static quantization path)", add_help=False)
+parser.add_argument(
+    "--dtype",
+    type=str,
+    choices=["float32", "bfloat16"],
+    default="float32",
+    help="choose the weight dtype and whether to enable auto mixed precision or not",
+)
+parser.add_argument(
+    "--max-new-tokens", default=32, type=int, help="output max new tokens"
+)
+parser.add_argument(
+    "--prompt", default="What are we having for dinner?", type=str, help="input prompt"
+)
+parser.add_argument("--greedy", action="store_true")
+parser.add_argument("--batch-size", default=1, type=int, help="batch size")
+parser.add_argument("--calibration", action="store_true")
+parser.add_argument("--calibration-samples", default=512, type=int, help="total number of calibration samples")
+parser.add_argument("--int8-qconfig", nargs="?", default="./qconfig.json", help="static quantization factors summary files generated by calibration")
+parser.add_argument("--dataset", nargs="?", default="NeelNanda/pile-10k")
+parser.add_argument("--alpha", default=0.5, type=float, help="alpha value for smoothquant")
+args = parser.parse_args()
+print(args)
+
+
+# dtype
+amp_enabled = True if args.dtype != "float32" and not calibration else False
+amp_dtype = getattr(torch, args.dtype) if not calibration else torch.float32
+
+# load model
+model_id = "meta-llama/Llama-2-7b-hf"
+config = AutoConfig.from_pretrained(
+    model_id, torchscript=True, trust_remote_code=True
+)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    torch_dtype=amp_dtype,
+    config=config,
+    low_cpu_mem_usage=True,
+    trust_remote_code=True,
+)
+tokenizer = AutoTokenizer.from_pretrained(
+    model_id,
+    trust_remote_code=True
+)
+model = model.eval()
+model = model.to(memory_format=torch.channels_last)
+
+num_beams = 1 if args.greedy else 4
+beam_idx_tmp = torch.zeros(
+    (2048, int(args.batch_size * num_beams)), dtype=torch.long
+).contiguous()
+global_past_key_value = [
+    (
+        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+        torch.zeros(
+            [
+                1,
+                model.config.num_attention_heads,
+                1,
+                int(
+                    model.config.hidden_size
+                    / model.config.num_attention_heads
+                ),
+            ]
+        ).contiguous(),
+        torch.zeros(
+            [
+                1,
+                user_model.config.num_attention_heads,
+                1,
+                int(
+                    model.config.hidden_size
+                    / model.config.num_attention_heads
+                ),
+            ]
+        ).contiguous(),
+        beam_idx_tmp,
+    )
+    for i in range(model.config.num_hidden_layers)
+]
+
+# Intel(R) Extension for PyTorch*
+#################### code changes ####################  # noqa F401
+class Calibration:
+    def __init__(self, dataset, tokenizer, batch_size=1, pad_val=1, pad_max=512):
+        self.dataset = dataset
+        self.tokenizer = tokenizer
+        self.batch_size = batch_size
+        self.pad_val = pad_val
+        self.pad_max = pad_max
+
+        # tokenize the dataset
+        self.dataset = self.dataset.map(self.tokenize_function, batched=True)
+        self.dataset.set_format(type="torch", columns=["input_ids"])
+
+    @torch.no_grad()
+    def tokenize_function(self, examples):
+        if "prompt" in examples:
+            example = self.tokenizer(examples["prompt"])
+        elif "text" in examples:
+            example = self.tokenizer(examples["text"])
+        elif "code" in examples:
+            example = self.tokenizer(examples["code"])
+        return example
+
+    @torch.no_grad()
+    def collate_batch(self, batch):
+        position_ids_padded = []
+        input_ids_padded = []
+        last_ind = []
+        attention_mask_padded = []
+        for text in batch:
+            input_ids = text["input_ids"]
+            input_ids = (
+                input_ids[: int(self.pad_max)]
+                if len(input_ids) > int(self.pad_max)
+                else input_ids
+            )
+            last_ind.append(input_ids.shape[0] - 1)
+            attention_mask = torch.ones(len(input_ids))
+            position_ids = torch.arange(len(input_ids))
+            input_ids_padded.append(input_ids)
+            attention_mask_padded.append(attention_mask)
+            position_ids_padded.append(position_ids)
+        return (
+            (
+                torch.vstack(input_ids_padded),
+                torch.vstack(attention_mask_padded),
+                torch.vstack(position_ids_padded),
+                tuple(global_past_key_value),
+            ),
+            torch.tensor(last_ind),
+        )
+
+calib_dataset = load_dataset(args.dataset, split="train")
+calib_evaluator = Calibration(calib_dataset, tokenizer, args.batch_size)
+calib_dataloader = DataLoader(
+    calib_evaluator.dataset,
+    batch_size=1,
+    shuffle=False,
+    collate_fn=calib_evaluator.collate_batch,
+)
+
+qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
+
+if args.calibration:
+    example_inputs = None
+    for i, (
+        (input_ids, attention_mask, position_ids, past_key_values),
+        last_ind,
+    ) in enumerate(calib_dataloader):
+        example_inputs =
+            (input_ids, attention_mask, position_ids, past_key_values)
+        break
+    from intel_extension_for_pytorch.quantization import prepare, convert
+    model = ipex.llm.optimize(
+        model.eval(),
+        dtype=amp_dtype,
+        quantization_config=qconfig,
+        inplace=True,
+        deployment_mode=False,
+    )
+    prepared_model = prepare(
+        model.eval(), qconfig, example_inputs=example_inputs
+    )
+    with torch.no_grad():
+        for i, (
+            (input_ids, attention_mask, position_ids, past_key_values),
+            last_ind,
+        ) in enumerate(calib_dataloader):
+            if i == args.calibration_samples:
+                break
+            prepared_model(
+                input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+            )
+
+    prepared_model.save_qconf_summary(qconf_summary=args.int8_qconfig)
+    print("calibration Done! Will exit and please launch model quantization and benchmark")
+    exit(0)
+else:
+    model = ipex.llm.optimize(
+        model.eval(),
+        dtype=amp_dtype,
+        quantization_config=qconfig,
+        qconfig_summary_file=args.int8_qconfig,
+        inplace=True,
+        deployment_mode=True,
+    )
+    print("model quantization - Done!")
+
+######################################################  # noqa F401
+
+# generate args
+num_beams = 1 if args.greedy else 4
+generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
+
+# input prompt
+prompt = args.prompt
+input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
+print("---- Prompt size:", input_size)
+prompt = [prompt] * args.batch_size
+
+# inference
+with torch.no_grad(), torch.inference_mode(), torch.cpu.amp.autocast(enabled=amp_enabled):
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+    gen_ids = model.generate(
+        input_ids,
+        max_new_tokens=args.max_new_tokens,
+        **generate_kwargs
+    )
+    gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+    input_tokens_lengths = [x.shape[0] for x in input_ids]
+    output_tokens_lengths = [x.shape[0] for x in gen_ids]
+    total_new_tokens = [
+        o - i for i, o in zip(input_tokens_lengths, output_tokens_lengths)
+    ]
+    print(gen_text, total_new_tokens, flush=True)
+```
+[//]: # (marker_llm_optimize_sq)
+
+#### Weight Only Quantization INT8/INT4
+
+[//]: # (marker_llm_optimize_woq)
+```python
+import torch
+#################### code changes ####################  # noqa F401
+import intel_extension_for_pytorch as ipex
+######################################################  # noqa F401
+import argparse
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+)
+
+# args
+parser = argparse.ArgumentParser("Generation script (weight only quantization path)", add_help=False)
+parser.add_argument(
+    "--dtype",
+    type=str,
+    choices=["float32", "bfloat16"],
+    default="float32",
+    help="choose the weight dtype and whether to enable auto mixed precision or not",
+)
+parser.add_argument(
+    "--max-new-tokens", default=32, type=int, help="output max new tokens"
+)
+parser.add_argument(
+    "--prompt", default="What are we having for dinner?", type=str, help="input prompt"
+)
+parser.add_argument("--greedy", action="store_true")
+parser.add_argument("--batch-size", default=1, type=int, help="batch size")
+# Intel(R) Extension for PyTorch*
+#################### code changes ####################  # noqa F401
+parser.add_argument(
+    "--lowp-mode",
+    choices=["AUTO", "BF16", "FP32", "INT8", "FP16"],
+    default="AUTO",
+    type=str,
+    help="low precision mode for weight only quantization. "
+    "It indicates data type for computation for speedup at the cost "
+    "of accuracy. Unrelated to activation or weight data type."
+    "It is not supported yet to use lowp_mode=INT8 for INT8 weight, "
+    "falling back to lowp_mode=BF16 implicitly in this case."
+    "If set to AUTO, lowp_mode is determined by weight data type: "
+    "lowp_mode=BF16 is used for INT8 weight "
+    "and lowp_mode=INT8 used for INT4 weight",
+)
+parser.add_argument(
+    "--weight-dtype",
+    choices=["INT8", "INT4"],
+    default="INT8",
+    type=str,
+    help="weight data type for weight only quantization. Unrelated to activation"
+    " data type or lowp-mode. If `--low-precision-checkpoint` is given, weight"
+    " data type is always INT4 and this argument is not needed.",
+)
+parser.add_argument(
+    "--low-precision-checkpoint",
+    default="",
+    type=str,
+    help="Low precision checkpoint file generated by calibration, such as GPTQ. It contains"
+    " modified weights, scales, zero points, etc. For better accuracy of weight only"
+    " quantization with INT4 weight.",
+)
+######################################################  # noqa F401
+args = parser.parse_args()
+print(args)
+
+# dtype
+amp_enabled = True if args.dtype != "float32" else False
+amp_dtype = getattr(torch, args.dtype)
+
+# load model
+model_id = "facebook/opt-125m"
+config = AutoConfig.from_pretrained(
+    model_id, torchscript=True, trust_remote_code=True
+)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    torch_dtype=amp_dtype,
+    config=config,
+    low_cpu_mem_usage=True,
+    trust_remote_code=True,
+)
+tokenizer = AutoTokenizer.from_pretrained(
+    model_id,
+    trust_remote_code=True
+)
+model = model.eval()
+model = model.to(memory_format=torch.channels_last)
+
+# Intel(R) Extension for PyTorch*
+#################### code changes ####################  # noqa F401
+from intel_extension_for_pytorch.quantization import WoqWeightDtype
+weight_dtype = WoqWeightDtype.INT4 if args.weight_dtype == "INT4" else WoqWeightDtype.INT8
+
+if args.lowp_mode == "INT8":
+    lowp_mode = ipex.quantization.WoqLowpMode.INT8
+elif args.lowp_mode == "FP32":
+    lowp_mode = ipex.quantization.WoqLowpMode.NONE
+elif args.lowp_mode == "FP16":
+    lowp_mode = ipex.quantization.WoqLowpMode.FP16
+elif args.lowp_mode == "BF16":
+    lowp_mode = ipex.quantization.WoqLowpMode.BF16
+else:  # AUTO
+    if args.low_precision_checkpoint != "" or weight_dtype == WoqWeightDtype.INT4:
+        lowp_mode = ipex.quantization.WoqLowpMode.INT8
+    else:
+        lowp_mode = ipex.quantization.WoqLowpMode.BF16
+
+qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+    weight_dtype=weight_dtype, lowp_mode=lowp_mode
+)
+if args.low_precision_checkpoint != "":
+    low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
+else:
+    low_precision_checkpoint = None
+model = ipex.llm.optimize(
+    model.eval(),
+    dtype=amp_dtype,
+    quantization_config=qconfig,
+    low_precision_checkpoint=low_precision_checkpoint,
+    deployment_mode=True,
+    inplace=True,
+)
+
+######################################################  # noqa F401
+
+# generate args
+num_beams = 1 if args.greedy else 4
+generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
+
+# input prompt
+prompt = args.prompt
+input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
+print("---- Prompt size:", input_size)
+prompt = [prompt] * args.batch_size
+
+# inference
+with torch.no_grad(), torch.inference_mode(), torch.cpu.amp.autocast(enabled=amp_enabled):
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+    gen_ids = model.generate(
+        input_ids,
+        max_new_tokens=args.max_new_tokens,
+        **generate_kwargs
+    )
+    gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+    input_tokens_lengths = [x.shape[0] for x in input_ids]
+    output_tokens_lengths = [x.shape[0] for x in gen_ids]
+    total_new_tokens = [
+        o - i for i, o in zip(input_tokens_lengths, output_tokens_lengths)
+    ]
+    print(gen_text, total_new_tokens, flush=True)
+```
+[//]: # (marker_llm_optimize_woq)
+
+**Note:** Please check [LLM Best Known Practice Page](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/inference/python/llm)
+for detailed environment setup and LLM workload running instructions.
 
 ## C++
 

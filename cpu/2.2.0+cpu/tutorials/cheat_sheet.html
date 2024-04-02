@@ -148,7 +148,7 @@
 <td><code>model = ...</code><br><code>model.eval()</code><br/><br/><code>model = ipex.optimize(model, dtype=torch.bfloat16)</code><br/><br/><code>with torch.cpu.amp.autocast():</code><br><code>model(data)</code></td>
 </tr>
 <tr>
-<td>[Experimental] Fast BERT Optimization</td>
+<td>[Prototype] Fast BERT Optimization</td>
 <td><code>from transformers import BertModel</code><br><code>model = BertModel.from_pretrained("bert-base-uncased")</code><br><code>model.eval()</code><br/><br/><code>model = ipex.fast_bert(model, dtype=torch.bfloat16)</code></td>
 </tr>
 <tr>
@@ -156,11 +156,11 @@
 <td><code>ipexrun [knobs] &lt;your_pytorch_script&gt; [args]</code></td>
 </tr>
 <tr>
-<td>[Experimental] Run HyperTune to perform hyperparameter/execution configuration search</td>
+<td>[Prototype] Run HyperTune to perform hyperparameter/execution configuration search</td>
 <td><code>python -m intel_extension_for_pytorch.cpu.hypertune --conf-file &lt;your_conf_file&gt; &lt;your_python_script&gt; [args]</code></td>
 </tr>
 <tr>
-<td>[Experimental] Enable Graph capture</td>
+<td>[Prototype] Enable Graph capture</td>
 <td><code>model = …</code><br><code>model.eval()</code><br><code>model = ipex.optimize(model, graph_mode=True)</code></td>
 </tr>
 <tr>
@@ -172,7 +172,7 @@
 <td><code>model = …</code><br><code>model.eval()</code><br><code>data = …</code><br/><br/><code>qconfig = ipex.quantization.default_dynamic_qconfig</code><br/><br/><code>prepared_model = ipex.quantization.prepare(model, qconfig, example_inputs=data)</code><br/><br/><code>converted_model = ipex.quantization.convert(prepared_model)</code></td>
 </tr>
 <tr>
-<td>[Experimental] Post-Training INT8 Quantization (Tuning Recipe):</td>
+<td>[Prototype] Post-Training INT8 Quantization (Tuning Recipe):</td>
 <td><code>model = …</code><br><code>model.eval()</code><br><code>data = …</code><br/><br/><code>qconfig = ipex.quantization.default_static_qconfig</code><br/><br/><code>prepared_model = ipex.quantization.prepare(model, qconfig, example_inputs=data, inplace=False)</code><br/><br/><code>tuned_model = ipex.quantization.autotune(prepared_model, calibration_data_loader, eval_function, sampling_sizes=[100],</code><br><code>accuracy_criterion={'relative': .01}, tuning_time=0)</code><br/><br/><code>convert_model = ipex.quantization.convert(tuned_model)</code></td>
 </tr>
 </tbody>
@@ -195,8 +195,8 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7fc0e8399b80> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f0fc1f55fd0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

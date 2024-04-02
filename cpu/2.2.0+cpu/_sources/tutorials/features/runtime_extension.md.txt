@@ -7,7 +7,7 @@ Intel® Extension for PyTorch\* Runtime Extension provides a couple of PyTorch f
 2. Spawn asynchronous tasks via the Python frontend module `ipex.cpu.runtime.Task`.
 3. Program core bindings for OpenMP threads via the Python frontend `ipex.cpu.runtime.pin`.
 
-**note**: Intel® Extension for PyTorch\* Runtime extension is in the **experimental** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.rst).
+**note**: Intel® Extension for PyTorch\* Runtime extension is in the **prototype** stage. The API is subject to change. More detailed descriptions are available at [API Documentation page](../api_doc.rst).
 
 ## Requirements
 

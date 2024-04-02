@@ -3,9 +3,9 @@ Transformers Optimization Frontend API
 
 The new API function, `ipex.llm.optimize`, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the `ipex.llm.optimize` function instead of the `ipex.optimize` function to apply all optimizations transparently.
 
-This API currently works for inference workloads. Support for training is undergoing. Currently, this API supports certain models. Supported model list can be found at [Overview](../llm.html#ipexllm-optimized-model-list).
+This API currently works for inference workloads. Support for training is undergoing. Currently, this API supports certain models. Supported model list can be found at [Overview](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/llm.html#ipexllm-optimized-model-list).
 
-API documentation is available at [API Docs page](../api_doc.html#ipex.llm.optimize).
+API documentation is available at [API Docs page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/api_doc.html#ipex.llm.optimize).
 
 ## Pseudocode of Common Usage Scenarios
 
@@ -59,7 +59,7 @@ with torch.no_grad():
 prepared_model.save_qconf_summary(qconf_summary=qconfig_summary_file_path)
 
 # stage 2: quantization
-model = ipex.llm.ptimize(
+model = ipex.llm.optimize(
   model.eval(),
   quantization_config=qconfig,
   qconfig_summary_file=qconfig_summary_file_path,
@@ -83,7 +83,7 @@ import transformers
 model= transformers.AutoModelForCausalLM(model_name_or_path).eval()
 
 qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-  weight_dtype=torch.qint8, # or torch.quint4x2
+  weight_dtype=ipex.quantization.WoqWeightDtype.INT8, # or INT4/NF4
   lowp_mode=ipex.quantization.WoqLowpMode.NONE, # or FP16, BF16, INT8
 )
 

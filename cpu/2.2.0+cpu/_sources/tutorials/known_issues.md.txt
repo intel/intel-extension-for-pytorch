@@ -49,7 +49,7 @@ Troubleshooting
 ## TorchDynamo
 
 - **Problem**: A workload that uses `torch.compile()` fails to run or demonstrates poor performance. 
-  - **Cause**: The support of `torch.compile()` with `ipex` as the backend is still an experimental feature. Currently, the following HuggingFace models fail to run using `torch.compile()` with `ipex` backend due to memory issues:
+  - **Cause**: The support of `torch.compile()` with `ipex` as the backend is still an beta feature. Currently, the following HuggingFace models fail to run using `torch.compile()` with `ipex` backend due to memory issues:
     - masked-language-modeling+xlm-roberta-base
     - casual-language-modeling+gpt2
     - casual-language-modeling+xlm-roberta-base
