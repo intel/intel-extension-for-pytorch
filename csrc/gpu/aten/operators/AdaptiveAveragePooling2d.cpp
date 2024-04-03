@@ -197,6 +197,10 @@ void adaptive_avg_pool2d_out_template(
       output_size.size() == 2,
       "adaptive_average_pool2d: internal error: output_size.size() must be 2");
 
+  TORCH_CHECK(
+      output_size[0] > 0 && output_size[1] > 0,
+      "Trying to create tensor with negative dimension");
+
   auto outputWidth = output_size[1];
   auto outputHeight = output_size[0];
 
