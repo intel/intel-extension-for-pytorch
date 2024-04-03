@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-VER_IPEX=main
+VER_IPEX=v2.3.0+cpu
 
 # Mode: Select which components to install. PyTorch and Intel® Extension for PyTorch* are always installed.
 # High bit: 8 7 6 5 4 3 2 1 :Low bit
@@ -134,6 +134,52 @@ fi
 
 # Install dependencies
 python -m pip install cmake
+
+# Compare the torch torchvision and torchaudio version
+function ver_compare_eq() {
+    RET=0
+    if  [[ "$1" == "$2" ]]; then
+            RET=1
+    fi
+    echo ${RET}
+}
+# Check if PyTorch is installed, if installed, compare the current version with compiling version
+if python -c "import torch; print(torch.__version__)" &> /dev/null; then
+    torch_version=$(python -c "import torch; print(torch.__version__)")
+    VER_COMP_TORCH=$(ver_compare_eq ${torch_version} ${VER_TORCH})
+    if python -c "import torchvision; print(torchvision.__version__)" &> /dev/null; then
+        torchvision_version=$(python -c "import torchvision; print(torchvision.__version__)")
+        VER_COMP_VISION=$(ver_compare_eq ${torchvision_version} ${VER_TORCHVISION})
+    fi
+    if python -c "import torchaudio; print(torchaudio.__version__)" &> /dev/null; then
+        torchaudio_version=$(python -c "import torchaudio; print(torchaudio.__version__)")
+        VER_COMP_AUDIO=$(ver_compare_eq ${torchaudio_version} ${VER_TORCHAUDIO})
+    fi
+    if [ ${VER_COMP_TORCH} -ne 1 ] || [ ${VER_COMP_VISION} -ne 1 ] || [ ${VER_COMP_AUDIO} -ne 1 ]; then
+        if [ ${VER_COMP_TORCH} -ne 1 ]; then
+            printf "WARNING: Found installed torch version ${torch_version}, the required version for compiling is ${VER_TORCH}\\n"
+        fi
+        if [ ${VER_COMP_VISION} -ne 1 ]; then
+            printf "         Found installed torchvision version ${torchvision_version}, the required version for compiling is ${VER_TORCHVISION}\\n"
+        fi
+        if [ ${VER_COMP_AUDIO} -ne 1 ]; then
+            printf "         Found installed torchaudio version ${torchaudio_version}, the required version for compiling is ${VER_COMP_AUDIO}\\n"
+        fi
+	printf "Continue to run the compile script will replace the current torch/torchvision/torchaudio package\\n"
+        printf "Are sure you want to continue the compilation? yes for continue, no for quit. [yes|no]\\n"
+        printf "[yes] >>> "
+        read -r ans
+        ans=$(echo "${ans}" | tr '[:lower:]' '[:upper:]')
+        if [ "${ans}" != "YES" ] && [ "${ans}" != "Y" ]
+        then
+            printf "Aborting compilation\\n"
+            exit 2
+        fi
+    fi
+fi
+
+
+
 python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch oneccl_bind_pt
 set +e
 echo ${VER_TORCH} | grep "dev" > /dev/null
