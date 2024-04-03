@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/core/TensorAccessor.h>
 #include <ATen/native/UpSample.h>
 
 #include <core/Memory.h>
@@ -21,24 +22,23 @@ namespace impl {
 template <typename scalar_t, typename accscalar_t>
 struct UpsampleBicubic2dOutFrameKernelFunctor {
   void operator()(sycl::nd_item<1> item) const {
-    auto in_ptr = in_data;
-    auto out_ptr = out_data;
+    auto idata = in_data;
+    auto odata = out_data;
     int global_id = item.get_global_linear_id();
-
+    const int nbatch = idata.size(0);
+    const int channels = idata.size(1);
+    const int input_height = idata.size(2);
+    const int input_width = idata.size(3);
+    const int output_height = odata.size(2);
+    const int output_width = odata.size(3);
     if (global_id < output_height * output_width) {
       const int output_x = global_id % output_width;
       const int output_y = global_id / output_width;
       if (input_height == output_height && input_width == output_width) {
         for (int n = 0; n < nbatch; n++) {
           for (int c = 0; c < channels; c++) {
-            auto val = in_ptr
-                [n * input_height * input_width * channels +
-                 c * input_height * input_width + output_y * input_width +
-                 output_x];
-            out_ptr
-                [n * output_height * output_width * channels +
-                 c * output_height * output_width + output_y * output_width +
-                 output_x] = val;
+            auto val = idata[n][c][output_y][output_x];
+            odata[n][c][output_y][output_x] = val;
           }
         }
         return;
@@ -61,7 +61,7 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
           for (int k = 0; k < 4; k++) {
             coefficients[k] = cubic_interp1d<scalar_t, accscalar_t>(
                 upsample_get_value_bounded<scalar_t>(
-                    in_ptr,
+                    idata,
                     n,
                     c,
                     input_width,
@@ -69,7 +69,7 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
                     in_x - 1,
                     in_y - 1 + k),
                 upsample_get_value_bounded<scalar_t>(
-                    in_ptr,
+                    idata,
                     n,
                     c,
                     input_width,
@@ -77,7 +77,7 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
                     in_x + 0,
                     in_y - 1 + k),
                 upsample_get_value_bounded<scalar_t>(
-                    in_ptr,
+                    idata,
                     n,
                     c,
                     input_width,
@@ -85,7 +85,7 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
                     in_x + 1,
                     in_y - 1 + k),
                 upsample_get_value_bounded<scalar_t>(
-                    in_ptr,
+                    idata,
                     n,
                     c,
                     input_width,
@@ -95,55 +95,34 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
                 t_x);
           }
 
-          out_ptr
-              [n * output_height * output_width * channels +
-               c * output_height * output_width + output_y * output_width +
-               output_x] =
-                  static_cast<scalar_t>(cubic_interp1d<scalar_t, accscalar_t>(
-                      coefficients[0],
-                      coefficients[1],
-                      coefficients[2],
-                      coefficients[3],
-                      t_y));
+          odata[n][c][output_y][output_x] =
+              static_cast<scalar_t>(cubic_interp1d<scalar_t, accscalar_t>(
+                  coefficients[0],
+                  coefficients[1],
+                  coefficients[2],
+                  coefficients[3],
+                  t_y));
         }
       }
     }
   }
   UpsampleBicubic2dOutFrameKernelFunctor(
-      scalar_t* out_data_,
-      scalar_t* in_data_,
-      int64_t input_height_,
-      int64_t input_width_,
-      int64_t output_height_,
-      int64_t output_width_,
-      int64_t nbatch_,
-      int64_t channels_,
+      PackedTensorAccessor64<scalar_t, 4> out_data_,
+      const PackedTensorAccessor64<scalar_t, 4> in_data_,
       int64_t onum_,
       bool align_corners_,
       const accscalar_t height_scale_,
       const accscalar_t width_scale_)
       : out_data(out_data_),
         in_data(in_data_),
-        input_height(input_height_),
-        input_width(input_width_),
-        output_height(output_height_),
-        output_width(output_width_),
-        nbatch(nbatch_),
-        channels(channels_),
         onum(onum_),
         align_corners(align_corners_),
         height_scale(height_scale_),
         width_scale(width_scale_) {}
 
  private:
-  scalar_t* out_data;
-  scalar_t* in_data;
-  int64_t input_height;
-  int64_t input_width;
-  int64_t output_height;
-  int64_t output_width;
-  int64_t nbatch;
-  int64_t channels;
+  PackedTensorAccessor64<scalar_t, 4> out_data;
+  const PackedTensorAccessor64<scalar_t, 4> in_data;
   int64_t onum;
   bool align_corners;
   const accscalar_t height_scale;
@@ -152,14 +131,8 @@ struct UpsampleBicubic2dOutFrameKernelFunctor {
 
 template <typename scalar_t, typename accscalar_t>
 static void upsample_bicubic2d_out_frame(
-    scalar_t* odata,
-    scalar_t* idata,
-    int64_t input_height,
-    int64_t input_width,
-    int64_t output_height,
-    int64_t output_width,
-    int64_t nbatch,
-    int64_t channels,
+    PackedTensorAccessor64<scalar_t, 4> odata,
+    const PackedTensorAccessor64<scalar_t, 4> idata,
     int64_t onum,
     bool align_corners,
     const accscalar_t height_scale,
@@ -172,24 +145,12 @@ static void upsample_bicubic2d_out_frame(
     local_range = onum < wg_size ? onum : wg_size;
     global_range = ((onum + local_range - 1) / local_range) * local_range;
   }
-
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto in_data = idata;
     auto out_data = odata;
 
     UpsampleBicubic2dOutFrameKernelFunctor<scalar_t, accscalar_t> kfn(
-        out_data,
-        in_data,
-        input_height,
-        input_width,
-        output_height,
-        output_width,
-        nbatch,
-        channels,
-        onum,
-        align_corners,
-        height_scale,
-        width_scale);
+        out_data, in_data, onum, align_corners, height_scale, width_scale);
     cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
@@ -201,9 +162,15 @@ static void upsample_bicubic2d_out_frame(
 template <typename scalar_t, typename accscalar_t>
 struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
   void operator()(sycl::nd_item<1> item) const {
-    auto in_ptr = in_data;
-    auto out_ptr = out_data;
+    auto idata = in_data;
+    auto odata = out_data;
     int global_id = item.get_global_linear_id();
+    const int nbatch = idata.size(0);
+    const int channels = idata.size(1);
+    const int input_height = idata.size(2);
+    const int input_width = idata.size(3);
+    const int output_height = odata.size(2);
+    const int output_width = odata.size(3);
 
     if (global_id < output_height * output_width) {
       const int output_x = global_id % output_width;
@@ -212,14 +179,8 @@ struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
       if (input_height == output_height && input_width == output_width) {
         for (int n = 0; n < nbatch; n++) {
           for (int c = 0; c < channels; ++c) {
-            auto val = out_ptr
-                [n * output_height * output_width * channels +
-                 c * output_height * output_width + output_y * output_width +
-                 output_x];
-            in_ptr
-                [n * input_height * input_width * channels +
-                 c * input_height * input_width + output_y * input_width +
-                 output_x] = val;
+            auto val = odata[n][c][output_y][output_x];
+            idata[n][c][output_y][output_x] = val;
           }
         }
         return;
@@ -243,14 +204,11 @@ struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
 
       for (int n = 0; n < nbatch; n++) {
         for (int c = 0; c < channels; ++c) {
-          scalar_t out_value = out_ptr
-              [n * output_height * output_width * channels +
-               c * output_height * output_width + output_y * output_width +
-               output_x];
+          scalar_t out_value = odata[n][c][output_y][output_x];
           for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 4; j++) {
               upsample_increment_value_bounded<scalar_t>(
-                  in_ptr,
+                  idata,
                   n,
                   c,
                   input_width,
@@ -265,40 +223,22 @@ struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
     }
   }
   UpsampleBicubic2dBackwardOutFrameKernelFunctor(
-      scalar_t* out_data_,
-      scalar_t* in_data_,
-      int64_t input_height_,
-      int64_t input_width_,
-      int64_t output_height_,
-      int64_t output_width_,
-      int64_t nbatch_,
-      int64_t channels_,
+      const PackedTensorAccessor64<scalar_t, 4> out_data_,
+      PackedTensorAccessor64<scalar_t, 4> in_data_,
       int64_t onum_,
       bool align_corners_,
       const accscalar_t height_scale_,
       const accscalar_t width_scale_)
       : out_data(out_data_),
         in_data(in_data_),
-        input_height(input_height_),
-        input_width(input_width_),
-        output_height(output_height_),
-        output_width(output_width_),
-        nbatch(nbatch_),
-        channels(channels_),
         onum(onum_),
         align_corners(align_corners_),
         height_scale(height_scale_),
         width_scale(width_scale_) {}
 
  private:
-  scalar_t* out_data;
-  scalar_t* in_data;
-  int64_t input_height;
-  int64_t input_width;
-  int64_t output_height;
-  int64_t output_width;
-  int64_t nbatch;
-  int64_t channels;
+  const PackedTensorAccessor64<scalar_t, 4> out_data;
+  PackedTensorAccessor64<scalar_t, 4> in_data;
   int64_t onum;
   bool align_corners;
   const accscalar_t height_scale;
@@ -308,14 +248,8 @@ struct UpsampleBicubic2dBackwardOutFrameKernelFunctor {
 // Backward (adjoint) operation 1 <- 2 (accumulates)
 template <typename scalar_t, typename accscalar_t>
 static void upsample_bicubic2d_backward_out_frame(
-    scalar_t* odata,
-    scalar_t* idata,
-    int64_t input_height,
-    int64_t input_width,
-    int64_t output_height,
-    int64_t output_width,
-    int64_t nbatch,
-    int64_t channels,
+    const PackedTensorAccessor64<scalar_t, 4> odata,
+    PackedTensorAccessor64<scalar_t, 4> idata,
     int64_t onum,
     bool align_corners,
     const accscalar_t height_scale,
@@ -333,18 +267,7 @@ static void upsample_bicubic2d_backward_out_frame(
     auto out_data = odata;
 
     UpsampleBicubic2dBackwardOutFrameKernelFunctor<scalar_t, accscalar_t> kfn(
-        out_data,
-        in_data,
-        input_height,
-        input_width,
-        output_height,
-        output_width,
-        nbatch,
-        channels,
-        onum,
-        align_corners,
-        height_scale,
-        width_scale);
+        out_data, in_data, onum, align_corners, height_scale, width_scale);
     cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>(
             sycl::range<1>(global_range), sycl::range<1>(local_range)),
@@ -394,8 +317,8 @@ static void upsample_bicubic2d_out_template(
       input.scalar_type(),
       "upsample_bicubic2d",
       [&] {
-        auto* idata = input.data_ptr<scalar_t>();
-        auto* odata = output.data_ptr<scalar_t>();
+        auto idata = input.packed_accessor64<scalar_t, 4>();
+        auto odata = output.packed_accessor64<scalar_t, 4>();
         auto onum = output.numel();
 
         // Get scaling factors
@@ -406,18 +329,7 @@ static void upsample_bicubic2d_out_template(
             input_width, output_width, align_corners, scales_w);
 
         upsample_bicubic2d_out_frame<scalar_t, accscalar_t>(
-            odata,
-            idata,
-            input_height,
-            input_width,
-            output_height,
-            output_width,
-            nbatch,
-            channels,
-            onum,
-            align_corners,
-            rheight,
-            rwidth);
+            odata, idata, onum, align_corners, rheight, rwidth);
       });
 }
 
@@ -464,8 +376,8 @@ static void upsample_bicubic2d_backward_out_template(
 
   IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
       grad_output.scalar_type(), "upsample_bicubic2d_backward", [&] {
-        scalar_t* idata = grad_input.data_ptr<scalar_t>();
-        scalar_t* odata = grad_output.data_ptr<scalar_t>();
+        auto idata = grad_input.packed_accessor64<scalar_t, 4>();
+        auto odata = grad_output.packed_accessor64<scalar_t, 4>();
         auto onum = grad_output.numel();
 
         using accscalar_t = at::AtenIpexTypeXPU::acc_type<scalar_t>;
@@ -475,18 +387,7 @@ static void upsample_bicubic2d_backward_out_template(
             input_width, output_width, align_corners, scales_w);
 
         upsample_bicubic2d_backward_out_frame<scalar_t, accscalar_t>(
-            odata,
-            idata,
-            input_height,
-            input_width,
-            output_height,
-            output_width,
-            nbatch,
-            channels,
-            onum,
-            align_corners,
-            rheight,
-            rwidth);
+            odata, idata, onum, align_corners, rheight, rwidth);
       });
 }
 } // namespace impl

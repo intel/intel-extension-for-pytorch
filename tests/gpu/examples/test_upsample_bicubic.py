@@ -117,3 +117,15 @@ class TestNNMethod(TestCase):
         grad_cpu = input_cpu.grad
         grad_xpu = input_xpu.grad
         self.assertEqual(grad_cpu, grad_xpu.cpu())
+
+    def test_upsample_bicubic2d_muti_batch(self, dtype=torch.float):
+        input_cpu = torch.randn((2, 3, 240, 240), dtype=torch.float32, device="cpu")
+        input_xpu = input_cpu.to("xpu")
+
+        output_cpu = torch.nn.functional.interpolate(
+            input_cpu, size=(224, 224), mode="bicubic", align_corners=False
+        )
+        output_xpu = torch.nn.functional.interpolate(
+            input_xpu, size=(224, 224), mode="bicubic", align_corners=False
+        )
+        self.assertEqual(output_cpu, output_xpu.to("cpu"), atol=1e-4, rtol=1e-4)
