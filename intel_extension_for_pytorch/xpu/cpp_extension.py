@@ -1032,7 +1032,6 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
     oneapi_link_args += [f"{x}" for x in get_one_api_help().get_onemkl_libraries()]
     oneapi_link_args += ["-Wl,--end-group"]
     oneapi_link_args += ["-lsycl", "-lOpenCL", "-lpthread", "-lm", "-ldl"]
-    oneapi_link_args += ["-ldnnl"]
 
     # Append IPEX link parameters.
     oneapi_link_args += ["-lintel-ext-pt-gpu"]
@@ -1549,7 +1548,6 @@ class _one_api_help:
         CUR_DIR = os.path.dirname(__file__)
         self.__default_root = os.path.dirname(CUR_DIR)
 
-        self.check_onednn_cfg()
         self.check_dpcpp_cfg()
         self.check_onemkl_cfg()
 
@@ -1604,14 +1602,12 @@ class _one_api_help:
     def get_library_dirs(self):
         library_dirs = []
         library_dirs += [f"{x}" for x in self.get_default_lib_dir()]
-        library_dirs += [f"{x}" for x in self.get_onednn_lib_dir()]
         return library_dirs
 
     def get_include_dirs(self):
         include_dirs = []
         include_dirs += [f"{x}" for x in self.get_dpcpp_include_dir()]
         include_dirs += [f"{x}" for x in self.get_onemkl_include_dir()]
-        include_dirs += [f"{x}" for x in self.get_onednn_include_dir()]
         include_dirs += [f"{x}" for x in self.get_default_include_dir()]
         return include_dirs
 
