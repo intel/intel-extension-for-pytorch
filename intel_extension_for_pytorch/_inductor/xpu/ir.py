@@ -21,6 +21,7 @@ from torch._inductor.utils import pad_listlike
 
 import sympy
 
+
 def _prepare_convolution_fusion_create(
     cls,
     x: "TensorBox",

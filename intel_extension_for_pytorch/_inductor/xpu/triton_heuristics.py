@@ -14,7 +14,7 @@ from torch._dynamo.utils import dynamo_timed, get_first_attr
 from torch._inductor import config
 from torch._inductor.ir import ReductionHint, TileHint
 from torch._inductor.triton_heuristics import AutotuneHint  # noqa
-from torch._inductor.utils import (get_num_bytes, create_bandwidth_info_str, do_bench)
+from torch._inductor.utils import get_num_bytes, create_bandwidth_info_str, do_bench
 
 from .utils import has_triton
 from torch._C import _xpu_getCurrentRawStream as get_xpu_stream
@@ -85,7 +85,7 @@ class XPUCachingAutotuner(CachingAutotuner):
             heuristic_type,
             size_hints,
             inductor_meta,
-            custom_kernel
+            custom_kernel,
         )
 
     def _precompile_config(self, cfg: Config, warm_cache_only_with_cc: Dict):
@@ -95,7 +95,7 @@ class XPUCachingAutotuner(CachingAutotuner):
             compile_meta["constants"][self.fn.arg_names.index(k)] = v
         compile_meta["num_warps"] = cfg.num_warps
         compile_meta["num_stages"] = cfg.num_stages
-        compile_meta["debug"] = config.assert_indirect_indexing 
+        compile_meta["debug"] = config.assert_indirect_indexing
 
         compile_meta["device_type"] = "xpu"
 
@@ -550,7 +550,6 @@ def pointwise(
     raise NotImplementedError(f"size_hints: {size_hints}")
 
 
-
 def _reduction_configs(
     *, size_hints: List[int], inductor_meta: Dict[str, Any]
 ) -> List[Config]:
@@ -677,6 +676,7 @@ def template(num_stages, num_warps, triton_meta, filename=None, inductor_meta=No
         heuristic_type=HeuristicType.TEMPLATE,
         filename=filename,
     )
+
 
 def foreach(triton_meta, num_warps, filename=None, inductor_meta=None):
     """

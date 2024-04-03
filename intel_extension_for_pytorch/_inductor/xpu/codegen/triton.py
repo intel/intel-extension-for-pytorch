@@ -24,15 +24,12 @@ from torch._inductor.codegen.triton import (
     TritonKernel,
     TritonScheduling,
     EnableReduction,
-    DisableReduction
+    DisableReduction,
 )
 from torch._inductor import config, scheduler
 from torch._inductor.codegen.triton_utils import signature_to_meta
 
-from torch._inductor.utils import (
-    next_power_of_2,
-    Placeholder
-)
+from torch._inductor.utils import next_power_of_2, Placeholder
 from torch.utils._triton import has_triton_package
 from torch._inductor.scheduler import BaseSchedulerNode
 from typing import cast
@@ -40,7 +37,6 @@ from typing import cast
 
 pexpr = PythonPrinter().doprint
 log = logging.getLogger(__name__)
-
 
 
 @lru_cache(None)
@@ -86,7 +82,6 @@ def gen_common_triton_imports():
 
 
 class XPUTritonKernel(TritonKernel):
-
     def __init__(
         self,
         *groups,
@@ -106,7 +101,6 @@ class XPUTritonKernel(TritonKernel):
             min_elem_per_thread=min_elem_per_thread,
             disable_persistent_reduction=disable_persistent_reduction,
         )
-
 
     def codegen_kernel_benchmark(self, num_gb, grid=None):
         result = IndentedBuffer()
@@ -189,7 +183,9 @@ class XPUTritonKernel(TritonKernel):
 
         result.writelines(["\n", "\n", "if __name__ == '__main__':"])
         with result.indent():
-            result.writeline("from torch._inductor.utils import get_num_bytes, do_bench")
+            result.writeline(
+                "from torch._inductor.utils import get_num_bytes, do_bench"
+            )
             result.writeline("")
 
             result.writeline("args = get_args()")
@@ -203,7 +199,6 @@ class XPUTritonKernel(TritonKernel):
             )
 
         return result
-
 
     def codegen_kernel(self, name=None):
         code = IndentedBuffer()
@@ -238,7 +233,6 @@ class XPUTritonKernel(TritonKernel):
 
             if config.benchmark_kernel:
                 code.splice(self.imports_for_benchmark_kernel())
-
 
         argdefs, _, signature = self.args.python_argdefs()
         # maps actual expression to SizeArg if it is in sizevars replacements

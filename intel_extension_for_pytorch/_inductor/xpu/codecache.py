@@ -21,12 +21,14 @@ from torch._inductor.codecache import (
     _load_kernel,
     TritonFuture,
     AsyncCompile,
-    caching_device_properties
+    caching_device_properties,
 )
 from torch._dynamo.device_interface import get_interface_for_device
 
 
 _pool_set: Set[ProcessPoolExecutor] = set()
+
+
 class XPUAsyncCompile(AsyncCompile):
     def __init__(self):
         super().__init__()
