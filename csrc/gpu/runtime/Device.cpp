@@ -519,6 +519,9 @@ static const std::array pvc_vg_device_list = {0xbd4};
 // MTL iGPU not supported in SYCL architecture of OneAPI 2024.1
 static const std::array mtl_device_list = {0x7D55, 0x7DD5, 0x7D57, 0x7DD7};
 
+// FS1 Coral Simulator not supported in SYCL architecture of OneAPI 2024.1
+static const std::array coral_device_list = {0x0b73};
+
 bool dpcppGetDeviceHasXMX(DeviceId device_id) noexcept {
   DeviceInfo* dinfo = dpcppGetDeviceInfo(device_id);
   for (uint32_t pvc_vg_device_id : pvc_vg_device_list) {
@@ -528,6 +531,11 @@ bool dpcppGetDeviceHasXMX(DeviceId device_id) noexcept {
   }
   for (uint32_t mtl_device_id : mtl_device_list) {
     if (dinfo->device_id == mtl_device_id) {
+      return false;
+    }
+  }
+  for (uint32_t coral_device_id : coral_device_list) {
+    if (dinfo->device_id == coral_device_id) {
       return false;
     }
   }
@@ -551,6 +559,11 @@ bool dpcppGetDeviceHas2DBlock(DeviceId device_id) noexcept {
   }
   for (uint32_t mtl_device_id : mtl_device_list) {
     if (dinfo->device_id == mtl_device_id) {
+      return false;
+    }
+  }
+  for (uint32_t coral_device_id : coral_device_list) {
+    if (dinfo->device_id == coral_device_id) {
       return false;
     }
   }
