@@ -1,17 +1,16 @@
 import torch
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Set
 from torch._inductor.ir import (
     ExternKernelAlloc,
     MutationLayout,
     Layout,
     FixedLayout,
     FlexibleLayout,
+    NoneLayout,
     convert_shape_to_inductor,
     ir_node_to_tensor,
     may_convert_to_optional,
-    OptionalString,
-    OptionalList,
-    OptionalScalar,
+    mark_node_as_mutating,
     TensorBox,
 )
 from torch._prims_common import (
@@ -20,6 +19,7 @@ from torch._prims_common import (
 from torch._inductor.virtualized import V
 from torch._inductor.utils import pad_listlike
 
+import sympy
 
 def _prepare_convolution_fusion_create(
     cls,
@@ -130,15 +130,14 @@ class ConvolutionUnary(ExternKernelAlloc):
         layout,
         inputs,
         constant_args=(),
-        kernel="torch.ops.torch_ipex._convolution_pointwise",
     ):
         super().__init__(
             layout,
             inputs,
             constant_args,
             None,
-            kernel="torch.ops.torch_ipex._convolution_pointwise",
-            cpp_kernel="torch_ipex::_convolution_pointwise",
+            python_kernel_name="torch.ops.torch_ipex._convolution_pointwise",
+            cpp_kernel_name="torch_ipex::_convolution_pointwise",
         )
         self.cpp_kernel_key = "convolution_pointwise"
         self.cpp_op_schema = """
@@ -157,7 +156,7 @@ class ConvolutionUnary(ExternKernelAlloc):
     def codegen(self, wrapper):
         wrapper.generate_extern_kernel_alloc_and_find_schema_if_needed(
             self.get_name(),
-            self.kernel,
+            self.get_kernel_name(),
             self.codegen_args(),
             self.cpp_op_schema,
             self.cpp_kernel_key,
@@ -176,18 +175,16 @@ class ConvolutionUnary(ExternKernelAlloc):
         dilation_: List[int],
         groups: int,
         attr,
-        scalars,
+        scalars: Optional[List[Any]],
         algorithm,
     ):
         (inputs, constant_args, kernel_layout, _) = _prepare_convolution_fusion_create(
             cls, x, weight, bias, padding_, stride_, dilation_, groups
         )
-        optional_string = OptionalString()
-        optional_list = OptionalList()
         constant_args = constant_args + [
             attr,
-            may_convert_to_optional(optional_list, scalars),
-            may_convert_to_optional(optional_string, algorithm),
+            may_convert_to_optional(scalars),
+            algorithm,
         ]
         return ConvolutionUnary(
             layout=kernel_layout,
@@ -208,8 +205,8 @@ class LinearUnary(ExternKernelAlloc):
             inputs,
             constant_args,
             None,
-            kernel="torch.ops.torch_ipex._linear_pointwise",
-            cpp_kernel="torch_ipex::_linear_pointwise",
+            python_kernel_name="torch.ops.torch_ipex._linear_pointwise",
+            cpp_kernel_name="torch_ipex::_linear_pointwise",
         )
         self.cpp_kernel_key = "linear_pointwise"
         self.cpp_op_schema = """
@@ -224,7 +221,7 @@ class LinearUnary(ExternKernelAlloc):
     def codegen(self, wrapper):
         wrapper.generate_extern_kernel_alloc_and_find_schema_if_needed(
             self.get_name(),
-            self.kernel,
+            self.get_kernel_name(),
             self.codegen_args(),
             self.cpp_op_schema,
             self.cpp_kernel_key,
@@ -232,17 +229,15 @@ class LinearUnary(ExternKernelAlloc):
 
     @classmethod
     def create(cls, x, w, b, attr, scalars, algorithm):
-        x = cls.require_stride1(cls.realize_input(x))
-        w = cls.require_stride1(cls.realize_input(w))
+        x = cls.require_contiguous(cls.realize_input(x))
+        w = cls.require_contiguous(cls.realize_input(w))
 
         *m, ic = x.get_size()
-        # After freezing pass, w should be [ic, oc] shape, format is ba
-        ic, oc = w.get_size()
-
+        oc, ic = w.get_size()
         inputs = [x, w]
         constant_args = [attr, scalars if scalars else [-1], algorithm]
         if b is not None:
-            b = cls.require_stride1(cls.realize_input(b))
+            b = cls.require_contiguous(cls.realize_input(b))
             inputs.append(b)
         else:
             constant_args.insert(0, None)
@@ -275,10 +270,10 @@ class LinearBinary(ExternKernelAlloc):
             inputs,
             constant_args,
             None,
-            kernel="torch.ops.torch_ipex._linear_pointwise.binary",
-            cpp_kernel="torch_ipex::_linear_pointwise",
+            python_kernel_name="torch.ops.torch_ipex._linear_pointwise.binary",
+            cpp_kernel_name="torch_ipex::_linear_pointwise",
         )
-        self.cpp_kernel_overlad_name = "binary"
+        self.cpp_kernel_overload_name = "binary"
         self.cpp_kernel_key = "linear_pointwise_binary"
         self.cpp_op_schema = """
             at::Tensor(
@@ -292,27 +287,26 @@ class LinearBinary(ExternKernelAlloc):
     def codegen(self, wrapper):
         wrapper.generate_extern_kernel_alloc_and_find_schema_if_needed(
             self.get_name(),
-            self.kernel,
+            self.get_kernel_name(),
             self.codegen_args(),
             self.cpp_op_schema,
             self.cpp_kernel_key,
-            self.cpp_kernel_overlad_name,
+            self.cpp_kernel_overload_name,
         )
 
     @classmethod
     def create(cls, x, y, w, b, attr):
-        x = cls.require_stride1(cls.realize_input(x))
-        y = cls.require_stride1(cls.realize_input(y))
-        w = cls.require_stride1(cls.realize_input(w))
+        x = cls.require_contiguous(cls.realize_input(x))
+        y = cls.require_contiguous(cls.realize_input(y))
+        w = cls.require_contiguous(cls.realize_input(w))
 
         *m, ic = x.get_size()
-        # After freezing pass, w should be [ic, oc] shape, format is ba
-        ic, oc = w.get_size()
+        oc, ic = w.get_size()
 
         inputs = [x, y, w]
         constant_args = [attr]
         if b is not None:
-            b = cls.require_stride1(cls.realize_input(b))
+            b = cls.require_contiguous(cls.realize_input(b))
             inputs.append(b)
         else:
             constant_args.insert(0, b)
@@ -344,10 +338,10 @@ class ConvolutionBinary(ExternKernelAlloc):
             inputs,
             constant_args,
             None,
-            kernel="torch.ops.torch_ipex._convolution_pointwise.binary",
-            cpp_kernel="torch_ipex::_convolution_pointwise",
+            python_kernel_name="torch.ops.torch_ipex._convolution_pointwise.binary",
+            cpp_kernel_name="torch_ipex::_convolution_pointwise",
         )
-        self.cpp_kernel_overlad_name = "binary"
+        self.cpp_kernel_overload_name = "binary"
         self.cpp_kernel_key = "convolution_pointwise_binary"
         self.cpp_op_schema = """
             at::Tensor(
@@ -369,11 +363,11 @@ class ConvolutionBinary(ExternKernelAlloc):
     def codegen(self, wrapper):
         wrapper.generate_extern_kernel_alloc_and_find_schema_if_needed(
             self.get_name(),
-            self.kernel,
+            self.get_kernel_name(),
             self.codegen_args(),
             self.cpp_op_schema,
             self.cpp_kernel_key,
-            self.cpp_kernel_overlad_name,
+            self.cpp_kernel_overload_name,
         )
         if isinstance(self.layout, Layout):
             self.codegen_size_asserts(wrapper)
@@ -405,15 +399,12 @@ class ConvolutionBinary(ExternKernelAlloc):
         )
         other = cls.require_stride_order(other, req_stride_order)
         inputs.insert(1, other)
-        optional_scalar = OptionalScalar()
-        optional_string = OptionalString()
-        optional_list = OptionalList()
         constant_args = constant_args + [
             binary_attr,
-            may_convert_to_optional(optional_scalar, binary_alpha),
-            may_convert_to_optional(optional_string, unary_attr),
-            may_convert_to_optional(optional_list, unary_scalars),
-            may_convert_to_optional(optional_string, unary_algorithm),
+            binary_alpha,
+            unary_attr,
+            may_convert_to_optional(unary_scalars),
+            unary_algorithm,
         ]
         return ConvolutionBinary(
             layout=kernel_layout,
@@ -437,10 +428,10 @@ class ConvolutionBinaryInplace(ExternKernelAlloc):
             reordered_inputs,
             constant_args,
             None,
-            kernel="torch.ops.torch_ipex._convolution_pointwise_.binary",
-            cpp_kernel="torch_ipex::_convolution_pointwise_",
+            python_kernel_name="torch.ops.torch_ipex._convolution_pointwise_.binary",
+            cpp_kernel_name="torch_ipex::_convolution_pointwise_",
         )
-        self.cpp_kernel_overlad_name = "binary"
+        self.cpp_kernel_overload_name = "binary"
         self.cpp_kernel_key = "convolution_pointwise_binary_"
         # TODO: op.call: input[0] should be at::Tensor&
         self.cpp_op_schema = """
@@ -462,16 +453,18 @@ class ConvolutionBinaryInplace(ExternKernelAlloc):
     def codegen(self, wrapper):
         wrapper.generate_extern_kernel_alloc_and_find_schema_if_needed(
             self.get_name(),
-            self.kernel,
+            self.get_kernel_name(),
             self.codegen_args(),
             self.cpp_op_schema,
             self.cpp_kernel_key,
-            self.cpp_kernel_overlad_name,
+            self.cpp_kernel_overload_name,
         )
 
     def get_mutation_names(self):
-        assert isinstance(self.layout, MutationLayout)
-        return (self.layout.target.get_name(),)
+        return [self.inputs[0].get_name()]
+
+    def get_unbacked_symbol_defs(self) -> Set[sympy.Symbol]:
+        return set()
 
     @classmethod
     def create(
@@ -500,18 +493,20 @@ class ConvolutionBinaryInplace(ExternKernelAlloc):
         )
         other = cls.require_stride_order(other, req_stride_order)
         inputs.insert(1, other)
-        optional_scalar = OptionalScalar()
-        optional_string = OptionalString()
-        optional_list = OptionalList()
         constant_args = constant_args + [
             binary_attr,
-            may_convert_to_optional(optional_scalar, binary_alpha),
-            may_convert_to_optional(optional_string, unary_attr),
-            may_convert_to_optional(optional_list, unary_scalars),
-            may_convert_to_optional(optional_string, unary_algorithm),
+            binary_alpha,
+            unary_attr,
+            may_convert_to_optional(unary_scalars),
+            unary_algorithm,
         ]
-        return ConvolutionBinaryInplace(
-            kernel_layout=MutationLayout(inputs[1]),
+        packed = ConvolutionBinaryInplace(
+            kernel_layout=NoneLayout(inputs[1].get_device()),  # type: ignore[arg-type]
             inputs=inputs,
             constant_args=constant_args,
         )
+        mark_node_as_mutating(packed, inputs[1])
+        # This op mutates in place which means that the result is not the
+        # target but rather the input that is being mutated
+        # init reorders the inputs, so inputs[1] becomes packed.inputs[0]
+        return packed.inputs[0]
