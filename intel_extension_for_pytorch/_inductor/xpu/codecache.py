@@ -6,52 +6,48 @@ import sys
 from concurrent.futures import ProcessPoolExecutor
 from threading import Thread
 from time import sleep
-
+from types import ModuleType
+from typing import Union, Set
+from functools import partial
 import torch
 
 from torch._inductor import config
 from torch._inductor.codecache import (
+    _async_compile_initializer,
     _compile_start,
     _worker_compile,
     _load_kernel,
     TritonFuture,
     AsyncCompile,
+    caching_device_properties
 )
+from torch._dynamo.device_interface import get_interface_for_device
 
 
+_pool_set: Set[ProcessPoolExecutor] = set()
 class XPUAsyncCompile(AsyncCompile):
     def __init__(self):
         super().__init__()
 
     @staticmethod
     @functools.lru_cache(1)
-    def process_pool():
+    def process_pool() -> ProcessPoolExecutor:
+        # ensure properties have been calculated before processes
+        # are forked
+        caching_device_properties()
         assert config.compile_threads > 1
         orig_ppid = os.getpid()
 
-        # if this process dies abnormally (e.g. segfault)
-        # it will not shut down the workers. Instead
-        # the workers will have their parent reassigned to the
-        # init process. This launches a separate thread to
-        # watch for the worker getting reassigned,
-        # and cleans it up in this case.
-        def init():
-            def run():
-                while True:
-                    sleep(1)
-                    if orig_ppid != os.getppid():
-                        os.kill(os.getpid(), signal.SIGKILL)
-
-            global _watchdog_thread
-            _watchdog_thread = Thread(target=run, daemon=True)
-            _watchdog_thread.start()
-
-        # we rely on 'fork' because we cannot control whether users
-        # have an `if __name__ == '__main__'` in their main process.
-        fork_context = multiprocessing.get_context("fork")
+        ctx = multiprocessing.get_context(config.worker_start_method)
         pool = ProcessPoolExecutor(
-            config.compile_threads, mp_context=fork_context, initializer=init
+            config.compile_threads,
+            mp_context=ctx,
+            initializer=partial(_async_compile_initializer, orig_ppid),
         )
+
+        global _pool_set
+        _pool_set.add(pool)
+
         # when this pool is created in a subprocess object, the normal exit handler
         # doesn't run, and we need to register our own handler.
         # exitpriority has to be high, because another one of the finalizers will
@@ -59,12 +55,15 @@ class XPUAsyncCompile(AsyncCompile):
         multiprocessing.util.Finalize(None, pool.shutdown, exitpriority=sys.maxsize)
         return pool
 
-    def triton(self, kernel_name, source_code):
+    def triton(
+        self, kernel_name: str, source_code: str, device_str: str = "xpu"
+    ) -> Union[TritonFuture, ModuleType]:
         _compile_start()
 
         if config.compile_threads > 1:
-            device = torch.device("xpu", torch.xpu.current_device())
-            cc = torch.xpu.get_device_capability(device)
+            device_interface = get_interface_for_device(device_str)
+            device = torch.device(device_str, device_interface.current_device())
+            cc = device_interface.get_compute_capability(device)
             future = self.process_pool().submit(
                 _worker_compile, kernel_name, source_code, cc, device
             )
