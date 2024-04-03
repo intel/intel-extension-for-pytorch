@@ -1,14 +1,18 @@
 import itertools
 import sympy
+import logging
 
 import torch  # noqa
+import torch._logging
 
+from functools import lru_cache
 from torch.utils._sympy.value_ranges import ValueRanges
 from torch._dynamo.utils import counters
 from torch._inductor.ir import ReductionHint
+from torch._inductor.codecache import code_hash
 
 from torch._inductor.virtualized import ops, V
-
+from torch._inductor.codegen.multi_kernel import MultiKernel
 from torch._inductor.codegen.common import (
     IndentedBuffer,
     PythonPrinter,
@@ -19,13 +23,66 @@ from torch._inductor.codegen.triton import (
     config_of,
     TritonKernel,
     TritonScheduling,
+    EnableReduction,
+    DisableReduction
 )
 from torch._inductor import config, scheduler
 from torch._inductor.codegen.triton_utils import signature_to_meta
-from torch._inductor.utils import unique
+
+from torch._inductor.utils import (
+    next_power_of_2,
+    Placeholder
+)
+from torch.utils._triton import has_triton_package
+from torch._inductor.scheduler import BaseSchedulerNode
+from typing import cast
 
 
 pexpr = PythonPrinter().doprint
+log = logging.getLogger(__name__)
+
+
+
+@lru_cache(None)
+def gen_attr_descriptor_import():
+    """
+    import AttrsDescriptor if the triton version is new enough to have this
+    class defined.
+    """
+    if not has_triton_package():
+        return ""
+
+    import triton.compiler.compiler
+
+    if hasattr(triton.compiler.compiler, "AttrsDescriptor"):
+        return "from triton.compiler.compiler import AttrsDescriptor"
+    else:
+        return ""
+
+
+@lru_cache(None)
+def gen_common_triton_imports():
+    imports = IndentedBuffer()
+    imports.splice(
+        """
+        import triton
+        import triton.language as tl
+        """
+    )
+    if attr_desc := gen_attr_descriptor_import():
+        imports.writeline(attr_desc)
+
+    imports.splice(
+        """
+        from intel_extension_for_pytorch._inductor.xpu.triton_heuristics import foreach
+        from torch._inductor import triton_helpers, triton_heuristics
+        from torch._inductor.ir import ReductionHint, TileHint
+        from torch._inductor.triton_helpers import libdevice, math as tl_math
+        from torch._inductor.triton_heuristics import AutotuneHint
+        from torch._inductor.utils import instance_descriptor
+        """
+    )
+    return imports.getvalue()
 
 
 class XPUTritonKernel(TritonKernel):
@@ -37,6 +94,8 @@ class XPUTritonKernel(TritonKernel):
         mutations=None,
         pid_cache=None,
         reduction_hint=ReductionHint.DEFAULT,
+        min_elem_per_thread=0,
+        disable_persistent_reduction=False,
     ):
         super().__init__(
             *groups,
@@ -44,9 +103,12 @@ class XPUTritonKernel(TritonKernel):
             mutations=mutations,
             pid_cache=pid_cache,
             reduction_hint=reduction_hint,
+            min_elem_per_thread=min_elem_per_thread,
+            disable_persistent_reduction=disable_persistent_reduction,
         )
 
-    def codegen_kernel_benchmark(self):
+
+    def codegen_kernel_benchmark(self, num_gb, grid=None):
         result = IndentedBuffer()
         argdefs, call_args, signature = self.args.python_argdefs()
 
@@ -65,7 +127,7 @@ class XPUTritonKernel(TritonKernel):
                     # note that random seed is put in V.graph.constants
                     const_tensor = V.graph.constants[arg_name]
                     result.writeline(
-                        f"{var_name} = rand_strided({V.graph.sizevars.size_hints(const_tensor.size())}, {V.graph.sizevars.size_hints(const_tensor.stride())}, device='{const_tensor.device}', dtype={const_tensor.dtype})"  # noqa: B950 line too long
+                        f"{var_name} = rand_strided({V.graph.sizevars.size_hints(const_tensor.size())}, {V.graph.sizevars.size_hints(const_tensor.stride())}, device='{const_tensor.device}', dtype={const_tensor.dtype})"  # type: ignore[arg-type]  # noqa: B950 line too long
                     )
                 elif isinstance(arg_sig, SizeArg):
                     symval_hint = V.graph.sizevars.size_hint(arg_sig.expr)
@@ -84,43 +146,47 @@ class XPUTritonKernel(TritonKernel):
             result.writeline(f"return {', '.join(var_names)},")
 
         result.writelines(["\n", "\n", "def call(args):"])
-        grid = []
-        extra_args = []
-        extra_args_str = None
+        if grid is None:
+            grid = []
+            extra_args = []
+            extra_args_str = None
+            for tree in self.active_range_trees():
+                expr = pexpr(V.graph.sizevars.size_hint(tree.numel))
+                extra_args.append(expr)
+                if tree.prefix != "r":
+                    grid.append(expr)
+            if self.need_numel_args():
+                extra_args_str = ", ".join(map(str, extra_args)) + ", "
+            else:
+                extra_args_str = ""
+            grid_arg = f"{extra_args_str}grid=grid({', '.join(grid)})"
+        else:
+            grid_arg = f"grid={grid}"
         index = V.graph.scheduler.current_device.index
         with result.indent():
-            result.writeline(f"with torch.xpu._DeviceGuard({index}):")
+            result.writeline(f"with {V.graph.device_ops.device_guard(index)}:")
             with result.indent():
                 result.writeline(
-                    f"torch.xpu.set_device({index})"
+                    V.graph.device_ops.set_device(index)
                 )  # no-op to ensure context
-                for tree in self.range_trees:
-                    expr = pexpr(V.graph.sizevars.size_hint(tree.numel))
-                    if tree.prefix != "r" or self.inside_reduction:
-                        extra_args.append(expr)
-                    if tree.prefix != "r":
-                        grid.append(expr)
-
                 stream_name = f"stream{index}"
-                result.writeline(f"{stream_name} = get_xpu_stream({index})")
-                extra_args_str = ", ".join(map(str, extra_args)) + ", "
+                result.writeline(f"{stream_name} = get_raw_stream({index})")
                 result.writeline(
-                    f"KERNEL_NAME.run(*args, {extra_args_str}grid=grid({', '.join(grid)}), stream={stream_name})"
+                    f"{str(Placeholder.KERNEL_NAME)}.run(*args, {grid_arg}, stream={stream_name})"
                 )
 
         # benchmark all configs
         result.writelines(["\n", "\n", "def benchmark_all_configs(args):"])
         with result.indent():
-            result.writeline(f"with torch.xpu._DeviceGuard({index}):")
+            result.writeline(f"with {V.graph.device_ops.device_guard(index)}:")
             with result.indent():
                 result.writeline(
-                    f"torch.xpu.set_device({index})"
+                    V.graph.device_ops.set_device(index)
                 )  # no-op to ensure context
                 result.writeline(
-                    f"return KERNEL_NAME.benchmark_all_configs(*args, {extra_args_str}grid=grid({', '.join(grid)}))"
+                    f"return {str(Placeholder.KERNEL_NAME)}.benchmark_all_configs(*args, {grid_arg})"
                 )
 
-        ninplace_args = len(unique(self.args.inplace_buffers.values()))
         result.writelines(["\n", "\n", "if __name__ == '__main__':"])
         with result.indent():
             result.writeline("from torch._inductor.utils import get_num_bytes, do_bench")
@@ -130,9 +196,7 @@ class XPUTritonKernel(TritonKernel):
             result.writeline(
                 "ms = do_bench(lambda: call(args), rep=40, fast_flush=True)"
             )
-            result.writeline(
-                f"num_gb = get_num_bytes(*args, num_in_out_args={ninplace_args}) / 1e9"
-            )
+            result.writeline(f"num_gb = {num_gb}")
             result.writeline("gb_per_s = num_gb / (ms / 1e3)")
             result.writeline(
                 'print(f"{ms:.3f}ms    {num_gb:.3f}GB    {gb_per_s:.2f}GB/s")'
@@ -140,55 +204,53 @@ class XPUTritonKernel(TritonKernel):
 
         return result
 
-    def codegen_kernel(self, name=None):
-        from triton import next_power_of_2
 
+    def codegen_kernel(self, name=None):
         code = IndentedBuffer()
 
-        size_hints = [
-            next_power_of_2(V.graph.sizevars.size_hint(numel)) for numel in self.numels
-        ]
-        if self.persistent_reduction:
-            assert self.inside_reduction
-            heuristics = "persistent_reduction"
-        elif self.inside_reduction:
-            heuristics = "reduction"
-        else:
+        size_hints = []
+        for numel in self.numels:
+            numel_hint = V.graph.sizevars.symbolic_hint(numel)
+            if not isinstance(numel_hint, (int, sympy.Integer)):
+                # This default heuristic hint was picked carefully: it is
+                # large, to ensure that we don't shrink the block size (since
+                # if you don't have many elements, it'd be wasteful to pick a
+                # large block size).  Since we don't know how many elements we
+                # might have, we should be OK with some inefficiency to make
+                # sure we handle the large case well.  8192 is the largest
+                # block size we support, so we pick that.
+                #
+                # If we have a better hint for unbacked SymInts (e.g., because
+                # a user told us, or we are tracking upper bounds) we could
+                # use that here.
+                size_hint = 8192
+            else:
+                size_hint = next_power_of_2(int(numel_hint))
+            size_hints.append(size_hint)
+
+        if not self.inside_reduction:
             size_hints.pop()
-            heuristics = "pointwise"
+
+        heuristics = self._get_heuristic()
 
         if name is None:
-            code.splice(
-                f"""
-                    import triton
-                    import triton.language as tl
-                    from torch._inductor.ir import ReductionHint
-                    from torch._inductor.ir import TileHint
-                    from intel_extension_for_pytorch._inductor.xpu.triton_heuristics import AutotuneHint, {heuristics}
-                    from torch._inductor.utils import instance_descriptor
-                    from torch._inductor import triton_helpers
-                """
-            )
+            code.splice(gen_common_triton_imports())
+
             if config.benchmark_kernel:
-                code.splice(
-                    """
-                        from torch._dynamo.testing import rand_strided
-                        from torch._C import _xpu_getCurrentRawStream as get_xpu_stream
-                        import torch
-                        from torch._inductor.triton_heuristics import grid
-                    """
-                )
+                code.splice(self.imports_for_benchmark_kernel())
+
 
         argdefs, _, signature = self.args.python_argdefs()
-        # maps actual expression to SizeArg if its in sizevars replacements
+        # maps actual expression to SizeArg if it is in sizevars replacements
         for i, arg in enumerate(signature):
-            if (
-                isinstance(arg, SizeArg)
-                and arg.expr in V.graph.sizevars.inv_precomputed_replacements
-            ):
-                signature[i] = SizeArg(
-                    arg.name, V.graph.sizevars.inv_precomputed_replacements[arg.expr]
-                )
+            if isinstance(arg, SizeArg):
+                # mypy is unhappy about the sympy.Expr
+                # type for the key of the dict below
+                symbol = cast(sympy.Symbol, arg.expr)
+                if symbol in V.graph.sizevars.inv_precomputed_replacements:
+                    signature[i] = SizeArg(
+                        arg.name, V.graph.sizevars.inv_precomputed_replacements[symbol]
+                    )
 
         mutated_args = set()
         for mutation in self.mutations:
@@ -197,55 +259,83 @@ class XPUTritonKernel(TritonKernel):
             if (
                 mutation in self.args.inplace_buffers
                 and mutation not in V.graph.removed_buffers
+                and mutation not in self.removed_buffers
             ):
                 mutated_args.add(self.args.inplace_buffers[mutation].inner_name)
             if mutation in self.args.output_buffers:
                 mutated_args.add(self.args.output_buffers[mutation])
         mutated_args = sorted(mutated_args)
 
+        triton_meta_signature = signature_to_meta(
+            signature, size_dtype=self.index_dtype
+        )
         triton_meta = {
-            "signature": signature_to_meta(signature, size_dtype=self.index_dtype),
+            "signature": triton_meta_signature,
             "device": V.graph.scheduler.current_device.index,
             "device_type": V.graph.scheduler.current_device.type,
             "constants": {},
-            "mutated_arg_names": mutated_args,
-            "autotune_hints": set(self.autotune_hints),
-            "kernel_name": "DESCRIPTIVE_KRNL_NAME",
         }
 
-        for tree in self.range_trees:
-            if tree.prefix != "r" or self.inside_reduction:
-                sizearg = SizeArg(f"{tree.prefix}numel", tree.numel)
-                signature.append(sizearg)
-                triton_meta["signature"][len(argdefs)] = signature_of(
-                    sizearg, size_dtype=self.index_dtype
-                )
-                argdefs.append(f"{tree.prefix}numel")
-                # constexpr version causes issues, see
-                # https://github.com/pytorch/torchdynamo/pull/1362
-                # triton_meta["constants"][len(argdefs)] = V.graph.sizevars.size_hint(
-                #     tree.numel
-                # )
-                # argdefs.append(f"{tree.prefix}numel: tl.constexpr")
+        inductor_meta = {
+            "autotune_hints": set(self.autotune_hints),
+            "kernel_name": str(Placeholder.DESCRIPTIVE_NAME),
+            "mutated_arg_names": mutated_args,
+            "no_x_dim": self.no_x_dim,
+            "backend_hash": torch.utils._triton.triton_hash_with_backend(),
+        }
+        num_gb = None
+        if config.benchmark_kernel or config.profile_bandwidth:
+            num_gb = self.estimate_kernel_num_bytes() / 1e9
+            inductor_meta["kernel_num_gb"] = num_gb
+
+        for tree in self.active_range_trees():
+            sizearg = SizeArg(f"{tree.prefix}numel", tree.numel)
+            signature.append(sizearg)
+            triton_meta_signature[len(argdefs)] = signature_of(
+                sizearg, size_dtype=self.index_dtype
+            )
+            argdefs.append(f"{tree.prefix}numel")
+            # constexpr version causes issues, see
+            # https://github.com/pytorch/torchdynamo/pull/1362
+            # triton_meta["constants"][len(argdefs)] = V.graph.sizevars.size_hint(
+            #     tree.numel
+            # )
+            # argdefs.append(f"{tree.prefix}numel: tl.constexpr")
         triton_meta["configs"] = [config_of(signature)]
 
+        # Triton compiler includes equal_to_1 args into constants even
+        # when they are not constexpr. otherwise there may be a segfault
+        # during launching the Inductor-compiled Triton kernel.
+        # https://github.com/pytorch/pytorch/issues/120478#issuecomment-1962822307
+        # https://github.com/openai/triton/blob/231efe9ed2d200be0f69a07c298e4342b08efe3d/python/triton/runtime/jit.py#L384
+        for arg_num in triton_meta["configs"][0].equal_to_1:  # type: ignore[index]
+            triton_meta["constants"][arg_num] = 1  # type: ignore[index]
+
+        self.triton_meta = triton_meta
+
         for tree in self.range_trees:
-            if tree.prefix == "r" and (
-                not self.inside_reduction or self.persistent_reduction
-            ):
+            if tree.prefix == "r" and self.persistent_reduction:
+                # RBLOCK for persistent_reduction is defined in codegen_static_numels
                 continue
-            if tree.prefix == "x" and self.no_x_dim:
+            if tree.tensor_dim is None:
                 continue
             argdefs.append(f"{tree.prefix.upper()}BLOCK : tl.constexpr")
+
+        self.codegen_body()
+
+        for helper in self.helper_functions:
+            code.writeline("")
+            code.splice(helper)
 
         if self.inside_reduction:
             reduction_hint = self.reduction_hint
             heuristics_line = f"""
-                @{heuristics}(
+                @triton_heuristics.{heuristics}(
                     size_hints={size_hints!r},
                     reduction_hint={reduction_hint},
                     filename=__file__,
-                    meta={triton_meta!r}
+                    triton_meta={triton_meta!r},
+                    inductor_meta={inductor_meta!r}
                 )
                 @triton.jit
             """
@@ -257,12 +347,19 @@ class XPUTritonKernel(TritonKernel):
                 else:
                     tile_hint = "tile_hint=TileHint.DEFAULT,"
             heuristics_line = f"""
-                @{heuristics}(size_hints={size_hints!r}, {tile_hint}filename=__file__, meta={triton_meta!r})
+                @triton_heuristics.{heuristics}(
+                    size_hints={size_hints!r}, {tile_hint}
+                    filename=__file__,
+                    triton_meta={triton_meta!r},
+                    inductor_meta={inductor_meta!r},
+                    min_elem_per_thread={self.min_elem_per_thread}
+                )
                 @triton.jit
             """
         code.splice(heuristics_line)
-        code.writeline(f"def {name or 'KERNEL_NAME'}({', '.join(argdefs)}):")
-        self.codegen_body()
+        code.writeline(
+            f"def {name or str(Placeholder.KERNEL_NAME)}({', '.join(argdefs)}):"
+        )
         with code.indent():
             self.codegen_static_numels(code)
             for old, new in self.args.aliases():
@@ -270,10 +367,7 @@ class XPUTritonKernel(TritonKernel):
             code.splice(self.body)
 
         if config.benchmark_kernel:
-            code.splice(self.codegen_kernel_benchmark())
-
-        if name is not None:
-            return code.getvalue()
+            code.splice(self.codegen_kernel_benchmark(num_gb))
 
         return code.getvalue()
 
@@ -282,28 +376,77 @@ class XPUTritonScheduling(TritonScheduling):
     def __init__(self, scheduler):
         super().__init__(scheduler)
 
-    def codegen_node_schedule(self, node_schedule, numel, reduction_numel):
+    def codegen_node_schedule(
+        self, node_schedule, buf_accesses, numel, reduction_numel
+    ):
+        from torch._inductor.codegen.triton_split_scan import TritonSplitScanKernel
+
         tiled_groups = self.select_tiling(node_schedule, numel, reduction_numel)
         reduction_hint_val, mutations, index_dtype = self.get_kernel_args(
             node_schedule, numel, reduction_numel
         )
 
-        kernel = XPUTritonKernel(
-            *tiled_groups,
-            reduction_hint=reduction_hint_val,
-            mutations=mutations,
-            index_dtype=index_dtype,
+        is_split_scan = any(
+            isinstance(node, BaseSchedulerNode) and node.is_split_scan()
+            for node in node_schedule
         )
+        # TODO : DO we support TritonSplitScanKernel?
+        kernel_type = TritonSplitScanKernel if is_split_scan else XPUTritonKernel
+        kernel_args = tiled_groups
+        kernel_kwargs = {
+            "reduction_hint": reduction_hint_val,
+            "mutations": mutations,
+            "index_dtype": index_dtype,
+        }
+
+        kernel = kernel_type(
+            *kernel_args,
+            **kernel_kwargs,
+        )
+
+        kernel.buf_accesses = buf_accesses
 
         self.codegen_node_schedule_with_kernel(node_schedule, kernel)
 
-        src_code = kernel.codegen_kernel()
-        kernel_name = self.define_kernel(src_code, node_schedule)
-        self.codegen_comment(node_schedule)
-        kernel.call_kernel(kernel_name)
+        with V.set_kernel_handler(kernel):
+            src_code = kernel.codegen_kernel()
 
+        kernel_name = self.define_kernel(src_code, node_schedule)
+        log.debug("Generating kernel code with kernel_name: %s", kernel_name)
+        kernel.kernel_name = kernel_name
+        kernel.code_hash = code_hash(src_code)
+
+        if kernel.persistent_reduction and config.triton.multi_kernel:
+            kernel2 = TritonKernel(
+                *kernel_args,
+                **kernel_kwargs,
+                disable_persistent_reduction=True,
+            )
+            self.codegen_node_schedule_with_kernel(node_schedule, kernel2)
+            with V.set_kernel_handler(kernel2):
+                src_code2 = kernel2.codegen_kernel()
+            kernel_name2 = self.define_kernel(src_code2, node_schedule)
+            kernel2.kernel_name = kernel_name2
+            kernel2.code_hash = code_hash(src_code2)
+
+            final_kernel = MultiKernel([kernel, kernel2])
+        else:
+            final_kernel = kernel  # type: ignore[assignment]
+
+        with V.set_kernel_handler(final_kernel):
+            for node in node_schedule:
+                if node not in (EnableReduction, DisableReduction):
+                    node.mark_run()
+
+        self.codegen_comment(node_schedule)
+        final_kernel.call_kernel(final_kernel.kernel_name)
+        if config.nan_asserts:
+            final_kernel.codegen_nan_check()
         if config.warn_mix_layout:
-            kernel.warn_mix_layout(kernel_name)
+            final_kernel.warn_mix_layout(kernel_name)
+
+        V.graph.removed_buffers |= final_kernel.removed_buffers
+        V.graph.inplaced_to_remove |= final_kernel.inplaced_to_remove
 
         if (
             V.graph.wrapper_code.supports_intermediate_hooks
@@ -327,9 +470,6 @@ class XPUTritonScheduling(TritonScheduling):
 
         self.scheduler.free_buffers()
 
-    def codegen_sync(self):
-        V.graph.wrapper_code.writeline("torch.xpu.synchronize()")
-
     def codegen_foreach(self, foreach_node):
         from .triton_foreach import XPUForeachKernel
 
@@ -344,15 +484,25 @@ class XPUTritonScheduling(TritonScheduling):
                     mutations,
                     index_dtype,
                 ) = self.get_kernel_args(node_schedule, numel, rnumel)
+
+                subkernel = kernel.create_sub_kernel(
+                    *tiled_groups,
+                    reduction_hint=reduction_hint_val,
+                    mutations=mutations,
+                    index_dtype=index_dtype,
+                )
+
                 self.codegen_node_schedule_with_kernel(
                     node_schedule,
-                    kernel.create_sub_kernel(
-                        *tiled_groups,
-                        reduction_hint=reduction_hint_val,
-                        mutations=mutations,
-                        index_dtype=index_dtype,
-                    ),
+                    subkernel,
                 )
+
+                with V.set_kernel_handler(subkernel):
+                    for node in node_schedule:
+                        if node not in (EnableReduction, DisableReduction):
+                            node.mark_run()
+                V.graph.removed_buffers |= subkernel.removed_buffers
+                V.graph.inplaced_to_remove |= subkernel.inplaced_to_remove
 
             src_code = kernel.codegen_kernel()
             kernel_name = self.define_kernel(src_code, [foreach_node])
