@@ -22,7 +22,7 @@ from torch._inductor.codegen.triton import (
 )
 from torch._inductor import config, scheduler
 from torch._inductor.codegen.triton_utils import signature_to_meta
-from torch._inductor.utils import DeferredLineBase, sympy_symbol, unique
+from torch._inductor.utils import unique
 
 
 pexpr = PythonPrinter().doprint
@@ -123,10 +123,7 @@ class XPUTritonKernel(TritonKernel):
         ninplace_args = len(unique(self.args.inplace_buffers.values()))
         result.writelines(["\n", "\n", "if __name__ == '__main__':"])
         with result.indent():
-            result.writeline("from torch._inductor.utils import get_num_bytes")
-            result.writeline(
-                "from intel_extension_for_pytorch._inductor.xpu.utils import do_bench"
-            )
+            result.writeline("from torch._inductor.utils import get_num_bytes, do_bench")
             result.writeline("")
 
             result.writeline("args = get_args()")
@@ -176,8 +173,8 @@ class XPUTritonKernel(TritonKernel):
                 code.splice(
                     """
                         from torch._dynamo.testing import rand_strided
+                        from torch._C import _xpu_getCurrentRawStream as get_xpu_stream
                         import torch
-                        from intel_extension_for_pytorch._C import _getCurrentRawStream as get_xpu_stream
                         from torch._inductor.triton_heuristics import grid
                     """
                 )

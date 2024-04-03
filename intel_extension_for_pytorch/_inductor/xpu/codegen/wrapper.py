@@ -83,7 +83,7 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
             import triton
             import triton.language as tl
             from torch._inductor.triton_heuristics import grid, start_graph, end_graph
-            from intel_extension_for_pytorch._C import _getCurrentRawStream as get_xpu_stream
+            from torch._C import _xpu_getCurrentRawStream as get_xpu_stream
             """
         )
 

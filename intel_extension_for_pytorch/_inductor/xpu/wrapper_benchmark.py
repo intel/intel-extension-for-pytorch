@@ -8,8 +8,8 @@ import intel_extension_for_pytorch
 from torch.autograd import DeviceType
 
 from torch._inductor.wrapper_benchmark import get_kernel_category
-from torch._inductor.utils import create_bandwidth_info_str, get_num_bytes
-from .utils import do_bench
+from torch._inductor.utils import create_bandwidth_info_str, get_num_bytes, do_bench
+
 
 
 @dataclasses.dataclass
