@@ -11,6 +11,7 @@ from torch._inductor.codegen.wrapper import (
     MemoryPlanningState,
     MemoryPlanningLine,
     WrapperCodeGen,
+    WrapperLine
 )
 from torch._inductor.utils import cache_on_self, get_benchmark_name
 from .. import codecache
@@ -29,17 +30,15 @@ class EnterXPUDeviceContextManagerLine:
         else:
             # Note _DeviceGuard has less overhead than device, but only accepts
             # integers
-            code.writeline(f"with torch.xpu._DeviceGuard({self.device_idx}):")
-            device_cm_stack.enter_context(code.indent())
-            code.writeline(
-                f"torch.xpu.set_device({self.device_idx}) # no-op to ensure context"
-            )
+            code.writeline(f"with {V.graph.device_ops.device_guard(self.device_idx)}:")
+            code.do_indent()
+            code.writeline(V.graph.device_ops.set_device(self.device_idx))
 
 
 class ExitXPUDeviceContextManagerLine:
-    def codegen(self, code: IndentedBuffer, device_cm_stack: contextlib.ExitStack):
+    def codegen(self, code: IndentedBuffer) -> None:
         if not V.graph.cpp_wrapper:
-            device_cm_stack.close()
+            code.do_unindent()
 
 
 class XPUTritonWrapperCodeGen(WrapperCodeGen):
@@ -83,7 +82,7 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
             import triton
             import triton.language as tl
             from torch._inductor.triton_heuristics import grid, start_graph, end_graph
-            from torch._C import _xpu_getCurrentRawStream as get_xpu_stream
+            from torch._C import _xpu_getCurrentRawStream as get_raw_stream
             """
         )
 
@@ -110,10 +109,10 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
             if config.size_asserts:
                 self.codegen_input_size_asserts()
 
-    def write_get_raw_stream(self, index):
+    def write_get_raw_stream(self, device_idx: int, graph=None) -> str:
         self.write_triton_header_once()
-        name = f"stream{index}"
-        self.writeline(f"{name} = get_xpu_stream({index})")
+        name = f"stream{device_idx}"
+        self.writeline(f"{name} = get_raw_stream({device_idx})")
         return name
 
     def codegen_device_guard_enter(self, device_idx):
@@ -126,64 +125,57 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
         self.lines.append(ExitXPUDeviceContextManagerLine())
 
     @dynamo_timed
-    def generate(self):
+    def generate(self, is_inference):
+        if config.profile_bandwidth:
+            self.write_triton_header_once()
         result = IndentedBuffer()
         result.splice(self.header)
 
-        out_names = V.graph.get_output_names()
         with contextlib.ExitStack() as stack:
             stack.enter_context(self.wrapper_call.indent())
             if config.profiler_mark_wrapper_call:
                 self.generate_profiler_mark_wrapper_call(stack)
             if config.profile_bandwidth:
-                self.write_triton_header_once()
-                self.wrapper_call.writeline("start_graph()")
+                self.generate_start_graph()
 
-            while (
-                self.lines
-                and isinstance(self.lines[-1], MemoryPlanningLine)
-                # TODO: this seems legit, NullLine has no node
-                and self.lines[-1].node.name not in out_names  # type: ignore[attr-defined]
-            ):
-                # these lines will be pointless
-                self.lines.pop()
+            # We disable planning during training because it presently increases peak memory consumption.
+            if is_inference and config.memory_planning:
+                self.memory_plan()
+                # TODO: integrate memory planning & stack allocation?
+                self.allow_stack_allocation = False
+            else:
+                self.memory_plan_reuse()
 
-            # codegen allocations in two passes
-            planning_state = MemoryPlanningState()
-            for i in range(len(self.lines)):
-                if isinstance(self.lines[i], MemoryPlanningLine):
-                    self.lines[i] = self.lines[i].plan(planning_state)
+            if config.triton.store_cubin:
+                self.generate_reset_kernel_saved_flags()
 
-            device_cm_stack = contextlib.ExitStack()
             for line in self.lines:
-                if isinstance(line, MemoryPlanningLine):
+                if isinstance(line, WrapperLine):
                     line.codegen(self.wrapper_call)
-                elif isinstance(
-                    line,
-                    (
-                        EnterXPUDeviceContextManagerLine,
-                        ExitXPUDeviceContextManagerLine,
-                    ),
-                ):
-                    line.codegen(self.wrapper_call, device_cm_stack)
                 else:
                     self.wrapper_call.writeline(line)
 
             output_refs = self.get_output_refs()
             self.mark_output_type()
             if config.triton.debug_sync_graph:
-                self.wrapper_call.writeline("torch.xpu.synchronize()")
+                self.wrapper_call.writeline(V.graph.device_ops.synchronize())
 
             if config.profile_bandwidth:
-                self.wrapper_call.writeline("end_graph()")
+                self.generate_end_graph()
+
+            if config.triton.store_cubin:
+                self.generate_save_uncompiled_kernels()
 
             self.generate_return(output_refs)
 
-        self.append_precomputed_sizes_to_prefix()
+        self.finalize_prefix()
         result.splice(self.prefix)
 
         with result.indent():
             result.splice(self.wrapper_call)
+
+        self.generate_before_suffix(result)
+        result.splice(self.suffix)
 
         self.generate_end(result)
 
