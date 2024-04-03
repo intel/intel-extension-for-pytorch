@@ -415,10 +415,9 @@ namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
 
-#ifdef USE_ONEMKL
 constexpr int64_t mkl_max_ndim = 3;
 
-double _mkl_dft_scale(
+double _dft_scale(
     IntArrayRef dim,
     IntArrayRef input_sizes,
     IntArrayRef out_sizes,
@@ -454,10 +453,11 @@ const Tensor& _fft_apply_normalization(
     int64_t normalization,
     IntArrayRef sizes,
     IntArrayRef dims) {
-  auto scale = _mkl_dft_scale(dims, sizes, self.sizes(), normalization);
+  auto scale = _dft_scale(dims, sizes, self.sizes(), normalization);
   return (scale == 1.0) ? self : self.mul_(scale);
 }
 
+#ifdef USE_ONEMKL
 template <precision prec, domain signal_type, typename scalar_t>
 void _mkl_dft(
     const Tensor& input,
