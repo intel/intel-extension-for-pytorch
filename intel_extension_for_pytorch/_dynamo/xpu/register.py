@@ -2,10 +2,8 @@ import types
 import inspect
 
 import torch
-from torch._dynamo.allowed_functions import _allowed_function_ids as _allowed_container
-from torch._dynamo.allowed_functions import (
-    _disallowed_function_ids as _disallowed_container,
-)
+import torch._dynamo.trace_rules as trace_rules
+
 from torch._dynamo.utils import is_safe_constant
 from torch._dynamo.config import allowed_functions_module_string_ignorelist
 
@@ -75,17 +73,17 @@ def _register_module_function_to_dynamo(obj):
         torch.xpu.optimize,
     ]
     for entity in remove:
-        _disallowed_container.add(id(entity))
+        trace_rules._disallowed_callable_ids.add(id(entity))
 
     # enumerate all modules and save in _torch_object_ids
     _find_torch_objects(torch.xpu)
 
     # kick out disallowed
-    for idx in _disallowed_container():
+    for idx in trace_rules._disallowed_callable_ids():
         if idx in _torch_object_ids:
             del _torch_object_ids[idx]
 
     # register to the dynamo legal list
     for index, _ in _torch_object_ids.items():
-        if index not in _allowed_container.function_ids:
-            _allowed_container.add(index)
+        if index not in trace_rules._allowed_callable_ids():
+            trace_rules._allowed_callable_ids.add(index)
