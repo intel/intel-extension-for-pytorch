@@ -1,0 +1,68 @@
+name: install-e2e-suites
+
+runs:
+    using: composite
+    steps:
+      - name: Torchvision Install
+        shell: bash
+        run: |
+            source activate e2e_ci
+            cd ../pytorch
+            TORCH_VISION_PIN_COMMIT=$(cat .github/ci_commit_pins/vision.txt)
+            cd ..
+            if [ ! -d "vision" ]; then
+                git clone --recursive https://github.com/pytorch/vision.git
+            fi
+            cd vision
+            git checkout ${TORCH_VISION_PIN_COMMIT}
+            conda install -y libpng jpeg
+            # TODO: We use an older version ffmpeg to avoid the vision capability issue.
+            conda install -y -c conda-forge 'ffmpeg<4.4'
+            python setup.py install
+            cd ..
+      - name: Torchtext Install
+        shell: bash
+        run: |
+            source activate e2e_ci
+            cd ../pytorch
+            TORCH_TEXT_PIN_COMMIT=$(cat .github/ci_commit_pins/text.txt)
+            cd ..
+            if [ ! -d "text" ]; then
+                git clone --recursive https://github.com/pytorch/text.git
+            fi
+            # Torchtext
+            cd text
+            git checkout ${TORCH_TEXT_PIN_COMMIT}
+            python setup.py clean install
+            cd ..
+      - name: Torchaudio Install
+        shell: bash
+        run: |
+            source activate e2e_ci
+            cd ../pytorch
+            TORCH_AUDIO_PIN_COMMIT=$(cat .github/ci_commit_pins/audio.txt)
+            cd ..
+            # Torch audio
+            if [ ! -d "audio" ]; then
+                git clone --recursive https://github.com/pytorch/audio.git
+            fi
+            cd audio
+            # Optionally `git checkout {pinned_commit}`
+            # git checkout ${TORCH_AUDIO_PIN_COMMIT} break in pinned_commit
+            python setup.py install
+            cd ..
+      - name: Benchmark Install
+        shell: bash
+        run: |
+            source activate e2e_ci
+            BENCHMARK_PINNED_COMMIT=$(cat .github/ci_commit_pins/benchmark.txt)
+            cd ..
+            if [ ! -d "benchmark" ]; then
+                git clone --recursive https://github.com/weishi-deng/benchmark
+            fi
+            cd benchmark
+            git checkout ${BENCHMARK_PINNED_COMMIT}
+            python install.py
+            pip install -e .
+
+
