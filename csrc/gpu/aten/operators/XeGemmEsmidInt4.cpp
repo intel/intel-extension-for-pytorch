@@ -9,10 +9,19 @@
 #include <stdlib.h>
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
-#include "comm/Numerics.h"
+// #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 #include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
+
+#include <sycl/ext/intel/esimd.hpp>
+#include <sycl/sycl.hpp>
+using namespace sycl::ext::intel::esimd;
+using namespace sycl::ext::intel::esimd::xmx;
+using fp16 = sycl::half;
+using namespace sycl;
+
+#include "esimd/matrixMulCommonDim4096Int4NoReshapeNx16V3.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -32,7 +41,7 @@ struct XeGemmInt4EsimdKernelFunctor {
   }
   XeGemmInt4EsimdKernelFunctor(
       const scalar_t* input_,
-      const uint8_t* weight_,
+      uint8_t* weight_,
       scalar_t* output_,
       const scalar_t* weight_scl_,
       const uint8_t* weight_zp_,
@@ -48,7 +57,7 @@ struct XeGemmInt4EsimdKernelFunctor {
 
  private:
   const scalar_t* input;
-  const uint8_t* weight;
+  uint8_t* weight;
   scalar_t* output;
   const scalar_t* weight_scl;
   const uint8_t* weight_zp;
@@ -56,14 +65,23 @@ struct XeGemmInt4EsimdKernelFunctor {
   uint32_t k;
 };
 
+static void dump_element(const Tensor src, int nele, std::string str) {
+  std::cout << str;
+  for (int i = 0; i < nele; i++) {
+    std::cout << " " << src[0][i];
+  }
+  std::cout << std::endl;
+}
+
 // forward dpcpp implementation
 template <typename scalar_t, typename uint8_t>
 static inline void xegemm_int4_esimd_kernel(
     const scalar_t* input,
-    const uint8_t* weight,
+    uint8_t* weight,
     scalar_t* output,
     const scalar_t* weight_scl,
     const uint8_t* weight_zp,
+    uint8_t* reorder_buffer,
     int64_t calib_gz,
     uint32_t m,
     uint32_t n,
@@ -74,18 +92,53 @@ static inline void xegemm_int4_esimd_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   uint32_t pixelPerGroupCommonDim4096 = 16;
-  if (n != 4096 && k != 1) {
+  if (k != 4096 && m != 1) {
     std::cout << "n should be 4096 and k should be 1" << std::endl;
     return;
   }
 
-  // if (dispatchPattern[1] > 3) {
-  //   std::cout << "matrixMulCommonDim11008Int4NoReshape kernel require
-  //   dispatchPattern[1] to be 0 ~ 2" << std::endl; return false;
-  // }
+  // reorder for the weights and scaling
+  {
+    uint8_t* weight_reorder = (uint8_t*)weight;
+    uint8_t* reorderTmp = reorder_buffer;
+    dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(4096, n), [=](sycl::id<2> idx) {
+        int i = idx[0];
+        int j = idx[1];
+
+        int32_t origIdx = i * m + j;
+        int32_t afterIdx = j * 4096 + i;
+
+        int8_t tmp = weight_reorder[origIdx / 2];
+        if (origIdx % 2 == 0) {
+          tmp = tmp & 0xf;
+        } else {
+          tmp = tmp >> 4;
+        }
+        reorderTmp[afterIdx] = tmp;
+      });
+    });
+    dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(2048, n), [=](sycl::id<2> idx) {
+        int i = idx[0];
+        int j = idx[1];
+
+        int32_t afterIdxInt4 = j * 2048 + i;
+
+        int8_t tmpLow = reorderTmp[afterIdxInt4 * 2];
+        int8_t tmpHigh = reorderTmp[afterIdxInt4 * 2 + 1];
+
+        int8_t tmp = (tmpLow & 0xf) | (tmpHigh << 4);
+
+        // weight[afterIdxInt4] = 0x88;
+        weight_reorder[afterIdxInt4] = 0x88; // tmp;
+      });
+    });
+    dpcpp_queue.wait();
+  }
 
   int groupsV2 =
-      (m + pixelPerGroupCommonDim4096 - 1) / pixelPerGroupCommonDim4096;
+      (n + pixelPerGroupCommonDim4096 - 1) / pixelPerGroupCommonDim4096;
   int localThread[2];
   localThread[0] = 16;
 
@@ -94,39 +147,21 @@ static inline void xegemm_int4_esimd_kernel(
   sycl::nd_range<1> RangeCommonDim4096V2(
       GlobalRangeCommonDim4096V2, LocalRangeCommonDim4096V2);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    XeGemmInt4EsimdKernelFunctor<scalar_t> kfn(
-        input, weight, output, weight_scl, weight_zp, calib_gz, k);
-    cgh.parallel_for<decltype(kfn)>(
-        sycl::nd_range<1>(
-            GlobalRangeCommonDim4096V2, LocalRangeCommonDim4096V2),
-        kfn);
-  };
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-
-  // try {
-  //   if (n == 4096) {
-  //       switch (pixelPerGroupCommonDim4096) {
-  //       case 16:
-  //         e = q.submit([&](handler& cgh) {
-  //           cgh.parallel_for(RangeCommonDim4096V2, [=](nd_item<1> ndi)
-  //           SYCL_ESIMD_KERNEL{
-  //             matrixMulCommonDim4096Int4NoReshapeNx16V3_ipex<4>((uint8_t*)a,
-  //             (uint8_t*)b, (uint8_t*)c, (uint8_t*)d, ndi);
-  //             });
-  //           });
-  //         break;
-  //       default:
-  //         break;
-  //       }
-  //   }
-  // } catch (sycl::exception const& e) {
-  //   std::cout << "SYCL exception caught: " << e.what() << '\n';
-  //   return false;
-  // }
-
-  // bool success = true;
-  // return success;
+  sycl::event e;
+  // Launches the task on the GPU.
+  if (k == 4096) {
+    e = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(
+          RangeCommonDim4096V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
+            matrixMulCommonDim4096Int4NoReshapeNx16V3_ipex2<4>(
+                (uint8_t*)weight,
+                (uint8_t*)input,
+                (uint8_t*)output,
+                (uint8_t*)weight_scl,
+                ndi);
+          });
+    });
+  }
 }
 
 } // namespace impl
@@ -141,7 +176,7 @@ inline Tensor resize_as_mat2(const Tensor& mat1, const Tensor& output) {
 
 static Tensor mm_esimd_int4(
     const Tensor& input,
-    const Tensor& weight,
+    Tensor& weight,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t calib_gz) {
@@ -157,9 +192,12 @@ static Tensor mm_esimd_int4(
   uint32_t m = input_flat.sizes()[0]; // 1
   uint32_t k = input_flat.sizes()[1]; // 4096
   uint32_t n = weight.sizes()[1] * 2; // 11008
+  auto reorder_buffer = at::empty({k, n}, weight.options());
   auto output = at::empty({m, n}, input.options()); // 11008, 11008
 
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+  impl::dump_element(weight_flat, 10, "weight first 10 elem: ");
+  impl::dump_element(reorder_buffer, 10, "reorder_buffer first 10 elem: ");
 
   if (compute_eng_valid) {
     std::cout << "get in esimd int4 gemm" << std::endl;
@@ -171,6 +209,7 @@ static Tensor mm_esimd_int4(
               output.data_ptr<scalar_t>(),
               weight_scl.data_ptr<scalar_t>(),
               weight_zp.data_ptr<uint8_t>(),
+              reorder_buffer.data_ptr<uint8_t>(),
               calib_gz,
               m,
               n,
@@ -179,6 +218,10 @@ static Tensor mm_esimd_int4(
   } else {
     AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
   }
+  impl::dump_element(weight_flat, 10, "weight before output first 10 elem: ");
+  impl::dump_element(
+      reorder_buffer, 10, "reorder_buffer  before output first 10 elem: ");
+  impl::dump_element(output, 10, "output first 10 elem: ");
   return resize_as_mat2(input, output);
 }
 

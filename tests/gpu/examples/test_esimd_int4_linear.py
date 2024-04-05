@@ -1,4 +1,6 @@
 import torch
+
+torch.set_printoptions(profile="full")
 import intel_extension_for_pytorch  # noqa
 
 from torch.testing._internal.common_utils import TestCase
@@ -63,20 +65,25 @@ class TestTorchMethod(TestCase):
     def test_gemm_int4(self, per_channel=False, dtype=torch.float16):
         input = torch.rand([1, 4096], device="xpu", dtype=torch.float16)
 
-        group_size = 128
+        group_size = 32  # 128 -> 32
         if per_channel:
             group_size = 4096
         group_num = int(4096 / group_size)
 
         scales = torch.rand([group_num, 16384], device="xpu", dtype=torch.float16)
-        zero_points = torch.rand([group_num, 8192], device="xpu").byte()
+        scales_t = torch.transpose(scales, 0, 1)
+        # zero_points = torch.rand([group_num, 8192], device="xpu").byte()
+        zero_points = torch.zeros(group_num, 8192, device="xpu").byte()
         weight = (torch.rand([4096, 8192], device="xpu") * 10).byte()
 
         weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
 
         # check gemm
         out_int4 = torch.ops.torch_ipex.mm_esimd_int4(
-            input, weight, scales, zero_points, group_size
+            input, weight, scales_t, zero_points, group_size
         )
+        print("out_int4: ", out_int4.to(torch.float).to("cpu"))
+
         out_fp16 = torch.matmul(input, weight_fp16)
+        print("out_fp16: ", out_fp16.to(torch.float).to("cpu"))
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
