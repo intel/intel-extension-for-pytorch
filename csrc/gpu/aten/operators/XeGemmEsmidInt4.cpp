@@ -98,6 +98,7 @@ static inline void xegemm_int4_esimd_kernel(
   }
 
   // reorder for the weights and scaling
+  // Assume group size 32.   4096 / 32 = 128
   {
     uint8_t* weight_reorder = (uint8_t*)weight;
     uint8_t* reorderTmp = reorder_buffer;
@@ -106,7 +107,7 @@ static inline void xegemm_int4_esimd_kernel(
         int i = idx[0];
         int j = idx[1];
 
-        int32_t origIdx = i * m + j;
+        int32_t origIdx = i * n + j;
         int32_t afterIdx = j * 4096 + i;
 
         int8_t tmp = weight_reorder[origIdx / 2];
@@ -130,8 +131,32 @@ static inline void xegemm_int4_esimd_kernel(
 
         int8_t tmp = (tmpLow & 0xf) | (tmpHigh << 4);
 
-        // weight[afterIdxInt4] = 0x88;
-        weight_reorder[afterIdxInt4] = 0x88; // tmp;
+        weight_reorder[afterIdxInt4] = tmp;
+      });
+    });
+    dpcpp_queue.wait();
+
+    fp16* reorderTmpScal = (fp16*)reorder_buffer;
+    fp16* weight_scl_reorder = (fp16*)weight_scl;
+    dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(128, n), [=](sycl::id<2> idx) {
+        int i = idx[0];
+        int j = idx[1];
+
+        int32_t origIdx = i * n + j;
+        int32_t afterIdx = j * 128 + i;
+
+        reorderTmpScal[afterIdx] = weight_scl_reorder[origIdx];
+      });
+    });
+    dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(128, n), [=](sycl::id<2> idx) {
+        int i = idx[0];
+        int j = idx[1];
+
+        int32_t afterIdx = j * 128 + i;
+
+        weight_scl_reorder[afterIdx] = reorderTmpScal[afterIdx];
       });
     });
     dpcpp_queue.wait();
@@ -197,7 +222,8 @@ static Tensor mm_esimd_int4(
 
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   impl::dump_element(weight_flat, 10, "weight first 10 elem: ");
-  impl::dump_element(reorder_buffer, 10, "reorder_buffer first 10 elem: ");
+  //impl::dump_element(reorder_buffer, 10, "reorder_buffer first 10 elem: ");
+  impl::dump_element(weight_scl, 10, "scal first 10 elem: ");
 
   if (compute_eng_valid) {
     std::cout << "get in esimd int4 gemm" << std::endl;
@@ -219,8 +245,8 @@ static Tensor mm_esimd_int4(
     AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
   }
   impl::dump_element(weight_flat, 10, "weight before output first 10 elem: ");
-  impl::dump_element(
-      reorder_buffer, 10, "reorder_buffer  before output first 10 elem: ");
+  //impl::dump_element(
+  //    reorder_buffer, 10, "reorder_buffer  before output first 10 elem: ");
   impl::dump_element(output, 10, "output first 10 elem: ");
   return resize_as_mat2(input, output);
 }
