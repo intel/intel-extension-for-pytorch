@@ -249,7 +249,9 @@ void single_query_cached_kv_attention_kernel(
             attn_out_start,
             head_size,
             flag_access[thread_id][seq_id][head_id]);
-        flag_access[thread_id][seq_id][head_id] = 1;
+        if (flag_access[thread_id][seq_id][head_id] == 0) {
+          flag_access[thread_id][seq_id][head_id] = 1;
+        }
       } // for token_id
     } // for head_id
   } // for seq_id

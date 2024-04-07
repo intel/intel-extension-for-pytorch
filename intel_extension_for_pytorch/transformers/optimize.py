@@ -903,7 +903,7 @@ def ipex_quantization_flow(
         print("ipex.llm.optimize is doing the weight only quantization")
 
     with torch.no_grad(), torch.cpu.amp.autocast(
-        enabled=True if dtype is torch.bfloat16 else False
+        enabled=True if dtype in [torch.bfloat16, torch.half] else False, dtype=dtype
     ):
         convert_model = convert(prepared_model.eval(), inplace=True).eval()
         if is_woq and dtype is torch.bfloat16:
@@ -930,8 +930,6 @@ def model_convert_lowering(
 
         _disable_tpp()
         if not is_quantization:
-            if dtype is torch.bfloat16:
-                _enable_tpp()
             if ipex._C.is_llga_fp32_bf16_enabled():
                 _disable_tpp()
                 _model = ipex.optimize(
@@ -942,13 +940,22 @@ def model_convert_lowering(
                 )
             else:
                 if dtype is torch.float32:
+                    # this call also support bf32 path
                     _model = ipex.optimize(
                         _model.eval(),
                         dtype=dtype,
                         inplace=True,
                         auto_kernel_selection=True,
                     )
-                else:
+                elif dtype is torch.half:
+                    _model = ipex.optimize(
+                        _model.eval(),
+                        dtype=dtype,
+                        inplace=True,
+                        auto_kernel_selection=True,
+                    )
+                elif dtype is torch.bfloat16:
+                    _enable_tpp()
                     _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
 
         if not is_quantization or woq:
@@ -1019,7 +1026,8 @@ def model_convert_lowering(
                 else sample_inputs
             )
             with torch.no_grad(), torch.cpu.amp.autocast(
-                enabled=True if dtype is torch.bfloat16 else False
+                enabled=True if dtype in [torch.bfloat16, torch.half] else False,
+                dtype=dtype,
             ):
                 trace_model = torch.jit.trace(
                     _model,
@@ -1076,13 +1084,13 @@ def optimize(
 
     For the model that is not in the scope of supported model family above, will try to
     apply default ipex.optimize transparently to get benifits (not include quantizations,
-    only works for dtypes of torch.bfloat16 and torch.float).
+    only works for dtypes of torch.bfloat16 and torch.half and torch.float).
 
     Args:
         model (torch.nn.Module): User model to apply optimizations.
         optimizer (torch.optim.Optimizer): User optimizer to apply optimizations
             on, such as SGD. The default value is ``None``, meaning inference case.
-        dtype (torch.dtype): Now it works for ``torch.bfloat16`` and ``torch.float``.
+        dtype (torch.dtype): Now it works for ``torch.bfloat16``, ``torch.half`` and ``torch.float``.
             The default value is ``torch.float``. When working with quantization, it means the mixed dtype with quantization.
         inplace (bool): Whether to perform inplace optimization. Default value is ``False``.
         device (str): Specifying the device on which the optimization will be performed.
@@ -1171,7 +1179,26 @@ def optimize(
                     + "fallback to origin model"
                 )
                 return model
-            _model = ipex.optimize(model.eval(), dtype=dtype, inplace=inplace)
+
+            if dtype is torch.float:
+                _model = ipex.optimize(
+                    model.eval(),
+                    dtype=dtype,
+                    inplace=inplace,
+                    auto_kernel_selection=True
+                    if ipex.get_fp32_math_mode() == ipex.FP32MathMode.BF32
+                    else False,
+                )
+            elif dtype is torch.bfloat16:
+                _model = ipex.optimize(model.eval(), dtype=dtype, inplace=inplace)
+            elif dtype is torch.half:
+                _model = ipex.optimize(
+                    model.eval(),
+                    dtype=dtype,
+                    auto_kernel_selection=True,
+                    inplace=inplace,
+                )
+
             return _model
 
         if not inplace:
@@ -1245,7 +1272,10 @@ def optimize(
                         else sample_inputs
                     )
                     with torch.no_grad(), torch.cpu.amp.autocast(
-                        enabled=True if dtype is torch.bfloat16 else False
+                        enabled=True
+                        if dtype in [torch.bfloat16, torch.half]
+                        else False,
+                        dtype=dtype,
                     ):
                         trace_model = torch.jit.trace(
                             _model,
