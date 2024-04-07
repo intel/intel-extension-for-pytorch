@@ -27,10 +27,10 @@ RUN ${PYTHON} -m pip --no-cache-dir install --upgrade \
 # Some TF tools expect a "python" binary
 RUN ln -s $(which ${PYTHON}) /usr/local/bin/python
 
-ARG IPEX_VERSION=2.2.0
-ARG PYTORCH_VERSION=2.2.0
-ARG TORCHAUDIO_VERSION=2.2.0
-ARG TORCHVISION_VERSION=0.17.0
+ARG IPEX_VERSION=2.3.0
+ARG PYTORCH_VERSION=2.3.0
+ARG TORCHAUDIO_VERSION=2.3.0
+ARG TORCHVISION_VERSION=0.18.0
 ARG TORCH_CPU_URL=https://download.pytorch.org/whl/cpu/torch_stable.html
 
 RUN \

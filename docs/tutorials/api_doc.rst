@@ -15,7 +15,7 @@ General
 .. automodule:: intel_extension_for_pytorch.llm
 .. autofunction:: optimize
 
-.. automodule:: intel_extension_for_pytorch
+.. currentmodule:: intel_extension_for_pytorch
 .. autoclass:: verbose
 
 

@@ -44,7 +44,7 @@ ipex.llm provides dedicated optimization for running Large Language Models (LLM)
 |GPT-J| EleutherAI/gpt-j-6b | 🟨 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟨 | 🟩 |
 |DOLLY| databricks/dolly-v2-12b | 🟨 | 🟩 |
-|FALCON| tiiuae/falcon-40b | 🟨 | 🟨 |
+|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 |
 |OPT| facebook/opt-30b | 🟨 | 🟩 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 |
 |Bloom| bigscience/bloom-1b7 | 🟨 | 🟩 |
@@ -64,30 +64,27 @@ ipex.llm provides dedicated optimization for running Large Language Models (LLM)
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16).
 We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
-*Note*: The accuracy drop issue in distributed inference mode for "tiiuae/falcon-40b" has been fixed by DeepSpeed in a recent patch release [v0.13.1](https://github.com/microsoft/DeepSpeed/tree/v0.13.1).
-
 <br>
 
 # 3. Environment Setup
 
-*Note*: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. 
-If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.2.0%2Bcpu/examples/cpu/inference/python/llm/README.md#3-environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
+There are several environment setup methodologies provided. You can choose either of them according to your usage scenario. The Docker-based ones are recommended.
 
-
-## 3.1 [Recommended] Docker-based environment setup with compilation from source
+## 3.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
+git checkout v2.3.0+cpu
 git submodule sync
 git submodule update --init --recursive
 
-# Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON -t ipex-llm:main .
+# Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.0 .
 
 # Run the container with command below
-docker run --rm -it --privileged ipex-llm:main bash
+docker run --rm -it --privileged ipex-llm:2.3.0 bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -96,12 +93,60 @@ cd llm
 source ./tools/env_activate.sh
 ```
 
-## 3.2 Conda-based environment setup with compilation from source
+## 3.2 Conda-based environment setup with pre-built wheels
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
+git checkout v2.3.0+cpu
+git submodule sync
+git submodule update --init --recursive
+
+# GCC 12.3 is required. Installation can be taken care of by the environment configuration script.
+# Create a conda environment
+conda create -n llm python=3.10 -y
+conda activate llm
+
+# Setup the environment with the provided script
+# A sample "prompt.json" file for benchmarking is also downloaded
+cd examples/cpu/inference/python/llm
+bash ./tools/env_setup.sh 7
+
+# Activate environment variables
+source ./tools/env_activate.sh
+```
+
+## 3.3 Docker-based environment setup with compilation from source
+
+```bash
+# Get the Intel® Extension for PyTorch\* source code
+git clone https://github.com/intel/intel-extension-for-pytorch.git
+cd intel-extension-for-pytorch
+git checkout v2.3.0+cpu
+git submodule sync
+git submodule update --init --recursive
+
+# Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON -t ipex-llm:2.3.0 .
+
+# Run the container with command below
+docker run --rm -it --privileged ipex-llm:2.3.0 bash
+
+# When the command prompt shows inside the docker container, enter llm examples directory
+cd llm
+
+# Activate environment variables
+source ./tools/env_activate.sh
+```
+
+## 3.4 Conda-based environment setup with compilation from source
+
+```bash
+# Get the Intel® Extension for PyTorch\* source code
+git clone https://github.com/intel/intel-extension-for-pytorch.git
+cd intel-extension-for-pytorch
+git checkout v2.3.0+cpu
 git submodule sync
 git submodule update --init --recursive
 

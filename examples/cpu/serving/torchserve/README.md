@@ -14,7 +14,7 @@ docker run \
     --rm -it -u root \
     --entrypoint='' \
     -v $PWD:/home/model-server \
-    intel/intel-optimized-pytorch:2.2.0-serving-cpu \
+    intel/intel-optimized-pytorch:2.3.0-serving-cpu \
     python quantize_model.py
 ```
 
@@ -31,7 +31,7 @@ docker run \
     --rm -it -u root \
     --entrypoint='' \
     -v $PWD:/home/model-server \
-    intel/intel-optimized-pytorch:2.2.0-serving-cpu \
+    intel/intel-optimized-pytorch:2.3.0-serving-cpu \
     torch-model-archiver \
         --model-name ipex-resnet50 \
         --version 1.0 \
@@ -88,7 +88,7 @@ docker run \
     -v $PWD/model-store:/home/model-server/model-store \
     -v $PWD/wf-store:/home/model-server/wf-store \
     --net=host \
-    intel/intel-optimized-pytorch:2.2.0-serving-cpu
+    intel/intel-optimized-pytorch:2.3.0-serving-cpu
 ```
 
 > [!TIP]
