@@ -1,0 +1,142 @@
+
+#include <ATen/ATen.h>
+#include <ATen/CPUApplyUtils.h>
+#include <ATen/record_function.h>
+#include <core/detail/IndexUtils.h>
+#include <core/detail/TensorInfo.h>
+#include <oneDNN/oneDNN.h>
+#include <runtime/Utils.h>
+#include <stdlib.h>
+#include <utils/oneMKLUtils.h>
+#include "comm/ATDispatch.h"
+// #include "comm/Numerics.h"
+#include "comm/RegistrationDeclarations.h"
+#include "utils/ComputeEngine.h"
+#include "utils/CustomOperatorRegistration.h"
+
+#include <sycl/ext/intel/esimd.hpp>
+#include <sycl/sycl.hpp>
+using namespace sycl::ext::intel::esimd;
+using namespace sycl::ext::intel::esimd::xmx;
+using fp16 = sycl::half;
+using namespace sycl;
+
+#include "esimd/matrixMulCommonDim4096Int4NoReshapeNx16V3.h"
+
+using namespace xpu::dpcpp::detail;
+using namespace xpu::dpcpp;
+using namespace at::native;
+
+namespace at {
+namespace AtenIpexTypeXPU {
+
+namespace impl {
+
+static void dump_element(const Tensor src, int nele, std::string str) {
+  std::cout << str;
+  for (int i = 0; i < nele; i++) {
+    std::cout << " " << src[0][i];
+  }
+  std::cout << std::endl;
+}
+
+// forward dpcpp implementation
+template <typename scalar_t>
+static inline void sdp_esimd_kernel(
+    scalar_t* query,
+    scalar_t* key,
+    scalar_t* value,
+    void* alibi,
+    void* attn_mask,
+    void* head_mask,
+    scalar_t* output,
+    float alpha,
+    float beta,
+    float dropout_prob,
+    bool is_causal,
+    bool seq_last) {
+  std::cout << "alpha: " << alpha << std::endl;
+  std::cout << "beta: " << beta << std::endl;
+  std::cout << "dropout_prob: " << dropout_prob << std::endl;
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+
+  return;
+}
+
+} // namespace impl
+
+static Tensor sdp_esimd(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<Tensor>& alibi,
+    const c10::optional<Tensor>& attn_mask,
+    const c10::optional<Tensor>& head_mask,
+    const double alpha,
+    const double beta,
+    const double dropout_p,
+    bool is_causal,
+    bool seq_last) {
+  std::cout << "start sdp_esimd" << std::endl;
+  TORCH_CHECK(
+      query.scalar_type() == at::kHalf, "IPEX SDP only supports half datatype");
+  TORCH_CHECK(
+      key.scalar_type() == at::kHalf, "IPEX SDP only supports half datatype");
+  TORCH_CHECK(
+      value.scalar_type() == at::kHalf, "IPEX SDP only supports half datatype");
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, query, key);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+
+  int64_t num_heads_q = query.size(1);
+  int64_t num_heads_k = key.size(1);
+  int64_t M = query.size(-2);
+  int64_t N = key.size(-2);
+
+  auto output = at::empty_like(query);
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  char str__[100];
+  sprintf(
+      str__,
+      "sdp_esimd(Nq=%ld, Nkv=%ld, M=%ld, N=%ld)",
+      num_heads_q,
+      num_heads_k,
+      M,
+      N);
+  RECORD_FUNCTION(str__, {});
+
+  if (compute_eng_valid) {
+    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+        query.scalar_type(), "sdp_esimd", [&] {
+          impl::sdp_esimd_kernel<scalar_t>(
+              query.data_ptr<scalar_t>(),
+              key.data_ptr<scalar_t>(),
+              value.data_ptr<scalar_t>(),
+              alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
+              attn_mask.has_value() ? attn_mask.value().data_ptr()
+                                    : (void*)nullptr,
+              head_mask.has_value() ? head_mask.value().data_ptr()
+                                    : (void*)nullptr,
+              output.data_ptr<scalar_t>(),
+              alpha,
+              beta,
+              dropout_p,
+              is_causal,
+              seq_last);
+        });
+  } else {
+    AT_ERROR("ESIMD SDP: invalid COMPUTE_ENG!");
+  }
+
+  return output;
+}
+
+} // namespace AtenIpexTypeXPU
+} // namespace at
+
+namespace {
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "sdp_esimd.xpu", at::AtenIpexTypeXPU::sdp_esimd, c10::DispatchKey::XPU);
+}
+} // namespace

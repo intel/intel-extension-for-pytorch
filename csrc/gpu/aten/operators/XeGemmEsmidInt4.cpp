@@ -31,9 +31,9 @@ static constexpr int64_t GRU_WORKSPACE_MULTIPLIER = 5;
 
 inline double report_time(const std::string& msg, event e0, event en) {
   uint64_t time_start =
-    e0.get_profiling_info<info::event_profiling::command_start>();
+      e0.get_profiling_info<info::event_profiling::command_start>();
   uint64_t time_end =
-    en.get_profiling_info<info::event_profiling::command_end>();
+      en.get_profiling_info<info::event_profiling::command_end>();
   double elapsed = (time_end - time_start) / 1e6;
   // cerr << msg << elapsed << " msecs" << std::endl;
   std::cout << msg << elapsed << " msecs" << std::endl;
@@ -193,10 +193,12 @@ static inline void xegemm_int4_esimd_kernel(
   sycl::nd_range<1> RangeCommonDim4096V2(
       GlobalRangeCommonDim4096V2, LocalRangeCommonDim4096V2);
 
-  groupsV2 = (n + pixelPerGroupCommonDim11008 - 1) / pixelPerGroupCommonDim11008;
+  groupsV2 =
+      (n + pixelPerGroupCommonDim11008 - 1) / pixelPerGroupCommonDim11008;
   sycl::range<1> GlobalRangeCommonDim11008V2(groupsV2 * localThread[1]);
   sycl::range<1> LocalRangeCommonDim11008V2(localThread[1]);
-  sycl::nd_range<1> RangeCommonDim11008V2(GlobalRangeCommonDim11008V2, LocalRangeCommonDim11008V2);
+  sycl::nd_range<1> RangeCommonDim11008V2(
+      GlobalRangeCommonDim11008V2, LocalRangeCommonDim11008V2);
 
   sycl::event e;
   // Launches the task on the GPU.
@@ -216,14 +218,15 @@ static inline void xegemm_int4_esimd_kernel(
     double etime = report_time("GEMV kernel time", e, e);
   } else if (k == 11008) {
     e = dpcpp_queue.submit([&](handler& cgh) {
-            cgh.parallel_for(RangeCommonDim11008V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL{
+      cgh.parallel_for(
+          RangeCommonDim11008V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
             matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex<6>(
                 (uint8_t*)weight,
                 (uint8_t*)input,
                 (uint8_t*)output,
                 (uint8_t*)weight_scl,
                 ndi);
-            });
+          });
     });
     e.wait();
     double etime = report_time("GEMV kernel time", e, e);
@@ -262,9 +265,9 @@ static Tensor mm_esimd_int4(
   auto output = at::empty({m, n}, input.options()); // 11008, 11008
 
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  //impl::dump_element(weight_flat, 10, "weight first 10 elem: ");
-  //impl::dump_element(reorder_buffer, 10, "reorder_buffer first 10 elem: ");
-  //impl::dump_element(weight_scl, 10, "scal first 10 elem: ");
+  // impl::dump_element(weight_flat, 10, "weight first 10 elem: ");
+  // impl::dump_element(reorder_buffer, 10, "reorder_buffer first 10 elem: ");
+  // impl::dump_element(weight_scl, 10, "scal first 10 elem: ");
 
   if (compute_eng_valid) {
     std::cout << "get in esimd int4 gemm" << std::endl;
@@ -285,10 +288,10 @@ static Tensor mm_esimd_int4(
   } else {
     AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
   }
-  //impl::dump_element(weight_flat, 10, "weight before output first 10 elem: ");
-  //impl::dump_element(
+  // impl::dump_element(weight_flat, 10, "weight before output first 10 elem:
+  // "); impl::dump_element(
   //    reorder_buffer, 10, "reorder_buffer  before output first 10 elem: ");
-  //impl::dump_element(output, 10, "output first 10 elem: ");
+  // impl::dump_element(output, 10, "output first 10 elem: ");
   return resize_as_mat2(input, output);
 }
 

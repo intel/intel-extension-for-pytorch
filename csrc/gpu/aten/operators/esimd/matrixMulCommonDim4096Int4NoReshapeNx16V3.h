@@ -17,7 +17,8 @@
 //   int h = ndi.get_group(0); // [0, 256)
 //   // int rowSize = ndi.get_group_range(0) * pixelPerGroup;
 //   int offsetABase = (h * pixelPerGroup * 4096 + hh * 8 * 8) >> 1;
-//   int offsetQuanBase = /*rowSize * 2048 +*/ h * quantPerGroup * sizeof(fp16) +
+//   int offsetQuanBase = /*rowSize * 2048 +*/ h * quantPerGroup * sizeof(fp16)
+//   +
 //       hh * 2 * sizeof(fp16);
 //   int offsetB = hh * 64 * sizeof(fp16);
 //   int outputOffset = pixelPerGroup * h;
@@ -49,7 +50,8 @@
 //             __ESIMD_ENS::cache_hint::cached,
 //             __ESIMD_ENS::cache_hint::cached>((uint8_t*)b + offsetB);
 
-//     // bb.template bit_cast_view<unsigned char>().template select<256, 1>(512 *
+//     // bb.template bit_cast_view<unsigned char>().template select<256, 1>(512
+//     *
 //     // k + 256) =
 //     //  __ESIMD_ENS::lsc_block_load<
 //     //  uint8_t,
@@ -121,7 +123,7 @@
 
 // #pragma unroll
 //     for (int k = 0; k < 8; k++) {
-      
+
 //       simd<int8_t, 16> aaaa = aaa.select<16, 1>(16 * k) & 0xf;
 //       #pragma unroll
 //       for (int l = 0; l < 16; l++)
@@ -346,7 +348,6 @@ ESIMD_INLINE void matrixMulCommonDim4096Int4NoReshapeNx16V3_ipex2(
 
 #pragma unroll
     for (int k = 0; k < 8; k++) {
-
       simd<int8_t, 16> aaaa = aaa.select<16, 1>(16 * k) & 0xf;
       aaaa.select<16, 1>(0) = aaaa.select<16, 1>(0) << 4;
       aaaa.select<16, 1>(0) = aaaa.select<16, 1>(0) >> 4;
@@ -357,7 +358,7 @@ ESIMD_INLINE void matrixMulCommonDim4096Int4NoReshapeNx16V3_ipex2(
       aaaa.select<16, 1>(0) = aaaa.select<16, 1>(0) >> 4;
 
       aa.select<16, 2>(32 * k + 1) = aaaa.select<16, 1>(0);
-      
+
       // simd<int8_t, 16> aaaa = aaa.select<16, 1>(16 * k) & 0xf;
       // #pragma unroll
       // for (int l = 0; l < 16; l++)
@@ -461,19 +462,26 @@ ESIMD_INLINE void matrixMulCommonDim4096Int4NoReshapeNx16V3_ipex2(
   }
 }
 
-template<uint32_t pixelPerGroupShift>
-ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(uint8_t* a, uint8_t* b, uint8_t* c, uint8_t* d, nd_item<1>& ndi) {
+template <uint32_t pixelPerGroupShift>
+ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(
+    uint8_t* a,
+    uint8_t* b,
+    uint8_t* c,
+    uint8_t* d,
+    nd_item<1>& ndi) {
   constexpr uint32_t pixelPerGroup = 1 << pixelPerGroupShift;
   constexpr uint32_t quantPerGroup = 11008 / 32 * pixelPerGroup;
   constexpr uint32_t sumThreads = pixelPerGroup / 16;
-  constexpr uint32_t baseOffsetInc16[16] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
-  constexpr uint32_t baseOffsetInc8[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+  constexpr uint32_t baseOffsetInc16[16] = {
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  constexpr uint32_t baseOffsetInc8[8] = {0, 1, 2, 3, 4, 5, 6, 7};
   __ESIMD_NS::slm_init(16 * 128 * sizeof(float));
   int hh = ndi.get_local_id(0); // [0, 64)
   int h = ndi.get_group(0); // [0, 256)
   int rowSize = ndi.get_group_range(0) * pixelPerGroup;
   int offsetABase = (h * pixelPerGroup * 11008 + hh * 8 * 8) >> 1;
-  int offsetQuanBase = /*rowSize * 5504 +*/ h * quantPerGroup * sizeof(fp16) + hh * 2 * sizeof(fp16);
+  int offsetQuanBase = /*rowSize * 5504 +*/ h * quantPerGroup * sizeof(fp16) +
+      hh * 2 * sizeof(fp16);
   int offsetB = hh * 64 * sizeof(fp16);
   int outputOffset = pixelPerGroup * h;
   simd<int8_t, 64> aaa;
@@ -489,55 +497,57 @@ ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(uint8_t* a, ui
 
 #pragma unroll
   for (int k = 0; k < 10; k++) {
-    bb.template bit_cast_view<unsigned char>().template select<128, 1>(128 * k) =
-      __ESIMD_ENS::lsc_block_load<
-      uint8_t,
-      128,
-      __ESIMD_ENS::lsc_data_size::default_size,
-      __ESIMD_ENS::cache_hint::cached,
-      __ESIMD_ENS::cache_hint::cached>((uint8_t*)b + offsetB);
+    bb.template bit_cast_view<unsigned char>().template select<128, 1>(
+        128 * k) =
+        __ESIMD_ENS::lsc_block_load<
+            uint8_t,
+            128,
+            __ESIMD_ENS::lsc_data_size::default_size,
+            __ESIMD_ENS::cache_hint::cached,
+            __ESIMD_ENS::cache_hint::cached>((uint8_t*)b + offsetB);
 
     offsetB += 1024 * sizeof(fp16);
   }
 
   if (hh < 12) {
-    bb.template bit_cast_view<unsigned char>().template select<128, 1>(128 * 10) =
-      __ESIMD_ENS::lsc_block_load<
-      uint8_t,
-      128,
-      __ESIMD_ENS::lsc_data_size::default_size,
-      __ESIMD_ENS::cache_hint::cached,
-      __ESIMD_ENS::cache_hint::cached>((uint8_t*)b + offsetB);
+    bb.template bit_cast_view<unsigned char>().template select<128, 1>(
+        128 * 10) =
+        __ESIMD_ENS::lsc_block_load<
+            uint8_t,
+            128,
+            __ESIMD_ENS::lsc_data_size::default_size,
+            __ESIMD_ENS::cache_hint::cached,
+            __ESIMD_ENS::cache_hint::cached>((uint8_t*)b + offsetB);
   } else {
-    bb.template bit_cast_view<unsigned char>().template select<128, 1>(128 * 10) = 0;
+    bb.template bit_cast_view<unsigned char>().template select<128, 1>(
+        128 * 10) = 0;
   }
 
   for (int n = 0; n < pixelPerGroup; n++) {
     cc = 0.0f;
     offsetQuan = baseOffsetInc8;
-    offsetQuan = offsetQuan * 32 * sizeof(fp16) + offsetQuanBase + n * 344 * sizeof(fp16);
+    offsetQuan = offsetQuan * 32 * sizeof(fp16) + offsetQuanBase +
+        n * 344 * sizeof(fp16);
     quant.template bit_cast_view<uint32_t>().template select<8, 1>(0) =
-      __ESIMD_ENS::lsc_gather<
-      uint32_t,
-      1,
-      __ESIMD_ENS::lsc_data_size::u32,
-      __ESIMD_ENS::cache_hint::cached,
-      __ESIMD_ENS::cache_hint::cached,
-      8,
-      uint32_t
-      >((uint32_t*)d, offsetQuan);
+        __ESIMD_ENS::lsc_gather<
+            uint32_t,
+            1,
+            __ESIMD_ENS::lsc_data_size::u32,
+            __ESIMD_ENS::cache_hint::cached,
+            __ESIMD_ENS::cache_hint::cached,
+            8,
+            uint32_t>((uint32_t*)d, offsetQuan);
 
     offsetQuan += 32 * sizeof(fp16) * 8;
     quant.template bit_cast_view<uint32_t>().template select<8, 1>(8) =
-      __ESIMD_ENS::lsc_gather<
-      uint32_t,
-      1,
-      __ESIMD_ENS::lsc_data_size::u32,
-      __ESIMD_ENS::cache_hint::cached,
-      __ESIMD_ENS::cache_hint::cached,
-      8,
-      uint32_t
-      >((uint32_t*)d, offsetQuan);
+        __ESIMD_ENS::lsc_gather<
+            uint32_t,
+            1,
+            __ESIMD_ENS::lsc_data_size::u32,
+            __ESIMD_ENS::cache_hint::cached,
+            __ESIMD_ENS::cache_hint::cached,
+            8,
+            uint32_t>((uint32_t*)d, offsetQuan);
 
     offsetA = baseOffsetInc8;
     offsetA = offsetA * sizeof(uint32_t) + offsetABase + n * 5504;
@@ -546,27 +556,25 @@ ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(uint8_t* a, ui
     for (int k = 0; k < 5; k++) {
       simd<float, 4> fp32Q = quant.select<4, 1>(4 * k);
       aaa.template bit_cast_view<uint32_t>().template select<8, 1>(0) =
-        __ESIMD_ENS::lsc_gather<
-        uint32_t,
-        1,
-        __ESIMD_ENS::lsc_data_size::u32,
-        __ESIMD_ENS::cache_hint::cached,
-        __ESIMD_ENS::cache_hint::cached,
-        8,
-        uint32_t
-        >((uint32_t*)a, offsetA);
+          __ESIMD_ENS::lsc_gather<
+              uint32_t,
+              1,
+              __ESIMD_ENS::lsc_data_size::u32,
+              __ESIMD_ENS::cache_hint::cached,
+              __ESIMD_ENS::cache_hint::cached,
+              8,
+              uint32_t>((uint32_t*)a, offsetA);
       offsetA += 512;
 
       aaa.template bit_cast_view<uint32_t>().template select<8, 1>(8) =
-        __ESIMD_ENS::lsc_gather<
-        uint32_t,
-        1,
-        __ESIMD_ENS::lsc_data_size::u32,
-        __ESIMD_ENS::cache_hint::cached,
-        __ESIMD_ENS::cache_hint::cached,
-        8,
-        uint32_t
-        >((uint32_t*)a, offsetA);
+          __ESIMD_ENS::lsc_gather<
+              uint32_t,
+              1,
+              __ESIMD_ENS::lsc_data_size::u32,
+              __ESIMD_ENS::cache_hint::cached,
+              __ESIMD_ENS::cache_hint::cached,
+              8,
+              uint32_t>((uint32_t*)a, offsetA);
       offsetA += 512;
 
 #pragma unroll
@@ -585,7 +593,7 @@ ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(uint8_t* a, ui
         aa.select<16, 2>(32 * kk + 1) = aaaa.select<16, 1>(0);
       }
 
-      //aa = aa - 8.0f;
+      // aa = aa - 8.0f;
 #pragma unroll
       for (int kk = 0; kk < 4; kk++) {
         aa.select<32, 1>(32 * kk) = fp32Q[kk] * aa.select<32, 1>(32 * kk);
@@ -600,15 +608,14 @@ ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(uint8_t* a, ui
     if (hh < 12) {
       simd<float, 2> fp32Q = quant.select<2, 1>(4 * 5);
       aaa.template bit_cast_view<uint32_t>().template select<8, 1>(0) =
-        __ESIMD_ENS::lsc_gather<
-        uint32_t,
-        1,
-        __ESIMD_ENS::lsc_data_size::u32,
-        __ESIMD_ENS::cache_hint::cached,
-        __ESIMD_ENS::cache_hint::cached,
-        8,
-        uint32_t
-        >((uint32_t*)a, offsetA);
+          __ESIMD_ENS::lsc_gather<
+              uint32_t,
+              1,
+              __ESIMD_ENS::lsc_data_size::u32,
+              __ESIMD_ENS::cache_hint::cached,
+              __ESIMD_ENS::cache_hint::cached,
+              8,
+              uint32_t>((uint32_t*)a, offsetA);
       offsetA += 512;
 
 #pragma unroll
@@ -646,8 +653,9 @@ ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(uint8_t* a, ui
     simd<float, 1> slmAccumulationTemp = cc[0] + cc[1];
     uint32_t slmGroup = n >> 4;
     uint32_t slmInnerGroupOffset = n & 0xf;
-    uint32_t slmAccumulationOffset = (slmGroup * 16 * 16 + hh * 16 + slmInnerGroupOffset) * sizeof(float);
-    //slm_scalar_store(slmAccumulationOffset, slmAccumulationTemp);
+    uint32_t slmAccumulationOffset =
+        (slmGroup * 16 * 16 + hh * 16 + slmInnerGroupOffset) * sizeof(float);
+    // slm_scalar_store(slmAccumulationOffset, slmAccumulationTemp);
     slm_block_store<float, 1>(slmAccumulationOffset, slmAccumulationTemp);
   }
   barrier();
@@ -655,22 +663,24 @@ ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(uint8_t* a, ui
     uint32_t slmSumPhase1LoadOffset = hh * 16 * 16 * sizeof(float);
 #pragma unroll
     for (int k = 0; k < 4; k++) {
-      bb_f32.select<64, 1>(64 * k) = slm_block_load<float, 64>(slmSumPhase1LoadOffset + 64 * k * sizeof(float));
+      bb_f32.select<64, 1>(64 * k) = slm_block_load<float, 64>(
+          slmSumPhase1LoadOffset + 64 * k * sizeof(float));
     }
 
 #pragma unroll
     for (int k = 1; k < 16; k++) {
-      bb_f32.select<16, 1>(0) = bb_f32.select<16, 1>(0) + bb_f32.select<16, 1>(16 * k);
+      bb_f32.select<16, 1>(0) =
+          bb_f32.select<16, 1>(0) + bb_f32.select<16, 1>(16 * k);
     }
 
     bb.select<16, 1>(0) = bb_f32.select<16, 1>(0);
 
     __ESIMD_ENS::lsc_block_store<
-      fp16,
-      16,
-      __ESIMD_ENS::lsc_data_size::default_size,
-      __ESIMD_ENS::cache_hint::write_back,
-      __ESIMD_ENS::cache_hint::write_back>((fp16*)c + outputOffset + hh * 16, bb.select<16, 1>(0));
+        fp16,
+        16,
+        __ESIMD_ENS::lsc_data_size::default_size,
+        __ESIMD_ENS::cache_hint::write_back,
+        __ESIMD_ENS::cache_hint::write_back>(
+        (fp16*)c + outputOffset + hh * 16, bb.select<16, 1>(0));
   }
 }
-
