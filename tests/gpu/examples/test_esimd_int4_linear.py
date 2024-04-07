@@ -175,7 +175,7 @@ class TestTorchMethod(TestCase):
         scales = torch.rand([group_num, 16384], device="xpu", dtype=torch.float16)
         # zero_points = torch.rand([group_num, 8192], device="xpu").byte()
         zero_points = torch.zeros(group_num, 8192, device="xpu").byte()
-        weight = (torch.rand([4096, 8192], device="xpu") * 10 * 16 ).byte()
+        weight = (torch.rand([4096, 8192], device="xpu") * 10 * 16).byte()
         # print(weight)
 
         weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
@@ -193,6 +193,131 @@ class TestTorchMethod(TestCase):
 
         out_int4 = out_int4.to(torch.float).to("cpu")
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+
+    # def test_gemm_int4_long_hidden_dim_refcpu(self, per_channel=False, dtype=torch.float16):
+    #     input = torch.rand([1, 11008], device="xpu", dtype=torch.float16)
+    #     # for ind in range(2048, 4096):
+    #     #     input[0][ind] = 0.0
+
+    #     group_size = 32  # 128 -> 32
+    #     if per_channel:
+    #         group_size = 11008
+    #     group_num = int(11008 / group_size)
+
+    #     scales = torch.rand([group_num, 4096], device="xpu", dtype=torch.float16)
+    #     # zero_points = torch.rand([group_num, 8192], device="xpu").byte()
+    #     zero_points = torch.zeros(group_num, 2048, device="xpu").byte()
+    #     weight = (torch.rand([11008, 2048], device="xpu") * 10 * 16).byte()
+    #     # print(weight)
+
+    #     weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
+
+    #     # check gemm
+    #     out_int4 = torch.ops.torch_ipex.mm_esimd_int4(
+    #         input, weight, scales, zero_points, group_size
+    #     )
+    #     print("out_int4: ", out_int4.to(torch.float).to("cpu"))
+
+    #     weight_fp32 = weight_fp16.to(torch.float).to("cpu")
+    #     input_fp32 = input.to(torch.float).to("cpu")
+    #     out_fp16 = torch.matmul(input_fp32, weight_fp32)
+    #     print("out_fp16: ", out_fp16.to(torch.float).to("cpu"))
+
+    #     out_int4 = out_int4.to(torch.float).to("cpu")
+    #     self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+
+    # def test_gemm_int4_perf(self, per_channel=False, dtype=torch.float16):
+    #     for ind in range(0, 4):
+    #         input = torch.rand([1, 4096], device="xpu", dtype=torch.float16)
+    #         # for ind in range(2048, 4096):
+    #         #     input[0][ind] = 0.0
+
+    #         group_size = 32  # 128 -> 32
+    #         if per_channel:
+    #             group_size = 4096
+    #         group_num = int(4096 / group_size)
+
+    #         scales = torch.rand([group_num, 4096], device="xpu", dtype=torch.float16)
+    #         # zero_points = torch.rand([group_num, 8192], device="xpu").byte()
+    #         zero_points = torch.zeros(group_num, 2048, device="xpu").byte()
+    #         weight = (torch.rand([4096, 2048], device="xpu") * 10 * 16).byte()
+    #         # print(weight)
+
+    #         # check gemm
+    #         with torch.autograd.profiler_legacy.profile(
+    #             enabled=True, use_xpu=True, record_shapes=True
+    #         ) as prof:
+    #             out_int4 = torch.ops.torch_ipex.mm_esimd_int4(
+    #                 input, weight, scales, zero_points, group_size
+    #             )
+    #         # print("out_int4: ", out_int4.to(torch.float).to("cpu"))
+    #         print(prof.key_averages().table(sort_by="self_xpu_time_total"))
+
+    #         print(
+    #             "###################################################################################"
+    #         )
+
+    # def test_gemm_int4_long_hidden_dim_perf(self, per_channel=False, dtype=torch.float16):
+    #     for ind in range(0, 4):
+    #         input = torch.rand([1, 11008], device="xpu", dtype=torch.float16)
+    #         # for ind in range(2048, 4096):
+    #         #     input[0][ind] = 0.0
+
+    #         group_size = 32  # 128 -> 32
+    #         if per_channel:
+    #             group_size = 11008
+    #         group_num = int(11008 / group_size)
+
+    #         scales = torch.rand([group_num, 4096], device="xpu", dtype=torch.float16)
+    #         # zero_points = torch.rand([group_num, 8192], device="xpu").byte()
+    #         zero_points = torch.zeros(group_num, 2048, device="xpu").byte()
+    #         weight = (torch.rand([4096, 2048], device="xpu") * 10 * 16).byte()
+    #         # print(weight)
+
+    #         # check gemm
+    #         with torch.autograd.profiler_legacy.profile(
+    #             enabled=True, use_xpu=True, record_shapes=True
+    #         ) as prof:
+    #             out_int4 = torch.ops.torch_ipex.mm_esimd_int4(
+    #                 input, weight, scales, zero_points, group_size
+    #             )
+    #         # print("out_int4: ", out_int4.to(torch.float).to("cpu"))
+    #         print(prof.key_averages().table(sort_by="self_xpu_time_total"))
+
+    #         print(
+    #             "###################################################################################"
+    #         )
+
+    # def test_gemm_int4_large_non_hidden_dim_perf(self, per_channel=False, dtype=torch.float16):
+    #     for ind in range(0, 4):
+    #         input = torch.rand([1, 4096], device="xpu", dtype=torch.float16)
+    #         # for ind in range(2048, 4096):
+    #         #     input[0][ind] = 0.0
+
+    #         group_size = 32  # 128 -> 32
+    #         if per_channel:
+    #             group_size = 4096
+    #         group_num = int(4096 / group_size)
+
+    #         scales = torch.rand([group_num, 12288], device="xpu", dtype=torch.float16)
+    #         # zero_points = torch.rand([group_num, 8192], device="xpu").byte()
+    #         zero_points = torch.zeros(group_num, 6144, device="xpu").byte()
+    #         weight = (torch.rand([4096, 6144], device="xpu") * 10 * 16).byte()
+    #         # print(weight)
+
+    #         # check gemm
+    #         with torch.autograd.profiler_legacy.profile(
+    #             enabled=True, use_xpu=True, record_shapes=True
+    #         ) as prof:
+    #             out_int4 = torch.ops.torch_ipex.mm_esimd_int4(
+    #                 input, weight, scales, zero_points, group_size
+    #             )
+    #         # print("out_int4: ", out_int4.to(torch.float).to("cpu"))
+    #         print(prof.key_averages().table(sort_by="self_xpu_time_total"))
+
+    #         print(
+    #             "###################################################################################"
+    #         )
 
 
 # res 26: 2 * 2 *2 + 1 * 1.2 * 8 = 17.6

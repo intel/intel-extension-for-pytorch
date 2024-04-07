@@ -29,6 +29,17 @@ using namespace at::native;
 
 static constexpr int64_t GRU_WORKSPACE_MULTIPLIER = 5;
 
+inline double report_time(const std::string& msg, event e0, event en) {
+  uint64_t time_start =
+    e0.get_profiling_info<info::event_profiling::command_start>();
+  uint64_t time_end =
+    en.get_profiling_info<info::event_profiling::command_end>();
+  double elapsed = (time_end - time_start) / 1e6;
+  // cerr << msg << elapsed << " msecs" << std::endl;
+  std::cout << msg << elapsed << " msecs" << std::endl;
+  return elapsed;
+}
+
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -92,23 +103,25 @@ static inline void xegemm_int4_esimd_kernel(
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   uint32_t pixelPerGroupCommonDim4096 = 16;
-  if (k != 4096 && m != 1) {
-    std::cout << "n should be 4096 and k should be 1" << std::endl;
+  uint32_t pixelPerGroupCommonDim11008 = 64;
+  if (!((k == 4096 || k == 11008) && m == 1)) {
+    std::cout << "k should be 4096 or 11008 and m should be 1" << std::endl;
     return;
   }
 
   // reorder for the weights and scaling
   // Assume group size 32.   4096 / 32 = 128
   {
+    sycl::event e0;
     uint8_t* weight_reorder = (uint8_t*)weight;
     uint8_t* reorderTmp = reorder_buffer;
-    dpcpp_queue.submit([&](handler& cgh) {
-      cgh.parallel_for(sycl::range<2>(4096, n), [=](sycl::id<2> idx) {
+    e0 = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(k, n), [=](sycl::id<2> idx) {
         int i = idx[0];
         int j = idx[1];
 
         int32_t origIdx = i * n + j;
-        int32_t afterIdx = j * 4096 + i;
+        int32_t afterIdx = j * k + i;
 
         int8_t tmp = weight_reorder[origIdx / 2];
         if (origIdx % 2 == 0) {
@@ -119,12 +132,14 @@ static inline void xegemm_int4_esimd_kernel(
         reorderTmp[afterIdx] = tmp;
       });
     });
-    dpcpp_queue.submit([&](handler& cgh) {
-      cgh.parallel_for(sycl::range<2>(2048, n), [=](sycl::id<2> idx) {
+    e0.wait();
+    report_time("reshape1 kernel time", e0, e0);
+    e0 = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(k / 2, n), [=](sycl::id<2> idx) {
         int i = idx[0];
         int j = idx[1];
 
-        int32_t afterIdxInt4 = j * 2048 + i;
+        int32_t afterIdxInt4 = j * k / 2 + i;
 
         int8_t tmpLow = reorderTmp[afterIdxInt4 * 2];
         int8_t tmpHigh = reorderTmp[afterIdxInt4 * 2 + 1];
@@ -134,31 +149,36 @@ static inline void xegemm_int4_esimd_kernel(
         weight_reorder[afterIdxInt4] = tmp;
       });
     });
-    dpcpp_queue.wait();
+    e0.wait();
+    report_time("reshape2 kernel time", e0, e0);
 
     fp16* reorderTmpScal = (fp16*)reorder_buffer;
     fp16* weight_scl_reorder = (fp16*)weight_scl;
-    dpcpp_queue.submit([&](handler& cgh) {
-      cgh.parallel_for(sycl::range<2>(128, n), [=](sycl::id<2> idx) {
+    e0 = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(k / 32, n), [=](sycl::id<2> idx) {
         int i = idx[0];
         int j = idx[1];
 
         int32_t origIdx = i * n + j;
-        int32_t afterIdx = j * 128 + i;
+        int32_t afterIdx = j * k / 32 + i;
 
         reorderTmpScal[afterIdx] = weight_scl_reorder[origIdx];
       });
     });
-    dpcpp_queue.submit([&](handler& cgh) {
-      cgh.parallel_for(sycl::range<2>(128, n), [=](sycl::id<2> idx) {
+    e0.wait();
+    report_time("reshape3 kernel time", e0, e0);
+    e0 = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(k / 32, n), [=](sycl::id<2> idx) {
         int i = idx[0];
         int j = idx[1];
 
-        int32_t afterIdx = j * 128 + i;
+        int32_t afterIdx = j * k / 32 + i;
 
         weight_scl_reorder[afterIdx] = reorderTmpScal[afterIdx];
       });
     });
+    e0.wait();
+    report_time("reshape4 kernel time", e0, e0);
     dpcpp_queue.wait();
   }
 
@@ -166,11 +186,17 @@ static inline void xegemm_int4_esimd_kernel(
       (n + pixelPerGroupCommonDim4096 - 1) / pixelPerGroupCommonDim4096;
   int localThread[2];
   localThread[0] = 16;
+  localThread[1] = 16;
 
   sycl::range<1> GlobalRangeCommonDim4096V2(groupsV2 * localThread[0]);
   sycl::range<1> LocalRangeCommonDim4096V2(localThread[0]);
   sycl::nd_range<1> RangeCommonDim4096V2(
       GlobalRangeCommonDim4096V2, LocalRangeCommonDim4096V2);
+
+  groupsV2 = (n + pixelPerGroupCommonDim11008 - 1) / pixelPerGroupCommonDim11008;
+  sycl::range<1> GlobalRangeCommonDim11008V2(groupsV2 * localThread[1]);
+  sycl::range<1> LocalRangeCommonDim11008V2(localThread[1]);
+  sycl::nd_range<1> RangeCommonDim11008V2(GlobalRangeCommonDim11008V2, LocalRangeCommonDim11008V2);
 
   sycl::event e;
   // Launches the task on the GPU.
@@ -186,6 +212,21 @@ static inline void xegemm_int4_esimd_kernel(
                 ndi);
           });
     });
+    e.wait();
+    double etime = report_time("GEMV kernel time", e, e);
+  } else if (k == 11008) {
+    e = dpcpp_queue.submit([&](handler& cgh) {
+            cgh.parallel_for(RangeCommonDim11008V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL{
+            matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex<6>(
+                (uint8_t*)weight,
+                (uint8_t*)input,
+                (uint8_t*)output,
+                (uint8_t*)weight_scl,
+                ndi);
+            });
+    });
+    e.wait();
+    double etime = report_time("GEMV kernel time", e, e);
   }
 }
 
@@ -221,9 +262,9 @@ static Tensor mm_esimd_int4(
   auto output = at::empty({m, n}, input.options()); // 11008, 11008
 
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  impl::dump_element(weight_flat, 10, "weight first 10 elem: ");
+  //impl::dump_element(weight_flat, 10, "weight first 10 elem: ");
   //impl::dump_element(reorder_buffer, 10, "reorder_buffer first 10 elem: ");
-  impl::dump_element(weight_scl, 10, "scal first 10 elem: ");
+  //impl::dump_element(weight_scl, 10, "scal first 10 elem: ");
 
   if (compute_eng_valid) {
     std::cout << "get in esimd int4 gemm" << std::endl;
@@ -244,10 +285,10 @@ static Tensor mm_esimd_int4(
   } else {
     AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
   }
-  impl::dump_element(weight_flat, 10, "weight before output first 10 elem: ");
+  //impl::dump_element(weight_flat, 10, "weight before output first 10 elem: ");
   //impl::dump_element(
   //    reorder_buffer, 10, "reorder_buffer  before output first 10 elem: ");
-  impl::dump_element(output, 10, "output first 10 elem: ");
+  //impl::dump_element(output, 10, "output first 10 elem: ");
   return resize_as_mat2(input, output);
 }
 
