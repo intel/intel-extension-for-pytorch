@@ -149,8 +149,8 @@ class ShmReduction {
     shmCtx_.nblocks = MAX_SHM_BLOCK_COUNT;
     if (rank_ == 0) {
       torch_ipex::cpu::create_shm(&shmCtx_);
-      memset(shmCtx_.state, 0, shmCtx_.nstates * sizeof(int));
-      memset((void*)shmCtx_.blockState, 0, shmCtx_.nstates * shmCtx_.nblocks);
+      std::fill_n(shmCtx_.state, shmCtx_.nstates, 0);
+      std::fill_n(shmCtx_.blockState, shmCtx_.nstates * shmCtx_.nblocks, 0);
     }
 
     callback(shmCtx_.pid_fd, 2);

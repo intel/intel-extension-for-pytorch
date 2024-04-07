@@ -75,7 +75,11 @@ loop_param_t find_loop_param_at_pos(loop_param_t* i_loop_params, int pos) {
 }
 
 void add_buf_to_code(loop_code* i_code, char* buf) {
-  sprintf(i_code->buf + i_code->cur_pos, "%s", buf);
+  snprintf(
+      i_code->buf + i_code->cur_pos,
+      (MAX_CODE_SIZE - i_code->cur_pos) * sizeof(char),
+      "%s",
+      buf);
   i_code->cur_pos += strlen(buf);
 }
 
@@ -104,9 +108,13 @@ void emit_parallel_for(loop_code* i_code, int collapse_level) {
   char tmp_buf[512];
   align_line(i_code);
   if (collapse_level > 1) {
-    sprintf(tmp_buf, "#pragma omp for collapse(%d) nowait\n", collapse_level);
+    snprintf(
+        tmp_buf,
+        sizeof(tmp_buf),
+        "#pragma omp for collapse(%d) nowait\n",
+        collapse_level);
   } else {
-    sprintf(tmp_buf, "#pragma omp for nowait\n");
+    snprintf(tmp_buf, sizeof(tmp_buf), "#pragma omp for nowait\n");
   }
   add_buf_to_code(i_code, tmp_buf);
   return;
@@ -115,36 +123,38 @@ void emit_parallel_for(loop_code* i_code, int collapse_level) {
 void emit_loop_header(loop_code* i_code) {
   char tmp_buf[512];
   align_line(i_code);
-  sprintf(tmp_buf, "#pragma omp parallel\n");
+  snprintf(tmp_buf, sizeof(tmp_buf), "#pragma omp parallel\n");
 }
 
 void emit_parallel_region(loop_code* i_code) {
   char tmp_buf[512];
   align_line(i_code);
-  sprintf(tmp_buf, "#pragma omp parallel\n");
+  snprintf(tmp_buf, sizeof(tmp_buf), "#pragma omp parallel\n");
   add_buf_to_code(i_code, tmp_buf);
   align_line(i_code);
-  sprintf(tmp_buf, "{\n");
+  snprintf(tmp_buf, sizeof(tmp_buf), "{\n");
   add_buf_to_code(i_code, tmp_buf);
   increase_nest_level(i_code);
   if (i_code->use_2d_par > 0) {
     align_line(i_code);
-    sprintf(tmp_buf, "int tid = omp_get_thread_num();\n");
+    snprintf(tmp_buf, sizeof(tmp_buf), "int tid = omp_get_thread_num();\n");
     add_buf_to_code(i_code, tmp_buf);
     align_line(i_code);
-    sprintf(tmp_buf, "int row_teams = %d;\n", i_code->n_row_teams);
+    snprintf(
+        tmp_buf, sizeof(tmp_buf), "int row_teams = %d;\n", i_code->n_row_teams);
     add_buf_to_code(i_code, tmp_buf);
     align_line(i_code);
-    sprintf(tmp_buf, "int col_teams = %d;\n", i_code->n_col_teams);
+    snprintf(
+        tmp_buf, sizeof(tmp_buf), "int col_teams = %d;\n", i_code->n_col_teams);
     add_buf_to_code(i_code, tmp_buf);
     align_line(i_code);
-    sprintf(tmp_buf, "int row_id = tid/col_teams;\n");
+    snprintf(tmp_buf, sizeof(tmp_buf), "int row_id = tid/col_teams;\n");
     add_buf_to_code(i_code, tmp_buf);
     align_line(i_code);
-    sprintf(tmp_buf, "int col_id = tid%%col_teams;\n");
+    snprintf(tmp_buf, sizeof(tmp_buf), "int col_id = tid%%col_teams;\n");
     add_buf_to_code(i_code, tmp_buf);
     align_line(i_code);
-    sprintf(tmp_buf, "if (tid < row_teams * col_teams) {\n");
+    snprintf(tmp_buf, sizeof(tmp_buf), "if (tid < row_teams * col_teams) {\n");
     add_buf_to_code(i_code, tmp_buf);
     increase_nest_level(i_code);
   }
@@ -155,7 +165,7 @@ void close_parallel_region(loop_code* i_code) {
   char tmp_buf[512];
   decrease_nest_level(i_code);
   align_line(i_code);
-  sprintf(tmp_buf, "}\n");
+  snprintf(tmp_buf, sizeof(tmp_buf), "}\n");
   add_buf_to_code(i_code, tmp_buf);
   return;
 }
@@ -168,40 +178,41 @@ void emit_loop_header(loop_code* i_code, loop_param_t* i_loop_param) {
   char str_step[512];
 
   if (strcmp(i_loop_param->idx_name, "") == 0) {
-    sprintf(str_idx, "i%d", i_loop_param->idx_id);
+    snprintf(str_idx, sizeof(str_idx), "i%d", i_loop_param->idx_id);
   } else {
-    sprintf(str_idx, "%s", i_loop_param->idx_name);
+    snprintf(str_idx, sizeof(str_idx), "%s", i_loop_param->idx_name);
   }
 
   if (strcmp(i_loop_param->start_var_name, "") == 0) {
-    sprintf(str_start, "%ld", i_loop_param->start);
+    snprintf(str_start, sizeof(str_start), "%ld", i_loop_param->start);
   } else {
-    sprintf(str_start, "%s", i_loop_param->start_var_name);
+    snprintf(str_start, sizeof(str_start), "%s", i_loop_param->start_var_name);
   }
 
   if (strcmp(i_loop_param->end_var_name, "") == 0) {
-    sprintf(str_end, "%ld", i_loop_param->end);
+    snprintf(str_end, sizeof(str_end), "%ld", i_loop_param->end);
   } else {
-    sprintf(str_end, "%s", i_loop_param->end_var_name);
+    snprintf(str_end, sizeof(str_end), "%s", i_loop_param->end_var_name);
   }
 
   if (strcmp(i_loop_param->step_var_name, "") == 0) {
-    sprintf(str_step, "%ld", i_loop_param->step);
+    snprintf(str_step, sizeof(str_step), "%ld", i_loop_param->step);
   } else {
-    sprintf(str_step, "%s", i_loop_param->step_var_name);
+    snprintf(str_step, sizeof(str_step), "%s", i_loop_param->step_var_name);
   }
 
   if ((i_loop_param->is_par_across_col_teams > 0) ||
       (i_loop_param->is_par_across_row_teams > 0)) {
     char prefix[16];
     if (i_loop_param->is_par_across_col_teams > 0) {
-      sprintf(prefix, "col");
+      snprintf(prefix, sizeof(prefix), "col");
     } else {
-      sprintf(prefix, "row");
+      snprintf(prefix, sizeof(prefix), "row");
     }
     align_line(i_code);
-    sprintf(
+    snprintf(
         tmp_buf,
+        sizeof(tmp_buf),
         "int %s_tasks = ((%s) - (%s) + ((%s) - 1))/(%s);\n",
         prefix,
         str_end,
@@ -210,8 +221,9 @@ void emit_loop_header(loop_code* i_code, loop_param_t* i_loop_param) {
         str_step);
     add_buf_to_code(i_code, tmp_buf);
     align_line(i_code);
-    sprintf(
+    snprintf(
         tmp_buf,
+        sizeof(tmp_buf),
         "int %s_tasks_chunksize = (%s_tasks + %s_teams - 1)/%s_teams;\n",
         prefix,
         prefix,
@@ -219,8 +231,9 @@ void emit_loop_header(loop_code* i_code, loop_param_t* i_loop_param) {
         prefix);
     add_buf_to_code(i_code, tmp_buf);
     align_line(i_code);
-    sprintf(
+    snprintf(
         tmp_buf,
+        sizeof(tmp_buf),
         "int my_%s_start = (%s_id * %s_tasks_chunksize < %s_tasks) ? %s + (%s_id * %s_tasks_chunksize) * %s : %s;\n",
         prefix,
         prefix,
@@ -233,8 +246,9 @@ void emit_loop_header(loop_code* i_code, loop_param_t* i_loop_param) {
         str_end);
     add_buf_to_code(i_code, tmp_buf);
     align_line(i_code);
-    sprintf(
+    snprintf(
         tmp_buf,
+        sizeof(tmp_buf),
         "int my_%s_end = ((%s_id+1) * %s_tasks_chunksize < %s_tasks) ? %s + ((%s_id+1) * %s_tasks_chunksize) * %s : %s;\n",
         prefix,
         prefix,
@@ -247,8 +261,9 @@ void emit_loop_header(loop_code* i_code, loop_param_t* i_loop_param) {
         str_end);
     add_buf_to_code(i_code, tmp_buf);
     align_line(i_code);
-    sprintf(
+    snprintf(
         tmp_buf,
+        sizeof(tmp_buf),
         "for (int %s = my_%s_start; %s < my_%s_end; %s += %s) {\n",
         str_idx,
         prefix,
@@ -260,8 +275,9 @@ void emit_loop_header(loop_code* i_code, loop_param_t* i_loop_param) {
     increase_nest_level(i_code);
   } else {
     align_line(i_code);
-    sprintf(
+    snprintf(
         tmp_buf,
+        sizeof(tmp_buf),
         "for (int %s = %s; %s < %s; %s += %s) {\n",
         str_idx,
         str_start,
@@ -285,8 +301,9 @@ void emit_func_signature(
   char tmp_buf[512];
   // int i;
   align_line(i_code);
-  sprintf(
+  snprintf(
       tmp_buf,
+      sizeof(tmp_buf),
       "#include <omp.h>\nextern \"C\" void par_nested_loops(loop_rt_spec_t *%s, std::function<void(int *)> %s, std::function<void()> %s, std::function<void()> %s) {\n",
       spec_func_name,
       body_func_name,
@@ -300,12 +317,12 @@ void emit_func_termination(loop_code* i_code) {
   char tmp_buf[512];
   decrease_nest_level(i_code);
   align_line(i_code);
-  sprintf(tmp_buf, "}\n");
+  snprintf(tmp_buf, sizeof(tmp_buf), "}\n");
   add_buf_to_code(i_code, tmp_buf);
   if (i_code->use_2d_par > 0) {
     decrease_nest_level(i_code);
     align_line(i_code);
-    sprintf(tmp_buf, "}\n");
+    snprintf(tmp_buf, sizeof(tmp_buf), "}\n");
     add_buf_to_code(i_code, tmp_buf);
   }
   return;
@@ -314,7 +331,7 @@ void emit_func_termination(loop_code* i_code) {
 void emit_void_function(loop_code* i_code, char* func_name) {
   char tmp_buf[512];
   align_line(i_code);
-  sprintf(tmp_buf, "if (%s) %s();\n", func_name, func_name);
+  snprintf(tmp_buf, sizeof(tmp_buf), "if (%s) %s();\n", func_name, func_name);
   add_buf_to_code(i_code, tmp_buf);
   return;
 }
@@ -323,18 +340,23 @@ void emit_loop_body(loop_code* i_code, char* body_func_name) {
   char tmp_buf[512];
   int i;
   align_line(i_code);
-  sprintf(tmp_buf, "int idx[%d];\n", i_code->n_logical_loops);
+  snprintf(tmp_buf, sizeof(tmp_buf), "int idx[%d];\n", i_code->n_logical_loops);
   add_buf_to_code(i_code, tmp_buf);
   /* Here we set the idx array to be used by function called */
   for (i = 0; i < i_code->n_logical_loops; i++) {
     char str_idx[64];
-    sprintf(str_idx, "%c%d", 'a' + i, i_code->occurence_map['a' + i] - 1);
+    snprintf(
+        str_idx,
+        sizeof(tmp_buf),
+        "%c%d",
+        'a' + i,
+        i_code->occurence_map['a' + i] - 1);
     align_line(i_code);
-    sprintf(tmp_buf, "idx[%d] = %s;\n", i, str_idx);
+    snprintf(tmp_buf, sizeof(tmp_buf), "idx[%d] = %s;\n", i, str_idx);
     add_buf_to_code(i_code, tmp_buf);
   }
   align_line(i_code);
-  sprintf(tmp_buf, "%s(idx);\n", body_func_name);
+  snprintf(tmp_buf, sizeof(tmp_buf), "%s(idx);\n", body_func_name);
   add_buf_to_code(i_code, tmp_buf);
   return;
 }
@@ -343,7 +365,7 @@ void emit_loop_termination(loop_code* i_code) {
   char tmp_buf[512];
   decrease_nest_level(i_code);
   align_line(i_code);
-  sprintf(tmp_buf, "}\n");
+  snprintf(tmp_buf, sizeof(tmp_buf), "}\n");
   add_buf_to_code(i_code, tmp_buf);
   return;
 }
@@ -351,7 +373,7 @@ void emit_loop_termination(loop_code* i_code) {
 void emit_barrier(loop_code* i_code) {
   char tmp_buf[512];
   align_line(i_code);
-  sprintf(tmp_buf, "#pragma omp barrier\n");
+  snprintf(tmp_buf, sizeof(tmp_buf), "#pragma omp barrier\n");
   add_buf_to_code(i_code, tmp_buf);
   return;
 }
@@ -364,10 +386,16 @@ void set_loop_param(
     const char* step_name,
     int pos) {
   io_param->pos_in_loopnest = pos;
-  sprintf(io_param->idx_name, "%s", idx_name);
-  sprintf(io_param->start_var_name, "%s", s_name);
-  sprintf(io_param->end_var_name, "%s", e_name);
-  sprintf(io_param->step_var_name, "%s", step_name);
+  snprintf(io_param->idx_name, sizeof(io_param->idx_name), "%s", idx_name);
+  snprintf(
+      io_param->start_var_name, sizeof(io_param->start_var_name), "%s", s_name);
+  snprintf(
+      io_param->end_var_name, sizeof(io_param->end_var_name), "%s", e_name);
+  snprintf(
+      io_param->step_var_name,
+      sizeof(io_param->step_var_name),
+      "%s",
+      step_name);
   return;
 }
 
@@ -413,21 +441,21 @@ void parse_jit_info(char* jit_info_str, loop_param_t* loop_param) {
       if (i == 0) {
         /* Empty token */
         if (token_id == 0) {
-          sprintf(token_start, "");
+          snprintf(token_start, sizeof(token_start), "");
         } else if (token_id == 1) {
-          sprintf(token_end, "");
+          snprintf(token_end, sizeof(token_end), "");
         } else if (token_id == 2) {
-          sprintf(token_step, "");
+          snprintf(token_step, sizeof(token_step), "");
         }
         token_id++;
       } else if (jit_info_str[i - 1] == ',') {
         /* Empty token */
         if (token_id == 0) {
-          sprintf(token_start, "");
+          snprintf(token_start, sizeof(token_start), "");
         } else if (token_id == 1) {
-          sprintf(token_end, "");
+          snprintf(token_end, sizeof(token_end), "");
         } else if (token_id == 2) {
-          sprintf(token_step, "");
+          snprintf(token_step, sizeof(token_step), "");
         }
         token_id++;
       } else {
@@ -435,11 +463,11 @@ void parse_jit_info(char* jit_info_str, loop_param_t* loop_param) {
         cur_token[j] = '\0';
         j = 0;
         if (token_id == 0) {
-          sprintf(token_start, "%s", cur_token);
+          snprintf(token_start, sizeof(token_start), "%s", cur_token);
         } else if (token_id == 1) {
-          sprintf(token_end, "%s", cur_token);
+          snprintf(token_end, sizeof(token_end), "%s", cur_token);
         } else if (token_id == 2) {
-          sprintf(token_step, "%s", cur_token);
+          snprintf(token_step, sizeof(token_step), "%s", cur_token);
         }
         token_id++;
       }
@@ -589,11 +617,12 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
   char barrier_positions[256];
   int jit_loop_spec = 0;
   int use_2d_par = 0;
-  char _loop_nest_desc_extended[strlen(__loop_nest_desc_extended)];
-  char loop_nest_desc_extended[strlen(_loop_nest_desc_extended)];
+  size_t src_len = strlen(__loop_nest_desc_extended);
+  char _loop_nest_desc_extended[src_len];
+  char loop_nest_desc_extended[src_len];
 
   /* Extract explicit 2D parallelization info */
-  for (i = 0; i < strlen(__loop_nest_desc_extended); i++) {
+  for (i = 0; i < src_len; i++) {
     if (__loop_nest_desc_extended[i] == '{') {
       use_2d_par = 1;
       break;
@@ -609,11 +638,12 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
         loop_params,
         &l_code);
   } else {
-    strcpy(_loop_nest_desc_extended, __loop_nest_desc_extended);
+    strncpy(_loop_nest_desc_extended, __loop_nest_desc_extended, src_len);
+    _loop_nest_desc_extended[src_len] = '\0';
   }
 
   /* Check if we have to jit the loop specs  */
-  for (i = 0; i < strlen(_loop_nest_desc_extended); i++) {
+  for (i = 0; i < src_len; i++) {
     if (_loop_nest_desc_extended[i] == '[') {
       jit_loop_spec = 1;
       break;
@@ -621,18 +651,19 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
   }
   l_code.jit_loop_spec = jit_loop_spec;
 
-  memset(loop_params_map, 0, 256 * sizeof(loop_param_t));
+  std::fill_n(loop_params_map, 256, loop_param_t{});
   if (jit_loop_spec > 0) {
     extract_jit_info(
         _loop_nest_desc_extended, loop_nest_desc_extended, loop_params_map);
   } else {
-    strcpy(loop_nest_desc_extended, _loop_nest_desc_extended);
+    strncpy(loop_nest_desc_extended, _loop_nest_desc_extended, src_len);
+    loop_nest_desc_extended[src_len] = '\0';
   }
 
   /* Cleanup input descriptor to exclude barriers */
   k = 0;
-  memset(barrier_positions, 0, 256);
-  for (i = 0; i < strlen(loop_nest_desc_extended); i++) {
+  std::fill_n(barrier_positions, 256, 0);
+  for (i = 0; i < src_len; i++) {
     if (loop_nest_desc_extended[i] == '|') {
       if (k - 1 >= 0) {
         barrier_positions[k - 1] = 1;
@@ -662,13 +693,13 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
 
   /* Count how many times each loop occurs (lower case and upper case are
    * equivalent for that matter) */
-  memset(loop_map, 0, 256 * sizeof(char));
+  std::fill_n(loop_map, 256, 0);
   for (i = 0; i < n_loops; i++) {
     loop_map[tolower(loop_nest_desc[i])]++;
   }
 
   /* Set up loop properties */
-  memset(occurence_map, 0, 256 * sizeof(char));
+  std::fill_n(occurence_map, 256, 0);
   for (i = 0; i < n_loops; i++) {
     int is_blocked = (loop_map[tolower(loop_nest_desc[i])] > 1) ? 1 : 0;
     int is_parallelizable =
@@ -685,39 +716,67 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
     is_blocked_outer = (occurence_id == 0) ? 1 : 0;
     occurence_map[tolower(loop_nest_desc[i])]++;
 
-    sprintf(spec_array_name, "%s", spec_func_name);
+    snprintf(spec_array_name, sizeof(spec_array_name), "%s", spec_func_name);
 
-    sprintf(idx_name, "%c%d", tolower(loop_nest_desc[i]), occurence_id);
+    snprintf(
+        idx_name,
+        sizeof(idx_name),
+        "%c%d",
+        tolower(loop_nest_desc[i]),
+        occurence_id);
 
     if (occurence_id == 0) {
       if (loop_params_map[loop_abs_index].jit_start > 0) {
-        sprintf(start_var_name, "%d", loop_params_map[loop_abs_index].start);
+        snprintf(
+            start_var_name,
+            sizeof(start_var_name),
+            "%d",
+            loop_params_map[loop_abs_index].start);
       } else {
-        sprintf(
-            start_var_name, "%s[%d].start", spec_array_name, loop_abs_index);
+        snprintf(
+            start_var_name,
+            sizeof(start_var_name),
+            "%s[%d].start",
+            spec_array_name,
+            loop_abs_index);
       }
     } else {
-      sprintf(
-          start_var_name, "%c%d", tolower(loop_nest_desc[i]), occurence_id - 1);
+      snprintf(
+          start_var_name,
+          sizeof(start_var_name),
+          "%c%d",
+          tolower(loop_nest_desc[i]),
+          occurence_id - 1);
     }
 
     if (occurence_id == 0) {
       if (loop_params_map[loop_abs_index].jit_end > 0) {
-        sprintf(end_var_name, "%d", loop_params_map[loop_abs_index].end);
+        snprintf(
+            end_var_name,
+            sizeof(end_var_name),
+            "%d",
+            loop_params_map[loop_abs_index].end);
       } else {
-        sprintf(end_var_name, "%s[%d].end", spec_array_name, loop_abs_index);
+        snprintf(
+            end_var_name,
+            sizeof(end_var_name),
+            "%s[%d].end",
+            spec_array_name,
+            loop_abs_index);
       }
     } else {
       if (loop_params_map[loop_abs_index].jit_block_sizes > 0) {
-        sprintf(
+        snprintf(
             end_var_name,
+            sizeof(end_var_name),
             "%c%d + %d",
             tolower(loop_nest_desc[i]),
             occurence_id - 1,
             loop_params_map[loop_abs_index].block_size[occurence_id - 1]);
       } else {
-        sprintf(
+        snprintf(
             end_var_name,
+            sizeof(end_var_name),
             "%c%d + %s[%d].block_size[%d]",
             tolower(loop_nest_desc[i]),
             occurence_id - 1,
@@ -730,20 +789,30 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
     if (is_blocked) {
       if (occurence_id == loop_map[tolower(loop_nest_desc[i])] - 1) {
         if (loop_params_map[loop_abs_index].jit_step > 0) {
-          sprintf(step_var_name, "%d", loop_params_map[loop_abs_index].step);
+          snprintf(
+              step_var_name,
+              sizeof(step_var_name),
+              "%d",
+              loop_params_map[loop_abs_index].step);
         } else {
-          sprintf(
-              step_var_name, "%s[%d].step", spec_array_name, loop_abs_index);
+          snprintf(
+              step_var_name,
+              sizeof(step_var_name),
+              "%s[%d].step",
+              spec_array_name,
+              loop_abs_index);
         }
       } else {
         if (loop_params_map[loop_abs_index].jit_block_sizes > 0) {
-          sprintf(
+          snprintf(
               step_var_name,
+              sizeof(step_var_name),
               "%d",
               loop_params_map[loop_abs_index].block_size[occurence_id]);
         } else {
-          sprintf(
+          snprintf(
               step_var_name,
+              sizeof(step_var_name),
               "%s[%d].block_size[%d]",
               spec_array_name,
               loop_abs_index,
@@ -752,9 +821,18 @@ std::string loop_generator(const char* __loop_nest_desc_extended) {
       }
     } else {
       if (loop_params_map[loop_abs_index].jit_step > 0) {
-        sprintf(step_var_name, "%d", loop_params_map[loop_abs_index].step);
+        snprintf(
+            step_var_name,
+            sizeof(step_var_name),
+            "%d",
+            loop_params_map[loop_abs_index].step);
       } else {
-        sprintf(step_var_name, "%s[%d].step", spec_array_name, loop_abs_index);
+        snprintf(
+            step_var_name,
+            sizeof(step_var_name),
+            "%s[%d].step",
+            spec_array_name,
+            loop_abs_index);
       }
     }
 

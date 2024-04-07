@@ -392,10 +392,10 @@ at::Tensor woq_linear_pack_weight(
       int64_t weight_int4_size_bytes = weight_int4.numel();
       int64_t pad_size_bytes = weight_int4_size_bytes - weight_size_bytes;
       std::memcpy(weight_int4.data_ptr(), weight.data_ptr(), weight_size_bytes);
-      std::memset(
+      std::fill_n(
           (uint8_t*)weight_int4.data_ptr() + weight_size_bytes,
-          0,
-          pad_size_bytes);
+          pad_size_bytes,
+          0);
       return woq_tpp_gemm_packB_stub(
           kCPU, weight_int4, weight_dtype, block_n, block_k, lowp_mode);
     }

@@ -18,7 +18,7 @@ void* jit_compile_and_load(
   int fd = mkstemp(libname);
   unlink(libname);
   char fdname[50];
-  sprintf(fdname, "/proc/self/fd/%d", fd);
+  snprintf(fdname, sizeof(fdname), "/proc/self/fd/%d", fd);
   auto cmd = std::string("g++ -shared -fPIC -x c++ ") + flags;
   cmd = cmd + " -o " + fdname + " " + filename;
   printf("JIT COMPILE: %s\n", cmd.c_str());
@@ -66,7 +66,7 @@ void* jit_from_str(
   int fd = mkstemp(filename);
   unlink(filename);
   char fdname[50];
-  sprintf(fdname, "/proc/self/fd/%d", fd);
+  snprintf(fdname, sizeof(fdname), "/proc/self/fd/%d", fd);
   write(fd, src.c_str(), src.length());
   return jit_from_file(fdname, flags, func_name);
 #else

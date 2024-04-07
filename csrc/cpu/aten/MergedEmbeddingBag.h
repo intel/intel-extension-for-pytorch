@@ -24,7 +24,7 @@ class EMBROW {
     length = len;
     arr.resize(length);
     data = &arr[0];
-    memset(data, 0, len * sizeof(T));
+    std::fill_n(data, len, T(0));
   }
 };
 
@@ -36,7 +36,7 @@ class EMBROWFixLen {
 
   EMBROWFixLen(int32_t len) {
     data = &arr[0];
-    memset(data, 0, emb_dim * sizeof(T));
+    std::fill_n(data, emb_dim, T(0));
   }
 };
 

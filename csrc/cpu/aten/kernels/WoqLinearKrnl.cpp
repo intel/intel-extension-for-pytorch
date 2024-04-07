@@ -1507,7 +1507,7 @@ void dot_update(
 template <typename T>
 void zero_fill(T* C, int M, int N, int stride) {
   for (int m = 0; m < M; m++) {
-    memset(C + m * stride, 0, sizeof(T) * N);
+    std::fill_n(C + m * stride, N, T(0));
   }
 }
 

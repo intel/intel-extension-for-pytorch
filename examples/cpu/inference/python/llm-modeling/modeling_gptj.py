@@ -516,11 +516,11 @@ class IPEXGPTJForCausalLM(GPTJPreTrainedModel):
         ):
             # return dict is handled by ipex._set_optimized_model_for_generation
             output = (lm_logits,) + transformer_outputs[1:]
-            return ((loss,) + output) if loss is not None else output
+            return output
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
-            return ((loss,) + output) if loss is not None else output
+            return output
 
         return CausalLMOutputWithPast(
             loss=loss,
