@@ -320,6 +320,31 @@ class TestTorchMethod(TestCase):
     #         )
 
 
+    def test_qkv_gemm_int4(self, dtype=torch.float16):
+        input = torch.rand([3, 4096, 4096], device="xpu", dtype=torch.float16)
+        q = torch.empty([4096, 16384], device="xpu", dtype=torch.float16)
+        k = torch.rand([4096, 16384], device="xpu", dtype=torch.float16)
+        v = torch.rand([4096, 16384], device="xpu", dtype=torch.float16)
+        bias = None
+        weight = (torch.rand([3, 4096, 8192], device="xpu") * 10).byte()
+
+        group_size = 32
+        group_num = int(4096 / group_size)
+
+        scales = torch.ones([3, group_num, 16384], device="xpu", dtype=torch.float16)
+        zero_points = (torch.zeros([3, group_num, 8192], device="xpu")).byte()
+
+        out_int4 = torch.ops.torch_ipex.qkv_mm_esimd_int4(
+            input, weight, bias, scales, zero_points, group_size, q, k, v
+        )
+
+        # weight_fp16 = self.dequantize(
+        #     weight, scales, zero_points, group_size, gemm_num=3
+        # )
+        # out_fp16 = torch.ops.torch_ipex.mm_qkv(input, weight_fp16, bias)
+
+        # self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+
 # res 26: 2 * 2 *2 + 1 * 1.2 * 8 = 17.6
 # res 27: 2 * 1.7 * 3 + 1 * 2.5 * 1 = 12.7
 

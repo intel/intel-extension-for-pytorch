@@ -1,0 +1,7 @@
+model:
+  backend: default
+  domain: auto
+  inputs: []
+  outputs: []
+  quant_format: default
+device: cpu

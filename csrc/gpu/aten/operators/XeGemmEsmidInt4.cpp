@@ -86,7 +86,7 @@ static void dump_element(const Tensor src, int nele, std::string str) {
 
 // forward dpcpp implementation
 template <typename scalar_t, typename uint8_t>
-static inline void xegemm_int4_esimd_kernel(
+static inline void gemm_int4_esimd_kernel(
     const scalar_t* input,
     uint8_t* weight,
     scalar_t* output,
@@ -233,6 +233,29 @@ static inline void xegemm_int4_esimd_kernel(
   }
 }
 
+// forward dpcpp implementation
+template <typename scalar_t, typename uint8_t>
+static inline void qkv_gemm_int4_esimd_kernel(
+    const scalar_t* input,
+    uint8_t* weight,
+    const scalar_t* weight_scl,
+    const uint8_t* weight_zp,
+    void* bias,
+    uint8_t* reorder_buffer,
+    int64_t calib_gz,
+    uint32_t m,
+    uint32_t n,
+    uint32_t k,
+    scalar_t* out0,
+    scalar_t* out1,
+    scalar_t* out2) {
+  std::cout << "qkv_gemm_int4_esimd_kernel m: " << m << std::endl;
+  std::cout << "qkv_gemm_int4_esimd_kernel n: " << n << std::endl;
+  std::cout << "qkv_gemm_int4_esimd_kernel k: " << k << std::endl;
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+
+  return;
+}
 } // namespace impl
 
 inline Tensor resize_as_mat2(const Tensor& mat1, const Tensor& output) {
@@ -273,7 +296,7 @@ static Tensor mm_esimd_int4(
     std::cout << "get in esimd int4 gemm" << std::endl;
     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
         input_flat.scalar_type(), "XeGemm_int4_esimd", [&] {
-          impl::xegemm_int4_esimd_kernel<scalar_t, uint8_t>(
+          impl::gemm_int4_esimd_kernel<scalar_t, uint8_t>(
               input_flat.data_ptr<scalar_t>(),
               weight_flat.data_ptr<uint8_t>(),
               output.data_ptr<scalar_t>(),
@@ -295,11 +318,85 @@ static Tensor mm_esimd_int4(
   return resize_as_mat2(input, output);
 }
 
+static Tensor qkv_mm_esimd_int4(
+    const Tensor& input_,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    const optional<Tensor>& bias_,
+    const Tensor& out0_,
+    const Tensor& out1_,
+    const Tensor& out2_,
+    int64_t calib_gz) {
+  std::cout << "start qkv_mm_esimd_int4" << std::endl;
+
+  xpu::COMPUTE_ENG real_eng =
+      choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input_, weight);
+  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+
+  auto input = input_.flatten(0, -2);
+  if (input.scalar_type() == ScalarType::Float)
+    input = input.to(at::kHalf);
+  auto out0 = out0_.flatten(0, -2);
+  auto out1 = out1_.flatten(0, -2);
+  auto out2 = out2_.flatten(0, -2);
+  // input: m,k; weight: 3,k,n, bias(opt): 3,n
+  TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
+  TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
+  int m = input.sizes()[0];
+  int k = input.sizes()[1];
+  int n = weight.sizes()[2] * 2;
+
+  bool has_bias = bias_.has_value();
+  if (has_bias) {
+    auto bias = bias_.value();
+    TORCH_CHECK(
+        bias.dim() == 2 && bias.sizes()[0] == 3 && bias.sizes()[1] == n);
+  }
+  TORCH_CHECK(
+      out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
+  TORCH_CHECK(
+      out0.sizes()[1] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
+
+  TORCH_CHECK(
+      input.scalar_type() == kHalf &&
+      (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
+       weight.scalar_type() == kChar));
+
+  auto reorder_buffer = at::empty({k, n}, weight.options());
+  // impl::dump_element(weight, 10, "weight first 10 elem: ");
+
+  if (compute_eng_valid) {
+    std::cout << "get in esimd int4 gemm" << std::endl;
+    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+        input.scalar_type(), "XeGemm_int4_esimd", [&] {
+          impl::qkv_gemm_int4_esimd_kernel<scalar_t, uint8_t>(
+              input.data_ptr<scalar_t>(),
+              weight.data_ptr<uint8_t>(),
+              weight_scl.data_ptr<scalar_t>(),
+              weight_zp.data_ptr<uint8_t>(),
+              bias_.has_value() ? bias_.value().data_ptr() : (void*)nullptr,
+              reorder_buffer.data_ptr<uint8_t>(),
+              calib_gz,
+              m,
+              n,
+              k,
+              out0.data_ptr<scalar_t>(),
+              out1.data_ptr<scalar_t>(),
+              out2.data_ptr<scalar_t>());
+        });
+  } else {
+    AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
+  }
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_esimd_int4.xpu", at::AtenIpexTypeXPU::mm_esimd_int4);
+  IPEX_OP_REGISTER(
+      "qkv_mm_esimd_int4.xpu", at::AtenIpexTypeXPU::qkv_mm_esimd_int4);
 }
 } // namespace
