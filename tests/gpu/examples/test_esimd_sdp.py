@@ -31,16 +31,16 @@ dtype = torch.float16
 checking_atol = 1e-3
 checking_rtol = 1e-3
 
-f = 1
-t_in = 1919
-t_out = 111
-t = t_in + t_out
-t_max = 2176
-beam = 4
-bs = 64
+f = 1   
+t_in = 1000  # history tokens n_kvs
+t_out = 1
+t = t_in + t_out  # n_kvs
+# t_max = 2176
+beam = 1
+bs = 1
 b = bs * beam
-n = 16
-h = 256
+n = 32  # head num
+h = 128
 
 alpha = 1.0 / math.sqrt(h)
 beta = 1.0
@@ -59,49 +59,56 @@ print(alpha)
 
 class TestTorchMethod(TestCase):
     def test_esmid_sdp(self, dtype=torch.float16):
-        q = torch.randn([b, f, n, h], dtype=dtype, device=torch.device("xpu"))
-        k_in_proj = torch.randn(
-            [bs, t_in, n, h], dtype=dtype, device=torch.device("xpu")
-        )
-        v_in_proj = torch.randn(
-            [bs, t_in, n, h], dtype=dtype, device=torch.device("xpu")
-        )
-        k = torch.randn([b, t, n, h], dtype=dtype, device=torch.device("xpu"))
-        v = torch.randn([b, t, n, h], dtype=dtype, device=torch.device("xpu"))
-        k_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
-        v_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
-        attn_mask = torch.randn([b, n, f, t], dtype=dtype, device=torch.device("xpu"))
-        attn_mask_padded = torch.zeros(
-            [b, n, f, t_max], dtype=dtype, device=torch.device("xpu")
-        )
-        index = torch.randint(
-            0, beam, [t_out, bs, beam], dtype=torch.int, device=torch.device("xpu")
-        )
+        print("\nf(n_q) t(n_kv) b(beam) n(head) h(hid dim) are:")
+        print(f)
+        print(t)
+        print(b)
+        print(n)
+        print(h)
+
+        q = torch.randn([b, f, n, h], dtype=dtype, device=torch.device("xpu")) # 1, 1, 32, 128
+        # k_in_proj = torch.randn(
+        #     [bs, t_in, n, h], dtype=dtype, device=torch.device("xpu")
+        # )
+        # v_in_proj = torch.randn(
+        #     [bs, t_in, n, h], dtype=dtype, device=torch.device("xpu")
+        # )
+        k = torch.randn([b, t, n, h], dtype=dtype, device=torch.device("xpu")) # 1, 32, 32, 128
+        v = torch.randn([b, t, n, h], dtype=dtype, device=torch.device("xpu")) # 1, 32, 32, 128
+        # k_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
+        # v_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
+        attn_mask = torch.zeros(b, n, f, t, dtype=dtype, device=torch.device("xpu"))
+        # attn_mask_padded = torch.zeros(
+        #     [b, n, f, t_max], dtype=dtype, device=torch.device("xpu")
+        # )
+        # index = torch.randint(
+        #     0, beam, [t_out, bs, beam], dtype=torch.int, device=torch.device("xpu")
+        # )
         # print("index", index)
 
         # Reference init
         # 1. Init k, v 1st half, input prompt projection
         # broadcast bs -> bs*beam
         # print("before bc k", k[:, 0:t_in, :, :])
-        k_ = k[:, 0:t_in, :, :].view(bs, beam, t_in, n, h)
-        k_.copy_(k_in_proj.view(bs, 1, t_in, n, h))
-        v_ = v[:, 0:t_in, :, :].view(bs, beam, t_in, n, h)
-        v_.copy_(v_in_proj.view(bs, 1, t_in, n, h))
+        # k_ = k[:, 0:t_in, :, :].view(bs, beam, t_in, n, h)
+        # k_.copy_(k_in_proj.view(bs, 1, t_in, n, h))
+        # v_ = v[:, 0:t_in, :, :].view(bs, beam, t_in, n, h)
+        # v_.copy_(v_in_proj.view(bs, 1, t_in, n, h))
         # print("after bc k", k[:, 0:t_in, :, :])
 
         # 2. Init k, v 2nd half, inference output tokens projection till last timestep
         # index select according to beam record index
-        k_history = k_cache[0:t_out, :, :, :].view(t_out, bs, beam, n, h)
-        v_history = v_cache[0:t_out, :, :, :].view(t_out, bs, beam, n, h)
-        index_ = index.view(t_out, b)
-        for i in range(t_out):
-            for j in range(b):
-                bs_ = j / beam
-                beam_choice = index_[i, j]
-                k[j][t_in + i].copy_(k_history[i][int(bs_)][beam_choice])
-                v[j][t_in + i].copy_(v_history[i][int(bs_)][beam_choice])
+        # k_history = k_cache[0:t_out, :, :, :].view(t_out, bs, beam, n, h)
+        # v_history = v_cache[0:t_out, :, :, :].view(t_out, bs, beam, n, h)
+        # index_ = index.view(t_out, b)
+        # for i in range(t_out):
+        #     for j in range(b):
+        #         bs_ = j / beam
+        #         beam_choice = index_[i, j]
+        #         k[j][t_in + i].copy_(k_history[i][int(bs_)][beam_choice])
+        #         v[j][t_in + i].copy_(v_history[i][int(bs_)][beam_choice])
 
-        attn_mask_padded[:, :, :, 0:t] = attn_mask
+        # attn_mask_padded[:, :, :, 0:t] = attn_mask
 
         # print("q", q)
         # print("k_in_proj", k_in_proj)
@@ -121,6 +128,9 @@ class TestTorchMethod(TestCase):
             alpha,
         )
 
+        print("naive: ", naive.type())
+        print("naive: ", naive.cpu())
+
         ref = torch.ops.torch_ipex.sdp_esimd(
             q.permute(0, 2, 1, 3),
             k.permute(0, 2, 1, 3),
@@ -134,6 +144,9 @@ class TestTorchMethod(TestCase):
             is_causal,
             seq_last,
         )
+
+        print("esimd: ", ref.type())
+        print("esimd: ", ref.cpu())
 
         print(
             "esimd sdp vs naive: ", torch.max(torch.abs(ref.cpu() - naive.cpu())).item()

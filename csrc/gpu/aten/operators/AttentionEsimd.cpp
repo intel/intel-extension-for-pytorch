@@ -21,7 +21,7 @@ using namespace sycl::ext::intel::esimd::xmx;
 using fp16 = sycl::half;
 using namespace sycl;
 
-#include "esimd/matrixMulCommonDim4096Int4NoReshapeNx16V3.h"
+#include "esimd/qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -54,11 +54,24 @@ static inline void sdp_esimd_kernel(
     float beta,
     float dropout_prob,
     bool is_causal,
-    bool seq_last) {
+    bool seq_last,
+    int64_t kv_len) {
   std::cout << "alpha: " << alpha << std::endl;
   std::cout << "beta: " << beta << std::endl;
   std::cout << "dropout_prob: " << dropout_prob << std::endl;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
+  
+  const int batch_size = 1;
+  sycl::range<2> GlobalRange(32 * 32, batch_size); // num_head x kv_len, batch size
+  sycl::range<2> LocalRange(32, 1);                // kv_len, x
+  sycl::nd_range<2> Range(GlobalRange, LocalRange);
+  sycl::event e;
+  int vCacheStride = 0; // not used.
+  e = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(Range, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL{
+          qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex((uint8_t*)query, (uint8_t*)key, (uint8_t*)value, (uint8_t*)output, kv_len, vCacheStride, ndi);
+        });
+      });
 
   return;
 }
@@ -92,6 +105,7 @@ static Tensor sdp_esimd(
   int64_t num_heads_k = key.size(1);
   int64_t M = query.size(-2);
   int64_t N = key.size(-2);
+  auto kv_len = N;
 
   auto output = at::empty_like(query);
   auto dpcpp_queue = dpcppGetCurrentQueue();
@@ -122,7 +136,8 @@ static Tensor sdp_esimd(
               beta,
               dropout_p,
               is_causal,
-              seq_last);
+              seq_last,
+              kv_len);
         });
   } else {
     AT_ERROR("ESIMD SDP: invalid COMPUTE_ENG!");
