@@ -28,9 +28,6 @@ namespace dpcpp {
  *      Default = 0 | Set verbose level with synchronization execution mode, will be removed
  *   IPEX_XPU_SYNC_MODE:
  *      Default = 0 | Set 1 to enforce synchronization execution mode
- *   IPEX_TILE_AS_DEVICE:
- *      Default = 1 | Set 0 to disable tile partition and map per root device
- *      Only works when `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`
  *   IPEX_LOG_LEVEL:
  *      Default = -1 | Set IPEX_LOG_LEVEL = Disabled
  *   IPEX_LOG_COMPONENT:
@@ -62,9 +59,6 @@ namespace dpcpp {
  *   IPEX_COMPUTE_ENG:
  *      Default = 0 (RECOMMEND) | Set RECOMMEND to select recommended compute engine
  *      operators: RECOMMEND, BASIC, ONEDNN, ONEMKL, XETLA
- *   ZE_FLAT_DEVICE_HIERARCHY:
- *      Default = 1 (FLAT) | All sub-devices are exposed, root-devices can be accessed.
- *      It is a driver environment variable, only used for backward compatibility.
  * ==========INT==========
  */
 // clang-format on
@@ -181,17 +175,6 @@ Settings::Settings() {
   fp32_math_mode = FP32_MATH_MODE::FP32;
   DPCPP_INIT_ENV_VAL(
       "IPEX_FP32_MATH_MODE", fp32_math_mode, FP32_MATH_MODE, show_opt);
-
-  tile_as_device_enabled = ENV_VAL::ON;
-  DPCPP_INIT_ENV_VAL(
-      "IPEX_TILE_AS_DEVICE", tile_as_device_enabled, ENV_VAL, show_opt);
-
-  device_hierarchy_mode = DEVICE_HIERARCHY::FLAT;
-  DPCPP_INIT_ENV_VAL(
-      "ZE_FLAT_DEVICE_HIERARCHY",
-      device_hierarchy_mode,
-      DEVICE_HIERARCHY,
-      show_opt);
 
 #ifdef BUILD_SIMPLE_TRACE
   simple_trace_enabled = ENV_VAL::OFF;
