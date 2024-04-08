@@ -234,7 +234,8 @@ class LinearUnary(ExternKernelAlloc):
         w = cls.require_contiguous(cls.realize_input(w))
 
         *m, ic = x.get_size()
-        oc, ic = w.get_size()
+        # After freezing pass, w should be [ic, oc] shape, format is ba
+        ic, oc = w.get_size()
         inputs = [x, w]
         constant_args = [attr, scalars if scalars else [-1], algorithm]
         if b is not None:
@@ -302,7 +303,8 @@ class LinearBinary(ExternKernelAlloc):
         w = cls.require_contiguous(cls.realize_input(w))
 
         *m, ic = x.get_size()
-        oc, ic = w.get_size()
+        # After freezing pass, w should be [ic, oc] shape, format is ba
+        ic, oc = w.get_size()
 
         inputs = [x, y, w]
         constant_args = [attr]
