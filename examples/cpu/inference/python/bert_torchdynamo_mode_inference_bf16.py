@@ -16,6 +16,7 @@ model = ipex.optimize(model, dtype=torch.bfloat16, weights_prepack=False)
 model = torch.compile(model, backend="ipex")
 ######################################################  # noqa F401
 
+# Note: bf16 inference requires amp.autocast() context  # noqa F401
 with torch.no_grad(), torch.cpu.amp.autocast():
     model(data)
 

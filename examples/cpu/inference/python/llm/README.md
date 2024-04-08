@@ -44,7 +44,7 @@ ipex.llm provides dedicated optimization for running Large Language Models (LLM)
 |GPT-J| EleutherAI/gpt-j-6b | 🟨 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟨 | 🟩 |
 |DOLLY| databricks/dolly-v2-12b | 🟨 | 🟩 |
-|FALCON| tiiuae/falcon-40b | 🟨 | 🟨 |
+|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 |
 |OPT| facebook/opt-30b | 🟨 | 🟩 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 |
 |Bloom| bigscience/bloom-1b7 | 🟨 | 🟩 |
@@ -63,8 +63,6 @@ ipex.llm provides dedicated optimization for running Large Language Models (LLM)
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16).
 We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
-
-*Note*: The accuracy drop issue in distributed inference mode for "tiiuae/falcon-40b" has been fixed by DeepSpeed in a recent patch release [v0.13.1](https://github.com/microsoft/DeepSpeed/tree/v0.13.1).
 
 <br>
 

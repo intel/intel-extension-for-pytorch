@@ -81,7 +81,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     # Install deps
-    conda install -y cmake ninja
+    conda install -y cmake ninja unzip
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then

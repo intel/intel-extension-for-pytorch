@@ -33,6 +33,7 @@ model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat1
 
 for batch_idx, (data, target) in enumerate(train_loader):
     optimizer.zero_grad()
+    # Note: bf16 training requires amp.autocast() context  # noqa F401
     with torch.cpu.amp.autocast():
         output = model(data)
         loss = criterion(output, target)

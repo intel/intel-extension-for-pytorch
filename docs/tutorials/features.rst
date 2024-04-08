@@ -169,7 +169,9 @@ Intel® Extension for PyTorch* provides built-in quantization recipes to deliver
 
 Users are always recommended to try quantization with the built-in quantization recipe first with Intel® Extension for PyTorch* quantization APIs. For even higher accuracy demandings, users can try with separate `recipe tuning APIs <features/int8_recipe_tuning_api.md>`_. The APIs are powered by Intel® Neural Compressor to take advantage of its tuning feature.
 
-Check more detailed information for `INT8 Quantization <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Prototype, *NEW feature in 1.13.0*) <features/int8_recipe_tuning_api.md>`_.
+Smooth quantization (SmoothQuant) is a more recent post-training quantization (PTQ) solution which tackles the quantization error problem caused by systematic outliers in activations. SmoothQuant is commonly used for LLM quantization, and Intel® Extension for PyTorch* has provided built-in support for this solution.
+
+Check more detailed information for `INT8 Quantization <features/int8_overview.md>`_ and `INT8 recipe tuning API guide (Prototype) <features/int8_recipe_tuning_api.md>`_. In addition, SmoothQuant specific argument introduction and examples can be checked in `SmoothQuant recipe tuning API guide (Prototype) <features/sq_recipe_tuning_api.md>`_.
 
 .. toctree::
    :hidden:
@@ -177,6 +179,7 @@ Check more detailed information for `INT8 Quantization <features/int8_overview.m
 
    features/int8_overview
    features/int8_recipe_tuning_api
+   features/sq_recipe_tuning_api
 
 Codeless Optimization (Prototype, *NEW feature from 1.13.0*)
 ---------------------------------------------------------------

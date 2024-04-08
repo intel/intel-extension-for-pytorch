@@ -30,8 +30,6 @@ Verified for distributed inference mode via DeepSpeed
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
-*Note*: The accuracy drop issue in distributed inference mode for "tiiuae/falcon-40b" has been fixed by DeepSpeed in a recent patch release `v0.13.1 <https://github.com/microsoft/DeepSpeed/tree/v0.13.1>`_.
-
 Please check `LLM best known practice <../../examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts.
 
 

@@ -7,7 +7,7 @@ Troubleshooting
   - **Cause**: Certain Python packages may have PyTorch as a hard dependency. If you installed the `+cpu` version of PyTorch, installation of these packages might replace the `+cpu` version with the default version released on Pypi.org.
   - **Solution**: Reinstall the `+cpu` version back.
 - **Problem**: The workload running with Intel® Extension for PyTorch\* occupies a remarkably large amount of memory.
-  - **Solution**: Try to reduce the occupied memory size by setting the `--weights_prepack` parameter of the `ipex.optimize()` function to `False`.
+  - **Solution**: Try to reduce the occupied memory size by setting the `weights_prepack` parameter of the `ipex.optimize()` function to `False`.
 - **Problem**: The `conv+bn` folding feature of the `ipex.optimize()` function does not work if inference is done with a custom function:
    
   ```
@@ -108,6 +108,9 @@ Troubleshooting
 - **Problem**: BF16 AMP(auto-mixed-precision) runs abnormally with the extension on the AVX2-only machine if the topology contains `Conv`, `Matmul`, `Linear`, and `BatchNormalization`.
   - **Solution**: TBD
 
+- **Problem**: A PyTorch* model containing `torch.nn.TransformerEncoderLayer` component may encounter a RuntimeError in BF16 training or inference process if the model is optimized by `ipex.optimize()` with arguments set to default values.
+  - **Solution**: `TransformerEncoderLayer` optimized by `ipex.optimize()` with weight prepacking functionality enabled may encounter a weight dimension issue. The error can be avoided by disabling weight prepacking, `model = ipex.optimize(model, weights_prepack=False)`.
+
 ## Runtime Extension
 
 The following limitations currently exist:
@@ -119,8 +122,3 @@ The following limitations currently exist:
 
 - **Problem**: Incorrect Conv and Linear result if the number of OMP threads is changed at runtime.
   - **Cause**: The oneDNN memory layout depends on the number of OMP threads, which requires the caller to detect the changes for the # of OMP threads while this release has not implemented it yet.
-
-## Float32 Training
-
-- **Problem**: Low throughput with DLRM FP32 Train.
-  - **Solution**: A 'Sparse Add' [PR](https://github.com/pytorch/pytorch/pull/23057) is pending on review. The issue will be fixed when the PR is merged.
