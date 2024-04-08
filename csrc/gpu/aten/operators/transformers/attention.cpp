@@ -52,9 +52,6 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
     double dropout_p,
     c10::optional<double> scale) {
 #if defined(USE_XETLA)
-  TORCH_CHECK(
-      dpcppGetDeviceHasXMX(),
-      "SDP kernel requires XMX, but the current platform has no XMX ...");
   // check attn_mask padded
   uint32_t attn_mask_padded_block_size = 0;
   if (attn_mask.has_value()) {
@@ -80,38 +77,40 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
 
   const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  gpu_arch xeArch = sdp::aten_to_Xetla_arch();
   fmha_forward_kernel(
+      xeArch,
       xeType,
       dpcpp_queue,
-      query.data_ptr(),
-      key.data_ptr(),
-      value.data_ptr(),
-      /* alibi */ nullptr,
-      attn_mask.has_value() ? attn_mask->data_ptr() : (void*)nullptr,
-      dropout_mask.has_value() ? dropout_mask->data_ptr() : (void*)nullptr,
-      output.data_ptr(),
-      softmax_lse.data_ptr(),
-      softmax_scale,
-      /* beta */ 1.0f,
-      dropout_p,
-      query.size(0),
-      query.size(1),
-      key.size(1),
-      query.size(3),
-      query.size(2),
-      key.size(2),
-      attn_mask.has_value() ? attn_mask->stride(0) : -1,
-      attn_mask.has_value() ? attn_mask->stride(1) : -1,
-      attn_mask.has_value() ? attn_mask->stride(2) : -1,
-      /* ablibi padded size */ 0,
-      attn_mask_padded_block_size,
-      is_causal,
-      false,
-      is_training,
-      use_dropout,
-      seed_t.has_value() ? (uint64_t)*seed_t.value().data_ptr<int64_t>() : -1,
-      offset_t.has_value() ? (uint64_t)*offset_t.value().data_ptr<int64_t>()
-                           : -1);
+      {query.data_ptr(),
+       key.data_ptr(),
+       value.data_ptr(),
+       /* alibi */ nullptr,
+       attn_mask.has_value() ? attn_mask->data_ptr() : (void*)nullptr,
+       dropout_mask.has_value() ? dropout_mask->data_ptr() : (void*)nullptr,
+       output.data_ptr(),
+       softmax_lse.data_ptr(),
+       softmax_scale,
+       /* beta */ 1.0f,
+       dropout_p,
+       query.size(0),
+       query.size(1),
+       key.size(1),
+       query.size(3),
+       query.size(2),
+       key.size(2),
+       attn_mask.has_value() ? attn_mask->stride(0) : -1,
+       attn_mask.has_value() ? attn_mask->stride(1) : -1,
+       attn_mask.has_value() ? attn_mask->stride(2) : -1,
+       /* ablibi padded size */ 0,
+       attn_mask_padded_block_size,
+       is_causal,
+       false,
+       is_training,
+       use_dropout,
+       seed_t.has_value() ? (uint64_t)*seed_t.value().data_ptr<int64_t>() : -1,
+       offset_t.has_value() ? (uint64_t)*offset_t.value().data_ptr<int64_t>()
+                            : -1});
 
   return output;
 #else
@@ -800,41 +799,40 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
 
 #if defined(USE_XETLA)
-  TORCH_CHECK(
-      dpcppGetDeviceHasXMX(),
-      "SDP kernel requires XMX, but the current platform has no XMX ...");
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  gpu_arch xeArch = sdp::aten_to_Xetla_arch();
   gpu::xetla::fmha_forward_kernel(
+      xeArch,
       xeType,
       dpcpp_queue,
-      query.data_ptr(),
-      key.data_ptr(),
-      value.data_ptr(),
-      alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
-      attn_mask.has_value() ? attn_mask_bc.data_ptr() : (void*)nullptr,
-      nullptr,
-      output.data_ptr(),
-      softmax_lse.data_ptr(),
-      alpha,
-      beta,
-      dropout_p,
-      B,
-      num_heads_q,
-      num_heads_k,
-      head_dim,
-      M,
-      N,
-      attn_mask.has_value() ? attn_mask_bc.stride(0) : -1,
-      attn_mask.has_value() ? attn_mask_bc.stride(1) : -1,
-      attn_mask.has_value() ? attn_mask_bc.stride(2) : -1,
-      alibi_padded_block_size,
-      attn_mask_padded_block_size,
-      is_causal,
-      seq_last,
-      false, // is_training
-      false, // use_dropout
-      (int)0,
-      (int)0);
+      {query.data_ptr(),
+       key.data_ptr(),
+       value.data_ptr(),
+       alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
+       attn_mask.has_value() ? attn_mask_bc.data_ptr() : (void*)nullptr,
+       nullptr,
+       output.data_ptr(),
+       softmax_lse.data_ptr(),
+       alpha,
+       beta,
+       dropout_p,
+       B,
+       num_heads_q,
+       num_heads_k,
+       head_dim,
+       M,
+       N,
+       attn_mask.has_value() ? attn_mask_bc.stride(0) : -1,
+       attn_mask.has_value() ? attn_mask_bc.stride(1) : -1,
+       attn_mask.has_value() ? attn_mask_bc.stride(2) : -1,
+       alibi_padded_block_size,
+       attn_mask_padded_block_size,
+       is_causal,
+       seq_last,
+       false, // is_training
+       false, // use_dropout
+       (int)0,
+       (int)0});
 #else
   AT_ERROR("SDP: xetla library not found in compilation");
 #endif

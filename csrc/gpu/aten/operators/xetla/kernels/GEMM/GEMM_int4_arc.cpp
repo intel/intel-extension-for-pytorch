@@ -312,31 +312,223 @@ namespace xetla {
       const uint32_t k);
 
 // per channel ARC
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 0, 8, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 0, 4, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(32, 256, 16, 16, 32, 0, 1, 0);
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    0,
+    8,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    0,
+    4,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    32,
+    256,
+    16,
+    16,
+    32,
+    0,
+    1,
+    static_cast<int>(gpu_arch::XeHpg));
 
 // k group ARC
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 16, 8, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 32, 8, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 64, 8, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 128, 8, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 256, 8, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 512, 8, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 1024, 8, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 16, 4, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 32, 4, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 64, 4, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 128, 4, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 256, 4, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 512, 4, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(8, 64, 8, 16, 16, 1024, 4, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(32, 256, 16, 16, 32, 16, 1, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(32, 256, 16, 16, 32, 32, 1, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(32, 256, 16, 16, 32, 64, 1, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(32, 256, 16, 16, 32, 128, 1, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(32, 256, 16, 16, 32, 256, 1, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(32, 256, 16, 16, 32, 512, 1, 0);
-HGEMM_WINT4_ARC_IMPL_FUNC(32, 256, 16, 16, 32, 1024, 1, 0);
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    16,
+    8,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    32,
+    8,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    64,
+    8,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    128,
+    8,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    256,
+    8,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    512,
+    8,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    1024,
+    8,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    16,
+    4,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    32,
+    4,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    64,
+    4,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    128,
+    4,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    256,
+    4,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    512,
+    4,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    16,
+    1024,
+    4,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    32,
+    256,
+    16,
+    16,
+    32,
+    16,
+    1,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    32,
+    256,
+    16,
+    16,
+    32,
+    32,
+    1,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    32,
+    256,
+    16,
+    16,
+    32,
+    64,
+    1,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    32,
+    256,
+    16,
+    16,
+    32,
+    128,
+    1,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    32,
+    256,
+    16,
+    16,
+    32,
+    256,
+    1,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    32,
+    256,
+    16,
+    16,
+    32,
+    512,
+    1,
+    static_cast<int>(gpu_arch::XeHpg));
+HGEMM_WINT4_ARC_IMPL_FUNC(
+    32,
+    256,
+    16,
+    16,
+    32,
+    1024,
+    1,
+    static_cast<int>(gpu_arch::XeHpg));
 } // namespace xetla
 } // namespace xpu

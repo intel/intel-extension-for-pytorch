@@ -200,12 +200,12 @@ class paged_attention_kernel {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using local_st_payload_t = subgroup::mem_payload_t<
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>,
         tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     uint32_t boundary_x = args.head_size;
     uint32_t boundary_y = args.num_seqs * args.num_heads;
@@ -250,7 +250,7 @@ class paged_attention_kernel {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>,
         query_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     constexpr tdesc_update_dir query_update_dir = tdesc_update_dir::x_dir;
 
 #if TransposeKCacheInLoad
@@ -276,12 +276,12 @@ class paged_attention_kernel {
         mem_desc_t<scalar_t, k_mem_layout, mem_space::global>,
         key_tile_desc_t,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using key_prefetch_payload_t = subgroup::prefetch_payload_t<
         mem_desc_t<scalar_t, k_mem_layout, mem_space::global>,
         key_tile_desc_t,
         1,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     query_tile_t mat_query;
     key_tile_t mat_key;
@@ -391,7 +391,7 @@ class paged_attention_kernel {
           mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
           tile_desc_t,
           msg_type::block_1d,
-          gpu_arch::Xe>;
+          gpu_arch::XeHpc>;
 
       uint32_t boundary_y = args.num_seqs * args.num_heads;
       int32_t start_y = ctx.seq_id * args.num_heads + ctx.head_id;
@@ -442,12 +442,12 @@ class paged_attention_kernel {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         value_tile_desc_t,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using value_prefetch_payload_t = subgroup::prefetch_payload_t<
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         value_tile_desc_t,
         1,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     constexpr tdesc_update_dir value_update_dir = tdesc_update_dir::y_dir;
 
     value_tile_t mat_value;
@@ -518,7 +518,7 @@ class paged_attention_kernel {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
         out_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     // for loading out to reg
     using ld_tile_desc_t = subgroup::
         tile_desc_t<head_size_per_sg, wg_size, sg_tile_size_x, sg_tile_size_y>;
@@ -527,7 +527,7 @@ class paged_attention_kernel {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
         ld_tile_desc_t,
         msg_type::scatter,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     // for storing out to global
     using st_tile_desc_t =
         subgroup::tile_desc_t<head_size_per_sg, 1, sg_tile_size_x, 1>;
@@ -536,7 +536,7 @@ class paged_attention_kernel {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         st_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     // store out data of each subgroup to slm
     int32_t start_y = ctx.sg_id;
@@ -757,7 +757,7 @@ class paged_attention_reduce {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         ld_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     static constexpr tdesc_update_dir update_dir = tdesc_update_dir::x_dir;
 
     int32_t start_x = ctx.sg_id * partition_stride;
@@ -849,12 +849,12 @@ class paged_attention_reduce {
         mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>,
         tmp_tile_desc_t,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using tmp_prefetch_payload_t = subgroup::prefetch_payload_t<
         mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>,
         tmp_tile_desc_t,
         1,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     constexpr tdesc_update_dir tmp_update_dir = tdesc_update_dir::x_dir;
 
     using wg_reduce_sum_t = group_reduce_t<tile_t, wg_size, reduce_op::sum>;
@@ -937,7 +937,7 @@ class paged_attention_reduce {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
         out_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     // for loading out to reg
     using ld_tile_desc_t = subgroup::
         tile_desc_t<head_size_per_sg, wg_size, sg_tile_size_x, sg_tile_size_y>;
@@ -946,7 +946,7 @@ class paged_attention_reduce {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
         ld_tile_desc_t,
         msg_type::scatter,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     // for storing out to global
     using st_tile_desc_t =
         subgroup::tile_desc_t<head_size_per_sg, 1, sg_tile_size_x, 1>;
@@ -955,7 +955,7 @@ class paged_attention_reduce {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         st_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     // store out data of each subgroup to slm
     int32_t start_y = ctx.sg_id;

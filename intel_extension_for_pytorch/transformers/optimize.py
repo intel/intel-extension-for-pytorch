@@ -554,7 +554,7 @@ def check_xpu_llm_support(model):
     # If the XPU platform does NOT has XMX and NO 2D load instructions, such as meteorlake igpu,
     # ipex.optimize_transformers supports Llama.
     elif not ipex._C._has_2d_block_array(0) and not ipex._C._has_xmx(0):
-        xpu_well_supported_pattern = r"llama"
+        xpu_well_supported_pattern = r"llama|QWen"
         xpu_supported_model = re.search(
             xpu_well_supported_pattern, model.config.architectures[0], re.IGNORECASE
         )
@@ -563,7 +563,7 @@ def check_xpu_llm_support(model):
                 "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
                 " and the transformer model."
                 " If the XPU platform does NOT has XMX and NO 2D load instructions, such as meteorlake igpu, "
-                " ipex.optimize_transformers supports Llama."
+                " ipex.optimize_transformers supports Llama/QWen."
             )
         return xpu_supported_model
 
@@ -714,6 +714,8 @@ def optimize_transformers(
                 " If the XPU platform has XMX but no 2D load instructions, such as ATS-M and ARC, "
                 " ipex.optimize_transformers supports GPT-J/Llama/QWen, "
                 " and BasicTransformerBlock of diffusers. "
+                " If the XPU platform has no XMX and no 2D load instructions, such as MTL,"
+                " ipex.optimize_transformers supports Llama/QWen, "
                 " If the platform is CPU, "
                 " ipex.optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT."
             )

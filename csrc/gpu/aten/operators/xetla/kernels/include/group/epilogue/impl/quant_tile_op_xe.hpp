@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "group/epilogue/api.hpp"
-#include "group/epilogue/common.hpp"
-#include "group/epilogue/epilogue_policy.hpp"
+#include <group/epilogue/api.hpp>
+#include <group/epilogue/common.hpp>
+#include <group/epilogue/epilogue_policy.hpp>
 
 namespace gpu::xetla::group {
 
@@ -47,7 +47,7 @@ class epilogue_t<
         dtype_dequant_>,
     tile_shape_,
     mem_desc_c_t_,
-    std::enable_if_t<(arch_tag_ == gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ == gpu_arch::XeHpc)>> {
  public:
   using epilogue_policy = epilogue_policy_quant_op<
       dequant_op_t_,

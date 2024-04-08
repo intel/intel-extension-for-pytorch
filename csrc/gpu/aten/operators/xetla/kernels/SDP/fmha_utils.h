@@ -78,13 +78,13 @@ struct tile_mask_t {
 
   inline static void padding_mask(mat_t& src, int num_keep) {
 #pragma unroll
-    for (int i = 0; i < tile_size_y / block_size_y; i++) {
+    for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
-      for (int j = 0; j < num_block_x; j++) {
+      for (uint32_t j = 0; j < num_block_x; j++) {
         int start_x = j * block_size_x;
         int num_keep_blk = std::max(0, num_keep - start_x);
 
-        if (num_keep_blk < block_size_x) {
+        if (num_keep_blk < int(block_size_x)) {
           xetla_mask<block_size_x> mask =
               xetla_vector_gen<uint32_t, block_size_x>(1, 1) > num_keep_blk;
           auto src_sub =
@@ -93,7 +93,7 @@ struct tile_mask_t {
                       (i * num_block_x + j) * block_elems)
                   .xetla_format<accum_t, block_size_y, block_size_x>();
 #pragma unroll
-          for (int k = 0; k < block_size_y; k++) {
+          for (uint32_t k = 0; k < block_size_y; k++) {
             src_sub.row(k).xetla_merge(kNegInfinity, mask);
           }
         }
@@ -130,7 +130,11 @@ struct tile_mask_t {
 
 // ==================== // group_row_reduce_t // ================== //
 
-template <typename mat_t, uint32_t kNumSg, reduce_op reduce_kind>
+template <
+    typename mat_t,
+    uint32_t kNumSg,
+    reduce_op reduce_kind,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct group_row_reduce_t {
   using T = typename mat_t::dtype;
   static constexpr uint32_t kNum = mat_t::tile_desc::tile_size_y;
@@ -144,7 +148,7 @@ struct group_row_reduce_t {
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       store_tile_desc,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      arch_tag>;
   // load all subgroup results together
   using load_tile_desc =
       subgroup::tile_desc_t<kTotal, 1, kTotal, 1, reg_layout::tiled>;
@@ -153,9 +157,9 @@ struct group_row_reduce_t {
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       load_tile_desc,
       subgroup::msg_type_v<load_tile_desc, mem_space::local>,
-      gpu_arch::Xe>;
+      arch_tag>;
 
-  xetla_nbarrier_t<kNumSg, kNumSg> nbarrier;
+  xetla_nbarrier_t<kNumSg, kNumSg, arch_tag> nbarrier;
   uint32_t slm_base;
   uint32_t sg_id;
   inline group_row_reduce_t() = default;
@@ -190,7 +194,7 @@ struct group_row_reduce_t {
     auto data_2d = sg_load.reg.xetla_format<T, kNumSg, kNum>();
     ret = data_2d.row(0);
 #pragma unroll
-    for (int i = 1; i < kNumSg; i++) {
+    for (uint32_t i = 1; i < kNumSg; i++) {
       ret = reduce_helper<reduce_kind, T, kNum>(data_2d.row(i), ret);
     }
     return ret;
@@ -202,11 +206,11 @@ struct group_row_reduce_t {
 /// output in place. Used in epilogue::tile_op or chained_tile_op.
 /// @tparam dtype_bias Is the data type of bias buffer.
 /// @tparam arch_tag Is the hardware architecture tag.
-template <typename dtype_bias, gpu_arch arch_tag = gpu_arch::Xe>
-struct bias_add_op_t {};
+template <typename dtype_bias, gpu_arch arch_tag = gpu_arch::XeHpc>
+struct bias_add_op_t;
 /// @brief Is the bias_add op functor, specialized for Xe architecture.
-template <typename dtype_bias_>
-struct bias_add_op_t<dtype_bias_, gpu_arch::Xe> {
+template <typename dtype_bias_, gpu_arch arch_tag>
+struct bias_add_op_t {
   using dtype_bias = dtype_bias_;
   using mem_desc_bias_t =
       mem_desc_t<dtype_bias, mem_layout::row_major, mem_space::global>;
@@ -226,16 +230,14 @@ struct bias_add_op_t<dtype_bias_, gpu_arch::Xe> {
       matAcc_t& matAcc,
       const coord_t& coord,
       const arguments_t& args,
-      uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
     using dtype_acc = typename matAcc_t::dtype;
     static constexpr uint32_t tile_size_x = matAcc_t::tile_size_x;
     static constexpr uint32_t tile_size_y = matAcc_t::tile_size_y;
     static constexpr uint32_t block_size_x = matAcc_t::block_size_x;
     static constexpr uint32_t block_size_y = matAcc_t::block_size_y;
     static constexpr int32_t num_block_x = matAcc_t::num_block_x;
-    static constexpr int32_t num_block_y = matAcc_t::num_block_y;
-    static constexpr uint32_t tile_elems = matAcc_t::tile_elems;
     static constexpr uint32_t block_elems = matAcc_t::block_elems;
 
     using bias_tile_desc_t = subgroup::
@@ -245,7 +247,7 @@ struct bias_add_op_t<dtype_bias_, gpu_arch::Xe> {
         mem_desc_t<dtype_bias, mem_desc_bias_t::layout, mem_desc_bias_t::space>,
         bias_tile_desc_t,
         subgroup::msg_type_v<bias_tile_desc_t, mem_desc_bias_t::space>,
-        gpu_arch::Xe>;
+        arch_tag>;
     coord_t bias_coord(coord.x, coord.y);
     mem_desc_bias_t mem_desc_bias(args.base, args.shape, bias_coord);
     bias_t bias;
@@ -319,13 +321,13 @@ class epilogue_transp_t {};
 
 template <typename tile_op_t_, typename tile_shape_, typename mem_desc_c_t_>
 class epilogue_transp_t<
-    epilogue_policy_tile_op<tile_op_t_, gpu_arch::Xe>,
+    epilogue_policy_tile_op<tile_op_t_, gpu_arch::XeHpc>,
     tile_shape_,
     mem_desc_c_t_> {
  public:
   using tile_shape = tile_shape_;
   using mem_desc_c_t = mem_desc_c_t_;
-  static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   static constexpr uint32_t barrier_count = 0;
   static constexpr uint32_t slm_size = 0;
 
@@ -404,7 +406,7 @@ class epilogue_write_back_t<
     epilogue_policy_default<arch_tag_>,
     tile_shape_,
     mem_desc_c_t_,
-    std::enable_if_t<((arch_tag_ <= gpu_arch::Xe))>> {
+    std::enable_if_t<((arch_tag_ <= gpu_arch::XeHpc))>> {
  public:
   using epilogue_policy = epilogue_policy_default<arch_tag_>;
   using tile_shape = tile_shape_;

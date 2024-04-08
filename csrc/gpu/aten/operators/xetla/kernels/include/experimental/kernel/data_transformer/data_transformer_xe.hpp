@@ -19,10 +19,10 @@
 
 #pragma once
 
-#include "experimental/kernel/data_transformer/api.hpp"
-#include "experimental/kernel/data_transformer/common.hpp"
-#include "experimental/kernel/data_transformer/config.hpp"
-#include "group/reduction/reduction_xe.hpp"
+#include <experimental/kernel/data_transformer/api.hpp>
+#include <experimental/kernel/data_transformer/common.hpp>
+#include <experimental/kernel/data_transformer/config.hpp>
+#include <group/reduction/reduction_xe.hpp>
 
 namespace gpu::xetla::kernel {
 
@@ -51,7 +51,7 @@ struct xetla_data_transformer<
     data_transformer_attr_,
     mem_layout_in_,
     need_fp8_op,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   using dtype_in = dtype_in_;
   using dtype_out = dtype_out_;
   using dtype_compute = dtype_compute_;
@@ -74,7 +74,7 @@ struct xetla_data_transformer<
   static constexpr uint32_t wg_size_y = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
 
   using load_store_attr = typename arch_attr_t<
-      gpu_arch::Xe>::template load_store_attr<msg_type::block_2d>;
+      gpu_arch::XeHpc>::template load_store_attr<msg_type::block_2d>;
   static constexpr uint32_t max_load_height_in_elem =
       load_store_attr::max_load_height_in_elem;
   static constexpr uint32_t max_load_width_in_bytes =
@@ -126,7 +126,7 @@ struct xetla_data_transformer<
       mem_desc_t<dtype_in, mem_layout_in, mem_space::global>,
       global_ld_tile_desc_t,
       subgroup::msg_type_v<global_ld_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using global_st_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x,
@@ -139,7 +139,7 @@ struct xetla_data_transformer<
       mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>,
       global_st_tile_desc_t,
       msg_type::block_2d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using global_compute_tile_desc = subgroup::tile_desc_t<
       tile_size_x,
       tile_size_y,
@@ -156,7 +156,7 @@ struct xetla_data_transformer<
       reduce_op::max,
       wg_size_x * wg_size_y,
       true,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   /// @brief Arguments for gemm::run.
   /// User should prepare mat_in_ptr, mat_out_ptr, matrix_m, matrix_n,

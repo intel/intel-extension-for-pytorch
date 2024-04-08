@@ -21,6 +21,7 @@
 
 #include <CL/sycl.hpp>
 #include <ext/intel/esimd.hpp>
+#include <version.hpp>
 
 template <class T>
 using remove_const_t = typename std::remove_const<T>::type;
@@ -70,7 +71,11 @@ __XETLA_API int32_t xetla_get_subdevice_id() {
 
 namespace gpu::xetla {
 
-enum class gpu_arch : uint8_t { Dg2 = 0, Xe = 1 };
+enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2 };
+inline constexpr bool arch_has_xmx(gpu_arch arch) {
+  return arch >= gpu_arch::XeHpg;
+}
+
 enum class grf_mode : uint8_t { normal = 0, double_grf = 1 };
 
 enum class mem_layout : uint8_t { row_major = 0, col_major = 1 };
@@ -111,7 +116,7 @@ enum class data_size : uint8_t {
 /// The specific LSC shared function to fence with xetla_fence
 enum class memory_kind : uint8_t {
   untyped_global = 0, /// untyped global memory
-  untyped_global_low_pri = 1, /// low-priority untyped global memory
+  // "1" reserved for low-priority untyped global memory
   typed_global = 2, /// typed global memory
   shared_local = 3, /// shared local memory
 };
@@ -121,10 +126,8 @@ enum class fence_op : uint8_t {
   none = 0, /// no operation
   evict = 1, /// dirty lines evicted and invalidated from L1
   invalidate = 2, /// invalidate all clean lines
-  discard = 3, /// direct and clean lines are discarded w/o eviction
+
   clean = 4, /// dirty lines are written to memory, but retained in cache
-  /// in clean state
-  flushl2 = 5, /// flush only L2
 };
 /// The scope that xetla_fence operation should apply to
 enum class fence_scope : uint8_t {

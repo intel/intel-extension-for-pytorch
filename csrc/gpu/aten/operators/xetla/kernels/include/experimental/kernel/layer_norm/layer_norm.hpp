@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "experimental/kernel/layer_norm/api.hpp"
-#include "experimental/kernel/layer_norm/common.hpp"
-#include "experimental/kernel/layer_norm/config.hpp"
-#include "experimental/kernel/layer_norm/layer_norm_bwd_xe.hpp"
-#include "experimental/kernel/layer_norm/layer_norm_fwd_xe.hpp"
+#include <experimental/kernel/layer_norm/api.hpp>
+#include <experimental/kernel/layer_norm/common.hpp>
+#include <experimental/kernel/layer_norm/config.hpp>
+#include <experimental/kernel/layer_norm/layer_norm_bwd_xe.hpp>
+#include <experimental/kernel/layer_norm/layer_norm_fwd_xe.hpp>

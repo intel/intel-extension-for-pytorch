@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch as ipex  # noqa F401
 from .RoPE import apply_rotary_pos_emb
 
 
@@ -132,7 +132,15 @@ def qwen_sdp(self, query, key, value, attention_mask, head_mask, alibi):
             attention_mask = new_attention_mask.masked_fill_(
                 attention_mask.logical_not(), torch.finfo(query.dtype).min
             )
-    if not ipex._C._has_2d_block_array(0):
+    # Currently only PVC and MTL (without beam search) have sdp fusion available
+    if not (
+        torch.xpu.has_2d_block_array()
+        or (  # MTL greedy search
+            torch.xpu.has_xetla()
+            and not torch.xpu.has_xmx()
+            and not self.is_beam_search()
+        )
+    ):
         return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
     key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
     (

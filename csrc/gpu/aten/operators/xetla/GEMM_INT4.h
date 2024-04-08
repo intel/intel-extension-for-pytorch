@@ -1,10 +1,10 @@
 #pragma once
 
+#include <common/core/common.hpp>
 #include <sycl/sycl.hpp>
 
 namespace xpu {
 namespace xetla {
-
 template <
     typename scalar_t,
     int WG_M = 8,
@@ -17,7 +17,7 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = 1>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 void hgemm_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -43,7 +43,7 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = 1>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 void hgemm_bias_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -70,7 +70,7 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = 1>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 void hgemm_bias_gelu_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -97,7 +97,7 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = 1>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 void hgemm_mul_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -124,7 +124,7 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = 1>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 void hgemm_silu_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -150,7 +150,7 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = 1>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 void hgemm_bias_res_res_wint4(
     sycl::queue& queue,
     scalar_t* out,
@@ -179,7 +179,7 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = 1>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 void hgemm_qkv_wint4(
     sycl::queue& queue,
     scalar_t* out0,
@@ -207,7 +207,7 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = 1>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 void hgemm_qkv_bias_wint4(
     sycl::queue& queue,
     scalar_t* out0,
@@ -319,7 +319,7 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = 1>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 void hgemm_res_wint4(
     sycl::queue& queue,
     scalar_t* out,

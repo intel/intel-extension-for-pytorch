@@ -122,8 +122,10 @@ struct gru_layer_bpi {
   static constexpr uint32_t prefetch_distance = 3;
   using perf_tuning_knob = perf_tuning_knob_t<sg_tile_k, prefetch_distance>;
   using compute_attr = compute_attr_t<T, T, Act_T>;
-  using compute_policy =
-      compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch::Xe>;
+  using compute_policy = compute_policy_default_xmx<
+      compute_attr,
+      perf_tuning_knob,
+      gpu_arch::XeHpc>;
 
   using tile_shape_0 = tile_shape_t<
       wg_tile_n_0, // workgroup size in N dim
@@ -170,7 +172,7 @@ struct gru_layer_bpi {
       mem_desc_t<T, layout_grad, mem_loc_grad>,
       matA_tile_desc_t,
       msg_type_v<matA_tile_desc_t, mem_loc_grad>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using matA_load_0_t = tile_t<T, matA_tile_desc_t>;
 
@@ -178,7 +180,7 @@ struct gru_layer_bpi {
       mem_desc_t<T, layout_grad, mem_loc_grad>,
       tile_desc_t<matA_load_0_t::tile_size_x, matA_load_0_t::tile_size_y, 1, 1>,
       1, /*tg_size_x*/
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using matA_bpi_t = tile_t<Act_T, matA_tile_desc_t>;
 
@@ -192,21 +194,21 @@ struct gru_layer_bpi {
           1,
           1>,
       1, /*tg_size_x=1*/
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using matC_t0 = tile_t<T, matAcc_tile_desc_t0>;
   using matC_payload_t0 = mem_payload_t<
       mem_desc_t<T, layout_grad, mem_loc_grad>,
       matAcc_tile_desc_t0,
       msg_type_v<matAcc_tile_desc_t0, mem_loc_grad>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using matC_t1 = tile_t<T, matAcc_tile_desc_t1>;
   using matC_payload_t1 = mem_payload_t<
       mem_desc_t<T, layout_grad, mem_loc_grad>,
       matAcc_tile_desc_t1,
       msg_type_v<matAcc_tile_desc_t1, mem_loc_grad>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   static constexpr tdesc_update_dir load_update_config =
       tdesc_update_dir::x_dir;
   using mask_in_t = tile_t<float, matAcc_tile_desc_t1>;
@@ -214,7 +216,7 @@ struct gru_layer_bpi {
       mem_desc_t<float, mem_layout::row_major, mem_space::global>,
       matAcc_tile_desc_t1,
       msg_type_v<matAcc_tile_desc_t1, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   static void inline call(nd_item<3>& item, bpi_config_t<T>* args) {
     matA_tile_desc_t matA_tile_desc;

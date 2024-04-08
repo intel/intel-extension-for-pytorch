@@ -255,6 +255,8 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
             # for 2nd to last token, we convert the layout back
             # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
             hidden_states = hidden_states.transpose(0, 1)
+        elif not ipex._C._has_2d_block_array(0) and not ipex._C._has_xmx(0):
+            hidden_states = hidden_states.transpose(0, 1)
         outputs = (hidden_states,)
         if output_attentions:
             outputs += (self_attn_weights,)

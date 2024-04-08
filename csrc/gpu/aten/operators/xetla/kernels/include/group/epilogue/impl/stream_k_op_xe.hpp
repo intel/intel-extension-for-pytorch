@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "group/epilogue/api.hpp"
-#include "group/epilogue/common.hpp"
-#include "group/epilogue/epilogue_policy.hpp"
+#include <group/epilogue/api.hpp>
+#include <group/epilogue/common.hpp>
+#include <group/epilogue/epilogue_policy.hpp>
 
 namespace gpu::xetla::group {
 
@@ -35,7 +35,7 @@ template <
     typename mem_desc_d_t_,
     typename mem_desc_atomic_sync_t_>
 struct epilogue_stream_k_t {
-  static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   using epilogue_t = epilogue_t_;
   using mem_desc_d_t = mem_desc_d_t_;
   using mem_desc_c_t = typename epilogue_t::mem_desc_c_t;
@@ -116,8 +116,6 @@ struct epilogue_stream_k_t {
     static constexpr uint32_t tile_size_y = matAcc_t::tile_size_y;
     static constexpr uint32_t block_size_x = matAcc_t::block_size_x;
     static constexpr uint32_t block_size_y = matAcc_t::block_size_y;
-    static constexpr uint32_t tile_elems = matAcc_t::tile_elems;
-    static constexpr uint32_t block_elems = matAcc_t::block_elems;
 
     using matD_tile_desc_t = subgroup::tile_desc_t<
         tile_size_x,
@@ -126,7 +124,6 @@ struct epilogue_stream_k_t {
         block_size_y,
         reg_layout::tiled>;
 
-    using matD_t = subgroup::tile_t<dtype_d, matD_tile_desc_t>;
     using matD_atomic_payload_t = subgroup::mem_payload_t<
         mem_desc_d_t,
         matD_tile_desc_t,

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "subgroup/subgroup.hpp"
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla::group {
 
@@ -41,7 +41,7 @@ template <
     reduce_op Op,
     uint32_t N_SG,
     bool is_all_reduce = true,
-    gpu_arch arch_ = gpu_arch::Xe>
+    gpu_arch arch_ = gpu_arch::XeHpc>
 struct group_reduce_t {};
 
 } // namespace gpu::xetla::group

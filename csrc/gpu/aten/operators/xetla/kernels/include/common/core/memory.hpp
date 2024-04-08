@@ -19,11 +19,11 @@
 
 #pragma once
 
-#include "common/core/base_ops.hpp"
-#include "common/core/base_types.hpp"
-#include "common/core/common.hpp"
-#include "common/core/explicit_conv.hpp"
-#include "common/utils/limitation.hpp"
+#include <common/core/base_ops.hpp>
+#include <common/core/base_types.hpp>
+#include <common/core/common.hpp>
+#include <common/core/explicit_conv.hpp>
+#include <common/utils/limitation.hpp>
 
 namespace gpu::xetla {
 
@@ -78,59 +78,89 @@ constexpr __ESIMD_ENS::lsc_data_size get_data_size(gpu::xetla::data_size ds) {
 /// @brief lookup table for memory kind.
 ///
 ///
-constexpr __ESIMD_ENS::lsc_memory_kind get_memory_kind(
-    gpu::xetla::memory_kind mk) {
+constexpr auto get_memory_kind(gpu::xetla::memory_kind mk) {
   switch (mk) {
+#if __INTEL_LLVM_COMPILER >= 20240100
+    case gpu::xetla::memory_kind::untyped_global:
+      return __ESIMD_NS::memory_kind::global;
+    case gpu::xetla::memory_kind::typed_global:
+      return __ESIMD_NS::memory_kind::image;
+    case gpu::xetla::memory_kind::shared_local:
+      return __ESIMD_NS::memory_kind::local;
+#else // legacy experimental api
     case gpu::xetla::memory_kind::untyped_global:
       return __ESIMD_ENS::lsc_memory_kind::untyped_global;
-    case gpu::xetla::memory_kind::untyped_global_low_pri:
-      return __ESIMD_ENS::lsc_memory_kind::untyped_global_low_pri;
     case gpu::xetla::memory_kind::typed_global:
       return __ESIMD_ENS::lsc_memory_kind::typed_global;
     case gpu::xetla::memory_kind::shared_local:
       return __ESIMD_ENS::lsc_memory_kind::shared_local;
+#endif
   }
 }
 
 /// @brief lookup table for fence op.
 ///
 ///
-constexpr __ESIMD_ENS::lsc_fence_op get_fence_op(gpu::xetla::fence_op fo) {
+constexpr auto get_fence_op(gpu::xetla::fence_op fo) {
   switch (fo) {
+#if __INTEL_LLVM_COMPILER >= 20240100
     case gpu::xetla::fence_op::none:
+      return __ESIMD_NS::fence_flush_op::none;
+    case gpu::xetla::fence_op::evict:
+      return __ESIMD_NS::fence_flush_op::evict;
+    case gpu::xetla::fence_op::invalidate:
+      return __ESIMD_NS::fence_flush_op::invalidate;
+    case gpu::xetla::fence_op::clean:
+      return __ESIMD_NS::fence_flush_op::clean;
+#else // legacy experimental api
+    case gpu::xetla::fence_op::none: //
       return __ESIMD_ENS::lsc_fence_op::none;
     case gpu::xetla::fence_op::evict:
       return __ESIMD_ENS::lsc_fence_op::evict;
     case gpu::xetla::fence_op::invalidate:
       return __ESIMD_ENS::lsc_fence_op::invalidate;
-    case gpu::xetla::fence_op::discard:
-      return __ESIMD_ENS::lsc_fence_op::discard;
     case gpu::xetla::fence_op::clean:
       return __ESIMD_ENS::lsc_fence_op::clean;
-    case gpu::xetla::fence_op::flushl2:
-      return __ESIMD_ENS::lsc_fence_op::flushl3;
+#endif
   }
 }
 
 /// @brief lookup table for fence scope.
 ///
 ///
-constexpr __ESIMD_ENS::lsc_scope get_fence_scope(gpu::xetla::fence_scope fs) {
+constexpr auto get_fence_scope(gpu::xetla::fence_scope fs) {
   switch (fs) {
+#if __INTEL_LLVM_COMPILER >= 20240100
+    case gpu::xetla::fence_scope::group:
+      return __ESIMD_NS::fence_scope::group;
+    case gpu::xetla::fence_scope::local:
+      return __ESIMD_NS::fence_scope::local;
+    case gpu::xetla::fence_scope::tile:
+      return __ESIMD_NS::fence_scope::tile;
+    case gpu::xetla::fence_scope::gpu: //
+      return __ESIMD_NS::fence_scope::gpu;
+    case gpu::xetla::fence_scope::gpus:
+      return __ESIMD_NS::fence_scope::gpus;
+    case gpu::xetla::fence_scope::system:
+      return __ESIMD_NS::fence_scope::system;
+    case gpu::xetla::fence_scope::sysacq:
+      return __ESIMD_NS::fence_scope::system_acquire;
+#else // legacy experimental api
     case gpu::xetla::fence_scope::group:
       return __ESIMD_ENS::lsc_scope::group;
     case gpu::xetla::fence_scope::local:
       return __ESIMD_ENS::lsc_scope::local;
-    case gpu::xetla::fence_scope::tile:
+    case gpu::xetla::fence_scope::tile: //
       return __ESIMD_ENS::lsc_scope::tile;
-    case gpu::xetla::fence_scope::gpu:
+    case gpu::xetla::fence_scope::gpu: //
       return __ESIMD_ENS::lsc_scope::gpu;
-    case gpu::xetla::fence_scope::gpus:
+    case gpu::xetla::fence_scope::gpus: //
       return __ESIMD_ENS::lsc_scope::gpus;
     case gpu::xetla::fence_scope::system:
       return __ESIMD_ENS::lsc_scope::system;
     case gpu::xetla::fence_scope::sysacq:
       return __ESIMD_ENS::lsc_scope::sysacq;
+#endif
   }
 }
 
@@ -293,8 +323,8 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_global(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts, N>(
-          offsets, (uint64_t)p));
+      core::general_1d<gpu_arch::XeHpc, Ty>::
+          template check_restriction<NElts, N>(offsets, (uint64_t)p));
 
   return __ESIMD_ENS::lsc_gather<
       T,
@@ -335,7 +365,7 @@ __XETLA_API xetla_vector<Ty, NElts> xetla_load_global(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts>(
+      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
           offset, (uint64_t)p));
 
   return __ESIMD_ENS::lsc_block_load<
@@ -578,8 +608,8 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_local(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts, N>(
-          offsets));
+      core::general_1d<gpu_arch::XeHpc, Ty>::
+          template check_restriction<NElts, N>(offsets));
 
   return __ESIMD_ENS::
       lsc_slm_gather<T, NElts, gpu::xetla::detail::get_data_size(DS), N>(
@@ -609,7 +639,7 @@ __XETLA_API xetla_vector<Ty, NElts> xetla_load_local(uint32_t offset) {
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts>(
+      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
           (uint64_t)offset));
 
   return __ESIMD_ENS::
@@ -645,7 +675,7 @@ __XETLA_API void xetla_store_local(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::
+      core::general_1d<gpu_arch::XeHpc, Ty>::
           template check_restriction<NElts, N, uint32_t>(offsets));
 
   __ESIMD_ENS::
@@ -677,7 +707,7 @@ __XETLA_API void xetla_store_local(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts>(
+      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
           offset));
 
   __ESIMD_ENS::
@@ -791,12 +821,19 @@ template <
     fence_op FenceOp = fence_op::none,
     fence_scope Scope = fence_scope::group,
     int N = 16>
-__XETLA_API void xetla_fence(xetla_mask<N> pred = 1) {
+__XETLA_API void xetla_fence() {
+#if __INTEL_LLVM_COMPILER >= 20240100
+  __ESIMD_NS::fence<
+      gpu::xetla::detail::get_memory_kind(Kind),
+      gpu::xetla::detail::get_fence_op(FenceOp),
+      gpu::xetla::detail::get_fence_scope(Scope)>();
+#else
   __ESIMD_ENS::lsc_fence<
       gpu::xetla::detail::get_memory_kind(Kind),
       gpu::xetla::detail::get_fence_op(FenceOp),
       gpu::xetla::detail::get_fence_scope(Scope),
-      N>(pred);
+      N>(xetla_mask<N>(1));
+#endif
 }
 
 /// @} xetla_core_memory

@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "common/utils/common.hpp"
+#include <common/utils/common.hpp>
 
 namespace gpu::xetla {
 

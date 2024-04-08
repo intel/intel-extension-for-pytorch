@@ -16,99 +16,125 @@
 
 #pragma once
 
-#include "common/common.hpp"
-#include "group/group.hpp"
-#include "subgroup/subgroup.hpp"
+#include <common/common.hpp>
+#include <group/group.hpp>
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla {
 
 // enum
 
-enum class tune_key {
-  DATA_TYPE_A,
-  MEMORY_LAYOUT_A,
-  MEMORY_ALIGNMENT_A,
-  MEMORY_SPACE_A,
-  DATA_TYPE_B,
-  MEMORY_LAYOUT_B,
-  MEMORY_ALIGNMENT_B,
-  MEMORY_SPACE_B,
-  DATA_TYPE_C,
-  MEMORY_LAYOUT_C,
-  MEMORY_ALIGNMENT_C,
-  MEMORY_SPACE_C,
-  DATA_TYPE_ACC,
-  GLOBAL_KSLICING_RATIO,
-  LOCAL_KSLICING_RATIO,
-  WG_TILE_SHAPE,
-  WG_TILE_K,
-  SG_TILE_SHAPE,
-  PRE_PROCESSING,
-  PREFETCH_DISTANCE,
-  PERIODIC_SYNC_INTERVAL,
-  MMA_ENGINE,
-  GPU_ARCH,
-  EPILOGUE_POLICY,
-  DISPATCH_POLICY,
-  GROUP_SWIZZLE_POLICY,
-  PARAM_OPTIMZER_TYPE,
-  SOURCE_LOCATION
+enum class tune_key : uint8_t {
+  data_type_a,
+  memory_layout_a,
+  memory_alignment_a,
+  memory_space_a,
+  data_type_b,
+  memory_layout_b,
+  memory_alignment_b,
+  memory_space_b,
+  data_type_c,
+  memory_layout_c,
+  memory_alignment_c,
+  memory_space_c,
+  data_type_acc,
+  global_kslicing_ratio,
+  local_kslicing_ratio,
+  wg_tile_shape,
+  wg_tile_k,
+  sg_tile_shape,
+  pre_processing,
+  prefetch_distance,
+  periodic_sync_interval,
+  mma_engine,
+  gpu_arch,
+  epilogue_policy,
+  dispatch_policy,
+  group_swizzle_policy,
+  param_optimizer_type,
+  param_optimizer_level,
+  source_location
 };
+template <typename T>
+using data_type_a_t =
+    typename T::template find_elem_t<tune_key::data_type_a>::type;
+template <typename T>
+using data_type_b_t =
+    typename T::template find_elem_t<tune_key::data_type_b>::type;
+template <typename T>
+using data_type_c_t =
+    typename T::template find_elem_t<tune_key::data_type_c>::type;
+template <typename T>
+constexpr auto memory_layout_a_v =
+    T::template find_elem_v<tune_key::memory_layout_a>;
+template <typename T>
+constexpr auto memory_alignment_a_v =
+    T::template find_elem_v<tune_key::memory_alignment_a>;
+template <typename T>
+constexpr auto memory_layout_b_v =
+    T::template find_elem_v<tune_key::memory_layout_b>;
+template <typename T>
+constexpr auto memory_alignment_b_v =
+    T::template find_elem_v<tune_key::memory_alignment_b>;
+template <typename T>
+constexpr auto memory_layout_c_v =
+    T::template find_elem_v<tune_key::memory_layout_c>;
+template <typename T>
+constexpr auto memory_alignment_c_v =
+    T::template find_elem_v<tune_key::memory_alignment_c>;
+template <typename T>
+constexpr auto gpu_arch_v = T::template find_elem_v<tune_key::gpu_arch>;
 
-enum class tune_key_value {
-  PRE_PROCESSING_DEFAULT,
-  PRE_PROCESSING_MATA_NEG_FILTER,
-  DISPATCH_POLICY_DEFAULT,
-  DISPATCH_POLICY_KSLICING,
-  DISPATCH_POLICY_STREAM_K,
-  PARAM_OPTIMZER_DUMMY,
-  PARAM_OPTIMZER_DECISION_TREE
+enum class tune_key_value : uint8_t {
+  pre_processing_default,
+  pre_processing_mata_neg_filter,
+  dispatch_policy_default,
+  dispatch_policy_kslicing,
+  dispatch_policy_stream_k,
+  param_optimizer_dummy,
+  param_optimizer_decision_tree
 };
 
 // parameter optimizer
 
-enum class param_optimizer_tag { KERNEL, WORKGROUP };
+enum class param_optimizer_tag : uint8_t { kernel, work_group };
+// optimizer_level (currently only useful with param_optimizer_decision_tree)
+enum class param_optimizer_level : uint8_t {
+  full, // optimize all available options
+  keep_shape, // optimize all except keeping the original wg/sg tile shape
+};
 
 template <param_optimizer_tag tag_, typename dict_t_>
 struct param_optimizer;
 
 struct param_optimizer_base {
   template <typename T, typename U>
-  struct validate_attribute {
-    static constexpr bool value = []() constexpr {
-      bool valid = true;
-      valid &= std::is_same<
-          typename T::template find_elem_t<tune_key::DATA_TYPE_A>::type,
-          typename U::template find_elem_t<tune_key::DATA_TYPE_A>::type>::value;
-      valid &= T::template find_elem_v<tune_key::MEMORY_LAYOUT_A> ==
-          U::template find_elem_v<tune_key::MEMORY_LAYOUT_A>;
-      valid &= T::template find_elem_v<tune_key::MEMORY_ALIGNMENT_A> ==
-          U::template find_elem_v<tune_key::MEMORY_ALIGNMENT_A>;
-      valid &= std::is_same<
-          typename T::template find_elem_t<tune_key::DATA_TYPE_B>::type,
-          typename U::template find_elem_t<tune_key::DATA_TYPE_B>::type>::value;
-      valid &= T::template find_elem_v<tune_key::MEMORY_LAYOUT_B> ==
-          U::template find_elem_v<tune_key::MEMORY_LAYOUT_B>;
-      valid &= T::template find_elem_v<tune_key::MEMORY_ALIGNMENT_B> ==
-          U::template find_elem_v<tune_key::MEMORY_ALIGNMENT_B>;
-      valid &= std::is_same<
-          typename T::template find_elem_t<tune_key::DATA_TYPE_C>::type,
-          typename U::template find_elem_t<tune_key::DATA_TYPE_C>::type>::value;
-      valid &= T::template find_elem_v<tune_key::MEMORY_LAYOUT_C> ==
-          U::template find_elem_v<tune_key::MEMORY_LAYOUT_C>;
-      valid &= T::template find_elem_v<tune_key::MEMORY_ALIGNMENT_C> ==
-          U::template find_elem_v<tune_key::MEMORY_ALIGNMENT_C>;
-      valid &= T::template find_elem_v<tune_key::GPU_ARCH> ==
-          U::template find_elem_v<tune_key::GPU_ARCH>;
-      return valid;
-    }
-    ();
-  };
+  static constexpr bool valid_attribute_v =
+      std::is_same_v<data_type_a_t<T>, data_type_a_t<U>> //
+          && memory_layout_a_v<T> ==
+      memory_layout_a_v<U> //
+          && memory_alignment_a_v<T> ==
+      memory_alignment_a_v<U> //
+          && std::is_same_v<data_type_b_t<T>, data_type_b_t<U>> //
+              && memory_layout_b_v<T> ==
+      memory_layout_b_v<U> //
+          && memory_alignment_b_v<T> ==
+      memory_alignment_b_v<U> //
+          && std::is_same_v<data_type_c_t<T>, data_type_c_t<U>> //
+              && memory_layout_c_v<T> ==
+      memory_layout_c_v<U> //
+          && memory_alignment_c_v<T> ==
+      memory_alignment_c_v<U> //
+          && gpu_arch_v<T> == gpu_arch_v<U>;
 };
 
 // parameter adaptor
 
-enum class param_adaptor_tag { KERNEL, WORKGROUP_GEMM, WORKGROUP_EPILOGUE };
+enum class param_adaptor_tag : uint8_t {
+  kernel,
+  work_group_gemm,
+  work_group_epilogue
+};
 
 template <param_adaptor_tag tag_, typename dict_t_>
 struct param_adaptor;
@@ -116,25 +142,25 @@ struct param_adaptor;
 template <typename dict_t_>
 struct param_adaptor_base {
   using dtype_acc =
-      typename dict_t_::template find_elem_t<tune_key::DATA_TYPE_ACC>::type;
+      typename dict_t_::template find_elem_t<tune_key::data_type_acc>::type;
   using wg_tile_shape =
-      typename dict_t_::template find_elem_t<tune_key::WG_TILE_SHAPE>::type;
+      typename dict_t_::template find_elem_t<tune_key::wg_tile_shape>::type;
   static constexpr uint32_t wg_tile_n = wg_tile_shape::template dim<0>();
   static constexpr uint32_t wg_tile_m = wg_tile_shape::template dim<1>();
   static constexpr uint32_t wg_tile_k =
-      dict_t_::template find_elem_v<tune_key::WG_TILE_K>;
+      dict_t_::template find_elem_v<tune_key::wg_tile_k>;
   using sg_tile_shape =
-      typename dict_t_::template find_elem_t<tune_key::SG_TILE_SHAPE>::type;
+      typename dict_t_::template find_elem_t<tune_key::sg_tile_shape>::type;
   static constexpr uint32_t sg_tile_n = sg_tile_shape::template dim<0>();
   static constexpr uint32_t sg_tile_m = sg_tile_shape::template dim<1>();
   static constexpr uint32_t prefetch_distance =
-      dict_t_::template find_elem_v<tune_key::PREFETCH_DISTANCE>;
+      dict_t_::template find_elem_v<tune_key::prefetch_distance>;
   static constexpr uint32_t periodic_sync_interval =
-      dict_t_::template find_elem_v<tune_key::PERIODIC_SYNC_INTERVAL>;
+      dict_t_::template find_elem_v<tune_key::periodic_sync_interval>;
   static constexpr auto mma_engine_tag =
-      dict_t_::template find_elem_v<tune_key::MMA_ENGINE>;
+      dict_t_::template find_elem_v<tune_key::mma_engine>;
   static constexpr auto gpu_arch_tag =
-      dict_t_::template find_elem_v<tune_key::GPU_ARCH>;
+      dict_t_::template find_elem_v<tune_key::gpu_arch>;
 
   // Org the compute shape for sub-matrix
   using tile_shape = group::tile_shape_t<
@@ -146,5 +172,5 @@ struct param_adaptor_base {
 
 } // namespace gpu::xetla
 
-#include "kernel/default_config/decision_tree_policy.hpp"
-#include "kernel/default_config/dummy_policy.hpp"
+#include <kernel/default_config/decision_tree_policy.hpp>
+#include <kernel/default_config/dummy_policy.hpp>

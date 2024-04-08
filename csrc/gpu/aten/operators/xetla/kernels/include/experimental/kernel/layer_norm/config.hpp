@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "experimental/kernel/layer_norm/common.hpp"
+#include <experimental/kernel/layer_norm/common.hpp>
 
 namespace gpu::xetla::kernel {
 

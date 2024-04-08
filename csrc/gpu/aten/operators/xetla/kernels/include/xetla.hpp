@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "common/common.hpp"
-#include "experimental/experimental.hpp"
-#include "group/group.hpp"
-#include "kernel/kernel.hpp"
-#include "subgroup/subgroup.hpp"
+#include <common/common.hpp>
+#include <experimental/experimental.hpp>
+#include <group/group.hpp>
+#include <kernel/kernel.hpp>
+#include <subgroup/subgroup.hpp>

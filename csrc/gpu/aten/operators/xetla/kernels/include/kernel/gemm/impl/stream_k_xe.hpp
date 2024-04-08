@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "kernel/gemm/api.hpp"
-#include "kernel/gemm/common.hpp"
-#include "kernel/gemm/dispatch_policy.hpp"
+#include <kernel/gemm/api.hpp>
+#include <kernel/gemm/common.hpp>
+#include <kernel/gemm/dispatch_policy.hpp>
 namespace gpu::xetla::kernel {
 
 /// @addtogroup xetla_gemm_universal
@@ -33,14 +33,14 @@ namespace gpu::xetla::kernel {
 /// @tparam epilogue_t_ Is the epilogue functor to compose a GEMM_UNIVERSAL.
 template <typename gemm_t_, typename epilogue_t_>
 class gemm_universal_t<
-    dispatch_policy_stream_k<gpu_arch::Xe>,
+    dispatch_policy_stream_k<gpu_arch::XeHpc>,
     gemm_t_,
     epilogue_t_> {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using gemm_args_t = typename gemm_t::arguments_t;
   using epilogue_args_t = typename epilogue_t::arguments_t;
-  using dispatch_stream_k = dispatch_policy_stream_k<gpu_arch::Xe>;
+  using dispatch_stream_k = dispatch_policy_stream_k<gpu_arch::XeHpc>;
 
   // Scratchspace to accumulate partials
   using mem_desc_d_t =
@@ -63,7 +63,7 @@ class gemm_universal_t<
 
   using work_group_t = typename gemm_t::work_group_t;
 
-  static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   static_assert(arch_tag == gemm_t::arch_tag, "arch_tag should be the same");
 
   using mem_desc_a_t = typename gemm_t::mem_desc_a_t;
@@ -175,16 +175,16 @@ class gemm_universal_t<
         : matrix_m(matrix_m_),
           matrix_k(matrix_k_),
           matrix_n(matrix_n_),
-          matA_base(matA_base_),
           matA_ld(matA_ld_),
-          matB_base(matB_base_),
           matB_ld(matB_ld_),
-          matC_base(matC_base_),
           matC_ld(matC_ld_),
-          matD_base(matD_base_),
           matD_ld(matD_ld_),
-          matatomic_sync_base(matatomic_sync_base_),
           matatomic_sync_ld(matatomic_sync_ld_),
+          matA_base(matA_base_),
+          matB_base(matB_base_),
+          matC_base(matC_base_),
+          matD_base(matD_base_),
+          matatomic_sync_base(matatomic_sync_base_),
           stream_k_args(stream_k_args_),
           epilogue_args(epilogue_args_) {}
     // Be aware of the risks: Rule of three (copy constructor, copy assignment,
@@ -194,16 +194,16 @@ class gemm_universal_t<
         : matrix_m(args.matrix_m),
           matrix_k(args.matrix_k),
           matrix_n(args.matrix_n),
-          matA_base(args.matA_base),
           matA_ld(args.matA_ld),
-          matB_base(args.matB_base),
           matB_ld(args.matB_ld),
-          matC_base(args.matC_base),
           matC_ld(args.matC_ld),
-          matD_base(args.matD_base),
           matD_ld(args.matD_ld),
-          matatomic_sync_base(args.matatomic_sync_base),
           matatomic_sync_ld(args.matatomic_sync_ld),
+          matA_base(args.matA_base),
+          matB_base(args.matB_base),
+          matC_base(args.matC_base),
+          matD_base(args.matD_base),
+          matatomic_sync_base(args.matatomic_sync_base),
           stream_k_args(args.stream_k_args),
           epilogue_args(args.epilogue_args) {}
     inline arguments_t& operator=(const arguments_t& args) {
@@ -243,8 +243,8 @@ class gemm_universal_t<
   __XETLA_API static constexpr uint32_t get_slm_size() {
     constexpr uint32_t size = gemm_t::slm_size + epilogue_t::slm_size;
     static_assert(
-        size <= (128 * 1024),
-        "The local memory size should be less than 128KB!");
+        size <= arch_attr_t<arch_tag>::local_mem_size,
+        "The local memory size excess!");
     return size;
   };
 
@@ -254,8 +254,8 @@ class gemm_universal_t<
   static cl::sycl::range<3> get_local_range() {
     uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
     uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
-    // std::cout << "Local range: {" << 1 << ", " << local_range_m << ", "
-    //           << local_range_n << "} \n";
+    std::cout << "Local range: {" << 1 << ", " << local_range_m << ", "
+              << local_range_n << "} \n";
     assert(local_range_m * local_range_n <= 32);
     // Linearize for stream_k algorithm
     return cl::sycl::range<3>{1, 1, local_range_m * local_range_n};
@@ -393,7 +393,7 @@ class gemm_universal_t<
       int group_iter_end,
       int matrix_k,
       int iters_per_tile,
-      uint32_t stride_k) {
+      [[maybe_unused]] uint32_t stride_k) {
     // The first global-scoped MAC iteration for this tile
     int tile_iter_begin = tile_idx * iters_per_tile;
 
@@ -517,7 +517,7 @@ class gemm_universal_t<
 
         int first_group_idx =
             workgroup_mapping.get_first_group_idx(tile_idx, group_idx);
-        bool tile_finished = (tile_work.k_end == args.matrix_k);
+        bool tile_finished = (boundary_k == args.matrix_k);
         bool tile_started = (tile_work.k_begin == 0);
 
         // set up arguments
@@ -625,7 +625,6 @@ class gemm_universal_t<
     }
   }
 };
-
 /// @} xetla_gemm_universal
 
 } // namespace gpu::xetla::kernel

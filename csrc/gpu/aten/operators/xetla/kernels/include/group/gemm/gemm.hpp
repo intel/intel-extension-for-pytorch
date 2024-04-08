@@ -23,12 +23,12 @@
 /// @defgroup xetla_gemm XeTLA GEMM
 /// This is a gemm API to compute matAcc = matA * matB.
 
-#include "group/gemm/api.hpp"
-#include "group/gemm/common.hpp"
-#include "group/gemm/compute_policy.hpp"
-#include "group/gemm/impl/default_fpu_xe.hpp"
-#include "group/gemm/impl/default_xmx_xe.hpp"
-#include "group/gemm/impl/pre_processing_xe.hpp"
-#include "group/gemm/impl/selector_xe.hpp"
-#include "group/gemm/impl/unaligned_xmx_xe.hpp"
-#include "group/tile_shape.hpp"
+#include <group/gemm/api.hpp>
+#include <group/gemm/common.hpp>
+#include <group/gemm/compute_policy.hpp>
+#include <group/gemm/impl/default_fpu_xe.hpp>
+#include <group/gemm/impl/default_xmx_xe.hpp>
+#include <group/gemm/impl/pre_processing_xe.hpp>
+#include <group/gemm/impl/selector_xe.hpp>
+#include <group/gemm/impl/unaligned_xmx_xe.hpp>
+#include <group/tile_shape.hpp>

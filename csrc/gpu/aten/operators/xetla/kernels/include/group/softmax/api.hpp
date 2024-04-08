@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "group/softmax/common.hpp"
+#include <group/softmax/common.hpp>
 
 namespace gpu::xetla::group {
 

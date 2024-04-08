@@ -1,3 +1,4 @@
+#if defined(USE_XETLA)
 #include "XEGEMM_INT4.h"
 #include <ATen/ATen.h>
 #include <ATen/CPUApplyUtils.h>
@@ -5,8 +6,6 @@
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
 #include "utils/CustomOperatorRegistration.h"
-
-#if defined(USE_XETLA)
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -47,6 +46,19 @@ namespace AtenIpexTypeXPU {
     policy.run();                                                             \
   }
 
+int8_t GetGpuArchId() noexcept {
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  bool is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
+  bool is_xmx = dpcppGetDeviceHasXMX(curDevID);
+  if (is_2d_block && is_xmx) {
+    return static_cast<int8_t>(gpu::xetla::gpu_arch::XeHpc);
+  } else if (is_xmx) {
+    return static_cast<int8_t>(gpu::xetla::gpu_arch::XeHpg);
+  } else { // TODO(Yi): distinguish PVC-VG from MTL which supports 2d-block
+    return static_cast<int8_t>(gpu::xetla::gpu_arch::XeLpg);
+  }
+}
 static void mm_qkv_out_wint4(
     const Tensor& input_,
     const Tensor& weight,
@@ -90,10 +102,7 @@ static void mm_qkv_out_wint4(
       (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
        weight.scalar_type() == kChar));
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
-  GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias, is_2d_block);
+  GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias, GetGpuArchId());
 }
 
 #undef GEMM_QKV_WINT4_XETLA_DISPATCH
@@ -143,11 +152,6 @@ static Tensor mm_bias_int4(
   auto output = at::empty({m, n}, input.options());
 
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
-
   auto policy = HGEMMXetla_INT4()
                     .add_matrix_out(output)
                     .add_matrix_inp(input_flat)
@@ -156,7 +160,7 @@ static Tensor mm_bias_int4(
                     .add_matrix_zp(weight_zp)
                     .add_epilogue(bias, HGEMMXetla_INT4::EpilogueType::BIAS)
                     .add_calib_gz(calib_gz)
-                    .add_arch(is_2d_block)
+                    .add_arch(GetGpuArchId())
                     .build();
   TORCH_CHECK(policy.fallback() == false, "mm bias int4: invalid gemm shape");
   policy.run();
@@ -181,10 +185,6 @@ static Tensor mm_int4(
 
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
-
   auto policy = HGEMMXetla_INT4()
                     .add_matrix_out(output)
                     .add_matrix_inp(input_flat)
@@ -192,7 +192,7 @@ static Tensor mm_int4(
                     .add_matrix_scl(weight_scl)
                     .add_matrix_zp(weight_zp)
                     .add_calib_gz(calib_gz)
-                    .add_arch(is_2d_block)
+                    .add_arch(GetGpuArchId())
                     .build();
   TORCH_CHECK(policy.fallback() == false, "mm int4: invalid gemm shape");
   policy.run();
@@ -215,10 +215,6 @@ static Tensor mm_silu_int4(
   int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
-
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
   auto policy = HGEMMXetla_INT4()
                     .add_matrix_out(output)
                     .add_matrix_inp(input_flat)
@@ -227,7 +223,7 @@ static Tensor mm_silu_int4(
                     .add_matrix_zp(weight_zp)
                     .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
                     .add_calib_gz(calib_gz)
-                    .add_arch(is_2d_block)
+                    .add_arch(GetGpuArchId())
                     .build();
   TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
   policy.run();
@@ -252,9 +248,6 @@ static Tensor mm_resmul_int4(
   int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
   auto policy =
       HGEMMXetla_INT4()
           .add_matrix_out(output)
@@ -264,7 +257,7 @@ static Tensor mm_resmul_int4(
           .add_matrix_zp(weight_zp)
           .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
           .add_calib_gz(calib_gz)
-          .add_arch(is_2d_block)
+          .add_arch(GetGpuArchId())
           .build();
   TORCH_CHECK(policy.fallback() == false, "mm resmul int4: invalid gemm shape");
   policy.run();
@@ -291,9 +284,6 @@ static Tensor mm_bias_gelu_int4(
   int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
   auto policy =
       HGEMMXetla_INT4()
           .add_matrix_out(output)
@@ -304,7 +294,7 @@ static Tensor mm_bias_gelu_int4(
           .add_epilogue(bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS)
           .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::GELU)
           .add_calib_gz(calib_gz)
-          .add_arch(is_2d_block)
+          .add_arch(GetGpuArchId())
           .build();
   TORCH_CHECK(
       policy.fallback() == false, "mm bias gelu int4: invalid gemm shape");
@@ -336,9 +326,6 @@ static Tensor mm_bias_resadd_resadd_int4(
   int n = weight.sizes()[1] * 2;
   int k = input.sizes()[1];
   auto output = at::empty({m, n}, input.options());
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
   auto policy = HGEMMXetla_INT4()
                     .add_matrix_out(output)
                     .add_matrix_inp(input)
@@ -349,7 +336,7 @@ static Tensor mm_bias_resadd_resadd_int4(
                     .add_epilogue(res0, HGEMMXetla_INT4::EpilogueType::RES_ADD)
                     .add_epilogue(res1, HGEMMXetla_INT4::EpilogueType::RES_ADD)
                     .add_calib_gz(calib_gz)
-                    .add_arch(is_2d_block)
+                    .add_arch(GetGpuArchId())
                     .build();
   TORCH_CHECK(
       policy.fallback() == false,
@@ -392,10 +379,6 @@ static Tensor mm_silu_mul_int4(
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block =
-      static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
   auto policy =
       HGEMMXetla_INT4()
           .add_matrix_out(output)
@@ -406,7 +389,7 @@ static Tensor mm_silu_mul_int4(
           .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
           .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
           .add_calib_gz(calib_gz)
-          .add_arch(is_2d_block)
+          .add_arch(GetGpuArchId())
           .build();
   TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
   policy.run();
@@ -434,10 +417,6 @@ static Tensor mm_bias_silu_mul_int4(
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block =
-      static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
   auto policy =
       HGEMMXetla_INT4()
           .add_matrix_out(output)
@@ -449,7 +428,7 @@ static Tensor mm_bias_silu_mul_int4(
           .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
           .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
           .add_calib_gz(calib_gz)
-          .add_arch(is_2d_block)
+          .add_arch(GetGpuArchId())
           .build();
   TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
   policy.run();
@@ -475,10 +454,6 @@ static Tensor mm_add_int4(
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block =
-      static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
   auto policy =
       HGEMMXetla_INT4()
           .add_matrix_out(output)
@@ -488,7 +463,7 @@ static Tensor mm_add_int4(
           .add_matrix_zp(weight_zp)
           .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD)
           .add_calib_gz(calib_gz)
-          .add_arch(is_2d_block)
+          .add_arch(GetGpuArchId())
           .build();
   TORCH_CHECK(policy.fallback() == false, "mm add int4: invalid gemm shape");
   policy.run();
@@ -516,10 +491,6 @@ static Tensor mm_bias_add_int4(
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
 
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  int8_t is_2d_block =
-      static_cast<int8_t>(Settings::I().has_2d_block_array(curDevID));
   auto policy =
       HGEMMXetla_INT4()
           .add_matrix_out(output)
@@ -530,7 +501,7 @@ static Tensor mm_bias_add_int4(
           .add_epilogue(bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS)
           .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD)
           .add_calib_gz(calib_gz)
-          .add_arch(is_2d_block)
+          .add_arch(GetGpuArchId())
           .build();
   TORCH_CHECK(
       policy.fallback() == false, "mm bias add int4: invalid gemm shape");

@@ -293,7 +293,7 @@ class ifmha_forward_t {
           mem_desc_t<index_t, mem_desc_Ij_t::layout, mem_desc_Ij_t::space>,
           index_tile_desc_t,
           msg_type::block_2d,
-          gpu_arch::Xe>;
+          gpu_arch::XeHpc>;
       index_tile_t index_tile;
       index_payload_t index_payload;
 
@@ -332,7 +332,7 @@ class ifmha_forward_t {
   using compute_policy_bmbc = group::compute_policy_default_xmx<
       compute_attr,
       perf_tuning_knob_bmbc,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using brgemm_Sij_t = group::gemm_t<
       compute_policy_bmbc,
       tile_shape_BmBc,
@@ -490,12 +490,12 @@ class ifmha_forward_t {
         mem_desc_t<scalar_t, layout_b, mem_space::global>,
         matB_tile_desc_t,
         subgroup::msg_type_v<matB_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
         mem_desc_t<scalar_t, layout_b, mem_space::global>,
         subgroup::tile_desc_t<kSgBc, accum_step_bmbc, 1, 1>,
         tile_shape_BmBc::wg_size_y,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     mem_desc_Kj_t matB_mem_desc = ctx.desc_Kj;
     int32_t sg_idx = ctx.g.get_id() % tile_shape_BmBc::wg_size_x;
@@ -565,7 +565,7 @@ class ifmha_forward_t {
         mem_desc_t<scalar_t, mem_desc_QiL_t::layout, mem_desc_QiL_t::space>,
         matQi_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using matQi_t = subgroup::tile_t<scalar_t, matQi_tile_desc_t>;
     using matQi_acc_t = subgroup::tile_t<accum_t, matQi_tile_desc_t>;
 
@@ -631,7 +631,7 @@ class ifmha_forward_t {
   using compute_policy_bmhm = group::compute_policy_default_xmx<
       compute_attr,
       perf_tuning_knob_bmhm,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using brgemm_Oi_t = group::gemm_t<
       compute_policy_bmhm,
       tile_shape_BmHm,
@@ -646,7 +646,7 @@ class ifmha_forward_t {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         subgroup::tile_desc_t<kSgHm, stages_bmhm * accum_step_bmhm, 1, 1>,
         1,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     mem_desc_Vj_t desc_pre_Vj(ctx.desc_Vj);
     desc_pre_Vj.update_coord_x(ctx.sg_idx * kSgHm);
@@ -679,7 +679,7 @@ class ifmha_forward_t {
         mem_desc_t<scalar_t, mem_desc_Pij_t::layout, mem_desc_Pij_t::space>,
         matPi_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     mem_desc_Pij_t desc_Pi_load(ctx.desc_Pij);
     matPi_load_t matPi_load(desc_Pi_load);
@@ -720,12 +720,12 @@ class ifmha_forward_t {
         mem_desc_t<scalar_t, layout_b, mem_space::global>,
         matB_tile_desc_t,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
         mem_desc_t<scalar_t, layout_b, mem_space::global>,
         subgroup::tile_desc_t<kSgBc, accum_step_bmhm, 1, 1>,
         tile_shape_BmHm::wg_size_y,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     mem_desc_Vj_t matB_mem_desc(ctx.desc_Vj);
     int32_t sg_idx = ctx.g.get_id() % tile_shape_BmHm::wg_size_x;
@@ -844,7 +844,7 @@ class ifmha_forward_t {
           mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
           matX_tile_desc_t,
           msg_type::block_1d,
-          gpu_arch::Xe>;
+          gpu_arch::XeHpc>;
       using matX_acc_t = subgroup::tile_t<accum_t, matX_tile_desc_t>;
 
       // xetla_nbarrier_t<1, 1> nbarrier_producer;
@@ -1013,7 +1013,7 @@ class ifmha_forward_t {
   /// @brief store Pij to local memory.
   inline void store_Pij(matPij_t& matPij) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::XeHpc>,
         tile_shape_BmBc,
         mem_desc_Pij_t>;
     epilogue_t epilogue;
@@ -1029,7 +1029,7 @@ class ifmha_forward_t {
   /// @brief store Oi to global memory.
   inline void store_Oi(matOi_t& matOi) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::Xe>,
+        group::epilogue_policy_default<gpu_arch::XeHpc>,
         tile_shape_BmHm,
         mem_desc_Oi_t>;
     epilogue_t epilogue;
@@ -1045,7 +1045,7 @@ class ifmha_forward_t {
         mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
         matQ_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     mem_desc_Qi_t desc_Qi_load(ctx.desc_Qi);
 

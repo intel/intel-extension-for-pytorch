@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "subgroup/tile/tile.hpp"
+#include <subgroup/tile/tile.hpp>
 
 namespace gpu::xetla::subgroup {
 
@@ -46,7 +46,7 @@ class cooperative_load_helper_t<
     mem_layout::row_major,
     num_cooperative_wg,
     arch_tag_,
-    std::enable_if_t<gpu_arch::Xe == arch_tag_>> {
+    std::enable_if_t<gpu_arch::XeHpc == arch_tag_>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using matAcc_t = matAcc_t_;
@@ -112,7 +112,7 @@ class cooperative_load_helper_t<
     mem_layout::col_major,
     num_cooperative_wg,
     arch_tag_,
-    std::enable_if_t<gpu_arch::Xe == arch_tag_>> {
+    std::enable_if_t<gpu_arch::XeHpc == arch_tag_>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using matAcc_t = matAcc_t_;

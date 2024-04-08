@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "experimental/kernel/layer_norm/common.hpp"
-#include "experimental/kernel/layer_norm/config.hpp"
+#include <experimental/kernel/layer_norm/common.hpp>
+#include <experimental/kernel/layer_norm/config.hpp>
 
 namespace gpu::xetla::kernel {
 
@@ -41,7 +41,7 @@ template <
     typename dtype_acc_,
     typename layer_norm_attr_,
     bool store_for_bwd_ = true,
-    gpu_arch arch_ = gpu_arch::Xe,
+    gpu_arch arch_ = gpu_arch::XeHpc,
     typename ln_fwd_fused_op_ = group::ln_fwd_fused_op_t<
         ln_fwd_fused_kind::none,
         dtype_x_,
@@ -66,7 +66,7 @@ template <
     typename dtype_weight_,
     typename dtype_acc_,
     typename layer_norm_attr_,
-    gpu_arch arch_ = gpu_arch::Xe,
+    gpu_arch arch_ = gpu_arch::XeHpc,
     typename ln_bwd_fused_op_ = group::ln_bwd_fused_op_t<
         ln_bwd_fused_kind::none,
         dtype_y_,

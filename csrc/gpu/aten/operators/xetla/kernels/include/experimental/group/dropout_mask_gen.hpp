@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "common/common.hpp"
-#include "subgroup/tile/tile.hpp"
+#include <common/common.hpp>
+#include <subgroup/tile/tile.hpp>
 
 namespace gpu::xetla::group {
 
@@ -40,7 +40,7 @@ template <
     uint32_t sg_tile_n_,
     uint32_t sg_tile_m_,
     uint32_t random_simd_ = 16,
-    gpu_arch arch_ = gpu_arch::Xe>
+    gpu_arch arch_ = gpu_arch::XeHpc>
 struct mask_gen_t {
   using dtype_mask = dtype_mask_;
   static constexpr uint32_t wg_tile_n = wg_tile_n_;
@@ -99,7 +99,7 @@ struct mask_gen_t {
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>,
       mask_out_tile_desc_t,
       (sg_tile_m == 1) ? msg_type::block_1d : msg_type::block_2d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   static constexpr uint32_t tile_size = tile_size_x * tile_size_y;
 
   /// @brief

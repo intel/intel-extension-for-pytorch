@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "group/epilogue/api.hpp"
-#include "group/epilogue/common.hpp"
-#include "group/epilogue/epilogue_policy.hpp"
+#include <group/epilogue/api.hpp>
+#include <group/epilogue/common.hpp>
+#include <group/epilogue/epilogue_policy.hpp>
 
 namespace gpu::xetla::group {
 
@@ -39,7 +39,7 @@ class epilogue_t<
     epilogue_policy_tile_op<tile_op_t_, arch_tag_>,
     tile_shape_,
     mem_desc_c_t_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   using epilogue_policy = epilogue_policy_tile_op<tile_op_t_, arch_tag_>;
   using tile_op_t = typename epilogue_policy::tile_op_t;

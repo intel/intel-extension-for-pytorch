@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "kernel/gemm/api.hpp"
-#include "kernel/gemm/common.hpp"
-#include "kernel/gemm/dispatch_policy.hpp"
+#include <kernel/gemm/api.hpp>
+#include <kernel/gemm/common.hpp>
+#include <kernel/gemm/dispatch_policy.hpp>
 
 namespace gpu::xetla::kernel {
 
@@ -37,7 +37,7 @@ class gemm_universal_t<
     dispatch_policy_default<group_swizzle_>,
     gemm_t_,
     epilogue_t_,
-    std::enable_if_t<(group_swizzle_::arch_tag == gpu_arch::Xe)>> {
+    std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::XeHpc)>> {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using gemm_args_t = typename gemm_t::arguments_t;
@@ -145,12 +145,12 @@ class gemm_universal_t<
         : matrix_m(matrix_m_),
           matrix_k(matrix_k_),
           matrix_n(matrix_n_),
-          matA_base(matA_base_),
           matA_ld(matA_ld_),
-          matB_base(matB_base_),
           matB_ld(matB_ld_),
-          matC_base(matC_base_),
           matC_ld(matC_ld_),
+          matA_base(matA_base_),
+          matB_base(matB_base_),
+          matC_base(matC_base_),
           epilogue_args(epilogue_args_) {}
     // Be aware of the risks: Rule of three (copy constructor, copy assignment,
     // destructor) Please check if you need to add self-define destructor inline
@@ -159,12 +159,12 @@ class gemm_universal_t<
         : matrix_m(args.matrix_m),
           matrix_k(args.matrix_k),
           matrix_n(args.matrix_n),
-          matA_base(args.matA_base),
           matA_ld(args.matA_ld),
-          matB_base(args.matB_base),
           matB_ld(args.matB_ld),
-          matC_base(args.matC_base),
           matC_ld(args.matC_ld),
+          matA_base(args.matA_base),
+          matB_base(args.matB_base),
+          matC_base(args.matC_base),
           epilogue_args(args.epilogue_args) {}
     inline arguments_t& operator=(const arguments_t& args) {
       this->matrix_m = args.matrix_m;
@@ -198,8 +198,8 @@ class gemm_universal_t<
   __XETLA_API static constexpr uint32_t get_slm_size() {
     constexpr uint32_t size = gemm_t::slm_size + epilogue_t::slm_size;
     static_assert(
-        size <= (128 * 1024),
-        "The local memory size should be less than 128KB!");
+        size <= arch_attr_t<arch_tag>::local_mem_size,
+        "The local memory size excess!");
     return size;
   };
 
@@ -209,8 +209,8 @@ class gemm_universal_t<
   static cl::sycl::range<3> get_local_range() {
     uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
     uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
-    // std::cout << "Local range: {" << 1 << ", " << local_range_m << ", "
-    //           << local_range_n << "} \n";
+    std::cout << "Local range: {" << 1 << ", " << local_range_m << ", "
+              << local_range_n << "} \n";
     assert(local_range_m * local_range_n <= 32);
     return cl::sycl::range<3>{1, local_range_m, local_range_n};
   };
@@ -228,8 +228,8 @@ class gemm_universal_t<
     uint32_t group_range_m = (matrix_m + wg_tile_m - 1) / wg_tile_m;
     uint32_t group_range_n = (matrix_n + wg_tile_n - 1) / wg_tile_n;
     group_swizzle_t::update_group_range(group_range_m, group_range_n);
-    // std::cout << "Group range: {" << 1 << ", " << group_range_m << ", "
-    //           << group_range_n << "} \n";
+    std::cout << "Group range: {" << 1 << ", " << group_range_m << ", "
+              << group_range_n << "} \n";
     return cl::sycl::range<3>{1, group_range_m, group_range_n};
   };
 
@@ -253,40 +253,43 @@ class gemm_universal_t<
     bool implementable = true;
     if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_a == msg_type::block_2d) {
-        implementable &= kernel::block_2d<gpu_arch::Xe, dtype_a>::check_tensor(
-            (uint64_t)(args.matA_base.base),
-            gemm_t::is_col_major_a ? args.matrix_m : args.matrix_k,
-            gemm_t::is_col_major_a ? args.matrix_k : args.matrix_m,
-            args.matA_ld);
+        implementable &=
+            kernel::block_2d<gpu_arch::XeHpc, dtype_a>::check_tensor(
+                (uint64_t)(args.matA_base.base),
+                gemm_t::is_col_major_a ? args.matrix_m : args.matrix_k,
+                gemm_t::is_col_major_a ? args.matrix_k : args.matrix_m,
+                args.matA_ld);
       } else {
         implementable &=
-            kernel::general_1d<gpu_arch::Xe, dtype_a>::check_alignment(
+            kernel::general_1d<gpu_arch::XeHpc, dtype_a>::check_alignment(
                 args.matA_base.base, args.matA_ld);
       }
     }
     if (gemm_t::msg_type_b != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_b == msg_type::block_2d) {
-        implementable &= kernel::block_2d<gpu_arch::Xe, dtype_b>::check_tensor(
-            (uint64_t)(args.matB_base.base),
-            gemm_t::is_col_major_b ? args.matrix_k : args.matrix_n,
-            gemm_t::is_col_major_b ? args.matrix_n : args.matrix_k,
-            args.matB_ld);
+        implementable &=
+            kernel::block_2d<gpu_arch::XeHpc, dtype_b>::check_tensor(
+                (uint64_t)(args.matB_base.base),
+                gemm_t::is_col_major_b ? args.matrix_k : args.matrix_n,
+                gemm_t::is_col_major_b ? args.matrix_n : args.matrix_k,
+                args.matB_ld);
       } else {
         implementable &=
-            kernel::general_1d<gpu_arch::Xe, dtype_b>::check_alignment(
+            kernel::general_1d<gpu_arch::XeHpc, dtype_b>::check_alignment(
                 args.matB_base.base, args.matB_ld);
       }
     }
     if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
       if (epilogue_t::msg_type_c == msg_type::block_2d) {
-        implementable &= kernel::block_2d<gpu_arch::Xe, dtype_c>::check_tensor(
-            (uint64_t)(args.matC_base.base),
-            args.matrix_n,
-            args.matrix_m,
-            args.matC_ld);
+        implementable &=
+            kernel::block_2d<gpu_arch::XeHpc, dtype_c>::check_tensor(
+                (uint64_t)(args.matC_base.base),
+                args.matrix_n,
+                args.matrix_m,
+                args.matC_ld);
       } else {
         implementable &=
-            kernel::general_1d<gpu_arch::Xe, dtype_c>::check_alignment(
+            kernel::general_1d<gpu_arch::XeHpc, dtype_c>::check_alignment(
                 args.matC_base.base, args.matC_ld);
       }
     }

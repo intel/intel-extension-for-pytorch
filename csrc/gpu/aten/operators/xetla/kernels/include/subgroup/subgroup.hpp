@@ -19,5 +19,5 @@
 
 #pragma once
 
-#include "subgroup/cooperative_load_helper.hpp"
-#include "subgroup/tile/tile.hpp"
+#include <subgroup/cooperative_load_helper.hpp>
+#include <subgroup/tile/tile.hpp>

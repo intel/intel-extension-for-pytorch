@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "subgroup/subgroup.hpp"
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla {
 
@@ -47,7 +47,7 @@ template <
     typename dtype_out_,
     typename dtype_acc_,
     typename reduction_attr_,
-    gpu_arch arch_ = gpu_arch::Xe>
+    gpu_arch arch_ = gpu_arch::XeHpc>
 struct row_reduction_fused_op_t {};
 
 } // namespace group

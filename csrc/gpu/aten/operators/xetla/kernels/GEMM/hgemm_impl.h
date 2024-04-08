@@ -27,7 +27,7 @@ struct hgemm_caller {
   using data_type_acc = float;
   using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
   using epilogue_t = epilogue_t<
-      epilogue_policy_tile_op<tile_op_t, gpu_arch::Xe>,
+      epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
   using args_t = epilogue_t::arguments_t;
@@ -88,12 +88,12 @@ struct hgemm_caller {
         tile_shape,
         SG_K,
         mma_engine::xmx,
-        gpu_arch::Xe,
+        gpu_arch::XeHpc,
         prefetch_distance,
         periodic_sync_interval>::gemm;
 
     using group_swizzle =
-        gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+        gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
     using dispatch_policy =
         dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
     using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
@@ -612,7 +612,7 @@ inline void hgemm_mul(
     const int n,
     const int k) {
   using tile_op_t = chained_tile_op_t<
-      elemwise_reduce_op_t<reduce_op::prod, scalar_t, gpu_arch::Xe>>;
+      elemwise_reduce_op_t<reduce_op::prod, scalar_t, gpu_arch::XeHpc>>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -715,15 +715,15 @@ struct HgemmQKVKernelFunctor {
         tile_shape,
         SG_K,
         mma_engine::xmx,
-        gpu_arch::Xe,
+        gpu_arch::XeHpc,
         prefetch_distance,
         periodic_sync_interval>::gemm;
     using epilogue_t = epilogue_t<
-        epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::Xe>,
+        epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::XeHpc>,
         tile_shape,
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
     using group_swizzle =
-        gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+        gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
     using dispatch_policy =
         dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
     using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
@@ -918,17 +918,17 @@ struct HgemmQKVBiasKernelFunctor {
         tile_shape,
         SG_K,
         mma_engine::xmx,
-        gpu_arch::Xe,
+        gpu_arch::XeHpc,
         prefetch_distance,
         periodic_sync_interval>::gemm;
     using epilogue_t = epilogue_t<
         epilogue_policy_tile_op<
             chained_tile_op_t<epilogue_impl::bias_op_t<data_type_bias>>,
-            gpu_arch::Xe>,
+            gpu_arch::XeHpc>,
         tile_shape,
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
     using group_swizzle =
-        gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+        gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
     using dispatch_policy =
         dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
     using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
@@ -1163,14 +1163,15 @@ inline void hgemm_qkv_group(
       tile_shape,
       SG_K,
       mma_engine::xmx,
-      gpu_arch::Xe,
+      gpu_arch::XeHpc,
       prefetch_distance,
       periodic_sync_interval>::gemm;
   using epilogue_t = epilogue_t<
-      epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::Xe>,
+      epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+  using group_swizzle =
+      gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
   using dispatch_policy =
       dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
@@ -1280,16 +1281,17 @@ inline void hgemm_qkv_group_bias(
       tile_shape,
       SG_K,
       mma_engine::xmx,
-      gpu_arch::Xe,
+      gpu_arch::XeHpc,
       prefetch_distance,
       periodic_sync_interval>::gemm;
   using epilogue_t = epilogue_t<
       epilogue_policy_tile_op<
           chained_tile_op_t<epilogue_impl::bias_op_t<data_type_bias>>,
-          gpu_arch::Xe>,
+          gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+  using group_swizzle =
+      gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
   using dispatch_policy =
       dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;

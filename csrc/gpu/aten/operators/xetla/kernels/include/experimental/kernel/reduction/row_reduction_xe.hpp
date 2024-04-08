@@ -19,11 +19,11 @@
 
 #pragma once
 
-#include "experimental/group/fused_op/row_reduction_fused_op_xe.hpp"
-#include "experimental/group/reduction/row_reduce_store_xe.hpp"
-#include "experimental/kernel/reduction/api.hpp"
-#include "experimental/kernel/reduction/common.hpp"
-#include "experimental/kernel/reduction/config.hpp"
+#include <experimental/group/fused_op/row_reduction_fused_op_xe.hpp>
+#include <experimental/group/reduction/row_reduce_store_xe.hpp>
+#include <experimental/kernel/reduction/api.hpp>
+#include <experimental/kernel/reduction/common.hpp>
+#include <experimental/kernel/reduction/config.hpp>
 
 namespace gpu::xetla::kernel {
 
@@ -49,7 +49,7 @@ struct xetla_row_reduction_t<
     dtype_out_,
     dtype_acc_,
     reduction_attr_,
-    gpu_arch::Xe,
+    gpu_arch::XeHpc,
     fused_op_t_> {
   using dtype_in = dtype_in_;
   using dtype_out = dtype_out_;
@@ -68,7 +68,7 @@ struct xetla_row_reduction_t<
   using work_group_t = work_group_t<wg_size_x * wg_size_y>;
   static constexpr bool use_dynamic_job = is_dynamic_job && (wg_size_y > 1);
   using load_store_attr = typename arch_attr_t<
-      gpu_arch::Xe>::template load_store_attr<msg_type::block_2d>;
+      gpu_arch::XeHpc>::template load_store_attr<msg_type::block_2d>;
   static constexpr uint32_t max_load_height_in_elem =
       load_store_attr::max_load_height_in_elem;
   static constexpr uint32_t max_load_width_in_bytes =
@@ -112,7 +112,7 @@ struct xetla_row_reduction_t<
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
       global_ld_tile_desc_t,
       subgroup::msg_type_v<global_ld_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using mat_buffer_t = subgroup::tile_t<
       dtype_acc,
       subgroup::
@@ -177,7 +177,7 @@ struct xetla_row_reduction_t<
 
     int global_start_x_in = item.get_group(2) * wg_tile_n + sg_idx * sg_tile_n;
     int global_start_y_in = sg_idy * sg_tile_m;
-    xetla_nbarrier_t<wg_size_y, wg_size_y, gpu_arch::Xe> nbarrier;
+    xetla_nbarrier_t<wg_size_y, wg_size_y, gpu_arch::XeHpc> nbarrier;
     nbarrier.init_nbarrier(
         nbarrier_base + sg_idx, nbarrier_role::producer_consumer);
     if constexpr (use_dynamic_job) {

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "common/utils/common.hpp"
+#include <common/utils/common.hpp>
 
 namespace gpu::xetla {
 
@@ -60,7 +60,7 @@ struct xetla_rand_t {
     auto key_2d_ = key_.xetla_format<uint32_t, 2, SIMD>();
 
 #pragma unroll
-    for (int i = 0; i < round; i++) {
+    for (uint32_t i = 0; i < round; i++) {
       counter_ = single_round(counter_, key_);
       key_2d_.row(0) += kPhilox10A;
       key_2d_.row(1) += kPhilox10B;
@@ -133,7 +133,7 @@ struct dropout_fwd_t {
   __XETLA_API xetla_vector<dtype, SZ> process(xetla_vector<dtype, SZ> input) {
     xetla_vector<dtype, SZ> output = input;
 #pragma unroll
-    for (int i = 0; i < SZ / random_len; i++) {
+    for (uint32_t i = 0; i < SZ / random_len; i++) {
       auto out_sub = output.xetla_select<random_len, 1>(i * random_len);
       auto mask_sub = mask.xetla_select<random_len, 1>(i * random_len);
       xetla_vector<uint32_t, random_len> rand_val = rand_gen.rand();

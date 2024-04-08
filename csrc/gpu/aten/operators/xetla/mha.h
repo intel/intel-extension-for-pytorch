@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include <common/core/common.hpp>
 #include <sycl/sycl.hpp>
 
 namespace gpu::xetla {
@@ -11,41 +12,46 @@ enum class XetlaType {
   bf16,
 };
 
+struct fmha_forward_kernel_args_t {
+  void* query;
+  void* key;
+  void* value;
+  void* alibi;
+  void* attn_mask;
+  void* dropout;
+  void* out;
+  void* log_sumexp;
+  float alpha;
+  float beta;
+  float dropout_prob;
+  uint32_t num_batches;
+  uint32_t num_heads;
+  uint32_t num_kv_heads;
+  uint32_t head_size;
+  uint32_t num_queries;
+  uint32_t num_keys;
+  uint32_t bias_strideB;
+  uint32_t bias_strideN;
+  uint32_t bias_strideF;
+  uint32_t alibi_padded_block_size;
+  uint32_t attn_mask_padded_block_size;
+  bool is_causal;
+  bool seq_last;
+  bool is_training;
+  bool is_dropout;
+  uint64_t seed_t;
+  uint64_t offset_t;
+};
+
 // * General interface kernel for FSDP
 // * causal
 // * permutation t, n, h
 // * alibi
 void fmha_forward_kernel(
+    gpu_arch arch,
     XetlaType xeType,
     sycl::queue& q,
-    void* query,
-    void* key,
-    void* value,
-    void* alibi,
-    void* attn_mask,
-    void* dropout,
-    void* out,
-    void* log_sumexp,
-    float alpha,
-    float beta,
-    float dropout_prob,
-    uint32_t num_batches,
-    uint32_t num_heads,
-    uint32_t num_kv_heads,
-    uint32_t head_size,
-    uint32_t num_queries,
-    uint32_t num_keys,
-    uint32_t bias_strideB,
-    uint32_t bias_strideN,
-    uint32_t bias_strideF,
-    uint32_t alibi_padded_block_size,
-    uint32_t attn_mask_padded_block_size,
-    bool is_causal,
-    bool seq_last,
-    bool is_training,
-    bool is_dropout,
-    uint64_t seed_t,
-    uint64_t offset_t);
+    const fmha_forward_kernel_args_t& args);
 
 void fmha_forward_index_kernel(
     sycl::queue& q,

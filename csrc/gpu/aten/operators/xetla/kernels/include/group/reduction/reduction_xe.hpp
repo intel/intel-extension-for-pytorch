@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "group/reduction/reduction_api.hpp"
+#include <group/reduction/reduction_api.hpp>
 
 namespace gpu::xetla::group {
 
@@ -30,9 +30,9 @@ template <
     reduce_op Op,
     uint32_t N_SG,
     bool is_all_reduce>
-struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::Xe> {
-  group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::Xe> sg_reduce{};
-  xetla_nbarrier_t<N_SG, N_SG, gpu_arch::Xe> nbarrier;
+struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::XeHpc> {
+  group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::XeHpc> sg_reduce{};
+  xetla_nbarrier_t<N_SG, N_SG, gpu_arch::XeHpc> nbarrier;
   uint32_t slm_base;
   uint32_t sg_id;
   using local_st_tile_desc =
@@ -45,12 +45,12 @@ struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::Xe> {
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       local_ld_tile_desc,
       subgroup::msg_type_v<local_ld_tile_desc, mem_space::local>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using local_st_payload_t = subgroup::mem_payload_t<
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       local_st_tile_desc,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   inline group_reduce_t() = default;
   inline group_reduce_t(
       uint32_t sg_id_,
@@ -103,23 +103,23 @@ struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::Xe> {
 };
 
 template <typename T, uint32_t SZ, uint32_t N, reduce_op Op, bool is_all_reduce>
-struct group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::Xe> {
+struct group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::XeHpc> {
   inline group_reduce_t() = default;
   inline group_reduce_t(
-      uint32_t sg_id_,
-      uint32_t nbarrier_id,
-      uint32_t slm_base_) {}
+      [[maybe_unused]] uint32_t sg_id_,
+      [[maybe_unused]] uint32_t nbarrier_id,
+      [[maybe_unused]] uint32_t slm_base_) {}
   inline void init(
-      uint32_t sg_id_ = 0,
-      uint32_t nbarrier_id = 0,
-      uint32_t slm_base_ = 0) {}
-  inline void set_slm_base(uint32_t slm_base_ = 0) {}
+      [[maybe_unused]] uint32_t sg_id_ = 0,
+      [[maybe_unused]] uint32_t nbarrier_id = 0,
+      [[maybe_unused]] uint32_t slm_base_ = 0) {}
+  inline void set_slm_base([[maybe_unused]] uint32_t slm_base_ = 0) {}
   inline KERNEL_FUNC xetla_vector<T, N> operator()(
       xetla_vector<T, N * SZ> buffer) {
     auto buffer_2d = buffer.xetla_format<T, N, SZ>();
     xetla_vector<T, N> ret;
 #pragma unroll
-    for (int i = 0; i < N; i++) {
+    for (uint32_t i = 0; i < N; i++) {
       ret[i] = xetla_reduce<T, T, SZ, Op>(buffer_2d.row(i));
     }
     return ret;

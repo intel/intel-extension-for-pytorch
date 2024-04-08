@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "experimental/kernel/data_transformer/common.hpp"
+#include <experimental/kernel/data_transformer/common.hpp>
 
 namespace gpu::xetla::kernel {
 

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "common/utils/common.hpp"
+#include <common/utils/common.hpp>
 
 namespace gpu::xetla {
 
@@ -43,8 +43,16 @@ enum class nbarrier_role : uint8_t {
 template <
     uint8_t num_producers = 1,
     uint8_t num_consumers = 1,
-    gpu_arch arch_tag = gpu_arch::Xe>
-struct xetla_nbarrier_t {
+    gpu_arch arch_tag = gpu_arch::XeHpc,
+    typename enable = void>
+struct xetla_nbarrier_t;
+
+template <uint8_t num_producers, uint8_t num_consumers, gpu_arch arch_tag>
+struct xetla_nbarrier_t<
+    num_producers,
+    num_consumers,
+    arch_tag,
+    std::enable_if_t<arch_tag == gpu_arch::XeHpc>> {
   ///
   /// @brief Description of named barrier objection.
   /// Structure is defined in
@@ -92,8 +100,12 @@ struct xetla_nbarrier_t {
   }
 };
 
-template <uint8_t num_producers, uint8_t num_consumers>
-struct xetla_nbarrier_t<num_producers, num_consumers, gpu_arch::Dg2> {
+template <uint8_t num_producers, uint8_t num_consumers, gpu_arch arch_tag>
+struct xetla_nbarrier_t<
+    num_producers,
+    num_consumers,
+    arch_tag,
+    std::enable_if_t<arch_tag != gpu_arch::XeHpc>> {
   ///
   /// @brief Description of named barrier objection.
   /// Structure is defined in
@@ -107,9 +119,7 @@ struct xetla_nbarrier_t<num_producers, num_consumers, gpu_arch::Dg2> {
   /// note:  all subgroups participating the barrier should have the same
   /// barrier_id. Here is the bspec link
   /// https://gfxspecs.intel.com/Predator/Home/Index/54006
-  __XETLA_API void init_nbarrier(
-      uint8_t nbarrier_id,
-      nbarrier_role role = nbarrier_role::producer_consumer) {}
+  __XETLA_API void init_nbarrier(uint8_t, nbarrier_role) {}
 
   /// @brief Generic work-group split barrier.
   ///
@@ -121,7 +131,6 @@ struct xetla_nbarrier_t<num_producers, num_consumers, gpu_arch::Dg2> {
   ///
   __XETLA_API void wait() {
     __ESIMD_ENS::split_barrier<__ESIMD_ENS::split_barrier_action::wait>();
-    // __ESIMD_NS::barrier();
   }
 
   /// @brief named barrier signal from subgroup.

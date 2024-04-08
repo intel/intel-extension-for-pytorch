@@ -19,10 +19,10 @@
 
 #pragma once
 
-#include "experimental/group/fused_op/layer_norm_fused_op_fwd_xe.hpp"
-#include "experimental/kernel/layer_norm/api.hpp"
-#include "experimental/kernel/layer_norm/common.hpp"
-#include "experimental/kernel/layer_norm/config.hpp"
+#include <experimental/group/fused_op/layer_norm_fused_op_fwd_xe.hpp>
+#include <experimental/kernel/layer_norm/api.hpp>
+#include <experimental/kernel/layer_norm/common.hpp>
+#include <experimental/kernel/layer_norm/config.hpp>
 
 namespace gpu::xetla::kernel {
 
@@ -50,7 +50,7 @@ struct layer_norm_fwd_t<
     dtype_acc_,
     layer_norm_attr_,
     store_for_bwd_,
-    gpu_arch::Xe,
+    gpu_arch::XeHpc,
     ln_fwd_fused_op_> {
   using dtype_x = dtype_x_;
   using dtype_y = dtype_y_;
@@ -105,22 +105,22 @@ struct layer_norm_fwd_t<
       mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       subgroup::msg_type_v<ln_fwd_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using gamma_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       subgroup::msg_type_v<ln_fwd_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using beta_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       subgroup::msg_type_v<ln_fwd_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using y_out_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_y, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   /// @brief
   ///
@@ -202,7 +202,7 @@ struct layer_norm_fwd_t<
     int start_n = wg_idx * wg_tile_n + sg_idx * sg_tile_n;
     int start_m = wg_idy * wg_tile_m + sg_idy * sg_tile_m;
 
-    xetla_nbarrier_t<wg_size_x, wg_size_x, gpu_arch::Xe> nbarrier;
+    xetla_nbarrier_t<wg_size_x, wg_size_x, gpu_arch::XeHpc> nbarrier;
     nbarrier.init_nbarrier(
         sg_idy + nbarrier_base, nbarrier_role::producer_consumer);
 
@@ -252,7 +252,8 @@ struct layer_norm_fwd_t<
         slm_load_base_0 + wg_size_x * wg_size_y * 2 * sizeof(dtype_acc);
     uint32_t itr_count = 0;
 
-    for (int row = start_m; row < args->matrix_m; row += wg_num_m * wg_tile_m) {
+    for (uint32_t row = start_m; row < args->matrix_m;
+         row += wg_num_m * wg_tile_m) {
       if constexpr (n_chunks > 1) {
         fused_op.init(fused_op_args, wg_idx, wg_idy, sg_idx, sg_idy, row);
       }
@@ -270,7 +271,7 @@ struct layer_norm_fwd_t<
             row);
       }
 #pragma unroll
-      for (int i = 0; i < n_chunks; i++) {
+      for (uint32_t i = 0; i < n_chunks; i++) {
         subgroup::tile_load(x_in, x_in_payload);
         x_in_payload.update_tdesc(chunk_size);
         input = xetla_cvt<dtype_acc, dtype_x>(x_in.reg);
@@ -293,7 +294,7 @@ struct layer_norm_fwd_t<
             row);
       }
 #pragma unroll
-      for (int i = 0; i < n_chunks; i++) {
+      for (uint32_t i = 0; i < n_chunks; i++) {
         if constexpr (n_chunks > 1) {
           subgroup::tile_load(x_in, x_in_payload);
           x_in_payload.update_tdesc(chunk_size);
@@ -355,7 +356,6 @@ struct layer_norm_fwd_t<
         }
       }
       // to generate mixed instruction
-      constexpr uint32_t SIMD = 64 / sizeof(dtype_acc);
       if constexpr (chunk_size > 1) {
         gamma_in_payload.init(
             args->gamma_ptr, args->matrix_n, 1, args->mat_ld, start_n, 0);
@@ -375,10 +375,8 @@ struct layer_norm_fwd_t<
             start_n,
             row);
       }
-      xetla_vector<dtype_acc, chunk_size> beta;
-      xetla_vector<dtype_acc, chunk_size> gamma;
 #pragma unroll
-      for (int i = 0; i < n_chunks; i++) {
+      for (uint32_t i = 0; i < n_chunks; i++) {
         if constexpr (n_chunks > 1) {
           subgroup::tile_load(gamma_in, gamma_in_payload);
           gamma_in_payload.update_tdesc(chunk_size);

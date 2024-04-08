@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "group/epilogue/api.hpp"
-#include "group/epilogue/common.hpp"
-#include "group/epilogue/epilogue_policy.hpp"
+#include <group/epilogue/api.hpp>
+#include <group/epilogue/common.hpp>
+#include <group/epilogue/epilogue_policy.hpp>
 
 namespace gpu::xetla::group {
 
@@ -35,7 +35,7 @@ class epilogue_t<
     epilogue_policy_unaligned<arch_tag_>,
     tile_shape_,
     mem_desc_c_t_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   using epilogue_policy = epilogue_policy_unaligned<arch_tag_>;
   using tile_shape = tile_shape_;
@@ -89,9 +89,9 @@ class epilogue_t<
       work_group_t& g,
       matAcc_t& matAcc,
       mem_desc_c_t mem_desc_c,
-      arguments_t args = {},
-      uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
+      [[maybe_unused]] arguments_t args = {},
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
     using matC_tile_desc_t = subgroup::tile_desc_t<
         matAcc_t::tile_size_x,
         matAcc_t::tile_size_y,

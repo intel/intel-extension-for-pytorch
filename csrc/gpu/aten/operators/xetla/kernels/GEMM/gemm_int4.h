@@ -6,7 +6,6 @@
 
 namespace xpu {
 namespace xetla {
-
 using namespace gpu::xetla;
 
 template <
@@ -56,14 +55,18 @@ struct hgemm_wint4_func {
   using perf_tuning_knob = gpu::xetla::group::
       perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;
 
-  using compute_policy = gpu::xetla::group::compute_policy_int4_dequantize_xmx<
+  static constexpr mma_engine mma_eng =
+      (static_cast<gpu_arch>(arch) == gpu_arch::XeLpg) ? mma_engine::fpu
+                                                       : mma_engine::xmx;
+  using compute_policy = gpu::xetla::group::compute_policy_int4_dequantize<
       compute_attr,
       perf_tuning_knob,
       dtype_scale,
-      dtype_b,
+      dtype_zero_pt,
+      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
       dequant_s == 0 ? 131072 : dequant_s,
-      static_cast<gpu_arch>(arch),
-      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP>;
+      mma_eng,
+      static_cast<gpu_arch>(arch)>;
   using gemm_t = gpu::xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 

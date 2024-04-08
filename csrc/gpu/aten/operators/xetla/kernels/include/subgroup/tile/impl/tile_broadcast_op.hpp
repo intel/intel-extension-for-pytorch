@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "subgroup/subgroup.hpp"
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla::subgroup {
 
@@ -47,24 +47,22 @@ inline void tile_broadcast_op(
     xetla_vector<typename matAcc_t::dtype, matAcc_t::tile_size_y> data) {
   static constexpr uint32_t tile_size_y = matAcc_t::tile_size_y;
   static constexpr uint32_t tile_size_x = matAcc_t::tile_size_x;
-  static constexpr uint32_t tile_elems = matAcc_t::tile_elems;
   static constexpr uint32_t block_size_y = matAcc_t::block_size_y;
   static constexpr uint32_t block_size_x = matAcc_t::block_size_x;
   static constexpr uint32_t block_elems = matAcc_t::block_elems;
-  static constexpr int32_t num_block_y = matAcc_t::num_block_y;
   static constexpr int32_t num_block_x = matAcc_t::num_block_x;
   using dtype = typename matAcc_t::dtype;
 #pragma unroll
-  for (int i = 0; i < tile_size_y / block_size_y; i++) {
+  for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto acc_reg = (matAcc.reg)
                          .xetla_select<block_elems, 1>(
                              (i * num_block_x + j) * block_elems);
       auto acc_reg_2d =
           acc_reg.xetla_format<dtype, block_size_y, block_size_x>();
 #pragma unroll
-      for (int row_i = 0; row_i < block_size_y; row_i++) {
+      for (uint32_t row_i = 0; row_i < block_size_y; row_i++) {
         acc_reg_2d.row(row_i) = op::template func<dtype, block_size_x>(
             acc_reg_2d.row(row_i), data[block_size_y * i + row_i]);
       }
@@ -76,14 +74,14 @@ inline void tile_broadcast_op(
     constexpr uint32_t tail_size_y = tile_size_y % block_size_y;
     constexpr uint32_t tail_block_elems = tail_size_y * block_size_x;
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto acc_reg = (matAcc.reg)
                          .xetla_select<tail_block_elems, 1>(
                              tail_start_y * tile_size_x + j * tail_block_elems);
       auto acc_reg_2d =
           acc_reg.xetla_format<dtype, tail_size_y, block_size_x>();
 #pragma unroll
-      for (int row_i = 0; row_i < tail_size_y; row_i++) {
+      for (uint32_t row_i = 0; row_i < tail_size_y; row_i++) {
         acc_reg_2d.row(row_i) = op::template func<dtype, block_size_x>(
             acc_reg_2d.row(row_i), data[tail_start_y + row_i]);
       }
