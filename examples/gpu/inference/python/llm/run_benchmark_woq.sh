@@ -46,7 +46,7 @@ Run_benchmark_gpt-j-6b_int4() {
 Run_benchmark_llama2-7b_int4() {
     model=meta-llama/Llama-2-7b-hf
     sub_model_name=llama2-7b
-    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    dir=int4_perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
     python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
     mv log_e2e ${dir}
@@ -59,7 +59,7 @@ Run_benchmark_llama2-7b_int4() {
 Run_benchmark_llama2-70b_int4() {
     model=meta-llama/Llama-2-70b-hf
     sub_model_name=llama2-70b
-    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    dir=int4_perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
     python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
     mv log_e2e ${dir}
