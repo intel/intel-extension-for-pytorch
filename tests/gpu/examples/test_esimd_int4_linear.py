@@ -1,6 +1,6 @@
 import torch
 
-torch.set_printoptions(profile="full")
+# torch.set_printoptions(profile="full")
 import intel_extension_for_pytorch  # noqa
 
 from torch.testing._internal.common_utils import TestCase
@@ -194,37 +194,39 @@ class TestTorchMethod(TestCase):
         out_int4 = out_int4.to(torch.float).to("cpu")
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
 
-    # def test_gemm_int4_long_hidden_dim_refcpu(self, per_channel=False, dtype=torch.float16):
-    #     input = torch.rand([1, 11008], device="xpu", dtype=torch.float16)
-    #     # for ind in range(2048, 4096):
-    #     #     input[0][ind] = 0.0
+    def test_gemm_int4_long_hidden_dim_refcpu(
+        self, per_channel=False, dtype=torch.float16
+    ):
+        input = torch.rand([1, 11008], device="xpu", dtype=torch.float16)
+        # for ind in range(2048, 4096):
+        #     input[0][ind] = 0.0
 
-    #     group_size = 32  # 128 -> 32
-    #     if per_channel:
-    #         group_size = 11008
-    #     group_num = int(11008 / group_size)
+        group_size = 32  # 128 -> 32
+        if per_channel:
+            group_size = 11008
+        group_num = int(11008 / group_size)
 
-    #     scales = torch.rand([group_num, 4096], device="xpu", dtype=torch.float16)
-    #     # zero_points = torch.rand([group_num, 8192], device="xpu").byte()
-    #     zero_points = torch.zeros(group_num, 2048, device="xpu").byte()
-    #     weight = (torch.rand([11008, 2048], device="xpu") * 10 * 16).byte()
-    #     # print(weight)
+        scales = torch.rand([group_num, 4096], device="xpu", dtype=torch.float16)
+        # zero_points = torch.rand([group_num, 8192], device="xpu").byte()
+        zero_points = torch.zeros(group_num, 2048, device="xpu").byte()
+        weight = (torch.rand([11008, 2048], device="xpu") * 10 * 16).byte()
+        # print(weight)
 
-    #     weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
+        weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
 
-    #     # check gemm
-    #     out_int4 = torch.ops.torch_ipex.mm_esimd_int4(
-    #         input, weight, scales, zero_points, group_size
-    #     )
-    #     print("out_int4: ", out_int4.to(torch.float).to("cpu"))
+        # check gemm
+        out_int4 = torch.ops.torch_ipex.mm_esimd_int4(
+            input, weight, scales, zero_points, group_size
+        )
+        print("out_int4: ", out_int4.to(torch.float).to("cpu"))
 
-    #     weight_fp32 = weight_fp16.to(torch.float).to("cpu")
-    #     input_fp32 = input.to(torch.float).to("cpu")
-    #     out_fp16 = torch.matmul(input_fp32, weight_fp32)
-    #     print("out_fp16: ", out_fp16.to(torch.float).to("cpu"))
+        weight_fp32 = weight_fp16.to(torch.float).to("cpu")
+        input_fp32 = input.to(torch.float).to("cpu")
+        out_fp16 = torch.matmul(input_fp32, weight_fp32)
+        print("out_fp16: ", out_fp16.to(torch.float).to("cpu"))
 
-    #     out_int4 = out_int4.to(torch.float).to("cpu")
-    #     self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        out_int4 = out_int4.to(torch.float).to("cpu")
+        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
 
     # def test_gemm_int4_perf(self, per_channel=False, dtype=torch.float16):
     #     for ind in range(0, 4):
@@ -319,31 +321,54 @@ class TestTorchMethod(TestCase):
     #             "###################################################################################"
     #         )
 
+    def test_qkv_gemm_int4_using_normal_gemm_as_ref(self, dtype=torch.float16):
+        input = torch.rand([1, 1, 4096], device="xpu", dtype=torch.float16)
+        q = torch.zeros([1, 4096], device="xpu", dtype=torch.float16)
+        k = torch.zeros([1, 4096], device="xpu", dtype=torch.float16)
+        v = torch.zeros([1, 4096], device="xpu", dtype=torch.float16)
 
-    def test_qkv_gemm_int4(self, dtype=torch.float16):
-        input = torch.rand([3, 4096, 4096], device="xpu", dtype=torch.float16)
-        q = torch.empty([4096, 16384], device="xpu", dtype=torch.float16)
-        k = torch.rand([4096, 16384], device="xpu", dtype=torch.float16)
-        v = torch.rand([4096, 16384], device="xpu", dtype=torch.float16)
         bias = None
-        weight = (torch.rand([3, 4096, 8192], device="xpu") * 10).byte()
+        weight = (torch.rand([3, 4096, 2048], device="xpu") * 10 * 16).byte()
+        print("weight.size()", weight.size())
+        print("weight.stride()", weight.stride())
+        weight_ref = torch.clone(weight)
 
         group_size = 32
         group_num = int(4096 / group_size)
 
-        scales = torch.ones([3, group_num, 16384], device="xpu", dtype=torch.float16)
-        zero_points = (torch.zeros([3, group_num, 8192], device="xpu")).byte()
+        scales = torch.rand([3, group_num, 4096], device="xpu", dtype=torch.float16)
+        zero_points = (torch.zeros([3, group_num, 2048], device="xpu")).byte()
 
-        out_int4 = torch.ops.torch_ipex.qkv_mm_esimd_int4(
-            input, weight, bias, scales, zero_points, group_size, q, k, v
+        print("scales.size()", scales.size())
+        print("scales.stride()", scales.stride())
+        scales_ref = torch.clone(scales)
+
+        torch.ops.torch_ipex.qkv_mm_esimd_int4(
+            input, weight, scales, zero_points, bias, q, k, v, group_size
         )
 
-        # weight_fp16 = self.dequantize(
-        #     weight, scales, zero_points, group_size, gemm_num=3
-        # )
-        # out_fp16 = torch.ops.torch_ipex.mm_qkv(input, weight_fp16, bias)
+        print("q ", q.to(torch.float).to("cpu"))
+        print("k ", k.to(torch.float).to("cpu"))
+        print("v ", v.to(torch.float).to("cpu"))
 
-        # self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        q_ref = torch.ops.torch_ipex.mm_esimd_int4(
+            input[0], weight_ref[0], scales_ref[0], zero_points[0], group_size
+        )
+        k_ref = torch.ops.torch_ipex.mm_esimd_int4(
+            input[0], weight_ref[1], scales_ref[1], zero_points[1], group_size
+        )
+        v_ref = torch.ops.torch_ipex.mm_esimd_int4(
+            input[0], weight_ref[2], scales_ref[2], zero_points[2], group_size
+        )
+
+        print("q ref", q_ref.to(torch.float).to("cpu"))
+        print("k ref", k_ref.to(torch.float).to("cpu"))
+        print("v ref", v_ref.to(torch.float).to("cpu"))
+
+        self.assertEqual(q, q_ref, atol=1e-3, rtol=1e-3)
+        self.assertEqual(k, k_ref, atol=1e-3, rtol=1e-3)
+        self.assertEqual(v, v_ref, atol=1e-3, rtol=1e-3)
+
 
 # res 26: 2 * 2 *2 + 1 * 1.2 * 8 = 17.6
 # res 27: 2 * 1.7 * 3 + 1 * 2.5 * 1 = 12.7

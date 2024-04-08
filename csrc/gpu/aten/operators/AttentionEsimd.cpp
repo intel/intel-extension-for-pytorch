@@ -23,6 +23,17 @@ using namespace sycl;
 
 #include "esimd/qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm.h"
 
+inline double report_time(const std::string& msg, event e0, event en) {
+  uint64_t time_start =
+      e0.get_profiling_info<info::event_profiling::command_start>();
+  uint64_t time_end =
+      en.get_profiling_info<info::event_profiling::command_end>();
+  double elapsed = (time_end - time_start) / 1e6;
+  // cerr << msg << elapsed << " msecs" << std::endl;
+  std::cout << msg << elapsed << " msecs" << std::endl;
+  return elapsed;
+}
+
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
 using namespace at::native;
@@ -72,6 +83,8 @@ static inline void sdp_esimd_kernel(
           qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex((uint8_t*)query, (uint8_t*)key, (uint8_t*)value, (uint8_t*)output, kv_len, vCacheStride, ndi);
         });
       });
+  e.wait();
+    double etime = report_time("SDP fused kernel time", e, e);
 
   return;
 }
