@@ -239,17 +239,29 @@ struct clamp_max_out_dpcpp_functor {
   }
 };
 
+struct clamp_max_out_dpcpp_bool_functor {
+  bool operator()(bool in, bool max_val) const {
+    return in && max_val;
+  }
+};
+
 Tensor& clamp_max_out(const Tensor& self, const Tensor& max, Tensor& result) {
   TORCH_CHECK(
       self.layout() == Layout::Strided,
       "torch.clamp only supports strided layout, got: ",
       self.layout());
   auto iter = TensorIterator::borrowing_binary_op(result, self, max);
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      kHalf, kBFloat16, iter.common_dtype(), "clamp_max_dpcpp", [&] {
-        clamp_max_out_dpcpp_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
+
+  if (iter.dtype() == ScalarType::Bool) {
+    clamp_max_out_dpcpp_bool_functor f;
+    opmath_symmetric_gpu_kernel_with_scalars<bool>(iter, f);
+  } else {
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        kHalf, kBFloat16, iter.common_dtype(), "clamp_max_dpcpp", [&] {
+          clamp_max_out_dpcpp_functor<scalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
+        });
+  }
   result = iter.output();
   return result;
 }
@@ -269,18 +281,31 @@ struct clamp_min_out_dpcpp_functor {
   }
 };
 
+struct clamp_min_out_dpcpp_bool_functor {
+  bool operator()(bool in, bool min_val) const {
+    return (in || min_val);
+  }
+};
+
 Tensor& clamp_min_out(const Tensor& self, const Tensor& min, Tensor& result) {
   TORCH_CHECK(
       self.layout() == Layout::Strided,
       "torch.clamp only supports strided layout, got: ",
       self.layout());
   auto iter = TensorIterator::borrowing_binary_op(result, self, min);
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      kHalf, kBFloat16, iter.common_dtype(), "clamp_min_dpcpp", [&] {
-        clamp_min_out_dpcpp_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
+
+  if (iter.dtype() == ScalarType::Bool) {
+    clamp_min_out_dpcpp_bool_functor f;
+    opmath_symmetric_gpu_kernel_with_scalars<bool>(iter, f);
+  } else {
+    IPEX_DISPATCH_ALL_TYPES_AND2(
+        kHalf, kBFloat16, iter.common_dtype(), "clamp_min_dpcpp", [&] {
+          clamp_min_out_dpcpp_functor<scalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
+        });
+  }
   result = iter.output();
+
   return result;
 }
 

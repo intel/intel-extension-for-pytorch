@@ -89,7 +89,8 @@ Tensor& log_sigmoid_backward_out(
                   .add_input(self)
                   .build();
 
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
       at::ScalarType::BFloat16,
       iter.common_dtype(),
       "log_sigmoid_backward",

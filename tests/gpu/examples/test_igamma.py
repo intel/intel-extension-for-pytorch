@@ -42,3 +42,23 @@ class TestTorchMethod(TestCase):
         y_dpcpp = torch.igammac(a_dpcpp, x_dpcpp)
 
         self.assertEqual(y, y_dpcpp.cpu())
+
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_igammac_half(self):
+        a = np.array(
+            [[1.6835, 1.8474, 1.1929], [1.0475, 1.7162, 1.4180]], dtype=np.float16
+        )
+        data = torch.from_numpy(a)
+        a_tensor = data.clone().detach()
+        a_dpcpp = a_tensor.to("xpu")
+
+        x = np.array([[1.4845, 1.6588, 1.7829], [1.4753, 1.4286, 1.4260]])
+        x_tensor = torch.from_numpy(x)
+        x_dpcpp = x_tensor.to("xpu")
+
+        y = torch.igammac(a_tensor, x_tensor)
+        y_dpcpp = torch.igammac(a_dpcpp, x_dpcpp)
+
+        self.assertEqual(y, y_dpcpp.cpu())

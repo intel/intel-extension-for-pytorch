@@ -15,3 +15,14 @@ class TestTorchMethod(TestCase):
         self.assertEqual(False, torch.equal(x1.cpu(), x2.cpu()))
         self.assertEqual(True, torch.equal(x1.cpu(), x1.cpu()))
         self.assertEqual(True, torch.equal(x2.cpu(), x2.cpu()))
+
+        real = torch.tensor([1.0, 2.0], dtype=torch.float16, device=dpcpp_device)
+        imag = torch.tensor([3.0, 4.0], dtype=torch.float16, device=dpcpp_device)
+        z1 = torch.complex(real, imag)
+
+        real = torch.tensor([1.0, 2.0], dtype=torch.float16, device=dpcpp_device)
+        imag = torch.tensor([3.1, 4.0], dtype=torch.float16, device=dpcpp_device)
+        z2 = torch.complex(real, imag)
+        self.assertEqual(torch.tensor([True, True]), torch.eq(z1, z1))
+        self.assertEqual(torch.tensor([True, True]), torch.eq(z2, z2))
+        self.assertEqual(torch.tensor([False, True]), torch.eq(z1, z2))

@@ -29,10 +29,11 @@ struct EqKernelDpcppFunctor {
 };
 
 void eq_kernel_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
+      at::ScalarType::ComplexHalf,
       iter.common_dtype(),
       "eq_dpcpp",
       [&]() {
