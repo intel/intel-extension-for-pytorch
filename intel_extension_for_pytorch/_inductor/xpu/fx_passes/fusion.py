@@ -13,6 +13,7 @@ from torch._inductor.pattern_matcher import (
 )
 from torch._inductor.virtualized import ops
 from ..pattern_matcher import _register_lowering_pattern_post_grad_pre_pass
+from typing import Tuple, Any
 
 """ conv_relu_fusion
 aten = torch.ops.aten
@@ -304,15 +305,16 @@ def _is_valid_binary(match, fn):
     binary_nodes = filter_nodes(match.nodes, fn)
     if len(binary_nodes) < 1:
         return False
+
+    def get_meta_value(argument: torch.fx.node.Argument):
+        # Only torch.fx.Node is expected to have meta.
+        if isinstance(argument, torch.fx.Node):
+            return argument.meta.get("val", None)
+        return None
+
     if any(
-        not (
-            hasattr(n.args[0], "meta")
-            and isinstance(n.args[0].meta.get("val", None), torch.Tensor)
-        )
-        or not (
-            hasattr(n.args[1], "meta")
-            and isinstance(n.args[1].meta.get("val", None), torch.Tensor)
-        )
+        not isinstance(get_meta_value(n.args[0]), torch.Tensor)
+        or not isinstance(get_meta_value(n.args[1]), torch.Tensor)
         for n in binary_nodes
     ):
         return False
@@ -324,9 +326,9 @@ def _is_valid_binary(match, fn):
     ):
         return False
     if any(
-        n.args[0].meta["val"].size() != n.args[1].meta["val"].size()
-        or n.args[0].meta["val"].device != n.args[1].meta["val"].device
-        or n.args[0].meta["val"].dtype != n.args[1].meta["val"].dtype
+        get_meta_value(n.args[0]).size() != get_meta_value(n.args[1]).size()
+        or get_meta_value(n.args[0]).device != get_meta_value(n.args[1]).device
+        or get_meta_value(n.args[0]).dtype != get_meta_value(n.args[1]).dtype
         for n in binary_nodes
     ):
         return False
@@ -347,12 +349,72 @@ def _is_valid_computation_binary(computation_op, binary_op, other_index=None):
     return fn
 
 
+def _get_remaining_users(extra_input_node, compute_node):
+    # Think about this pattern:
+    #      ReLU
+    #     /   \
+    #  Conv1
+    #   /      \
+    # Conv2
+    #   \      /
+    #      Add
+    # Although, the extra input node (ReLU) has more than 1 users: Conv1 and Add.
+    # The Conv1 is the ancestor node of the current compute node (Conv2).
+    # This indicates that the buffer of ReLU has completed all its usage,
+    # So we can safely make changes to it now by doing Conv2->Add inplace fusion.
+    # Take above case as example:
+    # * extra_input_node: ReLU
+    # * compute_node: Conv2
+    # _get_remaining_users will return the users of extra_input_node which are not
+    # ancestor node of compute_node.
+    def _is_ancestor_node(_current_node, _ancestor_node):
+        # Check whether _ancestor_node is the ancestor node of _current_node
+        _node_list = [_current_node]
+        _visited_nodes = set()
+        while len(_node_list) != 0:
+            _current_node = _node_list.pop(0)
+            if _current_node not in _visited_nodes:
+                _visited_nodes.add(_current_node)
+                if _current_node == _ancestor_node:
+                    return True
+                elif isinstance(
+                    _current_node, torch.fx.Node
+                ) and _current_node.op not in ["placeholder", "output", "get_attr"]:
+                    for input in _current_node.all_input_nodes:
+                        _node_list.append(input)  # noqa: PERF402
+        return False
+
+    return [
+        user
+        for user in list(extra_input_node.users)
+        if not _is_ancestor_node(compute_node, user)
+    ]
+
+
 def _is_valid_computation_binary_inplace(computation_op, binary_op, other_index):
     def fn(match):
         if not _is_valid_computation_binary(computation_op, binary_op)(match):
             return False
         binary_nodes = filter_nodes(match.nodes, binary_op)
-        if any(len(n.args[other_index].users) > 1 for n in binary_nodes):
+
+        def _get_compute_node(_binary_node, _other_index):
+            assert (
+                len(_binary_node.all_input_nodes) == 2
+            ), "Binary node should have 2 input nodes."
+            _compute_index = 1 if (_other_index == 0) else 0
+            return _binary_node.args[_compute_index]
+
+        def _other_input_not_inplaceable(_binary_node, _other_index):
+            _compute_node = _get_compute_node(_binary_node, _other_index)
+            return (
+                len(
+                    _get_remaining_users(_binary_node.args[_other_index], _compute_node)
+                )
+                > 1
+                or _binary_node.args[_other_index] == _compute_node.args[0]
+            )
+
+        if any(_other_input_not_inplaceable(n, other_index) for n in binary_nodes):
             return False
         if any(
             n.args[other_index].op in ["placeholder", "output"] for n in binary_nodes
@@ -438,7 +500,7 @@ def _register_unary_fusion():
             {
                 UnaryAttr("relu"): [_combined_fusion(u, aten.relu) for u in call_user1],
                 UnaryAttr("sigmoid"): [
-                    _combined_fusion(u, aten.sigmoid.default) for u in call_user1
+                    _combined_fusion(u, aten.sigmoid) for u in call_user1
                 ],
                 UnaryAttr("tanh"): [_combined_fusion(u, aten.tanh) for u in call_user1],
             }
@@ -462,6 +524,18 @@ def _register_unary_fusion():
     ]
     for pattern, computation_op in zip(hardtanh_patterns, computation_ops):
         _register_hardtanh_fusion_lowering(pattern, computation_op)
+
+
+def _can_be_inplace(_other):
+    if isinstance(_other.data, torch_ir.View):
+        return _can_be_inplace(_other.data)
+    else:
+        return not (
+            isinstance(_other.data, torch_ir.ReinterpretView)
+            or isinstance(
+                _other.get_layout(), (torch_ir.MutationLayout, torch_ir.AliasedLayout)
+            )
+        )
 
 
 def _register_binary_unary_maybe_inplace_fusion_lowering(
@@ -497,13 +571,7 @@ def _register_binary_unary_maybe_inplace_fusion_lowering(
                 computation_args += [1.0, None, [], None]
         # Make sure the other is not an alias or mutation(fx side doesn't has such info).
         other.realize()
-        can_be_inplace = not (
-            isinstance(other.data, torch_ir.ReinterpretView)
-            or isinstance(
-                other.get_layout(), (torch_ir.MutationLayout, torch_ir.AliasedLayout)
-            )
-        )
-        if not can_be_inplace:
+        if not _can_be_inplace(other):
             return L[outplace_fusion_op](*computation_args)
         return L[inplace_fusion_op](*computation_args)
 
@@ -712,9 +780,11 @@ def _register_weight_pack_pass():
         with graph.inserting_before(conv_node):
             constant_args = [args[4], args[3], args[5], args[-1]]
             packed_conv_op = torch_ipex._convolution_pointwise.default
-            weight = args[1]
+            packed_weight_node = args[1]
             packed_conv_inputs = (
-                (args[0], weight, args[2]) + tuple(constant_args) + ("none", [], "")
+                (args[0], packed_weight_node, args[2])
+                + tuple(constant_args)
+                + ("none", [], "")
             )
             packed_conv_node = graph.create_node(
                 "call_function", packed_conv_op, tuple(packed_conv_inputs)
