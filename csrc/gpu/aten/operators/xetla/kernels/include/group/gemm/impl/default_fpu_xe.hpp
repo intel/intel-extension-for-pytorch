@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "group/gemm/api.hpp"
-#include "group/gemm/compute_policy.hpp"
+#include <group/gemm/api.hpp>
+#include <group/gemm/compute_policy.hpp>
 
 namespace gpu::xetla::group {
 
@@ -42,7 +42,7 @@ class gemm_t<
     mem_desc_a_t_, // memory attribute of matA
     mem_desc_b_t_, // memory attribute of matB
     pre_processing_t_, // pre_processing functor
-    std::enable_if_t<(arch_tag_ == gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   using mem_desc_a_t = mem_desc_a_t_;
   using mem_desc_b_t = mem_desc_b_t_;
@@ -72,7 +72,7 @@ class gemm_t<
   using dtype_mma_b = typename compute_policy::dtype_mma_b;
 
   using check_dtype =
-      group::gemm<gpu_arch::Xe>::default_fpu::check_dtype_default<
+      group::gemm<arch_tag_>::default_fpu::template check_dtype_default<
           dtype_a,
           dtype_b,
           dtype_mma_a,
@@ -91,7 +91,7 @@ class gemm_t<
       is_col_major_b ? tdesc_update_dir::x_dir : tdesc_update_dir::y_dir;
 
   using check_memory =
-      group::gemm<gpu_arch::Xe>::default_fpu::check_memory_default<
+      group::gemm<arch_tag_>::default_fpu::template check_memory_default<
           mem_layout_a,
           mem_layout_b,
           mem_space_a,
@@ -126,7 +126,7 @@ class gemm_t<
       : compute_policy::block_size_y_b;
 
   using check_tile_size =
-      group::gemm<gpu_arch::Xe>::default_fpu::check_tile_size_default<
+      group::gemm<arch_tag_>::default_fpu::template check_tile_size_default<
           dtype_mma_acc,
           tile_size_x_a,
           tile_size_y_a,
@@ -150,7 +150,7 @@ class gemm_t<
   using matA_payload_t = subgroup::mem_payload_t<
       mem_desc_a_t,
       matA_tile_desc_t,
-      msg_type::block_2d,
+      subgroup::msg_type_v<matA_tile_desc_t, mem_space_a>,
       arch_tag>;
   // the tile size in register may bigger than in memory because of the padding
   using matA_acc_t = subgroup::tile_t<dtype_mma_a, matA_tile_desc_t>;
@@ -171,7 +171,7 @@ class gemm_t<
   using matB_payload_t = subgroup::mem_payload_t<
       mem_desc_b_t,
       matB_tile_desc_t,
-      msg_type::block_2d,
+      subgroup::msg_type_v<matB_tile_desc_t, mem_space_b>,
       arch_tag>;
   using matB_acc_t = subgroup::tile_t<dtype_mma_b, matB_tile_desc_t>;
   using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
@@ -332,7 +332,7 @@ class gemm_t<
       work_group_t& g,
       matAcc_t& matAcc,
       arguments_t args,
-      uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t slm_base = 0,
       uint32_t nbarrier_base = 0) {
     int32_t sg_idx = g.get_id() % wg_size_x;
     int32_t sg_idy = g.get_id() / wg_size_x;
@@ -354,7 +354,7 @@ class gemm_t<
         sg_idx + barrier_count_y + nbarrier_base,
         nbarrier_role::producer_consumer);
 #pragma unroll
-    for (int i = 0; i < stages; i++) {
+    for (uint32_t i = 0; i < stages; i++) {
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
           matA_prefetch_payload);
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -365,20 +365,24 @@ class gemm_t<
           matB_t::tile_size_y);
     }
 
-    for (int i = 0; i < args.inner_loop_count; i++) {
+    for (uint32_t i = 0; i < args.inner_loop_count; i++) {
       if constexpr (enable_periodic_sync) {
         if ((i % sync_freq) == 0) {
           if constexpr (wg_size_x > 1) {
             nbarrier_a.arrive();
           }
-          if constexpr (wg_size_y > 1) {
-            nbarrier_b.arrive();
-          }
+          if constexpr (arch_tag >= gpu_arch::XeHpc)
+            if constexpr (wg_size_y > 1) {
+              nbarrier_b.arrive();
+            }
         }
       }
       SW_BARRIER();
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matA, matA_payload);
+      if constexpr (!is_col_major_a)
+        reorder_matA(matA);
+
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matB, matB_payload);
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
@@ -406,9 +410,10 @@ class gemm_t<
           if constexpr (wg_size_x > 1) {
             nbarrier_a.wait();
           }
-          if constexpr (wg_size_y > 1) {
-            nbarrier_b.wait();
-          }
+          if constexpr (arch_tag >= gpu_arch::XeHpc)
+            if constexpr (wg_size_y > 1) {
+              nbarrier_b.wait();
+            }
         }
       }
     }
@@ -416,6 +421,20 @@ class gemm_t<
   }
 
  private:
+  inline void reorder_matA(matA_t& matA) {
+    constexpr uint32_t num_block_x = tile_size_x_a / block_size_x_a;
+    constexpr uint32_t num_block_y = tile_size_y_a / block_size_y_a;
+    for (uint32_t i = 0; i < num_block_y * num_block_x; i++) {
+      auto dst_blk = matA.reg.xetla_select<matA_t::block_elems, 1>(
+          i * matA_t::block_elems);
+      xetla_vector<dtype_a, matA_t::block_elems> trans_blk;
+      for (uint32_t j = 0; j < block_size_y_a; j++) {
+        trans_blk.xetla_select<block_size_x_a, block_size_y_a>(j) =
+            dst_blk.xetla_select<block_size_x_a, 1>(j * block_size_x_a);
+      }
+      dst_blk = trans_blk;
+    }
+  }
   /// @brief Updates tile base descriptor based on the tid.
   __XETLA_API static void update_sg_tile_tdesc(
       arguments_t& args,

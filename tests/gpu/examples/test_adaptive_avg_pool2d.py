@@ -370,3 +370,29 @@ class TestNNMethod(TestCase):
         self.assertEqual(
             x_xpu.grad.is_contiguous(memory_format=torch.channels_last), True
         )
+
+    def test_adaptive_avg_pool_corner_shape(self, dtype=torch.float):
+        x_cpu = torch.randn([0, 8, 8, 8], device=cpu_device, dtype=dtype)
+        x_xpu = x_cpu.detach().clone().to(dpcpp_device)
+        output_sz = [308, 308]
+
+        y_cpu = torch._C._nn.adaptive_avg_pool2d(x_cpu, output_sz)
+        y_xpu = torch._C._nn.adaptive_avg_pool2d(x_xpu, output_sz)
+
+        self.assertEqual(y_cpu, y_xpu.to(cpu_device))
+
+        x_cpu_1d = torch.randn(1, 2, device=cpu_device)
+        x_xpu_1d = x_cpu_1d.detach().clone().to(dpcpp_device)
+
+        m1 = torch.nn.AdaptiveAvgPool1d(0)
+        y_cpu_1d = m1(x_cpu_1d)
+        y_xpu_1d = m1(x_xpu_1d)
+        self.assertEqual(y_cpu_1d, y_xpu_1d.to(cpu_device))
+
+        x_cpu_2d = torch.randn(1, 2, 3, 4, device=cpu_device)
+        x_xpu_2d = x_cpu_2d.detach().clone().to(dpcpp_device)
+
+        m2 = torch.nn.AdaptiveAvgPool2d(0)
+        y_cpu_2d = m2(x_cpu_2d)
+        y_xpu_2d = m2(x_xpu_2d)
+        self.assertEqual(y_cpu_2d, y_xpu_2d.to(cpu_device))

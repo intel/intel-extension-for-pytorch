@@ -12,6 +12,11 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
+template <int n, typename index_t>
+inline index_t make_alignment_n(index_t size) {
+  return (size + n - 1) / n * n;
+}
+
 template <
     typename KeyT,
     typename ValueT,
@@ -40,12 +45,15 @@ struct FastGroupRadixSelectImplFunctor {
     KeyT keys[SelectMethod::REG_LEN];
     PrivateValueT values[SelectMethod::REG_LEN];
 
+    constexpr int max_type_bytes = std::max(sizeof(KeyT), sizeof(ValueT));
+
     KeyT* keys_temp = reinterpret_cast<KeyT*>(
         slm.template get_multi_ptr<sycl::access::decorated::no>().get() +
-        SelectMethod::GetSharedLocalMemorySize());
+        make_alignment_n<max_type_bytes>(
+            SelectMethod::GetSharedLocalMemorySize()));
     PrivateValueT* values_temp = reinterpret_cast<PrivateValueT*>(
-        slm.template get_multi_ptr<sycl::access::decorated::no>().get() +
-        SelectMethod::GetSharedLocalMemorySize() + ntopk * sizeof(KeyT));
+        reinterpret_cast<unsigned char*>(keys_temp) +
+        make_alignment_n<max_type_bytes>(ntopk * sizeof(KeyT)));
 
 #pragma unroll
     for (int ITEM = 0; ITEM < KEYS_PER_ITEM; ++ITEM) {
@@ -156,9 +164,12 @@ inline void fast_group_radix_select_impl_(
                                    : Numerics<KeyT>::upper_bound();
 
   auto cgf = DPCPP_Q_CGF(h) {
+    constexpr int max_type_bytes = std::max(sizeof(KeyT), sizeof(ValueT));
     auto slm = dpcpp_local_acc_t<unsigned char>(
-        SelectMethod::GetSharedLocalMemorySize() +
-            ntopk * (sizeof(KeyT) + sizeof(ValueT)),
+        make_alignment_n<max_type_bytes>(
+            SelectMethod::GetSharedLocalMemorySize()) +
+            make_alignment_n<max_type_bytes>(ntopk * sizeof(KeyT)) +
+            ntopk * sizeof(ValueT),
         h);
     FastGroupRadixSelectImplFunctor<
         KeyT,

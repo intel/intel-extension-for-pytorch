@@ -15,7 +15,7 @@ Large Language Models (LLMs) are introduced in the Intel® Extension for PyTorch
 The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts, users can enable it dynamically by importing ``intel_extension_for_pytorch``.
 
 .. note:: 
-   
+   - CPU features are not included in GPU-only packages.   
    - GPU features are not included in CPU-only packages.
    - Optimizations for CPU-only may have a newer code base due to different development schedules.
 
@@ -27,7 +27,7 @@ Intel® Extension for PyTorch* has been released as an open–source project at 
 You can find more information about the product at:
 
 - `Features <https://intel.github.io/intel-extension-for-pytorch/gpu/latest/tutorials/features>`_
-- `Performance <https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance>`_ 
+- `Performance <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/performance>`_ 
 
 Architecture
 ------------
@@ -59,9 +59,10 @@ The team tracks bugs and enhancement requests using `GitHub issues <https://gith
    tutorials/introduction
    tutorials/features
    Large Language Models (LLM)<tutorials/llm>
+   tutorials/performance
    tutorials/technical_details
    tutorials/releases
-   tutorials/performance_tuning/known_issues
+   tutorials/known_issues
    tutorials/blogs_publications
    tutorials/license
 
@@ -73,23 +74,13 @@ The team tracks bugs and enhancement requests using `GitHub issues <https://gith
    tutorials/installation
    tutorials/getting_started
    tutorials/examples
-   tutorials/cheat_sheet
 
 .. toctree::
    :maxdepth: 3
    :caption: DEVELOPER REFERENCE
    :hidden:
 
-   tutorials/api_doc
-   
-.. toctree::
-   :maxdepth: 3
-   :caption: PERFORMANCE TUNING
-   :hidden:
-
-   tutorials/performance_tuning/tuning_guide
-   tutorials/performance_tuning/launch_script
-   tutorials/performance_tuning/torchserve   
+   tutorials/api_doc 
    
 .. toctree::
    :maxdepth: 3

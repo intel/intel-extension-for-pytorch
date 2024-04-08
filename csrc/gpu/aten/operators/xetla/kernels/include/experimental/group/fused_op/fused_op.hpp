@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "experimental/group/fused_op/layer_norm_fused_op_api.hpp"
-#include "experimental/group/fused_op/layer_norm_fused_op_bwd_xe.hpp"
-#include "experimental/group/fused_op/layer_norm_fused_op_fwd_xe.hpp"
-#include "experimental/group/fused_op/row_reduction_fused_op_api.hpp"
-#include "experimental/group/fused_op/row_reduction_fused_op_xe.hpp"
+#include <experimental/group/fused_op/layer_norm_fused_op_api.hpp>
+#include <experimental/group/fused_op/layer_norm_fused_op_bwd_xe.hpp>
+#include <experimental/group/fused_op/layer_norm_fused_op_fwd_xe.hpp>
+#include <experimental/group/fused_op/row_reduction_fused_op_api.hpp>
+#include <experimental/group/fused_op/row_reduction_fused_op_xe.hpp>

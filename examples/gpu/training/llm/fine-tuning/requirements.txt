@@ -1,0 +1,11 @@
+numpy
+peft
+rouge_score
+fire
+openai==0.27.10
+transformers>=4.28.1
+torch
+sentencepiece
+tokenizers>=0.13.3
+wandb
+trl

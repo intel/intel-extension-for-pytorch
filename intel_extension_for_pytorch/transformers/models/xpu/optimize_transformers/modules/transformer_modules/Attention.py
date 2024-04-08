@@ -6,7 +6,7 @@ import math
 from .NaiveAttention import IPEXTransformerAttnNaive
 from .BaseAttention import IPEXTransformerAttn, IPEXRuntimeAttnCache
 from .Linear import matmul_add_add
-import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch as ipex  # noqa F401
 
 
 class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
@@ -238,8 +238,15 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     # ################################################################ sdp ##############################################
 
     def sdp(self, query, key, value, attention_mask, head_mask, alibi):
-        # for ATS-M machine
-        if not ipex._C._has_2d_block_array(0):
+        # Currently only PVC and MTL (without beam search) have sdp fusion available
+        if not (
+            torch.xpu.has_2d_block_array()
+            or (  # MTL greedy search
+                torch.xpu.has_xetla()
+                and not torch.xpu.has_xmx()
+                and not self.is_beam_search()
+            )
+        ):
             return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
         key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
         (
@@ -302,12 +309,11 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 alibi=alibi,
                 first_token=self.is_1st_token(),
             )
-
-            # if self.is_1st_token_beam_search():
-            #     attn_output = attn_output.permute(0, 2, 1, 3)
-            # else:
-            #     attn_output = attn_output.permute(2, 0, 1, 3)
-            attn_output = attn_output.permute(0, 2, 1, 3)
+            # IpexSDP will modify the layout to minimize copying, so naive_sdp here aligns with IpexSDP.
+            if torch.xpu.has_2d_block_array() or self.is_1st_token_beam_search():
+                attn_output = attn_output.permute(0, 2, 1, 3)
+            else:
+                attn_output = attn_output.permute(2, 0, 1, 3)
             attn_output = attn_output.reshape(
                 attn_output.size()[:-2] + (self.embed_dim // self.tp_size,)
             )

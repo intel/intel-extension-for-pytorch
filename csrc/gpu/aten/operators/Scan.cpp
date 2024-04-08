@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
 
 #include <core/Memory.h>
 #include <runtime/Utils.h>
@@ -155,22 +156,20 @@ Tensor _logcumsumexp(const Tensor& self, int64_t dim) {
   return _logcumsumexp_out(self, dim, result);
 }
 
-template <typename scalar_t, typename accscalar_t>
+template <typename scalar_t, typename opmath_t>
 struct _logcumsumexp_out_log_add_exp_functor {
-  scalar_t operator()(const scalar_t x, const scalar_t y) const {
-    // sycl::min returns first arg if one of the args is nan
-    scalar_t min =
-        Numerics<scalar_t>::isnan(y) ? y : Numerics<scalar_t>::min(x, y);
-    // sycl::max returns first arg if one of the args is nan
-    scalar_t max =
-        Numerics<scalar_t>::isnan(y) ? y : Numerics<scalar_t>::max(x, y);
-    if (min != max ||
-        (!Numerics<accscalar_t>::isinf(static_cast<accscalar_t>(min)))) {
+  scalar_t operator()(const scalar_t x_, const scalar_t y_) const {
+    const opmath_t x{x_}, y{y_};
+
+    auto isnan_x = at::_isnan(x);
+    auto isnan_y = at::_isnan(y);
+    opmath_t min = isnan_y ? y : (isnan_x ? x : std::min(x, y));
+    opmath_t max = isnan_y ? y : (isnan_x ? x : std::max(x, y));
+    if (min != max || ::isfinite(min)) {
       // nan will be propagated here
-      return Numerics<scalar_t>::log1p(Numerics<scalar_t>::exp(min - max)) +
-          max;
+      return ::log1p(std::exp(min - max)) + max;
     } else {
-      // special case to correctly handle infinite inputs
+      // special case to correctly handle infinite cases
       return x;
     }
   }
@@ -187,20 +186,22 @@ Tensor& _logcumsumexp_out(const Tensor& self, int64_t dim, Tensor& result) {
     result.zero_();
     return result;
   }
-
+  auto result_ = contiguous_out_arg(result);
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       self.scalar_type(),
       "logcumsumexp_out_dpcpp",
       [&]() {
-        using accscalar_t = acc_type<scalar_t>;
+        using opmath_t = at::opmath_type<scalar_t>;
         scalar_t init = Numerics<scalar_t>::lower_bound();
-        _logcumsumexp_out_log_add_exp_functor<scalar_t, accscalar_t>
-            log_add_exp;
+        _logcumsumexp_out_log_add_exp_functor<scalar_t, opmath_t> log_add_exp;
         scan<INCLUSIVE_TYPE, scalar_t, scalar_t>(
-            result, self, wrap_dim, init, log_add_exp);
+            *result_, self, wrap_dim, init, log_add_exp);
       });
+  if (!result.is_same(*result_)) {
+    result.copy_(*result_);
+  }
   return result;
 }
 

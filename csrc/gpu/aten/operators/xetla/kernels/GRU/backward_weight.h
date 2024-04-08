@@ -113,8 +113,10 @@ struct gru_layer_bpk {
       perf_tuning_knob_t<16, prefetch_distance, periodic_sync_interval>;
 
   using compute_attr = compute_attr_t<T, T, Act_T>;
-  using compute_policy =
-      compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch::Xe>;
+  using compute_policy = compute_policy_default_xmx<
+      compute_attr,
+      perf_tuning_knob,
+      gpu_arch::XeHpc>;
 
   static constexpr uint32_t tg_size_x =
       (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0;
@@ -141,11 +143,11 @@ struct gru_layer_bpk {
   using mem_desc_hidden_t = mem_desc_t<T, layout_hidden, mem_loc_hidden>;
 
   using epilogue0_t = epilogue_t<
-      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, gpu_arch::Xe>,
+      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, gpu_arch::XeHpc>,
       tile_shape_0,
       mem_desc_weight_t>;
   using epilogue1_t = epilogue_t<
-      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, gpu_arch::Xe>,
+      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, gpu_arch::XeHpc>,
       tile_shape_1,
       mem_desc_weight_t>;
   using epilogue_args_0_t = typename epilogue0_t::arguments_t;
@@ -168,7 +170,7 @@ struct gru_layer_bpk {
   using matAcc_desc_t1 = typename brgemm_t_1::matAcc_tile_desc_t;
 
   using block_attr =
-      get_load_block_size_auto<T, sg_tile_m, sg_tile_k, gpu_arch::Xe>;
+      get_load_block_size_auto<T, sg_tile_m, sg_tile_k, gpu_arch::XeHpc>;
 
   using matA_tile_desc_t = tile_desc_t<
       sg_tile_m,
@@ -182,7 +184,7 @@ struct gru_layer_bpk {
       matA_tile_desc_t,
       msg_type_v<matA_tile_desc_t, mem_space::global>,
 
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using matA_bpi_t = tile_t<Act_T, matA_tile_desc_t>;
 
@@ -191,13 +193,13 @@ struct gru_layer_bpk {
       matAcc_desc_t0,
       msg_type_v<matAcc_desc_t0, mem_loc_weight>,
 
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_t0 = tile_t<T, matAcc_desc_t0>;
   using matC_payload_t1 = mem_payload_t<
       mem_desc_t<T, layout_weight, mem_loc_weight>,
       matAcc_desc_t1,
       msg_type_v<matAcc_desc_t1, mem_loc_weight>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_t1 = tile_t<T, matAcc_desc_t1>;
 
   using bias_desc_t = tile_desc_t<
@@ -211,13 +213,13 @@ struct gru_layer_bpk {
       mem_desc_t<Act_T, layout_bias, mem_loc_bias>,
       bias_desc_t,
       msg_type_v<bias_desc_t, mem_loc_bias>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using prefetch_t = prefetch_payload_t<
       mem_desc_t<T, mem_layout::row_major, mem_space::global>,
       tile_desc_t<matA_load_0_t::tile_size_x, matA_load_0_t::tile_size_y, 1, 1>,
       1, /*tg_size_x=1*/
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   static constexpr tdesc_update_dir load_update_config =
       tdesc_update_dir::y_dir;
 

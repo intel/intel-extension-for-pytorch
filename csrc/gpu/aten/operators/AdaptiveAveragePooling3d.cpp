@@ -21,7 +21,7 @@ void adaptive_avg_pool3d_out_template(
     Tensor& output,
     Tensor const& input,
     IntArrayRef output_size) {
-  for (int64_t i = 0; i < input.ndimension(); i++) {
+  for (int64_t i = 1; i < input.ndimension(); i++) {
     TORCH_CHECK(
         input.size(i) > 0,
         "adaptive_avg_pool3d(): expected input to have non-empty spatial "
@@ -89,6 +89,9 @@ void adaptive_avg_pool3d_out_template(
     input_ = contiguous_if_needed(input, smf);
     output.resize_(
         {nbatch, nblock, outputDepth, outputHeight, outputWidth}, smf);
+  }
+  if (output.numel() == 0) {
+    return;
   }
 
   // per oneDNN definition, no dilation means dilation ratio is 0

@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "subgroup/tile/api.hpp"
-#include "subgroup/tile/common.hpp"
+#include <subgroup/tile/api.hpp>
+#include <subgroup/tile/common.hpp>
 
 namespace gpu::xetla::subgroup {
 
@@ -47,7 +47,7 @@ elemwise_cvt(T_dst& dst, T_src& src) {
     dst.reg = src.reg;
   } else {
 #pragma unroll
-    for (int i = 0; i < tile_elems; i += block_size_x) {
+    for (uint32_t i = 0; i < tile_elems; i += block_size_x) {
       dst.reg.xetla_select<block_size_x, 1>(i) =
           xetla_cvt<dtype_dst, dtype_src, block_size_x>(
               src.reg.xetla_select<block_size_x, 1>(i));
@@ -77,14 +77,14 @@ elemwise_cvt(T_dst& dst, T_src& src) {
   xetla_vector<dtype_src, tile_elems> rnde_reg;
   // rnde
 #pragma unroll
-  for (int i = 0; i < tile_elems; i += block_size_x) {
+  for (uint32_t i = 0; i < tile_elems; i += block_size_x) {
     rnde_reg.xetla_select<block_size_x, 1>(i) =
         xetla_rnde<dtype_src, block_size_x>(
             src.reg.xetla_select<block_size_x, 1>(i));
   }
   // sat
 #pragma unroll
-  for (int i = 0; i < tile_elems; i += block_size_x) {
+  for (uint32_t i = 0; i < tile_elems; i += block_size_x) {
     dst.reg.xetla_select<block_size_x, 1>(i) =
         xetla_sat<dtype_dst, dtype_src, block_size_x>(
             rnde_reg.xetla_select<block_size_x, 1>(i));
@@ -135,9 +135,9 @@ __XETLA_API
     return;
   }
 #pragma unroll
-  for (int i = 0; i < tile_size_y / block_size_y; i++) {
+  for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg = (mat_Acc.reg)
                      .xetla_select<block_elems, 1>(
                          (i * num_block_x + j) * block_elems);
@@ -148,7 +148,7 @@ __XETLA_API
       auto reg_dst_2d =
           reg_dst.xetla_format<native_type_t<dtype>, move_rows, move_cols>();
 #pragma unroll
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<move_rows, 1, block_size_x, vnni_stride>(
             0, vnni_i) =
             reg_2d.xetla_select<move_rows, vnni_stride, block_size_x, 1>(
@@ -166,7 +166,7 @@ __XETLA_API
     constexpr int32_t remain_move_cols = block_size_x * vnni_stride;
     constexpr int32_t remain_move_rows = remain_size_y / vnni_stride;
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg = (mat_Acc.reg)
                      .xetla_select<remain_block_elems, 1>(
                          remain_elems_start + j * remain_block_elems);
@@ -178,7 +178,7 @@ __XETLA_API
           native_type_t<dtype>,
           remain_move_rows,
           remain_move_cols>();
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<remain_move_rows, 1, block_size_x, vnni_stride>(
             0, vnni_i) =
             reg_2d.xetla_select<remain_move_rows, vnni_stride, block_size_x, 1>(
@@ -214,9 +214,9 @@ vnni_reverse(T& mat_Acc) {
     return;
   }
 #pragma unroll
-  for (int i = 0; i < tile_size_y / block_size_y; i++) {
+  for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg = (mat_Acc.reg)
                      .xetla_select<block_elems, 1>(
                          (i * num_block_x + j) * block_elems);
@@ -228,7 +228,7 @@ vnni_reverse(T& mat_Acc) {
           reg_dst
               .xetla_format<native_type_t<dtype>, block_size_y, block_size_x>();
 #pragma unroll
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<move_rows, vnni_stride, block_size_x, 1>(
             vnni_i, 0) =
             reg_2d.xetla_select<move_rows, 1, block_size_x, vnni_stride>(
@@ -246,7 +246,7 @@ vnni_reverse(T& mat_Acc) {
     constexpr int32_t remain_move_cols = block_size_x * vnni_stride;
     constexpr int32_t remain_move_rows = remain_size_y / vnni_stride;
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg = (mat_Acc.reg)
                      .xetla_select<remain_block_elems, 1>(
                          remain_elems_start + j * remain_block_elems);
@@ -260,7 +260,7 @@ vnni_reverse(T& mat_Acc) {
           native_type_t<dtype>,
           remain_size_y,
           block_size_x>();
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<remain_move_rows, vnni_stride, block_size_x, 1>(
             vnni_i, 0) =
             reg_2d.xetla_select<remain_move_rows, 1, block_size_x, vnni_stride>(
@@ -297,9 +297,9 @@ __XETLA_API
     return;
   }
 #pragma unroll
-  for (int i = 0; i < tile_size_y / block_size_y; i++) {
+  for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg = (mat_Acc.reg)
                      .xetla_select<block_elems, 1>(
                          (i * num_block_x + j) * block_elems);
@@ -311,7 +311,7 @@ __XETLA_API
       auto reg_dst_2d =
           reg_dst
               .xetla_format<native_type_t<dtype>, block_size_x, block_size_y>();
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<move_rows, vnni_stride, block_size_y, 1>(
             vnni_i, 0) =
             reg_2d.xetla_select<move_rows, 1, block_size_y, vnni_stride>(
@@ -328,7 +328,7 @@ __XETLA_API
     constexpr int32_t remain_move_cols = remain_size_y * vnni_stride;
     constexpr int32_t remain_move_rows = block_size_x / vnni_stride;
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg = (mat_Acc.reg)
                      .xetla_select<remain_block_elems, 1>(
                          remain_elems_start + j * remain_block_elems);
@@ -344,7 +344,7 @@ __XETLA_API
           block_size_x,
           remain_size_y>();
 
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d
             .xetla_select<remain_move_rows, vnni_stride, remain_size_y, 1>(
                 vnni_i, 0) =
@@ -395,14 +395,14 @@ vnni_transform(T_dst& dst, T_src& src) {
   using move_dtype = get_uint_type_t<sizeof(dtype_dst) * scale_factor>;
   constexpr uint32_t select_stride = vnni_row / scale_factor;
 #pragma unroll
-  for (int i = 0; i < tile_size_y / block_size_y; i++) {
+  for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg_src_blk = reg_src.xetla_select<block_elems, 1>(
           (i * num_block_x + j) * block_elems);
       auto reg_dst_blk = reg_dst.xetla_select<block_elems, 1>(
           (i * num_block_x + j) * block_elems);
-      for (int row_i = 0; row_i < block_size_y; row_i += vnni_row) {
+      for (uint32_t row_i = 0; row_i < block_size_y; row_i += vnni_row) {
         auto reg_src_move =
             reg_src_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
                 .xetla_format<native_type_t<move_dtype>>();
@@ -410,7 +410,7 @@ vnni_transform(T_dst& dst, T_src& src) {
             reg_dst_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
                 .xetla_format<native_type_t<move_dtype>>();
 #pragma unroll
-        for (int move_i = 0; move_i < select_stride; move_i++) {
+        for (uint32_t move_i = 0; move_i < select_stride; move_i++) {
           if constexpr (sizeof(dtype_dst) > sizeof(dtype_src)) {
             reg_dst_move.xetla_select<block_size_x, 1>(move_i * block_size_x) =
                 reg_src_move.xetla_select<block_size_x, select_stride>(move_i);
@@ -430,14 +430,14 @@ vnni_transform(T_dst& dst, T_src& src) {
     constexpr uint32_t remain_size_y = tile_size_y % block_size_y;
     constexpr uint32_t remain_block_elems = remain_size_y * block_size_x;
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg_src_blk = reg_src.xetla_select<remain_block_elems, 1>(
           remain_elems_start + j * remain_block_elems);
       auto reg_dst_blk = reg_dst.xetla_select<remain_block_elems, 1>(
           remain_elems_start + j * remain_block_elems);
       // for mma, here we can guarantee that the remaining is a multiple of
       // vnni_row
-      for (int row_i = 0; row_i < remain_size_y; row_i += vnni_row) {
+      for (uint32_t row_i = 0; row_i < remain_size_y; row_i += vnni_row) {
         auto reg_src_move =
             reg_src_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
                 .xetla_format<native_type_t<move_dtype>>();
@@ -445,7 +445,7 @@ vnni_transform(T_dst& dst, T_src& src) {
             reg_dst_blk.xetla_select<move_elems, 1>(row_i * block_size_x)
                 .xetla_format<native_type_t<move_dtype>>();
 #pragma unroll
-        for (int move_i = 0; move_i < select_stride; move_i++) {
+        for (uint32_t move_i = 0; move_i < select_stride; move_i++) {
           if constexpr (sizeof(dtype_dst) > sizeof(dtype_src)) {
             reg_dst_move.xetla_select<block_size_x, 1>(move_i * block_size_x) =
                 reg_src_move.xetla_select<block_size_x, select_stride>(move_i);
@@ -461,6 +461,33 @@ vnni_transform(T_dst& dst, T_src& src) {
   dst.reg = reg_dst;
 }
 
+/// @brief  Converts tiled layout to transpose_tiled layout.
+///
+/// @tparam T Is the tile data type.
+/// @param mat_Acc Is the reference of the tile object.
+/// @return No return, update the data in-place.
+template <typename T>
+__XETLA_API void tile_transpose(T& mat_Acc) {
+  constexpr uint32_t tile_size_y = T::tile_size_y;
+  constexpr uint32_t tile_size_x = T::tile_size_x;
+  constexpr uint32_t block_size_y = T::block_size_y;
+  constexpr uint32_t block_size_x = T::block_size_x;
+  constexpr uint32_t block_elems = block_size_y * block_size_x;
+  constexpr int32_t num_block_x = tile_size_x / block_size_x;
+  constexpr int32_t num_block_y = tile_size_y / block_size_y;
+  using dtype = typename T::dtype;
+#pragma unroll
+  for (uint32_t i = 0; i < num_block_y * num_block_x; i++) {
+    auto dst_blk = mat_Acc.reg.xetla_select<block_elems, 1>(i * block_elems);
+    xetla_vector<dtype, block_elems> trans_blk;
+#pragma unroll
+    for (uint32_t j = 0; j < block_size_y; j++) {
+      trans_blk.xetla_select<block_size_x, block_size_y>(j) =
+          dst_blk.xetla_select<block_size_x, 1>(j * block_size_x);
+    }
+    dst_blk = trans_blk;
+  }
+}
 /// @brief Broadcasts 1d src tile to the entire 2d tile, as well as do the data
 /// conversion.
 ///
@@ -477,19 +504,17 @@ __XETLA_API typename std::enable_if_t<
 row_broadcast(T_dst& dst, T_src& src) {
   static constexpr uint32_t dst_tile_size_y = T_dst::tile_size_y;
   static constexpr uint32_t dst_tile_size_x = T_dst::tile_size_x;
-  static constexpr uint32_t dst_tile_elems = T_dst::tile_elems;
   static constexpr uint32_t dst_block_size_y = T_dst::block_size_y;
   static constexpr uint32_t dst_block_size_x = T_dst::block_size_x;
   static constexpr uint32_t dst_block_elems = T_dst::block_elems;
-  static constexpr int32_t dst_num_block_y = T_dst::num_block_y;
   static constexpr int32_t dst_num_block_x = T_dst::num_block_x;
   using dst_dtype = typename T_dst::dtype;
   using src_dtype = typename T_src::dtype;
 
 #pragma unroll
-  for (int i = 0; i < dst_tile_size_y / dst_block_size_y; i++) {
+  for (uint32_t i = 0; i < dst_tile_size_y / dst_block_size_y; i++) {
 #pragma unroll
-    for (int j = 0; j < dst_num_block_x; j++) {
+    for (uint32_t j = 0; j < dst_num_block_x; j++) {
       auto dst_reg = (dst.reg)
                          .xetla_select<dst_block_elems, 1>(
                              (i * dst_num_block_x + j) * dst_block_elems)
@@ -498,7 +523,7 @@ row_broadcast(T_dst& dst, T_src& src) {
                              dst_block_size_y,
                              dst_block_size_x>();
 #pragma unroll
-      for (int row_i = 0; row_i < dst_block_size_y; row_i++) {
+      for (uint32_t row_i = 0; row_i < dst_block_size_y; row_i++) {
         auto src_reg =
             src.reg.xetla_select<dst_block_size_x, 1>(j * dst_block_size_x);
         dst_reg.row(row_i) =
@@ -514,7 +539,7 @@ row_broadcast(T_dst& dst, T_src& src) {
     constexpr int32_t dst_tail_size_y = dst_tile_size_y % dst_block_size_y;
     constexpr int32_t dst_tail_block_elems = dst_tail_size_y * dst_block_size_x;
 #pragma unroll
-    for (int j = 0; j < dst_num_block_x; j++) {
+    for (uint32_t j = 0; j < dst_num_block_x; j++) {
       auto dst_reg =
           (dst.reg)
               .xetla_select<dst_tail_block_elems, 1>(
@@ -524,7 +549,7 @@ row_broadcast(T_dst& dst, T_src& src) {
                   dst_tail_size_y,
                   dst_block_size_x>();
 #pragma unroll
-      for (int row_i = 0; row_i < dst_tail_size_y; row_i++) {
+      for (uint32_t row_i = 0; row_i < dst_tail_size_y; row_i++) {
         auto src_reg =
             src.reg.xetla_select<dst_block_size_x, 1>(j * dst_block_size_x);
         dst_reg.row(row_i) =
@@ -565,10 +590,10 @@ layout_convert(T_dst& dst, T_src& src) {
   auto dst_reg =
       dst.reg.xetla_format<native_type_t<dtype>, tile_size_y, tile_size_x>();
 #pragma unroll
-  for (int i = 0; i < num_block_y; ++i) {
+  for (uint32_t i = 0; i < num_block_y; ++i) {
     uint32_t offset_y = i * block_size_y;
 #pragma unroll
-    for (int j = 0; j < num_block_x; ++j) {
+    for (uint32_t j = 0; j < num_block_x; ++j) {
       uint32_t offset_x = j * block_size_x;
       auto src_reg = src.reg.xetla_select<block_elems, 1>(
           (i * num_block_x + j) * block_elems);
@@ -583,7 +608,7 @@ layout_convert(T_dst& dst, T_src& src) {
     constexpr uint32_t processed_elems = offset_y * tile_size_x;
     constexpr uint32_t remained_block_elems = remained_size_y * block_size_x;
 #pragma unroll
-    for (int j = 0; j < num_block_x; ++j) {
+    for (uint32_t j = 0; j < num_block_x; ++j) {
       uint32_t offset_x = j * block_size_x;
       auto src_reg = src.reg.xetla_select<remained_block_elems, 1>(
           processed_elems + j * remained_block_elems);
@@ -624,10 +649,10 @@ layout_convert(T_dst& dst, T_src& src) {
   auto src_reg =
       src.reg.xetla_format<native_type_t<dtype>, tile_size_y, tile_size_x>();
 #pragma unroll
-  for (int i = 0; i < num_block_y; ++i) {
+  for (uint32_t i = 0; i < num_block_y; ++i) {
     uint32_t offset_y = i * block_size_y;
 #pragma unroll
-    for (int j = 0; j < num_block_x; ++j) {
+    for (uint32_t j = 0; j < num_block_x; ++j) {
       uint32_t offset_x = j * block_size_x;
       auto dst_reg = dst.reg.xetla_select<block_elems, 1>(
           (i * num_block_x + j) * block_elems);
@@ -642,7 +667,7 @@ layout_convert(T_dst& dst, T_src& src) {
     constexpr uint32_t processed_elems = offset_y * tile_size_x;
     constexpr uint32_t remained_block_elems = remained_size_y * block_size_x;
 #pragma unroll
-    for (int j = 0; j < num_block_x; ++j) {
+    for (uint32_t j = 0; j < num_block_x; ++j) {
       uint32_t offset_x = j * block_size_x;
       auto dst_reg = dst.reg.xetla_select<remained_block_elems, 1>(
           processed_elems + j * remained_block_elems);

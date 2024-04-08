@@ -758,6 +758,7 @@ struct AvgPool3dOutFrameKernelFunctor {
     index_t oRow = item.get_global_id()[1];
     index_t oFrame = (item.get_group(0) + offsetZ) % oDepth;
     index_t slice = (item.get_group(0) + offsetZ) / oDepth;
+    auto out_data = output_acc;
 
     if (oRow < oHeight && oCol < oWidth) {
       accscalar_t sum = 0.0f;
@@ -778,9 +779,7 @@ struct AvgPool3dOutFrameKernelFunctor {
       wend = Numerics<index_t>::min(wend, iWidth);
 
       if (tstart >= tend || hstart >= hend || wstart >= wend) {
-        output
-            [oCol * ostride3 + oRow * ostride2 + oFrame * ostride1 +
-             slice * ostride0] = 0.0f;
+        out_data[slice][oFrame][oRow][oCol] = static_cast<scalar_t>(0.0f);
         return;
       }
 
@@ -800,16 +799,13 @@ struct AvgPool3dOutFrameKernelFunctor {
       for (ti = tstart; ti < tend; ++ti) {
         for (hi = hstart; hi < hend; ++hi) {
           for (wi = wstart; wi < wend; ++wi) {
-            scalar_t val = input
-                [wi * istride3 + hi * istride2 + ti * istride1 +
-                 slice * istride0];
+            scalar_t val = input_acc[slice][ti][hi][wi];
             sum += val;
           }
         }
       }
-      output
-          [oCol * ostride3 + oRow * ostride2 + oFrame * ostride1 +
-           slice * ostride0] = static_cast<scalar_t>(sum / divide_factor);
+      out_data[slice][oFrame][oRow][oCol] =
+          static_cast<scalar_t>(sum / divide_factor);
     }
   }
   AvgPool3dOutFrameKernelFunctor(
@@ -845,8 +841,8 @@ struct AvgPool3dOutFrameKernelFunctor {
       index_t width_group_range_,
       index_t height_group_range_,
       index_t z_group_range_,
-      scalar_t* input_,
-      scalar_t* output_)
+      PackedTensorAccessor64<scalar_t, 4> input_acc_,
+      PackedTensorAccessor64<scalar_t, 4> output_acc_)
       : kT(kT_),
         kH(kH_),
         kW(kW_),
@@ -879,8 +875,8 @@ struct AvgPool3dOutFrameKernelFunctor {
         width_group_range(width_group_range_),
         height_group_range(height_group_range_),
         z_group_range(z_group_range_),
-        input(input_),
-        output(output_) {}
+        input_acc(input_acc_),
+        output_acc(output_acc_) {}
 
  private:
   int kT;
@@ -915,8 +911,8 @@ struct AvgPool3dOutFrameKernelFunctor {
   index_t width_group_range;
   index_t height_group_range;
   index_t z_group_range;
-  scalar_t* input;
-  scalar_t* output;
+  PackedTensorAccessor64<scalar_t, 4> input_acc;
+  PackedTensorAccessor64<scalar_t, 4> output_acc;
 };
 
 template <typename scalar_t, typename accscalar_t, typename index_t>
@@ -962,8 +958,8 @@ void avg_pool3d_out_frame(
 
   index_t z_group_range = totalZ > 65535 ? 65535 : totalZ;
 
-  scalar_t* input = work_input.data_ptr<scalar_t>();
-  scalar_t* output = work_output.data_ptr<scalar_t>();
+  auto input_acc = work_input.packed_accessor64<scalar_t, 4>();
+  auto output_acc = work_output.packed_accessor64<scalar_t, 4>();
   auto cgf = DPCPP_Q_CGF(cgh) {
     AvgPool3dOutFrameKernelFunctor<scalar_t, accscalar_t, index_t> kfn(
         kT,
@@ -998,8 +994,8 @@ void avg_pool3d_out_frame(
         width_group_range,
         height_group_range,
         z_group_range,
-        input,
-        output);
+        input_acc,
+        output_acc);
 
     cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<3>(
@@ -1230,7 +1226,8 @@ void avg_pool3d_out_template(
             offsetZ += 65535;
           }
         });
-    output = work_output.resize_as_(output);
+    auto work_output1 = work_output.resize_as_(output);
+    output.copy_(work_output1);
   }
 }
 

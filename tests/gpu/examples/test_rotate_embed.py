@@ -65,7 +65,7 @@ class TestNNMethod(TestCase):
             kernel_out = torch.ops.torch_ipex.apply_rotary_embedding_two_qk(
                 tensor, tensor1, sin, cos, out, out1
             )
-            ipex.llm.modules.RotaryEmbedding.apply(
+            ipex.llm.functional.rotary_embedding(
                 tensor, tensor1, sin, cos, tensor.size(-1), False
             )
             self.assertEqual(out, ref)
@@ -101,7 +101,7 @@ class TestNNMethod(TestCase):
             kernel_out = torch.ops.torch_ipex.apply_rotary_embedding_half_qk(
                 tensor, tensor1, sin, cos, out, out1
             )
-            ipex.llm.modules.RotaryEmbedding.apply(
+            ipex.llm.functional.rotary_embedding(
                 tensor, tensor1, sin, cos, tensor.size(-1), True
             )
             self.assertEqual(out, ref)

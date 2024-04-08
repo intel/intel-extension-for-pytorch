@@ -8,7 +8,11 @@ set(IPEX_INCLUDE_DIRS
         ${BUILD_IPEX_GPU_ATEN_GENERATED})
 
 # link openblas
-set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl)
+set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS}
+  -fsycl
+  -fsycl-device-code-split=per_kernel
+  -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS}
+)
 
 if (USE_AOT_DEVLIST)
   set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
@@ -57,6 +61,8 @@ if(NOT XETLA_HEADER)
 endif()
 
 target_include_directories(${TARGET} PUBLIC ${XETLA_INCLUDE_DIR} )
+# suppress warnings inside aten by setting it as a system include directory
+target_include_directories(${TARGET} SYSTEM PUBLIC ${TORCH_INCLUDE_DIRS})
 target_include_directories(${TARGET} PUBLIC ${IPEX_INCLUDE_DIRS} )
 
 target_link_options(${TARGET} PRIVATE ${XETLA_KERNEL_FLAGS})

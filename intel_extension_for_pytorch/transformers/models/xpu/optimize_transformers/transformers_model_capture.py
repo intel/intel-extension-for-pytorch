@@ -63,7 +63,10 @@ class TransformersModelCapture(ModelCapture):
     #    setattr(self.model, "forward", self.forward)
 
     def model_jit_absolute(self):
-        if self.config.architectures[0] in jit_absolute_list:
+        if (
+            getattr(self.config, "architectures", False)
+            and self.config.architectures[0] in jit_absolute_list
+        ):
             return True
         return False
 

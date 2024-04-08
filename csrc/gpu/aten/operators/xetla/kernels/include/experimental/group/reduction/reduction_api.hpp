@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "subgroup/subgroup.hpp"
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla::group {
 
@@ -46,7 +46,7 @@ template <
     uint32_t wg_size_x,
     uint32_t wg_size_y,
     uint32_t max_simd_len = 32,
-    gpu_arch arch_ = gpu_arch::Xe>
+    gpu_arch arch_ = gpu_arch::XeHpc>
 struct group_row_reduce_store_t {};
 
 } // namespace gpu::xetla::group

@@ -43,7 +43,7 @@ inline void adam_math(
     const bool maximize,
     const opmath_t bias_correction1,
     const opmath_t step_size,
-    const opmath_t lr_weight_decay,
+    const double lr_weight_decay,
     const opmath_t bias_correction2,
     const opmath_t bias_correction2_sqrt) {
   bool use_weight_decay = weight_decay != 0;
@@ -81,13 +81,10 @@ inline void adam_math(
     opmath_t denom;
 
     if constexpr (amsgrad) {
-      max_exp_avg_sq = Numerics<opmath_t>::max(max_exp_avg_sq, exp_avg_sq);
-      denom =
-          (Numerics<opmath_t>::sqrt(max_exp_avg_sq) / bias_correction2_sqrt) +
-          eps;
+      max_exp_avg_sq = std::max(max_exp_avg_sq, exp_avg_sq);
+      denom = (std::sqrt(max_exp_avg_sq) / bias_correction2_sqrt) + eps;
     } else {
-      denom =
-          (Numerics<opmath_t>::sqrt(exp_avg_sq) / bias_correction2_sqrt) + eps;
+      denom = (std::sqrt(exp_avg_sq) / bias_correction2_sqrt) + eps;
     }
     param -= step_size * exp_avg / denom;
 
@@ -119,10 +116,10 @@ struct FusedAdamMathFunctor {
       sycl::nd_item<1> item,
       const float* lr_ptr,
       const double lr,
-      const float beta1,
-      const float beta2,
-      const float weight_decay,
-      const float eps,
+      const double beta1,
+      const double beta2,
+      const double weight_decay,
+      const double eps,
       const bool maximize) const {
     auto group_id = item.get_group(0);
     auto item_id = item.get_local_id(0);
@@ -142,13 +139,15 @@ struct FusedAdamMathFunctor {
     scalar_type r_args[depth][kILP];
     double lr_value = lr_ptr ? *lr_ptr : lr;
 
-    const float bias_correction1 =
-        static_cast<float>(1.0f - Numerics<float>::pow(beta1, *step_count));
-    const float bias_correction2 =
-        static_cast<float>(1.0f - Numerics<float>::pow(beta2, *step_count));
-    const float step_size = static_cast<float>(lr_value / bias_correction1);
-    const float bias_correction2_sqrt = Numerics<float>::sqrt(bias_correction2);
-    const float lr_weight_decay = static_cast<float>(lr_value * weight_decay);
+    const opmath_t bias_correction1 = static_cast<opmath_t>(
+        1.0f - Numerics<opmath_t>::pow(beta1, *step_count));
+    const opmath_t bias_correction2 = static_cast<opmath_t>(
+        1.0f - Numerics<opmath_t>::pow(beta2, *step_count));
+    const opmath_t step_size =
+        static_cast<opmath_t>(lr_value / bias_correction1);
+    const opmath_t bias_correction2_sqrt =
+        Numerics<opmath_t>::sqrt(bias_correction2);
+    const double lr_weight_decay = lr_value * weight_decay;
 
     if ((n % kILP == 0) && (chunk_size % kILP == 0) && all_aligned) {
       for (int i_start = item_id;

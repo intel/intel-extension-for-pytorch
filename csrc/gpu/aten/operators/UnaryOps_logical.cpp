@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/TensorIterator.h>
-
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pairwise.h"
@@ -37,17 +37,36 @@ void logical_not_kernel(TensorIterator& iter) {
 
 template <typename scalar_t>
 struct signbit_kernel_functor {
+  using opmath_t = at::opmath_type<scalar_t>;
+  bool operator()(scalar_t a) const {
+    return std::signbit(opmath_t{a});
+  }
+};
+
+template <typename scalar_t>
+struct signbit_kernel_int_type_functor {
   bool operator()(scalar_t a) const {
     return !std::is_unsigned<scalar_t>::value && a < 0;
   }
 };
 
 void signbit_kernel(TensorIteratorBase& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
-      kBFloat16, ScalarType::Half, iter.input_dtype(), "signbit_dpcpp", [&]() {
-        signbit_kernel_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
+  if (at::isIntegralType(iter.input_dtype(), /*includeBool=*/false)) {
+    IPEX_DISPATCH_INTEGRAL_TYPES(iter.input_dtype(), "signbit_dpcpp", [&]() {
+      signbit_kernel_int_type_functor<scalar_t> f;
+      dpcpp_kernel_for_tensor_iter(iter, f);
+    });
+  } else {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        kBFloat16,
+        ScalarType::Half,
+        iter.input_dtype(),
+        "signbit_dpcpp",
+        [&]() {
+          signbit_kernel_functor<scalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
+        });
+  }
 }
 
 } // namespace impl

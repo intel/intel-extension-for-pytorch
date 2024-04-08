@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/record_function.h>
 #include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
@@ -17,8 +18,9 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
     const Tensor& logsumexp,
     bool is_causal,
     double dropout_p,
-    const Tensor& philox_seed,
-    const Tensor& philox_offset,
+    const c10::optional<at::Tensor>& dropout_mask,
+    const c10::optional<at::Tensor>& philox_seed,
+    const c10::optional<at::Tensor>& philox_offset,
     const bool bias_requires_grad,
     const c10::optional<double> scale) {
 #if defined(USE_XETLA)
@@ -36,8 +38,10 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
   auto value = _value.transpose(1, 2).contiguous().transpose(1, 2);
   auto out = _out.transpose(1, 2).contiguous().transpose(1, 2);
 
-  Tensor grad_q, grad_k, grad_v, grad_bias;
-  grad_q = at::zeros_like(query);
+  Tensor grad_q_tmp, grad_q, grad_k, grad_v, grad_bias;
+  // tmp grad_q for accumulation
+  grad_q_tmp = at::zeros(query.sizes(), query.options().dtype(kFloat));
+  grad_q = at::empty_like(query);
   grad_k = at::empty_like(key);
   grad_v = at::empty_like(value);
 
@@ -77,9 +81,12 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
       key.data_ptr(),
       value.data_ptr(),
       bias.has_value() ? bias.value().data_ptr() : (void*)nullptr,
+      dropout_mask.has_value() ? dropout_mask.value().data_ptr()
+                               : (void*)nullptr,
       out.data_ptr(),
       logsumexp.data_ptr(),
       workspace.data_ptr(),
+      grad_q_tmp.data_ptr(),
       softmax_scale,
       dropout_p,
       grad_q.data_ptr(),
@@ -97,8 +104,12 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
       attn_mask_padded_block_size,
       is_causal,
       use_dropout,
-      (uint64_t)*philox_seed.data_ptr<int64_t>(),
-      (uint64_t)*philox_offset.data_ptr<int64_t>());
+      philox_seed.has_value()
+          ? (uint64_t)*philox_seed.value().data_ptr<int64_t>()
+          : -1,
+      philox_offset.has_value()
+          ? (uint64_t)*philox_offset.value().data_ptr<int64_t>()
+          : -1);
   return std::make_tuple(grad_q, grad_k, grad_v, grad_bias);
 #else
   AT_ERROR("SDP backward: xetla library not found in compilation");
@@ -142,9 +153,45 @@ _scaled_dot_product_efficient_attention_backward(
       logsumexp,
       causal,
       dropout_p,
+      c10::nullopt,
       philox_seed,
       philox_offset,
       grad_input_mask[3],
+      scale);
+}
+
+std::tuple<Tensor, Tensor, Tensor, Tensor> ipex_sdp_dropout_backward(
+    const Tensor& grad_out,
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<Tensor>& attn_bias,
+    const Tensor& out,
+    const Tensor& logsumexp,
+    const Tensor& dropout_mask,
+    double dropout_p,
+    bool grad_input_mask,
+    bool causal,
+    c10::optional<double> scale) {
+  RECORD_FUNCTION("ipex_sdp_dropout_backward", {});
+  if (!grad_out.defined()) {
+    return std::make_tuple(Tensor{}, Tensor{}, Tensor{}, Tensor{});
+  }
+
+  return _efficient_attention_backward_impl(
+      grad_out,
+      query,
+      key,
+      value,
+      attn_bias,
+      out,
+      logsumexp,
+      causal,
+      dropout_p,
+      dropout_mask,
+      c10::nullopt,
+      c10::nullopt,
+      grad_input_mask,
       scale);
 }
 

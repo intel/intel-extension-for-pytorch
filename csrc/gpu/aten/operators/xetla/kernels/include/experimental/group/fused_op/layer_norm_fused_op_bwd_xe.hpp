@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "experimental/group/fused_op/layer_norm_fused_op_api.hpp"
+#include <experimental/group/fused_op/layer_norm_fused_op_api.hpp>
 
 namespace gpu::xetla::group {
 
@@ -62,7 +62,7 @@ struct ln_bwd_fused_op_t<
     dtype_out_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr ln_bwd_fused_kind fused_op_kind = ln_fused_op_kind_;
   using dtype_acc = dtype_acc_;
   using dtype_in = dtype_in_;
@@ -85,11 +85,11 @@ struct ln_bwd_fused_op_t<
   /// @param sg_idy
   /// @return
   __XETLA_API void init(
-      arguments_t* args,
-      uint32_t wg_idx,
-      uint32_t wg_idy,
-      uint32_t sg_idx,
-      uint32_t sg_idy) {}
+      [[maybe_unused]] arguments_t* args,
+      [[maybe_unused]] uint32_t wg_idx,
+      [[maybe_unused]] uint32_t wg_idy,
+      [[maybe_unused]] uint32_t sg_idx,
+      [[maybe_unused]] uint32_t sg_idy) {}
 
   /// @brief
   ///
@@ -115,7 +115,7 @@ struct ln_bwd_fused_op_t<
   /// @param ln_group_row_reduce
   /// @return
   template <typename reduce_t>
-  __XETLA_API void final_op(reduce_t& ln_group_row_reduce) {}
+  __XETLA_API void final_op([[maybe_unused]] reduce_t& ln_group_row_reduce) {}
 };
 
 /// @brief
@@ -135,7 +135,7 @@ struct ln_bwd_fused_op_t<
     dtype_out_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr ln_bwd_fused_kind fused_op_kind =
       ln_bwd_fused_kind::bias_dropout_resAdd_ln;
   using dtype_acc = dtype_acc_;
@@ -164,13 +164,13 @@ struct ln_bwd_fused_op_t<
       mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using mask_in_t = subgroup::tile_t<dtype_mask, ln_bwd_tile_desc_t>;
   using mask_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   dx_resAdd_out_t dx_resAdd_out;
   dx_resAdd_out_payload_t dx_resAdd_out_payload;
   mask_in_t mask_in;
@@ -278,7 +278,7 @@ struct ln_bwd_fused_op_t<
     dtype_out_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr ln_bwd_fused_kind fused_op_kind =
       ln_bwd_fused_kind::ln_dropout_gradAdd;
   using dtype_acc = dtype_acc_;
@@ -307,13 +307,13 @@ struct ln_bwd_fused_op_t<
       mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using mask_in_t = subgroup::tile_t<dtype_mask, ln_bwd_tile_desc_t>;
   using mask_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   grad_in_t grad_in;
   grad_in_payload_t grad_in_payload;
@@ -394,7 +394,7 @@ struct ln_bwd_fused_op_t<
   /// @param ln_group_row_reduce
   /// @return
   template <typename reduce_t>
-  __XETLA_API void final_op(reduce_t& ln_group_row_reduce) {}
+  __XETLA_API void final_op([[maybe_unused]] reduce_t& ln_group_row_reduce) {}
 };
 
 /// @brief
@@ -414,7 +414,7 @@ struct ln_bwd_fused_op_t<
     dtype_out_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr ln_bwd_fused_kind fused_op_kind =
       ln_bwd_fused_kind::ln_dropout;
   using dtype_acc = dtype_acc_;
@@ -439,7 +439,7 @@ struct ln_bwd_fused_op_t<
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   mask_in_t mask_in;
   mask_in_payload_t mask_in_payload;
@@ -503,7 +503,7 @@ struct ln_bwd_fused_op_t<
   /// @param ln_group_row_reduce
   /// @return
   template <typename reduce_t>
-  __XETLA_API void final_op(reduce_t& ln_group_row_reduce) {}
+  __XETLA_API void final_op([[maybe_unused]] reduce_t& ln_group_row_reduce) {}
 };
 
 } // namespace gpu::xetla::group

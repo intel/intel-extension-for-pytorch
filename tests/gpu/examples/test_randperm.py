@@ -15,3 +15,8 @@ class TestTorchMethod(TestCase):
         res = src[idx]
         res_cpu = src.cpu()[idx.cpu()]
         self.assertEqual(res.cpu(), res_cpu)
+
+    def test_corner_randperm(self):
+        res_cpu = torch.randperm(0, device=cpu_device)[:0]
+        res_xpu = torch.randperm(0, device=sycl_device)[:0]
+        self.assertEqual(res_cpu, res_xpu.to(cpu_device))

@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "group/tile_shape.hpp"
-#include "subgroup/subgroup.hpp"
+#include <group/tile_shape.hpp>
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla::group {
 
@@ -54,7 +54,7 @@ class cooperative_reduce_t<
     matAcc_t,
     num_cooperative_wg,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape = tile_shape_;
@@ -197,7 +197,7 @@ class cooperative_reduce_t<
       tile_load(local_ld, local_ld_payload);
       mat_slice.reg = local_ld.reg;
 #pragma unroll
-      for (int i = 1; i < num_cooperative_wg; i++) {
+      for (uint32_t i = 1; i < num_cooperative_wg; i++) {
         local_ld_payload.template update_tdesc<tdesc_update_dir::y_dir>(
             real_wg_tile_m);
         tile_load(local_ld, local_ld_payload);
@@ -221,7 +221,7 @@ class cooperative_reduce_t<
     matAcc_t,
     1,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape = tile_shape_;
@@ -239,7 +239,7 @@ class cooperative_reduce_t<
   uint32_t coop_id;
   uint32_t coop_id_x;
   uint32_t coop_id_y;
-  inline cooperative_reduce_t(uint32_t coop_id_) {
+  inline cooperative_reduce_t([[maybe_unused]] uint32_t coop_id_) {
     coop_id = 0;
     coop_id_x = 0;
     coop_id_y = 0;
@@ -249,11 +249,11 @@ class cooperative_reduce_t<
   }
 
   inline KERNEL_FUNC void operator()(
-      work_group_t& g,
+      [[maybe_unused]] work_group_t& g,
       mat_slice_t& mat_slice,
       matAcc_t& matAcc,
-      uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
     mat_slice.reg = matAcc.reg;
   }
 };

@@ -19,10 +19,10 @@
 
 #pragma once
 
-#include "experimental/group/fused_op/layer_norm_fused_op_bwd_xe.hpp"
-#include "experimental/kernel/layer_norm/api.hpp"
-#include "experimental/kernel/layer_norm/common.hpp"
-#include "experimental/kernel/layer_norm/config.hpp"
+#include <experimental/group/fused_op/layer_norm_fused_op_bwd_xe.hpp>
+#include <experimental/kernel/layer_norm/api.hpp>
+#include <experimental/kernel/layer_norm/common.hpp>
+#include <experimental/kernel/layer_norm/config.hpp>
 
 namespace gpu::xetla::kernel {
 
@@ -47,7 +47,7 @@ struct layer_norm_bwd_t<
     dtype_weight_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe,
+    gpu_arch::XeHpc,
     ln_bwd_fused_op_> {
   using dtype_x = dtype_x_;
   using dtype_y = dtype_y_;
@@ -96,22 +96,22 @@ struct layer_norm_bwd_t<
       mem_desc_t<dtype_y, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using x_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using gamma_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using dx_out_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using ln_group_row_reduce_store_t = group::group_row_reduce_store_t<
       dtype_acc,
@@ -120,7 +120,7 @@ struct layer_norm_bwd_t<
       wg_size_x,
       wg_size_y,
       32,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   /// @brief
   ///
@@ -162,7 +162,7 @@ struct layer_norm_bwd_t<
       reduce_op Op,
       uint32_t wg_size_x,
       uint32_t wg_size_y,
-      gpu_arch arch_ = gpu_arch::Xe>
+      gpu_arch arch_ = gpu_arch::XeHpc>
   struct ln_group_all_reduce_t {
     uint32_t itr_count;
     uint32_t slm_base_0;
@@ -217,7 +217,7 @@ struct layer_norm_bwd_t<
     xetla_vector<dtype_acc, sg_tile_n> x_acc = xetla_cvt<dtype_acc, dtype_x>(x);
     /// to generate mixed instruction
 #pragma unroll
-    for (int i = 0; i < sg_tile_n / SIMD; i++) {
+    for (uint32_t i = 0; i < sg_tile_n / SIMD; i++) {
       x_temp.xetla_select<SIMD, 1>(i * SIMD) =
           rs * (x_acc.xetla_select<SIMD, 1>(i * SIMD) - mu);
     }
@@ -245,7 +245,7 @@ struct layer_norm_bwd_t<
         xetla_cvt<dtype_acc, dtype_weight>(gamma);
     /// to generate mixed instruction
 #pragma unroll
-    for (int i = 0; i < sg_tile_n / SIMD; i++) {
+    for (uint32_t i = 0; i < sg_tile_n / SIMD; i++) {
       dy_temp.xetla_select<SIMD, 1>(i * SIMD) =
           gamma_acc.xetla_select<SIMD, 1>(i * SIMD) *
           dy.xetla_select<SIMD, 1>(i * SIMD);
@@ -266,7 +266,7 @@ struct layer_norm_bwd_t<
       reduce_op::sum,
       wg_size_x,
       wg_size_y,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
  public:
   __XETLA_API static void call(
@@ -326,7 +326,8 @@ struct layer_norm_bwd_t<
     xetla_vector<dtype_acc, sg_tile_n> dgamma = 0;
     xetla_vector<dtype_acc, sg_tile_n> dbeta = 0;
 
-    for (int row = start_m; row < args->matrix_m; row += wg_num_m * wg_tile_m) {
+    for (uint32_t row = start_m; row < args->matrix_m;
+         row += wg_num_m * wg_tile_m) {
       subgroup::tile_load(dy_in, dy_in_payload);
       subgroup::tile_load(x_in, x_in_payload);
       xetla_vector<dtype_acc, 1> mu_v = xetla_load_global<

@@ -113,24 +113,6 @@ print(modelJit.graph_for(inference_dta))
 
 ```
 
-### Weight Only Quantization (WOQ)
-
-Supports INT4.
-
-``` python
-from transformers import GPTJForCausalLM
-
-model_path = ...
-dataset = ...
-model = GPTJForCausalLM.from_pretrained(model_path)
-model.eval()
-
-ipex.quantization._gptq(model, dataset, 'quantized_weight.pt', wbits=4)
-
-# inference with model.generate()
-...
-```
-
 ### Distributed Inference with DeepSpeed
 
 Distributed inference can be performed with `DeepSpeed`. Based on original Intel® Extension for PyTorch\* scripts, the following code changes are required.

@@ -51,3 +51,40 @@ class TestNNMethod(TestCase):
         self.assertEqual(z_cpu, z_dpcpp.cpu())
         self.assertEqual(linear.weight, linear_dpcpp.weight.cpu())
         self.assertEqual(linear.weight.grad, linear_dpcpp.weight.grad.cpu())
+
+    def test_logsigmoid_half(self, dtype=torch.float16):
+        grad_output_cpu = torch.randn([1, 1, 8, 8])
+        grad_output_xpu = grad_output_cpu.to("xpu", dtype=dtype)
+
+        # cpu
+        linear = nn.Linear(8, 8)
+        tanh = nn.LogSigmoid()
+        x_cpu = torch.ones([1, 1, 8, 8], device=cpu_device, dtype=torch.float32)
+        z_cpu = linear(x_cpu)
+        y_cpu = tanh(z_cpu)
+        y_cpu.backward(grad_output_cpu)
+        linear_weight_grad_cpu = linear.weight.grad.clone()
+        linear.zero_grad()
+
+        # xpu
+        linear_xpu = linear.to("xpu", dtype=dtype)
+        tanh_xpu = tanh.to("xpu", dtype=dtype)
+        x_xpu = x_cpu.to("xpu", dtype=dtype)
+        z_xpu = linear_xpu(x_xpu)
+        y_xpu = tanh_xpu(z_xpu)
+        y_xpu.backward(grad_output_xpu)
+        linear_weight_grad_xpu = linear.weight.grad.clone()
+        linear_xpu.zero_grad()
+
+        self.assertEqual(
+            z_cpu, z_xpu.to("cpu", dtype=torch.float32), atol=1e-3, rtol=1e-3
+        )
+        self.assertEqual(
+            y_cpu, y_xpu.to("cpu", dtype=torch.float32), atol=1e-3, rtol=1e-3
+        )
+        self.assertEqual(
+            linear_weight_grad_cpu,
+            linear_weight_grad_xpu.to("cpu", dtype=torch.float32),
+            atol=1e-3,
+            rtol=1e-3,
+        )

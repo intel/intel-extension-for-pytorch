@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 #pragma once
 #include <ATen/ATen.h>
 #include <ATen/NestedTensorImpl.h>
@@ -5,11 +13,14 @@
 #include <ATen/core/grad_mode.h>
 #include <c10/core/SymFloat.h>
 #include <runtime/Device.h>
-#include "../xetla/mha.h"
 #include "utils/LogUtils.h"
 
-using namespace at;
+#if defined(USE_XETLA)
+#include "../xetla/mha.h"
 using namespace gpu::xetla;
+#endif
+
+using namespace at;
 namespace sdp {
 
 // This helper function creates a constexpr std::array
@@ -74,7 +85,7 @@ inline c10::optional<at::Tensor> convert_boolean_attn_mask(
   // Otherwise, attn_mask represents an additive attention tensor
   return attn_mask;
 }
-
+#if defined(USE_XETLA)
 inline XetlaType aten_to_Xetla_dtype(const Tensor& input) {
   XetlaType xeType;
   if (input.scalar_type() == kHalf) {
@@ -88,6 +99,19 @@ inline XetlaType aten_to_Xetla_dtype(const Tensor& input) {
   }
   return xeType;
 }
+
+inline gpu_arch aten_to_Xetla_arch() {
+  bool has_2d_block = dpcppGetDeviceHas2DBlock();
+  bool has_xmx = dpcppGetDeviceHasXMX();
+  if (has_2d_block && has_xmx) {
+    return gpu_arch::XeHpc;
+  } else if (has_xmx) {
+    return gpu_arch::XeHpg;
+  } else { // TODO(Yi): distinguish PVC-VG from MTL which supports 2d-block
+    return gpu_arch::XeLpg;
+  }
+}
+#endif
 
 inline bool xetla_supported(sdp::sdp_params params) {
   bool is_supported = false;

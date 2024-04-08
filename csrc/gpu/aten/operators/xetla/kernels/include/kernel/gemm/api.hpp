@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "kernel/gemm/common.hpp"
+#include <kernel/gemm/common.hpp>
 
 namespace gpu::xetla::kernel {
 

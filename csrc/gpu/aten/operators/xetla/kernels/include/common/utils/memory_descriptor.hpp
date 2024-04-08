@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "common/utils/common.hpp"
-#include "common/utils/raw_send_load_store.hpp"
+#include <common/utils/common.hpp>
+#include <common/utils/raw_send_load_store.hpp>
 
 namespace gpu::xetla {
 
@@ -173,12 +173,12 @@ struct mem_desc_t<dtype_, layout_, space_, alignment_, 2> {
 
   inline mem_desc_t() = default;
   inline mem_desc_t(base_t base_, shape_t shape_, coord_t coord_)
-      : base(base_), shape(shape_), coord(coord_) {}
+      : shape(shape_), coord(coord_), base(base_) {}
   // Be aware of the risks: Rule of three (copy constructor, copy assignment,
   // destructor) Please check if you need to add self-define destructor inline
   // ~mem_desc_t(){}
   inline mem_desc_t(const this_type_t& mem_desc)
-      : base(mem_desc.base), shape(mem_desc.shape), coord(mem_desc.coord) {}
+      : shape(mem_desc.shape), coord(mem_desc.coord), base(mem_desc.base) {}
 
   inline this_type_t& operator=(const this_type_t& mem_desc) {
     this->base = mem_desc.base;
@@ -211,9 +211,9 @@ struct mem_desc_t<dtype_, layout_, space_, alignment_, 2> {
         base.base, width, height, pitch, coord_x, coord_y);
   }
 
-  base_t base;
   shape_t shape;
   coord_t coord;
+  base_t base;
 };
 
 } // namespace gpu::xetla

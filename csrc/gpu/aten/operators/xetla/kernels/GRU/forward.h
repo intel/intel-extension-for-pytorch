@@ -105,8 +105,10 @@ struct gru_cell {
       periodic_sync_interval>;
 
   using compute_attr = compute_attr_t<T, T, Act_T>;
-  using compute_policy =
-      compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch::Xe>;
+  using compute_policy = compute_policy_default_xmx<
+      compute_attr,
+      perf_tuning_knob,
+      gpu_arch::XeHpc>;
   using mem_desc_a_t = mem_desc_t<T, layout_input, mem_loc_input>;
   using mem_desc_b_t = mem_desc_t<T, layout_weight, mem_loc_weight>;
   // Org the compute shape for sub-matrix
@@ -129,7 +131,7 @@ struct gru_cell {
   // define arguments for each epilogue_tile_op in chained_tile_op_t<>
 
   using epilogue_t = epilogue_t<
-      epilogue_policy_default<gpu_arch::Xe>,
+      epilogue_policy_default<gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_c_t>;
   using epilogue_args_t = typename epilogue_t::arguments_t;
@@ -146,13 +148,13 @@ struct gru_cell {
       mem_desc_t<T, layout_hidden, mem_loc_hidden>,
       mat_tile_desc_t,
       msg_type_v<mat_tile_desc_t, mem_loc_hidden>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using matC_payload_t = mem_payload_t<
       mem_desc_t<T, layout_out, mem_loc_out>,
       mat_tile_desc_t,
       msg_type_v<mat_tile_desc_t, mem_loc_out>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using mask_t = tile_t<Act_T, mat_tile_desc_t>;
 
@@ -160,7 +162,7 @@ struct gru_cell {
       mem_desc_t<Act_T, layout_out, mem_loc_out>,
       mat_tile_desc_t,
       msg_type_v<mat_tile_desc_t, mem_loc_out>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using sigmoid_t = typename subgroup::sigmoid_op_t;
   using tanh_t = typename subgroup::tanh_op_t;
@@ -374,7 +376,7 @@ struct gru_cell {
         mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>,
         bias_tile_desc_t,
         msg_type_v<bias_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     bias_t bias;
     bias_payload_t bias_payload;
@@ -406,7 +408,7 @@ struct gru_cell {
         mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>,
         bias_tile_desc_t,
         msg_type_v<bias_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     bias_t bias1;
     bias_t bias2;

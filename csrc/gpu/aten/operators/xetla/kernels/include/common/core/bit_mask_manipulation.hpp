@@ -19,9 +19,11 @@
 
 #pragma once
 
-#include "common/core/base_types.hpp"
-#include "common/core/common.hpp"
+#include <common/core/base_types.hpp>
+#include <common/core/common.hpp>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
 namespace gpu::xetla {
 
 /// @addtogroup xetla_core_bit_manipulation
@@ -334,3 +336,4 @@ __XETLA_API xetla_mask<N> xetla_unpack_mask(uint32_t src0) {
 /// @} xetla_core_bit_manipulation
 
 } // namespace gpu::xetla
+#pragma clang diagnostic pop

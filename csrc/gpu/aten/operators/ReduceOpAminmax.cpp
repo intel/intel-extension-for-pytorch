@@ -65,9 +65,10 @@ void _min_max_values_kernel_dpcpp_impl(TensorIterator& iter) {
 }
 
 void aminmax_kernel(TensorIterator& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
       iter.dtype(),
       "aminmax_elementwise_dpcpp",
       [&]() { _min_max_values_kernel_dpcpp_impl<scalar_t>(iter); });

@@ -312,142 +312,1166 @@ namespace xetla {
       const uint32_t k);
 
 // per channel PVC
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 256, 8, 16, 32, 0, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 64, 8, 16, 64, 0, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 512, 8, 16, 32, 0, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 256, 16, 16, 32, 0, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 64, 16, 16, 32, 0, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 512, 16, 16, 32, 0, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 256, 32, 16, 32, 0, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 64, 32, 16, 32, 0, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 128, 32, 16, 32, 0, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 512, 32, 16, 32, 0, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 256, 64, 16, 32, 0, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 128, 64, 16, 32, 0, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 512, 64, 16, 32, 0, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 256, 64, 16, 32, 0, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 512, 64, 32, 32, 0, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(256, 256, 64, 32, 32, 0, 1, 1);
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    256,
+    8,
+    16,
+    32,
+    0,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    64,
+    0,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    512,
+    8,
+    16,
+    32,
+    0,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    256,
+    16,
+    16,
+    32,
+    0,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    64,
+    16,
+    16,
+    32,
+    0,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    512,
+    16,
+    16,
+    32,
+    0,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    256,
+    32,
+    16,
+    32,
+    0,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    64,
+    32,
+    16,
+    32,
+    0,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    128,
+    32,
+    16,
+    32,
+    0,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    512,
+    32,
+    16,
+    32,
+    0,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    256,
+    64,
+    16,
+    32,
+    0,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    128,
+    64,
+    16,
+    32,
+    0,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    512,
+    64,
+    16,
+    32,
+    0,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    256,
+    64,
+    16,
+    32,
+    0,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    512,
+    64,
+    32,
+    32,
+    0,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    256,
+    256,
+    64,
+    32,
+    32,
+    0,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
 
 // k group PVC
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 256, 8, 16, 32, 16, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 64, 8, 16, 64, 16, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 512, 8, 16, 32, 16, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 256, 16, 16, 32, 16, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 64, 16, 16, 32, 16, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 512, 16, 16, 32, 16, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 256, 32, 16, 32, 16, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 64, 32, 16, 32, 16, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 128, 32, 16, 32, 16, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 512, 32, 16, 32, 16, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 256, 64, 16, 32, 16, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 128, 64, 16, 32, 16, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 512, 64, 16, 32, 16, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 256, 64, 16, 32, 16, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 512, 64, 32, 32, 16, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(256, 256, 64, 32, 32, 16, 1, 1);
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    256,
+    8,
+    16,
+    32,
+    16,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    64,
+    16,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    512,
+    8,
+    16,
+    32,
+    16,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    256,
+    16,
+    16,
+    32,
+    16,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    64,
+    16,
+    16,
+    32,
+    16,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    512,
+    16,
+    16,
+    32,
+    16,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    256,
+    32,
+    16,
+    32,
+    16,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    64,
+    32,
+    16,
+    32,
+    16,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    128,
+    32,
+    16,
+    32,
+    16,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    512,
+    32,
+    16,
+    32,
+    16,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    256,
+    64,
+    16,
+    32,
+    16,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    128,
+    64,
+    16,
+    32,
+    16,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    512,
+    64,
+    16,
+    32,
+    16,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    256,
+    64,
+    16,
+    32,
+    16,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    512,
+    64,
+    32,
+    32,
+    16,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    256,
+    256,
+    64,
+    32,
+    32,
+    16,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
 
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 256, 8, 16, 32, 32, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 64, 8, 16, 64, 32, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 512, 8, 16, 32, 32, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 256, 16, 16, 32, 32, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 64, 16, 16, 32, 32, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 512, 16, 16, 32, 32, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 256, 32, 16, 32, 32, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 64, 32, 16, 32, 32, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 128, 32, 16, 32, 32, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 512, 32, 16, 32, 32, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 256, 64, 16, 32, 32, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 128, 64, 16, 32, 32, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 512, 64, 16, 32, 32, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 256, 64, 16, 32, 32, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 512, 64, 32, 32, 32, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(256, 256, 64, 32, 32, 32, 1, 1);
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    256,
+    8,
+    16,
+    32,
+    32,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    64,
+    32,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    512,
+    8,
+    16,
+    32,
+    32,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    256,
+    16,
+    16,
+    32,
+    32,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    64,
+    16,
+    16,
+    32,
+    32,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    512,
+    16,
+    16,
+    32,
+    32,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    256,
+    32,
+    16,
+    32,
+    32,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    64,
+    32,
+    16,
+    32,
+    32,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    128,
+    32,
+    16,
+    32,
+    32,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    512,
+    32,
+    16,
+    32,
+    32,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    256,
+    64,
+    16,
+    32,
+    32,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    128,
+    64,
+    16,
+    32,
+    32,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    512,
+    64,
+    16,
+    32,
+    32,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    256,
+    64,
+    16,
+    32,
+    32,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    512,
+    64,
+    32,
+    32,
+    32,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    256,
+    256,
+    64,
+    32,
+    32,
+    32,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
 
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 256, 8, 16, 32, 64, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 64, 8, 16, 64, 64, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 512, 8, 16, 32, 64, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 256, 16, 16, 32, 64, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 64, 16, 16, 32, 64, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 512, 16, 16, 32, 64, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 256, 32, 16, 32, 64, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 64, 32, 16, 32, 64, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 128, 32, 16, 32, 64, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 512, 32, 16, 32, 64, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 256, 64, 16, 32, 64, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 128, 64, 16, 32, 64, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 512, 64, 16, 32, 64, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 256, 64, 16, 32, 64, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 512, 64, 32, 32, 64, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(256, 256, 64, 32, 32, 64, 1, 1);
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    256,
+    8,
+    16,
+    32,
+    64,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    64,
+    64,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    512,
+    8,
+    16,
+    32,
+    64,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    256,
+    16,
+    16,
+    32,
+    64,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    64,
+    16,
+    16,
+    32,
+    64,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    512,
+    16,
+    16,
+    32,
+    64,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    256,
+    32,
+    16,
+    32,
+    64,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    64,
+    32,
+    16,
+    32,
+    64,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    128,
+    32,
+    16,
+    32,
+    64,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    512,
+    32,
+    16,
+    32,
+    64,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    256,
+    64,
+    16,
+    32,
+    64,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    128,
+    64,
+    16,
+    32,
+    64,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    512,
+    64,
+    16,
+    32,
+    64,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    256,
+    64,
+    16,
+    32,
+    64,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    512,
+    64,
+    32,
+    32,
+    64,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    256,
+    256,
+    64,
+    32,
+    32,
+    64,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
 
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 256, 8, 16, 32, 128, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 64, 8, 16, 64, 128, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 512, 8, 16, 32, 128, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 256, 16, 16, 32, 128, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 64, 16, 16, 32, 128, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 512, 16, 16, 32, 128, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 256, 32, 16, 32, 128, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 64, 32, 16, 32, 128, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 128, 32, 16, 32, 128, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 512, 32, 16, 32, 128, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 256, 64, 16, 32, 128, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 128, 64, 16, 32, 128, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 512, 64, 16, 32, 128, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 256, 64, 16, 32, 128, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 512, 64, 32, 32, 128, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(256, 256, 64, 32, 32, 128, 1, 1);
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    256,
+    8,
+    16,
+    32,
+    128,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    64,
+    128,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    512,
+    8,
+    16,
+    32,
+    128,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    256,
+    16,
+    16,
+    32,
+    128,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    64,
+    16,
+    16,
+    32,
+    128,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    512,
+    16,
+    16,
+    32,
+    128,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    256,
+    32,
+    16,
+    32,
+    128,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    64,
+    32,
+    16,
+    32,
+    128,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    128,
+    32,
+    16,
+    32,
+    128,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    512,
+    32,
+    16,
+    32,
+    128,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    256,
+    64,
+    16,
+    32,
+    128,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    128,
+    64,
+    16,
+    32,
+    128,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    512,
+    64,
+    16,
+    32,
+    128,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    256,
+    64,
+    16,
+    32,
+    128,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    512,
+    64,
+    32,
+    32,
+    128,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    256,
+    256,
+    64,
+    32,
+    32,
+    128,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
 
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 256, 8, 16, 32, 256, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 64, 8, 16, 64, 256, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 512, 8, 16, 32, 256, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 256, 16, 16, 32, 256, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 64, 16, 16, 32, 256, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 512, 16, 16, 32, 256, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 256, 32, 16, 32, 256, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 64, 32, 16, 32, 256, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 128, 32, 16, 32, 256, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 512, 32, 16, 32, 256, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 256, 64, 16, 32, 256, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 128, 64, 16, 32, 256, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 512, 64, 16, 32, 256, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 256, 64, 16, 32, 256, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 512, 64, 32, 32, 256, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(256, 256, 64, 32, 32, 256, 1, 1);
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    256,
+    8,
+    16,
+    32,
+    256,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    64,
+    256,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    512,
+    8,
+    16,
+    32,
+    256,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    256,
+    16,
+    16,
+    32,
+    256,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    64,
+    16,
+    16,
+    32,
+    256,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    512,
+    16,
+    16,
+    32,
+    256,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    256,
+    32,
+    16,
+    32,
+    256,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    64,
+    32,
+    16,
+    32,
+    256,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    128,
+    32,
+    16,
+    32,
+    256,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    512,
+    32,
+    16,
+    32,
+    256,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    256,
+    64,
+    16,
+    32,
+    256,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    128,
+    64,
+    16,
+    32,
+    256,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    512,
+    64,
+    16,
+    32,
+    256,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    256,
+    64,
+    16,
+    32,
+    256,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    512,
+    64,
+    32,
+    32,
+    256,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    256,
+    256,
+    64,
+    32,
+    32,
+    256,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
 
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 256, 8, 16, 32, 512, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 64, 8, 16, 64, 512, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 512, 8, 16, 32, 512, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 256, 16, 16, 32, 512, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 64, 16, 16, 32, 512, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 512, 16, 16, 32, 512, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 256, 32, 16, 32, 512, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 64, 32, 16, 32, 512, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 128, 32, 16, 32, 512, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 512, 32, 16, 32, 512, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 256, 64, 16, 32, 512, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 128, 64, 16, 32, 512, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 512, 64, 16, 32, 512, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 256, 64, 16, 32, 512, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 512, 64, 32, 32, 512, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(256, 256, 64, 32, 32, 512, 1, 1);
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    256,
+    8,
+    16,
+    32,
+    512,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    64,
+    512,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    512,
+    8,
+    16,
+    32,
+    512,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    256,
+    16,
+    16,
+    32,
+    512,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    64,
+    16,
+    16,
+    32,
+    512,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    512,
+    16,
+    16,
+    32,
+    512,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    256,
+    32,
+    16,
+    32,
+    512,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    64,
+    32,
+    16,
+    32,
+    512,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    128,
+    32,
+    16,
+    32,
+    512,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    512,
+    32,
+    16,
+    32,
+    512,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    256,
+    64,
+    16,
+    32,
+    512,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    128,
+    64,
+    16,
+    32,
+    512,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    512,
+    64,
+    16,
+    32,
+    512,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    256,
+    64,
+    16,
+    32,
+    512,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    512,
+    64,
+    32,
+    32,
+    512,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    256,
+    256,
+    64,
+    32,
+    32,
+    512,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
 
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 256, 8, 16, 32, 1024, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 64, 8, 16, 64, 1024, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(8, 512, 8, 16, 32, 1024, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 256, 16, 16, 32, 1024, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 64, 16, 16, 32, 1024, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(16, 512, 16, 16, 32, 1024, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 256, 32, 16, 32, 1024, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 64, 32, 16, 32, 1024, 8, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 128, 32, 16, 32, 1024, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(32, 512, 32, 16, 32, 1024, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 256, 64, 16, 32, 1024, 2, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 128, 64, 16, 32, 1024, 4, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(64, 512, 64, 16, 32, 1024, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 256, 64, 16, 32, 1024, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(128, 512, 64, 32, 32, 1024, 1, 1);
-HGEMM_WINT4_PVC_IMPL_FUNC(256, 256, 64, 32, 32, 1024, 1, 1);
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    256,
+    8,
+    16,
+    32,
+    1024,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    64,
+    8,
+    16,
+    64,
+    1024,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    8,
+    512,
+    8,
+    16,
+    32,
+    1024,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    256,
+    16,
+    16,
+    32,
+    1024,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    64,
+    16,
+    16,
+    32,
+    1024,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    16,
+    512,
+    16,
+    16,
+    32,
+    1024,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    256,
+    32,
+    16,
+    32,
+    1024,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    64,
+    32,
+    16,
+    32,
+    1024,
+    8,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    128,
+    32,
+    16,
+    32,
+    1024,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    32,
+    512,
+    32,
+    16,
+    32,
+    1024,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    256,
+    64,
+    16,
+    32,
+    1024,
+    2,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    128,
+    64,
+    16,
+    32,
+    1024,
+    4,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    64,
+    512,
+    64,
+    16,
+    32,
+    1024,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    256,
+    64,
+    16,
+    32,
+    1024,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    128,
+    512,
+    64,
+    32,
+    32,
+    1024,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
+HGEMM_WINT4_PVC_IMPL_FUNC(
+    256,
+    256,
+    64,
+    32,
+    32,
+    1024,
+    1,
+    static_cast<int>(gpu_arch::XeHpc));
 
 } // namespace xetla
 } // namespace xpu

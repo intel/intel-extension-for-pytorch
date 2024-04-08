@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/Context.h>
-
+#include <ATen/OpMathType.h>
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
@@ -13,15 +13,17 @@ namespace AtenIpexTypeXPU {
 
 template <typename scalar_t>
 struct leaky_relu_out_functor {
+  using opmath_t = at::opmath_type<scalar_t>;
   scalar_t operator()(scalar_t x) const {
-    x = (x >= 0) ? x : x * negval;
-    return x;
+    opmath_t x_ = static_cast<opmath_t>(x);
+    x_ = (x_ >= opmath_t(0)) ? x_ : x_ * negval;
+    return x_;
   }
 
-  leaky_relu_out_functor(scalar_t negval) : negval(negval) {}
+  leaky_relu_out_functor(opmath_t negval) : negval(negval) {}
 
  private:
-  scalar_t negval;
+  opmath_t negval;
 };
 
 Tensor& leaky_relu_out(
@@ -36,7 +38,8 @@ Tensor& leaky_relu_out(
       iter.dtype(),
       "LeakyReLU",
       [&]() {
-        auto negval = negative_slope.to<scalar_t>();
+        using opmath_t = at::opmath_type<scalar_t>;
+        auto negval = negative_slope.to<opmath_t>();
         leaky_relu_out_functor<scalar_t> f(negval);
         dpcpp_kernel_for_tensor_iter(iter, f);
       });
@@ -45,17 +48,20 @@ Tensor& leaky_relu_out(
 
 template <typename scalar_t>
 struct leaky_relu_backward_out_functor {
-  scalar_t operator()(scalar_t grad_output, scalar_t x) const {
-    if (x > 0)
+  using opmath_t = at::opmath_type<scalar_t>;
+  scalar_t operator()(scalar_t grad_output_, scalar_t x_) const {
+    opmath_t grad_output = static_cast<opmath_t>(grad_output_);
+    opmath_t x = static_cast<opmath_t>(x_);
+    if (x > opmath_t(0))
       return grad_output;
     else
       return grad_output * negval;
   }
 
-  leaky_relu_backward_out_functor(scalar_t negval) : negval(negval) {}
+  leaky_relu_backward_out_functor(opmath_t negval) : negval(negval) {}
 
  private:
-  scalar_t negval;
+  opmath_t negval;
 };
 
 Tensor& leaky_relu_backward_out(
@@ -72,7 +78,8 @@ Tensor& leaky_relu_backward_out(
       iter.dtype(),
       "LeakyReLU_backward",
       [&]() {
-        auto negval = negative_slope.to<scalar_t>();
+        using opmath_t = at::opmath_type<scalar_t>;
+        auto negval = negative_slope.to<opmath_t>();
         leaky_relu_backward_out_functor<scalar_t> f(negval);
         dpcpp_kernel_for_tensor_iter(iter, f);
       });

@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "experimental/kernel/gemm/common.hpp"
-#include "experimental/kernel/gemm/dispatch_policy.hpp"
+#include <experimental/kernel/gemm/common.hpp>
+#include <experimental/kernel/gemm/dispatch_policy.hpp>
 
 namespace gpu::xetla::kernel {
 
@@ -241,37 +241,36 @@ class gemm_universal_t<
         : matrix_m(matrix_m_),
           matrix_k(matrix_k_),
           matrix_n(matrix_n_),
-          matA_base(matA_base_),
           matA_ld(matA_ld_),
-          matB_base(matB_base_),
           matB_ld(matB_ld_),
-          matC_base(matC_base_),
           matC_ld(matC_ld_),
-          scale_base(scale_base_),
-          scale_ld(scale_ld_),
-          zero_pt_base(zero_pt_base_),
-          zero_pt_ld(zero_pt_ld_),
+          matA_base(matA_base_),
+          matB_base(matB_base_),
+          matC_base(matC_base_),
           acc_base(acc_base_),
           cnt_base(cnt_base_),
-          epilogue_args(epilogue_args_) {}
-
+          epilogue_args(epilogue_args_),
+          scale_base(scale_base_),
+          zero_pt_base(zero_pt_base_),
+          scale_ld(scale_ld_),
+          zero_pt_ld(zero_pt_ld_) {}
     inline arguments_t(const arguments_t& args)
         : matrix_m(args.matrix_m),
           matrix_k(args.matrix_k),
           matrix_n(args.matrix_n),
-          matA_base(args.matA_base),
           matA_ld(args.matA_ld),
-          matB_base(args.matB_base),
           matB_ld(args.matB_ld),
-          matC_base(args.matC_base),
           matC_ld(args.matC_ld),
-          scale_base(args.scale_base),
-          scale_ld(args.scale_ld),
-          zero_pt_base(args.zero_pt_base),
-          zero_pt_ld(args.zero_pt_ld),
+          matA_base(args.matA_base),
+          matB_base(args.matB_base),
+          matC_base(args.matC_base),
           acc_base(args.acc_base),
           cnt_base(args.cnt_base),
-          epilogue_args(args.epilogue_args) {}
+          epilogue_args(args.epilogue_args),
+          scale_base(args.scale_base),
+          zero_pt_base(args.zero_pt_base),
+          scale_ld(args.scale_ld),
+          zero_pt_ld(args.zero_pt_ld) {}
     // Be aware of the risks: Rule of three (copy constructor, copy assignment,
     // destructor) Please check if you need to add self-define destructor inline
     // ~arguments_t(){}
@@ -287,7 +286,7 @@ class gemm_universal_t<
       this->matC_ld = args.matC_ld;
       this->scale_base = args.scale_base;
       this->scale_ld = args.scale_ld;
-      this->zero_pt_base = args.zero_pt_base_;
+      this->zero_pt_base = args.zero_pt_base;
       this->zero_pt_ld = args.zero_pt_ld;
       this->acc_base = args.acc_base;
       this->cnt_base = args.cnt_base;
@@ -308,25 +307,26 @@ class gemm_universal_t<
     /// k x n).
     uint32_t matrix_n;
     /// @brief Is the leading dimension (pitch) size of the matrix A in memory.
-    matA_base_t matA_base;
-    /// @brief Is the base address of matrix B.
     uint32_t matA_ld;
     /// @brief Is the leading dimension (pitch) size of the matrix B in memory.
-    matB_base_t matB_base;
-    /// @brief Is the base address of matrix C.
     uint32_t matB_ld;
     /// @brief Is the leading dimension (pitch) size of the matrix C in memory.
-    matC_base_t matC_base;
-    /// @brief Is the base address of accumulation buffer.
     uint32_t matC_ld;
     /// @brief Is the base address of matrix A.
-    scale_base_t scale_base;
-    uint32_t scale_ld;
+    matA_base_t matA_base;
+    /// @brief Is the base address of matrix B.
+    matB_base_t matB_base;
+    /// @brief Is the base address of matrix C.
+    matC_base_t matC_base;
+    /// @brief Is the base address of accumulation buffer.
     acc_base_t acc_base;
     /// @brief Is the base address of counter buffer.
     cnt_base_t cnt_base;
     /// @brief Is the epilogue arguments.
     epilogue_args_t epilogue_args;
+
+    scale_base_t scale_base;
+    uint32_t scale_ld;
 
     /// @brief Constructs arguments with default method.
     inline arguments_t() = default;
@@ -373,33 +373,33 @@ class gemm_universal_t<
         : matrix_m(matrix_m_),
           matrix_k(matrix_k_),
           matrix_n(matrix_n_),
-          matA_base(matA_base_),
           matA_ld(matA_ld_),
-          matB_base(matB_base_),
           matB_ld(matB_ld_),
-          matC_base(matC_base_),
           matC_ld(matC_ld_),
-          scale_base(scale_base_),
-          scale_ld(scale_ld_),
+          matA_base(matA_base_),
+          matB_base(matB_base_),
+          matC_base(matC_base_),
           acc_base(acc_base_),
           cnt_base(cnt_base_),
-          epilogue_args(epilogue_args_) {}
+          epilogue_args(epilogue_args_),
+          scale_base(scale_base_),
+          scale_ld(scale_ld_) {}
 
     inline arguments_t(const arguments_t& args)
         : matrix_m(args.matrix_m),
           matrix_k(args.matrix_k),
           matrix_n(args.matrix_n),
-          matA_base(args.matA_base),
           matA_ld(args.matA_ld),
-          matB_base(args.matB_base),
           matB_ld(args.matB_ld),
-          matC_base(args.matC_base),
           matC_ld(args.matC_ld),
-          scale_base(args.scale_base),
-          scale_ld(args.scale_ld),
+          matA_base(args.matA_base),
+          matB_base(args.matB_base),
+          matC_base(args.matC_base),
           acc_base(args.acc_base),
           cnt_base(args.cnt_base),
-          epilogue_args(args.epilogue_args) {}
+          epilogue_args(args.epilogue_args),
+          scale_base(args.scale_base),
+          scale_ld(args.scale_ld) {}
     // Be aware of the risks: Rule of three (copy constructor, copy assignment,
     // destructor) Please check if you need to add self-define destructor inline
     // ~arguments_t(){}
@@ -439,15 +439,9 @@ class gemm_universal_t<
   __XETLA_API static constexpr uint32_t get_slm_size() {
     constexpr uint32_t size = gemm_slm_size * num_local_kslicing +
         kslicing_slm_size + epilogue_slm_size * num_local_kslicing;
-    if constexpr (arch_tag == gpu_arch::Dg2) {
-      static_assert(
-          size <= (64 * 1024),
-          "The local memory size should be less than 64KB!");
-    } else {
-      static_assert(
-          size <= (128 * 1024),
-          "The local memory size should be less than 128KB!");
-    }
+    static_assert(
+        size <= arch_attr_t<arch_tag>::local_mem_size,
+        "The local memory size excess!");
     return size;
   }
 
@@ -457,8 +451,9 @@ class gemm_universal_t<
   static cl::sycl::range<3> get_local_range() {
     uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
     uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
-    // std::cout << "Local range: {" << num_local_kslicing << ", "
-    //           << local_range_m << ", " << local_range_n << "} \n";
+    // std::cout << "Local range: {" << num_local_kslicing << ", " <<
+    // local_range_m
+    //           << ", " << local_range_n << "} \n";
     assert(local_range_m * local_range_n * num_local_kslicing <= 32);
     return cl::sycl::range<3>{num_local_kslicing, local_range_m, local_range_n};
   };

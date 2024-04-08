@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "experimental/kernel/reduction/common.hpp"
+#include <experimental/kernel/reduction/common.hpp>
 
 namespace gpu::xetla::kernel {
 

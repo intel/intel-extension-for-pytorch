@@ -46,6 +46,22 @@ inline bool batch_norm_use_channels_last_kernels(const at::Tensor& self) {
       is_smf_channels_last(self));
 }
 
+static inline at::Tensor general_convert_tensor_to_channels_last(
+    const at::Tensor& t) {
+  const auto ndim = t.dim();
+  if (ndim == 3 &&
+      t.stride(1) != 1) { // make sure <t> need to be channels_last_1d and is
+                          // not channels_last_1d now
+    auto tmp = t.contiguous();
+    return convert_tensor_to_channels_last_1d(tmp);
+  } else if (ndim == 5) {
+    return t.contiguous(at::MemoryFormat::ChannelsLast3d);
+  } else if (ndim == 4) {
+    return t.contiguous(at::MemoryFormat::ChannelsLast);
+  }
+  return t;
+}
+
 static int getNumThreads(int nElem, int max_size) {
   int threadSizes[6] = {16, 32, 64, 128, 256, max_size};
   for (int i = 0; i < 6; ++i) {
@@ -768,11 +784,7 @@ void batch_norm_elementwise(
           (!invstd_.defined() || invstd_.is_contiguous())) {
         batch_norm_elemt_channels_last_template(
             out,
-            // It is a WA to fix Mobile-SSD convergence issue.
-            // TODO: Fully support: Check and convert activations with any
-            // shapes to align with kernel required memory layout.
-            self.dim() == 4 ? self.contiguous(at::MemoryFormat::ChannelsLast)
-                            : self,
+            general_convert_tensor_to_channels_last(self),
             *weight,
             *bias,
             mean_,
@@ -3939,12 +3951,8 @@ Tensor batch_norm_elementwise_backward_train(
       if ((!weight.defined() || weight.is_contiguous()) &&
           mean.is_contiguous() && invstd.is_contiguous()) {
         return batch_norm_backward_elemt_channels_last_template(
-            // It is a WA to fix Mobile-SSD convergence issue.
-            grad_out.dim() == 4
-                ? grad_out.contiguous(at::MemoryFormat::ChannelsLast)
-                : grad_out,
-            input.dim() == 4 ? input.contiguous(at::MemoryFormat::ChannelsLast)
-                             : input,
+            general_convert_tensor_to_channels_last(grad_out),
+            general_convert_tensor_to_channels_last(input),
             mean,
             invstd,
             weight,
@@ -4167,12 +4175,8 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> batch_norm_backward_reduce_dispatch(
       (!weight.defined() || weight.is_contiguous()) && mean.is_contiguous() &&
       invstd.is_contiguous()) {
     return batch_norm_backward_reduce_channels_last_template(
-        // It is a WA to fix Mobile-SSD convergence issue.
-        grad_output.dim() == 4
-            ? grad_output.contiguous(at::MemoryFormat::ChannelsLast)
-            : grad_output,
-        input.dim() == 4 ? input.contiguous(at::MemoryFormat::ChannelsLast)
-                         : input,
+        general_convert_tensor_to_channels_last(grad_output),
+        general_convert_tensor_to_channels_last(input),
         mean,
         invstd,
         weight,
@@ -5084,11 +5088,8 @@ Tensor batch_norm_backward_elemt_dispatch(
       batch_norm_use_channels_last_kernels(self) &&
       batch_norm_use_channels_last_kernels(input)) {
     return batch_norm_backward_elemt_channels_last_template(
-        // It is a WA to fix Mobile-SSD convergence issue.
-        self.dim() == 4 ? self.contiguous(at::MemoryFormat::ChannelsLast)
-                        : self,
-        input.dim() == 4 ? input.contiguous(at::MemoryFormat::ChannelsLast)
-                         : input,
+        general_convert_tensor_to_channels_last(self),
+        general_convert_tensor_to_channels_last(input),
         mean,
         invstd,
         weight,

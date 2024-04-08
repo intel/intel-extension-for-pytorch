@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "group/tile_shape.hpp"
-#include "subgroup/subgroup.hpp"
+#include <group/tile_shape.hpp>
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla::group {
 
@@ -64,7 +64,7 @@ class global_reduce_t<
     num_group_reduction,
     counter_size,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape_acc = tile_shape_acc_;
@@ -169,8 +169,8 @@ class global_reduce_t<
       matAcc_t& matAcc,
       mem_desc_acc_t mem_desc_acc,
       mem_desc_cnt_t mem_desc_cnt,
-      uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
     static_assert(
         std::is_same<typename matAcc_t::dtype, dtype_acc>::value,
         "matAcc_t::dtype should match with dtype_acc");
@@ -226,7 +226,7 @@ class global_reduce_t<
     1,
     counter_size_,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape_acc = tile_shape_acc_;
@@ -247,12 +247,12 @@ class global_reduce_t<
 
   template <typename matAcc_t>
   inline KERNEL_FUNC void operator()(
-      work_group_t& g,
-      matAcc_t& matAcc,
-      mem_desc_acc_t mem_desc_acc,
-      mem_desc_cnt_t mem_desc_cnt,
-      uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {}
+      [[maybe_unused]] work_group_t& g,
+      [[maybe_unused]] matAcc_t& matAcc,
+      [[maybe_unused]] mem_desc_acc_t mem_desc_acc,
+      [[maybe_unused]] mem_desc_cnt_t mem_desc_cnt,
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {}
 };
 
 } // namespace gpu::xetla::group

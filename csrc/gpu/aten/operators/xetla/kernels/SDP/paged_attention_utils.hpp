@@ -204,7 +204,7 @@ struct group_reduce_t {
       mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
       local_st_tile_desc,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   // load all subgroup results together
   using local_ld_tile_desc =
       subgroup::tile_desc_t<wg_size, 1, wg_size, 1, reg_layout::tiled>;
@@ -213,7 +213,7 @@ struct group_reduce_t {
       mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
       local_ld_tile_desc,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   // local variables
   xetla_nbarrier_t<wg_size, wg_size> nbarrier;
   uint32_t slm_base;

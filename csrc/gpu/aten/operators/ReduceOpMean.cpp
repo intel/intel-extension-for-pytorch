@@ -88,11 +88,21 @@ Tensor& mean_out(
     Tensor& result) {
   ScalarType scalarType =
       opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type();
-  TORCH_CHECK(
-      at::isFloatingType(scalarType) || at::isComplexType(scalarType),
-      "Can only calculate the mean of floating types. Got ",
-      toString(scalarType),
-      " instead.");
+  if (!at::isFloatingType(scalarType) && !at::isComplexType(scalarType)) {
+    std::string what = "Input";
+    std::string dtype = toString(self.scalar_type());
+    if (opt_dtype.has_value()) {
+      what = "Optional";
+      dtype = toString(opt_dtype.value());
+    }
+    TORCH_CHECK(
+        false,
+        "mean(): could not infer output dtype. ",
+        what,
+        " dtype must be either a floating point or complex dtype. ",
+        "Got: ",
+        dtype);
+  }
 
   ScalarType dtype = get_dtype(result, self, opt_dtype, true);
   auto dim = opt_dim.value_or(IntArrayRef{});

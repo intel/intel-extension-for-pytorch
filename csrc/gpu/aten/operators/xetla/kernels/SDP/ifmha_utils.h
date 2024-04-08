@@ -105,7 +105,7 @@ struct imem_desc_t {
         mem_desc_t<dtype, layout, space>,
         lane_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     lane_tile_t lane_tile;
 
@@ -126,7 +126,7 @@ struct imem_desc_t {
         mem_desc_t<dtype, layout, space>,
         lane_tile_desc_t,
         1,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     if (offset_pre_ < width_ && lane_pre_ < total_) {
       int32_t idx = index_[lane_pre_ * Beams + beam_pre_];
@@ -234,7 +234,7 @@ struct group_row_reduce_t {
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       store_tile_desc,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   // load all subgroup results together
   using load_tile_desc =
       subgroup::tile_desc_t<kTotal, 1, kTotal, 1, reg_layout::tiled>;
@@ -243,7 +243,7 @@ struct group_row_reduce_t {
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       load_tile_desc,
       subgroup::msg_type_v<load_tile_desc, mem_space::local>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   xetla_nbarrier_t<kNumSg, kNumSg> nbarrier;
   uint32_t slm_base;

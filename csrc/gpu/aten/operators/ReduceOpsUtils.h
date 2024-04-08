@@ -202,14 +202,17 @@ static TensorIterator make_reduction(
     ScalarType in_dtype,
     ScalarType out_dtype) {
   // check that result type and dtype match if provided
+  std::string opt_dtype = toString(out_dtype);
+  opt_dtype[0] += 32;
+  std::string out_dtype_str = toString(result.scalar_type());
+  out_dtype_str[0] += 32;
   TORCH_CHECK(
       !result.defined() || result.scalar_type() == out_dtype,
-      name,
-      ": provided dtype must match dtype of result. Got ",
-      toString(result.scalar_type()),
-      " and ",
-      toString(out_dtype),
-      ".");
+      "Expected out tensor to have dtype ",
+      opt_dtype,
+      ", but got ",
+      out_dtype_str,
+      " instead");
   IntArrayRef dim = dim_opt.value_or(IntArrayRef{});
   int64_t ndim = self.dim();
   auto mask = make_dim_mask(dim, ndim);
@@ -298,6 +301,22 @@ static TensorIterator make_reduction(
     at::OptionalIntArrayRef dim,
     bool keepdim,
     ScalarType dtype) {
+  if ((result1.defined() && dtype != result1.scalar_type()) ||
+      (result2.defined() && dtype != result2.scalar_type())) {
+    std::string result_dtype_str = dtype == result1.scalar_type()
+        ? toString(result2.scalar_type())
+        : toString(result1.scalar_type());
+    result_dtype_str[0] += 32;
+    std::string self_dtype_str = toString(dtype);
+    self_dtype_str[0] += 32;
+    TORCH_CHECK(
+        false,
+        "Expected out tensor to have dtype ",
+        self_dtype_str,
+        ", but got ",
+        result_dtype_str,
+        " instead");
+  }
   return make_reduction(
       name, result1, result2, self, dim, keepdim, dtype, dtype);
 }

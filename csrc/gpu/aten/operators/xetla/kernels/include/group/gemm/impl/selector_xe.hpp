@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "group/gemm/api.hpp"
-#include "group/gemm/compute_policy.hpp"
+#include <group/gemm/api.hpp>
+#include <group/gemm/compute_policy.hpp>
 
 namespace gpu::xetla::group {
 namespace detail {

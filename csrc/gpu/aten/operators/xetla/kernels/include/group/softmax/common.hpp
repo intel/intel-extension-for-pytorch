@@ -19,5 +19,5 @@
 
 #pragma once
 
-#include "group/tile_shape.hpp"
-#include "subgroup/subgroup.hpp"
+#include <group/tile_shape.hpp>
+#include <subgroup/subgroup.hpp>

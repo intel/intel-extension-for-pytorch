@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "subgroup/subgroup.hpp"
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla {
 
@@ -60,7 +60,7 @@ template <
     typename dtype_out_,
     typename dtype_acc_,
     typename layer_norm_attr_,
-    gpu_arch arch_ = gpu_arch::Xe>
+    gpu_arch arch_ = gpu_arch::XeHpc>
 struct ln_fwd_fused_op_t {};
 
 /// @brief
@@ -77,7 +77,7 @@ template <
     typename dtype_out_,
     typename dtype_acc_,
     typename layer_norm_attr_,
-    gpu_arch arch_ = gpu_arch::Xe>
+    gpu_arch arch_ = gpu_arch::XeHpc>
 struct ln_bwd_fused_op_t {};
 
 } // namespace group

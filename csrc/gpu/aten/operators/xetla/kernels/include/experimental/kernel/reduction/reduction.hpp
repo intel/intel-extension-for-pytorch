@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "experimental/kernel/reduction/api.hpp"
-#include "experimental/kernel/reduction/common.hpp"
-#include "experimental/kernel/reduction/config.hpp"
-#include "experimental/kernel/reduction/row_reduction_xe.hpp"
+#include <experimental/kernel/reduction/api.hpp>
+#include <experimental/kernel/reduction/common.hpp>
+#include <experimental/kernel/reduction/config.hpp>
+#include <experimental/kernel/reduction/row_reduction_xe.hpp>

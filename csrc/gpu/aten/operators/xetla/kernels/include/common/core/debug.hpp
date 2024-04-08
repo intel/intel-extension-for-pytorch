@@ -17,8 +17,8 @@
 #pragma once
 
 #include <CL/sycl.hpp>
+#include <common/core/common.hpp>
 #include <ext/intel/esimd.hpp>
-#include "common/core/common.hpp"
 
 namespace gpu::xetla {
 

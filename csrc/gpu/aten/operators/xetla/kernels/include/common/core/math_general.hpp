@@ -19,10 +19,11 @@
 
 #pragma once
 
-#include "common/core/base_ops.hpp"
-#include "common/core/base_types.hpp"
-#include "common/core/common.hpp"
-
+#include <common/core/base_ops.hpp>
+#include <common/core/base_types.hpp>
+#include <common/core/common.hpp>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
 namespace gpu::xetla {
 
 /// @addtogroup xetla_core_math
@@ -524,7 +525,11 @@ __XETLA_API xetla_vector<T, SZ> xetla_add_c(
       (std::is_same<remove_const_t<T>, uint32_t>::value),
       "For addc, only uint32_t is supported");
   xetla_vector<T, SZ> carry_tmp;
+#if __INTEL_LLVM_COMPILER >= 20240100
+  xetla_vector<T, SZ> out = __ESIMD_NS::addc(carry_tmp, src0, src1);
+#else
   xetla_vector<T, SZ> out = __ESIMD_ENS::addc(carry_tmp, src0, src1);
+#endif
   carry = carry_tmp;
   return out;
 }
@@ -546,7 +551,11 @@ __XETLA_API xetla_vector<T, SZ> xetla_add_c(
       (std::is_same<remove_const_t<T>, uint32_t>::value),
       "For addc, only uint32_t is supported");
   xetla_vector<T, SZ> carry_tmp;
+#if __INTEL_LLVM_COMPILER >= 20240100
+  xetla_vector<T, SZ> out = __ESIMD_NS::addc(carry_tmp, src0, src1);
+#else
   xetla_vector<T, SZ> out = __ESIMD_ENS::addc(carry_tmp, src0, src1);
+#endif
   carry = carry_tmp;
   return out;
 }
@@ -657,3 +666,4 @@ __XETLA_API xetla_vector<T1, SZ> xetla_sat(xetla_vector<T0, SZ> src) {
 /// @} xetla_core_math
 
 } // namespace gpu::xetla
+#pragma clang diagnostic pop

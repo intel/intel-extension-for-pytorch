@@ -107,10 +107,10 @@ struct fmha_policy_64x128x512 : fmha_policy_base {
   static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
 };
 struct fmha_policy_64x64x64 : fmha_policy_base {
-  static constexpr uint32_t kBr = 64;
-  static constexpr uint32_t kSgBr = 8;
-  static constexpr uint32_t kBc = 64;
-  static constexpr uint32_t kSgBc = 16;
+  static constexpr uint32_t kBr = 128;
+  static constexpr uint32_t kSgBr = 16;
+  static constexpr uint32_t kBc = 128;
+  static constexpr uint32_t kSgBc = 32;
   static constexpr uint32_t kHm = 64;
   static constexpr uint32_t kSgHm = 16;
   static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
@@ -136,4 +136,40 @@ struct fmha_policy_128x128x256 : fmha_policy_base {
   static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
 };
 
+/* MTL policies */
+
+struct fmha_policy_1x256x128 : fmha_policy_base {
+  static constexpr uint32_t kBr = 1;
+  static constexpr uint32_t kSgBr = 1;
+  static constexpr uint32_t kBc = 256;
+  static constexpr uint32_t kSgBc = 16;
+  static constexpr uint32_t kHm = 128;
+  static constexpr uint32_t kSgHm = 8;
+  static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
+};
+
+struct fmha_policy_1x512x128 : fmha_policy_base {
+  static constexpr uint32_t kBr = 1;
+  static constexpr uint32_t kSgBr = 1;
+  static constexpr uint32_t kBc = 512;
+  static constexpr uint32_t kSgBc = 32;
+  static constexpr uint32_t kHm = 128;
+  static constexpr uint32_t kSgHm = 8;
+  static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
+};
+
+struct fmha_policy_32x128x128 : fmha_policy_base {
+  static constexpr uint32_t kBr = 32;
+  static constexpr uint32_t kSgBr = 8;
+  static constexpr uint32_t kBc = 128;
+  static constexpr uint32_t kSgBc = 16;
+  static constexpr uint32_t kHm = 128;
+  static constexpr uint32_t kSgHm = 16;
+  static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
+};
+
+template <typename P>
+struct stage0 : P {
+  static constexpr uint32_t stages = 0;
+};
 } // namespace gpu::xetla

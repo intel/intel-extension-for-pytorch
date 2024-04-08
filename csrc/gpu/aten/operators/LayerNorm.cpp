@@ -761,16 +761,52 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   auto M_N = _check_layer_norm_inputs(input, normalized_shape, weight, bias);
   auto M = M_N.first;
   auto N = M_N.second;
-
-  Tensor grad_input = at::empty(input.sizes(), input.options());
+  Tensor grad_input;
   Tensor grad_weight, grad_bias;
-  if (weight.numel() != 0) {
-    grad_weight = at::zeros(weight.sizes(), weight.options());
-    grad_bias = at::zeros(bias.sizes(), bias.options());
-  } else {
-    grad_weight = at::empty(weight.sizes(), weight.options());
-    grad_bias = at::empty(bias.sizes(), bias.options());
+
+  if (grad_input_mask[0]) {
+    grad_input = at::native::empty_like(
+        input,
+        c10::nullopt /* dtype */,
+        c10::nullopt /* layout */,
+        c10::nullopt /* device */,
+        c10::nullopt /* pin_memory */,
+        LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   }
+
+  if (grad_input_mask[1]) {
+    grad_weight = M > 0 ? at::native::empty_like(
+                              weight,
+                              c10::nullopt /* dtype */,
+                              c10::nullopt /* layout */,
+                              c10::nullopt /* device */,
+                              c10::nullopt /* pin_memory */,
+                              LEGACY_CONTIGUOUS_MEMORY_FORMAT)
+                        : at::native::zeros_like(
+                              weight,
+                              c10::nullopt /* dtype */,
+                              c10::nullopt /* layout */,
+                              c10::nullopt /* device */,
+                              c10::nullopt /* pin_memory */,
+                              LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  }
+  if (grad_input_mask[2]) {
+    grad_bias = M > 0 ? at::native::empty_like(
+                            bias,
+                            c10::nullopt /* dtype */,
+                            c10::nullopt /* layout */,
+                            c10::nullopt /* device */,
+                            c10::nullopt /* pin_memory */,
+                            LEGACY_CONTIGUOUS_MEMORY_FORMAT)
+                      : at::native::zeros_like(
+                            bias,
+                            c10::nullopt /* dtype */,
+                            c10::nullopt /* layout */,
+                            c10::nullopt /* device */,
+                            c10::nullopt /* pin_memory */,
+                            LEGACY_CONTIGUOUS_MEMORY_FORMAT);
+  }
+
   if (input.numel() != 0 && grad_output.numel() != 0) {
     if (M > 0 && N > 0) {
       auto real_eng = choose_compute_eng(xpu::COMPUTE_ENG::BASIC, input);

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "common/common.hpp"
+#include <common/common.hpp>
 
 namespace gpu::xetla::group {
 

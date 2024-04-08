@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "common/core/arch_config.hpp"
-#include "common/core/debug.hpp"
-#include "common/utils/tensor_descriptor.hpp"
+#include <common/core/arch_config.hpp>
+#include <common/core/debug.hpp>
+#include <common/utils/tensor_descriptor.hpp>
 
 #define IN_RANGE(x, l, r) ((x) >= (l) && (x) <= (r))
 
@@ -318,7 +318,7 @@ class block_2d {
   static constexpr auto element_size = sizeof(T);
   static constexpr uint32_t max_24bit = 16 * 1024 * 1024; // 2 ^ 24
   static constexpr auto bytes_per_grf =
-      register_attr_t<grf_mode::double_grf, gpu_arch::Xe>::reg_in_bytes;
+      register_attr_t<grf_mode::double_grf, gpu_arch::XeHpc>::reg_in_bytes;
 
   static inline bool check_base_address(uint64_t base) {
     bool ret = ((base % 64) == 0);
@@ -516,7 +516,7 @@ class block_2d {
 
   static inline bool check_block(
       int32_t x,
-      int32_t y,
+      [[maybe_unused]] int32_t y,
       uint32_t width,
       uint32_t height,
       uint8_t array_len) {
@@ -746,11 +746,11 @@ struct check_store {
 } // namespace subgroup
 
 namespace group {
-template <gpu_arch arch = gpu_arch::Xe, class enable = void>
+template <gpu_arch arch = gpu_arch::XeHpc, class enable = void>
 struct gemm {};
 
 template <gpu_arch arch>
-struct gemm<arch, std::enable_if_t<(arch <= gpu_arch::Xe)>> {
+struct gemm<arch, std::enable_if_t<(arch <= gpu_arch::XeHpc)>> {
   struct default_fpu {
     template <
         typename dtype_a,
@@ -802,7 +802,7 @@ struct gemm<arch, std::enable_if_t<(arch <= gpu_arch::Xe)>> {
         int block_size_y_b>
     struct check_tile_size_default {
       static constexpr uint32_t reg_in_bytes =
-          register_attr_t<grf_mode::double_grf, gpu_arch::Xe>::reg_in_bytes;
+          register_attr_t<grf_mode::double_grf, gpu_arch::XeHpc>::reg_in_bytes;
       static constexpr uint32_t simd_len = reg_in_bytes / sizeof(dtype_mma);
 
       static_assert(
@@ -878,7 +878,7 @@ struct gemm<arch, std::enable_if_t<(arch <= gpu_arch::Xe)>> {
         int block_size_x_b,
         int block_size_y_b>
     struct check_tile_size_default {
-      using mma_attr = mma_attr_t<gpu_arch::Xe>;
+      using mma_attr = mma_attr_t<gpu_arch::XeHpc>;
       static constexpr int32_t mma_m = mma_attr::mma_m_in_elem;
       static constexpr int32_t mma_n = mma_attr::mma_n_in_elem;
       static constexpr int32_t mma_k =

@@ -97,7 +97,7 @@ class RotaryEmbedding(nn.Module):
         self.base = base
 
     @classmethod
-    def apply(
+    def apply_function(
         cls,
         query: torch.Tensor,
         key: torch.Tensor,
@@ -181,10 +181,10 @@ class FastLayerNorm(nn.Module):
         self.bias = bias
 
     @classmethod
-    def apply(cls, hidden_states, normalized_shape, weight, bias, eps):
+    def apply_function(cls, hidden_states, normalized_shape, weight, bias, eps):
         return cls.runtime_ops.get_module_from_device(
             hidden_states.device.type, IPEXCustomOpType.FAST_LAYERNORM, False
-        ).apply(hidden_states, normalized_shape, weight, bias, eps)
+        ).apply_function(hidden_states, normalized_shape, weight, bias, eps)
 
     def forward(self, hidden_states: torch.Tensor):
         runtime_module = self.runtime_ops.get_module_from_device(
@@ -212,10 +212,10 @@ class RMSNorm(nn.Module):
         self.weight = weight
 
     @classmethod
-    def apply(cls, hidden_states, weight, eps):
+    def apply_function(cls, hidden_states, weight, eps):
         return cls.runtime_ops.get_module_from_device(
             hidden_states.device.type, IPEXCustomOpType.RMS_NORM, False
-        ).apply(hidden_states, weight, eps)
+        ).apply_function(hidden_states, weight, eps)
 
     def forward(self, x: torch.Tensor):
         runtime_module = self.runtime_ops.get_module_from_device(
@@ -228,7 +228,7 @@ class VarlenAttention(nn.Module):
     runtime_ops: IPEXRuntimeCustomOps = IPEXRuntimeCustomOps()
 
     @classmethod
-    def apply(
+    def apply_function(
         cls,
         query: torch.Tensor,
         key: torch.Tensor,
@@ -247,7 +247,7 @@ class VarlenAttention(nn.Module):
     ):
         return cls.runtime_ops.get_module_from_device(
             query.device.type, IPEXCustomOpType.VARLEN_ATTENTION, False
-        ).apply(
+        ).apply_function(
             query,
             key,
             value,

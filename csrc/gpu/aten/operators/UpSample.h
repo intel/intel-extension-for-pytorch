@@ -139,9 +139,10 @@ static inline accscalar_t area_pixel_compute_source_index(
   }
 }
 
+/* Used by UpSampleBicubic2d.cpp */
 template <typename scalar_t>
 static scalar_t upsample_get_value_bounded(
-    const scalar_t* data,
+    const PackedTensorAccessor64<scalar_t, 4>& data,
     int batch,
     int channel,
     int width,
@@ -150,14 +151,13 @@ static scalar_t upsample_get_value_bounded(
     int y) {
   int access_x = max(min(x, width - 1), static_cast<int>(0));
   int access_y = max(min(y, height - 1), static_cast<int>(0));
-  return data
-      [batch * height * width * channel + channel * height * width +
-       access_y * width + access_x];
+  return data[batch][channel][access_y][access_x];
 }
 
+/* Used by UpSampleBicubic2d.cpp */
 template <typename scalar_t>
 static void upsample_increment_value_bounded(
-    const scalar_t* data,
+    PackedTensorAccessor64<scalar_t, 4>& data,
     int batch,
     int channel,
     int width,
@@ -168,9 +168,7 @@ static void upsample_increment_value_bounded(
   int64_t access_x = max(min(x, width - 1), static_cast<int>(0));
   int64_t access_y = max(min(y, height - 1), static_cast<int>(0));
   atomicAdd(
-      (dpcpp_global_ptr_pt<scalar_t>)&data
-          [batch * height * width * channel + channel * height * width +
-           access_y * width + access_x],
+      (dpcpp_global_ptr_pt<scalar_t>)&data[batch][channel][access_y][access_x],
       value);
 }
 

@@ -288,8 +288,7 @@ void reflection_pad1d_out_template(
   if (output.numel() == 0)
     return;
   Tensor input = input_.contiguous();
-
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
       kHalf,
       kBFloat16,
       input.scalar_type(),

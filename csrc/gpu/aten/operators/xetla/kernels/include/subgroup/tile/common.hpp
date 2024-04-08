@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "common/common.hpp"
+#include <common/common.hpp>
 
 namespace gpu::xetla::subgroup {
 
@@ -102,9 +102,9 @@ template <
     typename payload_t,
     typename tile_t>
 __XETLA_API typename std::enable_if_t<base_len == 0> process_1d_tail(
-    tile_t& tile,
-    payload_t& payload,
-    uint32_t offset) {}
+    [[maybe_unused]] tile_t& tile,
+    [[maybe_unused]] payload_t& payload,
+    [[maybe_unused]] uint32_t offset) {}
 
 template <
     uint32_t remained_len,
@@ -155,7 +155,6 @@ template <
 __XETLA_API typename std::enable_if_t<
     base_len != 0 && payload_t::memory_space == mem_space::local>
 process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
-  using dtype = typename payload_t::dtype;
   using mem_dtype = typename payload_t::mem_dtype;
   if constexpr (remained_len >= base_len) {
     auto reg_sub =
@@ -255,7 +254,7 @@ template <
 __XETLA_API static void reset_tile_desc_core(
     xetla_matrix_ref<uint32_t, num_tdesc, 16> __REF__ payload_row) {
 #pragma unroll
-  for (int j = 0; j < num_tdesc; j++) {
+  for (uint32_t j = 0; j < num_tdesc; j++) {
     constexpr uint8_t block_width =
         trans ? (size_y / scale_factor) : (size_x / scale_factor);
     constexpr uint8_t block_height = trans ? size_x : size_y;
@@ -320,12 +319,12 @@ struct get_load_block_size_auto<
     dtype,
     tile_size_x,
     tile_size_y,
-    gpu_arch::Xe,
+    gpu_arch::XeHpc,
     mem_layout::row_major,
     reg_layout::tiled> {
  private:
-  using load_store_attr =
-      arch_attr_t<gpu_arch::Xe>::template load_store_attr<msg_type::block_2d>;
+  using load_store_attr = arch_attr_t<
+      gpu_arch::XeHpc>::template load_store_attr<msg_type::block_2d>;
   static constexpr uint32_t max_load_height_in_elem =
       load_store_attr::max_load_height_in_elem;
   static constexpr uint32_t max_load_width_in_bytes =
@@ -357,12 +356,12 @@ struct get_store_block_size_auto<
     dtype,
     tile_size_x,
     tile_size_y,
-    gpu_arch::Xe,
+    gpu_arch::XeHpc,
     mem_layout::row_major,
     reg_layout::tiled> {
  private:
-  using load_store_attr =
-      arch_attr_t<gpu_arch::Xe>::template load_store_attr<msg_type::block_2d>;
+  using load_store_attr = arch_attr_t<
+      gpu_arch::XeHpc>::template load_store_attr<msg_type::block_2d>;
   static constexpr uint32_t max_store_height_in_elem =
       load_store_attr::max_store_height_in_elem;
   static constexpr uint32_t max_store_width_in_bytes =

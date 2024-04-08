@@ -19,17 +19,17 @@
 
 #pragma once
 
-#include "group/softmax/common.hpp"
+#include <group/softmax/common.hpp>
 
 namespace gpu::xetla::group {
 
-template <typename dtype_acc, gpu_arch arch_tag_ = gpu_arch::Xe>
+template <typename dtype_acc, gpu_arch arch_tag_ = gpu_arch::XeHpc>
 struct softmax_policy_fwd {};
 
 template <
     typename dtype_in,
     typename dtype_acc,
-    gpu_arch arch_tag_ = gpu_arch::Xe>
+    gpu_arch arch_tag_ = gpu_arch::XeHpc>
 struct softmax_policy_bwd {};
 
 } // namespace gpu::xetla::group

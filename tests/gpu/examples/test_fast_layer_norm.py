@@ -41,7 +41,7 @@ class TestNNMethod(TestCase):
             layer_norm.bias.to("xpu"),
             layer_norm.eps,
         )
-        fast_ln_llm_out = ipex.llm.modules.FastLayerNorm.apply(
+        fast_ln_llm_out = ipex.llm.functional.fast_layer_norm(
             embedding_xpu,
             layer_norm.normalized_shape,
             layer_norm.weight.to("xpu"),
@@ -64,7 +64,7 @@ class TestNNMethod(TestCase):
             layer_norm.bias.to(dtype).to("xpu"),
             layer_norm.eps,
         )
-        fast_ln_llm_out = ipex.llm.modules.FastLayerNorm.apply(
+        fast_ln_llm_out = ipex.llm.functional.fast_layer_norm(
             embedding_xpu,
             layer_norm.normalized_shape,
             layer_norm.weight.to(dtype).to("xpu"),

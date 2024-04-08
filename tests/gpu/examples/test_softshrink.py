@@ -44,3 +44,18 @@ class TestTorchMethod(TestCase):
         self.assertEqual(x_cpu, x_dpcpp.cpu())
         self.assertEqual(y, y_dpcpp.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+    def test_softshrink_half(self, dtype=torch.float16):
+        x_cpu = torch.ones(
+            [1, 1, 8, 8], device=cpu_device, requires_grad=True, dtype=dtype
+        )
+        x_xpu = x_cpu.clone().detach().to("xpu").requires_grad_()
+        y_cpu = F.softshrink(x_cpu, 1)
+        z_cpu = y_cpu.mean()
+        z_cpu.backward()
+
+        y_xpu = F.softshrink(x_xpu, 1)
+        z_xpu = y_xpu.mean()
+        z_xpu.backward()
+
+        self.assertEqual(x_cpu.grad, x_xpu.grad.cpu())

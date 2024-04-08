@@ -1,37 +1,57 @@
 #include <ATen/ATen.h>
 #include <ATen/TensorSubclassLikeUtils.h>
+#include <ATen/cpp_custom_type_hack.h>
+#include <ATen/native/nested/NestedTensorUtils.h>
 #include <ATen/record_function.h>
 #include <CL/sycl.hpp>
 #include <core/Generator.h>
 #include <runtime/Device.h>
 #include <runtime/Utils.h>
+#include <torch/autograd.h>
+#include <torch/custom_class.h>
 #include <utils/DPCPP.h>
+#include <utils/SimpleTrace.h>
 #include "../Blas.h"
 #include "../DistributionTemplates.h"
 #include "../RandomEngine.h"
 #include "../comm/ATDispatch.h"
+#include "../comm/AccumulateType.h"
+#include "dropout.h"
 #include "sdp_utils.h"
 #include "utils/CustomOperatorRegistration.h"
 
+using namespace torch::autograd;
 namespace at {
 namespace AtenIpexTypeXPU {
+
+std::tuple<Tensor, Tensor, Tensor, Tensor> ipex_sdp_dropout_backward(
+    const Tensor& grad_out,
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<Tensor>& attn_bias,
+    const Tensor& out,
+    const Tensor& logsumexp,
+    const Tensor& dropout_mask,
+    double dropout_p,
+    bool grad_input_mask,
+    bool causal,
+    c10::optional<double> scale);
 
 inline Tensor _scaled_dot_product_efficient_attention_impl(
     const Tensor& _query,
     const Tensor& _key,
     const Tensor& _value,
     const c10::optional<Tensor>& attn_mask,
-    Tensor& seed_t,
-    Tensor& offset_t,
+    const c10::optional<at::Tensor>& dropout_mask,
+    const c10::optional<at::Tensor>& seed_t,
+    const c10::optional<at::Tensor>& offset_t,
     Tensor& softmax_lse,
     bool is_causal,
     bool is_training,
     double dropout_p,
     c10::optional<double> scale) {
 #if defined(USE_XETLA)
-  TORCH_CHECK(
-      dpcppGetDeviceHasXMX(),
-      "SDP kernel requires XMX, but the current platform has no XMX ...");
   // check attn_mask padded
   uint32_t attn_mask_padded_block_size = 0;
   if (attn_mask.has_value()) {
@@ -57,37 +77,40 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
 
   const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  gpu_arch xeArch = sdp::aten_to_Xetla_arch();
   fmha_forward_kernel(
+      xeArch,
       xeType,
       dpcpp_queue,
-      query.data_ptr(),
-      key.data_ptr(),
-      value.data_ptr(),
-      /* alibi */ nullptr,
-      attn_mask.has_value() ? attn_mask->data_ptr() : (void*)nullptr,
-      /* dropout_mask */ nullptr,
-      output.data_ptr(),
-      softmax_lse.data_ptr(),
-      softmax_scale,
-      /* beta */ 1.0f,
-      dropout_p,
-      query.size(0),
-      query.size(1),
-      key.size(1),
-      query.size(3),
-      query.size(2),
-      key.size(2),
-      attn_mask.has_value() ? attn_mask->stride(0) : -1,
-      attn_mask.has_value() ? attn_mask->stride(1) : -1,
-      attn_mask.has_value() ? attn_mask->stride(2) : -1,
-      /* ablibi padded size */ 0,
-      attn_mask_padded_block_size,
-      is_causal,
-      false,
-      is_training,
-      use_dropout,
-      (uint64_t)*seed_t.data_ptr<int64_t>(),
-      (uint64_t)*offset_t.data_ptr<int64_t>());
+      {query.data_ptr(),
+       key.data_ptr(),
+       value.data_ptr(),
+       /* alibi */ nullptr,
+       attn_mask.has_value() ? attn_mask->data_ptr() : (void*)nullptr,
+       dropout_mask.has_value() ? dropout_mask->data_ptr() : (void*)nullptr,
+       output.data_ptr(),
+       softmax_lse.data_ptr(),
+       softmax_scale,
+       /* beta */ 1.0f,
+       dropout_p,
+       query.size(0),
+       query.size(1),
+       key.size(1),
+       query.size(3),
+       query.size(2),
+       key.size(2),
+       attn_mask.has_value() ? attn_mask->stride(0) : -1,
+       attn_mask.has_value() ? attn_mask->stride(1) : -1,
+       attn_mask.has_value() ? attn_mask->stride(2) : -1,
+       /* ablibi padded size */ 0,
+       attn_mask_padded_block_size,
+       is_causal,
+       false,
+       is_training,
+       use_dropout,
+       seed_t.has_value() ? (uint64_t)*seed_t.value().data_ptr<int64_t>() : -1,
+       offset_t.has_value() ? (uint64_t)*offset_t.value().data_ptr<int64_t>()
+                            : -1});
 
   return output;
 #else
@@ -396,6 +419,7 @@ _scaled_dot_product_efficient_attention(
       key,
       value,
       attn_bias,
+      c10::nullopt,
       seed_t,
       offset_t,
       softmax_lse,
@@ -408,6 +432,228 @@ _scaled_dot_product_efficient_attention(
       std::move(softmax_lse),
       std::move(seed_t),
       std::move(offset_t));
+}
+
+std::tuple<Tensor, Tensor, Tensor> ipex_sdp_dropout_forward(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<at::Tensor>& attn_bias,
+    bool compute_log_sumexp,
+    double dropout_p,
+    bool is_causal,
+    c10::optional<double> scale) {
+  RECORD_FUNCTION("ipex_sdp_dropout_forward", {});
+  int64_t B = query.size(0);
+  int64_t num_heads = query.size(1);
+  int64_t M = query.size(-2);
+  int64_t N = key.size(-2);
+  const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
+  Tensor dropout_mask = at::empty(
+      {B, num_heads, M, N},
+      query.options().dtype(c10::CppTypeToScalarType<uint8_t>::value));
+  if (use_dropout) {
+    dropout_mask = at::AtenIpexTypeXPU::dropout_mask_only<uint8_t>(
+        dropout_mask, dropout_p);
+  }
+  auto softmax_lse = at::empty(
+      {query.size(0), query.size(1), query.size(2)},
+      query.options().dtype(at::kFloat));
+
+  auto out = _scaled_dot_product_efficient_attention_impl(
+      query,
+      key,
+      value,
+      attn_bias,
+      dropout_mask,
+      c10::nullopt,
+      c10::nullopt,
+      softmax_lse,
+      is_causal,
+      compute_log_sumexp,
+      dropout_p,
+      scale);
+  return std::make_tuple(
+      std::move(out), std::move(softmax_lse), std::move(dropout_mask));
+}
+
+class IPEXSDPDropoutOp : public Function<IPEXSDPDropoutOp> {
+ public:
+  static variable_list forward(
+      AutogradContext* ctx,
+      const Tensor& query,
+      const Tensor& key,
+      const Tensor& value,
+      const c10::optional<at::Tensor>& attn_bias,
+      bool compute_log_sumexp,
+      double dropout_p,
+      bool is_causal,
+      c10::optional<double> scale) {
+#ifdef BUILD_SIMPLE_TRACE
+    SimpleTrace trace(
+        "IPEXSDPDropoutOp forward -> at::AtenIpexTypeXPU::IPEXSDPDropoutOp::forward");
+#endif
+    ctx->saved_data["dropout_p"] = dropout_p;
+    ctx->saved_data["is_causal"] = is_causal;
+    ctx->saved_data["scale"] = scale;
+    ctx->saved_data["attn_bias"] = attn_bias;
+    ctx->saved_data["attn_bias_requires_grad"] =
+        attn_bias.has_value() ? attn_bias.value().requires_grad() : false;
+
+    auto outputs = ipex_sdp_dropout_forward(
+        query,
+        key,
+        value,
+        attn_bias,
+        compute_log_sumexp,
+        dropout_p,
+        is_causal,
+        scale);
+    ctx->save_for_backward(
+        {query,
+         key,
+         value,
+         std::get<0>(outputs),
+         std::get<1>(outputs),
+         std::get<2>(outputs)});
+    variable_list result = {
+        std::get<0>(outputs), std::get<1>(outputs), std::get<2>(outputs)};
+    return result;
+  }
+
+  static variable_list backward(
+      AutogradContext* ctx,
+      variable_list grad_outputs) {
+#ifdef BUILD_SIMPLE_TRACE
+    SimpleTrace trace(
+        "IPEXSDPDropoutOp backward -> at::AtenIpexTypeXPU::IPEXSDPDropoutOp::backward");
+#endif
+    auto attn_bias = ctx->saved_data["attn_bias"].toOptional<at::Tensor>();
+    auto dropout_p = ctx->saved_data["dropout_p"].toDouble();
+    auto is_causal = ctx->saved_data["is_causal"].toBool();
+    auto scale = ctx->saved_data["scale"].toOptional<double>();
+    auto compute_grad = ctx->saved_data["attn_bias_requires_grad"].toBool();
+    auto saved = ctx->get_saved_variables();
+    Tensor query = saved[0];
+    Tensor key = saved[1];
+    Tensor value = saved[2];
+    Tensor output = saved[3];
+    Tensor logsumexp = saved[4];
+    Tensor dropout_mask = saved[5];
+
+    auto grad_inputs = ipex_sdp_dropout_backward(
+        grad_outputs[0],
+        query,
+        key,
+        value,
+        attn_bias,
+        output,
+        logsumexp,
+        dropout_mask,
+        dropout_p,
+        compute_grad,
+        is_causal,
+        scale);
+    return {
+        std::get<0>(grad_inputs),
+        std::get<1>(grad_inputs),
+        std::get<2>(grad_inputs),
+        std::get<3>(grad_inputs),
+        Tensor(),
+        Tensor(),
+        Tensor(),
+        Tensor()};
+  }
+};
+
+template <int alignment>
+bool is_aligned(const SymInt& size) {
+  return size % alignment == 0;
+}
+
+template <int alignment>
+at::Tensor pad_bias(const at::Tensor& attn_bias) {
+  auto last_dim_size = attn_bias.sym_size(-1);
+  auto pad_count = alignment - (last_dim_size % alignment);
+  auto padded_bias = at::pad_symint(attn_bias, {c10::SymInt(0), pad_count});
+  return padded_bias.slice_symint(-1, 0, last_dim_size);
+}
+
+Tensor preprocess_mask(
+    const Tensor& mask,
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value) {
+  constexpr int mem_eff_alignment = 16;
+  // Expand to 4d case
+  at::Tensor attn_mask = mask.expand_symint(
+      {query.sym_size(0),
+       query.sym_size(1),
+       query.sym_size(2),
+       key.sym_size(2)});
+
+  bool aligned_last_dim = is_aligned<mem_eff_alignment>(attn_mask.sym_size(-1));
+  // Apply pad_bias and store the result in attn_mask
+  if (!aligned_last_dim) {
+    return pad_bias<mem_eff_alignment>(attn_mask);
+  }
+  // Check and make the tensor contiguous if needed
+  if (attn_mask.sym_stride(0) % 16 != 0 || attn_mask.sym_stride(1) % 16 != 0 ||
+      attn_mask.sym_stride(2) % 16 != 0) {
+    return attn_mask.contiguous();
+  }
+
+  return attn_mask;
+}
+
+// We compute dropout mask tensor then pass to forward, and save for backward
+Tensor xetla_sdp_dropout(
+    const Tensor& query_,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<at::Tensor>& attn_mask_,
+    double dropout_p,
+    bool is_causal,
+    c10::optional<double> scale) {
+  c10::optional<Tensor> attn_mask =
+      sdp::convert_boolean_attn_mask(attn_mask_, query_.dtype());
+  bool compute_logsumexp =
+      (query_.requires_grad() || key.requires_grad() || value.requires_grad());
+  if (attn_mask.has_value()) {
+    attn_mask.value() = preprocess_mask(attn_mask.value(), query_, key, value);
+    ;
+  }
+  auto out_and_lse = IPEXSDPDropoutOp::apply(
+      query_,
+      key,
+      value,
+      attn_mask,
+      compute_logsumexp,
+      dropout_p,
+      is_causal,
+      scale);
+  return out_and_lse[0];
+}
+
+inline bool xetla_supported(
+    Tensor q,
+    Tensor k,
+    Tensor v,
+    const c10::optional<Tensor>& b) {
+  bool is_supported = false;
+#if defined(USE_XETLA)
+  if (dpcppGetDeviceHasXMX()) {
+    DeviceId curDevID;
+    AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+    if ((q.dtype() == at::kHalf || q.dtype() == at::kBFloat16) &&
+        Settings::I().has_2d_block_array(curDevID)) {
+      if ((q.sym_size(-1) * q.itemsize() % 128 == 0) &&
+          (v.sym_size(-1) * v.itemsize() % 128 == 0))
+        is_supported = true;
+    }
+  }
+#endif
+  return is_supported;
 }
 
 int64_t _fused_sdp_choice(
@@ -553,41 +799,40 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
 
 #if defined(USE_XETLA)
-  TORCH_CHECK(
-      dpcppGetDeviceHasXMX(),
-      "SDP kernel requires XMX, but the current platform has no XMX ...");
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  gpu_arch xeArch = sdp::aten_to_Xetla_arch();
   gpu::xetla::fmha_forward_kernel(
+      xeArch,
       xeType,
       dpcpp_queue,
-      query.data_ptr(),
-      key.data_ptr(),
-      value.data_ptr(),
-      alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
-      attn_mask.has_value() ? attn_mask_bc.data_ptr() : (void*)nullptr,
-      nullptr,
-      output.data_ptr(),
-      softmax_lse.data_ptr(),
-      alpha,
-      beta,
-      dropout_p,
-      B,
-      num_heads_q,
-      num_heads_k,
-      head_dim,
-      M,
-      N,
-      attn_mask.has_value() ? attn_mask_bc.stride(0) : -1,
-      attn_mask.has_value() ? attn_mask_bc.stride(1) : -1,
-      attn_mask.has_value() ? attn_mask_bc.stride(2) : -1,
-      alibi_padded_block_size,
-      attn_mask_padded_block_size,
-      is_causal,
-      seq_last,
-      false, // is_training
-      false, // use_dropout
-      (int)0,
-      (int)0);
+      {query.data_ptr(),
+       key.data_ptr(),
+       value.data_ptr(),
+       alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
+       attn_mask.has_value() ? attn_mask_bc.data_ptr() : (void*)nullptr,
+       nullptr,
+       output.data_ptr(),
+       softmax_lse.data_ptr(),
+       alpha,
+       beta,
+       dropout_p,
+       B,
+       num_heads_q,
+       num_heads_k,
+       head_dim,
+       M,
+       N,
+       attn_mask.has_value() ? attn_mask_bc.stride(0) : -1,
+       attn_mask.has_value() ? attn_mask_bc.stride(1) : -1,
+       attn_mask.has_value() ? attn_mask_bc.stride(2) : -1,
+       alibi_padded_block_size,
+       attn_mask_padded_block_size,
+       is_causal,
+       seq_last,
+       false, // is_training
+       false, // use_dropout
+       (int)0,
+       (int)0});
 #else
   AT_ERROR("SDP: xetla library not found in compilation");
 #endif
@@ -880,6 +1125,395 @@ void xetla_paged_attention_v2(
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeNestedTensorXPU {
+static constexpr int TRANSFORM_BIAS_RESCALE_VEC = 4;
+
+namespace impl {
+
+template <typename scalar_t, typename accscalar_t>
+struct transform_bias_rescale_qkv_add_padding_impl {
+  void operator()(sycl::nd_item<1> item) const {
+    const auto NH = q_k_v.size(2);
+    const auto T = q_k_v.size(3);
+    const auto DH = q_k_v.size(4);
+
+    const auto stride_0 = q_k_v.stride(0);
+    const auto stride_1 = q_k_v.stride(1);
+    const auto stride_2 = q_k_v.stride(2);
+    const auto stride_3 = q_k_v.stride(3);
+    const auto stride_4 = q_k_v.stride(4);
+    scalar_t* const data = q_k_v.data();
+
+    const int32_t local_id = item.get_local_id(0);
+    const int32_t global_id = item.get_group(0);
+
+    const auto t = global_id % T;
+    const auto b = global_id / T;
+
+    const auto D = NH * DH;
+    const auto _3D = 3 * D;
+
+    const auto offset_for_batch = offsets[b];
+    const auto input_dim = 1;
+    const auto* sizes_i = input_sizes + b * input_dim;
+
+    if (assume_aligned) {
+      constexpr int VEC = TRANSFORM_BIAS_RESCALE_VEC;
+      using LoadT = at::native::Memory::aligned_vector_loop<scalar_t, VEC>;
+      for (int32_t d_v = local_id; d_v < D / VEC;
+           d_v += item.get_local_range(0)) {
+        auto d = d_v * VEC;
+        auto nh = d / DH;
+        auto dh = d % DH;
+        scalar_t qkv_bias_q[VEC];
+        scalar_t qkv_bias_k[VEC];
+        scalar_t qkv_bias_v[VEC];
+        scalar_t qkv_q[VEC];
+        scalar_t qkv_k[VEC];
+        scalar_t qkv_v[VEC];
+
+        const auto first_item_offset = t * _3D + d;
+        const auto last_item_offset = first_item_offset + VEC - 1;
+        const bool first_item_in_bounds = first_item_offset < sizes_i[0];
+        const bool entire_vec_in_bounds = last_item_offset < sizes_i[0];
+
+        // Here we require D % VEC == 0 for these vectorized loads.
+        *reinterpret_cast<LoadT*>(&qkv_bias_q) =
+            *reinterpret_cast<const LoadT*>(&qkv_bias[d + 0 * D]);
+        *reinterpret_cast<LoadT*>(&qkv_bias_k) =
+            *reinterpret_cast<const LoadT*>(&qkv_bias[d + 1 * D]);
+        *reinterpret_cast<LoadT*>(&qkv_bias_v) =
+            *reinterpret_cast<const LoadT*>(&qkv_bias[d + 2 * D]);
+
+        if (entire_vec_in_bounds) {
+          const auto offset = offset_for_batch + first_item_offset;
+          *reinterpret_cast<LoadT*>(&qkv_q) =
+              *reinterpret_cast<const LoadT*>(&qkv[offset + 0 * D]);
+          *reinterpret_cast<LoadT*>(&qkv_k) =
+              *reinterpret_cast<const LoadT*>(&qkv[offset + 1 * D]);
+          *reinterpret_cast<LoadT*>(&qkv_v) =
+              *reinterpret_cast<const LoadT*>(&qkv[offset + 2 * D]);
+
+#pragma unroll
+          for (auto ii = 0; ii < VEC; ++ii) {
+            qkv_q[ii] = static_cast<scalar_t>(
+                (static_cast<accscalar_t>(qkv_q[ii]) +
+                 static_cast<accscalar_t>(qkv_bias_q[ii])) *
+                static_cast<accscalar_t>(inv_sqrt_dim_per_head));
+            qkv_k[ii] = static_cast<scalar_t>(
+                (static_cast<accscalar_t>(qkv_k[ii]) +
+                 static_cast<accscalar_t>(qkv_bias_k[ii])));
+            qkv_v[ii] = static_cast<scalar_t>(
+                (static_cast<accscalar_t>(qkv_v[ii]) +
+                 static_cast<accscalar_t>(qkv_bias_v[ii])));
+          }
+        } else if (first_item_in_bounds) {
+          const auto offset = offset_for_batch + first_item_offset;
+          qkv_q[0] = qkv[offset + 0 * D];
+          qkv_k[0] = qkv[offset + 1 * D];
+          qkv_v[0] = qkv[offset + 2 * D];
+          qkv_q[0] = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(qkv_q[0]) +
+               static_cast<accscalar_t>(qkv_bias_q[0])) *
+              static_cast<accscalar_t>(inv_sqrt_dim_per_head));
+          qkv_k[0] = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(qkv_k[0]) +
+               static_cast<accscalar_t>(qkv_bias_k[0])));
+          qkv_v[0] = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(qkv_v[0]) +
+               static_cast<accscalar_t>(qkv_bias_v[0])));
+#pragma unroll
+          for (auto ii = 1; ii < VEC; ++ii) {
+            const auto loop_offset = offset + ii;
+            if (loop_offset < sizes_i[0]) {
+              qkv_q[ii] = qkv[loop_offset + 0 * D];
+              qkv_k[ii] = qkv[loop_offset + 1 * D];
+              qkv_v[ii] = qkv[loop_offset + 2 * D];
+              qkv_q[ii] = static_cast<scalar_t>(
+                  (static_cast<accscalar_t>(qkv_q[ii]) +
+                   static_cast<accscalar_t>(qkv_bias_q[ii])) *
+                  static_cast<accscalar_t>(inv_sqrt_dim_per_head));
+              qkv_k[ii] = static_cast<scalar_t>(
+                  (static_cast<accscalar_t>(qkv_k[ii]) +
+                   static_cast<accscalar_t>(qkv_bias_k[ii])));
+              qkv_v[ii] = static_cast<scalar_t>(
+                  (static_cast<accscalar_t>(qkv_v[ii]) +
+                   static_cast<accscalar_t>(qkv_bias_v[ii])));
+            } else {
+              qkv_q[ii] = 0;
+              qkv_k[ii] = 0;
+              qkv_v[ii] = 0;
+            }
+          }
+        } else {
+#pragma unroll
+          for (auto ii = 0; ii < VEC; ++ii) {
+            qkv_q[ii] = 0;
+            qkv_k[ii] = 0;
+            qkv_v[ii] = 0;
+          }
+        }
+
+        // Here we require DH % VEC == 0 for these vectorized stores.
+        *reinterpret_cast<LoadT*>(
+            &data
+                [0 * stride_0 + b * stride_1 + nh * stride_2 + t * stride_3 +
+                 dh * stride_4]) = *reinterpret_cast<const LoadT*>(&qkv_q);
+        *reinterpret_cast<LoadT*>(
+            &data
+                [1 * stride_0 + b * stride_1 + nh * stride_2 + t * stride_3 +
+                 dh * stride_4]) = *reinterpret_cast<const LoadT*>(&qkv_k);
+        *reinterpret_cast<LoadT*>(
+            &data
+                [2 * stride_0 + b * stride_1 + nh * stride_2 + t * stride_3 +
+                 dh * stride_4]) = *reinterpret_cast<const LoadT*>(&qkv_v);
+      }
+    } else {
+      for (int32_t d = local_id; d < D; d += item.get_local_range(0)) {
+        auto nh = d / DH;
+        auto dh = d % DH;
+        scalar_t qkv_bias_q = qkv_bias[d + 0 * D];
+        scalar_t qkv_bias_k = qkv_bias[d + 1 * D];
+        scalar_t qkv_bias_v = qkv_bias[d + 2 * D];
+
+        const auto item_offset = t * _3D + d;
+        const bool in_bounds = item_offset < sizes_i[0];
+        scalar_t qkv_q, qkv_k, qkv_v;
+
+        if (in_bounds) {
+          const auto qkv_offset = offset_for_batch + item_offset;
+          qkv_q = qkv[qkv_offset + 0 * D];
+          qkv_k = qkv[qkv_offset + 1 * D];
+          qkv_v = qkv[qkv_offset + 2 * D];
+          qkv_q = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(qkv_q) +
+               static_cast<accscalar_t>(qkv_bias_q)) *
+              static_cast<accscalar_t>(inv_sqrt_dim_per_head));
+          qkv_k = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(qkv_k) +
+               static_cast<accscalar_t>(qkv_bias_k)));
+          qkv_v = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(qkv_v) +
+               static_cast<accscalar_t>(qkv_bias_v)));
+        } else {
+          qkv_q = 0;
+          qkv_k = 0;
+          qkv_v = 0;
+        }
+
+        data
+            [0 * stride_0 + b * stride_1 + nh * stride_2 + t * stride_3 +
+             dh * stride_4] = qkv_q;
+        data
+            [1 * stride_0 + b * stride_1 + nh * stride_2 + t * stride_3 +
+             dh * stride_4] = qkv_k;
+        data
+            [2 * stride_0 + b * stride_1 + nh * stride_2 + t * stride_3 +
+             dh * stride_4] = qkv_v;
+      }
+    }
+  }
+
+  transform_bias_rescale_qkv_add_padding_impl(
+      const PackedTensorAccessor64<scalar_t, 1> qkv_,
+      const PackedTensorAccessor64<scalar_t, 1> qkv_bias_,
+      const int* offsets_,
+      const int* input_sizes_,
+      PackedTensorAccessor64<scalar_t, 5> q_k_v_,
+      const scalar_t inv_sqrt_dim_per_head_,
+      const bool assume_aligned_)
+      : qkv(qkv_),
+        qkv_bias(qkv_bias_),
+        offsets(offsets_),
+        input_sizes(input_sizes_),
+        q_k_v(q_k_v_),
+        inv_sqrt_dim_per_head(inv_sqrt_dim_per_head_),
+        assume_aligned(assume_aligned_) {}
+
+ private:
+  // [B, T, 3 * D], but it's a NestedTensor buffer
+  const PackedTensorAccessor64<scalar_t, 1> qkv;
+  // [3 * D]
+  const PackedTensorAccessor64<scalar_t, 1> qkv_bias;
+  const int* offsets;
+  const int* input_sizes;
+  // [3, B, NH, T, DH]
+  PackedTensorAccessor64<scalar_t, 5> q_k_v;
+  const scalar_t inv_sqrt_dim_per_head;
+  const bool assume_aligned;
+};
+
+Tensor collapse_dims_1_and_2(const Tensor& sizes) {
+  auto sizes_dim1 = at::native::narrow_symint(sizes, 1, 0, 1);
+  auto sizes_dim2 = at::native::narrow_symint(sizes, 1, 1, 1);
+
+  return (sizes_dim1 * sizes_dim2).contiguous();
+}
+
+Tensor NestedTensor_batch_offsets_from_size_tensor(
+    const Tensor& sizes,
+    int64_t extra_elements) {
+  int64_t* const sizes_ptr = sizes.data_ptr<int64_t>();
+  Tensor offsets = at::empty({1 + sizes.size(0) + extra_elements}, at::kInt);
+  int32_t* const offsets_ptr = offsets.mutable_data_ptr<int32_t>();
+  offsets_ptr[0] = 0;
+  const auto sizes_size_1 = sizes.size(1);
+  const auto sizes_size_0 = sizes.size(0);
+  for (const auto i : c10::irange(sizes_size_0)) {
+    int64_t prod = 1;
+    for (const auto j : c10::irange(sizes_size_1)) {
+      prod *= sizes_ptr[i * sizes_size_1 + j];
+    }
+    offsets_ptr[i + 1] = offsets_ptr[i] + prod;
+  }
+  return offsets;
+}
+
+// each nd_range is dealing with one qkv tensor, each nd_group is dealing with D
+// dim
+template <typename scalar_t, typename accscalar_t>
+struct transform_bias_rescale_qkv_kernel_functor {
+  void operator()(sycl::nd_item<1> item) const {
+    auto NH = q_k_v.size(2);
+    auto T = q_k_v.size(3);
+    auto DH = q_k_v.size(4);
+
+    const auto qkv_stride_0 = q_k_v.stride(0);
+    const auto qkv_stride_1 = q_k_v.stride(1);
+    const auto qkv_stride_2 = q_k_v.stride(2);
+    const auto qkv_stride_3 = q_k_v.stride(3);
+    const auto qkv_stride_4 = q_k_v.stride(4);
+    scalar_t* const qkv_data = q_k_v.data();
+
+    const auto group_id = item.get_group(0);
+    const auto local_id = item.get_local_id(0);
+    const auto local_range = item.get_local_range(0);
+
+    auto t = group_id % T;
+    auto b = group_id / T;
+
+    const auto D = NH * DH;
+
+    if (assume_aligned) {
+      constexpr int VEC = TRANSFORM_BIAS_RESCALE_VEC;
+      using LoadT = native::Memory::aligned_vector_loop<scalar_t, VEC>;
+      // here is aligned, no more need ceiling for D / VEC
+      for (int32_t d_v = local_id; d_v < D / VEC; d_v += local_range) {
+        auto d = d_v * VEC;
+        auto nh = d / DH;
+        auto dh = d % DH;
+        scalar_t qkv_bias_q[VEC];
+        scalar_t qkv_bias_k[VEC];
+        scalar_t qkv_bias_v[VEC];
+        scalar_t qkv_q[VEC];
+        scalar_t qkv_k[VEC];
+        scalar_t qkv_v[VEC];
+
+        *reinterpret_cast<LoadT*>(&qkv_bias_q) =
+            *reinterpret_cast<const LoadT*>(&qkv_bias[d + 0 * D]);
+        *reinterpret_cast<LoadT*>(&qkv_bias_k) =
+            *reinterpret_cast<const LoadT*>(&qkv_bias[d + 1 * D]);
+        *reinterpret_cast<LoadT*>(&qkv_bias_v) =
+            *reinterpret_cast<const LoadT*>(&qkv_bias[d + 2 * D]);
+
+        *reinterpret_cast<LoadT*>(&qkv_q) =
+            *reinterpret_cast<const LoadT*>(&qkv[b][t][d + 0 * D]);
+        *reinterpret_cast<LoadT*>(&qkv_k) =
+            *reinterpret_cast<const LoadT*>(&qkv[b][t][d + 1 * D]);
+        *reinterpret_cast<LoadT*>(&qkv_v) =
+            *reinterpret_cast<const LoadT*>(&qkv[b][t][d + 2 * D]);
+
+#pragma unroll
+        for (auto ii = 0; ii < VEC; ii++) {
+          qkv_q[ii] = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(qkv_q[ii]) +
+               static_cast<accscalar_t>(qkv_bias_q[ii])) *
+              static_cast<accscalar_t>(inv_sqrt_dim_per_head));
+          qkv_k[ii] = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(qkv_k[ii]) +
+               static_cast<accscalar_t>(qkv_bias_k[ii])));
+          qkv_v[ii] = static_cast<scalar_t>(
+              (static_cast<accscalar_t>(qkv_v[ii]) +
+               static_cast<accscalar_t>(qkv_bias_v[ii])));
+        }
+
+        // Here we require DH % VEC == 0 for these vectorized stores.
+        *reinterpret_cast<LoadT*>(
+            &qkv_data
+                [0 * qkv_stride_0 + b * qkv_stride_1 + nh * qkv_stride_2 +
+                 t * qkv_stride_3 + dh * qkv_stride_4]) =
+            *reinterpret_cast<const LoadT*>(&qkv_q);
+        *reinterpret_cast<LoadT*>(
+            &qkv_data
+                [1 * qkv_stride_0 + b * qkv_stride_1 + nh * qkv_stride_2 +
+                 t * qkv_stride_3 + dh * qkv_stride_4]) =
+            *reinterpret_cast<const LoadT*>(&qkv_k);
+        *reinterpret_cast<LoadT*>(
+            &qkv_data
+                [2 * qkv_stride_0 + b * qkv_stride_1 + nh * qkv_stride_2 +
+                 t * qkv_stride_3 + dh * qkv_stride_4]) =
+            *reinterpret_cast<const LoadT*>(&qkv_v);
+      }
+    } else {
+      // without vectorize load and store
+      for (int32_t d = local_id; d < D; d += local_range) {
+        auto nh = d / DH;
+        auto dh = d % DH;
+        scalar_t qkv_bias_q = qkv_bias[0 * D + d];
+        scalar_t qkv_bias_k = qkv_bias[1 * D + d];
+        scalar_t qkv_bias_v = qkv_bias[2 * D + d];
+        scalar_t qkv_q = qkv[b][t][0 * D + d];
+        scalar_t qkv_k = qkv[b][t][1 * D + d];
+        scalar_t qkv_v = qkv[b][t][2 * D + d];
+
+        qkv_q = static_cast<scalar_t>(
+            (static_cast<accscalar_t>(qkv_q) +
+             static_cast<accscalar_t>(qkv_bias_q)) *
+            static_cast<accscalar_t>(inv_sqrt_dim_per_head));
+        qkv_k = static_cast<scalar_t>(
+            static_cast<accscalar_t>(qkv_k) +
+            static_cast<accscalar_t>(qkv_bias_k));
+        qkv_v = static_cast<scalar_t>(
+            static_cast<accscalar_t>(qkv_v) +
+            static_cast<accscalar_t>(qkv_bias_v));
+
+        qkv_data
+            [0 * qkv_stride_0 + b * qkv_stride_1 + nh * qkv_stride_2 +
+             t * qkv_stride_3 + dh * qkv_stride_4] = qkv_q;
+        qkv_data
+            [1 * qkv_stride_0 + b * qkv_stride_1 + nh * qkv_stride_2 +
+             t * qkv_stride_3 + dh * qkv_stride_4] = qkv_k;
+        qkv_data
+            [2 * qkv_stride_0 + b * qkv_stride_1 + nh * qkv_stride_2 +
+             t * qkv_stride_3 + dh * qkv_stride_4] = qkv_v;
+      }
+    }
+  }
+
+  transform_bias_rescale_qkv_kernel_functor(
+      const PackedTensorAccessor64<scalar_t, 3> qkv_,
+      const PackedTensorAccessor64<scalar_t, 1> qkv_bias_,
+      PackedTensorAccessor64<scalar_t, 5> q_k_v_,
+      const scalar_t inv_sqrt_dim_per_head_,
+      const bool assume_aligned_)
+      : qkv(qkv_),
+        qkv_bias(qkv_bias_),
+        q_k_v(q_k_v_),
+        inv_sqrt_dim_per_head(inv_sqrt_dim_per_head_),
+        assume_aligned(assume_aligned_) {}
+
+ private:
+  // [B, T, 3 * D]
+  const PackedTensorAccessor64<scalar_t, 3> qkv;
+  // [3 * D]
+  const PackedTensorAccessor64<scalar_t, 1> qkv_bias;
+  // [3, B, num_heads, T, dim_per_head]
+  PackedTensorAccessor64<scalar_t, 5> q_k_v;
+  const scalar_t inv_sqrt_dim_per_head;
+  const bool assume_aligned;
+};
+
+} // namespace impl
+
 int64_t _fused_sdp_choice(
     const Tensor& query,
     const Tensor& key,
@@ -905,7 +1539,160 @@ int64_t _fused_sdp_choice(
   return static_cast<int64_t>(backend);
 }
 
+// compute q = (q + q_bias) / sqrt(dim_per_head), k = k + k_bias, v = v + v_bias
+// Note: current only support contiguous indexing, since nested tensor is all
+// contiguous
+std::tuple<Tensor, Tensor, Tensor> _transform_bias_rescale_qkv(
+    const Tensor& qkv,
+    const Tensor& qkv_bias,
+    const int64_t num_head) {
+  // for nested tensor, B is most outer size, but T is not regular, it should be
+  // the large size on dim1
+  auto B = qkv.is_nested()
+      ? at::native::get_nested_tensor_impl(qkv)->get_nested_sizes().size(0)
+      : qkv.size(0);
+
+  auto T = qkv.is_nested() ? at::native::NestedTensor_get_max_size(
+                                 *at::native::get_nested_tensor_impl(qkv))[0]
+                           : qkv.size(1);
+
+  // qkv_bias size should be same with finall linear projection layer, which
+  // size is 3 * D
+  auto _3D = qkv_bias.size(0);
+  auto D = _3D / 3;
+  TORCH_CHECK(D % num_head == 0);
+  const auto dim_per_head = D / num_head;
+
+  // q_k_v B T 3D -> 3, B, num_head, T, dim_per_head
+  auto q_k_v = at::empty({3, B, num_head, T, dim_per_head}, qkv_bias.options());
+
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+  auto max_wg_size = dpcppMaxWorkGroupSize();
+
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      qkv.scalar_type(),
+      "transform_bias_rescale_qkv",
+      [&] {
+        using accscalar_t = at::AtenIpexTypeXPU::acc_type<scalar_t>;
+        auto local_range = std::max(
+            std::min<int32_t>(
+                max_wg_size,
+                (D + TRANSFORM_BIAS_RESCALE_VEC - 1) /
+                    TRANSFORM_BIAS_RESCALE_VEC),
+            1);
+        auto global_range = B * T;
+        const bool aligned =
+            ((dim_per_head % TRANSFORM_BIAS_RESCALE_VEC) == 0) &&
+            ((reinterpret_cast<intptr_t>(qkv_bias.data_ptr()) %
+              TRANSFORM_BIAS_RESCALE_VEC) == 0);
+
+        if (aligned) {
+          TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
+              D % TRANSFORM_BIAS_RESCALE_VEC == 0,
+              "D = num_heads * dim_per_head, so we should have dim_per_head % "
+              "TRANSFORM_BIAS_RESCALE_VEC == 0 => "
+              "D % TRANSFORM_BIAS_RESCALE_VEC == 0");
+        }
+
+        if (qkv.is_nested()) {
+          auto* nt_qkv = at::native::get_nested_tensor_impl(qkv);
+          const at::Tensor& nt_qkv_buffer = nt_qkv->get_buffer();
+
+          auto sizes = impl::collapse_dims_1_and_2(nt_qkv->get_nested_sizes());
+          auto offsets = impl::NestedTensor_batch_offsets_from_size_tensor(
+              sizes, sizes.numel());
+
+          at::native::narrow_symint(
+              offsets, 0, sizes.numel() + 1, sizes.numel())
+              .copy_(sizes.reshape({-1}));
+          auto metadata = offsets.to(at::Device(kXPU), at::kInt, true, true);
+          const auto offsets_ptr = metadata.data_ptr<int>();
+          const auto sizes_ptr = offsets_ptr + sizes.numel() + 1;
+          const auto input_dim = sizes.sizes()[1];
+          auto qkv_acc = q_k_v.packed_accessor64<scalar_t, 5>();
+          if (aligned &&
+              ((reinterpret_cast<intptr_t>(qkv.data_ptr()) %
+                TRANSFORM_BIAS_RESCALE_VEC) == 0)) {
+            auto cgf = DPCPP_Q_CGF(cgh) {
+              impl::transform_bias_rescale_qkv_add_padding_impl<
+                  scalar_t,
+                  accscalar_t>
+                  kfn(nt_qkv_buffer.packed_accessor64<scalar_t, 1>(),
+                      qkv_bias.packed_accessor64<scalar_t, 1>(),
+                      offsets_ptr,
+                      sizes_ptr,
+                      qkv_acc,
+                      1.0 / std::sqrt(static_cast<scalar_t>(dim_per_head)),
+                      true);
+
+              cgh.parallel_for<decltype(kfn)>(
+                  sycl::nd_range<1>(
+                      sycl::range<1>(global_range * local_range),
+                      sycl::range<1>(local_range)),
+                  kfn);
+            };
+            DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+          } else {
+            auto cgf = DPCPP_Q_CGF(cgh) {
+              impl::transform_bias_rescale_qkv_add_padding_impl<
+                  scalar_t,
+                  accscalar_t>
+                  kfn(nt_qkv_buffer.packed_accessor64<scalar_t, 1>(),
+                      qkv_bias.packed_accessor64<scalar_t, 1>(),
+                      offsets_ptr,
+                      sizes_ptr,
+                      qkv_acc,
+                      1.0 / std::sqrt(static_cast<scalar_t>(dim_per_head)),
+                      false);
+
+              cgh.parallel_for<decltype(kfn)>(
+                  sycl::nd_range<1>(
+                      sycl::range<1>(global_range * local_range),
+                      sycl::range<1>(local_range)),
+                  kfn);
+            };
+            DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+          }
+        } else {
+          auto cgf = DPCPP_Q_CGF(cgh) {
+            impl::
+                transform_bias_rescale_qkv_kernel_functor<scalar_t, accscalar_t>
+                    kfn(qkv.packed_accessor64<scalar_t, 3>(),
+                        qkv_bias.packed_accessor64<scalar_t, 1>(),
+                        q_k_v.packed_accessor64<scalar_t, 5>(),
+                        1.0 / std::sqrt(static_cast<scalar_t>(dim_per_head)),
+                        aligned);
+
+            cgh.parallel_for<decltype(kfn)>(
+                sycl::nd_range<1>(
+                    sycl::range<1>(global_range * local_range),
+                    sycl::range<1>(local_range)),
+                kfn);
+          };
+          DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
+        }
+      });
+
+  auto q_k_v_s =
+      at::native::split(q_k_v.view({3 * B, num_head, T, dim_per_head}), B, 0);
+  return std::make_tuple(q_k_v_s[0], q_k_v_s[1], q_k_v_s[2]);
+}
+
 } // namespace AtenIpexTypeNestedTensorXPU
+
+namespace AtenIpexTypeXPU {
+std::tuple<Tensor, Tensor, Tensor> _transform_bias_rescale_qkv(
+    const Tensor& qkv,
+    const Tensor& qkv_bias,
+    int64_t num_head) {
+  return at::AtenIpexTypeNestedTensorXPU::_transform_bias_rescale_qkv(
+      qkv, qkv_bias, num_head);
+}
+
+} // namespace AtenIpexTypeXPU
+
 } // namespace at
 
 namespace {
@@ -926,6 +1713,13 @@ IPEX_LIBRARY_FRAGMENT() {
 
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
+      "_transform_bias_rescale_qkv",
+      at::AtenIpexTypeXPU::_transform_bias_rescale_qkv,
+      c10::DispatchKey::XPU);
+}
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
       "xetla_fsdp_forward_atten_mask_alibi_strided.xpu",
       at::AtenIpexTypeXPU::xetla_fsdp_forward_atten_mask_alibi_strided,
       c10::DispatchKey::XPU);
@@ -936,5 +1730,12 @@ IPEX_LIBRARY_FRAGMENT() {
       "xetla_fsdp_index_forward.xpu",
       at::AtenIpexTypeXPU::xetla_fsdp_index_forward,
       c10::DispatchKey::XPU);
+}
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "xetla_sdp_dropout",
+      at::AtenIpexTypeXPU::xetla_sdp_dropout,
+      c10::DispatchKey::AutogradXPU);
 }
 } // namespace

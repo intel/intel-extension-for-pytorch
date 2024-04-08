@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "kernel/gemm/api.hpp"
-#include "kernel/gemm/common.hpp"
-#include "kernel/gemm/dispatch_policy.hpp"
+#include <kernel/gemm/api.hpp>
+#include <kernel/gemm/common.hpp>
+#include <kernel/gemm/dispatch_policy.hpp>
 
 namespace gpu::xetla::kernel {
 
@@ -48,7 +48,7 @@ class gemm_universal_t<
         num_local_kslicing_>,
     gemm_t_,
     epilogue_t_,
-    std::enable_if_t<(group_swizzle_::arch_tag == gpu_arch::Xe)>> {
+    std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::XeHpc)>> {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using gemm_args_t = typename gemm_t::arguments_t;
@@ -283,8 +283,8 @@ class gemm_universal_t<
     constexpr uint32_t size = gemm_slm_size * num_local_kslicing +
         kslicing_slm_size + epilogue_slm_size * num_local_kslicing;
     static_assert(
-        size <= (128 * 1024),
-        "The local memory size should be less than 128KB!");
+        size <= arch_attr_t<arch_tag>::local_mem_size,
+        "The local memory size excess!");
     return size;
   }
 
@@ -294,8 +294,8 @@ class gemm_universal_t<
   static cl::sycl::range<3> get_local_range() {
     uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
     uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
-    // std::cout << "Local range: {" << num_local_kslicing << ", "
-    //           << local_range_m << ", " << local_range_n << "} \n";
+    std::cout << "Local range: {" << num_local_kslicing << ", " << local_range_m
+              << ", " << local_range_n << "} \n";
     assert(local_range_m * local_range_n * num_local_kslicing <= 32);
     return cl::sycl::range<3>{num_local_kslicing, local_range_m, local_range_n};
   };
@@ -313,8 +313,8 @@ class gemm_universal_t<
     uint32_t group_range_m = (matrix_m + wg_tile_m - 1) / wg_tile_m;
     uint32_t group_range_n = (matrix_n + wg_tile_n - 1) / wg_tile_n;
     group_swizzle_t::update_group_range(group_range_m, group_range_n);
-    // std::cout << "Group range: {" << num_global_kslicing << ", "
-    //           << group_range_m << ", " << group_range_n << "} \n";
+    std::cout << "Group range: {" << num_global_kslicing << ", "
+              << group_range_m << ", " << group_range_n << "} \n";
     return cl::sycl::range<3>{
         num_global_kslicing, group_range_m, group_range_n};
   };
@@ -365,40 +365,43 @@ class gemm_universal_t<
     bool implementable = true;
     if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_a == msg_type::block_2d) {
-        implementable &= kernel::block_2d<gpu_arch::Xe, dtype_a>::check_tensor(
-            (uint64_t)(args.matA_base.base),
-            gemm_t::is_col_major_a ? args.matrix_m : args.matrix_k,
-            gemm_t::is_col_major_a ? args.matrix_k : args.matrix_m,
-            args.matA_ld);
+        implementable &=
+            kernel::block_2d<gpu_arch::XeHpc, dtype_a>::check_tensor(
+                (uint64_t)(args.matA_base.base),
+                gemm_t::is_col_major_a ? args.matrix_m : args.matrix_k,
+                gemm_t::is_col_major_a ? args.matrix_k : args.matrix_m,
+                args.matA_ld);
       } else {
         implementable &=
-            kernel::general_1d<gpu_arch::Xe, dtype_a>::check_alignment(
+            kernel::general_1d<gpu_arch::XeHpc, dtype_a>::check_alignment(
                 args.matA_base.base, args.matA_ld);
       }
     }
     if (gemm_t::msg_type_b != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_b == msg_type::block_2d) {
-        implementable &= kernel::block_2d<gpu_arch::Xe, dtype_b>::check_tensor(
-            (uint64_t)(args.matB_base.base),
-            gemm_t::is_col_major_b ? args.matrix_k : args.matrix_n,
-            gemm_t::is_col_major_b ? args.matrix_n : args.matrix_k,
-            args.matB_ld);
+        implementable &=
+            kernel::block_2d<gpu_arch::XeHpc, dtype_b>::check_tensor(
+                (uint64_t)(args.matB_base.base),
+                gemm_t::is_col_major_b ? args.matrix_k : args.matrix_n,
+                gemm_t::is_col_major_b ? args.matrix_n : args.matrix_k,
+                args.matB_ld);
       } else {
         implementable &=
-            kernel::general_1d<gpu_arch::Xe, dtype_b>::check_alignment(
+            kernel::general_1d<gpu_arch::XeHpc, dtype_b>::check_alignment(
                 args.matB_base.base, args.matB_ld);
       }
     }
     if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
       if (epilogue_t::msg_type_c == msg_type::block_2d) {
-        implementable &= kernel::block_2d<gpu_arch::Xe, dtype_c>::check_tensor(
-            (uint64_t)(args.matC_base.base),
-            args.matrix_n,
-            args.matrix_m,
-            args.matC_ld);
+        implementable &=
+            kernel::block_2d<gpu_arch::XeHpc, dtype_c>::check_tensor(
+                (uint64_t)(args.matC_base.base),
+                args.matrix_n,
+                args.matrix_m,
+                args.matC_ld);
       } else {
         implementable &=
-            kernel::general_1d<gpu_arch::Xe, dtype_c>::check_alignment(
+            kernel::general_1d<gpu_arch::XeHpc, dtype_c>::check_alignment(
                 args.matC_base.base, args.matC_ld);
       }
     }
@@ -491,6 +494,7 @@ class gemm_universal_t<
     gemm_args_t gemm_args(mem_desc_a, mem_desc_b, inner_loop_count);
     matAcc_t matAcc;
     matAcc.init(0);
+
     gemm_t gemm;
     gemm(g, matAcc, gemm_args, gemm_slm_base, gemm_nbarr_base);
 
@@ -558,7 +562,5 @@ class gemm_universal_t<
     }
   }
 };
-
-/// @} xetla_gemm_universal
 
 } // namespace gpu::xetla::kernel

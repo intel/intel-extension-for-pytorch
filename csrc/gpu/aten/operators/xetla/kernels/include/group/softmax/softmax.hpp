@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "group/softmax/api.hpp"
-#include "group/softmax/common.hpp"
-#include "group/softmax/impl/softmax_bwd_xe.hpp"
-#include "group/softmax/impl/softmax_fwd_xe.hpp"
-#include "group/softmax/softmax_policy.hpp"
-#include "group/tile_shape.hpp"
+#include <group/softmax/api.hpp>
+#include <group/softmax/common.hpp>
+#include <group/softmax/impl/softmax_bwd_xe.hpp>
+#include <group/softmax/impl/softmax_fwd_xe.hpp>
+#include <group/softmax/softmax_policy.hpp>
+#include <group/tile_shape.hpp>

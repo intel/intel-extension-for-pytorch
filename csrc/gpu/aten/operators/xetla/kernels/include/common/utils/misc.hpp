@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "common/utils/common.hpp"
+#include <common/utils/common.hpp>
 
 __XETLA_API constexpr uint32_t div_round_up(uint32_t n, uint32_t d) {
   return (n + d - 1) / d;
@@ -94,7 +94,7 @@ __XETLA_API xetla_vector<dtype_acc, N> drop_out(
   constexpr uint32_t unroll_size = num_flag * 16;
   SW_BARRIER();
 #pragma unroll
-  for (int i = 0; i < N / unroll_size; i++) {
+  for (uint32_t i = 0; i < N / unroll_size; i++) {
     xetla_mask<unroll_size> mask_flag =
         mask.xetla_select<unroll_size, 1>(i * unroll_size) > 0;
     out.xetla_select<unroll_size, 1>(i * unroll_size).xetla_merge(0, mask_flag);

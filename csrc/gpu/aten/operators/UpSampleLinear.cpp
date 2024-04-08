@@ -23,60 +23,35 @@ namespace impl {
 template <typename scalar_t, typename accscalar_t>
 struct UpsampleBilinear2dOutFrameKernelFunctor {
   void operator()(sycl::nd_item<1> item) const {
-    auto in_ptr = in_data;
-    auto out_ptr = out_data;
     int index = item.get_global_linear_id();
 
     if (index < n) {
       const int output_x = index % output_width;
       const int output_y = index / output_width;
 
-      const accscalar_t h1r = area_pixel_compute_source_index<scalar_t>(
+      const accscalar_t h1r = area_pixel_compute_source_index<accscalar_t>(
           rheight, output_y, align_corners, /*cubic=*/false);
       const int h1 = h1r;
       const int h1p = (h1 < input_height - 1) ? 1 : 0;
       const accscalar_t h1lambda = h1r - h1;
       const accscalar_t h0lambda = static_cast<accscalar_t>(1) - h1lambda;
 
-      const accscalar_t w1r = area_pixel_compute_source_index<scalar_t>(
+      const accscalar_t w1r = area_pixel_compute_source_index<accscalar_t>(
           rwidth, output_x, align_corners, /*cubic=*/false);
       const int w1 = w1r;
       const int w1p = (w1 < input_width - 1) ? 1 : 0;
       const accscalar_t w1lambda = w1r - w1;
       const accscalar_t w0lambda = static_cast<accscalar_t>(1) - w1lambda;
-
+      auto odata = out_data_acc;
       for (int n = 0; n < nbatch; n++) {
         for (int c = 0; c < channels; ++c) {
-          auto val = h0lambda *
-                  (w0lambda *
-                       in_ptr
-                           [n * input_height * input_width * channels +
-                            c * input_height * input_width + h1 * input_width +
-                            w1] +
-
-                   w1lambda *
-                       in_ptr
-                           [n * input_height * input_width * channels +
-                            c * input_height * input_width + h1 * input_width +
-                            w1 + w1p]) +
-
+          const accscalar_t val = h0lambda *
+                  (w0lambda * in_data_acc[n][c][h1][w1] +
+                   w1lambda * in_data_acc[n][c][h1][w1 + w1p]) +
               h1lambda *
-                  (w0lambda *
-                       in_ptr
-                           [n * input_height * input_width * channels +
-                            c * input_height * input_width +
-                            (h1 + h1p) * input_width + w1] +
-
-                   w1lambda *
-                       in_ptr
-                           [n * input_height * input_width * channels +
-                            c * input_height * input_width +
-                            (h1 + h1p) * input_width + w1 + w1p]);
-
-          out_ptr
-              [n * output_height * output_width * channels +
-               c * output_height * output_width + output_y * output_width +
-               output_x] = val;
+                  (w0lambda * in_data_acc[n][c][h1 + h1p][w1] +
+                   w1lambda * in_data_acc[n][c][h1 + h1p][w1 + w1p]);
+          odata[n][c][output_y][output_x] = static_cast<scalar_t>(val);
         }
       }
     }
@@ -86,8 +61,8 @@ struct UpsampleBilinear2dOutFrameKernelFunctor {
       const accscalar_t rheight_,
       const accscalar_t rwidth_,
       const bool align_corners_,
-      scalar_t* in_data_,
-      scalar_t* out_data_,
+      const PackedTensorAccessor<scalar_t, 4> idata_acc_,
+      PackedTensorAccessor<scalar_t, 4> odata_acc_,
       int64_t input_height_,
       int64_t input_width_,
       int64_t output_height_,
@@ -98,8 +73,8 @@ struct UpsampleBilinear2dOutFrameKernelFunctor {
         rheight(rheight_),
         rwidth(rwidth_),
         align_corners(align_corners_),
-        in_data(in_data_),
-        out_data(out_data_),
+        in_data_acc(idata_acc_),
+        out_data_acc(odata_acc_),
         input_height(input_height_),
         input_width(input_width_),
         output_height(output_height_),
@@ -112,8 +87,8 @@ struct UpsampleBilinear2dOutFrameKernelFunctor {
   const accscalar_t rheight;
   const accscalar_t rwidth;
   const bool align_corners;
-  scalar_t* in_data;
-  scalar_t* out_data;
+  const PackedTensorAccessor<scalar_t, 4> in_data_acc;
+  PackedTensorAccessor<scalar_t, 4> out_data_acc;
   int64_t input_height;
   int64_t input_width;
   int64_t output_height;
@@ -128,8 +103,8 @@ void upsample_bilinear2d_out_frame(
     const accscalar_t rheight,
     const accscalar_t rwidth,
     const bool align_corners,
-    scalar_t* idata,
-    scalar_t* odata,
+    const PackedTensorAccessor<scalar_t, 4> idata_acc,
+    PackedTensorAccessor<scalar_t, 4> odata_acc,
     int64_t input_height,
     int64_t input_width,
     int64_t output_height,
@@ -141,16 +116,13 @@ void upsample_bilinear2d_out_frame(
   int num_group = CeilDiv((int64_t)n, (int64_t)1024);
 
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto in_data = idata;
-    auto out_data = odata;
-
     UpsampleBilinear2dOutFrameKernelFunctor<scalar_t, accscalar_t> kfn(
         n,
         rheight,
         rwidth,
         align_corners,
-        in_data,
-        out_data,
+        idata_acc,
+        odata_acc,
         input_height,
         input_width,
         output_height,
@@ -354,13 +326,12 @@ static void upsample_bilinear2d_out_dpcpp_template(
       "upsample_bilinear2d_out_frame",
       [&] {
         using accscalar_t = acc_type<scalar_t>;
+        auto idata_acc = input.packed_accessor64<scalar_t, 4>();
+        auto odata_acc = output.packed_accessor64<scalar_t, 4>();
 
-        auto* idata = input.data_ptr<scalar_t>();
-        auto* odata = output.data_ptr<scalar_t>();
-
-        const accscalar_t rheight = area_pixel_compute_scale<scalar_t>(
+        const accscalar_t rheight = area_pixel_compute_scale<accscalar_t>(
             input_height, output_height, align_corners, scales_h);
-        const accscalar_t rwidth = area_pixel_compute_scale<scalar_t>(
+        const accscalar_t rwidth = area_pixel_compute_scale<accscalar_t>(
             input_width, output_width, align_corners, scales_w);
 
         upsample_bilinear2d_out_frame<scalar_t, accscalar_t>(
@@ -368,8 +339,8 @@ static void upsample_bilinear2d_out_dpcpp_template(
             rheight,
             rwidth,
             align_corners,
-            idata,
-            odata,
+            idata_acc,
+            odata_acc,
             input_height,
             input_width,
             output_height,

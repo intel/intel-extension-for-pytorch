@@ -945,7 +945,8 @@ struct GemmWint4Config {
   static bool less_than(int m, int n, int k, int group_size) {
     if (gz < group_size)
       return true;
-    if (gz == group_size && arch == 0) {
+    if (gz == group_size &&
+        arch < static_cast<int>(gpu::xetla::gpu_arch::XeHpc)) {
       if (max_k < k)
         return true;
       if (max_m < m)
@@ -965,55 +966,59 @@ struct GemmWint4Config {
 #define MAX_INT std::numeric_limits<int>::max()
 
 // clang-format off
-#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(gz)                       \
-  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 4096, 1, 1, 3, 1>,               \
-  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 4096, 1, 1, 3, 1>,            \
-  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 4096, 1, 1, 3, 1>,            \
-  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 4096, 1, 1, 3, 1>,           \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 4096, 1, 1, 3, 1>,          \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 4096, 1, 1, 3, 1>,     \
-  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 16384, 1, 1, 3, 1>,              \
-  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 16384, 1, 1, 3, 1>,           \
-  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 16384, 1, 1, 3, 1>,           \
-  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 16384, 1, 1, 3, 1>,          \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 16384, 1, 1, 3, 1>,         \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 16384, 1, 1, 3, 1>,    \
-  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, MAX_INT, 1, 1, 3, 1>,            \
-  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, MAX_INT, 1, 1, 3, 1>,         \
-  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, MAX_INT, 1, 1, 3, 1>,         \
-  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, MAX_INT, 1, 1, 3, 1>,        \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, MAX_INT, 1, 1, 3, 1>,       \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, MAX_INT, 1, 1, 3, 1>,  \
-  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, 4096, 1, 1, 3, 1>,             \
-  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, 4096, 1, 1, 3, 1>,          \
-  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, 4096, 1, 1, 3, 1>,          \
-  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, 4096, 1, 1, 3, 1>,          \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, 4096, 1, 1, 3, 1>,         \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, 4096, 1, 1, 3, 1>,    \
-  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, MAX_INT, 1, 1, 3, 1>,          \
-  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, MAX_INT, 1, 1, 3, 1>,       \
-  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, MAX_INT, 1, 1, 3, 1>,       \
-  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, MAX_INT, 1, 1, 3, 1>,       \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, MAX_INT, 1, 1, 3, 1>,      \
-  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, MAX_INT, 1, 1, 3, 1>, \
-  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, 50416, 4096, 1, 1, 3, 1>,             \
-  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, 50416, 4096, 1, 1, 3, 1>,          \
-  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, 50416, 4096, 1, 1, 3, 1>,          \
-  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, 50416, 4096, 1, 1, 3, 1>,          \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 50416, 4096, 1, 1, 3, 1>,         \
-  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, 50416, 4096, 1, 1, 3, 1>,    \
-  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, MAX_INT, MAX_INT, 1, 1, 3, 1>,        \
-  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, MAX_INT, MAX_INT, 1, 1, 3, 1>,     \
-  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, MAX_INT, MAX_INT, 1, 1, 3, 1>,     \
-  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, MAX_INT, MAX_INT, 1, 1, 3, 1>,     \
-  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, MAX_INT, MAX_INT, 1, 1, 3, 1>,    \
-  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT, 1, 1, 3, 1>
+#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_PVC(gz)                                                                            \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,               \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,            \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,            \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,           \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,          \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,     \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, 16384, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,              \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, 16384, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,           \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, 16384, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,           \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, 16384, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, 16384, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,         \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, 16384, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,    \
+  GemmWint4Config<8, 64, 8, 16, 64, gz, 8, 8, 4096, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,            \
+  GemmWint4Config<16, 64, 16, 16, 32, gz, 8, 16, 4096, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,         \
+  GemmWint4Config<32, 64, 32, 16, 32, gz, 8, 32, 4096, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,         \
+  GemmWint4Config<32, 128, 32, 16, 32, gz, 4, 64, 4096, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,        \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 4096, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,       \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 4096, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,  \
+  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,             \
+  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,          \
+  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,          \
+  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,         \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,    \
+  GemmWint4Config<8, 256, 8, 16, 32, gz, 2, 8, 16384, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,          \
+  GemmWint4Config<16, 256, 16, 16, 32, gz, 2, 16, 16384, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,       \
+  GemmWint4Config<32, 256, 32, 16, 32, gz, 2, 32, 16384, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,       \
+  GemmWint4Config<64, 256, 64, 16, 32, gz, 2, 64, 16384, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,       \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 16384, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,      \
+  GemmWint4Config<128, 256, 64, 16, 32, gz, 1, MAX_INT, 16384, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>, \
+  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, 50416, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,             \
+  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, 50416, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,          \
+  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, 50416, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,          \
+  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, 50416, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,          \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, 50416, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,         \
+  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, 50416, 4096, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,    \
+  GemmWint4Config<8, 512, 8, 16, 32, gz, 1, 8, MAX_INT, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,        \
+  GemmWint4Config<16, 512, 16, 16, 32, gz, 1, 16, MAX_INT, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,     \
+  GemmWint4Config<32, 512, 32, 16, 32, gz, 1, 32, MAX_INT, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,     \
+  GemmWint4Config<64, 512, 64, 16, 32, gz, 1, 64, MAX_INT, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,     \
+  GemmWint4Config<64, 128, 64, 16, 32, gz, 4, 384, MAX_INT, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>,    \
+  GemmWint4Config<128, 512, 64, 32, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT, 1, 1, 3, static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 
-#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(gz)                       \
-  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, 1000, MAX_INT, 8192, 1, 0, 0, 0>,         \
-  GemmWint4Config<32, 256, 16, 16, 32, gz, 1, MAX_INT, MAX_INT, 8192, 1, 0, 0, 0>,   \
-  GemmWint4Config<8, 64, 8, 16, 16, gz, 4, 1000, MAX_INT, MAX_INT, 1, 0, 0, 0>,      \
-  GemmWint4Config<32, 256, 16, 16, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT, 1, 0, 0, 0>
+#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(gz)                                                                            \
+  GemmWint4Config<8, 64, 8, 16, 16, gz, 8, 1000, MAX_INT, 8192, 1, 0, 0, static_cast<int>(gpu::xetla::gpu_arch::XeHpg)>,         \
+  GemmWint4Config<32, 256, 16, 16, 32, gz, 1, MAX_INT, MAX_INT, 8192, 1, 0, 0, static_cast<int>(gpu::xetla::gpu_arch::XeHpg)>,   \
+  GemmWint4Config<8, 64, 8, 16, 16, gz, 4, 1000, MAX_INT, MAX_INT, 1, 0, 0, static_cast<int>(gpu::xetla::gpu_arch::XeHpg)>,      \
+  GemmWint4Config<32, 256, 16, 16, 32, gz, 1, MAX_INT, MAX_INT, MAX_INT, 1, 0, 0, static_cast<int>(gpu::xetla::gpu_arch::XeHpg)>
+
+#define ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_MTL(gz)                                                                            \
+  GemmWint4Config<1, 128, 1, 16, 16, gz, 8, 4,       MAX_INT, MAX_INT, 1, 0, 1, static_cast<int>(gpu::xetla::gpu_arch::XeLpg)>,  \
+  GemmWint4Config<16, 32, 8, 16, 16, gz, 8, MAX_INT, MAX_INT, MAX_INT, 1, 0, 1, static_cast<int>(gpu::xetla::gpu_arch::XeLpg)>
 // clang-format on
 
 #define ORDERED_GEMM_WINT4_CONFIG_SET_PVC             \
@@ -1035,6 +1040,16 @@ struct GemmWint4Config {
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(256), \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(512), \
       ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_ARC(1024)
+
+#define ORDERED_GEMM_WINT4_CONFIG_SET_MTL             \
+  ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_MTL(0),       \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_MTL(16),  \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_MTL(32),  \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_MTL(64),  \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_MTL(128), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_MTL(256), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_MTL(512), \
+      ORDERED_GEMM_WINT4_CONFIG_SET_WITH_GZ_MTL(1024)
 
 inline Tensor resize_as_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);
@@ -1074,8 +1089,7 @@ class HGEMMXetla_INT4 final {
   bool fallback_;
   int m_, n_, k_;
   int64_t calib_gz_;
-  int8_t arch_ = 1; // 0: ARC, 1: PVC
-
+  int8_t arch_ = static_cast<int>(gpu::xetla::gpu_arch::XeHpc);
   template <uint32_t a, uint32_t b>
   struct gcd {
     static constexpr uint32_t value = gcd<b, a % b>::value;
@@ -1341,10 +1355,14 @@ class HGEMMXetla_INT4 final {
     using scalar_t =
         decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
-    if (arch_ == 1) {
+    if (arch_ == static_cast<int>(gpu::xetla::gpu_arch::XeHpc)) {
       dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_PVC>(q);
-    } else {
+    }
+    if (arch_ == static_cast<int>(gpu::xetla::gpu_arch::XeHpg)) {
       dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_ARC>(q);
+    }
+    if (arch_ == static_cast<int>(gpu::xetla::gpu_arch::XeLpg)) {
+      dispatch<scalar_t, ORDERED_GEMM_WINT4_CONFIG_SET_MTL>(q);
     }
   }
 };

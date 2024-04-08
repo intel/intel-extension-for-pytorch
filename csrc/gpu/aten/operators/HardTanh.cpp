@@ -1,5 +1,6 @@
 #include <ATen/Context.h>
 #include <ATen/Functions.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/TensorIterator.h>
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
@@ -11,22 +12,23 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-template <typename scalar_t>
+template <typename scalar_t, typename accscalar_t>
 struct hardtanh_out_functor {
-  scalar_t operator()(scalar_t x) const {
-    if (x < min_)
-      return min_;
-    else if (x > max_)
-      return max_;
-    else
+  scalar_t operator()(scalar_t x_) const {
+    auto x = static_cast<accscalar_t>(x_);
+    if (at::_isnan(x)) {
       return x;
+    }
+    return (Numerics<accscalar_t>::min(
+        Numerics<accscalar_t>::max(static_cast<accscalar_t>(x), min_), max_));
   }
 
-  hardtanh_out_functor(scalar_t min_, scalar_t max_) : min_(min_), max_(max_) {}
+  hardtanh_out_functor(accscalar_t min_, accscalar_t max_)
+      : min_(min_), max_(max_) {}
 
  private:
-  scalar_t min_;
-  scalar_t max_;
+  accscalar_t min_;
+  accscalar_t max_;
 };
 
 Tensor& hardtanh_out(
@@ -46,9 +48,10 @@ Tensor& hardtanh_out(
             iter.dtype(),
             "hardtanh",
             [&]() {
-              scalar_t min_ = min_val.to<scalar_t>();
-              scalar_t max_ = max_val.to<scalar_t>();
-              hardtanh_out_functor<scalar_t> f(min_, max_);
+              using opmath_t = at::opmath_type<scalar_t>;
+              auto min_ = min_val.to<opmath_t>();
+              auto max_ = max_val.to<opmath_t>();
+              hardtanh_out_functor<scalar_t, opmath_t> f(min_, max_);
               dpcpp_kernel_for_tensor_iter(iter, f);
             });
       },
@@ -70,21 +73,23 @@ Tensor& hardtanh_(Tensor& self, const Scalar& min_val, const Scalar& max_val) {
   return at::AtenIpexTypeXPU::hardtanh_out(self, min_val, max_val, self);
 }
 
-template <typename scalar_t>
+template <typename scalar_t, typename accscalar_t>
 struct hardtanh_backward_out_functor {
   scalar_t operator()(scalar_t grad_output, scalar_t x) const {
-    if (x <= min_ || x >= max_)
-      return 0;
+    accscalar_t grad_output_ = static_cast<accscalar_t>(grad_output);
+    accscalar_t x_ = static_cast<accscalar_t>(x);
+    if (x_ <= min_ || x_ >= max_)
+      return accscalar_t(0);
     else
-      return grad_output;
+      return grad_output_;
   }
 
-  hardtanh_backward_out_functor(scalar_t min_, scalar_t max_)
+  hardtanh_backward_out_functor(accscalar_t min_, accscalar_t max_)
       : min_(min_), max_(max_) {}
 
  private:
-  scalar_t min_;
-  scalar_t max_;
+  accscalar_t min_;
+  accscalar_t max_;
 };
 
 Tensor& hardtanh_backward_out(
@@ -109,9 +114,10 @@ Tensor& hardtanh_backward_out(
       iter.dtype(),
       "hardtanh_backward",
       [&]() {
-        auto min_ = min_val.to<scalar_t>();
-        auto max_ = max_val.to<scalar_t>();
-        hardtanh_backward_out_functor<scalar_t> f(min_, max_);
+        using opmath_t = at::opmath_type<scalar_t>;
+        auto min_ = min_val.to<opmath_t>();
+        auto max_ = max_val.to<opmath_t>();
+        hardtanh_backward_out_functor<scalar_t, opmath_t> f(min_, max_);
         dpcpp_kernel_for_tensor_iter(iter, f);
       });
 

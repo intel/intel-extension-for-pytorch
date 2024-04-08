@@ -19,22 +19,22 @@
 
 #pragma once
 
-#include "group/reduction/reduction.hpp"
-#include "group/softmax/api.hpp"
-#include "group/softmax/common.hpp"
-#include "group/softmax/softmax_policy.hpp"
+#include <group/reduction/reduction.hpp>
+#include <group/softmax/api.hpp>
+#include <group/softmax/common.hpp>
+#include <group/softmax/softmax_policy.hpp>
 
 namespace gpu::xetla::group {
 
 template <typename dtype_in_, typename dtype_acc_, typename tile_shape_>
 class softmax_t<
-    softmax_policy_bwd<dtype_in_, dtype_acc_, gpu_arch::Xe>,
+    softmax_policy_bwd<dtype_in_, dtype_acc_, gpu_arch::XeHpc>,
     tile_shape_> {
  public:
   using tile_shape = tile_shape_;
   using dtype_in = dtype_in_;
   using dtype_acc = dtype_acc_;
-  static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
 
  private:
   using mem_desc_in_t =
@@ -55,7 +55,7 @@ class softmax_t<
       reduce_op::sum,
       wg_size_x,
       true,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
  public:
   struct arguments_t {
@@ -64,7 +64,7 @@ class softmax_t<
     dtype_acc sqrt_dk_inv;
     inline arguments_t() = default;
     inline arguments_t(base_t base_, shape_t shape_, dtype_acc sqrt_dk_inv_)
-        : base(base_), shape(shape_), sqrt_dk_inv(sqrt_dk_inv_) {}
+        : shape(shape_), base(base_), sqrt_dk_inv(sqrt_dk_inv_) {}
   };
   struct get_barrier_count {
     static constexpr uint32_t count = (wg_size_x > 1) ? wg_size_y : 0;
@@ -92,10 +92,6 @@ class softmax_t<
     static constexpr uint32_t tile_size_y = matAcc_t::tile_size_y;
     static constexpr uint32_t block_size_x = matAcc_t::block_size_x;
     static constexpr uint32_t block_size_y = matAcc_t::block_size_y;
-    static constexpr int32_t num_block_x = matAcc_t::num_block_x;
-    static constexpr int32_t num_block_y = matAcc_t::num_block_y;
-    static constexpr uint32_t tile_elems = matAcc_t::tile_elems;
-    static constexpr uint32_t block_elems = matAcc_t::block_elems;
     static_assert(
         (sg_tile_m == tile_size_y) && (sg_tile_n == tile_size_x),
         "tile size should match");
@@ -110,7 +106,7 @@ class softmax_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
         subgroup::msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     int32_t sg_idx = g.get_id() % wg_size_x;
     int32_t sg_idy = g.get_id() / wg_size_x;

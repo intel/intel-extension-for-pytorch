@@ -24,9 +24,7 @@ class TestTorchMethod(TestCase):
         weight_odd = (weight.to(torch.int8) >> 4).to(torch.int8)
 
         zp_even = (zero_points & 0x0F).to(torch.int8)
-        zp_even += 1
         zp_odd = (zero_points >> 4).to(torch.int8)
-        zp_odd += 1
 
         weight_fp16 = []
         zp_fp16 = []
@@ -63,75 +61,134 @@ class TestTorchMethod(TestCase):
 
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_qkv_gemm_int4(self, per_channel=False, dtype=torch.float16):
-        input = torch.rand([3, 4096, 4096], device="xpu", dtype=torch.float16)
-        bias = torch.rand([3, 16384], device="xpu", dtype=torch.float16)
-        weight = (torch.rand([3, 4096, 8192], device="xpu") * 10).byte()
+        m = 1
+        k = 4096
+        n = k
+        group_size = 32
+        input = torch.rand([1, m, k], device="xpu", dtype=torch.float16)
+        bias = torch.rand([3, n], device="xpu", dtype=torch.float16)
+        weight = (torch.rand([3, k, n // 2], device="xpu") * 256).byte()
 
-        group_size = 128
         if per_channel:
-            group_size = 4096
-        group_num = int(4096 / group_size)
+            group_size = k
+        group_num = int(k / group_size)
 
-        scales = torch.ones([3, group_num, 16384], device="xpu", dtype=torch.float16)
-        zero_points = (torch.zeros([3, group_num, 8192], device="xpu")).byte()
+        scales = torch.rand([3, group_num, k], device="xpu", dtype=torch.float16)
+        zero_points = (torch.zeros([3, group_num, int(n / 2)], device="xpu")).byte()
 
-        out_int4 = torch.ops.torch_ipex.mm_qkv_int4(
+        out_xetla = torch.ops.torch_ipex.mm_qkv_int4(
             input, weight, bias, scales, zero_points, group_size
         )
 
         weight_fp16 = self.dequantize(
             weight, scales, zero_points, group_size, gemm_num=3
         )
-        out_fp16 = torch.ops.torch_ipex.mm_qkv(input, weight_fp16, bias)
+        out_torch = torch.matmul(input.cpu().float(), weight_fp16.cpu().float())
+        out_torch_bias = out_torch + bias.cpu().float()[:, None, :]
+        # out_torch = torch.ops.torch_ipex.mm_qkv(input, weight_fp16, bias)
 
-        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(
+            out_xetla[0].cpu().float(),
+            out_torch_bias[0:1, :, :],
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
+        self.assertEqual(
+            out_xetla[1].cpu().float(),
+            out_torch_bias[1:2, :, :],
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
+        self.assertEqual(
+            out_xetla[2].cpu().float(),
+            out_torch_bias[2:3, :, :],
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
 
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_gemm_int4(self, per_channel=False, dtype=torch.float16):
-        input = torch.rand([1, 4096], device="xpu", dtype=torch.float16)
-        bias = torch.rand([16384], device="xpu", dtype=torch.float16)
+        m = 8
+        k = 4096
+        n = k
+        input = torch.rand([m, k], device="xpu", dtype=torch.float16)
+        input_torch = input.cpu().float()
+        weight = (torch.rand([k, int(n / 2)], device="xpu") * 10).byte()
 
-        group_size = 128
+        group_size = min(128, k)
         if per_channel:
-            group_size = 4096
-        group_num = int(4096 / group_size)
+            group_size = k
+        group_num = int(k / group_size)
 
-        scales = torch.rand([group_num, 16384], device="xpu", dtype=torch.float16)
-        zero_points = torch.rand([group_num, 8192], device="xpu").byte()
-        weight = (torch.rand([4096, 8192], device="xpu") * 10).byte()
+        scales = torch.rand([group_num, n], device="xpu", dtype=torch.float16)
+        zero_points = torch.rand([group_num, int(n / 2)], device="xpu").byte()
 
-        weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
-
+        weight_fp16 = (
+            self.dequantize(weight, scales, zero_points, group_size).cpu().float()
+        )
         # check gemm
-        out_int4 = torch.ops.torch_ipex.mm_int4(
+        out_xetla = torch.ops.torch_ipex.mm_int4(
             input, weight, scales, zero_points, group_size
         )
-        out_fp16 = torch.matmul(input, weight_fp16)
-        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        out_torch = torch.matmul(input_torch, weight_fp16)
+        self.assertEqual(
+            out_xetla.cpu().float(),
+            out_torch.float(),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
 
         # check gemm + bias
-        out_int4 = torch.ops.torch_ipex.mm_bias_int4(
+        bias = torch.rand([1, n], device="xpu", dtype=torch.float16)
+        out_xetla_bias = torch.ops.torch_ipex.mm_bias_int4(
             input, weight, bias, scales, zero_points, group_size
         )
-        out_fp16 = out_fp16 + bias
-        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        out_torch_bias = out_torch + bias.cpu().float()
+        self.assertEqual(
+            out_xetla_bias.cpu().float(),
+            out_torch_bias.float(),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
 
         # check gemm + bias + gelu
-        out_int4 = torch.ops.torch_ipex.mm_bias_gelu_int4(
+        out_xetla_gelu = torch.ops.torch_ipex.mm_bias_gelu_int4(
             input, weight, scales, zero_points, bias, group_size, "tanh"
         )
-        gelu_op = torch.nn.GELU(approximate="tanh")
-        gelu_out = gelu_op(out_fp16)
-        self.assertEqual(out_int4, gelu_out, atol=checking_atol, rtol=checking_rtol)
+        gelu_out = torch.nn.GELU(approximate="tanh")(out_torch_bias)
+        self.assertEqual(
+            out_xetla_gelu.cpu().float(),
+            gelu_out.float(),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
+
+        # check gemm + silu + mul
+        res0 = torch.rand([m, n], device="xpu", dtype=torch.float16)
+        out_xetla_silu = torch.ops.torch_ipex.mm_silu_mul_int4(
+            input, weight, scales, zero_points, group_size, res0
+        )
+        silu_mul_out = torch.nn.SiLU()(out_torch) * res0.cpu().float()
+        self.assertEqual(
+            out_xetla_silu.cpu().float(),
+            silu_mul_out.float(),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
 
         # check gemm + bias + residual + residual
-        res0 = torch.rand([1, 16384], device="xpu", dtype=torch.float16)
-        res1 = torch.rand([1, 16384], device="xpu", dtype=torch.float16)
-        out_int4 = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(
+        res0 = torch.rand([m, n], device="xpu", dtype=torch.float16)
+        res1 = torch.rand([m, n], device="xpu", dtype=torch.float16)
+        out_xetla_res = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(
             input, weight, bias, res0, res1, scales, zero_points, group_size
         )
-        out_fp16 = out_fp16 + res0 + res1
-        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        out_torch_res = out_torch_bias + res0.cpu().float() + res1.cpu().float()
+        self.assertEqual(
+            out_xetla_res.cpu().float(),
+            out_torch_res.float(),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
 
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_qkv_gemm_int4_per_channel(self, per_channel=True, dtype=torch.float16):
@@ -147,21 +204,21 @@ class TestTorchMethod(TestCase):
         scales = torch.ones([3, group_num, 16384], device="xpu", dtype=torch.float16)
         zero_points = (torch.zeros([3, group_num, 8192], device="xpu")).byte()
 
-        out_int4 = torch.ops.torch_ipex.mm_qkv_int4(
+        out_xetla = torch.ops.torch_ipex.mm_qkv_int4(
             input, weight, bias, scales, zero_points, group_size
         )
 
         weight_fp16 = self.dequantize(
             weight, scales, zero_points, group_size, gemm_num=3
         )
-        out_fp16 = torch.ops.torch_ipex.mm_qkv(input, weight_fp16, bias)
+        out_torch = torch.ops.torch_ipex.mm_qkv(input, weight_fp16, bias)
 
-        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        self.assertEqual(out_xetla, out_torch, atol=checking_atol, rtol=checking_rtol)
 
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_gemm_int4_per_channel(self, per_channel=True, dtype=torch.float16):
         input = torch.rand([1, 4096], device="xpu", dtype=torch.float16)
-        bias = torch.rand([16384], device="xpu", dtype=torch.float16)
+        bias = torch.ones([16384], device="xpu", dtype=torch.float16)
 
         group_size = 128
         if per_channel:
@@ -175,32 +232,37 @@ class TestTorchMethod(TestCase):
         weight_fp16 = self.dequantize(weight, scales, zero_points, group_size)
 
         # check gemm
-        out_int4 = torch.ops.torch_ipex.mm_int4(
+        out_xetla = torch.ops.torch_ipex.mm_int4(
             input, weight, scales, zero_points, group_size
         )
-        out_fp16 = torch.matmul(input, weight_fp16)
-        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        out_torch = torch.matmul(input, weight_fp16)
+        self.assertEqual(out_xetla, out_torch, atol=checking_atol, rtol=checking_rtol)
 
         # check gemm + bias
-        out_int4 = torch.ops.torch_ipex.mm_bias_int4(
+        out_xetla = torch.ops.torch_ipex.mm_bias_int4(
             input, weight, bias, scales, zero_points, group_size
         )
-        out_fp16 = out_fp16 + bias
-        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        out_torch = out_torch + bias
+        self.assertEqual(out_xetla, out_torch, atol=checking_atol, rtol=checking_rtol)
 
         # check gemm + bias + gelu
-        out_int4 = torch.ops.torch_ipex.mm_bias_gelu_int4(
+        out_xetla = torch.ops.torch_ipex.mm_bias_gelu_int4(
             input, weight, scales, zero_points, bias, group_size, "tanh"
         )
         gelu_op = torch.nn.GELU(approximate="tanh")
-        gelu_out = gelu_op(out_fp16)
-        self.assertEqual(out_int4, gelu_out, atol=checking_atol, rtol=checking_rtol)
+        gelu_out = gelu_op(out_torch)
+        self.assertEqual(out_xetla, gelu_out, atol=checking_atol, rtol=checking_rtol)
 
         # check gemm + bias + residual + residual
         res0 = torch.rand([1, 16384], device="xpu", dtype=torch.float16)
         res1 = torch.rand([1, 16384], device="xpu", dtype=torch.float16)
-        out_int4 = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(
+        out_xetla = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(
             input, weight, bias, res0, res1, scales, zero_points, group_size
         )
-        out_fp16 = out_fp16 + res0 + res1
-        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+        out_torch = out_torch + res0 + res1
+        self.assertEqual(out_xetla, out_torch, atol=checking_atol, rtol=checking_rtol)
+
+
+if __name__ == "__main__":
+    TestTorchMethod().test_gemm_int4()
+    TestTorchMethod().test_qkv_gemm_int4()

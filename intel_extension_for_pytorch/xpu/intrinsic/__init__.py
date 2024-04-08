@@ -14,6 +14,7 @@ __all__ = [
     "roi_align",
     "IpexSDP",
     "IpexSDP_Index",
+    "IpexSDP_dropout",
     "EMA",
     "clip_grad_norm_",
     "clip_grad_norm",
@@ -152,6 +153,14 @@ def IpexSDP_Index(
         beta,
         dropout_p,
         is_causal,
+    )
+
+
+def IpexSDP_dropout(
+    query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None
+) -> Tensor:
+    return torch.ops.torch_ipex.xetla_sdp_dropout(
+        query, key, value, attn_mask, dropout_p, is_causal, scale
     )
 
 

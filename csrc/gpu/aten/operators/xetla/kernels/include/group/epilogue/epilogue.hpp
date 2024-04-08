@@ -23,12 +23,12 @@
 /// @defgroup xetla_epilogue XeTLA EPILOGUE
 /// This is a epilogue API to compute matC = tile_op(matAcc).
 
-#include "group/epilogue/api.hpp"
-#include "group/epilogue/common.hpp"
-#include "group/epilogue/epilogue_policy.hpp"
-#include "group/epilogue/impl/default_xe.hpp"
-#include "group/epilogue/impl/quant_tile_op_xe.hpp"
-#include "group/epilogue/impl/stream_k_op_xe.hpp"
-#include "group/epilogue/impl/tile_op_xe.hpp"
-#include "group/epilogue/impl/unaligned_xe.hpp"
-#include "group/tile_shape.hpp"
+#include <group/epilogue/api.hpp>
+#include <group/epilogue/common.hpp>
+#include <group/epilogue/epilogue_policy.hpp>
+#include <group/epilogue/impl/default_xe.hpp>
+#include <group/epilogue/impl/quant_tile_op_xe.hpp>
+#include <group/epilogue/impl/stream_k_op_xe.hpp>
+#include <group/epilogue/impl/tile_op_xe.hpp>
+#include <group/epilogue/impl/unaligned_xe.hpp>
+#include <group/tile_shape.hpp>

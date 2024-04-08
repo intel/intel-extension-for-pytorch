@@ -78,7 +78,7 @@ def parse_args():
         "--ipex-verbose",
         nargs="?",
         type=str,
-        help="(Experimental) output specified verbose info to the screen." \
+        help="(Prototype) output specified verbose info to the screen." \
              " Supports only onednn, onemkl and ipex verbose. When enabled two or more, use comma without space to join each other."
     )
     parser.add_argument(
@@ -139,7 +139,10 @@ def select_tests_from(include_tests, options):
     tests_list = load_from_yaml(os.path.join(test_suite_root, "config/tests_list.yaml"))
     selected_tests = []
     if options.mode[0] == 'ci':
-        selected_tests = tests_list['CI_TESTS'] + include_tests
+        if include_tests:
+            selected_tests = include_tests
+        else:
+            selected_tests = tests_list['CI_TESTS'] + include_tests
         print("selected_tests:", selected_tests)
     elif options.mode[0] in ['weekly', 'maintain'] or len(include_tests) <= 0:
         selected_tests = tests_list['TESTS'] + include_tests
@@ -250,18 +253,22 @@ def run_tests(selected_tests, options):
                 else:
                     timeout_list[test_name] = max(timeout, ceil(2 * duration))
     elif os.path.exists(output_path):
-        shutil.rmtree(output_path)
-        warnings.warn(f"[INFO] Clean old output directory for log files: {output_path}")
-        os.makedirs(output_path)
+        if options.mode[0] != 'ci':
+            shutil.rmtree(output_path)
+            warnings.warn(f"[INFO] Clean old output directory for log files: {output_path}")
+            os.makedirs(output_path)
     else:
         os.makedirs(output_path)
     anls_path = os.path.join(os.path.abspath(options.log_dir), "analysis-reports")
     if os.path.exists(anls_path):
-        shutil.rmtree(anls_path)
-        warnings.warn(f"[INFO] Clean old anls directory for log files: {anls_path}")
-    os.makedirs(anls_path)
+        if options.mode[0] != 'ci':
+            shutil.rmtree(anls_path)
+            warnings.warn(f"[INFO] Clean old anls directory for log files: {anls_path}")
+            os.makedirs(anls_path)
+    else:
+        os.makedirs(anls_path)
     configure_log_file_path = os.path.join(anls_path, "configurations.log")
-    ci_error_log_path = os.path.join(anls_path, "ci_error.log")
+    #ci_error_log_path = os.path.join(anls_path, "ci_error.log")
     maintaince_result_log_path = os.path.join(anls_path, "maintaince_result.log")
     diffs_log_path = os.path.join(anls_path, "diffs_result.log")
     weekly_report_path = os.path.join(anls_path, "weekly_summary.log")
@@ -355,6 +362,7 @@ def run_tests(selected_tests, options):
                         header = "============================= CI FAILED IN PORTED UT =============================\n"
                         tail = f"[CI FAILED] Please check cases with COMMAND: {' '.join(cmd)}\n"
                         report_ci_failure(issued_cases, short_details, header, tail, sys.stdout)
+                        ci_error_log_path = os.path.join(anls_path, "ci_error.uuid" + str(uuid.uuid1()) + ".log")
                         report_ci_failure(issued_cases, details, header, tail, ci_error_log_path)
                         warnings.warn(f"[INFO] CI failure detailed report written to {ci_error_log_path}", UserWarning)
                         exit(1)

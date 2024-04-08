@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include "common/common.hpp"
-#include "group/group.hpp"
-#include "subgroup/subgroup.hpp"
+#include <common/common.hpp>
+#include <group/group.hpp>
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla::kernel {
 
@@ -84,7 +84,7 @@ struct xetla_mha_attn_reg_fwd_t {
   using compute_policy_QKT = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_bin, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using mem_desc_a_out =
       mem_desc_t<dtype_sfx, gemm_mem_layout_a, gemm_mem_space_a>;
@@ -93,7 +93,7 @@ struct xetla_mha_attn_reg_fwd_t {
   using compute_policy_out = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_sfx, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   static constexpr uint32_t global_kslicing = 1;
   static constexpr uint16_t sfx_type_size = sizeof(dtype_sfx);
@@ -103,19 +103,19 @@ struct xetla_mha_attn_reg_fwd_t {
   using work_group_t = work_group_t<ThreadNum>;
 
   using pre_processing_128x128 =
-      group::pre_processing_default_t<tile_attr_128x128, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_128x128, gpu_arch::XeHpc>;
   using pre_processing_128x256 =
-      group::pre_processing_default_t<tile_attr_128x256, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_128x256, gpu_arch::XeHpc>;
   using pre_processing_64x384 =
-      group::pre_processing_default_t<tile_attr_64x384, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_64x384, gpu_arch::XeHpc>;
   using pre_processing_64x512 =
-      group::pre_processing_default_t<tile_attr_64x512, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_64x512, gpu_arch::XeHpc>;
   using pre_processing_32x1024 =
-      group::pre_processing_default_t<tile_attr_32x1024, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_32x1024, gpu_arch::XeHpc>;
   using pre_processing_16x2048 =
-      group::pre_processing_default_t<tile_attr_16x2048, gpu_arch::Xe>;
-  using pre_processing_128x64 =
-      group::pre_processing_matA_neg_filter_t<tile_attr_128x64, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_16x2048, gpu_arch::XeHpc>;
+  using pre_processing_128x64 = group::
+      pre_processing_matA_neg_filter_t<tile_attr_128x64, gpu_arch::XeHpc>;
 
   using gemm_op_128x128_t = group::gemm_t<
       compute_policy_QKT,
@@ -232,49 +232,49 @@ struct xetla_mha_attn_reg_fwd_t {
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<mat_128x128_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_128x256_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       mat_128x256_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<mat_128x256_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_64x384_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       mat_64x384_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<mat_64x384_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_64x512_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       mat_64x512_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<mat_64x512_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_32x1024_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       mat_32x1024_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<mat_32x1024_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_16x2048_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       mat_16x2048_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<mat_16x2048_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_128x64_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       mat_128x64_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<mat_128x64_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using matDpotMk_128x128_t =
       subgroup::tile_t<uint8_t, mat_128x128_tile_desc_t>;
@@ -292,37 +292,37 @@ struct xetla_mha_attn_reg_fwd_t {
       mem_desc_t<uint8_t, mem_layout_c, mem_space_c>,
       mat_128x128_tile_desc_t,
       subgroup::msg_type_v<mat_128x128_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matDpotMk_128x256_payload_t = subgroup::mem_payload_t<
       mem_desc_t<uint8_t, mem_layout_c, mem_space_c>,
       mat_128x256_tile_desc_t,
       subgroup::msg_type_v<mat_128x256_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matDpotMk_64x384_payload_t = subgroup::mem_payload_t<
       mem_desc_t<uint8_t, mem_layout_c, mem_space_c>,
       mat_64x384_tile_desc_t,
       subgroup::msg_type_v<mat_64x384_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matDpotMk_64x512_payload_t = subgroup::mem_payload_t<
       mem_desc_t<uint8_t, mem_layout_c, mem_space_c>,
       mat_64x512_tile_desc_t,
       subgroup::msg_type_v<mat_64x512_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matDpotMk_32x1024_payload_t = subgroup::mem_payload_t<
       mem_desc_t<uint8_t, mem_layout_c, mem_space_c>,
       mat_32x1024_tile_desc_t,
       subgroup::msg_type_v<mat_32x1024_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matDpotMk_16x2048_payload_t = subgroup::mem_payload_t<
       mem_desc_t<uint8_t, mem_layout_c, mem_space_c>,
       mat_16x2048_tile_desc_t,
       subgroup::msg_type_v<mat_16x2048_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matDpotMk_128x64_payload_t = subgroup::mem_payload_t<
       mem_desc_t<uint8_t, mem_layout_c, mem_space_c>,
       mat_128x64_tile_desc_t,
       subgroup::msg_type_v<mat_128x64_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   /// @brief Arguments for xetla_softmax_fwd_t::run.
   /// User should prepare matQ_ptr, matK_ptr, matQKT_ptr, ...
@@ -450,9 +450,9 @@ struct xetla_mha_attn_reg_fwd_t {
     int tid_x = tid_linear & ((1 << tid_x_shift) - 1);
     int tid_y = tid_linear >> tid_x_shift;
 
-    xetla_nbarrier_t<32, 32, gpu_arch::Xe> first_nbarr;
-    xetla_nbarrier_t<32, 32, gpu_arch::Xe> second_nbarr;
-    xetla_nbarrier_t<32, 32, gpu_arch::Xe> third_nbarr;
+    xetla_nbarrier_t<32, 32, gpu_arch::XeHpc> first_nbarr;
+    xetla_nbarrier_t<32, 32, gpu_arch::XeHpc> second_nbarr;
+    xetla_nbarrier_t<32, 32, gpu_arch::XeHpc> third_nbarr;
     first_nbarr.init_nbarrier(31, nbarrier_role::producer_consumer);
     second_nbarr.init_nbarrier(30, nbarrier_role::producer_consumer);
     third_nbarr.init_nbarrier(29, nbarrier_role::producer_consumer);
@@ -743,7 +743,6 @@ struct xetla_mha_attn_reg_fwd_t {
         { // softmax
           xetla_vector<float, 16 * 1> matElem_reg_max_local;
           xetla_vector<float, 16 * 1> matElem_reg_max_global;
-          xetla_vector<uint8_t, 16 * 4> matElem_reg_attn_mk;
 
           xetla_vector<uint32_t, 16> address_fmax =
               xetla_vector_gen<uint32_t, 16>(0, 1);
@@ -1592,7 +1591,7 @@ struct xetla_mha_attn_reg_bwd_t {
   using compute_policy_QKT = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_bin, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using mem_desc_a_out =
       mem_desc_t<dtype_sfx, gemm_mem_layout_a, gemm_mem_space_a>;
@@ -1601,7 +1600,7 @@ struct xetla_mha_attn_reg_bwd_t {
   using compute_policy_out = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_sfx, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using mem_desc_a_out_b_trnp_a =
       mem_desc_t<dtype_sfx, gemm_mem_layout_trnp_a, gemm_mem_space_trnp_a>;
@@ -1610,7 +1609,7 @@ struct xetla_mha_attn_reg_bwd_t {
   using compute_policy_out_b_trnp_a = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_sfx, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   static constexpr uint32_t global_kslicing = 1;
   static constexpr uint16_t sfx_type_size = sizeof(dtype_sfx);
@@ -1620,25 +1619,25 @@ struct xetla_mha_attn_reg_bwd_t {
   using work_group_t = work_group_t<ThreadNum>;
 
   using pre_processing_128x128 =
-      group::pre_processing_default_t<tile_attr_128x128, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_128x128, gpu_arch::XeHpc>;
   using pre_processing_128x256 =
-      group::pre_processing_default_t<tile_attr_128x256, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_128x256, gpu_arch::XeHpc>;
   using pre_processing_64x384 =
-      group::pre_processing_default_t<tile_attr_64x384, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_64x384, gpu_arch::XeHpc>;
   using pre_processing_64x512 =
-      group::pre_processing_default_t<tile_attr_64x512, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_64x512, gpu_arch::XeHpc>;
   using pre_processing_32x1024 =
-      group::pre_processing_default_t<tile_attr_32x1024, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_32x1024, gpu_arch::XeHpc>;
   using pre_processing_16x2048 =
-      group::pre_processing_default_t<tile_attr_16x2048, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_16x2048, gpu_arch::XeHpc>;
   using pre_processing_128x64 =
-      group::pre_processing_default_t<tile_attr_128x64, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_128x64, gpu_arch::XeHpc>;
   using pre_processing_256x64 =
-      group::pre_processing_default_t<tile_attr_256x64, gpu_arch::Xe>;
-  using pre_processing_128x64_af =
-      group::pre_processing_matA_neg_filter_t<tile_attr_128x64, gpu_arch::Xe>;
-  using pre_processing_256x64_af =
-      group::pre_processing_matA_neg_filter_t<tile_attr_256x64, gpu_arch::Xe>;
+      group::pre_processing_default_t<tile_attr_256x64, gpu_arch::XeHpc>;
+  using pre_processing_128x64_af = group::
+      pre_processing_matA_neg_filter_t<tile_attr_128x64, gpu_arch::XeHpc>;
+  using pre_processing_256x64_af = group::
+      pre_processing_matA_neg_filter_t<tile_attr_256x64, gpu_arch::XeHpc>;
 
   using gemm_op_128x128_t = group::gemm_t<
       compute_policy_QKT,
@@ -1787,42 +1786,42 @@ struct xetla_mha_attn_reg_bwd_t {
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x128_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_128x256_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_128x256_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x256_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_64x384_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_64x384_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_64x384_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_64x512_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_64x512_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_64x512_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_32x1024_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_32x1024_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_32x1024_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_16x2048_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_16x2048_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_16x2048_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using matC_128x64_tile_desc_t = subgroup::tile_desc_t<
       matAcc_128x64_t::tile_desc::tile_size_x,
@@ -1870,33 +1869,33 @@ struct xetla_mha_attn_reg_bwd_t {
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x64_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_128x64_trnp_a_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_128x64_trnp_a_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x64_trnp_a_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_256x64_trnp_a_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_256x64_trnp_a_tile_desc_t,
       subgroup::msg_type_v<matC_256x64_trnp_a_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_128x64_trnp_af_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_128x64_trnp_af_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x64_trnp_af_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_256x64_trnp_af_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_256x64_trnp_af_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_256x64_trnp_af_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using matW_128x128_t = subgroup::tile_t<dtype_sfx, matC_128x128_tile_desc_t>;
   using matW_128x256_t = subgroup::tile_t<dtype_sfx, matC_128x256_tile_desc_t>;
@@ -1909,32 +1908,32 @@ struct xetla_mha_attn_reg_bwd_t {
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_128x128_tile_desc_t,
       subgroup::msg_type_v<matC_128x128_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matW_128x256_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_128x256_tile_desc_t,
       subgroup::msg_type_v<matC_128x256_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matW_64x384_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_64x384_tile_desc_t,
       subgroup::msg_type_v<matC_64x384_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matW_64x512_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_64x512_tile_desc_t,
       subgroup::msg_type_v<matC_64x512_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matW_32x1024_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_32x1024_tile_desc_t,
       subgroup::msg_type_v<matC_32x1024_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matW_16x2048_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_16x2048_tile_desc_t,
       subgroup::msg_type_v<matC_16x2048_tile_desc_t, mem_space_c>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
 #if 0
     //512 = 16x32 or 8x64
@@ -2084,15 +2083,15 @@ struct xetla_mha_attn_reg_bwd_t {
     int tid_y = tid_linear >> tid_x_shift;
 
     static_assert(ThreadNum == 32, "All Thread Sync");
-    xetla_nbarrier_t<ThreadNum, ThreadNum, gpu_arch::Xe> first_nbarr;
-    xetla_nbarrier_t<ThreadNum, ThreadNum, gpu_arch::Xe> second_nbarr;
+    xetla_nbarrier_t<ThreadNum, ThreadNum, gpu_arch::XeHpc> first_nbarr;
+    xetla_nbarrier_t<ThreadNum, ThreadNum, gpu_arch::XeHpc> second_nbarr;
 
     int max_2d_nbar_id = ThreadNum >> 1;
     first_nbarr.init_nbarrier(max_2d_nbar_id, nbarrier_role::producer_consumer);
     second_nbarr.init_nbarrier(
         max_2d_nbar_id + 1, nbarrier_role::producer_consumer);
 
-    xetla_nbarrier_t<ThreadNum, ThreadNum, gpu_arch::Xe> all_nbarr;
+    xetla_nbarrier_t<ThreadNum, ThreadNum, gpu_arch::XeHpc> all_nbarr;
     all_nbarr.init_nbarrier(ThreadNum - 1, nbarrier_role::producer_consumer);
 
     for (int transp128_loop = 0; transp128_loop < transp128_loop_num;

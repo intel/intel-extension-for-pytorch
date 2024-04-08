@@ -152,7 +152,7 @@ class _IPEXRMSNormXPU(nn.Module):
         self.eps = module.eps
 
     @classmethod
-    def apply(cls, hidden_states, weight, eps):
+    def apply_function(cls, hidden_states, weight, eps):
         return torch.ops.torch_ipex.rms_norm(
             hidden_states, [hidden_states.size(-1)], weight, eps
         )[0]
@@ -172,7 +172,7 @@ class _IPEXFastLayerNormXPU(nn.Module):
         self.bias = bias
 
     @classmethod
-    def apply(cls, hidden_states, normalized_shape, weight, bias, eps):
+    def apply_function(cls, hidden_states, normalized_shape, weight, bias, eps):
         return torch.ops.torch_ipex.fast_layer_norm(
             hidden_states, normalized_shape, weight, bias, eps
         )
@@ -188,7 +188,7 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
         super().__init__()
 
     @classmethod
-    def apply(
+    def apply_function(
         cls,
         query,
         key,

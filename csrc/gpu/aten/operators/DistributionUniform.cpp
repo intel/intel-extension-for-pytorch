@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <core/Generator.h>
@@ -44,7 +45,7 @@ void uniform_kernel(
       [&] {
         auto from = static_cast<scalar_t>(from_);
         auto to = static_cast<scalar_t>(to_);
-        using accscalar_t = acc_type<scalar_t>;
+        using accscalar_t = at::opmath_type<scalar_t>;
         auto range = static_cast<accscalar_t>(to - from);
         uniform_kernel_functor<scalar_t, accscalar_t> uniform_func(from, range);
         uniform_and_transform<scalar_t, accscalar_t, PHILOX_ENGINE_CALLS>(
