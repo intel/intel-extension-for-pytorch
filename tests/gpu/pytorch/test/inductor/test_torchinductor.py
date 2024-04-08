@@ -60,6 +60,7 @@ from torch.testing._internal.common_cuda import (
 from torch.testing._internal.common_device_type import (
     _has_sufficient_memory,
     expectedFailureXPU,
+    skipIf
 )
 from torch.testing._internal.common_dtype import all_types, get_all_dtypes
 from torch.testing._internal.common_utils import (
@@ -133,6 +134,10 @@ f32 = torch.float32
 i64 = torch.int64
 i32 = torch.int32
 
+class skipXPUIf(skipIf):
+
+    def __init__(self, dep, reason):
+        super().__init__(dep, reason, device_type='xpu')
 
 def _large_cumprod_input(shape, dim, dtype, device):
     # Construct a cumprod input which guaruntees not to overflow or underflow
