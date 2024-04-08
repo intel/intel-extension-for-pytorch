@@ -3,6 +3,7 @@ r"""
 This package is lazily initialized, so you can always import it.
 """
 import sys
+import types
 from typing import List, Optional, Tuple, Union, Dict
 
 import torch
@@ -123,26 +124,30 @@ def _xpu_deserialize(obj, location):
             return _xpu(obj, device=device)
 
 
-_register_white_list = {"empty_cache"}
+_register_submodule_white_list = {"empty_cache"}
 
 
 def _register_torch_device_module(device_type, module):
-    global _register_white_list
+    global _register_submodule_white_list
     device_type = torch.device(device_type).type
     torch_module = sys.modules["torch"]
     torch_device_module = getattr(torch_module, device_type, None)
+    torch_device_module_name = ".".join(["torch", device_type])
     if torch_device_module:
-        for sub_module_key in dir(module):
-            if sub_module_key in _register_white_list or not hasattr(
-                torch_device_module, sub_module_key
+        for submodule_key in dir(module):
+            if submodule_key in _register_submodule_white_list or not hasattr(
+                torch_device_module, submodule_key
             ):
+                submodule = getattr(module, submodule_key)
                 setattr(
                     torch_device_module,
-                    sub_module_key,
-                    getattr(module, sub_module_key),
+                    submodule_key,
+                    submodule,
                 )
-        torch_module_name = ".".join(["torch", device_type])
-        sys.modules[torch_module_name] = torch_device_module
+                submodule_name = ".".join([torch_device_module_name, submodule_key])
+                if isinstance(submodule, types.ModuleType):
+                    sys.modules[submodule_name] = submodule
+        sys.modules[torch_device_module_name] = torch_device_module
     else:
         torch._register_device_module(device_type, module)
 
