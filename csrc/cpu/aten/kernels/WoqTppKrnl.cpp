@@ -2016,10 +2016,8 @@ void qlinear_woq_affine_impl(
                     64, num_threads * M * N * sizeof(TGemmOut));
                 y_private_valid = (bool*)std::aligned_alloc(
                     64, num_threads * (M / BLOCK_M) * Nc * sizeof(bool));
-                memset(
-                    y_private_valid,
-                    0,
-                    sizeof(bool) * num_threads * (M / BLOCK_M) * Nc);
+                std::fill_n(
+                    y_private_valid, num_threads * (M / BLOCK_M) * Nc, false);
               }
               auto y_private_ptr = GetVLAPtr<TGemmOut>(y_private, {M, Nc, Nb});
               auto y_private_valid_ptr =

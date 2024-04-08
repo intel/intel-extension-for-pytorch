@@ -1903,7 +1903,8 @@ class BrgemmTPP {
       uint64_t count,
       bool no_tile_cfg = false) {
     libxsmm_gemm_param gemm_param;
-    memset(&gemm_param, 0, sizeof(libxsmm_gemm_param));
+    std::fill_n(
+        reinterpret_cast<char*>(&gemm_param), sizeof(libxsmm_gemm_param), 0);
     gemm_param.op.tertiary = &count;
     gemm_param.c.primary = (void*)C;
     gemm_param.a.primary = (void*)B;

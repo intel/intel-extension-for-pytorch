@@ -2435,11 +2435,12 @@ def GitVisionEncoder_forward(
     encoder_states = () if output_hidden_states else None
     all_attentions = () if output_attentions else None
 
-    bias = None
-    if causal_attention_mask is not None:
-        bias += causal_attention_mask
+    bias = causal_attention_mask
     if attention_mask is not None:
-        bias += attention_mask
+        if bias is not None:
+            bias += attention_mask
+        else:
+            bias = attention_mask
     hidden_states = inputs_embeds
     for idx, encoder_layer in enumerate(self.layers):
         if output_hidden_states:
@@ -2880,8 +2881,7 @@ def prepare_inputs_for_generation_llama(
     **kwargs,
 ):
     if past_key_values is not None:
-        cache_length = past_length = past_key_values[0][0].shape[2]
-        max_cache_length = None
+        past_length = past_key_values[0][0].shape[2]
 
         # Keep only the unprocessed tokens:
         # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
@@ -2894,14 +2894,6 @@ def prepare_inputs_for_generation_llama(
         elif past_length < input_ids.shape[1]:
             input_ids = input_ids[:, past_length:]
         # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
-
-        # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
-        if (
-            max_cache_length is not None
-            and attention_mask is not None
-            and cache_length + input_ids.shape[1] > max_cache_length
-        ):
-            attention_mask = attention_mask[:, -max_cache_length:]
 
     position_ids = kwargs.get("position_ids", None)
     if attention_mask is not None and position_ids is None:
@@ -2993,8 +2985,11 @@ def prepare_inputs_labels_for_multimodal_llavallama(
                 dtype=attention_mask.dtype,
                 device=attention_mask.device,
             )
+        input_embeds = self.model.embed_tokens(input_ids)
+        if images is not None:
+            input_embeds = input_embeds.to(images[0].dtype)
         model_inputs = {
-            "inputs_embeds": self.model.embed_tokens(input_ids).to(images[0].dtype),
+            "inputs_embeds": input_embeds,
             "attention_mask": attention_mask,
             "past_key_values": past_key_values,
         }

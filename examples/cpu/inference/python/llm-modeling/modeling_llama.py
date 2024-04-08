@@ -465,11 +465,11 @@ class IPEXLlamaForCausalLM(LlamaPreTrainedModel):
         ):
             # return dict is handled by ipex._set_optimized_model_for_generation
             output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
+            return output
 
         if not return_dict:
             output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
+            return output
         return CausalLMOutputWithPast(
             loss=loss,
             logits=logits,
@@ -488,8 +488,7 @@ class IPEXLlamaForCausalLM(LlamaPreTrainedModel):
         **kwargs,
     ):
         if past_key_values is not None:
-            cache_length = past_length = past_key_values[0][0].shape[2]
-            max_cache_length = None
+            past_length = past_key_values[0][0].shape[2]
             if (
                 attention_mask is not None
                 and attention_mask.shape[1] > input_ids.shape[1]
@@ -497,12 +496,6 @@ class IPEXLlamaForCausalLM(LlamaPreTrainedModel):
                 input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
             elif past_length < input_ids.shape[1]:
                 input_ids = input_ids[:, past_length:]
-            if (
-                max_cache_length is not None
-                and attention_mask is not None
-                and cache_length + input_ids.shape[1] > max_cache_length
-            ):
-                attention_mask = attention_mask[:, -max_cache_length:]
 
         position_ids = kwargs.get("position_ids", None)
         if attention_mask is not None and position_ids is None:

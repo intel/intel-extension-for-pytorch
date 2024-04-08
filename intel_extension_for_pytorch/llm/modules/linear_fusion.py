@@ -42,7 +42,7 @@ class IPEXLinear2Fusion(nn.Module):
             self.linear_1,
             self.linear_2,
             tpp=(
-                self.linear_1.use_tpp and self.linear_1.use_tpp
+                self.linear_1.use_tpp and self.linear_2.use_tpp
                 if isinstance(self.linear_1, _IPEXLinear)
                 and isinstance(self.linear_2, _IPEXLinear)
                 else False

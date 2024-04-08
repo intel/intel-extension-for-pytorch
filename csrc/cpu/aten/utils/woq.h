@@ -74,12 +74,16 @@ class DotMicroKernel {
         (trans_a ? LIBXSMM_GEMM_FLAG_TRANS_A : LIBXSMM_GEMM_FLAG_NONE) |
         (trans_b ? LIBXSMM_GEMM_FLAG_TRANS_B : LIBXSMM_GEMM_FLAG_NONE);
     libxsmm_gemm_batch_reduce_config brconfig;
-    memset(&brconfig, 0, sizeof(libxsmm_gemm_batch_reduce_config));
+    std::fill_n(
+        reinterpret_cast<char*>(&brconfig),
+        sizeof(libxsmm_gemm_batch_reduce_config),
+        0);
     brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_NONE;
 
     kernel_func_ = libxsmm_dispatch_brgemm_v2(
         brshape, brflags, /*prefetch_flags=*/0, brconfig);
-    memset(&gemm_param_, 0, sizeof(libxsmm_gemm_param));
+    std::fill_n(
+        reinterpret_cast<char*>(&gemm_param_), sizeof(libxsmm_gemm_param), 0);
   }
 
   void operator()(void* A, void* B, void* C) {

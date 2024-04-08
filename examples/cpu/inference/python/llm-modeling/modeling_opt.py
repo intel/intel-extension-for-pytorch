@@ -676,11 +676,11 @@ class IPEXOPTForCausalLM(OPTPreTrainedModel):
         ):
             # return dict is handled by ipex._set_optimized_model_for_generation
             output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
+            return output
 
         if not return_dict:
             output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
+            return output
 
         return CausalLMOutputWithPast(
             loss=loss,

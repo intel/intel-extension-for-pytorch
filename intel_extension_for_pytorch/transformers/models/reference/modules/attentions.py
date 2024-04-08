@@ -1543,16 +1543,15 @@ def _QWenAttention_forward(
         3,
     )
 
-    if use_cache:
-        (attn_output, attn_weights, present) = self._IPEXScaleDotProduct(
-            query,
-            key,
-            value,
-            math.sqrt(self.head_dim) if self.scale_attn_weights else 1,
-            layer_past,
-            None,
-            attention_mask,
-        )
+    (attn_output, attn_weights, present) = self._IPEXScaleDotProduct(
+        query,
+        key,
+        value,
+        math.sqrt(self.head_dim) if self.scale_attn_weights else 1,
+        layer_past,
+        None,
+        attention_mask,
+    )
     attn_output = attn_output.transpose(1, 2)
     attn_output = self._merge_heads(attn_output, self.num_heads, self.head_dim)
 

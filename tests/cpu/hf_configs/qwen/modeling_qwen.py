@@ -1286,6 +1286,7 @@ class QWenLMHeadModel(QWenPreTrainedModel):
             get_stop_words_ids(generation_config.chat_format, tokenizer)
         )
         if stop_words_ids is not None:
+            assert hasattr(generation_config, "eos_token_id")
             stop_words_logits_processor = StopWordsLogitsProcessor(
                 stop_words_ids=stop_words_ids,
                 eos_token_id=generation_config.eos_token_id,
@@ -1352,6 +1353,7 @@ class QWenLMHeadModel(QWenPreTrainedModel):
             stop_words_ids = getattr(generation_config, "stop_words_ids", None)
 
         if stop_words_ids is not None:
+            assert hasattr(generation_config, "eos_token_id")
             stop_words_logits_processor = StopWordsLogitsProcessor(
                 stop_words_ids=stop_words_ids,
                 eos_token_id=generation_config.eos_token_id,

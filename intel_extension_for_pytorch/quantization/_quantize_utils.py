@@ -1035,6 +1035,7 @@ def quantize_per_block(
             if not is_sym_quant(dtype):
                 zps = torch.cat([zps, zps_rem], dim=-1)
         if not is_4bit(dtype):
+            assert zps is not None
             zps -= 128
         return scales, zps
 
@@ -1071,12 +1072,14 @@ def quantize_per_block(
         if not is_sym_quant(dtype):
             zps_rem = zps[:, Kc - has_rem :]
         if dtype == WoqWeightDtype.INT8:
+            assert zps_rem is not None
             qt_rem = torch.clamp(
                 torch.round(t_rem * inv_scales_rem) + zps_rem.unsqueeze(-1),
                 min=qmin,
                 max=qmax,
             )
         elif dtype == WoqWeightDtype.INT4:
+            assert zps_rem is not None
             qt_rem = torch.clamp(
                 torch.round(t_rem * inv_scales_rem) + zps_rem.unsqueeze(-1),
                 min=qmin,
