@@ -96,3 +96,10 @@ class TestTorchMethod(TestCase):
             self.assertEqual(torch.xpu.get_autocast_xpu_dtype(), torch.bfloat16)
         with torch.xpu.amp.autocast(enabled=True, dtype=torch.float16):
             self.assertEqual(torch.xpu.get_autocast_xpu_dtype(), torch.float16)
+
+    def test_cat_dtype(self):
+        x1 = torch.rand((2, 4), dtype=torch.half, device=torch.device("xpu"))
+        x2 = torch.rand((2, 4), dtype=torch.half, device=torch.device("xpu"))
+        with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            out = torch.cat((x1, x2), dim=0)
+        self.assertEqual(out.dtype, torch.half)
