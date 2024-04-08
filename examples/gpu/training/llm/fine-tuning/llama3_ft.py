@@ -40,7 +40,7 @@ tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 if tokenizer.pad_token_id is None:
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
-model = AutoModelForCausalLM.from_pretrained(args.model_name, torch_dtype = torch.bfloat16, attn_implementation="sdpa")
+model = AutoModelForCausalLM.from_pretrained(args.model_name, torch_dtype = torch.bfloat16)
 
 device = 'xpu'
 model = model.to(device)
