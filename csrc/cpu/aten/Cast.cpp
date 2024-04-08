@@ -173,9 +173,9 @@ at::Tensor cast_from_fp8(
 namespace {
 
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_IPEX_REGISTER_DISPATCH(
+  IPEX_OP_REGISTER_DISPATCH(
       "cast_to_fp8", torch_ipex::cpu::cast_to_fp8, c10::DispatchKey::CPU);
-  IPEX_OP_IPEX_REGISTER_DISPATCH(
+  IPEX_OP_REGISTER_DISPATCH(
       "cast_from_fp8", torch_ipex::cpu::cast_from_fp8, c10::DispatchKey::CPU);
 }
 

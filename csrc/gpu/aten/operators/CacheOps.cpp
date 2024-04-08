@@ -378,9 +378,9 @@ void reshape_and_cache(
 }
 
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER("swap_blocks", swap_blocks);
-  IPEX_OP_REGISTER("copy_blocks", copy_blocks);
-  IPEX_OP_REGISTER("reshape_and_cache", reshape_and_cache);
+  IPEX_OP_REGISTER_DISPATCH("swap_blocks", swap_blocks, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH("copy_blocks", copy_blocks, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH("reshape_and_cache", reshape_and_cache, c10::DispatchKey::XPU);
 }
 } // namespace cache_op
 } // namespace AtenIpexTypeXPU

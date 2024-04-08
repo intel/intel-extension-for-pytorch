@@ -106,7 +106,7 @@ void adam_fused_step(
 namespace {
 
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_IPEX_REGISTER_DISPATCH(
+  IPEX_OP_REGISTER_DISPATCH(
       "adam_fused_step",
       torch_ipex::cpu::adam_fused_step,
       at::DispatchKey::CPU);

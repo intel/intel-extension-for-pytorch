@@ -1,6 +1,7 @@
 #include "PagedAttention.h"
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
+#include "csrc/utils/CustomOperatorRegistration.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -62,11 +63,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "single_query_cached_kv_attention",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::single_query_cached_kv_attention_forward_cpu);
-  m.def(
-      "reshape_and_cache(Tensor (a!)key, Tensor (a!)value, Tensor (a!)key_cache, Tensor (a!)value_cache, Tensor(a!) slot_mapping)-> ()");
-  m.impl(
-      "reshape_and_cache",
-      c10::DispatchKey::CPU,
-      torch_ipex::cpu::reshape_and_cache_cpu);
+  IPEX_OP_REGISTER_DISPATCH("reshape_and_cache", torch_ipex::cpu::reshape_and_cache_cpu, c10::DispatchKey::CPU);
 }
 } // namespace

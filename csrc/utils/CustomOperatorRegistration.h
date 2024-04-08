@@ -135,12 +135,12 @@ operator will automatically convert to normal tensor layout when execution.
       "torch_ipex::" NAME, Func, m);                  \
   m.impl(TORCH_SELECTIVE_NAME("torch_ipex::" NAME), Func);
 
-#define IPEX_OP_IPEX_REGISTER_DISPATCH(NAME, Func, DispatchKey) \
+#define IPEX_OP_REGISTER_DISPATCH(NAME, Func, DispatchKey) \
   torch_ipex::construct_function_schema_and_register(           \
       "torch_ipex::" NAME, Func, m);                            \
   m.impl(TORCH_SELECTIVE_NAME("torch_ipex::" NAME), DispatchKey, Func);
 
-#define IPEX_OP_IPEX_REGISTER_DISPATCH_NEED_PLAIN(NAME, Func, DispatchKey) \
+#define IPEX_OP_REGISTER_DISPATCH_NEED_PLAIN(NAME, Func, DispatchKey) \
   torch_ipex::construct_function_schema_and_register(                      \
       "torch_ipex::" NAME, Func, m);                                       \
   m.impl(TORCH_SELECTIVE_NAME("torch_ipex::" NAME), DispatchKey, Func);

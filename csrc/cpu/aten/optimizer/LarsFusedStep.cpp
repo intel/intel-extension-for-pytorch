@@ -4,6 +4,7 @@
 #include <torch/csrc/autograd/function.h>
 
 #include <cmath>
+#include "csrc/utils/CustomOperatorRegistration.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -93,11 +94,7 @@ c10::optional<at::Tensor> lars_fused_step(
 namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "lars_fused_step(Tensor param, Tensor grad, Tensor? momentum_buf, Tensor "
-      "trail, float momentum, float learning_rate, float eeta, float eps,"
-      "float weight_decay, float dampening, bool nesterov) -> Tensor?",
-      torch_ipex::cpu::lars_fused_step);
+    IPEX_OP_REGISTER_DISPATCH("lars_fused_step", torch_ipex::cpu::lars_fused_step, c10::DispatchKey::CPU);
 }
 
 } // namespace

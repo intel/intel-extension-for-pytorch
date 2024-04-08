@@ -49,11 +49,11 @@ std::tuple<at::Tensor, at::Tensor> split_float_bfloat16(
 namespace {
 
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_IPEX_REGISTER_DISPATCH(
+  IPEX_OP_REGISTER_DISPATCH(
       "split_float_bfloat16",
       torch_ipex::cpu::bf16::converter::split_float_bfloat16,
       c10::DispatchKey::CPU);
-  IPEX_OP_IPEX_REGISTER_DISPATCH(
+  IPEX_OP_REGISTER_DISPATCH(
       "cat_bfloat16_float",
       torch_ipex::cpu::bf16::converter::cat_bfloat16_float,
       c10::DispatchKey::CPU);
