@@ -213,3 +213,29 @@ self.assertEqual(y_cpu, y_xpu.cpu())
             if op == torch.logit:
                 param["eps"] = 0.15
             self._test_unary_backward(op, x_cpu, x_xpu, param)
+
+    def test_clamp_max(self, dtype=bool):
+        cpu_device = torch.device("cpu")
+        dpcpp_device = torch.device("xpu")
+        x_cpu = torch.tensor([False, True, False, True], dtype=dtype, device=cpu_device)
+        max_cpu = torch.tensor([-1, 0, 0, 5], dtype=dtype)
+        z_cpu = torch.clamp(x_cpu, max=max_cpu)
+
+        x_xpu = x_cpu.to(dpcpp_device)
+        max_xpu = max_cpu.to(dpcpp_device)
+        z_xpu = torch.clamp(x_xpu, max=max_xpu)
+
+        self.assertEqual(z_cpu, z_xpu)
+
+    def test_clamp_min(self, dtype=bool):
+        cpu_device = torch.device("cpu")
+        dpcpp_device = torch.device("xpu")
+        x_cpu = torch.tensor([False, True, False, True], dtype=dtype, device=cpu_device)
+        min_cpu = torch.tensor([-1, 0, 0, 5], dtype=dtype)
+        z_cpu = torch.clamp(x_cpu, min=min_cpu)
+
+        x_xpu = x_cpu.to(dpcpp_device)
+        min_xpu = min_cpu.to(dpcpp_device)
+        z_xpu = torch.clamp(x_xpu, min=min_xpu)
+
+        self.assertEqual(z_cpu, z_xpu)

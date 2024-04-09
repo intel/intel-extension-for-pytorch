@@ -1621,7 +1621,12 @@ struct Numerics<c10::complex<double>> {
     return c10::complex<double>(pi_i<double>(), 0);
   }
 };
-
+template <>
+struct Numerics<c10::complex<at::Half>> {
+  static inline bool eq(c10::complex<at::Half> a, c10::complex<at::Half> b) {
+    return a == b;
+  }
+};
 template <typename In, typename Out>
 struct ScalarConvert {
   static Out to(const In v) {

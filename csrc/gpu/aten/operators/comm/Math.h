@@ -1258,35 +1258,36 @@ static scalar_t _igam_helper_fac(scalar_t a, scalar_t x) {
   // compute x^a * exp(-a) / gamma(a)
   // corrected from (15) and (16) in [igam2] by replacing exp(x - a) with
   // exp(a - x).
-  using acc_t = acc_type<scalar_t>;
+  using accscalar_t = acc_type<scalar_t>;
 
-  scalar_t ax, fac, res, num, numfac;
-  scalar_t MAXLOG = std::is_same<scalar_t, double>::value
+  accscalar_t ax, fac, res, num, numfac;
+  accscalar_t MAXLOG = std::is_same<scalar_t, double>::value
       ? 7.09782712893383996843E2
       : 88.72283905206835;
-  scalar_t EXP1 = 2.718281828459045;
-  scalar_t lanczos_g = 6.024680040776729583740234375;
+  accscalar_t EXP1 = 2.718281828459045;
+  accscalar_t lanczos_g = 6.024680040776729583740234375;
 
-  acc_t a_x = static_cast<acc_t>(a - x);
-  acc_t a_ = static_cast<acc_t>(a);
+  accscalar_t a_x = static_cast<accscalar_t>(a - x);
+  accscalar_t a_ = static_cast<accscalar_t>(a);
   if (std::fabs(a_x) > 0.4 * std::fabs(a_)) {
     ax = a * Numerics<scalar_t>::log(x) - x - Numerics<scalar_t>::lgamma(a_);
     if (ax < -MAXLOG) {
       return 0.0;
     }
-    return Numerics<scalar_t>::exp(ax);
+    return Numerics<accscalar_t>::exp(ax);
   }
 
   fac = a + lanczos_g - 0.5;
-  res = Numerics<scalar_t>::sqrt(fac / EXP1) / lanczos_sum_expg_scaled(a);
+  res = Numerics<accscalar_t>::sqrt(fac / EXP1) / lanczos_sum_expg_scaled(a);
 
   if ((a < 200) && (x < 200)) {
-    res *= Numerics<acc_t>::exp(a - x) * Numerics<scalar_t>::pow((x / fac), a);
+    res *= Numerics<accscalar_t>::exp(a - x) *
+        Numerics<accscalar_t>::pow((x / fac), a);
   } else {
     num = x - a - lanczos_g + 0.5;
     numfac = num / fac;
-    res *= Numerics<scalar_t>::exp(
-        a * (Numerics<scalar_t>::log1p(numfac) - numfac) +
+    res *= Numerics<accscalar_t>::exp(
+        a * (Numerics<accscalar_t>::log1p(numfac) - numfac) +
         x * (0.5 - lanczos_g) / fac);
   }
   return res;

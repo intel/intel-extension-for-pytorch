@@ -61,8 +61,12 @@ struct softshrink_backward_functor {
 };
 
 static void softshrink_backward(TensorIterator& iter, Scalar lambd) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::BFloat16, iter.dtype(), "softshrink_backward", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.dtype(),
+      "softshrink_backward",
+      [&]() {
         auto lambd_data = lambd.to<scalar_t>();
         softshrink_backward_functor<scalar_t> f(lambd_data);
         dpcpp_kernel_for_tensor_iter(iter, f);

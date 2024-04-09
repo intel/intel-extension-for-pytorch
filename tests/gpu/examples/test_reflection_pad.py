@@ -75,3 +75,16 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to("cpu"))
+
+    def test_reflection_pad1d_fwd(self):
+        for dtype in [torch.int, torch.long, torch.float]:
+            x_cpu = torch.arange(8, dtype=dtype).reshape(1, 2, 4)
+            x_dpcpp = x_cpu.to("xpu")
+            m = nn.ReflectionPad1d(2)
+
+            y_cpu = m(x_cpu)
+
+            m.to("xpu")
+            y_dpcpp = m(x_dpcpp)
+
+            self.assertEqual(y_cpu, y_dpcpp.to("cpu"))

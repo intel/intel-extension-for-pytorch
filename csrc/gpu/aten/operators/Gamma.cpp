@@ -67,8 +67,12 @@ struct igammac_kernel_xpu_functor {
 };
 
 void igammac_kernel_xpu(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16, iter.common_dtype(), "igammac_xpu", [&]() {
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      iter.common_dtype(),
+      "igammac_xpu",
+      [&]() {
         igammac_kernel_xpu_functor<scalar_t> f;
         dpcpp_kernel_for_tensor_iter(iter, f);
       });
