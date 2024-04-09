@@ -239,15 +239,15 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
     def sdp(self, query, key, value, attention_mask, head_mask, alibi):
         # Currently only PVC and MTL (without beam search) have sdp fusion available
-        if not (
-            torch.xpu.has_2d_block_array()
-            or (  # MTL greedy search
-                torch.xpu.has_xetla()
-                and not torch.xpu.has_xmx()
-                and not self.is_beam_search()
-            )
-        ):
-            return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
+        # if not (
+        #     torch.xpu.has_2d_block_array()
+        #     or (  # MTL greedy search
+        #         torch.xpu.has_xetla()
+        #         and not torch.xpu.has_xmx()
+        #         and not self.is_beam_search()
+        #     )
+        # ):
+        return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
         key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
         (
             dropout,
