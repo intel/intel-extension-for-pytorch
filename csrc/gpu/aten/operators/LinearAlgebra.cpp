@@ -418,8 +418,6 @@ void mkl_potri<c10::complex<double>>(
       reinterpret_cast<std::complex<double>*>(scratchpad),
       scratchpadsize);
 }
-#else
-AT_ERROR("potri dpcpp: oneMKL library not found in compilation");
 #endif
 
 } // namespace impl

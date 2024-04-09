@@ -47,9 +47,26 @@ class CachingDeviceAllocator final {
       if (a->m_device != b->m_device) {
         return a->m_device < b->m_device;
       }
-      if (a->m_queue != b->m_queue) {
-        return (uintptr_t)a->m_queue < (uintptr_t)b->m_queue;
+
+      // Compare queues assigned to blocks:
+      // - if both queues are set (not nullptr) and they are not the same then
+      // compare hashes of queues
+      // - if first is nullptr and 2nd is not then first is smaller (true)
+      // - if first is not nullptr and the 2nd one is nullptr then 2nd is
+      // smaller (false)
+      // - if both queue are nullptr then continue comparison
+      if (a->m_queue != nullptr && b->m_queue != nullptr) {
+        auto a_hash = std::hash<sycl::queue>{}(*a->m_queue);
+        auto b_hash = std::hash<sycl::queue>{}(*b->m_queue);
+        if (a_hash != b_hash) {
+          return a_hash < b_hash;
+        }
+      } else if (a->m_queue == nullptr && b->m_queue != nullptr) {
+        return true;
+      } else if (a->m_queue != nullptr && b->m_queue == nullptr) {
+        return false;
       }
+
       if (a->m_size != b->m_size) {
         return a->m_size < b->m_size;
       }
@@ -58,7 +75,7 @@ class CachingDeviceAllocator final {
 
     DeviceId m_device;
     sycl::queue* m_queue{nullptr};
-    std::unordered_set<sycl::queue*> m_queue_uses;
+    std::unordered_set<sycl::queue> m_queue_uses;
     size_t m_size;
     PoolType m_pool_type;
     void* m_buffer;

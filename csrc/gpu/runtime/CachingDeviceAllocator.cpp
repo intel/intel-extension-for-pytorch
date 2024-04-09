@@ -218,7 +218,7 @@ void CachingDeviceAllocator::malloc(
   auto find_free_block = [&]() -> Block* {
     auto it = pool->lower_bound(&search_key);
     if (it != pool->end() && (*it)->m_device == curDevID &&
-        (*it)->m_queue == queue) {
+        *((*it)->m_queue) == *queue) {
       Block* block = *it;
       pool->erase(it);
       return block;
@@ -371,10 +371,10 @@ void CachingDeviceAllocator::recordQueue(void* buffer, sycl::queue* queue) {
 
   Block* block = find_allocated_block(buffer);
   TORCH_INTERNAL_ASSERT(block != nullptr, "No allocated block can be found");
-  if (queue == block->m_queue) {
+  if (*queue == *block->m_queue) {
     return;
   }
-  block->m_queue_uses.insert(queue);
+  block->m_queue_uses.insert(*queue);
 }
 
 void CachingDeviceAllocator::emptyCache() {
@@ -477,10 +477,14 @@ std::vector<const CachingDeviceAllocator::Block*> CachingDeviceAllocator::
 }
 
 void CachingDeviceAllocator::insert_events(Block* block) {
-  std::unordered_set<sycl::queue*> queues(std::move(block->m_queue_uses));
+  std::unordered_set<sycl::queue> queues(std::move(block->m_queue_uses));
   AT_ASSERT(block->m_queue_uses.empty());
   for (auto it = queues.begin(); it != queues.end(); ++it) {
-    auto event = queue_barrier(*(*it));
+    // removing const from reference to allow submit a barrier
+    // barrier submission doesn't change the queue hash value
+    sycl::queue& q = const_cast<sycl::queue&>(*it);
+
+    auto event = queue_barrier(q);
     block->m_event_cnt++;
     dpcpp_events.emplace_back(event, block);
   }
