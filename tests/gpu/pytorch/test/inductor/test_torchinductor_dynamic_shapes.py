@@ -8,6 +8,7 @@ import unittest
 from functools import partial
 
 import torch
+import intel_extension_for_pytorch
 import torch._custom_ops as custom_ops
 import torch.library
 from torch._dynamo.testing import make_test_cls_with_patches
@@ -26,8 +27,8 @@ from torch.testing._internal.common_utils import (
     TEST_WITH_ROCM,
     TestCaseBase as TestCase,
 )
-from torch.testing._internal.inductor_utils import GPU_TYPE, HAS_CPU, HAS_GPU
-
+from torch.testing._internal.inductor_utils import GPU_TYPE, HAS_CPU, HAS_GPU, HAS_XPU
+HAS_GPU = HAS_XPU
 if IS_WINDOWS and IS_CI:
     sys.stderr.write(
         "Windows CI does not have necessary dependencies for test_torchinductor_dynamic_shapes yet\n"

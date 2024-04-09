@@ -5,6 +5,7 @@ import sys
 import unittest
 
 import torch
+import intel_extension_for_pytorch
 from torch._inductor.compile_fx import compile_fx
 from torch._inductor.test_case import TestCase
 from torch.testing._internal.common_utils import (
@@ -18,7 +19,10 @@ from torch.testing._internal.inductor_utils import (
     GPU_TYPE,
     HAS_CPU,
     HAS_GPU,
+    HAS_XPU
 )
+
+HAS_GPU = HAS_XPU
 
 if IS_WINDOWS and IS_CI:
     sys.stderr.write(

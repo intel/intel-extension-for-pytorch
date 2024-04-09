@@ -11,7 +11,7 @@ from functools import partial
 from unittest.mock import patch
 
 import torch
-
+import intel_extension_for_pytorch
 from torch._dispatch.python import enable_python_dispatcher
 from torch._dynamo.test_case import run_tests
 from torch._subclasses.fake_tensor import (
@@ -47,6 +47,7 @@ from torch.testing._internal.inductor_utils import GPU_TYPE, HAS_CPU, HAS_CUDA, 
 from torch.utils._python_dispatch import TorchDispatchMode
 from torch.utils._pytree import tree_map
 
+GPU_TYPE = "xpu"
 try:
     try:
         from .test_torchinductor import check_model, check_model_xpu
@@ -439,7 +440,7 @@ class TestInductorOpInfo(TestCase):
     check_model = check_model
     check_model_gpu = check_model_xpu
 
-    @onlyNativeDeviceTypes
+    # @onlyNativeDeviceTypes
     @suppress_warnings
     @skipCUDAMemoryLeakCheckIf(
         True
@@ -666,7 +667,7 @@ class TestInductorOpInfo(TestCase):
         #     print(f"SUCCEEDED OP {op_name} on {device_type} with {dtype}", flush=True, file=f)
 
 
-instantiate_device_type_tests(TestInductorOpInfo, globals())
+instantiate_device_type_tests(TestInductorOpInfo, globals(), only_for="xpu")
 
 if __name__ == "__main__":
     run_tests()

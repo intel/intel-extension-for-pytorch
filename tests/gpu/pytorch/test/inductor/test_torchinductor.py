@@ -59,7 +59,7 @@ from torch.testing._internal.common_cuda import (
 
 from torch.testing._internal.common_device_type import (
     _has_sufficient_memory,
-    expectedFailureXPU,
+    expectedFailure,
     skipIf
 )
 from torch.testing._internal.common_dtype import all_types, get_all_dtypes
@@ -109,13 +109,14 @@ from torch.testing._internal.inductor_utils import (
     GPU_TYPE,
     HAS_CPU,
     HAS_GPU,
+    HAS_XPU,
     HAS_MULTIGPU,
     skipCPUIf,
     skipCUDAIf,
 )
 
 HAS_AVX2 = "fbgemm" in torch.backends.quantized.supported_engines
-
+HAS_GPU = HAS_XPU
 aten = torch.ops.aten
 requires_gpu = functools.partial(unittest.skipIf, not HAS_GPU, "requires gpu")
 
@@ -133,6 +134,9 @@ ids = set()
 f32 = torch.float32
 i64 = torch.int64
 i32 = torch.int32
+
+def expectedFailureXPU(fn):
+    return expectedFailure('xpu')(fn)
 
 class skipXPUIf(skipIf):
 
