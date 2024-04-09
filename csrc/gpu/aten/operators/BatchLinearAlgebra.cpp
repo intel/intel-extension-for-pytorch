@@ -2123,6 +2123,7 @@ void trans_and_apply_triangular_solve<c10::complex<double>>(
 #endif
 }
 
+#ifdef USE_ONEMKL
 template <typename scalar_t>
 int64_t mkl_potrs_batch_scratchpad(
     sycl::queue& queue,
@@ -2134,12 +2135,8 @@ int64_t mkl_potrs_batch_scratchpad(
     int64_t ldb,
     int64_t stride_b,
     int64_t batch_size) {
-#ifdef USE_ONEMKL
   return oneapi::mkl::lapack::potrs_batch_scratchpad_size<scalar_t>(
       queue, uplo, n, nrhs, lda, stride_a, ldb, stride_b, batch_size);
-#else
-  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
-#endif
 }
 
 template <>
@@ -2153,12 +2150,8 @@ int64_t mkl_potrs_batch_scratchpad<c10::complex<float>>(
     int64_t ldb,
     int64_t stride_b,
     int64_t batch_size) {
-#ifdef USE_ONEMKL
   return oneapi::mkl::lapack::potrs_batch_scratchpad_size<std::complex<float>>(
       queue, uplo, n, nrhs, lda, stride_a, ldb, stride_b, batch_size);
-#else
-  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
-#endif
 }
 
 template <>
@@ -2172,12 +2165,8 @@ int64_t mkl_potrs_batch_scratchpad<c10::complex<double>>(
     int64_t ldb,
     int64_t stride_b,
     int64_t batch_size) {
-#ifdef USE_ONEMKL
   return oneapi::mkl::lapack::potrs_batch_scratchpad_size<std::complex<double>>(
       queue, uplo, n, nrhs, lda, stride_a, ldb, stride_b, batch_size);
-#else
-  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
-#endif
 }
 
 template <typename scalar_t>
@@ -2195,7 +2184,6 @@ void mkl_potrs_batch(
     int64_t batch_size,
     scalar_t* scratchpad,
     int scratchpadsize) {
-#ifdef USE_ONEMKL
   DPCPP_ONEMKL_SUBMIT(
       queue,
       oneapi::mkl::lapack::potrs_batch,
@@ -2212,9 +2200,6 @@ void mkl_potrs_batch(
       batch_size,
       scratchpad,
       scratchpadsize);
-#else
-  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
-#endif
 }
 
 template <>
@@ -2232,7 +2217,6 @@ void mkl_potrs_batch<c10::complex<float>>(
     int64_t batch_size,
     c10::complex<float>* scratchpad,
     int scratchpadsize) {
-#ifdef USE_ONEMKL
   DPCPP_ONEMKL_SUBMIT(
       queue,
       oneapi::mkl::lapack::potrs_batch,
@@ -2249,9 +2233,6 @@ void mkl_potrs_batch<c10::complex<float>>(
       batch_size,
       reinterpret_cast<std::complex<float>*>(scratchpad),
       scratchpadsize);
-#else
-  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
-#endif
 }
 
 template <>
@@ -2269,7 +2250,6 @@ void mkl_potrs_batch<c10::complex<double>>(
     int64_t batch_size,
     c10::complex<double>* scratchpad,
     int scratchpadsize) {
-#ifdef USE_ONEMKL
   DPCPP_ONEMKL_SUBMIT(
       queue,
       oneapi::mkl::lapack::potrs_batch,
@@ -2286,10 +2266,8 @@ void mkl_potrs_batch<c10::complex<double>>(
       batch_size,
       reinterpret_cast<std::complex<double>*>(scratchpad),
       scratchpadsize);
-#else
-  AT_ERROR("mkl_potrs_batch: oneMKL library not found in compilation");
-#endif
 }
+#endif
 
 template <typename scalar_t>
 static void apply_cholesky_solve_dpcpp_(
