@@ -8,10 +8,10 @@ from torch._inductor import config
 from torch._inductor.virtualized import V
 from torch._inductor.codegen.common import IndentedBuffer, PythonPrinter
 from torch._inductor.codegen.wrapper import (
-    MemoryPlanningState,
-    MemoryPlanningLine,
     WrapperCodeGen,
     WrapperLine,
+    EnterDeviceContextManagerLine,
+    ExitDeviceContextManagerLine
 )
 from torch._inductor.utils import cache_on_self, get_benchmark_name
 from .. import codecache
@@ -19,26 +19,6 @@ from .. import codecache
 pexpr = PythonPrinter().doprint
 
 
-@dataclasses.dataclass
-class EnterXPUDeviceContextManagerLine:
-    device_idx: int
-    first_time: bool
-
-    def codegen(self, code: IndentedBuffer, device_cm_stack: contextlib.ExitStack):
-        if V.graph.cpp_wrapper:
-            raise NotImplementedError
-        else:
-            # Note _DeviceGuard has less overhead than device, but only accepts
-            # integers
-            code.writeline(f"with {V.graph.device_ops.device_guard(self.device_idx)}:")
-            code.do_indent()
-            code.writeline(V.graph.device_ops.set_device(self.device_idx))
-
-
-class ExitXPUDeviceContextManagerLine:
-    def codegen(self, code: IndentedBuffer) -> None:
-        if not V.graph.cpp_wrapper:
-            code.do_unindent()
 
 
 class XPUTritonWrapperCodeGen(WrapperCodeGen):
@@ -117,12 +97,12 @@ class XPUTritonWrapperCodeGen(WrapperCodeGen):
 
     def codegen_device_guard_enter(self, device_idx):
         self.writeline(
-            EnterXPUDeviceContextManagerLine(device_idx, self.first_device_guard)
+            EnterDeviceContextManagerLine(device_idx, self.last_seen_device_guard_index)
         )
-        self.first_device_guard = False
+        self.last_seen_device_guard_index = False
 
     def codegen_device_guard_exit(self):
-        self.lines.append(ExitXPUDeviceContextManagerLine())
+        self.lines.append(ExitDeviceContextManagerLine())
 
     @dynamo_timed
     def generate(self, is_inference):
