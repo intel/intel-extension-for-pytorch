@@ -1,12 +1,12 @@
 import torch
 from torch._dynamo.backends.registry import register_backend
-from torch._inductor.compile_fx import compile_fx
 from typing import List
 from ..utils.utils import has_xpu
 
 if has_xpu():
     from .xpu import *
 
+from torch._inductor.compile_fx import compile_fx
 
 def _get_device_from_graph_module(graph_module: torch.fx.GraphModule):
     """
