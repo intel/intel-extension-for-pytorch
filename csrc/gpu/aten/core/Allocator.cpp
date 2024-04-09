@@ -30,6 +30,16 @@ DataPtr DeviceAllocator::allocate(size_t size) const {
   return {r, ctx, &deleter, Device(DeviceType::XPU, curDevID)};
 }
 
+DataPtr DeviceAllocator::allocate(const sycl::queue& queue, size_t size) const {
+  void* r = nullptr;
+  DeviceIndex devID = dpcppGetDeviceIndex(queue.get_device());
+  if (size != 0) {
+    Instance()->alloc()->malloc(&r, size, &const_cast<sycl::queue&>(queue));
+  }
+  auto ctx = new at::AtenIpexTypeXPU::DPCPPTensorContext(r);
+  return {r, ctx, &deleter, Device(DeviceType::XPU, devID)};
+}
+
 void* DeviceAllocator::raw_allocate(size_t size) {
   DeviceIndex curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));

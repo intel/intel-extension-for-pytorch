@@ -2,6 +2,7 @@
 #include <c10/core/Allocator.h>
 #include <c10/core/Device.h>
 #include <runtime/CachingDeviceAllocator.h>
+#include <sycl/sycl.hpp>
 #include <mutex>
 
 #include <core/AllocationInfo.h>
@@ -18,6 +19,7 @@ class DeviceAllocator final : public at::Allocator {
   static void deleter(void* ptr);
 
   DataPtr allocate(size_t size) const override;
+  DataPtr allocate(const sycl::queue& queue, size_t size) const;
 
   /*
     `raw_allocate` is an IPEX private malloc utils. It is expected to be
