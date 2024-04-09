@@ -22,6 +22,7 @@ using fp16 = sycl::half;
 using namespace sycl;
 
 #include "esimd/matrixMulCommonDim4096Int4NoReshapeNx16V3.h"
+#include "esimd/gemmReduce2048WeightsQ40InputFp32.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -104,8 +105,8 @@ static inline void gemm_int4_esimd_kernel(
 
   uint32_t pixelPerGroupCommonDim4096 = 16;
   uint32_t pixelPerGroupCommonDim11008 = 64;
-  if (!((k == 4096 || k == 11008) && m == 1)) {
-    std::cout << "k should be 4096 or 11008 and m should be 1" << std::endl;
+  if (!(k == 4096 || k == 11008 || k == 14336)) {
+    std::cout << "k should be 4096 or 11008 or 14336" << std::endl;
     return;
   }
 
@@ -182,54 +183,151 @@ static inline void gemm_int4_esimd_kernel(
     dpcpp_queue.wait();
   }
 
-  int groupsV2 =
-      (n + pixelPerGroupCommonDim4096 - 1) / pixelPerGroupCommonDim4096;
-  int localThread[2];
-  localThread[0] = 16;
-  localThread[1] = 16;
+  if (m == 1) // GEMV
+  {
+    int groupsV2 =
+        (n + pixelPerGroupCommonDim4096 - 1) / pixelPerGroupCommonDim4096;
+    int localThread[2];
+    localThread[0] = 16;
+    localThread[1] = 16;
 
-  sycl::range<1> GlobalRangeCommonDim4096V2(groupsV2 * localThread[0]);
-  sycl::range<1> LocalRangeCommonDim4096V2(localThread[0]);
-  sycl::nd_range<1> RangeCommonDim4096V2(
-      GlobalRangeCommonDim4096V2, LocalRangeCommonDim4096V2);
+    sycl::range<1> GlobalRangeCommonDim4096V2(groupsV2 * localThread[0]);
+    sycl::range<1> LocalRangeCommonDim4096V2(localThread[0]);
+    sycl::nd_range<1> RangeCommonDim4096V2(
+        GlobalRangeCommonDim4096V2, LocalRangeCommonDim4096V2);
 
-  groupsV2 =
-      (n + pixelPerGroupCommonDim11008 - 1) / pixelPerGroupCommonDim11008;
-  sycl::range<1> GlobalRangeCommonDim11008V2(groupsV2 * localThread[1]);
-  sycl::range<1> LocalRangeCommonDim11008V2(localThread[1]);
-  sycl::nd_range<1> RangeCommonDim11008V2(
-      GlobalRangeCommonDim11008V2, LocalRangeCommonDim11008V2);
+    groupsV2 =
+        (n + pixelPerGroupCommonDim11008 - 1) / pixelPerGroupCommonDim11008;
+    sycl::range<1> GlobalRangeCommonDim11008V2(groupsV2 * localThread[1]);
+    sycl::range<1> LocalRangeCommonDim11008V2(localThread[1]);
+    sycl::nd_range<1> RangeCommonDim11008V2(
+        GlobalRangeCommonDim11008V2, LocalRangeCommonDim11008V2);
 
-  sycl::event e;
-  // Launches the task on the GPU.
-  if (k == 4096) {
-    e = dpcpp_queue.submit([&](handler& cgh) {
-      cgh.parallel_for(
-          RangeCommonDim4096V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
-            matrixMulCommonDim4096Int4NoReshapeNx16V3_ipex2<4>(
-                (uint8_t*)weight,
-                (uint8_t*)input,
-                (uint8_t*)output,
-                (uint8_t*)weight_scl,
-                ndi);
+    sycl::event e;
+    // Launches the task on the GPU.
+    if (k == 4096) {
+      e = dpcpp_queue.submit([&](handler& cgh) {
+        cgh.parallel_for(
+            RangeCommonDim4096V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
+              matrixMulCommonDim4096Int4NoReshapeNx16V3_ipex2<4>(
+                  (uint8_t*)weight,
+                  (uint8_t*)input,
+                  (uint8_t*)output,
+                  (uint8_t*)weight_scl,
+                  ndi);
+            });
+      });
+      e.wait();
+      double etime = report_time("GEMV kernel time", e, e);
+    } else if (k == 11008) {
+      e = dpcpp_queue.submit([&](handler& cgh) {
+        cgh.parallel_for(
+            RangeCommonDim11008V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
+              matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex<6>(
+                  (uint8_t*)weight,
+                  (uint8_t*)input,
+                  (uint8_t*)output,
+                  (uint8_t*)weight_scl,
+                  ndi);
+            });
+      });
+      e.wait();
+      double etime = report_time("GEMV kernel time", e, e);
+    } else if (k == 14336) {
+      e = dpcpp_queue.submit([&](handler& cgh) {
+        cgh.parallel_for(
+            RangeCommonDim11008V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
+              matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex<6>(
+                  (uint8_t*)weight,
+                  (uint8_t*)input,
+                  (uint8_t*)output,
+                  (uint8_t*)weight_scl,
+                  ndi);
+            });
+      });
+      e.wait();
+      double etime = report_time("GEMV kernel time", e, e);
+    }
+  }
+  else // GEMM
+  {
+    int groupReduce2048H = (n + 15) / 16;
+    int groupReduce2048V = 1;
+    int localReduce2048H = 64; // internalPrecision == 0  (fp32), not 32
+    int localReduce2048V = 1;
+    sycl::range<2> GlobalRangeReduce2048(groupReduce2048H * localReduce2048H, groupReduce2048V * localReduce2048V);
+    sycl::range<2> LocalRangeReduce2048(localReduce2048H, localReduce2048V);
+    sycl::nd_range<2> RangeReduce2048(GlobalRangeReduce2048, LocalRangeReduce2048);
+
+    int groupReduce768H = (n + 15) / 16;
+    int groupReduce768V = 1;
+    int localReduce768H = 12;
+    // if (internalPrecision == 0) {
+    localReduce768H = 24;
+    // }
+    int localReduce768V = 1;
+    sycl::range<2> GlobalRangeReduce768(groupReduce768H * localReduce768H, groupReduce768V * localReduce768V);
+    sycl::range<2> LocalRangeReduce768(localReduce768H, localReduce768V);
+    sycl::nd_range<2> RangeReduce768(GlobalRangeReduce768, LocalRangeReduce768);
+
+    sycl::event e;
+    int lastReduce = 0;
+    if (k == 4096) {
+        for (int ii = 0; ii < 2; ii++) {
+          if (ii == 2 - 1) {
+            lastReduce = 1;
+          }
+          else {
+            lastReduce = 0;
+          }
+          e = dpcpp_queue.submit([&](handler& cgh) {
+            cgh.parallel_for(RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL{
+                gemmReduce2048WeightsQ40InputFp32_ipex((uint8_t*)weight, (uint8_t*)input, (uint8_t*)output, (uint8_t*)weight_scl, k, m /*tokenLen*/, ii, lastReduce, ndi);
+              });
           });
-    });
-    e.wait();
-    double etime = report_time("GEMV kernel time", e, e);
-  } else if (k == 11008) {
-    e = dpcpp_queue.submit([&](handler& cgh) {
-      cgh.parallel_for(
-          RangeCommonDim11008V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
-            matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex<6>(
-                (uint8_t*)weight,
-                (uint8_t*)input,
-                (uint8_t*)output,
-                (uint8_t*)weight_scl,
-                ndi);
+          e.wait();
+          double etime = report_time("GEMV kernel time", e, e);
+        }
+      } else if (k == 14336) {
+        for (int ii = 0; ii < 7; ii++) {
+          if (ii == 7 - 1) {
+            lastReduce = 1;
+          }
+          else {
+            lastReduce = 0;
+          }
+          e = dpcpp_queue.submit([&](handler& cgh) {
+            cgh.parallel_for(RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL{
+                gemmReduce2048WeightsQ40InputFp32_ipex((uint8_t*)weight, (uint8_t*)input, (uint8_t*)output, (uint8_t*)weight_scl, k, m /*tokenLen*/, ii, lastReduce, ndi);
+              });
           });
-    });
-    e.wait();
-    double etime = report_time("GEMV kernel time", e, e);
+          e.wait();
+          double etime = report_time("GEMV kernel time", e, e);
+        }
+      } else if (k == 11008) {
+        for (int ii = 0; ii < 5; ii++) {
+          lastReduce = 0;
+          e = dpcpp_queue.submit([&](handler& cgh) {
+            cgh.parallel_for(RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL{
+                gemmReduce2048WeightsQ40InputFp32_ipex((uint8_t*)weight, (uint8_t*)input, (uint8_t*)output, (uint8_t*)weight_scl, k, m /*tokenLen*/, ii, lastReduce, ndi);
+              });
+          });
+          e.wait();
+          double etime = report_time("GEMV kernel time", e, e);
+        }
+
+        int ii = 5;
+        {
+          lastReduce = 1;
+          e = dpcpp_queue.submit([&](handler& cgh) {
+            cgh.parallel_for(RangeReduce768, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL{
+                gemmReduce768WeightsQ40InputFp32_ipex((uint8_t*)weight, (uint8_t*)input, (uint8_t*)output, (uint8_t*)weight_scl, k, m /*tokenLen*/, ii, lastReduce, ndi);
+              });
+          });
+          e.wait();
+          double etime = report_time("GEMV kernel time", e, e);
+        }
+      }
   }
 }
 
