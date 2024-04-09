@@ -28,7 +28,8 @@ if(NOT EXISTS ${TORCH_INSTALL_PREFIX})
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-Bsymbolic-functions")
 
 # Set the include dir
 include_directories(${PYTORCH_INSTALL_DIR}/include)
