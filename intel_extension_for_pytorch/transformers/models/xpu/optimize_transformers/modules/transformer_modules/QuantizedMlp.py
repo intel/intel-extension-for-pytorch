@@ -4,6 +4,7 @@ from .Mlp import IPEXTransformerMLP
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
 )
+from .Activation import ACT2FN
 
 
 class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
@@ -193,6 +194,36 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4Sil
             0, 1
         ).contiguous()
         torch.xpu.synchronize()
+        try_linear_gate_reorder_input = torch.empty(
+            1, 1, 4096, dtype=torch.float16, device="xpu"
+        )
+        try_linear_down_reorder_input = torch.empty(
+            1, 1, 11008, dtype=torch.float16, device="xpu"
+        )
+        try_linear_mlp_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+            try_linear_gate_reorder_input,
+            self.fc_out_quant.qweight,
+            self.fc_out_quant.scales,
+            self.fc_out_quant.qzeros,
+            self.fc_out_quant.blocksize,
+            True,
+        )
+        try_linear_mlp_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+            try_linear_down_reorder_input,
+            self.c_proj_quant.qweight,
+            self.c_proj_quant.scales,
+            self.c_proj_quant.qzeros,
+            self.c_proj_quant.blocksize,
+            True,
+        )
+        try_linear_mlp_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+            try_linear_gate_reorder_input,
+            self.fc_in_quant.qweight,
+            self.fc_in_quant.scales,
+            self.fc_in_quant.qzeros,
+            self.fc_in_quant.blocksize,
+            True,
+        )
 
     def inter_mm(self, hidden_states):
         if self.fc_in_quant.bias is None:
@@ -259,7 +290,42 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4Sil
 class IPEXTransformerMLPOptimizedInt4SiluLlama(IPEXTransformerMLPOptimizedInt4SiluQwen):
     def __init__(self, config):
         super().__init__(config)
+        self.act_fn = ACT2FN[config.activation_function]
 
     def load_parameter(self, fc_in, fc_out, c_proj):
-        # gate_proj, down_proj, up_proj
+        # gate down up
+        # gate_proj fc_out_quant
+        # down_proj c_proj_quant
+        # up_proj fc_in_quant
         return super().load_parameter(c_proj, fc_in, fc_out)
+
+    def forward(self, x, residual=None):
+        # down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+        hidden_states_gate = torch.ops.torch_ipex.mm_esimd_int4(
+            x,
+            self.fc_out_quant.qweight,
+            self.fc_out_quant.scales,
+            self.fc_out_quant.qzeros,
+            self.fc_out_quant.blocksize,
+            False,
+        )
+        hidden_states_act = self.act_fn(hidden_states_gate)
+        hidden_states_up = torch.ops.torch_ipex.mm_esimd_int4(
+            x,
+            self.fc_in_quant.qweight,
+            self.fc_in_quant.scales,
+            self.fc_in_quant.qzeros,
+            self.fc_in_quant.blocksize,
+            False,
+        )
+        hidden_states = hidden_states_act * hidden_states_up
+        down_proj = torch.ops.torch_ipex.mm_esimd_int4(
+            hidden_states,
+            self.c_proj_quant.qweight,
+            self.c_proj_quant.scales,
+            self.c_proj_quant.qzeros,
+            self.c_proj_quant.blocksize,
+            False,
+        )
+
+        return down_proj
