@@ -635,3 +635,51 @@ class TestTorchMethod(TestCase):
 
         out_int4 = out_int4.to(torch.float).to("cpu")
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
+
+    def test_qkv_gemm_1stt_int4_using_normal_gemm_as_ref(self, dtype=torch.float16):
+        input = torch.rand([1, 1024, 4096], device="xpu", dtype=torch.float16)
+        q = torch.zeros([1024, 4096], device="xpu", dtype=torch.float16)
+        k = torch.zeros([1024, 4096], device="xpu", dtype=torch.float16)
+        v = torch.zeros([1024, 4096], device="xpu", dtype=torch.float16)
+
+        bias = None
+        weight = (torch.rand([3, 4096, 2048], device="xpu") * 10 * 16).byte()
+        print("weight.size()", weight.size())
+        print("weight.stride()", weight.stride())
+        weight_ref = torch.clone(weight)
+
+        group_size = 32
+        group_num = int(4096 / group_size)
+
+        scales = torch.rand([3, group_num, 4096], device="xpu", dtype=torch.float16)
+        zero_points = (torch.zeros([3, group_num, 2048], device="xpu")).byte()
+
+        print("scales.size()", scales.size())
+        print("scales.stride()", scales.stride())
+        scales_ref = torch.clone(scales)
+
+        torch.ops.torch_ipex.qkv_mm_esimd_int4(
+            input, weight, scales, zero_points, bias, q, k, v, group_size
+        )
+
+        print("q ", q.to(torch.float).to("cpu"))
+        print("k ", k.to(torch.float).to("cpu"))
+        print("v ", v.to(torch.float).to("cpu"))
+
+        q_ref = torch.ops.torch_ipex.mm_esimd_int4(
+            input[0], weight_ref[0], scales_ref[0], zero_points[0], group_size
+        )
+        k_ref = torch.ops.torch_ipex.mm_esimd_int4(
+            input[0], weight_ref[1], scales_ref[1], zero_points[1], group_size
+        )
+        v_ref = torch.ops.torch_ipex.mm_esimd_int4(
+            input[0], weight_ref[2], scales_ref[2], zero_points[2], group_size
+        )
+
+        print("q ref", q_ref.to(torch.float).to("cpu"))
+        print("k ref", k_ref.to(torch.float).to("cpu"))
+        print("v ref", v_ref.to(torch.float).to("cpu"))
+
+        self.assertEqual(q, q_ref, atol=1e-3, rtol=1e-3)
+        self.assertEqual(k, k_ref, atol=1e-3, rtol=1e-3)
+        self.assertEqual(v, v_ref, atol=1e-3, rtol=1e-3)
