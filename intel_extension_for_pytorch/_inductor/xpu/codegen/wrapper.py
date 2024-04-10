@@ -11,14 +11,12 @@ from torch._inductor.codegen.wrapper import (
     WrapperCodeGen,
     WrapperLine,
     EnterDeviceContextManagerLine,
-    ExitDeviceContextManagerLine
+    ExitDeviceContextManagerLine,
 )
 from torch._inductor.utils import cache_on_self, get_benchmark_name
 from .. import codecache
 
 pexpr = PythonPrinter().doprint
-
-
 
 
 class XPUTritonWrapperCodeGen(WrapperCodeGen):

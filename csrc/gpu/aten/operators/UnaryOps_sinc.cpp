@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <utils/DPCPP.h>
@@ -20,8 +21,9 @@ struct sinc_kernel_xpu_functor {
     if (a == scalar_t(0)) {
       return scalar_t(1);
     } else {
-      scalar_t product = Numerics<scalar_t>::pi() * a;
-      return Numerics<scalar_t>::sin(product) / product;
+      using opmath_t = at::opmath_type<scalar_t>;
+      opmath_t product = c10::detail::pi<opmath_t>() * opmath_t{a};
+      return static_cast<scalar_t>(Numerics<opmath_t>::sin(product) / product);
     }
   }
 };

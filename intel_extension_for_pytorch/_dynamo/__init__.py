@@ -8,6 +8,7 @@ if has_xpu():
 
 from torch._inductor.compile_fx import compile_fx
 
+
 def _get_device_from_graph_module(graph_module: torch.fx.GraphModule):
     """
     This function gathers the device types from the fx graph nodes.
