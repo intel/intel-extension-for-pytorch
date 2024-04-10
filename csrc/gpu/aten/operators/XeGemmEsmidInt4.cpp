@@ -99,9 +99,9 @@ static inline void gemm_int4_esimd_kernel(
     uint32_t n,
     uint32_t k,
     bool need_reorder) {
-  std::cout << "m: " << m << std::endl;
-  std::cout << "n: " << n << std::endl;
-  std::cout << "k: " << k << std::endl;
+  // YC std::cout << "m: " << m << std::endl;
+  // YC std::cout << "n: " << n << std::endl;
+  // YC std::cout << "k: " << k << std::endl;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   uint32_t pixelPerGroupCommonDim4096 = 16;
@@ -220,8 +220,8 @@ static inline void gemm_int4_esimd_kernel(
                   ndi);
             });
       });
-      e.wait();
-      double etime = report_time("GEMV kernel time", e, e);
+      // YC e.wait();
+      // double etime = report_time("GEMV kernel time", e, e);
     } else if (k == 11008) {
       e = dpcpp_queue.submit([&](handler& cgh) {
         cgh.parallel_for(
@@ -234,8 +234,8 @@ static inline void gemm_int4_esimd_kernel(
                   ndi);
             });
       });
-      e.wait();
-      double etime = report_time("GEMV kernel time", e, e);
+      // YC e.wait();
+      // double etime = report_time("GEMV kernel time", e, e);
     } else if (k == 14336) {
       e = dpcpp_queue.submit([&](handler& cgh) {
         cgh.parallel_for(
@@ -248,8 +248,8 @@ static inline void gemm_int4_esimd_kernel(
                   ndi);
             });
       });
-      e.wait();
-      double etime = report_time("GEMV kernel time", e, e);
+      // YC e.wait();
+      // double etime = report_time("GEMV kernel time", e, e);
     }
   } else // GEMM
   {
@@ -300,8 +300,8 @@ static inline void gemm_int4_esimd_kernel(
                     ndi);
               });
         });
-        e.wait();
-        double etime = report_time("GEMV kernel time", e, e);
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
       }
     } else if (k == 14336) {
       for (int ii = 0; ii < 7; ii++) {
@@ -325,8 +325,8 @@ static inline void gemm_int4_esimd_kernel(
                     ndi);
               });
         });
-        e.wait();
-        double etime = report_time("GEMV kernel time", e, e);
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
       }
     } else if (k == 11008) {
       for (int ii = 0; ii < 5; ii++) {
@@ -346,8 +346,8 @@ static inline void gemm_int4_esimd_kernel(
                     ndi);
               });
         });
-        e.wait();
-        double etime = report_time("GEMV kernel time", e, e);
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
       }
 
       int ii = 5;
@@ -368,8 +368,8 @@ static inline void gemm_int4_esimd_kernel(
                     ndi);
               });
         });
-        e.wait();
-        double etime = report_time("GEMV kernel time", e, e);
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
       }
     }
   }
@@ -392,9 +392,9 @@ static inline void qkv_gemm_int4_esimd_kernel(
     scalar_t* out1, // K
     scalar_t* out2, // V
     bool need_reorder) {
-  std::cout << "qkv_gemm_int4_esimd_kernel m: " << m << std::endl;
-  std::cout << "qkv_gemm_int4_esimd_kernel n: " << n << std::endl;
-  std::cout << "qkv_gemm_int4_esimd_kernel k: " << k << std::endl;
+  // YC std::cout << "qkv_gemm_int4_esimd_kernel m: " << m << std::endl;
+  // YC std::cout << "qkv_gemm_int4_esimd_kernel n: " << n << std::endl;
+  // YC std::cout << "qkv_gemm_int4_esimd_kernel k: " << k << std::endl;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   if (!(k == 4096 && n == 4096)) {
@@ -509,8 +509,8 @@ static inline void qkv_gemm_int4_esimd_kernel(
                   ndi);
             });
       });
-      e.wait();
-      double etime = report_time("GEMV kernel time", e, e);
+      // YC e.wait();
+      // double etime = report_time("GEMV kernel time", e, e);
     }
     if (k == 4096) {
       e = dpcpp_queue.submit([&](handler& cgh) {
@@ -524,8 +524,8 @@ static inline void qkv_gemm_int4_esimd_kernel(
                   ndi);
             });
       });
-      e.wait();
-      double etime = report_time("GEMV kernel time", e, e);
+      // YC e.wait();
+      // double etime = report_time("GEMV kernel time", e, e);
     }
     if (k == 4096) {
       e = dpcpp_queue.submit([&](handler& cgh) {
@@ -539,8 +539,8 @@ static inline void qkv_gemm_int4_esimd_kernel(
                   ndi);
             });
       });
-      e.wait();
-      double etime = report_time("GEMV kernel time", e, e);
+      // YC e.wait();
+      // double etime = report_time("GEMV kernel time", e, e);
     }
   } else // GEMM
   {
@@ -579,8 +579,8 @@ static inline void qkv_gemm_int4_esimd_kernel(
                     ndi);
               });
         });
-        e.wait();
-        double etime = report_time("GEMV kernel time", e, e);
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
       }
     }
     if (k == 4096) {
@@ -605,8 +605,8 @@ static inline void qkv_gemm_int4_esimd_kernel(
                     ndi);
               });
         });
-        e.wait();
-        double etime = report_time("GEMV kernel time", e, e);
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
       }
     }
     if (k == 4096) {
@@ -631,8 +631,8 @@ static inline void qkv_gemm_int4_esimd_kernel(
                     ndi);
               });
         });
-        e.wait();
-        double etime = report_time("GEMV kernel time", e, e);
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
       }
     }
   }
@@ -656,7 +656,7 @@ static Tensor mm_esimd_int4(
     const Tensor& weight_zp,
     int64_t calib_gz,
     bool need_reorder) {
-  std::cout << "start mm_esimd_int4: " << need_reorder << std::endl;
+  // YC std::cout << "start mm_esimd_int4: " << need_reorder << std::endl;
   TORCH_CHECK(input.scalar_type() == ScalarType::Half);
   auto input_flat = input.flatten(0, -2); // 1, 1, 4096 -> 1, 4096
   auto weight_flat = weight.flatten(0, -2); // 4096, 5504, 1 -> 4096, 5504
@@ -679,7 +679,7 @@ static Tensor mm_esimd_int4(
   // impl::dump_element(weight_scl, 10, "scal first 10 elem: ");
 
   if (compute_eng_valid) {
-    std::cout << "get in esimd int4 gemm" << std::endl;
+    // YC std::cout << "get in esimd int4 gemm" << std::endl;
     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
         input_flat.scalar_type(), "XeGemm_int4_esimd", [&] {
           impl::gemm_int4_esimd_kernel<scalar_t, uint8_t>(
@@ -716,7 +716,7 @@ static void qkv_mm_esimd_int4(
     const Tensor& out2_,
     int64_t calib_gz,
     bool need_reorder) {
-  std::cout << "start qkv_mm_esimd_int4" << std::endl;
+  // YC std::cout << "start qkv_mm_esimd_int4" << std::endl;
 
   xpu::COMPUTE_ENG real_eng =
       choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input_, weight);
@@ -756,7 +756,7 @@ static void qkv_mm_esimd_int4(
   // impl::dump_element(weight, 10, "weight first 10 elem: ");
 
   if (compute_eng_valid) {
-    std::cout << "get in esimd int4 gemm" << std::endl;
+    // YC std::cout << "get in esimd int4 gemm" << std::endl;
     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
         input.scalar_type(), "XeGemm_int4_esimd", [&] {
           impl::qkv_gemm_int4_esimd_kernel<scalar_t, uint8_t>(

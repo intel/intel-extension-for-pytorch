@@ -67,9 +67,9 @@ static inline void sdp_esimd_kernel(
     bool is_causal,
     bool seq_last,
     int64_t kv_len) {
-  std::cout << "alpha: " << alpha << std::endl;
-  std::cout << "beta: " << beta << std::endl;
-  std::cout << "dropout_prob: " << dropout_prob << std::endl;
+  // YC std::cout << "alpha: " << alpha << std::endl;
+  // YC std::cout << "beta: " << beta << std::endl;
+  // YC std::cout << "dropout_prob: " << dropout_prob << std::endl;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   const int batch_size = 1;
@@ -91,8 +91,8 @@ static inline void sdp_esimd_kernel(
           ndi);
     });
   });
-  e.wait();
-  double etime = report_time("SDP fused kernel time", e, e);
+  // YC e.wait();
+  // double etime = report_time("SDP fused kernel time", e, e);
 
   return;
 }
@@ -111,7 +111,7 @@ static Tensor sdp_esimd(
     const double dropout_p,
     bool is_causal,
     bool seq_last) {
-  std::cout << "start sdp_esimd" << std::endl;
+  // YC std::cout << "start sdp_esimd" << std::endl;
   TORCH_CHECK(
       query.scalar_type() == at::kHalf, "IPEX SDP only supports half datatype");
   TORCH_CHECK(
