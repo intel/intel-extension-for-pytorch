@@ -169,6 +169,32 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         )
         self.qkv_proj_quant.blocksize = self.q_proj_quant.blocksize
 
+        try_qkv_linear_reorder_input = torch.empty(
+            1, 1024, 4096, dtype=torch.float16, device="xpu"
+        )
+        try_qkv_linear_reorder_q = torch.empty(
+            1024, 4096, dtype=torch.float16, device="xpu"
+        )
+        try_qkv_linear_reorder_k = torch.empty(
+            1024, 4096, dtype=torch.float16, device="xpu"
+        )
+        try_qkv_linear_reorder_v = torch.empty(
+            1024, 4096, dtype=torch.float16, device="xpu"
+        )
+
+        try_linear_out_reorder = torch.ops.torch_ipex.qkv_mm_esimd_int4(
+            try_qkv_linear_reorder_input,
+            self.qkv_proj_quant.qweight,
+            self.qkv_proj_quant.scales,
+            self.qkv_proj_quant.qzeros,
+            self.qkv_proj_quant.bias,
+            try_qkv_linear_reorder_q,
+            try_qkv_linear_reorder_k,
+            try_qkv_linear_reorder_v,
+            self.qkv_proj_quant.blocksize,
+            True,
+        )
+
         try_linear_out_reorder_input = torch.empty(
             1, 1, 4096, dtype=torch.float16, device="xpu"
         )
@@ -182,7 +208,7 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         )
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
-        torch.ops.torch_ipex.mm_qkv_out_int4(
+        torch.ops.torch_ipex.qkv_mm_esimd_int4(
             hidden_states,
             self.qkv_proj_quant.qweight,
             self.qkv_proj_quant.scales,
@@ -192,6 +218,7 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
             key,
             value,
             self.qkv_proj_quant.blocksize,
+            False,
         )
         return query, key, value
 

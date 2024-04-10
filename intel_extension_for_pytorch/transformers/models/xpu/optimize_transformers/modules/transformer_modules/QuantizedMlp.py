@@ -302,30 +302,30 @@ class IPEXTransformerMLPOptimizedInt4SiluLlama(IPEXTransformerMLPOptimizedInt4Si
     def forward(self, x, residual=None):
         # down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
         hidden_states_gate = torch.ops.torch_ipex.mm_esimd_int4(
-                    x,
-                    self.fc_out_quant.qweight,
-                    self.fc_out_quant.scales,
-                    self.fc_out_quant.qzeros,
-                    self.fc_out_quant.blocksize,
-                    False,
-                )
+            x,
+            self.fc_out_quant.qweight,
+            self.fc_out_quant.scales,
+            self.fc_out_quant.qzeros,
+            self.fc_out_quant.blocksize,
+            False,
+        )
         hidden_states_act = self.act_fn(hidden_states_gate)
         hidden_states_up = torch.ops.torch_ipex.mm_esimd_int4(
-                    x,
-                    self.fc_in_quant.qweight,
-                    self.fc_in_quant.scales,
-                    self.fc_in_quant.qzeros,
-                    self.fc_in_quant.blocksize,
-                    False,
-                )
+            x,
+            self.fc_in_quant.qweight,
+            self.fc_in_quant.scales,
+            self.fc_in_quant.qzeros,
+            self.fc_in_quant.blocksize,
+            False,
+        )
         hidden_states = hidden_states_act * hidden_states_up
         down_proj = torch.ops.torch_ipex.mm_esimd_int4(
-                    hidden_states,
-                    self.c_proj_quant.qweight,
-                    self.c_proj_quant.scales,
-                    self.c_proj_quant.qzeros,
-                    self.c_proj_quant.blocksize,
-                    False,
-                )
+            hidden_states,
+            self.c_proj_quant.qweight,
+            self.c_proj_quant.scales,
+            self.c_proj_quant.qzeros,
+            self.c_proj_quant.blocksize,
+            False,
+        )
 
         return down_proj

@@ -149,8 +149,14 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
     # ################################# compute_qkv #################################################
     def compute_qkv_gemm(self, hidden_states, query, key, value):
-        torch.ops.torch_ipex.mm_qkv_out(
-            hidden_states, self.qkv_proj.weight, self.qkv_proj.bias, query, key, value
+        torch.ops.torch_ipex.qkv_mm_esimd_int4(
+            hidden_states,
+            self.qkv_proj.weight,
+            self.qkv_proj.bias,
+            query,
+            key,
+            value,
+            False,
         )
         return query, key, value
 
@@ -540,7 +546,6 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         is_causal,
     ):
         if self.is_1st_token():
-            print("xetla sdp")
             attention_output = torch.xpu.IpexSDP(
                 query,
                 key,
@@ -555,8 +560,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 True,
             )
         else:
-            print("esimd sdp")
-            attention_output = torch.xpu.sdp_esimd(
+            attention_output = torch.ops.torch_ipex.sdp_esimd(
                 query,
                 key,
                 value,
