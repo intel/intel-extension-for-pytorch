@@ -149,9 +149,7 @@ def get_build_type():
     return (
         "RelWithDebInfo"
         if _check_env_flag("REL_WITH_DEB_INFO")
-        else "Debug"
-        if _check_env_flag("DEBUG")
-        else "Release"
+        else "Debug" if _check_env_flag("DEBUG") else "Release"
     )
 
 

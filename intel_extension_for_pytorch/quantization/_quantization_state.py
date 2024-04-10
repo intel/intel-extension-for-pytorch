@@ -90,9 +90,9 @@ class AutoQuantizationState(torch.nn.Module):
     def set_extra_state(self, state):
         self.tensor_id_to_scale_zp = state["tensor_id_to_scale_zp"]
         for _, seen_q_op_info in self.idx_to_seen_q_op_infos.items():
-            self.idx_to_op_convert_info[
-                seen_q_op_info.idx
-            ] = self.calculate_op_convert_info(seen_q_op_info)
+            self.idx_to_op_convert_info[seen_q_op_info.idx] = (
+                self.calculate_op_convert_info(seen_q_op_info)
+            )
 
     def has_at_least_one_seen_q_op_info(self) -> bool:
         return len(self.idx_to_seen_q_op_infos) > 0
@@ -1122,9 +1122,9 @@ class AutoQuantizationState(torch.nn.Module):
                     continue
                 else:
                     output_tensor_id = tensor_info.id
-                    self.tensor_id_to_observer[
-                        str(output_tensor_id)
-                    ] = qconfig.activation()
+                    self.tensor_id_to_observer[str(output_tensor_id)] = (
+                        qconfig.activation()
+                    )
 
     def insert_observers(self, root_module: torch.nn.Module):
         for _, seen_q_op_info in self.idx_to_seen_q_op_infos.items():

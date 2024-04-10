@@ -423,9 +423,9 @@ def convert(model, inplace=False):
             torch.nn.GRUCell: convert_model.q_config,
         }
         module_mappings = get_default_dynamic_quant_module_mappings().copy()
-        module_mappings[
-            torch.nn.Linear
-        ] = nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
+        module_mappings[torch.nn.Linear] = (
+            nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
+        )
 
         module_mappings, qconfig_spec = may_quantize_deepspeed_modules(
             IPEX_WEIGHT_ONLY_QUANTIZATION_MODULE_CPU(),

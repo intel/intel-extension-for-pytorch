@@ -34,9 +34,11 @@ class _IPEXlinearSiluCPU(_IPEXlinearFusionCPU):
             return torch.ops.torch_ipex.tpp_linear_silu(
                 x,
                 self.linear.weight.detach(),
-                self.linear.bias.detach()
-                if self.linear.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear.bias.detach()
+                    if self.linear.bias is not None
+                    else x.new_empty(0)
+                ),
                 self.linear.out_features,
             )
         else:  # fallback path
@@ -54,9 +56,11 @@ class _IPEXlinearReluCPU(_IPEXlinearFusionCPU):
             return torch.ops.torch_ipex.tpp_linear_relu(
                 x,
                 self.linear.weight.detach(),
-                self.linear.bias.detach()
-                if self.linear.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear.bias.detach()
+                    if self.linear.bias is not None
+                    else x.new_empty(0)
+                ),
                 self.linear.out_features,
             )
         else:  # fallback path
@@ -76,9 +80,11 @@ class _IPEXlinearMulCPU(_IPEXlinearFusionCPU):
                 x,
                 y,
                 self.linear.weight.detach(),
-                self.linear.bias.detach()
-                if self.linear.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear.bias.detach()
+                    if self.linear.bias is not None
+                    else x.new_empty(0)
+                ),
                 self.linear.out_features,
             )
         else:  # fallback path
@@ -98,9 +104,11 @@ class _IPEXlinearAddCPU(_IPEXlinearFusionCPU):
                 x,
                 y,
                 self.linear.weight.detach(),
-                self.linear.bias.detach()
-                if self.linear.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear.bias.detach()
+                    if self.linear.bias is not None
+                    else x.new_empty(0)
+                ),
                 1.0,
                 self.linear.out_features,
             )
@@ -133,9 +141,11 @@ class _IPEXlinearAddAddCPU(_IPEXlinearFusionCPU):
                 y,
                 z,
                 self.linear.weight.detach(),
-                self.linear.bias.detach()
-                if self.linear.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear.bias.detach()
+                    if self.linear.bias is not None
+                    else x.new_empty(0)
+                ),
                 1.0,
                 self.linear.out_features,
             )
@@ -164,9 +174,11 @@ class _IPEXlinearNewGeluCPU(_IPEXlinearFusionCPU):
             return torch.ops.torch_ipex.tpp_linear_gelu(
                 x,
                 self.linear.weight.detach(),
-                self.linear.bias.detach()
-                if self.linear.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear.bias.detach()
+                    if self.linear.bias is not None
+                    else x.new_empty(0)
+                ),
                 self.linear.out_features,
             )
         elif (
@@ -204,9 +216,11 @@ class _IPEXlinearGeluCPU(_IPEXlinearFusionCPU):
             return torch.ops.torch_ipex.tpp_linear_gelu(
                 x,
                 self.linear.weight.detach(),
-                self.linear.bias.detach()
-                if self.linear.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear.bias.detach()
+                    if self.linear.bias is not None
+                    else x.new_empty(0)
+                ),
                 self.linear.out_features,
             )
         if (
@@ -386,13 +400,17 @@ class _IPEXlinearSiluMulCPU(nn.Module):
             return torch.ops.torch_ipex.tpp_fused_gate_up_proj(
                 x,
                 self.linear_s.weight.detach(),
-                self.linear_s.bias.detach()
-                if self.linear_s.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear_s.bias.detach()
+                    if self.linear_s.bias is not None
+                    else x.new_empty(0)
+                ),
                 self.linear_m.weight.detach(),
-                self.linear_m.bias.detach()
-                if self.linear_m.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear_m.bias.detach()
+                    if self.linear_m.bias is not None
+                    else x.new_empty(0)
+                ),
             )
         else:  # fallback path
             return nn.functional.silu(self.linear_s(x)) * self.linear_m(x)
@@ -412,9 +430,11 @@ class _IPEXlinearSiluAndMulCPU(nn.Module):
             x1 = torch.ops.torch_ipex.tpp_linear_silu(
                 x,
                 self.linear.weight.detach(),
-                self.linear.bias.detach()
-                if self.linear.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear.bias.detach()
+                    if self.linear.bias is not None
+                    else x.new_empty(0)
+                ),
                 self.linear.out_features,
             )
             return x1 * y

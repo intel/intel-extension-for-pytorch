@@ -1,4 +1,5 @@
 """Utility functions for IPEX FP8 modules"""
+
 import torch
 from intel_extension_for_pytorch.frontend import _copy_model_and_optimizer
 

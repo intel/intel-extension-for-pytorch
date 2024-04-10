@@ -1427,9 +1427,11 @@ class TestPrepackCases(TestCase):
                             self.assertTrue(
                                 module_found(
                                     ipex_model,
-                                    torch.nn.ConvTranspose2d
-                                    if dims == 2
-                                    else torch.nn.ConvTranspose3d,
+                                    (
+                                        torch.nn.ConvTranspose2d
+                                        if dims == 2
+                                        else torch.nn.ConvTranspose3d
+                                    ),
                                 )
                             )
                             continue
@@ -1437,9 +1439,11 @@ class TestPrepackCases(TestCase):
                             self.assertFalse(
                                 module_found(
                                     ipex_model,
-                                    torch.nn.ConvTranspose2d
-                                    if dims == 2
-                                    else torch.nn.ConvTranspose3d,
+                                    (
+                                        torch.nn.ConvTranspose2d
+                                        if dims == 2
+                                        else torch.nn.ConvTranspose3d
+                                    ),
                                 )
                             )
 
@@ -1477,9 +1481,11 @@ class TestPrepackCases(TestCase):
                             self.assertTrue(
                                 module_found(
                                     ipex_model,
-                                    torch.nn.ConvTranspose2d
-                                    if dims == 2
-                                    else torch.nn.ConvTranspose3d,
+                                    (
+                                        torch.nn.ConvTranspose2d
+                                        if dims == 2
+                                        else torch.nn.ConvTranspose3d
+                                    ),
                                 )
                             )
                             continue
@@ -1487,9 +1493,11 @@ class TestPrepackCases(TestCase):
                             self.assertFalse(
                                 module_found(
                                     ipex_model,
-                                    torch.nn.ConvTranspose2d
-                                    if dims == 2
-                                    else torch.nn.ConvTranspose3d,
+                                    (
+                                        torch.nn.ConvTranspose2d
+                                        if dims == 2
+                                        else torch.nn.ConvTranspose3d
+                                    ),
                                 )
                             )
 

@@ -425,9 +425,9 @@ def meta_ROIAlign_backward(
     is_channels_last,
 ):
     return grad.new_empty((batch_size, channels, height, width)).to(
-        memory_format=torch.channels_last
-        if is_channels_last
-        else torch.contiguous_format
+        memory_format=(
+            torch.channels_last if is_channels_last else torch.contiguous_format
+        )
     )
 
 
