@@ -246,16 +246,14 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
         residual = hidden_states
         hidden_states = self.post_attn_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states, residual)
+        hidden_states = residual + hidden_states
+
         if first_token and beam > 1:
             # for 1st token, expand the result with beam
             hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand(
                 [bs, beam, seq, hidden_size]
             )
-        elif ipex._C._has_2d_block_array(0) or (beam > 1 and not first_token):
-            # for 2nd to last token, we convert the layout back
-            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1)
-        elif not ipex._C._has_2d_block_array(0) and not ipex._C._has_xmx(0):
+        else:
             hidden_states = hidden_states.transpose(0, 1)
         outputs = (hidden_states,)
         if output_attentions:

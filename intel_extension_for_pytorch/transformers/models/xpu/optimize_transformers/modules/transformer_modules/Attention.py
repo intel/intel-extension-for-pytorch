@@ -247,8 +247,8 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         #         and not self.is_beam_search()
         #     )
         # ):
-        if self.is_1st_token():
-            return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
+        # if self.is_1st_token():
+        #     return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
         key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
         (
             dropout,
@@ -539,19 +539,36 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         dropout,
         is_causal,
     ):
-        attention_output = torch.xpu.sdp_esimd(
-            query,
-            key,
-            value,
-            alibi,
-            attention_mask,
-            head_mask,
-            alpha,
-            beta,
-            dropout,
-            is_causal,
-            True,
-        )
+        if self.is_1st_token():
+            print("xetla sdp")
+            attention_output = torch.xpu.IpexSDP(
+                query,
+                key,
+                value,
+                alibi,
+                attention_mask,
+                head_mask,
+                alpha,
+                beta,
+                dropout,
+                is_causal,
+                True,
+            )
+        else:
+            print("esimd sdp")
+            attention_output = torch.xpu.sdp_esimd(
+                query,
+                key,
+                value,
+                alibi,
+                attention_mask,
+                head_mask,
+                alpha,
+                beta,
+                dropout,
+                is_causal,
+                True,
+            )
         return attention_output, None
 
     def sdp_1st_token_beam_search(
