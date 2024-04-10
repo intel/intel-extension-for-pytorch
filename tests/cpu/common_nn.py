@@ -4496,9 +4496,7 @@ new_criterion_tests = [
         / (
             i.numel()
             if get_reduction(m) == "mean"
-            else i.size(1)
-            if get_reduction(m) == "sum"
-            else 1
+            else i.size(1) if get_reduction(m) == "sum" else 1
         ),
         desc="weights",
         check_sum_reduction=True,

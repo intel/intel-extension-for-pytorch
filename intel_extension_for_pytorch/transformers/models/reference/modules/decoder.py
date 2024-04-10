@@ -813,9 +813,11 @@ def MixtralDecoderLayer_forward(
                 expert_layer.w1.weight,
                 expert_layer.w3.weight,
                 expert_layer.w2.weight,
-                expert_layer.w1.tpp_fallback
-                if hasattr(expert_layer.w1, "tpp_fallback")
-                else True,
+                (
+                    expert_layer.w1.tpp_fallback
+                    if hasattr(expert_layer.w1, "tpp_fallback")
+                    else True
+                ),
                 routing_weights,
                 final_hidden_states,
             )

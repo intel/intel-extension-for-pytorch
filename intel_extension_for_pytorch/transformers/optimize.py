@@ -1185,9 +1185,11 @@ def optimize(
                     model.eval(),
                     dtype=dtype,
                     inplace=inplace,
-                    auto_kernel_selection=True
-                    if ipex.get_fp32_math_mode() == ipex.FP32MathMode.BF32
-                    else False,
+                    auto_kernel_selection=(
+                        True
+                        if ipex.get_fp32_math_mode() == ipex.FP32MathMode.BF32
+                        else False
+                    ),
                 )
             elif dtype is torch.bfloat16:
                 _model = ipex.optimize(model.eval(), dtype=dtype, inplace=inplace)
@@ -1272,9 +1274,9 @@ def optimize(
                         else sample_inputs
                     )
                     with torch.no_grad(), torch.cpu.amp.autocast(
-                        enabled=True
-                        if dtype in [torch.bfloat16, torch.half]
-                        else False,
+                        enabled=(
+                            True if dtype in [torch.bfloat16, torch.half] else False
+                        ),
                         dtype=dtype,
                     ):
                         trace_model = torch.jit.trace(

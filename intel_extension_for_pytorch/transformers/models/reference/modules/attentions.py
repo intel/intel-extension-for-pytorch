@@ -457,10 +457,12 @@ def _FalconAttention_forward(
             math.sqrt(self.head_dim),
             layer_past,
             head_mask,
-            attention_mask_float
-            + alibi.view(batch_size, self.num_heads, 1, -1) * self.inv_norm_factor
-            if alibi is not None
-            else attention_mask_float,
+            (
+                attention_mask_float
+                + alibi.view(batch_size, self.num_heads, 1, -1) * self.inv_norm_factor
+                if alibi is not None
+                else attention_mask_float
+            ),
             alibi,
         )
 

@@ -1,4 +1,5 @@
 """This module provides predefined FP8 recipes."""
+
 from __future__ import annotations
 from enum import Enum
 from typing import Literal, NamedTuple

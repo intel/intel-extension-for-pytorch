@@ -259,6 +259,7 @@ class MergedEmbeddingBag(nn.Module):
     Now `MergedEmbeddingBagWithSGD` is the only option running with an optimizer. We plan to add more optimizer support
     in the future. Visit `MergedEmbeddingBagWithSGD` for introduction of `MergedEmbeddingBagWith[Optimizer]`.
     """
+
     embedding_specs: List[EmbeddingSpec]
 
     def __init__(
@@ -402,6 +403,7 @@ class MergedEmbeddingBagWithSGD(MergedEmbeddingBag):
         gradients from the backward step and thus the memory access pattern becomes more friendly. Data access will
         happen on cache more than on memory.
     """
+
     embedding_specs: List[EmbeddingSpec]
 
     def __init__(
@@ -625,6 +627,7 @@ class MergedEmbeddingBagWithCat(MergedEmbeddingBag):
         >>> merged_emb = MergedEmbeddingBagWithCat.from_embeddingbag_list(EmbLists)
         >>> cat_out = MergedEmbeddingBagWithCat(dense_feature, inputs)
     """
+
     embedding_specs: List[EmbeddingSpec]
 
     def __init__(
