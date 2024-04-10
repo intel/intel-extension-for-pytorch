@@ -3665,9 +3665,64 @@ Tensor _linalg_eigvals(const Tensor& input) {
 }
 
 Tensor& linalg_eigvals_out(const Tensor& input, Tensor& values) {
-  Tensor vectors;
-  std::tie(values, std::ignore) = linalg_eig_out(input, values, vectors);
-  return vectors;
+  native::squareCheckInputs(input, "linalg.eigvals");
+
+  // unlike NumPy for real-valued inputs the output is always complex-valued
+  native::checkLinalgCompatibleDtype(
+      "torch.linalg.eigvals",
+      values.scalar_type(),
+      toComplexType(input.scalar_type()),
+      "eigenvalues");
+  native::checkSameDevice("torch.linalg.eigvals", values, input, "eigenvalues");
+  // MAGMA doesn't have GPU interface for GEEV routine, it requires inputs to be
+  // on CPU
+  auto options = input.options().device(at::kCPU);
+  auto infos = at::zeros(
+      {std::max<int64_t>(1, native::batchCount(input))}, options.dtype(kInt));
+
+  bool values_expected_type =
+      (values.scalar_type() == toComplexType(input.scalar_type()));
+
+  auto expected_values_shape =
+      IntArrayRef(input.sizes().data(), input.dim() - 1); // input.shape[:-1]
+  bool values_equal_expected_shape =
+      values.sizes().equals(expected_values_shape);
+
+  // if result is not empty and not in batched column major format
+  bool values_tmp_needed = (values.numel() != 0 && !values.is_contiguous());
+  // or result does not have the expected shape
+  values_tmp_needed |= (values.numel() != 0 && !values_equal_expected_shape);
+  // or result does not have the expected dtype
+  values_tmp_needed |= !values_expected_type;
+  // we will allocate a temporary tensor and do the copy
+
+  // because MAGMA's GEEV takes CPU inputs and returns CPU outputs
+  // 'values' tensor that is on GPU device can't be used directly
+  values_tmp_needed |= (!values.is_cpu());
+
+  // determine the appropriate scalar_type for the temporary tensors
+  ScalarType values_type = input.scalar_type();
+  if (!input.is_complex()) {
+    // for real-valued input we can have either real- or complex-valued output
+    ScalarType input_complex_dtype = toComplexType(input.scalar_type());
+    values_type = values.is_complex() ? input_complex_dtype : values_type;
+  }
+
+  Tensor vectors =
+      at::empty({0}, options.dtype(toComplexType(input.scalar_type())));
+  if (values_tmp_needed) {
+    Tensor values_tmp = at::empty({0}, options.dtype(values_type));
+    std::tie(values_tmp, std::ignore) =
+        linalg_eig_out(input, values_tmp, vectors);
+    at::native::resize_output(values, values_tmp.sizes());
+    values.copy_(values_tmp);
+  } else { // use 'values' storage directly
+    std::tie(values, std::ignore) = linalg_eig_out(input, values, vectors);
+  }
+
+  // Now check LAPACK/MAGMA error codes
+  at::_linalg_check_errors(infos, "torch.linalg.eigvals", input.dim() == 2);
+  return values;
 }
 
 Tensor _det_lu_based_helper_backward_helper(

@@ -79,8 +79,10 @@ std::tuple<at::Tensor, at::Tensor> adagrad_fused_step(
 namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-    IPEX_OP_REGISTER_DISPATCH("adagrad_fused_step", torch_ipex::cpu::adagrad_fused_step, c10::DispatchKey::CPU)
-
+  IPEX_OP_REGISTER_DISPATCH(
+      "adagrad_fused_step",
+      torch_ipex::cpu::adagrad_fused_step,
+      c10::DispatchKey::CPU)
 }
 
 } // namespace

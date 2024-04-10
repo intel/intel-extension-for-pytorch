@@ -63,6 +63,9 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "single_query_cached_kv_attention",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::single_query_cached_kv_attention_forward_cpu);
-  IPEX_OP_REGISTER_DISPATCH("reshape_and_cache", torch_ipex::cpu::reshape_and_cache_cpu, c10::DispatchKey::CPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "reshape_and_cache",
+      torch_ipex::cpu::reshape_and_cache_cpu,
+      c10::DispatchKey::CPU);
 }
 } // namespace

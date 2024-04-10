@@ -682,6 +682,10 @@ supported:
   - angle.out
   - linalg_eig
   - linalg_eig.out
+  - linalg_eigh
+  - linalg_eigh.eigvals
+  - linalg_eigvalsh
+  - linalg_eigvalsh.out
   - _linalg_eigh.eigenvalues
   - _linalg_eigvals
   - linalg_eigvals.out

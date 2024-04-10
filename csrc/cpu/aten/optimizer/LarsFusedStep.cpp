@@ -94,7 +94,10 @@ c10::optional<at::Tensor> lars_fused_step(
 namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-    IPEX_OP_REGISTER_DISPATCH("lars_fused_step", torch_ipex::cpu::lars_fused_step, c10::DispatchKey::CPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "lars_fused_step",
+      torch_ipex::cpu::lars_fused_step,
+      c10::DispatchKey::CPU);
 }
 
 } // namespace
