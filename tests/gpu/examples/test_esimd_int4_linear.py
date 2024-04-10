@@ -570,7 +570,9 @@ class TestTorchMethod(TestCase):
         out_int4 = out_int4.to(torch.float).to("cpu")
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
 
-    def test_gemm_1stt_int4_long_hidden2_refcpu(self, per_channel=False, dtype=torch.float16):
+    def test_gemm_1stt_int4_long_hidden2_refcpu(
+        self, per_channel=False, dtype=torch.float16
+    ):
         print("\n!!!!!test_gemm_1stt_int4_refcpu\n")
         input = torch.rand([1024, 14336], device="xpu", dtype=torch.float16)
 

@@ -21,8 +21,8 @@ using namespace sycl::ext::intel::esimd::xmx;
 using fp16 = sycl::half;
 using namespace sycl;
 
-#include "esimd/matrixMulCommonDim4096Int4NoReshapeNx16V3.h"
 #include "esimd/gemmReduce2048WeightsQ40InputFp32.h"
+#include "esimd/matrixMulCommonDim4096Int4NoReshapeNx16V3.h"
 
 using namespace xpu::dpcpp::detail;
 using namespace xpu::dpcpp;
@@ -97,7 +97,8 @@ static inline void gemm_int4_esimd_kernel(
     int64_t calib_gz,
     uint32_t m,
     uint32_t n,
-    uint32_t k) {
+    uint32_t k,
+    bool need_reorder) {
   std::cout << "m: " << m << std::endl;
   std::cout << "n: " << n << std::endl;
   std::cout << "k: " << k << std::endl;
@@ -112,7 +113,7 @@ static inline void gemm_int4_esimd_kernel(
 
   // reorder for the weights and scaling
   // Assume group size 32.   4096 / 32 = 128
-  {
+  if (reorder) {
     sycl::event e0;
     uint8_t* weight_reorder = (uint8_t*)weight;
     uint8_t* reorderTmp = reorder_buffer;
@@ -181,6 +182,8 @@ static inline void gemm_int4_esimd_kernel(
     e0.wait();
     report_time("reshape4 kernel time", e0, e0);
     dpcpp_queue.wait();
+
+    return;
   }
 
   if (m == 1) // GEMV
@@ -248,16 +251,18 @@ static inline void gemm_int4_esimd_kernel(
       e.wait();
       double etime = report_time("GEMV kernel time", e, e);
     }
-  }
-  else // GEMM
+  } else // GEMM
   {
     int groupReduce2048H = (n + 15) / 16;
     int groupReduce2048V = 1;
     int localReduce2048H = 64; // internalPrecision == 0  (fp32), not 32
     int localReduce2048V = 1;
-    sycl::range<2> GlobalRangeReduce2048(groupReduce2048H * localReduce2048H, groupReduce2048V * localReduce2048V);
+    sycl::range<2> GlobalRangeReduce2048(
+        groupReduce2048H * localReduce2048H,
+        groupReduce2048V * localReduce2048V);
     sycl::range<2> LocalRangeReduce2048(localReduce2048H, localReduce2048V);
-    sycl::nd_range<2> RangeReduce2048(GlobalRangeReduce2048, LocalRangeReduce2048);
+    sycl::nd_range<2> RangeReduce2048(
+        GlobalRangeReduce2048, LocalRangeReduce2048);
 
     int groupReduce768H = (n + 15) / 16;
     int groupReduce768V = 1;
@@ -266,68 +271,107 @@ static inline void gemm_int4_esimd_kernel(
     localReduce768H = 24;
     // }
     int localReduce768V = 1;
-    sycl::range<2> GlobalRangeReduce768(groupReduce768H * localReduce768H, groupReduce768V * localReduce768V);
+    sycl::range<2> GlobalRangeReduce768(
+        groupReduce768H * localReduce768H, groupReduce768V * localReduce768V);
     sycl::range<2> LocalRangeReduce768(localReduce768H, localReduce768V);
     sycl::nd_range<2> RangeReduce768(GlobalRangeReduce768, LocalRangeReduce768);
 
     sycl::event e;
     int lastReduce = 0;
     if (k == 4096) {
-        for (int ii = 0; ii < 2; ii++) {
-          if (ii == 2 - 1) {
-            lastReduce = 1;
-          }
-          else {
-            lastReduce = 0;
-          }
-          e = dpcpp_queue.submit([&](handler& cgh) {
-            cgh.parallel_for(RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL{
-                gemmReduce2048WeightsQ40InputFp32_ipex((uint8_t*)weight, (uint8_t*)input, (uint8_t*)output, (uint8_t*)weight_scl, k, m /*tokenLen*/, ii, lastReduce, ndi);
-              });
-          });
-          e.wait();
-          double etime = report_time("GEMV kernel time", e, e);
-        }
-      } else if (k == 14336) {
-        for (int ii = 0; ii < 7; ii++) {
-          if (ii == 7 - 1) {
-            lastReduce = 1;
-          }
-          else {
-            lastReduce = 0;
-          }
-          e = dpcpp_queue.submit([&](handler& cgh) {
-            cgh.parallel_for(RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL{
-                gemmReduce2048WeightsQ40InputFp32_ipex((uint8_t*)weight, (uint8_t*)input, (uint8_t*)output, (uint8_t*)weight_scl, k, m /*tokenLen*/, ii, lastReduce, ndi);
-              });
-          });
-          e.wait();
-          double etime = report_time("GEMV kernel time", e, e);
-        }
-      } else if (k == 11008) {
-        for (int ii = 0; ii < 5; ii++) {
-          lastReduce = 0;
-          e = dpcpp_queue.submit([&](handler& cgh) {
-            cgh.parallel_for(RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL{
-                gemmReduce2048WeightsQ40InputFp32_ipex((uint8_t*)weight, (uint8_t*)input, (uint8_t*)output, (uint8_t*)weight_scl, k, m /*tokenLen*/, ii, lastReduce, ndi);
-              });
-          });
-          e.wait();
-          double etime = report_time("GEMV kernel time", e, e);
-        }
-
-        int ii = 5;
-        {
+      for (int ii = 0; ii < 2; ii++) {
+        if (ii == 2 - 1) {
           lastReduce = 1;
-          e = dpcpp_queue.submit([&](handler& cgh) {
-            cgh.parallel_for(RangeReduce768, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL{
-                gemmReduce768WeightsQ40InputFp32_ipex((uint8_t*)weight, (uint8_t*)input, (uint8_t*)output, (uint8_t*)weight_scl, k, m /*tokenLen*/, ii, lastReduce, ndi);
-              });
-          });
-          e.wait();
-          double etime = report_time("GEMV kernel time", e, e);
+        } else {
+          lastReduce = 0;
         }
+        e = dpcpp_queue.submit([&](handler& cgh) {
+          cgh.parallel_for(
+              RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
+                gemmReduce2048WeightsQ40InputFp32_ipex(
+                    (uint8_t*)weight,
+                    (uint8_t*)input,
+                    (uint8_t*)output,
+                    (uint8_t*)weight_scl,
+                    k,
+                    m /*tokenLen*/,
+                    ii,
+                    lastReduce,
+                    ndi);
+              });
+        });
+        e.wait();
+        double etime = report_time("GEMV kernel time", e, e);
       }
+    } else if (k == 14336) {
+      for (int ii = 0; ii < 7; ii++) {
+        if (ii == 7 - 1) {
+          lastReduce = 1;
+        } else {
+          lastReduce = 0;
+        }
+        e = dpcpp_queue.submit([&](handler& cgh) {
+          cgh.parallel_for(
+              RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
+                gemmReduce2048WeightsQ40InputFp32_ipex(
+                    (uint8_t*)weight,
+                    (uint8_t*)input,
+                    (uint8_t*)output,
+                    (uint8_t*)weight_scl,
+                    k,
+                    m /*tokenLen*/,
+                    ii,
+                    lastReduce,
+                    ndi);
+              });
+        });
+        e.wait();
+        double etime = report_time("GEMV kernel time", e, e);
+      }
+    } else if (k == 11008) {
+      for (int ii = 0; ii < 5; ii++) {
+        lastReduce = 0;
+        e = dpcpp_queue.submit([&](handler& cgh) {
+          cgh.parallel_for(
+              RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
+                gemmReduce2048WeightsQ40InputFp32_ipex(
+                    (uint8_t*)weight,
+                    (uint8_t*)input,
+                    (uint8_t*)output,
+                    (uint8_t*)weight_scl,
+                    k,
+                    m /*tokenLen*/,
+                    ii,
+                    lastReduce,
+                    ndi);
+              });
+        });
+        e.wait();
+        double etime = report_time("GEMV kernel time", e, e);
+      }
+
+      int ii = 5;
+      {
+        lastReduce = 1;
+        e = dpcpp_queue.submit([&](handler& cgh) {
+          cgh.parallel_for(
+              RangeReduce768, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
+                gemmReduce768WeightsQ40InputFp32_ipex(
+                    (uint8_t*)weight,
+                    (uint8_t*)input,
+                    (uint8_t*)output,
+                    (uint8_t*)weight_scl,
+                    k,
+                    m /*tokenLen*/,
+                    ii,
+                    lastReduce,
+                    ndi);
+              });
+        });
+        e.wait();
+        double etime = report_time("GEMV kernel time", e, e);
+      }
+    }
   }
 }
 
@@ -346,16 +390,17 @@ static inline void qkv_gemm_int4_esimd_kernel(
     uint32_t k,
     scalar_t* out0, // Q
     scalar_t* out1, // K
-    scalar_t* out2  // V
-    ) {
+    scalar_t* out2 // V
+) {
   std::cout << "qkv_gemm_int4_esimd_kernel m: " << m << std::endl;
   std::cout << "qkv_gemm_int4_esimd_kernel n: " << n << std::endl;
   std::cout << "qkv_gemm_int4_esimd_kernel k: " << k << std::endl;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
 
   if (!(k == 4096 && m == 1 && n == 4096)) {
-    std::cout << "k should be 4096 and m should be 1 and n should be 4096" << std::endl;
-     // m is input vector num
+    std::cout << "k should be 4096 and m should be 1 and n should be 4096"
+              << std::endl;
+    // m is input vector num
     return;
   }
 
@@ -363,8 +408,7 @@ static inline void qkv_gemm_int4_esimd_kernel(
 
   // reorder for the weights and scaling
   // Assume group size 32.   4096 / 32 = 128
-  for (int index = 0; index < 3; index++)
-  {
+  for (int index = 0; index < 3; index++) {
     sycl::event e0;
     uint8_t* weight_reorder = (uint8_t*)weight + 2048 * 4096 * index;
     uint8_t* reorderTmp = reorder_buffer;
@@ -512,8 +556,9 @@ static Tensor mm_esimd_int4(
     Tensor& weight,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
-    int64_t calib_gz) {
-  std::cout << "start mm_esimd_int4" << std::endl;
+    int64_t calib_gz,
+    bool need_reorder) {
+  std::cout << "start mm_esimd_int4: " << need_reorder << std::endl;
   TORCH_CHECK(input.scalar_type() == ScalarType::Half);
   auto input_flat = input.flatten(0, -2); // 1, 1, 4096 -> 1, 4096
   auto weight_flat = weight.flatten(0, -2); // 4096, 5504, 1 -> 4096, 5504
@@ -525,7 +570,8 @@ static Tensor mm_esimd_int4(
   uint32_t m = input_flat.sizes()[0]; // 1
   uint32_t k = input_flat.sizes()[1]; // 4096
   uint32_t n = weight.sizes()[1] * 2; // 11008
-  auto reorder_buffer = at::empty({k, n}, weight.options());
+  if (need_reorder)
+    auto reorder_buffer = at::empty({k, n}, weight.options());
   auto output = at::empty({m, n}, input.options()); // 11008, 11008
 
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
@@ -543,7 +589,8 @@ static Tensor mm_esimd_int4(
               output.data_ptr<scalar_t>(),
               weight_scl.data_ptr<scalar_t>(),
               weight_zp.data_ptr<uint8_t>(),
-              reorder_buffer.data_ptr<uint8_t>(),
+              need_reorder ? reorder_buffer.data_ptr<uint8_t>() : nullptr,
+              ,
               calib_gz,
               m,
               n,

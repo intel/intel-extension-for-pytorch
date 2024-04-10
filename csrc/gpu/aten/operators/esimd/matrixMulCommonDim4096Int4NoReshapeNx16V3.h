@@ -703,7 +703,8 @@ ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(
 //   int h = ndi.get_group(0); // [0, 256)
 //   int rowSize = ndi.get_group_range(0) * pixelPerGroup;
 //   int offsetABase = (h * pixelPerGroup * 14336 + hh * 8 * 8) >> 1;
-//   int offsetQuanBase = /*rowSize * 7168 +*/ h * quantPerGroup * sizeof(fp16) +
+//   int offsetQuanBase = /*rowSize * 7168 +*/ h * quantPerGroup * sizeof(fp16)
+//   +
 //       hh * 2 * sizeof(fp16);
 //   int offsetB = hh * 64 * sizeof(fp16);
 //   int outputOffset = pixelPerGroup * h;
@@ -810,7 +811,8 @@ ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(
 
 // #pragma unroll
 //       for (int kk = 0; kk < 8; kk++) {
-//         cc += aa.select<16, 1>(16 * kk) * bb.select<16, 1>(16 * kk + 128 * k);
+//         cc += aa.select<16, 1>(16 * kk) * bb.select<16, 1>(16 * kk + 128 *
+//         k);
 //       }
 //     }
 
@@ -852,7 +854,6 @@ ESIMD_INLINE void matrixMulCommonDim11008Int4NoReshapeNx16V2_ipex(
 //   }
 // }
 
-
 template <uint32_t pixelPerGroupShift>
 ESIMD_INLINE void matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex(
     uint8_t* a,
@@ -879,8 +880,8 @@ ESIMD_INLINE void matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex(
   int offsetSLMThread = hh * 2 * 64 * sizeof(fp16);
   simd<int8_t, 64> aaa;
   simd<fp16, 32> quant;
-  //simd<fp16, 896> bb;
-  simd<fp16, 768> bb;  // avoid grf spill
+  // simd<fp16, 896> bb;
+  simd<fp16, 768> bb; // avoid grf spill
   simd<fp16, 64> bbb;
   simd<float, 8 * 16> aa;
   simd<float, 16> cc(0.0f);
@@ -891,7 +892,8 @@ ESIMD_INLINE void matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex(
 
 #pragma unroll
   for (int k = 0; k < 12; k++) {
-    bb.template bit_cast_view<unsigned char>().template select<128, 1>(128 * k) =
+    bb.template bit_cast_view<unsigned char>().template select<128, 1>(
+        128 * k) =
         __ESIMD_ENS::lsc_block_load<
             uint8_t,
             128,
@@ -911,7 +913,9 @@ ESIMD_INLINE void matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex(
             __ESIMD_ENS::lsc_data_size::default_size,
             __ESIMD_ENS::cache_hint::cached,
             __ESIMD_ENS::cache_hint::cached>((uint8_t*)b + offsetB);
-    slm_block_store<fp16, 64>(offsetSLM + offsetSLMThread + k * 64 * sizeof(fp16), bbb.select<64, 1>(0));
+    slm_block_store<fp16, 64>(
+        offsetSLM + offsetSLMThread + k * 64 * sizeof(fp16),
+        bbb.select<64, 1>(0));
 
     offsetB += 1024 * sizeof(fp16);
   }
@@ -992,18 +996,16 @@ ESIMD_INLINE void matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex(
         aa.select<32, 1>(32 * kk) = fp32Q[kk] * aa.select<32, 1>(32 * kk);
       }
 
-      if (k < 6)
-      {
+      if (k < 6) {
 #pragma unroll
         for (int kk = 0; kk < 8; kk++) {
           cc += aa.select<16, 1>(16 * kk) * bb.select<16, 1>(16 * kk + 128 * k);
         }
-      }
-      else
-      {
+      } else {
 #pragma unroll
         for (int kk = 0; kk < 8; kk++) {
-          bbb.select<16, 1>(0) = slm_block_load<fp16, 16>(offsetSLM + offsetSLMThread + 16 * kk * sizeof(fp16));
+          bbb.select<16, 1>(0) = slm_block_load<fp16, 16>(
+              offsetSLM + offsetSLMThread + 16 * kk * sizeof(fp16));
           cc += aa.select<16, 1>(16 * kk) * bbb.select<16, 1>(0);
         }
       }
@@ -1031,11 +1033,10 @@ ESIMD_INLINE void matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex(
 
 #pragma unroll
     for (int k = 1; k < 16; k++) {
-      bb.select<16, 1>(0) =
-          bb.select<16, 1>(0) + bb.select<16, 1>(16 * k);
+      bb.select<16, 1>(0) = bb.select<16, 1>(0) + bb.select<16, 1>(16 * k);
     }
 
-    //bb.select<16, 1>(0) = bb_f32.select<16, 1>(0);
+    // bb.select<16, 1>(0) = bb_f32.select<16, 1>(0);
 
     __ESIMD_ENS::lsc_block_store<
         fp16,

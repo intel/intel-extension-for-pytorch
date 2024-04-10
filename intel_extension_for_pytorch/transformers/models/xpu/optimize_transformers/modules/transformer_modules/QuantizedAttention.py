@@ -169,6 +169,18 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         )
         self.qkv_proj_quant.blocksize = self.q_proj_quant.blocksize
 
+        try_linear_out_reorder_input = torch.empty(
+            1, 1, 4096, dtype=torch.float16, device="xpu"
+        )
+        try_linear_out_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+            try_linear_out_reorder_input,
+            self.out_proj_quant.qweight,
+            self.out_proj_quant.scales,
+            self.out_proj_quant.qzeros,
+            self.out_proj_quant.blocksize,
+            True,
+        )
+
     def compute_qkv_gemm(self, hidden_states, query, key, value):
         torch.ops.torch_ipex.mm_qkv_out_int4(
             hidden_states,
@@ -196,12 +208,13 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                     self.out_proj_quant.blocksize,
                 )
             else:
-                attn_output = torch.ops.torch_ipex.mm_int4(
+                attn_output = torch.ops.torch_ipex.mm_esimd_int4(
                     attn_output,
                     self.out_proj_quant.qweight,
                     self.out_proj_quant.scales,
                     self.out_proj_quant.qzeros,
                     self.out_proj_quant.blocksize,
+                    False,
                 )
         else:
             shape = [attn_output.shape[0], attn_output.shape[1], self.embed_dim]
@@ -215,12 +228,13 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                     self.out_proj_quant.blocksize,
                 )
             else:
-                attn_output = torch.ops.torch_ipex.mm_int4(
+                attn_output = torch.ops.torch_ipex.mm_esimd_int4(
                     attn_output,
                     self.out_proj_quant.qweight,
                     self.out_proj_quant.scales,
                     self.out_proj_quant.qzeros,
                     self.out_proj_quant.blocksize,
+                    False,
                 )
             attn_output = attn_output + residual
             attn_output = attn_output.view(shape)
