@@ -113,7 +113,7 @@ static inline void gemm_int4_esimd_kernel(
 
   // reorder for the weights and scaling
   // Assume group size 32.   4096 / 32 = 128
-  if (reorder) {
+  if (need_reorder) {
     sycl::event e0;
     uint8_t* weight_reorder = (uint8_t*)weight;
     uint8_t* reorderTmp = reorder_buffer;
@@ -570,8 +570,7 @@ static Tensor mm_esimd_int4(
   uint32_t m = input_flat.sizes()[0]; // 1
   uint32_t k = input_flat.sizes()[1]; // 4096
   uint32_t n = weight.sizes()[1] * 2; // 11008
-  if (need_reorder)
-    auto reorder_buffer = at::empty({k, n}, weight.options());
+  auto reorder_buffer = at::empty({k, n}, weight.options());
   auto output = at::empty({m, n}, input.options()); // 11008, 11008
 
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
@@ -590,11 +589,11 @@ static Tensor mm_esimd_int4(
               weight_scl.data_ptr<scalar_t>(),
               weight_zp.data_ptr<uint8_t>(),
               need_reorder ? reorder_buffer.data_ptr<uint8_t>() : nullptr,
-              ,
               calib_gz,
               m,
               n,
-              k);
+              k,
+              need_reorder);
         });
   } else {
     AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
