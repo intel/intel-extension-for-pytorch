@@ -1,5 +1,4 @@
 import torch
-import intel_extension_for_pytorch as ipex
 
 from .._transformer_configuration import IPEXTransformerConfig
 from .Attention import IPEXTransformerAttnOptimizedFp16
@@ -236,7 +235,6 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
         super().__init__(config)
         self.num_kv_head = config.num_key_value_head // self.tp_size
         self.num_kv_group = self.num_attn_head // self.num_kv_head
-        self.arch = 1 if ipex._C._has_2d_block_array(0) else 0
 
     # int4 grouped attention do not support fused_qkv computation so far
 
@@ -293,55 +291,55 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
         if self.q_proj.bias is None:
             query = torch.ops.torch_ipex.mm_int4(
                 hidden_states_flat,
-                self.q_proj_quant.weight,
-                self.q_proj_quant.scale,
-                self.q_proj_quant.zp,
-                self.q_proj_quant.gs,
+                self.q_proj_quant.qweight,
+                self.q_proj_quant.scales,
+                self.q_proj_quant.qzeros,
+                self.q_proj_quant.blocksize,
             )
         else:
             query = torch.ops.torch_ipex.mm_int4(
                 hidden_states_flat,
-                self.q_proj_quant.weight,
+                self.q_proj_quant.qweight,
                 self.q_proj_quant.bias,
-                self.q_proj_quant.scale,
-                self.q_proj_quant.zp,
-                self.q_proj_quant.gs,
+                self.q_proj_quant.scales,
+                self.q_proj_quant.qzeros,
+                self.q_proj_quant.blocksize,
             )
 
         if self.k_proj.bias is None:
             key = torch.ops.torch_ipex.mm_int4(
                 hidden_states_flat,
-                self.k_proj_quant.weight,
-                self.k_proj_quant.scale,
-                self.k_proj_quant.zp,
-                self.k_proj_quant.gs,
+                self.k_proj_quant.qweight,
+                self.k_proj_quant.scales,
+                self.k_proj_quant.qzeros,
+                self.k_proj_quant.blocksize,
             )
         else:
             key = torch.ops.torch_ipex.mm_int4(
                 hidden_states_flat,
-                self.k_proj_quant.weight,
+                self.k_proj_quant.qweight,
                 self.k_proj_quant.bias,
-                self.k_proj_quant.scale,
-                self.k_proj_quant.zp,
-                self.k_proj_quant.gs,
+                self.k_proj_quant.scales,
+                self.k_proj_quant.qzeros,
+                self.k_proj_quant.blocksize,
             )
 
         if self.v_proj.bias is None:
             value = torch.ops.torch_ipex.mm_int4(
                 hidden_states_flat,
-                self.v_proj_quant.weight,
-                self.v_proj_quant.scale,
-                self.v_proj_quant.zp,
-                self.v_proj_quant.gs,
+                self.v_proj_quant.qweight,
+                self.v_proj_quant.scales,
+                self.v_proj_quant.qzeros,
+                self.v_proj_quant.blocksize,
             )
         else:
             value = torch.ops.torch_ipex.mm_int4(
                 hidden_states_flat,
-                self.v_proj_quant.weight,
+                self.v_proj_quant.qweight,
                 self.v_proj_quant.bias,
-                self.v_proj_quant.scale,
-                self.v_proj_quant.zp,
-                self.v_proj_quant.gs,
+                self.v_proj_quant.scales,
+                self.v_proj_quant.qzeros,
+                self.v_proj_quant.blocksize,
             )
         return query, key, value
 
