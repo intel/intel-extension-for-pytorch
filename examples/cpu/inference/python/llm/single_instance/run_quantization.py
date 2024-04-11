@@ -634,17 +634,6 @@ if args.ipex_smooth_quant:
                         "shared_criterion": args.shared_criterion,
                         "enable_blockwise_loss": args.enable_blockwise_loss
                 }
-                # using specified sq recipes for llama2-7b
-                if re.search("llama", config.architectures[0], re.IGNORECASE):
-                    smoothquant_args = {"alpha": "auto", "folding": False}
-                    smoothquant_args["auto_alpha_args"] = {
-                        "init_alpha": 0.8,
-                        "alpha_min": 0.8,
-                        "alpha_max": 0.99,
-                        "alpha_step": 0.01,
-                        "shared_criterion": "mean",
-                        "enable_blockwise_loss": False
-                }
 
             prepared_model = ipex.quantization.autotune(
                 user_model,
