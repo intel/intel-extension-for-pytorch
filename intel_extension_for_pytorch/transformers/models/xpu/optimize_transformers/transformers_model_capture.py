@@ -287,9 +287,9 @@ class TransformersModelCapture(ModelCapture):
                                     args["token_type_ids"] = token_type_ids_change
                                     args["return_dict"] = return_dict_change
                                     args["output_attentions"] = output_attentions_change
-                                    args[
-                                        "output_hidden_states"
-                                    ] = output_hidden_states_change
+                                    args["output_hidden_states"] = (
+                                        output_hidden_states_change
+                                    )
                                     args["past_key_values"] = None
                                 # dynamo_model = torch._dynamo.optimize(
                                 #    compiler, dynamic=True
@@ -314,9 +314,9 @@ class TransformersModelCapture(ModelCapture):
                                     args["token_type_ids"] = token_type_ids_change
                                     args["return_dict"] = return_dict_change
                                     args["output_attentions"] = output_attentions_change
-                                    args[
-                                        "output_hidden_states"
-                                    ] = output_hidden_states_change
+                                    args["output_hidden_states"] = (
+                                        output_hidden_states_change
+                                    )
                                     args["past_key_values"] = None
 
                                 self.method = RunMethods.EagerInfer

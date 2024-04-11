@@ -1,4 +1,5 @@
 r"""Functional interface, port from torch/optim/_function.py"""
+
 import torch
 from torch import Tensor
 from typing import List, Optional
