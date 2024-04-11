@@ -9,8 +9,8 @@ dpcpp_device = torch.device("xpu")
 
 class TestNNMethod(TestCase):
     def test_adaptive_avg_pool2d(self, dtype=torch.float):
-        x_cpu = torch.ones([1, 2048, 7, 7], device=cpu_device)
-        grad_cpu = torch.ones([1, 2048, 2, 2], device=cpu_device)
+        x_cpu = torch.ones([1, 2048, 7, 7], device=cpu_device, dtype=dtype)
+        grad_cpu = torch.ones([1, 2048, 2, 2], device=cpu_device, dtype=dtype)
         x_dpcpp = x_cpu.to(dpcpp_device)
         grad_dpcpp = grad_cpu.to(dpcpp_device)
         self.assertEqual(x_cpu, x_dpcpp.to(cpu_device))
@@ -23,20 +23,20 @@ class TestNNMethod(TestCase):
 
         # y_cpu = conv1(x_cpu)
         y_cpu = avg_pool(x_cpu)
-        print("y_cpu", y_cpu)
+        #print("y_cpu", y_cpu)
         # conv1.zero_grad()
         output_cpu = y_cpu.backward(grad_cpu)
-        print("x_cpu.grad", x_cpu.grad)
+        #print("x_cpu.grad", x_cpu.grad)
 
         x_dpcpp.requires_grad_(True)
         avg_pool.to(dpcpp_device)
         # conv1 = conv1.dpcpp()
         # y_dpcpp = conv1(x_dpcpp)
         y_dpcpp = avg_pool(x_dpcpp)
-        print("y_dpcpp", y_dpcpp.cpu())
+        #print("y_dpcpp", y_dpcpp.cpu())
         # conv1.zero_grad()
         output_dpcpp = y_dpcpp.backward(grad_dpcpp)
-        print("x_dpcpp.grad", x_dpcpp.grad.cpu())
+        #print("x_dpcpp.grad", x_dpcpp.grad.cpu())
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
 
         # test output_size(0) == output_size(1) == 1 case
@@ -53,6 +53,99 @@ class TestNNMethod(TestCase):
         result = avg_pool(a)
         result_cpu = avg_pool(a_cpu)
         self.assertEqual(result_cpu, result.to(cpu_device))
+
+    def test_adaptive_avg_pool2d_bfloat16(self, dtype=torch.bfloat16):
+        x_cpu = torch.ones([1, 2048, 7, 7], device=cpu_device, dtype=dtype)
+        grad_cpu = torch.ones([1, 2048, 2, 2], device=cpu_device, dtype=dtype)
+        x_dpcpp = x_cpu.to(dpcpp_device)
+        grad_dpcpp = grad_cpu.to(dpcpp_device)
+        self.assertEqual(x_cpu, x_dpcpp.to(cpu_device))
+        self.assertEqual(grad_cpu, grad_dpcpp.to(cpu_device))
+
+        avg_pool = nn.AdaptiveAvgPool2d((2, 2))
+        # conv1 = nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=True)
+
+        x_cpu.requires_grad_(True)
+
+        # y_cpu = conv1(x_cpu)
+        y_cpu = avg_pool(x_cpu)
+        #print("y_cpu", y_cpu)
+        # conv1.zero_grad()
+        output_cpu = y_cpu.backward(grad_cpu)
+        #print("x_cpu.grad", x_cpu.grad)
+
+        x_dpcpp.requires_grad_(True)
+        avg_pool.to(dpcpp_device)
+        # conv1 = conv1.dpcpp()
+        # y_dpcpp = conv1(x_dpcpp)
+        y_dpcpp = avg_pool(x_dpcpp)
+        #print("y_dpcpp", y_dpcpp.cpu())
+        # conv1.zero_grad()
+        output_dpcpp = y_dpcpp.backward(grad_dpcpp)
+        #print("x_dpcpp.grad", x_dpcpp.grad.cpu())
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device))
+
+        # test output_size(0) == output_size(1) == 1 case
+        stride = [5760000, 1, 19200, 64]
+        shape = [64, 64, 300, 300]
+        avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        a = (
+            torch.randn(shape[0] * stride[0] + 1, dtype=torch.bfloat16)
+            .to(dpcpp_device)
+            .as_strided(shape, stride)
+        )
+        a_cpu = a.to(cpu_device)
+
+        result = avg_pool(a)
+        result_cpu = avg_pool(a_cpu)
+        self.assertEqual(result_cpu, result.to(cpu_device))
+
+    def test_adaptive_avg_pool2d_float16(self, dtype=torch.bfloat16):
+        x_cpu = torch.ones([1, 2048, 7, 7], device=cpu_device, dtype=dtype)
+        grad_cpu = torch.ones([1, 2048, 2, 2], device=cpu_device, dtype=dtype)
+        dtype_dpcpp = torch.float16
+        x_dpcpp = x_cpu.to(dpcpp_device).to(dtype_dpcpp)
+        grad_dpcpp = grad_cpu.to(dpcpp_device).to(dtype_dpcpp)
+        self.assertEqual(x_cpu, x_dpcpp.to(cpu_device).to(torch.bfloat16))
+        self.assertEqual(grad_cpu, grad_dpcpp.to(cpu_device).to(torch.bfloat16))
+
+        avg_pool = nn.AdaptiveAvgPool2d((2, 2))
+        # conv1 = nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=True)
+
+        x_cpu.requires_grad_(True)
+
+        # y_cpu = conv1(x_cpu)
+        y_cpu = avg_pool(x_cpu)
+        #print("y_cpu", y_cpu)
+        # conv1.zero_grad()
+        output_cpu = y_cpu.backward(grad_cpu)
+        #print("x_cpu.grad", x_cpu.grad)
+
+        x_dpcpp.requires_grad_(True)
+        avg_pool.to(dpcpp_device)
+        # conv1 = conv1.dpcpp()
+        # y_dpcpp = conv1(x_dpcpp)
+        y_dpcpp = avg_pool(x_dpcpp)
+        #print("y_dpcpp", y_dpcpp.cpu())
+        # conv1.zero_grad()
+        output_dpcpp = y_dpcpp.backward(grad_dpcpp)
+        #print("x_dpcpp.grad", x_dpcpp.grad.cpu())
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.to(cpu_device).to(torch.bfloat16))
+
+        # test output_size(0) == output_size(1) == 1 case
+        stride = [5760000, 1, 19200, 64]
+        shape = [64, 64, 300, 300]
+        avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        a = (
+            torch.randn(shape[0] * stride[0] + 1, dtype=torch.bfloat16)
+            .to(dpcpp_device)
+            .as_strided(shape, stride)
+        )
+        a_cpu = a.to(cpu_device)
+
+        result = avg_pool(a)
+        result_cpu = avg_pool(a_cpu)
+        self.assertEqual(result_cpu, result.to(cpu_device).to(torch.bfloat16))
 
     def test_channels_last_simple_fwd(self, dtype=torch.float):
         x_cpu = torch.ones([1, 2048, 7, 7], device=cpu_device)

@@ -7,15 +7,18 @@ import intel_extension_for_pytorch  # noqa
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
-shapes = [
-        (1, 512, 16, 64)
-]
-
 class TestTensorMethod(TestCase):
     def test_clone(self, dtype=torch.float):
-        for shape in shapes:
-            print("\n================== test shape: ", shape, "==================")
-            x_cpu = torch.randn(shape, device=cpu_device)
-            x_xpu = x_cpu.to("xpu")
-            
-            self.assertEqual(x_cpu.clone(), x_xpu.clone().to(cpu_device))
+        x_cpu = torch.randn((1, 512, 16, 64), device=cpu_device, dtype=dtype)
+        x_xpu = x_cpu.to("xpu")
+        self.assertEqual(x_cpu.clone(), x_xpu.clone().to(cpu_device))
+
+    def test_clone_bfloat16(self, dtype=torch.bfloat16):
+        x_cpu = torch.randn((1, 512, 16, 64), device=cpu_device, dtype=dtype)
+        x_xpu = x_cpu.to("xpu")
+        self.assertEqual(x_cpu.clone(), x_xpu.clone().to(cpu_device))
+
+    def test_clone_float16(self, dtype=torch.float16):
+        x_cpu = torch.randn((1, 512, 16, 64), device=cpu_device, dtype=dtype)
+        x_xpu = x_cpu.to("xpu")
+        self.assertEqual(x_cpu.clone(), x_xpu.clone().to(cpu_device))

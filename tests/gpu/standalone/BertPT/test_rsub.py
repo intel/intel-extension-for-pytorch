@@ -9,7 +9,31 @@ dpcpp_device = torch.device("xpu")
 
 class TestTensorMethod(TestCase):
     def test_rsub(self, dtype=torch.float):
-        input_cpu = torch.randn(1, 1, 1, 512)
+        input_cpu = torch.randn(1, 1, 1, 512, dtype=dtype)
+        input_dpcpp = input_cpu.to(dpcpp_device)
+
+        output_cpu = torch.rsub(input_cpu, 2)
+        out_dpcpp = torch.rsub(input_dpcpp, 2)
+
+        # print("input_cpu = ", input_cpu)
+        # print("input_dpcpp = ", input_dpcpp)
+
+        self.assertEqual(output_cpu, out_dpcpp)
+
+    def test_rsub_bfloat16(self, dtype=torch.bfloat16):
+        input_cpu = torch.randn(1, 1, 1, 512, dtype=dtype)
+        input_dpcpp = input_cpu.to(dpcpp_device)
+
+        output_cpu = torch.rsub(input_cpu, 2)
+        out_dpcpp = torch.rsub(input_dpcpp, 2)
+
+        # print("input_cpu = ", input_cpu)
+        # print("input_dpcpp = ", input_dpcpp)
+
+        self.assertEqual(output_cpu, out_dpcpp)
+
+    def test_rsub_float16(self, dtype=torch.float16):
+        input_cpu = torch.randn(1, 1, 1, 512, dtype=dtype)
         input_dpcpp = input_cpu.to(dpcpp_device)
 
         output_cpu = torch.rsub(input_cpu, 2)

@@ -29,7 +29,55 @@ shapes_Gelu = [
 class TestNNMethod(TestCase):
     def test_activation_relu(self, dtype=torch.float):
         for shape in shapes_Relu:
-            print("\n================== test shape: ", shape, "==================")
+            #print("\n================== test shape: ", shape, "==================")
+            relu_ = torch.nn.functional.relu_
+            relu = torch.nn.functional.relu
+            x_cpu = torch.randn(shape, dtype=dtype, device=cpu_device)
+            x_dpcpp = x_cpu.to("xpu")
+
+            relu_(x_cpu)
+            relu_(x_dpcpp)
+            self.assertEqual(x_cpu, x_dpcpp.cpu())
+
+            x_cpu.requires_grad_(True)
+            x_dpcpp.requires_grad_(True)
+            y_cpu = relu(x_cpu)
+            y_dpcpp = relu(x_dpcpp)
+
+            self.assertEqual(y_cpu, y_dpcpp.cpu())
+
+            y_cpu.backward(x_cpu)
+            y_dpcpp.backward(x_dpcpp)
+
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+    
+    def test_activation_relu_bfloat16(self, dtype=torch.bfloat16):
+        for shape in shapes_Relu:
+            #print("\n================== test shape: ", shape, "==================")
+            relu_ = torch.nn.functional.relu_
+            relu = torch.nn.functional.relu
+            x_cpu = torch.randn(shape, dtype=dtype, device=cpu_device)
+            x_dpcpp = x_cpu.to("xpu")
+
+            relu_(x_cpu)
+            relu_(x_dpcpp)
+            self.assertEqual(x_cpu, x_dpcpp.cpu())
+
+            x_cpu.requires_grad_(True)
+            x_dpcpp.requires_grad_(True)
+            y_cpu = relu(x_cpu)
+            y_dpcpp = relu(x_dpcpp)
+
+            self.assertEqual(y_cpu, y_dpcpp.cpu())
+
+            y_cpu.backward(x_cpu)
+            y_dpcpp.backward(x_dpcpp)
+
+            self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+    def test_activation_relu_float16(self, dtype=torch.float16):
+        for shape in shapes_Relu:
+            #print("\n================== test shape: ", shape, "==================")
             relu_ = torch.nn.functional.relu_
             relu = torch.nn.functional.relu
             x_cpu = torch.randn(shape, dtype=dtype, device=cpu_device)
@@ -53,7 +101,7 @@ class TestNNMethod(TestCase):
 
     def test_activation_gelu(self, dtype=torch.float):
         for shape in shapes_Gelu:
-            print("\n================== test shape: ", shape, "==================")
+            #print("\n================== test shape: ", shape, "==================")
             C, H, W = shape[0], shape[1], shape[2]
             GELU = torch.nn.GELU()
             GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
@@ -75,7 +123,7 @@ class TestNNMethod(TestCase):
 
     def test_activation_gelu_block(self, dtype=torch.float):
          for shape in shapes_Gelu:
-            print("\n================== test shape: ", shape, "==================")
+            #print("\n================== test shape: ", shape, "==================")
             C, H, W = shape[0], shape[1], shape[2]
             to_block_cpu = torch.nn.Conv2d(C, C, kernel_size=3, padding=1)
             to_block_dpcpp = copy.deepcopy(to_block_cpu).xpu()
@@ -94,4 +142,3 @@ class TestNNMethod(TestCase):
                 y_dpcpp.backward(x_dpcpp)
 
                 self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
-

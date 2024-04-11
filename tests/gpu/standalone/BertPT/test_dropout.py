@@ -8,7 +8,7 @@ sycl_device = torch.device("xpu")
 device = sycl_device
 
 class TestNNMethod(TestCase):
-    def test_dropout_1(self):
+    def test_dropout_1(self, dtype=torch.float):
         p = 0.2
         # cover the code path without tailing
         input = torch.randn(1, 512, 1024)
@@ -52,7 +52,94 @@ class TestNNMethod(TestCase):
         output.backward(input)
         self.assertLess(abs(input_var.grad.cpu().data.mean() - (1 - p)), 0.05)
 
-    def test_dropout_2(self):
+    def test_dropout_bfloat16_1(self, dtype=torch.bfloat16):
+        p = 0.2
+        # cover the code path without tailing
+        input = torch.randn(1, 512, 1024, dtype=dtype)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        self.assertLess(abs(output.cpu().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().data.mean() - (1 - p)), 0.05)
+
+        # cover the code path with tailing
+        input = torch.randn(1, 512, 1024, dtype=dtype)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        
+        self.assertLess(abs(output.cpu().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().data.mean() - (1 - p)), 0.05)
+
+        # cover the code path with non-contiguous input
+        input_orig = torch.randn(1, 512, 1024, dtype=dtype)
+        input = input_orig.transpose(1, 0)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        
+        self.assertLess(abs(output.cpu().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().data.mean() - (1 - p)), 0.05)
+
+    def test_dropout_float16_1(self, dtype=torch.float16):
+        p = 0.2
+        # cover the code path without tailing
+        input = torch.randn(1, 512, 1024, dtype=dtype)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        #a = abs(output.cpu().data.mean() - (1 - p))
+        self.assertLess(abs(output.cpu().float().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().float().data.mean() - (1 - p)), 0.05)
+
+        # cover the code path with tailing
+        input = torch.randn(1, 512, 1024, dtype=dtype)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        self.assertLess(abs(output.cpu().float().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().float().data.mean() - (1 - p)), 0.05)
+
+        # cover the code path with non-contiguous input
+        input_orig = torch.randn(1, 512, 1024, dtype=dtype)
+        input = input_orig.transpose(1, 0)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        self.assertLess(abs(output.cpu().float().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().float().data.mean() - (1 - p)), 0.05)
+
+    def test_dropout_2(self, dtype=torch.float):
         p = 0.2
         # cover the code path without tailing
         input = torch.randn(1, 16, 512, 512)
@@ -95,3 +182,92 @@ class TestNNMethod(TestCase):
         self.assertLess(abs(output.cpu().data.mean() - (1 - p)), 0.05)
         output.backward(input)
         self.assertLess(abs(input_var.grad.cpu().data.mean() - (1 - p)), 0.05)
+
+    def test_dropout_bfloat16_2(self, dtype=torch.bfloat16):
+        p = 0.2
+        # cover the code path without tailing
+        input = torch.randn(1, 16, 512, 512, dtype=dtype)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        self.assertLess(abs(output.cpu().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().data.mean() - (1 - p)), 0.05)
+
+        # cover the code path with tailing
+        input = torch.randn(1, 16, 512, 512, dtype=dtype)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        
+        self.assertLess(abs(output.cpu().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().data.mean() - (1 - p)), 0.05)
+
+        # cover the code path with non-contiguous input
+        input_orig = torch.randn(1, 16, 512, 512, dtype=dtype)
+        input = input_orig.transpose(1, 0)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        
+        self.assertLess(abs(output.cpu().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().data.mean() - (1 - p)), 0.05)
+
+    def test_dropout_float16_2(self, dtype=torch.float16):
+        p = 0.2
+        # cover the code path without tailing
+        input = torch.randn(1, 16, 512, 512, dtype=dtype)
+        dtype_dpcpp = torch.float16
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        self.assertLess(abs(output.cpu().float().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().float().data.mean() - (1 - p)), 0.05)
+
+        # cover the code path with tailing
+        input = torch.randn(1, 16, 512, 512, dtype=dtype)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        
+        self.assertLess(abs(output.cpu().float().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().float().data.mean() - (1 - p)), 0.05)
+
+        # cover the code path with non-contiguous input
+        input_orig = torch.randn(1, 16, 512, 512, dtype=dtype)
+        input = input_orig.transpose(1, 0)
+        input = input.to(device).fill_(1 - p)  # input valuses are 0.8
+
+        module = nn.Dropout(p)
+        input_var = input.clone().requires_grad_()
+        output = module(
+            input_var
+        )  # output values are 0.0 and 1.0 (input_value * 1/(1-p))
+        
+        self.assertLess(abs(output.cpu().float().data.mean() - (1 - p)), 0.05)
+        output.backward(input)
+        self.assertLess(abs(input_var.grad.cpu().float().data.mean() - (1 - p)), 0.05)
