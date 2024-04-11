@@ -1614,10 +1614,10 @@ class _one_api_help:
     def get_onemkl_libraries(self):
         MKLROOT = self.__onemkl_root
         return [
-            f"{MKLROOT}/lib/intel64/libmkl_sycl.a",
-            f"{MKLROOT}/lib/intel64/libmkl_intel_ilp64.a",
-            f"{MKLROOT}/lib/intel64/libmkl_sequential.a",
-            f"{MKLROOT}/lib/intel64/libmkl_core.a",
+            f"{MKLROOT}/lib/libmkl_sycl.a",
+            f"{MKLROOT}/lib/libmkl_intel_ilp64.a",
+            f"{MKLROOT}/lib/libmkl_sequential.a",
+            f"{MKLROOT}/lib/libmkl_core.a",
         ]
 
 
