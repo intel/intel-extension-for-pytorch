@@ -653,8 +653,6 @@ class ChatGLMRotaryEmbedding(PositionalEmbedding):
         key: torch.Tensor,
         rotary_pos_emb: torch.Tensor,
     ):
-        rotary_pos_emb = torch.repeat_interleave(rotary_pos_emb, 2, -2)
-
         sin = rotary_pos_emb[..., 1]
         cos = rotary_pos_emb[..., 0]
 
@@ -671,8 +669,6 @@ class ChatGLMRotaryEmbedding(PositionalEmbedding):
             cos_k = cos.expand(key.shape)
             sin_k = sin.expand(key.shape)
             torch.ops.torch_ipex.apply_rotary_embedding_two(key, sin_k, cos_k, key)
-
-        return query, key
 
     def apply_rotary_pos_emb_ref(
         self, x: torch.Tensor, rope_cache: torch.Tensor
@@ -698,8 +694,8 @@ class ChatGLMRotaryEmbedding(PositionalEmbedding):
         return torch.cat((x_out2, x_pass), dim=-1)
 
     def forward(self, query, key, rotary_pos_emb):
-        rot_dim = rotary_pos_emb.shape[-2] * 2
-        query[..., :rot_dim], key[..., :rot_dim] = self.apply_rotary_pos_emb(
+        rot_dim = rotary_pos_emb.shape[-2]
+        self.apply_rotary_pos_emb(
             query[..., :rot_dim], key[..., :rot_dim], rotary_pos_emb
         )
         return query, key
