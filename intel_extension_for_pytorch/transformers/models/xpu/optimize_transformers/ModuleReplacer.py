@@ -29,7 +29,11 @@ from .modules.llama import NewIPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
 from .modules.falcon import NewIPEXFalconBlock
 from .modules.qwen import NewIPEXQWENBlock
-from .modules.chatglm import NewIPEXCHATGLMBlock, prepare_inputs_for_generation
+from .modules.chatglm import (
+    NewIPEXCHATGLMBlock,
+    prepare_inputs_for_generation,
+    NewIPEXRotaryEmbedding,
+)
 from .modules.DiffusersTransformer import NewIPEXBasicTransformerBlock
 from .modules.bert import NewIPEXBertSelfAttention
 
@@ -187,6 +191,18 @@ class ModuleReplacer:
                 if new_module is not None:
                     setattr(model, name, new_module)
                     is_replace_success = True
+            # Replace RotaryEmbedding in ChatGLMModel
+            elif (
+                model.__class__.__name__ == "ChatGLMModel"
+                and child.__class__.__name__ == "RotaryEmbedding"
+            ):
+                new_module = NewIPEXRotaryEmbedding(
+                    child,
+                    config,
+                    device="xpu",
+                )
+                if new_module is not None:
+                    setattr(model, name, new_module)
             else:
                 is_replace_success = (
                     self.replace_module(child, dtype, config, module_name + name)
