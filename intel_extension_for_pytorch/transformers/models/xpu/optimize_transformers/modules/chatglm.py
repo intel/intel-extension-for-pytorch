@@ -280,7 +280,8 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
                     attention_mask.shape[3],
                 )
 
-        rotary_pos_emb = rotary_pos_emb.unsqueeze(2)
+        if rotary_pos_emb is not None:
+            rotary_pos_emb = rotary_pos_emb.unsqueeze(2)
 
         layernorm_output = self.input_layernorm(hidden_states)
 
