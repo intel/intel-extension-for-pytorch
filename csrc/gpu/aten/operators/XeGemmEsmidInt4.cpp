@@ -4,14 +4,14 @@
 #include <ATen/record_function.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <oneDNN/oneDNN.h>
+// #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <stdlib.h>
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
 // #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
-#include "utils/ComputeEngine.h"
+// #include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
 
 #include <sycl/ext/intel/esimd.hpp>
@@ -661,9 +661,10 @@ static Tensor mm_esimd_int4(
   auto input_flat = input.flatten(0, -2); // 1, 1, 4096 -> 1, 4096
   auto weight_flat = weight.flatten(0, -2); // 4096, 5504, 1 -> 4096, 5504
 
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input, weight);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+  // xpu::COMPUTE_ENG real_eng =
+  //     choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input, weight);
+  // bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+  bool compute_eng_valid = true;
 
   uint32_t m = input_flat.sizes()[0]; // 1
   uint32_t k = input_flat.sizes()[1]; // 4096
@@ -718,9 +719,10 @@ static void qkv_mm_esimd_int4(
     bool need_reorder) {
   // YC std::cout << "start qkv_mm_esimd_int4" << std::endl;
 
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input_, weight);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+  // xpu::COMPUTE_ENG real_eng =
+  //     choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input_, weight);
+  // bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+  bool compute_eng_valid = true;
 
   auto input = input_.flatten(0, -2);
   if (input.scalar_type() == ScalarType::Float)

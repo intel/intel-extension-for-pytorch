@@ -4,14 +4,14 @@
 #include <ATen/record_function.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
-#include <oneDNN/oneDNN.h>
+// #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <stdlib.h>
 #include <utils/oneMKLUtils.h>
 #include "comm/ATDispatch.h"
 // #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
-#include "utils/ComputeEngine.h"
+// #include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
 
 #include <sycl/ext/intel/esimd.hpp>
@@ -118,9 +118,10 @@ static Tensor sdp_esimd(
       key.scalar_type() == at::kHalf, "IPEX SDP only supports half datatype");
   TORCH_CHECK(
       value.scalar_type() == at::kHalf, "IPEX SDP only supports half datatype");
-  xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, query, key);
-  bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+  // xpu::COMPUTE_ENG real_eng =
+  //     choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, query, key);
+  // bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+  bool compute_eng_valid = true;
 
   int64_t num_heads_q = query.size(1);
   int64_t num_heads_k = key.size(1);
