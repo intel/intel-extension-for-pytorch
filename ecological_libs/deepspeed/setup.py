@@ -1,13 +1,53 @@
 import os
+import sys
+from functools import lru_cache
 from setuptools import setup
-import intel_extension_for_pytorch
-from torch.xpu.cpp_extension import DPCPPExtension, DpcppBuildExtension
 
 PACKAGE_NAME = "intel_extension_for_pytorch_deepspeed"
 
+@lru_cache(maxsize=128)
+def _get_build_target():
+    build_target = ""
+    if len(sys.argv) > 1:
+        if sys.argv[1] in ["clean"]:
+            build_target = "clean"
+        elif sys.argv[1] in ["develop"]:
+            build_target = "develop"
+        elif sys.argv[1] in ["bdist_wheel"]:
+            build_target = "bdist_wheel"
+        else:
+            build_target = "python"
+    return build_target
+
+if _get_build_target() in ["develop", "python", "bdist_wheel"]:
+    try:
+        import intel_extension_for_pytorch
+        from torch.xpu.cpp_extension import DPCPPExtension, DpcppBuildExtension
+    except ImportError as e:
+        raise RuntimeError("Fail to import intel_extension_for_pytorch!")
+
+def get_version_num():
+    versions = {}
+    version_file = "../../version.txt"
+    version_lines = open(version_file, "r").readlines()
+    for line in version_lines:
+        key, value = line.strip().split(" ")
+        versions[key] = value
+    for v in ("VERSION_MAJOR", "VERSION_MINOR", "VERSION_PATCH"):
+        if v not in versions:
+            print("ERROR:", v, "is not found in", version_file)
+            sys.exit(1)
+    version = (
+        versions["VERSION_MAJOR"]
+        + "."
+        + versions["VERSION_MINOR"]
+        + "."
+        + versions["VERSION_PATCH"]
+    )
+    return version
 
 def get_build_version():
-    ipex_ds_version = intel_extension_for_pytorch.__version__
+    ipex_ds_version = get_version_num()
     return ipex_ds_version
 
 
@@ -93,9 +133,11 @@ def _build_installation_dependency():
     return install_requires
 
 
-ext_modules = create_ext_modules()
-print(ext_modules)
-cmdclass = {'build_ext': DpcppBuildExtension}
+ext_modules = []
+cmdclass = {}
+if _get_build_target() in ["develop", "python", "bdist_wheel"]:
+    ext_modules += create_ext_modules()
+    cmdclass["build_ext"] = DpcppBuildExtension
 
 long_description = ""
 this_directory = os.path.abspath(os.path.dirname(__file__))
