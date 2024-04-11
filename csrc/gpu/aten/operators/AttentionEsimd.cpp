@@ -54,6 +54,7 @@ static void dump_element(const Tensor src, int nele, std::string str) {
 // forward dpcpp implementation
 template <typename scalar_t>
 static inline void sdp_esimd_kernel(
+    int heads_kv,
     scalar_t* query,
     scalar_t* key,
     scalar_t* value,
@@ -79,18 +80,36 @@ static inline void sdp_esimd_kernel(
   sycl::nd_range<2> Range(GlobalRange, LocalRange);
   sycl::event e;
   int vCacheStride = 0; // not used.
-  e = dpcpp_queue.submit([&](handler& cgh) {
-    cgh.parallel_for(Range, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
-      qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
-          (uint8_t*)query,
-          (uint8_t*)key,
-          (uint8_t*)value,
-          (uint8_t*)output,
-          kv_len,
-          vCacheStride,
-          ndi);
+  if (heads_kv == 32) {
+    e = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(Range, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
+        qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex<32>(
+            (uint8_t*)query,
+            (uint8_t*)key,
+            (uint8_t*)value,
+            (uint8_t*)output,
+            kv_len,
+            vCacheStride,
+            ndi);
+      });
     });
-  });
+  } else if (heads_kv == 8) {
+    e = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(Range, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
+        qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex<8>(
+            (uint8_t*)query,
+            (uint8_t*)key,
+            (uint8_t*)value,
+            (uint8_t*)output,
+            kv_len,
+            vCacheStride,
+            ndi);
+      });
+    });
+  } else {
+    AT_ERROR("ESIMD SDP: invalid HEADS_KV!");
+  }
+
   // YC e.wait();
   // double etime = report_time("SDP fused kernel time", e, e);
 
@@ -128,6 +147,8 @@ static Tensor sdp_esimd(
   int64_t M = query.size(-2);
   int64_t N = key.size(-2);
   auto kv_len = N;
+  TORCH_CHECK(num_heads_q == 32, "ESIMD SDP only supports num_heads == 32");
+  TORCH_CHECK(query.size(-1) == 128, "ESIMD SDP only supports head_dim == 32");
 
   auto output = at::empty_like(query);
   auto dpcpp_queue = dpcppGetCurrentQueue();
@@ -145,6 +166,7 @@ static Tensor sdp_esimd(
     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
         query.scalar_type(), "sdp_esimd", [&] {
           impl::sdp_esimd_kernel<scalar_t>(
+              num_heads_k,
               query.data_ptr<scalar_t>(),
               key.data_ptr<scalar_t>(),
               value.data_ptr<scalar_t>(),

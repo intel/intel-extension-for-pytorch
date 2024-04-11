@@ -1,3 +1,12 @@
+
+#include <sycl/ext/intel/esimd.hpp>
+#include <sycl/sycl.hpp>
+using namespace sycl::ext::intel::esimd;
+using namespace sycl::ext::intel::esimd::xmx;
+using fp16 = sycl::half;
+using namespace sycl;
+
+template <int headsKV = 32>
 ESIMD_INLINE void qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
     uint8_t* qState,
     uint8_t* kState,
@@ -6,17 +15,24 @@ ESIMD_INLINE void qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
     int kvSeqLen,
     int vCacheStride,
     nd_item<2>& ndi) {
+  constexpr int headDim = 128;
+  constexpr int headsQ = 32;
+  constexpr int loopStepKV = 32;
+  constexpr int groupSize = headsQ / headsKV;
   constexpr float matMulQuantCoeff =
       0.08838834764831844f; // 1.0f / sqrt(128.0f);
+  static_assert(
+      headsQ % headsKV == 0, "headsQ should be a multiple of headsKV");
   // constexpr uint32_t baseOffsetInc16[16] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
   // 10, 11, 12, 13, 14, 15 };
   __ESIMD_NS::slm_init(32 * 128 * sizeof(fp16) + 32 * sizeof(float)); //
   int localLinearId = ndi.get_local_linear_id(); // [0, 32)
   int hh = localLinearId & 0x3; // [0, 4)
   int vv = localLinearId >> 2; // [0, 8)
-  int h = ndi.get_group(0); // [0, 32)
-  int v = ndi.get_group(1); // [0, batch)
-  int kvSeqOutLoopCount = (kvSeqLen + 0x1f) >> 5; // seqLen / 64
+  int hQO = ndi.get_group(0); // [0, headsQ)  i.e. head idx of q
+  int hKV = hQO / groupSize; // [0, headsKV) i.e. head idx of k/v
+  int v = ndi.get_group(1); // [0, batch)   i.e. batch idx
+  int kvSeqOutLoopCount = (kvSeqLen + 0x1f) >> 5; // seqLen / loopStepKV
   simd<float, 128> qqFp32;
   simd<fp16, 128> qq;
   simd<fp16, 128> kk;
@@ -30,15 +46,15 @@ ESIMD_INLINE void qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
   simd<float, 1> softMax;
   float softMaxPadding = 0;
   simd<float, 16> output = 0;
-  unsigned int outputOffset = (v * 32 + h) * 128 + localLinearId * 16;
-  unsigned int outputVOffsetSlm = localLinearId * 128 * sizeof(fp16);
-  unsigned int outputSoftmaxOffsetSlm = 32 * 128 * sizeof(fp16);
-  unsigned int offsetQ = h * 128 * sizeof(fp16); // Q is fp16
-  unsigned int offsetK = (h * 128 + localLinearId * 128 * 32) * sizeof(fp16);
+  unsigned int outputOffset = (v * headsQ + hQO) * headDim + localLinearId * 16;
+  unsigned int outputVOffsetSlm = localLinearId * headDim * sizeof(fp16);
+  unsigned int outputSoftmaxOffsetSlm = 32 * headDim * sizeof(fp16);
+  unsigned int offsetQ = hQO * headDim * sizeof(fp16); // Q is fp16
+  unsigned int offsetK =
+      (hKV * headDim + localLinearId * headDim * headsKV) * sizeof(fp16);
   unsigned int offsetVBase =
-      (h * 128 + vv * 16 + hh * 8 * 128 * 32) * sizeof(fp16);
+      (hKV * headDim + vv * 16 + hh * 8 * headDim * headsKV) * sizeof(fp16);
   unsigned int offsetV = offsetVBase;
-  unsigned int offsetV_temp = 0;
   int kvSeqOffset = localLinearId;
 
   qq.template bit_cast_view<unsigned char>().template select<128, 1>(0) =
@@ -61,8 +77,7 @@ ESIMD_INLINE void qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
   qqFp32.select<128, 1>(0) = qq.select<128, 1>(0);
 
   for (int loopIdx = 0; loopIdx < kvSeqOutLoopCount; loopIdx++) {
-    offsetV_temp = offsetV;
-#pragma unroll
+#pragma unroll // load 16*8 elements of v
     for (int k = 0; k < 8; k++) {
       vvState.template bit_cast_view<unsigned char>().template select<32, 1>(
           32 * k) =
@@ -72,11 +87,11 @@ ESIMD_INLINE void qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
               __ESIMD_ENS::lsc_data_size::default_size,
               __ESIMD_ENS::cache_hint::cached,
               __ESIMD_ENS::cache_hint::cached>(
-              (unsigned char*)vState + offsetV_temp);
-      offsetV_temp += 128 * 32 * sizeof(fp16);
+              (unsigned char*)vState + offsetV +
+              headDim * headsKV * k * sizeof(fp16));
     }
 
-    if (kvSeqOffset < kvSeqLen) {
+    if (kvSeqOffset < kvSeqLen) { // calculate softmax value at kvSeqOffset
       output = 0;
       kk.template bit_cast_view<unsigned char>().template select<256, 1>(0) =
           __ESIMD_ENS::lsc_block_load<
@@ -115,7 +130,7 @@ ESIMD_INLINE void qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
 //   vvState.select<16, 1>(32 * ll) = shuffleTemp.select<16, 2>(0);
 //   vvState.select<16, 1>(32 * ll + 16) = shuffleTemp.select<16, 2>(1);
 // }
-#pragma unroll
+#pragma unroll // store flattened 128 elements to slm
     for (int ll = 0; ll < 2; ll++) {
       slm_block_store<fp16, 64>(
           outputVOffsetSlm + ll * 64 * sizeof(fp16),
@@ -128,7 +143,7 @@ ESIMD_INLINE void qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
       int slmSoftMaxLoadOffset = outputSoftmaxOffsetSlm;
       softMaxCache.select<32, 1>(0) =
           slm_block_load<float, 32>(slmSoftMaxLoadOffset);
-#pragma unroll
+#pragma unroll // load 4 blocks => 32 * 16 elms
       for (int cc = 0; cc < 4; cc++) {
         vvCache.select<128, 1>(128 * cc) =
             slm_block_load<fp16, 128>(slmVLoadOffset + 128 * cc * sizeof(fp16));
@@ -136,9 +151,9 @@ ESIMD_INLINE void qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
 
 #pragma unroll
       for (int nn = 0; nn < 4; nn++) {
-        fp32Kv = vvCache.select<128, 1>(128 * nn);
+        fp32Kv = vvCache.select<128, 1>(128 * nn); // 8 * 16 elms
 #pragma unroll
-        for (int nnn = 0; nnn < 8; nnn++) {
+        for (int nnn = 0; nnn < 8; nnn++) { // k-loop of the 2nd gemm
           if (32 * loopIdx + nn * 8 + nnn < kvSeqLen) {
             kvCacheOut.select<16, 1>(0) +=
                 fp32Kv.select<16, 1>(16 * nnn) * softMaxCache[nn * 8 + nnn];
@@ -151,9 +166,9 @@ ESIMD_INLINE void qkvFusion128To2048KvlengthLoopFp32QFp16KvXveSimd16Slm_ipex(
       }
     }
 
-    offsetK += 32 * 128 * 32 * sizeof(fp16);
-    offsetV += 32 * 128 * 32 * sizeof(fp16);
-    kvSeqOffset += 32;
+    offsetK += loopStepKV * headDim * headsKV * sizeof(fp16);
+    offsetV += loopStepKV * headDim * headsKV * sizeof(fp16);
+    kvSeqOffset += loopStepKV;
     barrier();
   }
 

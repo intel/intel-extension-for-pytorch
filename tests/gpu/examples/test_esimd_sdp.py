@@ -7,6 +7,8 @@ from torch.testing._internal.common_utils import TestCase
 
 
 def naive_sdp(query, key, value, attention_mask, head_mask, alibi, alpha):
+    key = key.repeat_interleave(query.shape[1] // key.shape[1], dim=1)
+    value = value.repeat_interleave(query.shape[1] // value.shape[1], dim=1)
     attn_weights = torch.matmul(query, key.transpose(-1, -2))
 
     attn_weights *= alpha
@@ -40,6 +42,7 @@ beam = 1
 bs = 1
 b = bs * beam
 n = 32  # head num
+n_kv = 8  # num_key_value_heads
 h = 128
 
 alpha = 1.0 / math.sqrt(h)
@@ -169,12 +172,9 @@ class TestTorchMethod(TestCase):
     #     )
 
     def test_esmid_sdp_cpu_ref(self, dtype=torch.float16):
-        print("\nf(n_q) t(n_kv) b(beam) n(head) h(hid dim) are:")
-        print(f)
-        print(t)
-        print(b)
-        print(n)
-        print(h)
+        print("\nf(n_q) t(n_kv) b(beam) n(heads) n_kv(kv_heads) h(hid dim) are:")
+        print(f, t, b, n, n_kv, h)
+        assert n % n_kv == 0, "n should be a multiple of n_kv"
 
         q = (
             torch.randn([b, f, n, h], dtype=dtype, device=torch.device("xpu")) * 2 - 1
@@ -186,10 +186,11 @@ class TestTorchMethod(TestCase):
         #     [bs, t_in, n, h], dtype=dtype, device=torch.device("xpu")
         # )
         k = (
-            torch.randn([b, t, n, h], dtype=dtype, device=torch.device("xpu")) * 2 - 1
+            torch.randn([b, t, n_kv, h], dtype=dtype, device=torch.device("xpu")) * 2
+            - 1
         )  # 1, 32, 32, 128
         v = torch.randn(
-            [b, t, n, h], dtype=dtype, device=torch.device("xpu")
+            [b, t, n_kv, h], dtype=dtype, device=torch.device("xpu")
         )  # 1, 32, 32, 128
         # k_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
         # v_cache = torch.randn([t_max, b, n, h], dtype=dtype, device=torch.device("xpu"))
