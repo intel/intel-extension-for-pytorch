@@ -29,7 +29,7 @@ ipex.llm.modules.RMSNorm
 ipex.llm.modules.FastLayerNorm
 ipex.llm.modules.VarlenAttention
 ipex.llm.modules.PagedAttention
-ipex.llm.modules.IndirectAccessKVCache
+ipex.llm.modules.IndirectAccessKVCacheAttention
 
 #using as functions
 ipex.llm.functional.rotary_embedding

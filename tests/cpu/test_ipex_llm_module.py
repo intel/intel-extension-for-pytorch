@@ -274,8 +274,10 @@ class TestLLMModules(TestCase):
         assert ipex.llm.modules.RotaryEmbedding is not None
         assert ipex.llm.modules.RotaryEmbedding.apply_function is not None
         assert ipex.llm.modules.PagedAttention is not None
-        assert ipex.llm.modules.IndirectAccessKVCache is not None
-        assert ipex.llm.modules.IndirectAccessKVCache.apply_function is not None
+        assert ipex.llm.modules.IndirectAccessKVCacheAttention is not None
+        assert (
+            ipex.llm.modules.IndirectAccessKVCacheAttention.apply_function is not None
+        )
         assert ipex.llm.modules.VarlenAttention is not None
         assert ipex.llm.modules.VarlenAttention.apply_function is not None
         assert ipex.llm.modules.FastLayerNorm is not None

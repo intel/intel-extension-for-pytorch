@@ -37,7 +37,7 @@ class GPTJAttention(nn.Module):
             pos_embd_dim,
             backbone=config.architectures[0],
         )
-        self._IPEXIndirectAccessKVCache = ipex.llm.modules.IndirectAccessKVCache(
+        self._IPEXIndirectAccessKVCacheAttention = ipex.llm.modules.IndirectAccessKVCacheAttention(
             max_positions
         )
         # ==========================================================================
@@ -111,7 +111,7 @@ class GPTJAttention(nn.Module):
             attn_output,
             attn_weights,
             present,
-        ) = self._IPEXIndirectAccessKVCache(
+        ) = self._IPEXIndirectAccessKVCacheAttention(
             query,
             key,
             value,
@@ -530,7 +530,7 @@ class IPEXGPTJForCausalLM(GPTJPreTrainedModel):
             attentions=transformer_outputs.attentions,
         )
 
-    # ==================== rewrite to _reorder_cache to work with ipex.llm.modules.IndirectAccessKVCache  ====================
+    # ==================== rewrite to _reorder_cache to work with ipex.llm.modules.IndirectAccessKVCacheAttention  ====================
     def _reorder_cache(
         self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
     ) -> Tuple[Tuple[torch.Tensor]]:
