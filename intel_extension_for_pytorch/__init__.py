@@ -215,4 +215,4 @@ if (
     try:
         import intel_extension_for_pytorch_deepspeed
     except ModuleNotFoundError as e:
-        print("Fail to import DeepSpeed kernels!")
+        pass  # skip
