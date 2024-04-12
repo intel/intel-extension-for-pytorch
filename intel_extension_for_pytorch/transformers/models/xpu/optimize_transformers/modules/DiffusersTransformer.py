@@ -210,9 +210,11 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
             dim_head=self.ipex_config.attention_head_dim,
             dropout=self.ipex_config.dropout,
             bias=self.ipex_config.attention_bias,
-            cross_attention_dim=self.ipex_config.cross_attention_dim
-            if self.ipex_config.only_cross_attention
-            else None,
+            cross_attention_dim=(
+                self.ipex_config.cross_attention_dim
+                if self.ipex_config.only_cross_attention
+                else None
+            ),
             upcast_attention=self.ipex_config.upcast_attention,
         )
 
@@ -231,9 +233,11 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
             )
             self.attn2 = DiffusersAttention(
                 query_dim=self.dim,
-                cross_attention_dim=self.ipex_config.cross_attention_dim
-                if not self.ipex_config.double_self_attention
-                else None,
+                cross_attention_dim=(
+                    self.ipex_config.cross_attention_dim
+                    if not self.ipex_config.double_self_attention
+                    else None
+                ),
                 heads=self.ipex_config.num_attention_heads,
                 dim_head=self.ipex_config.attention_head_dim,
                 dropout=self.ipex_config.dropout,
@@ -397,9 +401,9 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
 
         attn_output = self.attn1(
             norm_hidden_states,
-            encoder_hidden_states=encoder_hidden_states
-            if self.only_cross_attention
-            else None,
+            encoder_hidden_states=(
+                encoder_hidden_states if self.only_cross_attention else None
+            ),
             attention_mask=attention_mask,
             **cross_attention_kwargs,
         )

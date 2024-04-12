@@ -276,6 +276,7 @@ class StreamContext(object):
             ``None``.
     .. note:: Streams are per-device.
     """
+
     cur_stream: Optional["Stream"]
 
     def __init__(self, stream: Optional["Stream"]):

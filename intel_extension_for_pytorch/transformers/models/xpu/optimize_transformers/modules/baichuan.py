@@ -114,9 +114,11 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
             # transformers==4.31.0
             num_key_value_head=self.config.num_attention_heads,
             max_positions=max(
-                self.config.max_position_embeddings
-                if hasattr(self.config, "max_position_embeddings")
-                else self.config.model_max_length,
+                (
+                    self.config.max_position_embeddings
+                    if hasattr(self.config, "max_position_embeddings")
+                    else self.config.model_max_length
+                ),
                 MAX_SEQ_LEN,
             ),
             max_out_positions=MAX_OUT_SEQ_LEN,

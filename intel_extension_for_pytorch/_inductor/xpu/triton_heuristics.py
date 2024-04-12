@@ -39,7 +39,6 @@ from torch._inductor.triton_heuristics import (
 
 
 class XPUCachingAutotuner(CachingAutotuner):
-
     """
     Simplified version of Triton autotuner that has no invalidation
     key and caches the best config to disk to improve cold start times.
