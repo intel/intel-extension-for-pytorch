@@ -882,7 +882,8 @@ void dpcpp_index_kernel(
   // for 3-dims input:
   // Taking input[idx0,:,idx2] for example, the indices_sizes=[sz,1,sz]
   // While the satified case is input[:,idx1,idx2], indices_sizes=[1,sz,sz]
-  bool small_index = non_index_size.size() != 0 && iter.tensor(1).dim() == 3;
+  bool small_index = non_index_size.size() != 0 && iter.tensor(1).dim() == 3 &&
+      non_index_size.size() + index_size.size() == 3;
   auto indices_sizes = iter.tensor(2).sizes();
   for (size_t i = 1; i < iter.tensor(2).dim(); ++i) {
     if (indices_sizes[i - 1] > indices_sizes[i]) {

@@ -102,3 +102,16 @@ class TestTorchMethod(TestCase):
             torch.index_put_(inp_ref, (ind_long, ind_long), src, accum)
             torch.index_put_(inp_res, (ind_int, ind_int), src, accum)
             self.assertEqual(inp_ref, inp_res)
+
+    def test_index_special(self):
+        x1 = torch.randn((4, 196), dtype=torch.float, device="cpu")
+        x2 = torch.randint(196, [196, 196], dtype=torch.int, device="cpu")
+
+        def get_res(a, b):
+            return a[:, b]
+
+        x1_xpu = x1.to("xpu")
+        x2_xpu = x2.to("xpu")
+        y_cpu = get_res(x1, x2)
+        y_xpu = get_res(x1_xpu, x2_xpu)
+        self.assertEqual(y_cpu, y_xpu.cpu())
