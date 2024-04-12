@@ -70,7 +70,6 @@ def gen_common_triton_imports():
 
     imports.splice(
         """
-        from intel_extension_for_pytorch._inductor.xpu.triton_heuristics import foreach
         from torch._inductor import triton_helpers, triton_heuristics
         from torch._inductor.ir import ReductionHint, TileHint
         from torch._inductor.triton_helpers import libdevice, math as tl_math
