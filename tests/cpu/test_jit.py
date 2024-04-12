@@ -2164,6 +2164,7 @@ class Tester(TestCase):
                     result = model(a[0], a[1], a[2])
                     trace_model = torch.jit.trace(model, (a[0], a[1], a[2])).eval()
                     trace_model = torch.jit.freeze(trace_model)
+                    trace_model(a[0], a[1], a[2])
 
                     tresult = trace_model(a[0], a[1], a[2])
                     trace_graph = trace_model.graph_for(a[0], a[1], a[2])
