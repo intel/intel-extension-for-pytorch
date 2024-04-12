@@ -7,9 +7,9 @@ set -eo pipefail
 
 VER_IPEX=v2.1.30+xpu
 
-if [[ $# -lt 3 ]]; then
+if [[ $# -lt 5 ]]; then
     echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> <CCLROOT> <MPIROOT> <AOT>"
-    echo "DPCPPROOT, MKLROOT and CCLROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler, oneMKL and oneCCL respectively."
+    echo "DPCPPROOT, MKLROOT, CCLROOT and MPIROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler, oneMKL, oneCCL and Intel(R) MPI respectively."
     echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT."
     exit 1
 fi
@@ -27,13 +27,13 @@ fi
 #           | | | | | | | └- torch-ccl
 #           | | | | | | └--- TorchAudio
 #           | | | | | └----- TorchVision
-#           | | | | └------- Rebuild LLVM
+#           | | | | └------- Undefined
 #           | | | └--------- Undefined
 #           | | └----------- Undefined
 #           | └------------- Undefined
 #           └--------------- Undefined
 MODE=0x07
-if [ $# -gt 4 ]; then
+if [ $# -gt 5 ]; then
     if [[ ! $6 =~ ^[0-9]+$ ]] && [[ ! $6 =~ ^0x[0-9a-fA-F]+$ ]]; then
         echo "Warning: Unexpected argument. Using default value."
     else
@@ -57,27 +57,20 @@ fi
 CCL_ENV=${ONECCL_ROOT}/env/vars.sh
 if [ ! -f ${ONECCL_ROOT}/env/vars.sh ]; then
     echo "oneCCL environment ${ONECCL_ROOT} doesn't seem to exist."
-    exit 6
+    exit 4
 fi
 
 MPI_ENV=${MPI_ROOT}/env/vars.sh
 if [ ! -f ${MPI_ROOT}/env/vars.sh ]; then
-    echo "oneCCL environment ${MPI_ROOT} doesn't seem to exist."
-    exit 6
+    echo "Intel(R) MPI environment ${MPI_ROOT} doesn't seem to exist."
+    exit 5
 fi
 ONEAPIROOT=${ONEMKL_ROOT}/../..
 
 # Check existance of required Linux commands
-for APP in python git patch pkg-config nproc bzip2; do
-    command -v $APP > /dev/null || (echo "Error: Command \"${APP}\" not found." ; exit 4)
+for APP in python git patch nproc bzip2; do
+    command -v $APP > /dev/null || (echo "Error: Command \"${APP}\" not found." ; exit 6)
 done
-
-## Check existance of required libs
-#if [ $((${MODE} & 0x02)) -ne 0 ]; then
-#    for LIB_NAME in libpng libjpeg; do
-#        pkg-config --exists $LIB_NAME > /dev/null || (echo "Error: \"${LIB_NAME}\" not found in pkg-config." ; exit 5)
-#    done
-#fi
 
 #function ver_compare() {
 #    VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
@@ -108,7 +101,7 @@ done
 #    echo -e '\a'
 #    echo "Error: GCC version cannot be equal to or newer than ${VER_GCC}."
 #    echo "       Found GCC version $(gcc -dumpfullversion)"
-#    exit 6
+#    exit 8
 #fi
 
 # set number of compile processes, if not already defined
@@ -142,7 +135,6 @@ COMMIT_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d tor
 COMMIT_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k commit)
 REPO_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
 COMMIT_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k commit)
-VER_LLVM=llvmorg-$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k version)
 #VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
 python -m pip uninstall -y pyyaml
 cd ..
@@ -164,9 +156,6 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     if [ ! -d torch-ccl ]; then
         git clone ${REPO_TORCHCCL} torch-ccl
     fi
-fi
-if [ ! -d llvm-project ]; then
-    git clone https://github.com/llvm/llvm-project.git
 fi
 
 # Checkout required branch/commit and update submodules
@@ -220,51 +209,16 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     git submodule update --init --recursive
     cd ..
 fi
-cd llvm-project
-if [ ! -z ${VER_LLVM} ]; then
-    rm -rf * > /dev/null
-    git checkout . > /dev/null
-    git checkout main > /dev/null
-    git pull > /dev/null
-    git checkout ${VER_LLVM}
-fi
-git submodule sync
-git submodule update --init --recursive
-cd ..
 
 # Install python dependency
-python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch oneccl_bind_pt
+python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch intel-extension-for-pytorch-deepspeed oneccl_bind_pt
 python -m pip install cmake ninja
+conda install -y make
 if [ $((${MODE} & 0x04)) -ne 0 ]; then
     python -m pip install Pillow
     conda install -y libpng libjpeg-turbo -c conda-forge
 fi
 
-# Compile individual component
-conda install -y make -c conda-forge
-conda install -y sysroot_linux-64
-conda install -y gcc==11.4 gxx==11.4 cxx-compiler -c conda-forge
-export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
-#if [ -z ${CONDA_BUILD_SYSROOT} ]; then
-#    source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
-#    source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
-#    source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
-#fi
-#if [[ ! -z ${LDFLAGS} ]]; then
-#    read -a ldflags <<< "${LDFLAGS}"
-#    for i in "${!ldflags[@]}"; do
-#        if [[ "${ldflags[i]}" == "-Wl,--as-needed" ]]; then
-#            unset 'ldflags[i]'
-#            continue
-#        fi
-#        if [[ "${ldflags[i]}" =~ -Wl,-rpath,.* ]]; then
-#            unset 'ldflags[i]'
-#            continue
-#        fi
-#    done
-#    function join { local IFS="$1"; shift; echo "$*"; }
-#    export LDFLAGS=$(join ' ' "${ldflags[@]}")
-#fi
 ABI=1
 
 #  PyTorch
@@ -328,91 +282,53 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd ..
 fi
 
-# Set compiler env
-conda install -y gcc==12.3.0 gxx==12.3.0 cxx-compiler -c conda-forge
-export PATH=${CONDA_PREFIX}/bin:${PATH}
-
-#  LLVM
-LLVM_ROOT="$(pwd)/llvm-release"
-if [ $((${MODE} & 0x08)) -ne 0 ]; then
-    if [ -d ${LLVM_ROOT} ]; then
-        rm -rf ${LLVM_ROOT}
-    fi
-fi
-cd llvm-project
-if [ -d build ]; then
-    rm -rf build
-fi
-if [ ! -d ${LLVM_ROOT} ]; then
-    mkdir build
-    cd build
-    echo "***************************** cmake *****************************" > ../build.log
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${ABI}" -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF ../llvm 2>&1 | tee -a ../build.log
-    echo "***************************** build *****************************" >> ../build.log
-    cmake --build . -j ${MAX_JOBS_VAR} 2>&1 | tee -a ../build.log
-    echo "**************************** install ****************************" >> ../build.log
-    cmake -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT} -P cmake_install.cmake 2>&1 | tee -a ../build.log
-    #xargs rm -rf < install_manifest.txt
-    cd ..
-    rm -rf build
-    ln -s ${LLVM_ROOT}/bin/llvm-config ${LLVM_ROOT}/bin/llvm-config-13
-fi
-cd ..
-PATH_BK=${PATH}
-LD_LIBRARY_PATH_BK=${LD_LIBRARY_PATH}
-export PATH=${LLVM_ROOT}/bin:$PATH
-export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
-
 #  Intel® Extension for PyTorch*
 cd intel-extension-for-pytorch
 python -m pip install -r requirements.txt
 if [[ ! ${AOT} == "" ]]; then
     export USE_AOT_DEVLIST=${AOT}
 fi
-export USE_LLVM=${LLVM_ROOT}
-export LLVM_DIR=${USE_LLVM}/lib/cmake/llvm
-export DNNL_GRAPH_BUILD_COMPILER_BACKEND=1
-export IPEX_GPU_EXTRA_BUILD_OPTION="--gcc-install-dir=${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu/12.3.0 -fuse-ld=lld -lrt -lpthread"
 python setup.py clean
 if [ -d dist ]; then
     rm -rf dist
 fi
-python setup.py bdist_wheel 2>&1 | tee build.log
-unset IPEX_GPU_EXTRA_BUILD_OPTION
-unset DNNL_GRAPH_BUILD_COMPILER_BACKEND
-unset LLVM_DIR
-unset USE_LLVM
+python setup.py install 2>&1 | tee build_install.log
 if [[ ! ${AOT} == "" ]]; then
     unset USE_AOT_DEVLIST
 fi
-export LD_LIBRARY_PATH=${LD_LIBRARY_PATH_BK}
-export PATH=${PATH_BK}
+cd ecological_libs/deepspeed
+python setup.py clean
+if [ -d dist ]; then
+    rm -rf dist
+fi
+export USE_AOT_DEVLIST=pvc
+python setup.py bdist_wheel 2>&1 | tee build.log
+unset USE_AOT_DEVLIST
 python -m pip install dist/*.whl
+cd ../..
+python setup.py bdist_wheel 2>&1 | tee build_whl.log
+unset BUILD_WITH_CPU
 cd ..
 
 #  Torch-CCL
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     cd torch-ccl
     python setup.py clean
-    if [ -d ${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu ]; then
-        export DPCPP_GCC_INSTALL_DIR="${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu/12.3.0"
-    fi
     export INTELONEAPIROOT=${ONEAPIROOT}
     COMPUTE_BACKEND=dpcpp python setup.py bdist_wheel 2>&1 | tee build.log
     unset INTELONEAPIROOT
-    if [ -d ${CONDA_PREFIX}/lib/gcc/x86_64-conda-linux-gnu ]; then
-        unset DPCPP_GCC_INSTALL_DIR
-    fi
     python -m pip install dist/*.whl
     cd ..
 fi
 
-export LD_PRELOAD=$(bash ./intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh)
-
 # Sanity Test
-echo "======================================================"
-echo "Note: Set environment variable \"export LD_PRELOAD=${LD_PRELOAD}\" to avoid the \"version \`GLIBCXX_N.N.NN' not found\" error."
-echo "======================================================"
+LIBSTDCPP=$(bash ./intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh)
+if [[ ! "${LIBSTDCPP}" =~ "/usr/lib/" ]]; then
+    export LD_PRELOAD=${LIBSTDCPP}
+    echo "======================================================"
+    echo "Note: Set environment variable \"export LD_PRELOAD=${LD_PRELOAD}\" to avoid the \"version \`GLIBCXX_N.N.NN' not found\" error."
+    echo "======================================================"
+fi
 CMD="import torch; print(f'torch_cxx11_abi:     {torch._C._GLIBCXX_USE_CXX11_ABI}'); print(f'torch_version:       {torch.__version__}');"
 if [ $((${MODE} & 0x04)) -ne 0 ]; then
     CMD="${CMD} import torchvision; print(f'torchvision_version: {torchvision.__version__}');"

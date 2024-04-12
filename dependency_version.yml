@@ -17,9 +17,7 @@ torch-ccl:
   commit: 5ee65b42c42a0d91c4cf459d9be40020274003b6
   version: 2.1.200+xpu
 deepspeed:
-  repo: https://github.com/microsoft/DeepSpeed.git
-  version: v0.11.2
-  commit: 4fc181b01077521ba42379013ce91a1c294e5d8e
+  version: 0.14.0
 intel-extension-for-deepspeed:
   repo: https://github.com/intel/intel-extension-for-deepspeed.git
   commit: ec332772d8bb71c6d89804a862f039fc91ae96b5
