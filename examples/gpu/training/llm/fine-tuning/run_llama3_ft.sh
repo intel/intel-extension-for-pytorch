@@ -3,6 +3,6 @@
 # export https_proxy="http://child-jf.intel.com:912"
 
 # specify the model path
-model='/media/newdrive2/huggingface/llama3-8b'
+model='path_to_llama3/llama3'
 
 python llama3_ft.py -m ${model} 2>&1 | tee llama3_ft.log
