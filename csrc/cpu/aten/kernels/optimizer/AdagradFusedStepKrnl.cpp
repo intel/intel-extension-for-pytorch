@@ -54,7 +54,7 @@ void adagrad_fused_step_kernel(
           sum_vec.store(state_sum_ptr + d);
 
           Vec std_vec = sum_vec.sqrt() + Vec(scalar_t(eps));
-          param_vec = param_vec - grad_vec / std_vec * Vec(scalar_t(clr));
+          param_vec = param_vec + Vec(scalar_t(-clr)) * grad_vec / std_vec;
           param_vec.store(param_ptr + d);
         }
         for (; d < size; d++) {
@@ -64,7 +64,7 @@ void adagrad_fused_step_kernel(
           state_sum_ptr[d] += grad_val * grad_val;
 
           scalar_t std_val = std::sqrt(state_sum_ptr[d]) + eps;
-          param_ptr[d] -= grad_val / std_val * clr;
+          param_ptr[d] -= clr * grad_val / std_val;
         }
       });
 }
