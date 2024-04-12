@@ -35,6 +35,7 @@ class DropoutTester(TestCase):
         x = torch.randn(2, 3)
         named_children = dict(optimized_model.named_children())
         self.assertTrue(isinstance(named_children["dropout"], torch.nn.Identity))
+        self.assertEqual(optimized_model.dropout.p, model.dropout.p)
 
         optimized_model = ipex.optimize(model, replace_dropout_with_identity=False)
         named_children = dict(optimized_model.named_children())
