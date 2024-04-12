@@ -253,8 +253,13 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         #         and not self.is_beam_search()
         #     )
         # ):
-        # if self.is_1st_token():
-        #     return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
+        if self.is_1st_token():
+            if hasattr(self, "num_kv_group"):
+                # print("self.num_kv_group: ", self.num_kv_group)
+                key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(
+                    key, value
+                )
+            return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
         key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
         (
             dropout,

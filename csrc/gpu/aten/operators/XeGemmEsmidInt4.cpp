@@ -46,37 +46,6 @@ namespace AtenIpexTypeXPU {
 
 namespace impl {
 
-template <typename scalar_t>
-struct XeGemmInt4EsimdKernelFunctor {
-  void operator()(sycl::nd_item<1> itemId) const {
-    // todo : kernel calculation
-  }
-  XeGemmInt4EsimdKernelFunctor(
-      const scalar_t* input_,
-      uint8_t* weight_,
-      scalar_t* output_,
-      const scalar_t* weight_scl_,
-      const uint8_t* weight_zp_,
-      int64_t calib_gz_,
-      uint32_t k_)
-      : input(input_),
-        weight(weight_),
-        output(output_),
-        weight_scl(weight_scl_),
-        weight_zp(weight_zp_),
-        calib_gz(calib_gz_),
-        k(k_) {}
-
- private:
-  const scalar_t* input;
-  uint8_t* weight;
-  scalar_t* output;
-  const scalar_t* weight_scl;
-  const uint8_t* weight_zp;
-  int64_t calib_gz;
-  uint32_t k;
-};
-
 static void dump_element(const Tensor src, int nele, std::string str) {
   std::cout << str;
   for (int i = 0; i < nele; i++) {
@@ -790,5 +759,9 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_esimd_int4.xpu", at::AtenIpexTypeXPU::mm_esimd_int4);
   IPEX_OP_REGISTER(
       "qkv_mm_esimd_int4.xpu", at::AtenIpexTypeXPU::qkv_mm_esimd_int4);
+  // IPEX_OP_REGISTER("mm_esimd_int4.xpu",
+  // at::AtenIpexTypeXPU::mm_weight_reorder_esimd_int4); IPEX_OP_REGISTER(
+  //     "qkv_mm_esimd_int4.xpu",
+  //     at::AtenIpexTypeXPU::qkv_weight_reorde_mm_esimd_int4);
 }
 } // namespace

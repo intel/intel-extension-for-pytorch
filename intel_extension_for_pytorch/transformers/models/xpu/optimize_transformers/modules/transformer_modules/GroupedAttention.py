@@ -242,7 +242,41 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
         if self.num_kv_head == self.num_attn_head:
             super().cat_qkv()
         else:
-            pass
+            try_linear_out_reorder_input = torch.empty(
+                1, 1, 4096, dtype=torch.float16, device="xpu"
+            )
+            try_linear_out_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+                try_linear_out_reorder_input,
+                self.q_proj_quant.qweight,
+                self.q_proj_quant.scales,
+                self.q_proj_quant.qzeros,
+                self.q_proj_quant.blocksize,
+                True,
+            )
+            try_linear_out_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+                try_linear_out_reorder_input,
+                self.k_proj_quant.qweight,
+                self.k_proj_quant.scales,
+                self.k_proj_quant.qzeros,
+                self.k_proj_quant.blocksize,
+                True,
+            )
+            try_linear_out_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+                try_linear_out_reorder_input,
+                self.v_proj_quant.qweight,
+                self.v_proj_quant.scales,
+                self.v_proj_quant.qzeros,
+                self.v_proj_quant.blocksize,
+                True,
+            )
+            try_linear_out_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+                try_linear_out_reorder_input,
+                self.out_proj_quant.qweight,
+                self.out_proj_quant.scales,
+                self.out_proj_quant.qzeros,
+                self.out_proj_quant.blocksize,
+                True,
+            )
 
     def prepare_kv_prompt(self, hidden_states, kv_head):
         return super().prepare_kv_prompt(hidden_states, self.num_kv_head)
@@ -289,58 +323,40 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
             return super().compute_qkv_gemm(hidden_states, query, key, value)
         hidden_states_flat = hidden_states.flatten(0, -2)
         if self.q_proj.bias is None:
-            query = torch.ops.torch_ipex.mm_int4(
+            query = torch.ops.torch_ipex.mm_esimd_int4(
                 hidden_states_flat,
                 self.q_proj_quant.qweight,
                 self.q_proj_quant.scales,
                 self.q_proj_quant.qzeros,
                 self.q_proj_quant.blocksize,
+                False,
             )
         else:
-            query = torch.ops.torch_ipex.mm_int4(
-                hidden_states_flat,
-                self.q_proj_quant.qweight,
-                self.q_proj_quant.bias,
-                self.q_proj_quant.scales,
-                self.q_proj_quant.qzeros,
-                self.q_proj_quant.blocksize,
-            )
+            print("torch.ops.torch_ipex.mm_esimd_int4 for q linear not support bias!")
 
         if self.k_proj.bias is None:
-            key = torch.ops.torch_ipex.mm_int4(
+            key = torch.ops.torch_ipex.mm_esimd_int4(
                 hidden_states_flat,
                 self.k_proj_quant.qweight,
                 self.k_proj_quant.scales,
                 self.k_proj_quant.qzeros,
                 self.k_proj_quant.blocksize,
+                False,
             )
         else:
-            key = torch.ops.torch_ipex.mm_int4(
-                hidden_states_flat,
-                self.k_proj_quant.qweight,
-                self.k_proj_quant.bias,
-                self.k_proj_quant.scales,
-                self.k_proj_quant.qzeros,
-                self.k_proj_quant.blocksize,
-            )
+            print("torch.ops.torch_ipex.mm_esimd_int4 for k linear not support bias!")
 
         if self.v_proj.bias is None:
-            value = torch.ops.torch_ipex.mm_int4(
+            value = torch.ops.torch_ipex.mm_esimd_int4(
                 hidden_states_flat,
                 self.v_proj_quant.qweight,
                 self.v_proj_quant.scales,
                 self.v_proj_quant.qzeros,
                 self.v_proj_quant.blocksize,
+                False,
             )
         else:
-            value = torch.ops.torch_ipex.mm_int4(
-                hidden_states_flat,
-                self.v_proj_quant.qweight,
-                self.v_proj_quant.bias,
-                self.v_proj_quant.scales,
-                self.v_proj_quant.qzeros,
-                self.v_proj_quant.blocksize,
-            )
+            print("torch.ops.torch_ipex.mm_esimd_int4 for v linear not support bias!")
         return query, key, value
 
     def process_qkv_output(self, hidden_states, query, key, value):
@@ -369,8 +385,14 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
         return key, value, key_prompt, value_prompt
 
     def sdp_kv_preprocess_2nd2last(self, key, value):
-        if self.num_kv_group <= 1:
-            return super().sdp_kv_preprocess_2nd2last(key, value)
+        # next token for greedy will use IpexSDP which supports GQA and not need to repeat_kv
+        if not self.is_beam_search():
+            return (
+                key,
+                value,
+                self.runtime_cache.key_prompt,
+                self.runtime_cache.value_prompt,
+            )
         key = self.repeat_kv(key, self.num_kv_group)
         value = self.repeat_kv(value, self.num_kv_group)
         key_prompt = self.repeat_kv(self.runtime_cache.key_prompt, self.num_kv_group)
