@@ -319,6 +319,11 @@ class IPEXTransformerMLPOptimizedInt4SiluLlama(IPEXTransformerMLPOptimizedInt4Si
             False,
         )
         hidden_states = hidden_states_act * hidden_states_up
+
+        # synchronize for the 1st token to WA down_proj 1024in hang issue
+        if hidden_states.shape[0] != 1:
+            torch.xpu.synchronize()
+
         down_proj = torch.ops.torch_ipex.mm_esimd_int4(
             hidden_states,
             self.c_proj_quant.qweight,

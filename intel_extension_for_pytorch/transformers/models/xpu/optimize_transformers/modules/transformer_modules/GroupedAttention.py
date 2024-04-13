@@ -379,10 +379,13 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
     def sdp_kv_preprocess_1st_token_beam_search(self, key, value):
         if self.num_kv_group <= 1:
             return super().sdp_kv_preprocess_1st_token_beam_search(key, value)
-        key = self.repeat_kv(key, self.num_kv_group)
-        value = self.repeat_kv(value, self.num_kv_group)
-        key_prompt, value_prompt = key, value
-        return key, value, key_prompt, value_prompt
+        if self.is_1st_token():
+            key = self.repeat_kv(key, self.num_kv_group)
+            value = self.repeat_kv(value, self.num_kv_group)
+            key_prompt, value_prompt = key, value
+            return key, value, key_prompt, value_prompt
+        else:
+            return key, value, key, value
 
     def sdp_kv_preprocess_2nd2last(self, key, value):
         # next token for greedy will use IpexSDP which supports GQA and not need to repeat_kv
