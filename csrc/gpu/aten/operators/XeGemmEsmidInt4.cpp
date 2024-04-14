@@ -169,8 +169,7 @@ static inline void gemm_int4_esimd_kernel(
         GlobalRangeCommonDim4096V2, LocalRangeCommonDim4096V2);
 
     // Opt 14336
-    if (k == 14336)
-    {
+    if (k == 14336) {
       pixelPerGroupCommonDim11008 = 16;
     }
 
@@ -215,7 +214,8 @@ static inline void gemm_int4_esimd_kernel(
       e = dpcpp_queue.submit([&](handler& cgh) {
         cgh.parallel_for(
             RangeCommonDim11008V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
-              matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex<4>( // PPG comes to 16
+              matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex<4>( // PPG comes
+                                                                  // to 16
                   (uint8_t*)weight,
                   (uint8_t*)input,
                   (uint8_t*)output,
@@ -617,7 +617,7 @@ static inline void qkv_gemm_int4_esimd_kernel(
 
 // forward dpcpp implementation
 template <typename scalar_t, typename uint8_t>
-static inline void qkv_gemm_int4_esimd_kernel_fused(
+static inline void qkv_gemm_int4_gqa_esimd_kernel(
     const scalar_t* input,
     uint8_t* weight,
     const scalar_t* weight_scl,
@@ -748,8 +748,8 @@ static inline void qkv_gemm_int4_esimd_kernel_fused(
                   ndi);
             });
       });
-      e.wait();
-      double etime = report_time("GEMV kernel qkv fused time", e, e);
+      // YC e.wait();
+      // double etime = report_time("GEMV kernel qkv fused time", e, e);
     }
     // ************
 
@@ -861,7 +861,6 @@ static inline void qkv_gemm_int4_esimd_kernel_fused(
 
   return;
 }
-
 } // namespace impl
 
 inline Tensor resize_as_mat2(const Tensor& mat1, const Tensor& output) {
@@ -1005,6 +1004,293 @@ static void qkv_mm_esimd_int4(
   }
 }
 
+static void qkv_mm_esimd_int4_gqa(
+    const Tensor& input_,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    const optional<Tensor>& bias_,
+    const Tensor& out0_,
+    const Tensor& out1_,
+    const Tensor& out2_,
+    int64_t calib_gz,
+    bool need_reorder) {
+  // YC std::cout << "start qkv_mm_esimd_int4" << std::endl;
+
+  // xpu::COMPUTE_ENG real_eng =
+  //     choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input_, weight);
+  // bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+  bool compute_eng_valid = true;
+
+  auto input = input_.flatten(0, -2);
+  if (input.scalar_type() == ScalarType::Float)
+    input = input.to(at::kHalf);
+  auto out0 = out0_.flatten(0, -2);
+  auto out1 = out1_.flatten(0, -2);
+  auto out2 = out2_.flatten(0, -2);
+  // input: m,k; weight: k,(qn,kn,vn) bias(opt): 3,n
+  TORCH_CHECK(input.dim() == 2 && weight.dim() == 2);
+  TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
+  int m = input.sizes()[0]; // m is input vector num 1024 or 1
+  int k = input.sizes()[1]; // 4096
+  int n = weight.sizes()[1] * 2; // 6144*2
+
+  bool has_bias = bias_.has_value();
+  if (has_bias) {
+    auto bias = bias_.value();
+    TORCH_CHECK(
+        bias.dim() == 2 && bias.sizes()[0] == 3 && bias.sizes()[1] == n);
+  }
+  TORCH_CHECK(
+      out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
+  TORCH_CHECK(
+      out0.sizes()[1] == 4096 && out1.sizes()[1] == 1024 &&
+      out2.sizes()[1] == 1024);
+
+  TORCH_CHECK(
+      input.scalar_type() == kHalf &&
+      (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
+       weight.scalar_type() == kChar));
+  Tensor reorder_buffer;
+  if (need_reorder)
+    reorder_buffer = at::empty({k, n}, weight.options());
+  // impl::dump_element(weight, 10, "weight first 10 elem: ");
+
+  if (compute_eng_valid) {
+    // YC std::cout << "get in esimd int4 gemm" << std::endl;
+    IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+        input.scalar_type(), "XeGemm_int4_esimd", [&] {
+          impl::qkv_gemm_int4_gqa_esimd_kernel<scalar_t, uint8_t>(
+              input.data_ptr<scalar_t>(),
+              weight.data_ptr<uint8_t>(),
+              weight_scl.data_ptr<scalar_t>(),
+              weight_zp.data_ptr<uint8_t>(),
+              bias_.has_value() ? bias_.value().data_ptr() : (void*)nullptr,
+              need_reorder ? reorder_buffer.data_ptr<uint8_t>() : nullptr,
+              calib_gz,
+              m,
+              n,
+              k,
+              out0.data_ptr<scalar_t>(),
+              out1.data_ptr<scalar_t>(),
+              out2.data_ptr<scalar_t>(),
+              need_reorder);
+        });
+  } else {
+    AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
+  }
+}
+
+// static Tensor mm_weight_reorder_esimd_int4(
+//     const Tensor& input,
+//     Tensor& weight,
+//     const Tensor& weight_scl,
+//     const Tensor& weight_zp,
+//     int64_t calib_gz,
+//     bool need_reorder) {
+//   // YC std::cout << "start mm_esimd_int4: " << need_reorder << std::endl;
+//   TORCH_CHECK(input.scalar_type() == ScalarType::Half);
+//   auto input_flat = input.flatten(0, -2); // 1, 1, 4096 -> 1, 4096
+//   auto weight_flat = weight.flatten(0, -2); // 4096, 5504, 1 -> 4096, 5504
+
+//   // xpu::COMPUTE_ENG real_eng =
+//   //     choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input, weight);
+//   // bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+//   bool compute_eng_valid = true;
+
+//   uint32_t m = input_flat.sizes()[0]; // 1
+//   uint32_t k = input_flat.sizes()[1]; // 4096
+//   uint32_t n = weight.sizes()[1] * 2; // 11008
+//   Tensor reorder_buffer;
+//   if (need_reorder)
+//     reorder_buffer = at::empty({k, n}, weight.options());
+//   auto output = at::empty({m, n}, input.options()); // 11008, 11008
+
+//   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
+//   // impl::dump_element(weight_flat, 10, "weight first 10 elem: ");
+//   // impl::dump_element(reorder_buffer, 10, "reorder_buffer first 10 elem:
+//   ");
+//   // impl::dump_element(weight_scl, 10, "scal first 10 elem: ");
+
+//   if (compute_eng_valid) {
+//     // YC std::cout << "get in esimd int4 gemm" << std::endl;
+//     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+//         input_flat.scalar_type(), "XeGemm_int4_esimd", [&] {
+//           impl::gemm_int4_esimd_kernel<scalar_t, uint8_t>(
+//               input_flat.data_ptr<scalar_t>(),
+//               weight_flat.data_ptr<uint8_t>(),
+//               output.data_ptr<scalar_t>(),
+//               weight_scl.data_ptr<scalar_t>(),
+//               weight_zp.data_ptr<uint8_t>(),
+//               need_reorder ? reorder_buffer.data_ptr<uint8_t>() : nullptr,
+//               calib_gz,
+//               m,
+//               n,
+//               k,
+//               need_reorder);
+//         });
+//   } else {
+//     AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
+//   }
+//   // impl::dump_element(weight_flat, 10, "weight before output first 10 elem:
+//   // "); impl::dump_element(
+//   //    reorder_buffer, 10, "reorder_buffer  before output first 10 elem: ");
+//   // impl::dump_element(output, 10, "output first 10 elem: ");
+//   return resize_as_mat2(input, output);
+// }
+
+// static void qkv_weight_reorde_mm_esimd_int4(
+//     const Tensor& input_,
+//     const Tensor& weight,
+//     const Tensor& weight_scl,
+//     const Tensor& weight_zp,
+//     const optional<Tensor>& bias_,
+//     const Tensor& out0_,
+//     const Tensor& out1_,
+//     const Tensor& out2_,
+//     int64_t calib_gz,
+//     bool need_reorder) {
+//   // YC std::cout << "start qkv_mm_esimd_int4" << std::endl;
+
+//   // xpu::COMPUTE_ENG real_eng =
+//   //     choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input_, weight);
+//   // bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+//   bool compute_eng_valid = true;
+
+//   auto input = input_.flatten(0, -2);
+//   if (input.scalar_type() == ScalarType::Float)
+//     input = input.to(at::kHalf);
+//   auto out0 = out0_.flatten(0, -2);
+//   auto out1 = out1_.flatten(0, -2);
+//   auto out2 = out2_.flatten(0, -2);
+//   // input: m,k; weight: 3,k,n, bias(opt): 3,n
+//   TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
+//   TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
+//   int m = input.sizes()[0]; // m is input vector num
+//   int k = input.sizes()[1];
+//   int n = weight.sizes()[2] * 2;
+
+//   bool has_bias = bias_.has_value();
+//   if (has_bias) {
+//     auto bias = bias_.value();
+//     TORCH_CHECK(
+//         bias.dim() == 2 && bias.sizes()[0] == 3 && bias.sizes()[1] == n);
+//   }
+//   TORCH_CHECK(
+//       out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
+//   TORCH_CHECK(
+//       out0.sizes()[1] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
+
+//   TORCH_CHECK(
+//       input.scalar_type() == kHalf &&
+//       (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
+//        weight.scalar_type() == kChar));
+//   Tensor reorder_buffer;
+//   if (need_reorder)
+//     reorder_buffer = at::empty({k, n}, weight.options());
+//   // impl::dump_element(weight, 10, "weight first 10 elem: ");
+
+//   if (compute_eng_valid) {
+//     // YC std::cout << "get in esimd int4 gemm" << std::endl;
+//     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+//         input.scalar_type(), "XeGemm_int4_esimd", [&] {
+//           impl::qkv_gemm_int4_esimd_kernel<scalar_t, uint8_t>(
+//               input.data_ptr<scalar_t>(),
+//               weight.data_ptr<uint8_t>(),
+//               weight_scl.data_ptr<scalar_t>(),
+//               weight_zp.data_ptr<uint8_t>(),
+//               bias_.has_value() ? bias_.value().data_ptr() : (void*)nullptr,
+//               need_reorder ? reorder_buffer.data_ptr<uint8_t>() : nullptr,
+//               calib_gz,
+//               m,
+//               n,
+//               k,
+//               out0.data_ptr<scalar_t>(),
+//               out1.data_ptr<scalar_t>(),
+//               out2.data_ptr<scalar_t>(),
+//               need_reorder);
+//         });
+//   } else {
+//     AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
+//   }
+// }
+
+// static void qkv_weight_reorde_mm_esimd_int4_gqa(
+//     const Tensor& input_,
+//     const Tensor& weight,
+//     const Tensor& weight_scl,
+//     const Tensor& weight_zp,
+//     const optional<Tensor>& bias_,
+//     const Tensor& out0_,
+//     const Tensor& out1_,
+//     const Tensor& out2_,
+//     int64_t calib_gz,
+//     bool need_reorder) {
+//   // YC std::cout << "start qkv_mm_esimd_int4" << std::endl;
+
+//   // xpu::COMPUTE_ENG real_eng =
+//   //     choose_compute_eng(xpu::COMPUTE_ENG::ESIMD, input_, weight);
+//   // bool compute_eng_valid = (real_eng == xpu::COMPUTE_ENG::ESIMD);
+//   bool compute_eng_valid = true;
+
+//   auto input = input_.flatten(0, -2);
+//   if (input.scalar_type() == ScalarType::Float)
+//     input = input.to(at::kHalf);
+//   auto out0 = out0_.flatten(0, -2);
+//   auto out1 = out1_.flatten(0, -2);
+//   auto out2 = out2_.flatten(0, -2);
+//   // input: m,k; weight: 3,k,n, bias(opt): 3,n
+//   TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
+//   TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
+//   int m = input.sizes()[0]; // m is input vector num
+//   int k = input.sizes()[1];
+//   int n = weight.sizes()[2] * 2;
+
+//   bool has_bias = bias_.has_value();
+//   if (has_bias) {
+//     auto bias = bias_.value();
+//     TORCH_CHECK(
+//         bias.dim() == 2 && bias.sizes()[0] == 3 && bias.sizes()[1] == n);
+//   }
+//   TORCH_CHECK(
+//       out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
+//   TORCH_CHECK(
+//       out0.sizes()[1] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
+
+//   TORCH_CHECK(
+//       input.scalar_type() == kHalf &&
+//       (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
+//        weight.scalar_type() == kChar));
+//   Tensor reorder_buffer;
+//   if (need_reorder)
+//     reorder_buffer = at::empty({k, n}, weight.options());
+//   // impl::dump_element(weight, 10, "weight first 10 elem: ");
+
+//   if (compute_eng_valid) {
+//     // YC std::cout << "get in esimd int4 gemm" << std::endl;
+//     IPEX_DISPATCH_FLOATING_TYPES_AND_HALF(
+//         input.scalar_type(), "XeGemm_int4_esimd", [&] {
+//           impl::qkv_gemm_int4_esimd_kernel<scalar_t, uint8_t>(
+//               input.data_ptr<scalar_t>(),
+//               weight.data_ptr<uint8_t>(),
+//               weight_scl.data_ptr<scalar_t>(),
+//               weight_zp.data_ptr<uint8_t>(),
+//               bias_.has_value() ? bias_.value().data_ptr() : (void*)nullptr,
+//               need_reorder ? reorder_buffer.data_ptr<uint8_t>() : nullptr,
+//               calib_gz,
+//               m,
+//               n,
+//               k,
+//               out0.data_ptr<scalar_t>(),
+//               out1.data_ptr<scalar_t>(),
+//               out2.data_ptr<scalar_t>(),
+//               need_reorder);
+//         });
+//   } else {
+//     AT_ERROR("GEMM INT4: invalid COMPUTE_ENG!");
+//   }
+// }
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -1013,9 +1299,14 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_esimd_int4.xpu", at::AtenIpexTypeXPU::mm_esimd_int4);
   IPEX_OP_REGISTER(
       "qkv_mm_esimd_int4.xpu", at::AtenIpexTypeXPU::qkv_mm_esimd_int4);
-  // IPEX_OP_REGISTER("mm_esimd_int4.xpu",
+  IPEX_OP_REGISTER(
+      "qkv_mm_esimd_int4_gqa.xpu", at::AtenIpexTypeXPU::qkv_mm_esimd_int4_gqa);
+  // IPEX_OP_REGISTER("mm_weight_reorder_esimd_int4.xpu",
   // at::AtenIpexTypeXPU::mm_weight_reorder_esimd_int4); IPEX_OP_REGISTER(
-  //     "qkv_mm_esimd_int4.xpu",
+  //     "qkv_weight_reorde_mm_esimd_int4.xpu",
   //     at::AtenIpexTypeXPU::qkv_weight_reorde_mm_esimd_int4);
+  // IPEX_OP_REGISTER(
+  //     "qkv_weight_reorde_mm_esimd_int4_gqa.xpu",
+  //     at::AtenIpexTypeXPU::qkv_weight_reorde_mm_esimd_int4_gqa);
 }
 } // namespace

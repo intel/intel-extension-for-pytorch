@@ -166,38 +166,47 @@ class IPEXLmHeadLinearAllreduceWithPadding(IPEXOpForInference):
 class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
     def __init__(self, module):
         super().__init__(module)
-        self.qlinear = WeightOnlyQuantizedLinear(
-            in_features=4096, out_features=128256
-        )
+        self.qlinear = WeightOnlyQuantizedLinear(in_features=4096, out_features=128256)
         # print("self.module: ", self.module)
         # print("self.module.weight.size(): ", self.module.weight.size())
         self.n_dim = self.module.weight.shape[0]
         # print("self.n_dim: ", self.n_dim)
         ## WA since we don't have any lm_head int4 linear weight
+        # group_size = 32  # 128 -> 32
+        # group_num = int(4096 / group_size)
+        # scales = torch.rand([group_num, 128256], device="xpu", dtype=torch.float16)
+        # # zero_points = torch.rand([group_num, 512], device="xpu").byte()
+        # zero_points = torch.zeros(group_num, 64128, device="xpu").byte()
+        # weight = (torch.rand([4096, 64128], device="xpu") * 10 * 16).byte()
+        # bias = None
+        # self.qlinear.set_weights_bias(weight, bias)
+        # self.qlinear.set_scales_zps_gidx(scales, zero_points)
+        # self.qlinear.blocksize = 32
+        # self.qlinear.qweight.data = self.qlinear.qweight.transpose(
+        #     0, 1
+        # ).contiguous()
+        # try_linear_out_reorder_input = torch.empty(
+        #         1, 1, 4096, dtype=torch.float16, device="xpu"
+        # )
+        # try_linear_out_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+        #     try_linear_out_reorder_input,
+        #     self.qlinear.qweight,
+        #     self.qlinear.scales,
+        #     self.qlinear.qzeros,
+        #     self.qlinear.blocksize,
+        #     True,
+        # )
         group_size = 32  # 128 -> 32
         group_num = int(4096 / group_size)
-        scales = torch.rand([group_num, 128256], device="xpu", dtype=torch.float16)
-        # zero_points = torch.rand([group_num, 512], device="xpu").byte()
-        zero_points = torch.zeros(group_num, 64128, device="xpu").byte()
-        weight = (torch.rand([4096, 64128], device="xpu") * 10 * 16).byte()
-        bias = None
-        self.qlinear.set_weights_bias(weight, bias)
-        self.qlinear.set_scales_zps_gidx(scales, zero_points)
-        self.qlinear.blocksize = 32
-        self.qlinear.qweight.data = self.qlinear.qweight.transpose(
-            0, 1
-        ).contiguous()
-        try_linear_out_reorder_input = torch.empty(
-                1, 1, 4096, dtype=torch.float16, device="xpu"
-        )
-        try_linear_out_reorder = torch.ops.torch_ipex.mm_esimd_int4(
-            try_linear_out_reorder_input,
-            self.qlinear.qweight,
-            self.qlinear.scales,
-            self.qlinear.qzeros,
-            self.qlinear.blocksize,
-            True,
-        )
+
+        self.scales = torch.rand([group_num, 128256], device="xpu", dtype=torch.float16)
+        # zero_points = torch.rand([group_num, 8192], device="xpu").byte()
+        self.zero_points = torch.zeros(group_num, 64128, device="xpu").byte()
+        self.weight = (torch.rand([4096, 64128], device="xpu") * 10 * 16).byte()
+        bias = (torch.empty([1, 64128], device="xpu") * 10 * 16).byte()
+
+        self.group_size = 32  # 128 -> 32
+        self.group_num = int(4096 / group_size)
 
     def port_data(self):
         # print("self.module.qweight.size(): ", self.module.qweight.size())
@@ -237,14 +246,25 @@ class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
         #     return torch.nn.functional.linear(input, self.weight, bias=self.bias)[
         #         :, :, : self.n_dim
         #     ]
+
+        # return torch.ops.torch_ipex.mm_esimd_int4(
+        #     input,
+        #     self.qlinear.qweight,
+        #     self.qlinear.scales,
+        #     self.qlinear.qzeros,
+        #     self.qlinear.blocksize,
+        #     False,
+        # )[:, :, : self.n_dim]
+
         return torch.ops.torch_ipex.mm_esimd_int4(
             input,
-            self.qlinear.qweight,
-            self.qlinear.scales,
-            self.qlinear.qzeros,
-            self.qlinear.blocksize,
+            self.weight,
+            self.scales,
+            self.zero_points,
+            self.group_size,
             False,
         )[:, :, : self.n_dim]
+
 
 class IPEXLmHeadLinearAllreduceWithPaddingBaichuan(
     IPEXLmHeadLinearAllreduceWithPadding

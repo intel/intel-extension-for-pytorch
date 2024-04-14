@@ -218,7 +218,9 @@ class ModuleReplacer:
                         model, name, IPEXLmHeadLinearAllreduceWithPaddingBaichuan(child)
                     )
                 elif is_int4(model):
-                    setattr(model, name, IPEXLmHeadLinearAllreduceWithPaddingInt4(child))
+                    setattr(
+                        model, name, IPEXLmHeadLinearAllreduceWithPaddingInt4(child)
+                    )
                 else:
                     setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
             elif name == "ChatGLMModel" and (not is_int4(model)):
