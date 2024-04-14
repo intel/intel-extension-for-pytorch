@@ -152,7 +152,7 @@ static inline void gemm_int4_esimd_kernel(
     report_time("reshape4 kernel time", e0, e0);
     dpcpp_queue.wait();
 
-    return;
+    // return;
   }
 
   if (m == 1) // GEMV
@@ -448,7 +448,7 @@ static inline void qkv_gemm_int4_esimd_kernel(
       report_time("reshape4 kernel time", e0, e0);
       dpcpp_queue.wait();
     }
-    return;
+    // return;
   }
 
   if (m == 1) // GEMV
@@ -608,6 +608,254 @@ static inline void qkv_gemm_int4_esimd_kernel(
 
   return;
 }
+
+// forward dpcpp implementation
+template <typename scalar_t, typename uint8_t>
+static inline void qkv_gemm_int4_esimd_kernel_fused(
+    const scalar_t* input,
+    uint8_t* weight,
+    const scalar_t* weight_scl,
+    const uint8_t* weight_zp,
+    void* bias,
+    uint8_t* reorder_buffer,
+    int64_t calib_gz,
+    uint32_t m,
+    uint32_t n,
+    uint32_t k,
+    scalar_t* out0, // Q
+    scalar_t* out1, // K
+    scalar_t* out2, // V
+    bool need_reorder) {
+  auto& dpcpp_queue = dpcppGetCurrentQueue();
+
+  if (!(k == 4096 && (n == 4096 || n == 6144))) {
+    std::cout << "k should be 4096 and n should be 4096" << std::endl;
+    // m is input vector num
+    return;
+  }
+
+  uint32_t pixelPerGroupCommonDim4096 = 16;
+
+  // reorder for the weights and scaling
+  // Assume group size 32.   4096 / 32 = 128
+  if (need_reorder) {
+    sycl::event e0;
+    uint8_t* weight_reorder = (uint8_t*)weight;
+    uint8_t* reorderTmp = reorder_buffer;
+    // reorder weight
+    e0 = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(k, n), [=](sycl::id<2> idx) {
+        int i = idx[0];
+        int j = idx[1];
+
+        int32_t origIdx = i * n + j;
+        int32_t afterIdx = j * k + i;
+
+        int8_t tmp = weight_reorder[origIdx / 2];
+        if (origIdx % 2 == 0) {
+          tmp = tmp & 0xf;
+        } else {
+          tmp = tmp >> 4;
+        }
+        reorderTmp[afterIdx] = tmp;
+      });
+    });
+    e0.wait();
+    report_time("reshape1 kernel time", e0, e0);
+    e0 = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(k / 2, n), [=](sycl::id<2> idx) {
+        int i = idx[0];
+        int j = idx[1];
+
+        int32_t afterIdxInt4 = j * k / 2 + i;
+
+        int8_t tmpLow = reorderTmp[afterIdxInt4 * 2];
+        int8_t tmpHigh = reorderTmp[afterIdxInt4 * 2 + 1];
+
+        int8_t tmp = (tmpLow & 0xf) | (tmpHigh << 4);
+
+        weight_reorder[afterIdxInt4] = tmp;
+      });
+    });
+    e0.wait();
+    report_time("reshape2 kernel time", e0, e0);
+
+    // reorder scale
+    fp16* reorderTmpScal = (fp16*)reorder_buffer;
+    fp16* weight_scl_reorder = (fp16*)weight_scl;
+    e0 = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(k / 32, n), [=](sycl::id<2> idx) {
+        int i = idx[0];
+        int j = idx[1];
+
+        int32_t origIdx = i * n + j;
+        int32_t afterIdx = j * k / 32 + i;
+
+        reorderTmpScal[afterIdx] = weight_scl_reorder[origIdx];
+      });
+    });
+    e0.wait();
+    report_time("reshape3 kernel time", e0, e0);
+    e0 = dpcpp_queue.submit([&](handler& cgh) {
+      cgh.parallel_for(sycl::range<2>(k / 32, n), [=](sycl::id<2> idx) {
+        int i = idx[0];
+        int j = idx[1];
+
+        int32_t afterIdx = j * k / 32 + i;
+
+        weight_scl_reorder[afterIdx] = reorderTmpScal[afterIdx];
+      });
+    });
+    e0.wait();
+    report_time("reshape4 kernel time", e0, e0);
+    dpcpp_queue.wait();
+    // return;
+  }
+
+  if (m == 1) // GEMV
+  {
+    // ************ fused kqv gemv
+    int groupsV2 =
+        (n + pixelPerGroupCommonDim4096 - 1) / pixelPerGroupCommonDim4096;
+    int localThread[2];
+    localThread[0] = 16;
+    localThread[1] = 16;
+
+    sycl::range<1> GlobalRangeCommonDim4096V2(groupsV2 * localThread[0]);
+    sycl::range<1> LocalRangeCommonDim4096V2(localThread[0]);
+    sycl::nd_range<1> RangeCommonDim4096V2(
+        GlobalRangeCommonDim4096V2, LocalRangeCommonDim4096V2);
+
+    sycl::event e;
+    // Launches the task on the GPU.
+    if (k == 4096) {
+      e = dpcpp_queue.submit([&](handler& cgh) {
+        cgh.parallel_for(
+            RangeCommonDim4096V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
+              matrixMulCommonDim4096Int4NoReshapeNx16V3_ipex2_fused<4>(
+                  (uint8_t*)weight,
+                  (uint8_t*)input,
+                  (uint8_t*)out0,
+                  (uint8_t*)out1,
+                  (uint8_t*)out2,
+                  (uint8_t*)weight_scl,
+                  ndi);
+            });
+      });
+      e.wait();
+      double etime = report_time("GEMV kernel qkv fused time", e, e);
+    }
+    // ************
+
+  } else // GEMM
+  {
+    int groupReduce2048H = (4096 + 15) / 16;
+    int groupReduce2048V = 1;
+    int localReduce2048H = 64; // internalPrecision == 0  (fp32), not 32
+    int localReduce2048V = 1;
+    sycl::range<2> GlobalRangeReduce2048(
+        groupReduce2048H * localReduce2048H,
+        groupReduce2048V * localReduce2048V);
+    sycl::range<2> LocalRangeReduce2048(localReduce2048H, localReduce2048V);
+    sycl::nd_range<2> RangeReduce2048(
+        GlobalRangeReduce2048, LocalRangeReduce2048);
+
+    sycl::event e;
+    int lastReduce = 0;
+    if (k == 4096) {
+      for (int ii = 0; ii < 2; ii++) {
+        if (ii == 2 - 1) {
+          lastReduce = 1;
+        } else {
+          lastReduce = 0;
+        }
+        e = dpcpp_queue.submit([&](handler& cgh) {
+          cgh.parallel_for(
+              RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
+                gemmReduce2048WeightsQ40InputFp32_ipex(
+                    (uint8_t*)weight,
+                    (uint8_t*)input,
+                    (uint8_t*)out0,
+                    (uint8_t*)weight_scl,
+                    k,
+                    m /*tokenLen*/,
+                    ii,
+                    lastReduce,
+                    ndi);
+              });
+        });
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
+      }
+    }
+    int groupReduce2048H_kv = (1024 + 15) / 16;
+    int groupReduce2048V_kv = 1;
+    int localReduce2048H_kv = 64; // internalPrecision == 0  (fp32), not 32
+    int localReduce2048V_kv = 1;
+    sycl::range<2> GlobalRangeReduce2048_kv(
+        groupReduce2048H_kv * localReduce2048H_kv,
+        groupReduce2048V_kv * localReduce2048V_kv);
+    sycl::range<2> LocalRangeReduce2048_kv(
+        localReduce2048H_kv, localReduce2048V_kv);
+    sycl::nd_range<2> RangeReduce2048_kv(
+        GlobalRangeReduce2048_kv, LocalRangeReduce2048_kv);
+    if (k == 4096) {
+      for (int ii = 0; ii < 2; ii++) {
+        if (ii == 2 - 1) {
+          lastReduce = 1;
+        } else {
+          lastReduce = 0;
+        }
+        e = dpcpp_queue.submit([&](handler& cgh) {
+          cgh.parallel_for(
+              RangeReduce2048_kv, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
+                gemmReduce2048WeightsQ40InputFp32_ipex(
+                    (uint8_t*)(weight + 2048 * 4096 * 1),
+                    (uint8_t*)input,
+                    (uint8_t*)out1,
+                    (uint8_t*)(weight_scl + 128 * 4096 * 1),
+                    k,
+                    m /*tokenLen*/,
+                    ii,
+                    lastReduce,
+                    ndi);
+              });
+        });
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
+      }
+    }
+    if (k == 4096) {
+      for (int ii = 0; ii < 2; ii++) {
+        if (ii == 2 - 1) {
+          lastReduce = 1;
+        } else {
+          lastReduce = 0;
+        }
+        e = dpcpp_queue.submit([&](handler& cgh) {
+          cgh.parallel_for(
+              RangeReduce2048_kv, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
+                gemmReduce2048WeightsQ40InputFp32_ipex(
+                    (uint8_t*)(weight + 2048 * 4096 + 512 * 4096),
+                    (uint8_t*)input,
+                    (uint8_t*)out2,
+                    (uint8_t*)(weight_scl + 128 * 4096 + 128 * 1024),
+                    k,
+                    m /*tokenLen*/,
+                    ii,
+                    lastReduce,
+                    ndi);
+              });
+        });
+        // YC e.wait();
+        // double etime = report_time("GEMV kernel time", e, e);
+      }
+    }
+  }
+
+  return;
+}
+
 } // namespace impl
 
 inline Tensor resize_as_mat2(const Tensor& mat1, const Tensor& output) {
@@ -712,10 +960,10 @@ static void qkv_mm_esimd_int4(
     TORCH_CHECK(
         bias.dim() == 2 && bias.sizes()[0] == 3 && bias.sizes()[1] == n);
   }
-  TORCH_CHECK(
-      out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
-  TORCH_CHECK(
-      out0.sizes()[1] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
+  // TORCH_CHECK(
+  //     out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
+  // TORCH_CHECK(
+  //     out0.sizes()[1] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
 
   TORCH_CHECK(
       input.scalar_type() == kHalf &&
