@@ -152,7 +152,7 @@ static inline void gemm_int4_esimd_kernel(
     report_time("reshape4 kernel time", e0, e0);
     dpcpp_queue.wait();
 
-    // return;
+    return;
   }
 
   if (m == 1) // GEMV
@@ -167,6 +167,12 @@ static inline void gemm_int4_esimd_kernel(
     sycl::range<1> LocalRangeCommonDim4096V2(localThread[0]);
     sycl::nd_range<1> RangeCommonDim4096V2(
         GlobalRangeCommonDim4096V2, LocalRangeCommonDim4096V2);
+
+    // Opt 14336
+    if (k == 14336)
+    {
+      pixelPerGroupCommonDim11008 = 16;
+    }
 
     groupsV2 =
         (n + pixelPerGroupCommonDim11008 - 1) / pixelPerGroupCommonDim11008;
@@ -209,7 +215,7 @@ static inline void gemm_int4_esimd_kernel(
       e = dpcpp_queue.submit([&](handler& cgh) {
         cgh.parallel_for(
             RangeCommonDim11008V2, [=](nd_item<1> ndi) SYCL_ESIMD_KERNEL {
-              matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex<6>(
+              matrixMulCommonDim14336Int4NoReshapeNx16V2_ipex<4>( // PPG comes to 16
                   (uint8_t*)weight,
                   (uint8_t*)input,
                   (uint8_t*)output,
@@ -448,7 +454,7 @@ static inline void qkv_gemm_int4_esimd_kernel(
       report_time("reshape4 kernel time", e0, e0);
       dpcpp_queue.wait();
     }
-    // return;
+    return;
   }
 
   if (m == 1) // GEMV
@@ -709,7 +715,7 @@ static inline void qkv_gemm_int4_esimd_kernel_fused(
     e0.wait();
     report_time("reshape4 kernel time", e0, e0);
     dpcpp_queue.wait();
-    // return;
+    return;
   }
 
   if (m == 1) // GEMV
