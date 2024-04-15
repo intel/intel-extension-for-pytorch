@@ -778,7 +778,7 @@ static inline void qkv_gemm_int4_gqa_esimd_kernel(
         e = dpcpp_queue.submit([&](handler& cgh) {
           cgh.parallel_for(
               RangeReduce2048, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
-                gemmReduce2048WeightsQ40InputFp32_ipex(
+                gemmReduce2048WeightsQ40InputFp16_ipex(
                     (uint8_t*)weight,
                     (uint8_t*)input,
                     (uint8_t*)out0,
@@ -815,7 +815,7 @@ static inline void qkv_gemm_int4_gqa_esimd_kernel(
         e = dpcpp_queue.submit([&](handler& cgh) {
           cgh.parallel_for(
               RangeReduce2048_kv, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
-                gemmReduce2048WeightsQ40InputFp32_ipex(
+                gemmReduce2048WeightsQ40InputFp16_ipex(
                     (uint8_t*)(weight + 2048 * 4096 * 1),
                     (uint8_t*)input,
                     (uint8_t*)out1,
@@ -841,7 +841,7 @@ static inline void qkv_gemm_int4_gqa_esimd_kernel(
         e = dpcpp_queue.submit([&](handler& cgh) {
           cgh.parallel_for(
               RangeReduce2048_kv, [=](nd_item<2> ndi) SYCL_ESIMD_KERNEL {
-                gemmReduce2048WeightsQ40InputFp32_ipex(
+                gemmReduce2048WeightsQ40InputFp16_ipex(
                     (uint8_t*)(weight + 2048 * 4096 + 512 * 4096),
                     (uint8_t*)input,
                     (uint8_t*)out2,
