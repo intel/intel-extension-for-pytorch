@@ -33,6 +33,7 @@ def replace_dropout_with_identity(model):
         for child_name, child in model.named_children():
             if isinstance(child, torch.nn.Dropout):
                 setattr(model, child_name, torch.nn.Identity())
+                getattr(model, child_name).p = child.p
             else:
                 replace_dropout_with_identity(child)
 
