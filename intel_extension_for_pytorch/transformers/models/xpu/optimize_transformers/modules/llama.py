@@ -196,7 +196,7 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
             return
 
         IPEXTransformerAttn.beam_size = beam
-        first_token = True if acc_test or past_key_value is None else False
+        first_token = True if past_key_value is None else False
 
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
