@@ -25,8 +25,77 @@ class TestNNMethod(TestCase):
         y_dpcpp.backward(x_dpcpp)
 
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+    def test_activation_gelu_bfloat16_1(self, dtype=torch.bfloat16):
+        C, H, W = 1, 512, 1024
+        GELU = torch.nn.GELU()
+        GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
+        x_cpu = torch.randn([C, H, W], dtype=dtype)
+        print("x_cpu dtype", x_cpu.dtype)
+        x_dpcpp = x_cpu.to("xpu")
+        x_cpu.requires_grad_(True)
+        x_dpcpp.requires_grad_(True)
+        y_cpu = GELU(x_cpu)
+        y_dpcpp = GELU_dpcpp(x_dpcpp)
+
+        self.assertEqual(y_cpu, y_dpcpp.cpu())
+        y_cpu.backward(x_cpu)
+        y_dpcpp.backward(x_dpcpp)
+
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+    def test_activation_gelu_float16_1(self, dtype=torch.float16):
+        C, H, W = 1, 512, 1024
+        GELU = torch.nn.GELU()
+        GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
+        x_cpu = torch.randn([C, H, W], dtype=dtype)
+        x_dpcpp = x_cpu.to("xpu")
+        x_cpu.requires_grad_(True)
+        x_dpcpp.requires_grad_(True)
+        y_cpu = GELU(x_cpu)
+        y_dpcpp = GELU_dpcpp(x_dpcpp)
+
+        self.assertEqual(y_cpu, y_dpcpp.cpu())
+        y_cpu.backward(x_cpu)
+        y_dpcpp.backward(x_dpcpp)
+
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
     
     def test_activation_gelu_2(self, dtype=torch.float):
+        C, H, W = 1, 512, 4096
+        GELU = torch.nn.GELU()
+        GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
+        x_cpu = torch.randn([C, H, W], dtype=dtype)
+        x_dpcpp = x_cpu.to("xpu")
+        x_cpu.requires_grad_(True)
+        x_dpcpp.requires_grad_(True)
+        y_cpu = GELU(x_cpu)
+        y_dpcpp = GELU_dpcpp(x_dpcpp)
+
+        self.assertEqual(y_cpu, y_dpcpp.cpu())
+        y_cpu.backward(x_cpu)
+        y_dpcpp.backward(x_dpcpp)
+
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+    def test_activation_gelu_bfloat16_2(self, dtype=torch.bfloat16):
+        C, H, W = 1, 512, 4096
+        GELU = torch.nn.GELU()
+        GELU_dpcpp = copy.deepcopy(GELU).to("xpu")
+        x_cpu = torch.randn([C, H, W], dtype=dtype)
+        x_dpcpp = x_cpu.to("xpu")
+        x_cpu.requires_grad_(True)
+        x_dpcpp.requires_grad_(True)
+        y_cpu = GELU(x_cpu)
+        y_dpcpp = GELU_dpcpp(x_dpcpp)
+
+        self.assertEqual(y_cpu, y_dpcpp.cpu())
+        y_cpu.backward(x_cpu)
+        y_dpcpp.backward(x_dpcpp)
+
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+    def test_activation_gelu_float16_2(self, dtype=torch.float16):
         C, H, W = 1, 512, 4096
         GELU = torch.nn.GELU()
         GELU_dpcpp = copy.deepcopy(GELU).to("xpu")

@@ -3,7 +3,6 @@ import time
 
 import torch
 from torch.testing._internal.common_utils import TestCase
-from torch._dynamo.testing import rand_strided
 from functools import partial
 import intel_extension_for_pytorch  # noqa
 from torch.testing import make_tensor
@@ -454,16 +453,23 @@ class TestTorchMethod(TestCase):
 
     def test_lu_unpack(self):
         assert_size_stride = torch._C._dynamo.guards.assert_size_stride
-        aten = torch.ops.aten
-        primals_1 = rand_strided(
-            (3, 5), (1, 3), device=dpcpp_device, dtype=torch.float32
-        )
-        primals_2 = rand_strided((3,), (1,), device=dpcpp_device, dtype=torch.int32)
 
-        buf0 = aten.lu_unpack(primals_1, primals_2)
-        buf1 = buf0[0]
-        assert_size_stride(buf1, (3, 3), (3, 1))
-        buf2 = buf0[1]
-        assert_size_stride(buf2, (3, 3), (3, 1))
-        buf3 = buf0[2]
-        assert_size_stride(buf3, (3, 5), (5, 1))
+        A = torch.randn(3, 5, device=dpcpp_device, dtype=torch.float32)
+        LU, pivots = torch.linalg.lu_factor(A)
+        P, L, U = torch.lu_unpack(LU, pivots)
+        assert_size_stride(P, (3, 3), (3, 1))
+        assert_size_stride(L, (3, 3), (3, 1))
+        assert_size_stride(U, (3, 5), (5, 1))
+
+        A_ = P @ L @ U
+        self.assertEqual(A, A_)
+
+        A = torch.randn(3, 5, device=cpu_device, dtype=torch.float32)
+        LU, pivots = torch.linalg.lu_factor(A)
+        P, L, U = torch.lu_unpack(LU, pivots)
+        assert_size_stride(P, (3, 3), (3, 1))
+        assert_size_stride(L, (3, 3), (3, 1))
+        assert_size_stride(U, (3, 5), (5, 1))
+
+        A_ = P @ L @ U
+        self.assertEqual(A, A_)

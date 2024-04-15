@@ -164,9 +164,7 @@ class ComplexTensor:
         norm = abs(self)
         arg = self.arg()
         # defines a choice of branch cut for non-integer b, matching numpy convention
-        return ComplexTensor(
-            torch.cos(b * arg) * norm**b, torch.sin(b * arg) * norm**b
-        )
+        return ComplexTensor(torch.cos(b * arg) * norm**b, torch.sin(b * arg) * norm**b)
 
     def __matmul__(self, other):
         return ComplexTensor(

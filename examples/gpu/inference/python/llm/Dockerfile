@@ -16,6 +16,7 @@ RUN apt update && \
     gcc \
     g++ \
     make \
+    libgomp1 \
     pkg-config \
     software-properties-common \
     gnupg \
@@ -48,11 +49,6 @@ RUN . ./miniconda3/bin/activate && \
     bash tools/env_setup.sh ${MODE} /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest pvc,ats-m150,acm-g11
 
 FROM base AS deploy
-RUN bash /basekit_driver_install_helper.sh runtime && \
-    sudo apt clean && \
-    sudo rm -rf /var/lib/apt/lists/* && \
-    if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then sudo rm /etc/apt/apt.conf.d/proxy.conf; fi && \
-    sudo rm /basekit_driver_install_helper.sh
 COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/gpu/inference/python/llm ./llm
 COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh .
 RUN . ./miniconda3/bin/activate && \
@@ -63,3 +59,8 @@ RUN . ./miniconda3/bin/activate && \
     bash tools/env_setup.sh 1 && \
     python -m pip cache purge && \
     conda clean -a -y
+RUN bash /basekit_driver_install_helper.sh runtime && \
+    sudo apt clean && \
+    sudo rm -rf /var/lib/apt/lists/* && \
+    if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then sudo rm /etc/apt/apt.conf.d/proxy.conf; fi && \
+    sudo rm /basekit_driver_install_helper.sh

@@ -330,18 +330,22 @@ class _IPEXlinearSiluMulCPU(nn.Module):
             x1 = torch.ops.torch_ipex.tpp_linear_silu(
                 x,
                 self.linear_s.weight,
-                self.linear_s.bias
-                if self.linear_s.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear_s.bias
+                    if self.linear_s.bias is not None
+                    else x.new_empty(0)
+                ),
                 self.linear_s.out_features,
             )
             return torch.ops.torch_ipex.tpp_linear_mul(
                 x,
                 x1,
                 self.linear_m.weight,
-                self.linear_m.bias
-                if self.linear_m.bias is not None
-                else x.new_empty(0),
+                (
+                    self.linear_m.bias
+                    if self.linear_m.bias is not None
+                    else x.new_empty(0)
+                ),
                 self.linear_m.out_features,
             )
         else:  # fallback path

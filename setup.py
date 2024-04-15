@@ -158,9 +158,7 @@ def get_build_type():
     return (
         "RelWithDebInfo"
         if _check_env_flag("REL_WITH_DEB_INFO")
-        else "Debug"
-        if _check_env_flag("DEBUG")
-        else "Release"
+        else "Debug" if _check_env_flag("DEBUG") else "Release"
     )
 
 
@@ -752,9 +750,9 @@ class IPEXCPPLibBuild(build_clib, object):
                 ldflags = f"{my_env_local['LDFLAGS']} "
             my_env_local["LDFLAGS"] = f"{ldflags}-Wl,--no-as-needed"
             if "IPEX_GPU_EXTRA_BUILD_OPTION" in my_env_local:
-                my_env_local[
-                    "LDFLAGS"
-                ] = f"{my_env_local['IPEX_GPU_EXTRA_BUILD_OPTION']} {my_env_local['LDFLAGS']}"
+                my_env_local["LDFLAGS"] = (
+                    f"{my_env_local['IPEX_GPU_EXTRA_BUILD_OPTION']} {my_env_local['LDFLAGS']}"
+                )
             _gen_build_cfg_from_cmake(
                 cmake_exec,
                 project_root_dir,
@@ -937,7 +935,11 @@ def get_src_py_and_dst():
 class IPEXEggInfoBuild(egg_info, object):
     def write_file(self, what, filename, data):
         if _get_build_target() == "bdist_wheel" and what == "requirements" and IS_LINUX:
-            data += "intel_extension_for_pytorch_deepspeed\n"
+            data += (
+                "intel_extension_for_pytorch_deepspeed=="
+                + str(get_version_num())
+                + "\n"
+            )
         super(IPEXEggInfoBuild, self).write_file(what, filename, data)
 
     def finalize_options(self):

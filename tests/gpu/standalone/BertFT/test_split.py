@@ -12,7 +12,25 @@ class TestTensorMethod(TestCase):
         input_cpu = torch.arange(2, 384, 2)
         input_dpcpp = input_cpu.to(dpcpp_device)
 
-        print("input_cpu = ", input_cpu)
-        print("input_dpcpp = ", input_dpcpp)
+        # print("input_cpu = ", input_cpu)
+        # print("input_dpcpp = ", input_dpcpp)
+
+        self.assertEqual(input_cpu.split(split_size=2), input_dpcpp.split(split_size=2))
+
+    def test_split_bfloat16(self, dtype=torch.bfloat16):
+        input_cpu = torch.arange(2, 384, 2, dtype=dtype)
+        input_dpcpp = input_cpu.to(dpcpp_device)
+
+        # print("input_cpu = ", input_cpu)
+        # print("input_dpcpp = ", input_dpcpp)
+
+        self.assertEqual(input_cpu.split(split_size=2), input_dpcpp.split(split_size=2))
+
+    def test_split_float16(self, dtype=torch.float16):
+        input_cpu = torch.arange(2, 384, 2, dtype=dtype)
+        input_dpcpp = input_cpu.to(dpcpp_device)
+
+        # print("input_cpu = ", input_cpu)
+        # print("input_dpcpp = ", input_dpcpp)
 
         self.assertEqual(input_cpu.split(split_size=2), input_dpcpp.split(split_size=2))

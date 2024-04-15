@@ -530,7 +530,7 @@ def check_xpu_llm_support(model):
                 "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
                 " and the transformer model."
                 " If the XPU platform has XMX and 2D load instructions, such as PVC1100, PVC1100c, and PVC1550,"
-                " ipex.optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen "
+                " ipex.optimize_transformers supports GPT-J/Llama/OPT/Bloom/Falcon/QWen/Baichuan/ChatGLM "
                 " and BasicTransformerBlock of diffusers. "
             )
         return xpu_supported_model

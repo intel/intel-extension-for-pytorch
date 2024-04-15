@@ -158,9 +158,11 @@ class _Linear(torch.autograd.Function):
         )
 
         grad_weight = torch.ops.torch_ipex.fp8_gemm_backward(
-            torch.permute(grad_output, (0, 2, 1))
-            if grad_output.dim() == 3
-            else torch.transpose(grad_output, 0, 1),
+            (
+                torch.permute(grad_output, (0, 2, 1))
+                if grad_output.dim() == 3
+                else torch.transpose(grad_output, 0, 1)
+            ),
             fp8_dtype_backward,
             ipex.FP8BwdTensors.GRAD_OUTPUT1,
             input,

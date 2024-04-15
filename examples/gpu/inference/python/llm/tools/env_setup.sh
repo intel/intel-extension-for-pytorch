@@ -58,9 +58,9 @@ WHEELFOLDER=${BASEFOLDER}/../wheels
 AUX_INSTALL_SCRIPT=${WHEELFOLDER}/aux_install.sh
 cd ${BASEFOLDER}/..
 
-if [ ! -f ${WHEELFOLDER}/transformers*.whl ] ||
-   [ ! -f ${WHEELFOLDER}/deepspeed*.whl ] ||
-   [ ! -f ${WHEELFOLDER}/intel_extension_for_deepspeed*.whl ]; then
+if [ $((${MODE} & 0x02)) -eq 0 ] &&
+   ([ ! -f ${WHEELFOLDER}/transformers*.whl ] ||
+   [ ! -f ${WHEELFOLDER}/intel_extension_for_deepspeed*.whl ]); then
     (( MODE |= 0x02 ))
     echo "Expected wheel files are not found. Swith to source code compilation."
 fi
@@ -78,31 +78,22 @@ if [ $((${MODE} & 0x06)) -eq 2 ] &&
 fi
 
 # Check existance of required Linux commands
-for CMD in conda; do
-    command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 3;)
-done
-export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
-export LIBRARY_PATH=${CONDA_PREFIX}/lib:${LIBRARY_PATH}
-
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
     # Enter IPEX root dir
     cd ../../../../..
 
     if [ ! -f dependency_version.yml ]; then
         echo "Please check if `pwd` is a valid Intel® Extension for PyTorch* source code directory."
-        exit 4
+        exit 3
     fi
     python -m pip install pyyaml
-    DS_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k repo)
-    DS_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k commit)
+    VER_DS=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k version)
     IDEX_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d intel-extension-for-deepspeed -k repo)
     IDEX_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d intel-extension-for-deepspeed -k commit)
-    TORCHCCL_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
-    TORCHCCL_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k commit)
     VER_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k version)
     VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
     VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
-    TRANSFORMERS_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d transformers -k commit)
+    COMMIT_TRANSFORMERS=$(python tools/yaml_utils.py -f dependency_version.yml -d transformers -k commit)
     VER_PROTOBUF=$(python tools/yaml_utils.py -f dependency_version.yml -d protobuf -k version)
     VER_LM_EVAL=$(python tools/yaml_utils.py -f dependency_version.yml -d lm_eval -k version)
     VER_IPEX_MAJOR=$(grep "VERSION_MAJOR" version.txt | cut -d " " -f 2)
@@ -115,7 +106,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     # Check existance of required Linux commands
     for CMD in git; do
-        command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 5;)
+        command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 4;)
     done
 
     # Clear previous compilation output
@@ -125,7 +116,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     mkdir ${WHEELFOLDER}
 
     # Install deps
-    conda install -y cmake ninja
+    python -m pip install cmake ninja
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
@@ -134,7 +125,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     else
         if [ ! -f ${ONECCL_ROOT}/env/vars.sh ]; then
             echo "oneCCL environment ${ONECCL_ROOT} doesn't seem to exist."
-            exit 6
+            exit 5
         fi
 
         if [ ! -f ${MPI_ROOT}/env/vars.sh ]; then
@@ -148,14 +139,15 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         bash compile_bundle.sh ${DPCPP_ROOT} ${ONEMKL_ROOT} ${ONECCL_ROOT}  ${MPI_ROOT} ${AOT} 1
         cp pytorch/dist/*.whl ${WHEELFOLDER}
         cp intel-extension-for-pytorch/dist/*.whl ${WHEELFOLDER}
+        cp intel-extension-for-pytorch/ecological_libs/deepspeed/dist/*.whl ${WHEELFOLDER}
         cp torch-ccl/dist/*.whl ${WHEELFOLDER}
         rm -rf compile_bundle.sh llvm-project llvm-release pytorch torch-ccl
         export LD_PRELOAD=$(bash intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh)
     fi
 
-    echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install cpuid accelerate datasets sentencepiece diffusers protobuf==${VER_PROTOBUF} huggingface_hub mpi4py mkl" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install lm_eval==${VER_LM_EVAL}" >> ${AUX_INSTALL_SCRIPT}
+    #echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate datasets sentencepiece diffusers protobuf==${VER_PROTOBUF} lm_eval==${VER_LM_EVAL} huggingface_hub deepspeed==${VER_DS}" >> ${AUX_INSTALL_SCRIPT}
+    #echo "python -m pip install lm_eval==${VER_LM_EVAL}" >> ${AUX_INSTALL_SCRIPT}
 
     # Install Transformers
     if [ -d transformers ]; then
@@ -163,7 +155,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
     git clone https://github.com/huggingface/transformers.git
     cd transformers
-    git checkout ${TRANSFORMERS_COMMIT}
+    git checkout ${COMMIT_TRANSFORMERS}
     git apply ../intel-extension-for-pytorch/examples/gpu/inference/python/llm/tools/profile_patch
     python setup.py bdist_wheel
     cp dist/*.whl ${WHEELFOLDER}
@@ -171,17 +163,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     rm -rf transformers
 
     # Install DeepSpeed
-    python -m pip install impi-devel
-    python -m pip install huggingface_hub mpi4py
-    if [ -d DeepSpeed ]; then
-        rm -rf DeepSpeed
-    fi
-    git clone ${DS_REPO}
-    cd DeepSpeed
-    git checkout ${DS_COMMIT}
-    python -m pip install -r requirements/requirements.txt
-    cd ..
-
+    python -m pip install deepspeed==${VER_DS}
+    source ${MPI_ROOT}/env/vars.sh
     if [ -d intel-extension-for-deepspeed ]; then
         rm -rf intel-extension-for-deepspeed
     fi
@@ -193,16 +176,10 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cp dist/*.whl ${WHEELFOLDER}
     cd ..
     rm -rf intel-extension-for-deepspeed
-
-    cd DeepSpeed
-    python -m pip install mkl
-    python setup.py bdist_wheel
-    cp dist/*.whl ${WHEELFOLDER}
-    cd ..
-    rm -rf DeepSpeed
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     python -m pip install ${WHEELFOLDER}/*.whl
+    python -m pip install --force-reinstall ${WHEELFOLDER}/intel_extension_for_pytorch_deepspeed*.whl
     bash ${AUX_INSTALL_SCRIPT}
     rm -rf ${WHEELFOLDER}
 fi

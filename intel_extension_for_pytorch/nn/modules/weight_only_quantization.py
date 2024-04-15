@@ -43,6 +43,7 @@ class IpexWoqLinear(nn.Module):
     A weight-only quantized (WOQ) linear module with floating point tensor as inputs and outputs.
     Weight is dequantized at runtime for computation.
     """
+
     # version used in this class is different from the parent class nnq.Linear
     _version = 4
 
