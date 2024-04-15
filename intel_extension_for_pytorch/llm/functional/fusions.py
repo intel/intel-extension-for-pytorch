@@ -4,7 +4,7 @@ from intel_extension_for_pytorch.llm.modules import (
     RotaryEmbedding,
     RMSNorm,
     FastLayerNorm,
-    IndirectAccessKVCache,
+    IndirectAccessKVCacheAttention,
     VarlenAttention,
 )
 
@@ -128,7 +128,7 @@ def indirect_access_kv_cache(
     - new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).
 
     Notes:
-    - How to reorder KV cache when using the format of IndirectAccessKVCache (e.g., on llama model
+    - How to reorder KV cache when using the format of IndirectAccessKVCacheAttention (e.g., on llama model
       see https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318)
         def _reorder_cache(
             self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
@@ -141,7 +141,7 @@ def indirect_access_kv_cache(
                 return past_key_values
 
     """
-    return IndirectAccessKVCache.apply_function(
+    return IndirectAccessKVCacheAttention.apply_function(
         query,
         key,
         value,

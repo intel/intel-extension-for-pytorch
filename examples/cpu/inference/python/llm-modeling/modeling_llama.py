@@ -71,7 +71,7 @@ class LlamaAttention(nn.Module):
         self.o_proj = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
 
         # ==================== Changes to apply ipex.llm layers  ====================
-        self._IPEXIndirectAccessKVCache = ipex.llm.modules.IndirectAccessKVCache(
+        self._IPEXIndirectAccessKVCacheAttention = ipex.llm.modules.IndirectAccessKVCacheAttention(
             self.max_position_embeddings
         )
         self.ipex_rotary_emb = ipex.llm.modules.RotaryEmbedding(
@@ -128,7 +128,7 @@ class LlamaAttention(nn.Module):
             kv_seq_len,
         )
 
-        (attn_output, attn_weights, past_key_value) = self._IPEXIndirectAccessKVCache(
+        (attn_output, attn_weights, past_key_value) = self._IPEXIndirectAccessKVCacheAttention(
             query_states,
             key_states,
             value_states,
@@ -478,7 +478,7 @@ class IPEXLlamaForCausalLM(LlamaPreTrainedModel):
             attentions=outputs.attentions,
         )
 
-    # ======== rewrite to prepare_inputs_for_generation to work with ipex.llm.modules.IndirectAccessKVCache  =========
+    # ======== rewrite to prepare_inputs_for_generation to work with ipex.llm.modules.IndirectAccessKVCacheAttention  =========
     def prepare_inputs_for_generation(
         self,
         input_ids,
@@ -519,7 +519,7 @@ class IPEXLlamaForCausalLM(LlamaPreTrainedModel):
         )
         return model_inputs
 
-    # ==================== rewrite to _reorder_cache to work with ipex.llm.modules.IndirectAccessKVCache  ====================
+    # ==================== rewrite to _reorder_cache to work with ipex.llm.modules.IndirectAccessKVCacheAttention  ====================
     def _reorder_cache(
         self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
     ) -> Tuple[Tuple[torch.Tensor]]:
