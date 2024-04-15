@@ -3,6 +3,7 @@ import os
 from ._transformers import IPEXEmptyINT4LinearWithPadding
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
+    WeightOnlyQuantizedLinearforEsimd,
 )
 
 
@@ -70,17 +71,14 @@ def pad_for_gptj_lm_head(model, is_int4=False):
     if is_int4 and isinstance(model.lm_head, WeightOnlyQuantizedLinear):
         n = model.lm_head.out_features
 
-        lm_head_new = IPEXEmptyINT4LinearWithPadding(n)
-        lm_head_new.qweight = model.lm_head.qweight
-        lm_head_new.bias = (
-            model.lm_head.bias if model.lm_head.bias is not None else None
+        lm_head_new = WeightOnlyQuantizedLinearforEsimd(
+            in_features=4096, out_features=128256
         )
-        lm_head_new.scales = model.lm_head.scales
-        if hasattr(model.lm_head, "qzeros"):
-            lm_head_new.qzeros = model.lm_head.qzeros
-        else:
-            lm_head_new.qzeros = None
-        lm_head_new.group_size = model.lm_head.blocksize
+        lm_head_new.set_weights_bias(model.lm_head.qweight, model.lm_head.bias)
+        lm_head_new.set_scales_zps_gidx(model.lm_head.scales, model.lm_head.qzeros)
+        lm_head_new.blocksize = model.lm_head.blocksize
+        lm_head_new.n_dim = model.lm_head.qweight.shape[0]
+
         model.lm_head = lm_head_new
 
         model.lm_head.qweight.data = model.lm_head.qweight.transpose(0, 1).contiguous()
@@ -96,6 +94,19 @@ def pad_for_gptj_lm_head(model, is_int4=False):
 
         if model.lm_head.bias is not None:
             model.lm_head.bias.data = int4_gemm_bias_padding(model.lm_head.bias)
+
+        try_linear_vocab_input = torch.empty(
+            1, 1024, 4096, dtype=torch.float16, device="xpu"
+        )
+
+        try_linear_out_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+            try_linear_vocab_input,
+            model.lm_head.qweight,
+            model.lm_head.scales,
+            model.lm_head.qzeros,
+            model.lm_head.blocksize,
+            True,
+        )
 
     else:
         if hasattr(model.lm_head, "bias") and model.lm_head.bias is not None:

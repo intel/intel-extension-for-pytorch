@@ -21,7 +21,6 @@ from .modules.Layers import (
     IpexFastLinear,
     IpexFastAllReduceLinear,
     IPEXLmHeadLinearAllreduceWithPadding,
-    IPEXLmHeadLinearAllreduceWithPaddingInt4,
     IPEXLmHeadLinearAllreduceWithPaddingBaichuan,
 )
 from .modules.gptj import NewIPEXGPTJBlock
@@ -210,16 +209,10 @@ class ModuleReplacer:
                 or child.__class__.__name__ == "GLMBlock"
             ):
                 continue
-            if name == "lm_head":
-                if hasattr(model, "dtype_tag"):
-                    print("model.dtype_tag", model.dtype_tag)
+            if name == "lm_head" and (not is_int4(model)):
                 if model.__class__.__name__ == "BaichuanForCausalLM":
                     setattr(
                         model, name, IPEXLmHeadLinearAllreduceWithPaddingBaichuan(child)
-                    )
-                elif is_int4(model):
-                    setattr(
-                        model, name, IPEXLmHeadLinearAllreduceWithPaddingInt4(child)
                     )
                 else:
                     setattr(model, name, IPEXLmHeadLinearAllreduceWithPadding(child))
