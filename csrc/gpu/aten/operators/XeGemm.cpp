@@ -10,7 +10,6 @@
 #include "comm/ATDispatch.h"
 #include "utils/CustomOperatorRegistration.h"
 #include "xetla/hgemm.h"
-#if defined(USE_XETLA)
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -43,9 +42,11 @@ static Tensor mm_common(const Tensor& a, const Tensor& b) {
                     .add_matrix_b(b)
                     .build();
   GemmStatus status = GemmStatus::kError;
+#if defined(USE_XETLA)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
+#endif
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_common)
     bool is_fused;
@@ -78,9 +79,11 @@ static Tensor mm_resadd(
           .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
+#if defined(USE_XETLA)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
+#endif
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd)
     bool is_fused;
@@ -120,9 +123,11 @@ static Tensor mm_resadd_resadd(
           .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
+#if defined(USE_XETLA)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
+#endif
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resadd_resadd)
     bool is_fused;
@@ -162,9 +167,11 @@ static Tensor mm_bias(
           .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
+#if defined(USE_XETLA)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
+#endif
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias)
     bool is_fused;
@@ -204,9 +211,11 @@ static Tensor mm_bias_resadd(
           .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
+#if defined(USE_XETLA)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
+#endif
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd)
     bool is_fused;
@@ -251,9 +260,11 @@ static Tensor mm_bias_resadd_resadd(
           .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
+#if defined(USE_XETLA)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
+#endif
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_bias_resadd_resadd)
     bool is_fused;
@@ -291,9 +302,11 @@ static Tensor mm_resmul(const Tensor& a, const Tensor& b, const Tensor& res) {
                     .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_MUL)
                     .build();
   GemmStatus status = GemmStatus::kError;
+#if defined(USE_XETLA)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
+#endif
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_resmul)
     bool is_fused;
@@ -324,9 +337,11 @@ static Tensor mm_silu(const Tensor& a, const Tensor& b) {
                     .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::SILU)
                     .build();
   GemmStatus status = GemmStatus::kError;
+#if defined(USE_XETLA)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
+#endif
   if (status != GemmStatus::kSuccess) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_silu)
     auto result = matmul_silu(a, b);
@@ -359,12 +374,14 @@ Tensor matmul_relu(
                 bias.value(), HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::RELU)
             .build();
+#if defined(USE_XETLA)
     if (xetla_valid && policy.valid()) {
       status = policy.run();
       if (status == GemmStatus::kSuccess) {
         return matmul_resize(input, output);
       }
     }
+#endif
   }
 
   RECORD_ONEDNN_FUNCTION_IMPL(matmul_relu)
@@ -405,11 +422,13 @@ Tensor matmul_gelu(
                 bias.value(), HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::GELU)
             .build();
+#if defined(USE_XETLA)
     if (xetla_valid && policy.valid()) {
       auto status = policy.run();
       if (status == GemmStatus::kSuccess)
         return matmul_resize(input, output);
     }
+#endif
   }
   RECORD_ONEDNN_FUNCTION_IMPL(matmul_gelu)
   auto weight_ = weight.transpose(0, 1);
@@ -490,6 +509,7 @@ static size_t get_cnt_size(
       ks_coop_num_x * counter_size;
 }
 
+#if defined(USE_XETLA)
 static void get_acc_and_cnt_tensor(
     const Tensor& input_,
     uint32_t m_,
@@ -521,6 +541,7 @@ static void get_acc_and_cnt_tensor(
   cnt_tensor_ = at::AtenIpexTypeXPU::empty(
       {cnt_size}, input_.options().dtype(at::kByte), c10::nullopt);
 }
+#endif
 
 static void mm_qkv_out(
     const Tensor& input_,
@@ -586,6 +607,7 @@ static void mm_qkv_out(
   bool xetla_valid = fp64_valid && out0_valid && out1_valid && out2_valid &&
       input_valid && weight_valid && bias_valid && shape_valid;
 
+#if defined(USE_XETLA)
   if (dpcppGetDeviceHasXMX() && xetla_valid) {
     char str__[100];
     if (!has_bias) {
@@ -633,6 +655,7 @@ static void mm_qkv_out(
         return;
     }
   }
+#endif
 
   auto wq = weight[0];
   auto wk = weight[1];
@@ -722,6 +745,7 @@ static void mm_qkv_group_out(
   bool xetla_valid = fp64_valid && out0_valid && out1_valid && out2_valid &&
       input_valid && weight_valid && bias_valid && shape_valid;
 
+#if defined(USE_XETLA)
   if (dpcppGetDeviceHasXMX() && xetla_valid) {
     char str__[100];
     Tensor acc_tensor_, cnt_tensor_;
@@ -772,6 +796,7 @@ static void mm_qkv_group_out(
         return;
     }
   }
+#endif
 
   using namespace at::indexing;
   out0 = out0.view({m, num_kv_head, group - 2, head_dim});
@@ -849,5 +874,3 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_qkv.xpu", at::AtenIpexTypeXPU::mm_qkv);
 }
 } // namespace
-
-#endif
