@@ -764,9 +764,9 @@ class IPEXTransformerAtten(nn.Module):
                 dtype=attn_mask.dtype,
             )
             IPEXTransformerAtten.blocked_attn_mask.fill_(-65504.0)
-            IPEXTransformerAtten.blocked_attn_mask[:, :, :, 0 : attn_mask.shape[3]] = (
-                attn_mask
-            )
+            IPEXTransformerAtten.blocked_attn_mask[
+                :, :, :, 0 : attn_mask.shape[3]
+            ] = attn_mask
         return IPEXTransformerAtten.blocked_attn_mask
 
     def naive_self_attention(

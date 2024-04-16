@@ -3,7 +3,6 @@ import os
 from ._transformers import IPEXEmptyINT4LinearWithPadding
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
-    WeightOnlyQuantizedLinearforEsimd,
 )
 
 
@@ -71,9 +70,7 @@ def pad_for_gptj_lm_head(model, is_int4=False):
     if is_int4 and isinstance(model.lm_head, WeightOnlyQuantizedLinear):
         n = model.lm_head.out_features
 
-        lm_head_new = WeightOnlyQuantizedLinearforEsimd(
-            in_features=4096, out_features=128256
-        )
+        lm_head_new = WeightOnlyQuantizedLinear(in_features=4096, out_features=n)
         lm_head_new.set_weights_bias(model.lm_head.qweight, model.lm_head.bias)
         lm_head_new.set_scales_zps_gidx(model.lm_head.scales, model.lm_head.qzeros)
         lm_head_new.blocksize = model.lm_head.blocksize

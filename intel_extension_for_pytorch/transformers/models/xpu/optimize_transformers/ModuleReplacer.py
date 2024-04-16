@@ -21,7 +21,11 @@ from .modules.Layers import (
     IpexFastLinear,
     IpexFastAllReduceLinear,
     IPEXLmHeadLinearAllreduceWithPadding,
+    IPEXLmHeadLinearAllreduceWithPaddingInt4,
     IPEXLmHeadLinearAllreduceWithPaddingBaichuan,
+)
+from intel_extension_for_pytorch.nn.utils._quantize_convert import (
+    WeightOnlyQuantizedLinear,
 )
 from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
@@ -29,11 +33,7 @@ from .modules.llama import NewIPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
 from .modules.falcon import NewIPEXFalconBlock
 from .modules.qwen import NewIPEXQWENBlock
-from .modules.chatglm import (
-    NewIPEXCHATGLMBlock,
-    prepare_inputs_for_generation,
-    NewIPEXRotaryEmbedding,
-)
+from .modules.chatglm import NewIPEXCHATGLMBlock, prepare_inputs_for_generation
 from .modules.DiffusersTransformer import NewIPEXBasicTransformerBlock
 from .modules.bert import NewIPEXBertSelfAttention
 
@@ -191,18 +191,6 @@ class ModuleReplacer:
                 if new_module is not None:
                     setattr(model, name, new_module)
                     is_replace_success = True
-            # Replace RotaryEmbedding in ChatGLMModel
-            elif (
-                model.__class__.__name__ == "ChatGLMModel"
-                and child.__class__.__name__ == "RotaryEmbedding"
-            ):
-                new_module = NewIPEXRotaryEmbedding(
-                    child,
-                    config,
-                    device="xpu",
-                )
-                if new_module is not None:
-                    setattr(model, name, new_module)
             else:
                 is_replace_success = (
                     self.replace_module(child, dtype, config, module_name + name)
@@ -225,8 +213,14 @@ class ModuleReplacer:
                 or child.__class__.__name__ == "GLMBlock"
             ):
                 continue
-            if name == "lm_head" and (not is_int4(model)):
-                if model.__class__.__name__ == "BaichuanForCausalLM":
+            if name == "lm_head":
+                if is_int4(model) and isinstance(
+                    model.lm_head, WeightOnlyQuantizedLinear
+                ):
+                    setattr(
+                        model, name, IPEXLmHeadLinearAllreduceWithPaddingInt4(child)
+                    )
+                elif model.__class__.__name__ == "BaichuanForCausalLM":
                     setattr(
                         model, name, IPEXLmHeadLinearAllreduceWithPaddingBaichuan(child)
                     )
