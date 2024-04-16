@@ -190,6 +190,7 @@ def _beam_search(
             "QWenLMHeadModel",
             "GitForCausalLM",
             "LlavaLlamaForCausalLM",
+            "YuanForCausalLM",
         ]:
             first_token = False
             has_position_id = model_inputs.get("position_ids", None) is not None
@@ -271,7 +272,7 @@ def _beam_search(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
-            if first_token:
+            if first_token and self.model_backbone != "YuanForCausalLM":
                 if hasattr(self.config, "n_layer"):
                     num_hidden_layers = self.config.n_layer
                 elif hasattr(self.config, "num_hidden_layers"):
@@ -329,6 +330,8 @@ def _beam_search(
                 self, "prepare_inputs_labels_for_multimodal"
             ):
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
+            if first_token and self.model_backbone == "YuanForCausalLM":
+                model_inputs.pop("past_key_values", None)
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
@@ -341,7 +344,11 @@ def _beam_search(
                     output_attentions=output_attentions,
                     output_hidden_states=output_hidden_states,
                 )
-            if first_token and len(model_inputs["past_key_values"][0]) == 4:
+            if (
+                first_token
+                and self.model_backbone != "YuanForCausalLM"
+                and len(model_inputs["past_key_values"][0]) == 4
+            ):
                 if isinstance(outputs, dict):
                     outputs.logits = outputs.logits.repeat_interleave(num_beams, dim=0)
                 else:

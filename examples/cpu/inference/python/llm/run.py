@@ -495,6 +495,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "dolly": ("/dolly_local_shard"),
                 "qwen": ("/qwen_local_shard"),
                 "git": ("/git_local_shard"),
+                "yuan": ("/yuan_local_shard"),
                 "llava": ("/llava_local_shard"),
             }
             model_type = next(

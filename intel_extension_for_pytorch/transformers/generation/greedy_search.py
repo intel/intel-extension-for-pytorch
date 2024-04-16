@@ -171,6 +171,7 @@ def _greedy_search(
             "QWenLMHeadModel",
             "GitForCausalLM",
             "LlavaLlamaForCausalLM",
+            "YuanForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -276,6 +277,8 @@ def _greedy_search(
                 self, "prepare_inputs_labels_for_multimodal"
             ):
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
+            if first_token and self.model_backbone == "YuanForCausalLM":
+                model_inputs.pop("past_key_values", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
@@ -291,7 +294,10 @@ def _greedy_search(
                     model_inputs["encoder_outputs"] = (
                         model_inputs["encoder_outputs"]["last_hidden_state"],
                     )
-                outputs = self.trace_graph(**model_inputs)
+                if first_token and hasattr(self, "trace_graph_first"):
+                    outputs = self.trace_graph_first(**model_inputs)
+                else:
+                    outputs = self.trace_graph(**model_inputs)
             else:
                 outputs = self(
                     **model_inputs,

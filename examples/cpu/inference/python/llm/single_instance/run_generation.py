@@ -44,6 +44,7 @@ MODEL_CLASSES = {
     "stablelm": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "git": (AutoModelForCausalLM, AutoProcessor),
+    "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -204,7 +205,8 @@ if re.search("llava", model.config.architectures[0], re.IGNORECASE):
         roles = ('user', 'assistant')
     else:
         roles = conv.roles
-
+if re.search("yuan", model.config.architectures[0], re.IGNORECASE):
+    model.config.batch_size = int(args.batch_size) * num_beams
 def trace_handler(prof):
     print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1))
 # to ipex
