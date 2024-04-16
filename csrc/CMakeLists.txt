@@ -49,46 +49,48 @@ function(header_file_gen header_file, directory)
   endif()
 endfunction()
 
-function(header_files_install directory)
-  if(EXISTS ${IPEX_CSRC_INCLUDE_DIR}/${directory})
-    FILE(GLOB IPEX_HEADERS ${IPEX_CSRC_INCLUDE_DIR}/${directory}/*.h)
-    foreach(uheader ${IPEX_HEADERS})
-      get_filename_component(header ${uheader} NAME)
-      install(FILES "${IPEX_CSRC_INCLUDE_DIR}/${directory}/${header}" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${directory}")
-      if(NOT "${CMAKE_INSTALL_INCLUDEDIR}/${directory}/${header}" IN_LIST LIBIPEX_COMP_LIST)
-        set(LIBIPEX_COMP_LIST ${LIBIPEX_COMP_LIST} "${CMAKE_INSTALL_INCLUDEDIR}/${directory}/${header}" PARENT_SCOPE)
-      endif()
-    endforeach()
-  endif()
-endfunction()
-
 # Generate the IPEX All-In-One header
 if(NOT BUILD_MODULE_TYPE STREQUAL "PYTHON")
   set(header_file "${CMAKE_BINARY_DIR}/../ipex.h")
   if(NOT EXISTS ${header_file})
     file(WRITE ${header_file}
   "/*
-   * Do not modify this file manually!
-   * This is a automatically generated header file!
-   */
+ * Do not modify this file manually!
+ * This is an automatically generated header file!
+ */
 
-  #pragma once
+#pragma once
 
-  // IPEX headers for XPU
-  ")
+// IPEX headers for XPU
+")
     header_file_gen(${header_file}, ".")
-    message(STATUS "BUILD_MODULE_TYPE: ${BUILD_MODULE_TYPE}")
   endif()
   if(BUILD_MODULE_TYPE STREQUAL "CPU")
     header_file_gen(${header_file}, "cpu")
-    header_files_install("cpu")
   endif()
   if(BUILD_MODULE_TYPE STREQUAL "GPU")
     header_file_gen(${header_file}, "xpu")
-    header_files_install("xpu")
   endif()
-  header_files_install(".")
-  install(FILES ${header_file} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+endif()
+
+if(BUILD_MODULE_TYPE STREQUAL "CPPSDK" OR BUILD_MODULE_TYPE STREQUAL "GPU")
+  file(STRINGS "${header_file}" HEADERS_INSTALL)
+  foreach(hd_line ${HEADERS_INSTALL})
+    string(REGEX MATCH "^#include <(.*)>" MATCH_OUT ${hd_line})
+    set(file_match ${CMAKE_MATCH_1})
+    if(NOT MATCH_OUT STREQUAL "")
+      string(REGEX MATCH "(.*)/.*" MATCH_OUT ${file_match})
+      set(directory ".")
+      if(NOT MATCH_OUT STREQUAL "")
+        set(directory ${CMAKE_MATCH_1})
+      endif()
+      install(FILES "${IPEX_CSRC_INCLUDE_DIR}/${file_match}" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${directory}")
+      if(NOT "${CMAKE_INSTALL_INCLUDEDIR}/${file_match}" IN_LIST LIBIPEX_COMP_LIST)
+        list(APPEND LIBIPEX_COMP_LIST "${CMAKE_INSTALL_INCLUDEDIR}/${file_match}")
+      endif()
+    endif()
+  endforeach()
+  install(FILES "${header_file}" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
   if(NOT "${CMAKE_INSTALL_INCLUDEDIR}/ipex.h" IN_LIST LIBIPEX_COMP_LIST)
     list(APPEND LIBIPEX_COMP_LIST "${CMAKE_INSTALL_INCLUDEDIR}/ipex.h")
   endif()
