@@ -182,14 +182,6 @@ class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
         self.blocksize = self.module.blocksize
 
     def forward(self, input):
-        output = torch.ops.torch_ipex.mm_esimd_int4(
-            input,
-            self.qweight,
-            self.scales,
-            self.qzeros,
-            self.blocksize,
-            False,
-        )
         return torch.ops.torch_ipex.mm_esimd_int4(
             input,
             self.qweight,
