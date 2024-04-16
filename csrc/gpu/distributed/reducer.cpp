@@ -63,7 +63,10 @@ class XPUTimer : public Timer {
     // as mostly all operations are finished in previous iteration.
     start_event.synchronize();
     end_event.synchronize();
-    float milliseconds = start_event.elapsed_time(end_event);
+    // float milliseconds = start_event.elapsed_time(end_event);
+    float milliseconds = 0;
+    TORCH_WARN_ONCE(
+        "measureDifference between two events is not supported on XPU backend!");
     // If gpu_end is not recorded in this iteration,
     // milliseconds will have invalid value.
     // For some cases like DDP runs on non-sync mode,
