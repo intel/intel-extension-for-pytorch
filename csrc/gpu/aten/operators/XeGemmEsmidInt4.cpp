@@ -104,7 +104,7 @@ static inline void gemm_int4_esimd_kernel(
       });
     });
     e0.wait();
-    report_time("reshape1 kernel time", e0, e0);
+    //report_time("reshape1 kernel time", e0, e0);
     e0 = dpcpp_queue.submit([&](handler& cgh) {
       cgh.parallel_for(sycl::range<2>(k / 2, n), [=](sycl::id<2> idx) {
         int i = idx[0];
@@ -121,7 +121,7 @@ static inline void gemm_int4_esimd_kernel(
       });
     });
     e0.wait();
-    report_time("reshape2 kernel time", e0, e0);
+    //report_time("reshape2 kernel time", e0, e0);
 
     fp16* reorderTmpScal = (fp16*)reorder_buffer;
     fp16* weight_scl_reorder = (fp16*)weight_scl;
@@ -137,7 +137,7 @@ static inline void gemm_int4_esimd_kernel(
       });
     });
     e0.wait();
-    report_time("reshape3 kernel time", e0, e0);
+    //report_time("reshape3 kernel time", e0, e0);
     e0 = dpcpp_queue.submit([&](handler& cgh) {
       cgh.parallel_for(sycl::range<2>(k / 32, n), [=](sycl::id<2> idx) {
         int i = idx[0];
@@ -149,7 +149,7 @@ static inline void gemm_int4_esimd_kernel(
       });
     });
     e0.wait();
-    report_time("reshape4 kernel time", e0, e0);
+    //report_time("reshape4 kernel time", e0, e0);
     dpcpp_queue.wait();
 
     return;
@@ -405,7 +405,7 @@ static inline void qkv_gemm_int4_esimd_kernel(
         });
       });
       e0.wait();
-      report_time("reshape1 kernel time", e0, e0);
+      //report_time("reshape1 kernel time", e0, e0);
       e0 = dpcpp_queue.submit([&](handler& cgh) {
         cgh.parallel_for(sycl::range<2>(k / 2, n), [=](sycl::id<2> idx) {
           int i = idx[0];
@@ -422,7 +422,7 @@ static inline void qkv_gemm_int4_esimd_kernel(
         });
       });
       e0.wait();
-      report_time("reshape2 kernel time", e0, e0);
+      //report_time("reshape2 kernel time", e0, e0);
 
       fp16* reorderTmpScal = (fp16*)reorder_buffer;
       fp16* weight_scl_reorder = (fp16*)weight_scl;
@@ -439,7 +439,7 @@ static inline void qkv_gemm_int4_esimd_kernel(
         });
       });
       e0.wait();
-      report_time("reshape3 kernel time", e0, e0);
+      //report_time("reshape3 kernel time", e0, e0);
       e0 = dpcpp_queue.submit([&](handler& cgh) {
         cgh.parallel_for(sycl::range<2>(k / 32, n), [=](sycl::id<2> idx) {
           int i = idx[0];
@@ -451,7 +451,7 @@ static inline void qkv_gemm_int4_esimd_kernel(
         });
       });
       e0.wait();
-      report_time("reshape4 kernel time", e0, e0);
+      //report_time("reshape4 kernel time", e0, e0);
       dpcpp_queue.wait();
     }
     return;
@@ -667,7 +667,7 @@ static inline void qkv_gemm_int4_gqa_esimd_kernel(
       });
     });
     e0.wait();
-    report_time("reshape1 kernel time", e0, e0);
+    //report_time("reshape1 kernel time", e0, e0);
     e0 = dpcpp_queue.submit([&](handler& cgh) {
       cgh.parallel_for(sycl::range<2>(k / 2, n), [=](sycl::id<2> idx) {
         int i = idx[0];
@@ -684,7 +684,7 @@ static inline void qkv_gemm_int4_gqa_esimd_kernel(
       });
     });
     e0.wait();
-    report_time("reshape2 kernel time", e0, e0);
+    //report_time("reshape2 kernel time", e0, e0);
 
     // reorder scale
     fp16* reorderTmpScal = (fp16*)reorder_buffer;
@@ -701,7 +701,7 @@ static inline void qkv_gemm_int4_gqa_esimd_kernel(
       });
     });
     e0.wait();
-    report_time("reshape3 kernel time", e0, e0);
+    //report_time("reshape3 kernel time", e0, e0);
     e0 = dpcpp_queue.submit([&](handler& cgh) {
       cgh.parallel_for(sycl::range<2>(k / 32, n), [=](sycl::id<2> idx) {
         int i = idx[0];
@@ -713,7 +713,7 @@ static inline void qkv_gemm_int4_gqa_esimd_kernel(
       });
     });
     e0.wait();
-    report_time("reshape4 kernel time", e0, e0);
+    //report_time("reshape4 kernel time", e0, e0);
     dpcpp_queue.wait();
     return;
   }
