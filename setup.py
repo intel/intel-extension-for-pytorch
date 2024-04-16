@@ -933,15 +933,6 @@ def get_src_py_and_dst():
 
 # python specific setup modules
 class IPEXEggInfoBuild(egg_info, object):
-    def write_file(self, what, filename, data):
-        if _get_build_target() == "bdist_wheel" and what == "requirements" and IS_LINUX:
-            data += (
-                "intel_extension_for_pytorch_deepspeed=="
-                + str(get_version_num())
-                + "\n"
-            )
-        super(IPEXEggInfoBuild, self).write_file(what, filename, data)
-
     def finalize_options(self):
         super(IPEXEggInfoBuild, self).finalize_options()
 
