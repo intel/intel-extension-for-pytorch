@@ -131,7 +131,7 @@ bool XPUActivityProfilerController::shouldActivateIterationConfig(
   LOG(INFO) << "Received on-demand activity trace request by "
             << " profile start iteration = "
             << asyncRequestConfig_->profileStartIteration()
-            << ", curent iteration = " << currentIter;
+            << ", current iteration = " << currentIter;
   if (currentIter > rootIter) {
     auto newProfileStart =
         currentIter + asyncRequestConfig_->activitiesWarmupIterations();

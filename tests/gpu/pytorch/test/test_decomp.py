@@ -655,8 +655,8 @@ class TestDecomp(TestCase):
             #  because decompositions are run after functionalisation and we would not like them to
             #  de-functionalise the graph, as that would break AoTAutograd
             # We run the real function *after* the decomposition to make sure that the
-            # decomposition does not modify any of the inputs in-place. If it does
-            # real_out should be differen than decom_out so we should catch this
+            # decomposition does not modify any of the inputs in-place. If it does,
+            # real_out should be different from decom_out so we should catch this
             real_out_unflat = func(*args, **kwargs)
             real_out, _ = tree_flatten(real_out_unflat)
 
