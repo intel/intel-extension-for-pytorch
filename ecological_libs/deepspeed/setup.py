@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from functools import lru_cache
 from setuptools import setup
 
@@ -92,6 +93,11 @@ def get_module_include_dir(module_name):
 def create_ext_modules():
     modules_names = ['quantization', 'transformer_inference']
     ext_modules = []
+    aot_device_list = os.environ.get("USE_AOT_DEVLIST")
+
+    if 'pvc' not in aot_device_list:
+        raise OSError("intel_extension_for_pytorch_deepspeed only supports pvc for now.")
+        return ext_modules
 
     for module_name in modules_names:
         cxx_flags = [
