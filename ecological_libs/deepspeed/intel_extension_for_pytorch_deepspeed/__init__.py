@@ -14,6 +14,7 @@ from .transformer_inference import (
     layer_norm_residual_store_pre_ln_res,
     rms_norm,
     pre_rms_norm,
+    moe_res_matmul,
     residual_add_bias_fp16,
     residual_add_bias_fp32,
     residual_add_bias_bf16,

@@ -2119,7 +2119,6 @@ at::Tensor moe_res_matmul(
     at::Tensor& output) {
   int M = moe_res.size(0) * moe_res.size(1);
   int N = moe_res.size(2);
-  InferenceContext::Instance().SynchComm();
 
   DISPATCH_MOE_RESIDUAL(kFloat, float)
   DISPATCH_MOE_RESIDUAL(kHalf, sycl::half)
