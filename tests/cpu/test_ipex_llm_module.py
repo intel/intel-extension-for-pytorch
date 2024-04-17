@@ -288,7 +288,7 @@ class TestLLMModules(TestCase):
         assert ipex.llm.functional.rotary_embedding is not None
         assert ipex.llm.functional.rms_norm is not None
         assert ipex.llm.functional.fast_layer_norm is not None
-        assert ipex.llm.functional.indirect_access_kv_cache is not None
+        assert ipex.llm.functional.indirect_access_kv_cache_attention is not None
         assert ipex.llm.functional.varlen_attention is not None
 
     def test_rotary_embedding_tgi(self):

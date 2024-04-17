@@ -81,7 +81,7 @@ def fast_layer_norm(
     )
 
 
-def indirect_access_kv_cache(
+def indirect_access_kv_cache_attention(
     query: torch.Tensor,
     key: torch.Tensor,
     value: torch.Tensor,
