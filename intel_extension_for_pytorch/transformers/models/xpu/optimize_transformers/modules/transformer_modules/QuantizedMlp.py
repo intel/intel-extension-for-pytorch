@@ -198,7 +198,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4Sil
             1, 1, 4096, dtype=torch.float16, device="xpu"
         )
         try_linear_down_reorder_input = torch.empty(
-            1, 1, 11008, dtype=torch.float16, device="xpu"
+            1, 1, self.c_proj_quant.qweight.shape[0], dtype=torch.float16, device="xpu"
         )
         try_linear_mlp_reorder = torch.ops.torch_ipex.mm_esimd_int4(
             try_linear_gate_reorder_input,

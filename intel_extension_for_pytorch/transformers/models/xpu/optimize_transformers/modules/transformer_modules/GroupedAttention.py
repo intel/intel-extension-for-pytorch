@@ -320,6 +320,14 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
                 self.qkv_proj_quant.blocksize,
                 True,
             )
+            try_linear_out_reorder = torch.ops.torch_ipex.mm_esimd_int4(
+                try_linear_out_reorder_input,
+                self.out_proj_quant.qweight,
+                self.out_proj_quant.scales,
+                self.out_proj_quant.qzeros,
+                self.out_proj_quant.blocksize,
+                True,
+            )
 
     def prepare_kv_prompt(self, hidden_states, kv_head):
         return super().prepare_kv_prompt(hidden_states, self.num_kv_head)
