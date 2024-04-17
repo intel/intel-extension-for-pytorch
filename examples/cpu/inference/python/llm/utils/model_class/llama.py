@@ -1,7 +1,7 @@
 import torch
 
 from .llm import LLMConfig, EXAMPLE_INPUTS_MODE
-from transformers import LlamaForCausalLM
+from transformers import LlamaForCausalLM, AutoTokenizer
 
 import intel_extension_for_pytorch as ipex
 
