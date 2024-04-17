@@ -1,7 +1,7 @@
 import torch
 
 from .llm import LLMConfig, EXAMPLE_INPUTS_MODE
-from transformers import LlamaForCausalLM, LlamaTokenizer
+from transformers import LlamaForCausalLM
 
 import intel_extension_for_pytorch as ipex
 
@@ -33,4 +33,4 @@ class LLAMAConfig(LLMConfig):
         return self.model
 
     def get_tokenizer(self):
-        return LlamaTokenizer.from_pretrained(self.model_id)
+        return AutoTokenizer.from_pretrained(self.model_id)
