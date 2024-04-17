@@ -35,7 +35,7 @@ ipex.llm.modules.IndirectAccessKVCacheAttention
 ipex.llm.functional.rotary_embedding
 ipex.llm.functional.rms_norm
 ipex.llm.functional.fast_layer_norm
-ipex.llm.functional.indirect_access_kv_cache
+ipex.llm.functional.indirect_access_kv_cache_attention
 ipex.llm.functional.varlen_attention
 
 ```
