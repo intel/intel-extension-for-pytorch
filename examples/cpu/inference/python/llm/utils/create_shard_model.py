@@ -1,7 +1,7 @@
 import torch
 import argparse
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer, T5ForConditionalGeneration, AutoProcessor
+from transformers import AutoModelForCausalLM, AutoTokenizer, T5ForConditionalGeneration, AutoProcessor
 # Here import ipex for Baichuan loading compatibility, for other models we can ignore this import
 import intel_extension_for_pytorch
 
@@ -9,7 +9,7 @@ import intel_extension_for_pytorch
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, LlamaTokenizer),
+    "llama": (AutoModelForCausalLM, AutoTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),

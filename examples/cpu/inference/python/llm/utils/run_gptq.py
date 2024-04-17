@@ -103,12 +103,12 @@ def get_user_model():
     from transformers import AutoModelForCausalLM, AutoModel, AutoTokenizer
     torchscript = False
     if re.search("llama", args.model.lower()):
-        from transformers import LlamaForCausalLM, LlamaTokenizer
+        from transformers import LlamaForCausalLM, AutoTokenizer
         user_model = LlamaForCausalLM.from_pretrained(
             args.model,
             torchscript=torchscript,  # torchscript will force `return_dict=False` to avoid jit errors
         )
-        tokenizer = LlamaTokenizer.from_pretrained(args.model)
+        tokenizer = AutoTokenizer.from_pretrained(args.model)
     elif re.search("mpt-7b-chat", args.model.lower()):
         from mpt_7b.modeling_mpt import MPTForCausalLM
         user_model = MPTForCausalLM.from_pretrained(

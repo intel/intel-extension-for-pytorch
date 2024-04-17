@@ -17,7 +17,6 @@ from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    LlamaTokenizer,
     T5ForConditionalGeneration,
     AutoProcessor,
     TextStreamer
@@ -38,7 +37,7 @@ MODEL_CLASSES = {
     "gptj": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "gptneox": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, LlamaTokenizer),
+    "llama": (AutoModelForCausalLM, AutoTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
@@ -578,7 +577,7 @@ def generate():
         image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(infer_dtype) for img in image]
         input_tokens = {"input_ids": input_ids, "images": image_tensor}
     else:
-        input_tokens = tokenizer.batch_encode_plus(inputs, return_tensors="pt")
+        input_tokens = tokenizer.batch_encode_plus(inputs, return_token_type_ids=False, return_tensors="pt")
         input_ids = input_tokens.input_ids
     for t in input_tokens:
         if torch.is_tensor(input_tokens[t]):
