@@ -213,7 +213,8 @@ PyObject* THPModule_getCurrentRawStream(
         "torch.xpu.Stream.sycl_queue",
         nullptr);
   else
-    return PyLong_FromVoidPtr(xpu::dpcpp::getCurrentDPCPPStream(device).queue());
+    return PyLong_FromVoidPtr(
+        xpu::dpcpp::getCurrentDPCPPStream(device).queue());
   END_HANDLE_TH_ERRORS
 }
 
@@ -576,6 +577,7 @@ static void register_xpu_device_info(PyObject* module) {
       .def_readonly("max_num_sub_groups", &DeviceInfo::max_num_sub_groups)
       .def_readonly("sub_group_sizes", &DeviceInfo::sub_group_sizes)
       .def_readonly("has_fp64", &DeviceInfo::support_fp64)
+      .def_readonly("device_arch", &DeviceInfo::device_arch)
       .def_property_readonly(
           "dev_type", [](const DeviceInfo& info) { return get_dev_type(info); })
       .def("__repr__", [](const DeviceInfo& info) {
@@ -586,7 +588,8 @@ static void register_xpu_device_info(PyObject* module) {
                << info.driver_version << "', has_fp64=" << info.support_fp64
                << ", total_memory=" << info.global_mem_size / (1024 * 1024)
                << "MB, max_compute_units=" << info.max_compute_units
-               << ", gpu_eu_count=" << info.gpu_eu_count << ")";
+               << ", gpu_eu_count=" << info.gpu_eu_count
+               << ", device_arch=" << info.device_arch << ")";
         return stream.str();
       });
 }
