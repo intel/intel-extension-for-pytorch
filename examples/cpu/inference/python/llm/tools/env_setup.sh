@@ -94,10 +94,10 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             echo "Error: Detected dependent PyTorch is a nightly built version. Installation from prebuilt wheel files is not supported. Run again to compile from source."
             exit 4
         else
-            echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
+            echo "python -m pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/test/cpu" >> ${AUX_INSTALL_SCRIPT}
             echo "python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.3.0%2Bgit2b84b67-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
             echo "python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/oneccl_bind_pt-2.3.0%2Bcpu-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
-            python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
+            python -m pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/test/cpu
             python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.3.0%2Bgit2b84b67-cp310-cp310-linux_x86_64.whl
             python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/oneccl_bind_pt-2.3.0%2Bcpu-cp310-cp310-linux_x86_64.wh
         fi
