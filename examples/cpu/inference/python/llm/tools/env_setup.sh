@@ -81,7 +81,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     # Install deps
-    conda install -y cmake ninja unzip
+    python -m pip install cmake==3.28.4 ninja unzip
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
@@ -158,7 +158,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl
     fi
 
-    echo "python -m pip install cpuid accelerate datasets sentencepiece protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC} transformers_stream_generator tiktoken" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate datasets sentencepiece mkl protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC} transformers_stream_generator tiktoken" >> ${AUX_INSTALL_SCRIPT}
 
     # Used for accuracy test only
     if [ -d lm-evaluation-harness ]; then
@@ -206,7 +206,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd intel-extension-for-pytorch/examples/cpu/inference/python/llm
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    conda install -y mkl
     conda install -y gperftools -c conda-forge
     bash ${AUX_INSTALL_SCRIPT}
     python -m pip install ${WHEELFOLDER}/*.whl

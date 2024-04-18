@@ -133,7 +133,7 @@ if [ ! -z "${MAX_JOBS}" ]; then
 fi
 
 # Install dependencies
-python -m pip install cmake
+python -m pip install cmake==3.28.4
 
 # Compare the torch torchvision and torchaudio version
 function ver_compare_eq() {
