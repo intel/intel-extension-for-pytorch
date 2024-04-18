@@ -141,8 +141,9 @@ class _IPEXScaleDotProductCPU(nn.Module):
         super().__init__()
         self.text_max_length = text_max_length
 
-    def forward(
-        self,
+    @classmethod
+    def apply_function(
+        cls,
         query: torch.Tensor,
         key: torch.Tensor,
         value: torch.Tensor,
@@ -153,6 +154,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
         alibi: Optional[torch.Tensor] = None,
         add_casual_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
+        text_max_length: Optional[int] = 0,
         cutoff: Optional[torch.Tensor] = None,
         vision: Optional[torch.Tensor] = False,
     ):
@@ -199,6 +201,19 @@ class _IPEXScaleDotProductCPU(nn.Module):
                 layer_past[3].contiguous(),
             )
             return attn_output, None, present
+        if attention_mask is None:
+            query = query.transpose(1, 2).contiguous()
+            key = key.transpose(1, 2).contiguous()
+            value = value.transpose(1, 2).contiguous()
+            attn_output, _ = torch.ops.torch_ipex.flash_attention(
+                query,
+                key,
+                value,
+                dropout_p=0.0,
+                is_causal=False,
+                attention_mask=attention_mask,
+            )
+            return attn_output, None, None
         if layer_past is None:
             layer_past = (
                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
@@ -228,7 +243,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
             beam_idx,
             seq_info,
             scale_attn,
-            self.text_max_length,
+            text_max_length,
             head_mask,
             attention_mask,
             add_casual_mask,
@@ -248,6 +263,37 @@ class _IPEXScaleDotProductCPU(nn.Module):
         )
         return attn_output, attn_weights, present
 
+    def forward(
+        self,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        scale_attn: float,
+        layer_past: Optional[Tuple[torch.Tensor]] = None,
+        head_mask: Optional[Tuple[torch.Tensor]] = None,
+        attention_mask: Optional[Tuple[torch.Tensor]] = None,
+        alibi: Optional[torch.Tensor] = None,
+        add_casual_mask: Optional[bool] = True,
+        seq_info: Optional[torch.Tensor] = None,
+        cutoff: Optional[torch.Tensor] = None,
+        vision: Optional[torch.Tensor] = False,
+    ):
+        return self.apply_function(
+            query,
+            key,
+            value,
+            scale_attn,
+            layer_past,
+            head_mask,
+            attention_mask,
+            alibi,
+            add_casual_mask,
+            seq_info,
+            self.text_max_length,
+            cutoff,
+            vision,
+        )
+
 
 class _IPEXRMSNormCPU(nn.Module):
     def __init__(self, module, config=None, tpp=False, woq=False):
@@ -263,6 +309,27 @@ class _IPEXRMSNormCPU(nn.Module):
     def forward(self, hidden_states):
         return torch.ops.torch_ipex.rmsnorm(
             hidden_states, self.weight, self.variance_epsilon
+        )
+
+    @classmethod
+    def apply_function(cls, hidden_states, weight, eps):
+        return torch.ops.torch_ipex.rmsnorm(hidden_states, weight=weight, eps=eps)
+
+
+class _IPEXFastLayerNormCPU(nn.Module):
+    def __init__(self, normalized_shape, eps, weight, bias=None):
+        super().__init__()
+        self.module = nn.LayerNorm(normalized_shape, eps)
+        self.module.weight = weight
+        self.module.bias = bias
+
+    def forward(self, hidden_states):
+        return self.module(hidden_states)
+
+    @classmethod
+    def apply_function(cls, hidden_states, normalized_shape, weight, bias, eps):
+        return torch.nn.functional.layer_norm(
+            hidden_states, normalized_shape, weight=weight, bias=bias, eps=eps
         )
 
 
@@ -303,23 +370,13 @@ class _IPEXPagedAttentionCPU:
         )
 
 
-class _IPEXFastLayerNormCPU(nn.Module):
-    def __init__(self, normalized_shape, eps, weight, bias=None):
-        super().__init__()
-        self.module = nn.LayerNorm(normalized_shape, eps)
-        self.module.weight = weight
-        self.module.bias = bias
-
-    def forward(self, hidden_states):
-        return self.module(hidden_states)
-
-
 class _IPEXVarlenScaledDotProductCPU(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
 
-    def forward(
-        self,
+    @classmethod
+    def apply_functions(
+        cls,
         query,  # [total_q, num_head, head_size]
         key,  # [total_k, num_head_k, head_size]
         value,  # [total_k, num_head_k, head_size]
@@ -394,3 +451,39 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
             is_causal=is_causal,
         )
         out.copy_(out_.transpose(1, 2).reshape(-1, out.shape[-2], out.shape[-1]))
+
+        return out
+
+    def forward(
+        self,
+        query,
+        key,
+        value,
+        out,
+        seqlen_q,
+        seqlen_k,
+        max_seqlen_q,
+        max_seqlen_k,
+        pdropout,
+        softmax_scale,
+        zero_tensors,
+        is_causal,
+        return_softmax,
+        gen_,
+    ):
+        self.apply_function(
+            query,
+            key,
+            value,
+            out,
+            seqlen_q,
+            seqlen_k,
+            max_seqlen_q,
+            max_seqlen_k,
+            pdropout,
+            softmax_scale,
+            zero_tensors,
+            is_causal,
+            return_softmax,
+            gen_,
+        )

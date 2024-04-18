@@ -2,9 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from intel_extension_for_pytorch.nn.functional import interaction
-from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
+from ..utils.utils import has_cpu
 from ._utils import ParentNode, set_node_output_quantized
+
+if has_cpu():
+    from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 add_inplace_ops = [str(torch.Tensor.add_)]
 add_ops = [str(torch.add), str(torch.Tensor.add)]
@@ -70,11 +73,17 @@ rnn_ops = [str(torch.nn.LSTM)]
 s8_s8_symmetric_ops = [
     str(interaction),
     str(torch.ops.torch_ipex.interaction_forward),
-    str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
+    # str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
     str(torch.embedding_bag),
     str(F.embedding_bag),
     str(torch.nn.EmbeddingBag),
 ]
+
+if has_cpu():
+    s8_s8_symmetric_ops.append(
+        str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward)
+    )
+
 conv_gemm_fs = [
     str(F.conv2d),
     str(F.conv3d),

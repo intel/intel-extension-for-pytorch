@@ -161,6 +161,7 @@ class _IPEXRopeRef(nn.Module):
             "LlamaForCausalLM",
             "MistralForCausalLM",
             "MixtralForCausalLM",
+            "LlavaLlamaForCausalLM",
         ]:
             x = x.transpose(1, 2)
             x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
@@ -211,7 +212,7 @@ class _IPEXRopeRef(nn.Module):
                 .transpose(1, 2)
             )
             x = torch.cat([x_rot, x_pass], dim=-1)
-        elif self.model_backbone == "StableLMEpochForCausalLM":
+        elif self.model_backbone == "StableLmForCausalLM":
             x = x.transpose(1, 2)
             x_rot = x[..., :rotary_ndims]
             x_pass = x[..., rotary_ndims:]
@@ -222,6 +223,26 @@ class _IPEXRopeRef(nn.Module):
                 ),
                 dim=-1,
             )
+        elif self.model_backbone == "QWenLMHeadModel":
+            x = x.view(x.size(0), x.size(1), num_head, head_dim)
+            b, sq, np, hn = x.size(0), x.size(1), x.size(2), x.size(3)
+            x_float = x.float()
+            x_rot = x_float[..., :rotary_ndims]
+            x_pass = x_float[..., rotary_ndims:]
+            sin = (
+                _sin.squeeze(1)
+                .squeeze(0)[position_ids : position_ids + sq, :]
+                .unsqueeze(1)
+                .unsqueeze(0)
+            )
+            cos = (
+                _cos.squeeze(1)
+                .squeeze(0)[position_ids : position_ids + sq, :]
+                .unsqueeze(1)
+                .unsqueeze(0)
+            )
+            x_rot = (x_rot * cos) + (self.rotate_half(x_rot) * sin)
+            x = torch.cat((x_rot, x_pass), dim=-1).type_as(x)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return x
@@ -279,13 +300,18 @@ class _IPEXScaleDotProductRef(nn.Module):
             "LlamaForCausalLM",
             "MistralForCausalLM",
             "MixtralForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
+            "LlavaLlamaForCausalLM",
         ]:
             self.num_key_value_groups = (
                 module.num_key_value_groups
                 if hasattr(module, "num_key_value_groups")
                 else None
             )
+            if hasattr(module, "num_heads"):
+                self.num_heads = module.num_heads
+            if hasattr(module, "head_dim"):
+                self.head_dim = module.head_dim
         elif self.model_backbone == "OPTForCausalLM":
             self.num_heads = module.num_heads
             self.head_dim = module.head_dim
@@ -356,6 +382,15 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.head_dim = module.head_dim
             self.softmax_scale = module.softmax_scale
             self.attn_dropout_p = module.attn_dropout_p
+        elif self.model_backbone == "QWenLMHeadModel":
+            self.softmax_in_fp32 = config.softmax_in_fp32
+            self.head_dim = module.head_dim
+            self.num_heads = module.num_heads
+        elif self.model_backbone == "GitForCausalLM":
+            if hasattr(module, "num_heads"):
+                self.num_heads = module.num_heads
+            if hasattr(module, "head_dim"):
+                self.head_dim = module.head_dim
 
         for k, v in module.__class__.__dict__.items():
             if k.startswith("__") or k.startswith("forward"):
@@ -387,6 +422,8 @@ class _IPEXScaleDotProductRef(nn.Module):
         alibi: Optional[torch.Tensor] = None,
         add_casual_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
+        cutoff: Optional[torch.Tensor] = None,
+        vision: Optional[torch.Tensor] = False,
     ):
         if (
             self.model_backbone == "FalconForCausalLM"
@@ -414,6 +451,8 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "GPTBigCodeForCausalLM",
                     "T5ForConditionalGeneration",
                     "MptForCausalLM",
+                    "QWenLMHeadModel",
+                    "GitForCausalLM",
                 ]
                 else key
             )
@@ -429,17 +468,44 @@ class _IPEXScaleDotProductRef(nn.Module):
                     "ChatGLMModel",
                     "T5ForConditionalGeneration",
                     "MptForCausalLM",
+                    "QWenLMHeadModel",
+                    "GitForCausalLM",
                 ]
                 else query
             )
+            if self.model_backbone == "QWenLMHeadModel":
+                value = value.view(
+                    value.size(0), value.size(1), self.num_heads, self.head_dim
+                )
             value = value.permute(0, 2, 1, 3)
 
-        if layer_past is not None:
-            past_key = layer_past[0]
-            past_value = layer_past[1]
-            key = torch.cat((past_key, key), dim=-2)
-            value = torch.cat((past_value, value), dim=-2)
-        present = (key, value)
+        if self.model_backbone == "GitForCausalLM":
+            if not (vision is not None and vision):
+                if layer_past is not None:
+                    key = torch.cat(
+                        [key[:, :, :cutoff, :], layer_past[0], key[:, :, -1:, :]], dim=2
+                    )
+                    value = torch.cat(
+                        [value[:, :, :cutoff, :], layer_past[1], value[:, :, -1:, :]],
+                        dim=2,
+                    )
+            present = (
+                key[:, :, cutoff:, :],
+                value[:, :, cutoff:, :],
+            )
+        elif (
+            self.model_backbone == "LlavaLlamaForCausalLM"
+            and vision is not None
+            and vision
+        ):
+            present = None
+        else:
+            if layer_past is not None:
+                past_key = layer_past[0]
+                past_value = layer_past[1]
+                key = torch.cat((past_key, key), dim=-2)
+                value = torch.cat((past_value, value), dim=-2)
+            present = (key, value)
 
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             attn_output, attn_weights = self._attn(
@@ -449,7 +515,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             "LlamaForCausalLM",
             "MistralForCausalLM",
             "MixtralForCausalLM",
-            "StableLMEpochForCausalLM",
+            "StableLmForCausalLM",
         ]:
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)
@@ -705,6 +771,87 @@ class _IPEXScaleDotProductRef(nn.Module):
             )
 
             attn_output = torch.matmul(attn_weights, value)
+        elif self.model_backbone == "QWenLMHeadModel":
+            key_size = key.size(2)
+            if query.size(2) == key.size(2):
+                causal_mask = torch.tril(
+                    torch.ones(
+                        (key_size, key_size), dtype=torch.bool, device=query.device
+                    )
+                ).view(1, 1, key_size, key_size)
+            else:
+                causal_mask = None
+            attn_weights = torch.matmul(query, key.transpose(-1, -2)) / scale_attn
+            mask_value = torch.finfo(attn_weights.dtype).min
+            if causal_mask is not None:
+                attn_weights = torch.where(
+                    causal_mask, attn_weights.to(attn_weights.dtype), mask_value
+                )
+
+            if attention_mask is not None:
+                attn_weights = attn_weights + attention_mask
+
+            if self.softmax_in_fp32:
+                attn_weights = nn.functional.softmax(attn_weights.float(), dim=-1)
+            else:
+                attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+
+            attn_weights = attn_weights.type(query.dtype)
+
+            if head_mask is not None:
+                attn_weights = attn_weights * head_mask
+
+            attn_output = torch.matmul(attn_weights, value)
+        elif self.model_backbone == "GitForCausalLM":
+            # Take the dot product between "query" and "key" to get the raw attention scores.
+            attention_scores = torch.matmul(query, key.transpose(-1, -2))
+            attention_scores = attention_scores / scale_attn
+            if attention_mask is not None:
+                attention_scores = attention_scores + attention_mask
+            # Normalize the attention scores to probabilities.
+            attn_weights = nn.functional.softmax(attention_scores, dim=-1)
+            # Mask heads if we want to
+            if head_mask is not None:
+                attn_weights = attn_weights * head_mask
+            attn_output = torch.matmul(attn_weights, value)
+        elif self.model_backbone == "LlavaLlamaForCausalLM":
+            if vision is not None and vision:
+                bsz = query.shape[0]
+                proj_shape = (bsz * self.num_heads, -1, self.head_dim)
+                query_states = query.transpose(1, 2).contiguous().view(*proj_shape)
+                key_states = key.transpose(1, 2).contiguous().view(*proj_shape)
+                value_states = value.view(*proj_shape)
+
+                src_len = key_states.size(1)
+                attn_weights = (
+                    torch.bmm(query_states, key_states.transpose(1, 2)) / scale_attn
+                )
+
+                if attention_mask is not None:
+                    attn_weights = (
+                        attn_weights.view(bsz, self.num_heads, -1, src_len)
+                        + attention_mask
+                    )
+                    attn_weights = attn_weights.view(bsz * self.num_heads, -1, src_len)
+
+                attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+                attn_output = torch.bmm(attn_weights, value_states)
+                attn_weights = attn_weights.view(bsz, self.num_heads, -1, src_len)
+            else:
+                # repeat k/v heads if n_kv_heads < n_heads
+                key = self._repeat_kv(key, self.num_key_value_groups)
+                value = self._repeat_kv(value, self.num_key_value_groups)
+
+                attn_weights = torch.matmul(query, key.transpose(2, 3)) / scale_attn
+
+                if attention_mask is not None:
+                    attn_weights = attn_weights + attention_mask
+
+                # upcast attention to fp32
+                attn_weights = nn.functional.softmax(
+                    attn_weights, dim=-1, dtype=torch.float32
+                ).to(query.dtype)
+                attn_output = torch.matmul(attn_weights, value)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
         return attn_output, attn_weights, present

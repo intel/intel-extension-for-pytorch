@@ -7,6 +7,18 @@ from ._qconfig import (
     get_smooth_quant_qconfig_mapping,
     get_weight_only_quant_qconfig_mapping,
     WoqLowpMode,
+    WoqActQuantMode,
+    QConfigWoq,
+    WoqWeightDtype,
 )
 from ._autotune import autotune
-from .GPTQ import _gptq
+from ._quantize_utils import (
+    quantize_per_channel,
+    dequantize_per_channel,
+    quantize_per_block,
+    dequantize_per_block,
+)
+from ..utils.utils import has_cpu
+
+if has_cpu():
+    from ._GPTQ import gptq

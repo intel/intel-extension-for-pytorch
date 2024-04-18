@@ -1,6 +1,6 @@
 import torch
 import torch.distributed as dist
-import warnings
+from ...utils._logger import logger, WarningType
 from typing import Optional, Tuple, Union, List
 from transformers.generation.stopping_criteria import (
     StoppingCriteriaList,
@@ -10,7 +10,6 @@ from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.streamers import BaseStreamer
 from transformers.utils import ModelOutput
 import time
-import re
 
 
 class GreedySearchDecoderOnlyOutput(ModelOutput):
@@ -63,10 +62,10 @@ def _greedy_search(
         stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
     )
     if max_length is not None:
-        warnings.warn(
+        logger.warning(
             "`max_length` is deprecated in this function, use"
             " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead.",
-            UserWarning,
+            _type=WarningType.DeprecatedArgument,
         )
         stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
     pad_token_id = (
@@ -150,23 +149,118 @@ def _greedy_search(
 
         # prepare model inputs
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-        if (
-            re.search("GPTJ", self.config.architectures[0])
-            or re.search("llama", self.config.architectures[0], re.IGNORECASE)
-            or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
-            or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
-            or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
-            or re.search("rw", self.config.architectures[0], re.IGNORECASE)
-        ):
+
+        self.model_backbone = self.config.architectures[0]
+        if self.model_backbone in [
+            "GPTJForCausalLM",
+            "LlamaForCausalLM",
+            "GPTNeoXForCausalLM",
+            "OPTForCausalLM",
+            "FalconForCausalLM",
+            "RWForCausalLM",
+            "BloomForCausalLM",
+            "CodeGenForCausalLM",
+            "BaichuanForCausalLM",
+            "ChatGLMModel",
+            "GPTBigCodeForCausalLM",
+            "T5ForConditionalGeneration",
+            "MistralForCausalLM",
+            "MixtralForCausalLM",
+            "MptForCausalLM",
+            "StableLmForCausalLM",
+            "QWenLMHeadModel",
+            "GitForCausalLM",
+            "LlavaLlamaForCausalLM",
+        ]:
             first_token = False
             input_bs = input_ids.size()[0]
             if model_inputs["past_key_values"] is None:
                 first_token = True
+                if self.model_backbone == "T5ForConditionalGeneration":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.k(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.v(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(input_bs)), dtype=torch.long
-                    ).contiguous()
+                if hasattr(self.config, "n_layer"):
+                    num_hidden_layers = self.config.n_layer
+                elif hasattr(self.config, "num_hidden_layers"):
+                    num_hidden_layers = self.config.num_hidden_layers
+                elif hasattr(self.config, "num_layers"):
+                    num_hidden_layers = self.config.num_layers
+                elif hasattr(self.config, "n_layers"):
+                    num_hidden_layers = self.config.n_layers
+                beam_idx_tmp = torch.zeros(
+                    (2048, int(input_bs)), dtype=torch.long
+                ).contiguous()
+                if self.model_backbone == "GitForCausalLM":
+                    num_head = self.git.encoder.layer[
+                        0
+                    ].attention.self.num_attention_heads
+                    head_dim = int(
+                        self.git.encoder.layer[0].attention.self.hidden_size / num_head
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(
+                                    [input_bs, num_head, 1, head_dim]
+                                ).contiguous(),
+                                torch.zeros(
+                                    [input_bs, num_head, 1, head_dim]
+                                ).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
+                else:
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
@@ -175,78 +269,29 @@ def _greedy_search(
                                 torch.zeros([1, 1, 1, 1]).contiguous(),
                                 beam_idx_tmp,
                             )
-                            for i in range(self.config.n_layer)
+                            for i in range(num_hidden_layers)
                         ]
                     )
-                elif re.search("llama", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(input_bs)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                elif re.search("gptneox", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(input_bs)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                elif re.search("OPT", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(input_bs)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                elif re.search(
-                    "falcon", self.config.architectures[0], re.IGNORECASE
-                ) or re.search("rw", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(input_bs)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
+            if self.model_backbone == "LlavaLlamaForCausalLM" and hasattr(
+                self, "prepare_inputs_labels_for_multimodal"
+            ):
+                model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
+                if "return_last_logit" in model_inputs:
+                    model_inputs["return_last_logit"] = torch.tensor(
+                        model_inputs["return_last_logit"]
+                    )
+                if self.model_backbone == "T5ForConditionalGeneration":
+                    model_inputs.pop("head_mask", None)
+                    model_inputs.pop("decoder_head_mask", None)
+                    model_inputs.pop("decoder_attention_mask", None)
+                    model_inputs.pop("cross_attn_head_mask", None)
+                    model_inputs["encoder_outputs"] = (
+                        model_inputs["encoder_outputs"]["last_hidden_state"],
+                    )
                 outputs = self.trace_graph(**model_inputs)
-                if synced_gpus and this_peer_finished:
-                    continue  # don't waste resources running the code we don't need
-                next_token_logits = outputs[0][:, -1, :]
             else:
                 outputs = self(
                     **model_inputs,
@@ -254,9 +299,6 @@ def _greedy_search(
                     output_attentions=output_attentions,
                     output_hidden_states=output_hidden_states,
                 )
-                if synced_gpus and this_peer_finished:
-                    continue  # don't waste resources running the code we don't need
-                next_token_logits = outputs.logits[:, -1, :]
         else:
             outputs = self(
                 **model_inputs,
@@ -264,9 +306,13 @@ def _greedy_search(
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
             )
-            if synced_gpus and this_peer_finished:
-                continue  # don't waste resources running the code we don't need
+
+        if synced_gpus and this_peer_finished:
+            continue  # don't waste resources running the code we don't need
+        if isinstance(outputs, dict):
             next_token_logits = outputs.logits[:, -1, :]
+        else:
+            next_token_logits = outputs[0][:, -1, :]
 
         # pre-process distribution
         next_tokens_scores = logits_processor(input_ids, next_token_logits)

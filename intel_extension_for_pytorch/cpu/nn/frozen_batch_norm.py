@@ -7,11 +7,9 @@ class FrozenBatchNorm2d(nn.Module):
     BatchNorm2d where the batch statistics and the affine parameters are fixed
 
     Args:
-        num_features (int): :math:`C` from an expected input of size :math:`(N, C, H, W)`
-
-    Shape
-        - Input: :math:`(N, C, H, W)`
-        - Output: :math:`(N, C, H, W)` (same shape as input)
+        num_features (int): ``C`` from an expected input of size ``(N, C, H, W)``.
+            Input shape: ``(N, C, H, W)``.
+            Output shape: ``(N, C, H, W)`` (same shape as input).
     """
 
     def __init__(

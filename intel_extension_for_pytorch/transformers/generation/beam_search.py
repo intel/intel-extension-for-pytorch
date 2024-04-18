@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import torch.distributed as dist
-import warnings
+from ...utils._logger import logger, WarningType
 from typing import Optional, Tuple, Union, List
 from transformers.generation.stopping_criteria import (
     StoppingCriteriaList,
@@ -11,7 +11,6 @@ from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.beam_search import BeamScorer
 from transformers.utils import ModelOutput
 import time
-import re
 
 
 class BeamSearchEncoderDecoderOutput(ModelOutput):
@@ -66,16 +65,16 @@ def _beam_search(
         stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
     )
     if max_length is not None:
-        warnings.warn(
+        logger.warning(
             "`max_length` is deprecated in this function, use"
             " `stopping_criteria=StoppingCriteriaList(MaxLengthCriteria(max_length=max_length))` instead.",
-            UserWarning,
+            _type=WarningType.DeprecatedArgument,
         )
         stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
     if len(stopping_criteria) == 0:
-        warnings.warn(
-            "You don't have defined any stopping_criteria, this will likely loop forever",
-            UserWarning,
+        logger.warning(
+            "You have not defined any stopping_criteria, this will likely loop forever",
+            _type=WarningType.WrongArgument,
         )
     pad_token_id = (
         pad_token_id
@@ -169,138 +168,172 @@ def _beam_search(
                 break
 
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-        if (
-            re.search("GPTJ", self.config.architectures[0])
-            or re.search("llama", self.config.architectures[0], re.IGNORECASE)
-            or re.search("gptneox", self.config.architectures[0], re.IGNORECASE)
-            or re.search("OPT", self.config.architectures[0], re.IGNORECASE)
-            or re.search("falcon", self.config.architectures[0], re.IGNORECASE)
-            or re.search("rw", self.config.architectures[0], re.IGNORECASE)
-        ):
+
+        self.model_backbone = self.config.architectures[0]
+        if self.model_backbone in [
+            "GPTJForCausalLM",
+            "LlamaForCausalLM",
+            "GPTNeoXForCausalLM",
+            "OPTForCausalLM",
+            "FalconForCausalLM",
+            "RWForCausalLM",
+            "BloomForCausalLM",
+            "CodeGenForCausalLM",
+            "BaichuanForCausalLM",
+            "ChatGLMModel",
+            "GPTBigCodeForCausalLM",
+            "T5ForConditionalGeneration",
+            "MistralForCausalLM",
+            "MixtralForCausalLM",
+            "MptForCausalLM",
+            "StableLmForCausalLM",
+            "QWenLMHeadModel",
+            "GitForCausalLM",
+            "LlavaLlamaForCausalLM",
+        ]:
             first_token = False
-            input_bs = input_ids.size()[0]
-            has_position_id = True
+            has_position_id = model_inputs.get("position_ids", None) is not None
             if model_inputs["past_key_values"] is None:
                 first_token = True
+                if self.model_backbone == "T5ForConditionalGeneration":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.k(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(batch_size * num_beams),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                self.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.v(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(batch_size * num_beams),
+                                    -1,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.n_heads,
+                                    self.decoder.block[i]
+                                    .layer[1]
+                                    .EncDecAttention.key_value_proj_dim,
+                                )
+                                .transpose(0, 1),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+                elif self.model_backbone == "GitForCausalLM":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    num_head = self.git.encoder.layer[
+                        0
+                    ].attention.self.num_attention_heads
+                    head_dim = int(
+                        self.git.encoder.layer[0].attention.self.hidden_size / num_head
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros(
+                                    [int(batch_size * num_beams), num_head, 1, head_dim]
+                                ).contiguous(),
+                                torch.zeros(
+                                    [int(batch_size * num_beams), num_head, 1, head_dim]
+                                ).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
             if first_token:
-                if re.search("GPTJ", self.config.architectures[0]):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.n_layer)
-                        ]
-                    )
-                elif re.search("llama", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                elif re.search("gptneox", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                elif re.search("OPT", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                    has_position_id = False
-                elif re.search(
-                    "falcon", self.config.architectures[0], re.IGNORECASE
-                ) or re.search("rw", self.config.architectures[0], re.IGNORECASE):
-                    beam_idx_tmp = torch.zeros(
-                        (2048, int(batch_size * num_beams)), dtype=torch.long
-                    ).contiguous()
-                    model_inputs["past_key_values"] = tuple(
-                        [
-                            (
-                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                beam_idx_tmp,
-                            )
-                            for i in range(self.config.num_hidden_layers)
-                        ]
-                    )
-                    has_position_id = False
-
-            if hasattr(self, "trace_graph"):
-                if first_token:
-                    new_attention_mask = model_inputs["attention_mask"][
-                        :batch_size
-                    ].clone()
-                    new_input_ids = model_inputs["input_ids"][:batch_size].clone()
+                if hasattr(self.config, "n_layer"):
+                    num_hidden_layers = self.config.n_layer
+                elif hasattr(self.config, "num_hidden_layers"):
+                    num_hidden_layers = self.config.num_hidden_layers
+                elif hasattr(self.config, "num_layers"):
+                    num_hidden_layers = self.config.num_layers
+                elif hasattr(self.config, "n_layers"):
+                    num_hidden_layers = self.config.n_layers
+                beam_idx_tmp = torch.zeros(
+                    (2048, int(batch_size * num_beams)), dtype=torch.long
+                ).contiguous()
+                model_inputs["past_key_values"] = tuple(
+                    [
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            beam_idx_tmp,
+                        )
+                        for i in range(num_hidden_layers)
+                    ]
+                )
+                new_attention_mask = model_inputs["attention_mask"][:batch_size].clone()
+                new_input_ids = model_inputs["input_ids"][:batch_size].clone()
+                if has_position_id:
+                    new_position_ids = model_inputs["position_ids"][:batch_size].clone()
+                for i in range(batch_size):
+                    new_attention_mask[i] = model_inputs["attention_mask"][
+                        i * num_beams
+                    ]
+                    new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
                     if has_position_id:
-                        new_position_ids = model_inputs["position_ids"][
-                            :batch_size
-                        ].clone()
-                    for i in range(batch_size):
-                        new_attention_mask[i] = model_inputs["attention_mask"][
+                        new_position_ids[i] = model_inputs["position_ids"][
                             i * num_beams
                         ]
-                        new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
-                        if has_position_id:
-                            new_position_ids[i] = model_inputs["position_ids"][
-                                i * num_beams
-                            ]
-                    model_inputs["attention_mask"] = new_attention_mask
-                    model_inputs["input_ids"] = new_input_ids
-                    if has_position_id:
-                        model_inputs["position_ids"] = new_position_ids
-                model_inputs.pop("use_cache", None)
-                model_inputs.pop("token_type_ids", None)
+                model_inputs["attention_mask"] = new_attention_mask
+                model_inputs["input_ids"] = new_input_ids
+                if has_position_id:
+                    model_inputs["position_ids"] = new_position_ids
+            model_inputs.pop("use_cache", None)
+            model_inputs.pop("token_type_ids", None)
+            if "return_last_logit" in model_inputs:
+                model_inputs["return_last_logit"] = torch.tensor(
+                    model_inputs["return_last_logit"]
+                )
+            if self.model_backbone == "T5ForConditionalGeneration":
+                model_inputs.pop("head_mask", None)
+                model_inputs.pop("decoder_head_mask", None)
+                model_inputs.pop("decoder_attention_mask", None)
+                model_inputs.pop("cross_attn_head_mask", None)
+                model_inputs["encoder_outputs"] = (
+                    model_inputs["encoder_outputs"]["last_hidden_state"],
+                )
+            if self.model_backbone == "LlavaLlamaForCausalLM" and hasattr(
+                self, "prepare_inputs_labels_for_multimodal"
+            ):
+                model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
+            if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
                 else:
                     outputs = self.trace_graph(**model_inputs)
-
-                if first_token and len(model_inputs["past_key_values"][1]) == 4:
-                    outputs = list(outputs)
-                    outputs[0] = outputs[0].repeat_interleave(num_beams, dim=0)
-                    outputs = tuple(outputs)
-                if synced_gpus and this_peer_finished:
-                    cur_len = cur_len + 1
-                    continue  # don't waste resources running the code we don't need
-                next_token_logits = outputs[0][:, -1, :]
             else:
                 outputs = self(
                     **model_inputs,
@@ -308,10 +341,13 @@ def _beam_search(
                     output_attentions=output_attentions,
                     output_hidden_states=output_hidden_states,
                 )
-                if synced_gpus and this_peer_finished:
-                    cur_len = cur_len + 1
-                    continue  # don't waste resources running the code we don't need
-                next_token_logits = outputs.logits[:, -1, :]
+            if first_token and len(model_inputs["past_key_values"][0]) == 4:
+                if isinstance(outputs, dict):
+                    outputs.logits = outputs.logits.repeat_interleave(num_beams, dim=0)
+                else:
+                    outputs = list(outputs)
+                    outputs[0] = outputs[0].repeat_interleave(num_beams, dim=0)
+                    outputs = tuple(outputs)
         else:
             outputs = self(
                 **model_inputs,
@@ -319,16 +355,14 @@ def _beam_search(
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
             )
-            if synced_gpus and this_peer_finished:
-                cur_len = cur_len + 1
-                continue  # don't waste resources running the code we don't need
+        if synced_gpus and this_peer_finished:
+            cur_len = cur_len + 1
+            continue  # don't waste resources running the code we don't need
+        if isinstance(outputs, dict):
             next_token_logits = outputs.logits[:, -1, :]
+        else:
+            next_token_logits = outputs[0][:, -1, :]
 
-        # hack: adjust tokens for Marian. For Marian we have to make sure that the `pad_token_id`
-        # cannot be generated both before and after the `nn.functional.log_softmax` operation.
-        next_token_logits = self.adjust_logits_during_generation(
-            next_token_logits, cur_len=cur_len
-        )
         next_token_scores = nn.functional.log_softmax(
             next_token_logits, dim=-1
         )  # (batch_size * num_beams, vocab_size)

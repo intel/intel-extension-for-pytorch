@@ -500,3 +500,172 @@ def meta_cumsum(
     dtype=None,
 ):
     return input.new_empty(input.shape)
+
+
+@register_meta("tpp_linear")
+def meta_tpp_linear(
+    input,
+    weight,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_bias")
+def meta_tpp_linear_bias(
+    input,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_gelu")
+def meta_tpp_linear_gelu(
+    input,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_add_add")
+def meta_tpp_linear_add_add(
+    input,
+    input1,
+    input2,
+    weight,
+    bias,
+    scale,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_relu")
+def meta_tpp_linear_relu(
+    input,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_silu")
+def meta_tpp_linear_silu(
+    input,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_add")
+def meta_tpp_linear_add(
+    input,
+    input1,
+    weight,
+    bias,
+    scale,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("tpp_linear_mul")
+def meta_tpp_linear_mul(
+    input,
+    input1,
+    weight,
+    bias,
+    out_features,
+):
+    return input.new_empty((*input.shape[:-1], out_features))
+
+
+@register_meta("masked_multihead_self_attention")
+def meta_masked_multihead_self_attention(
+    query,
+    key,
+    value,
+    key_cache,
+    value_cache,
+    beam_idx,
+    seq_info,
+    scale_attn,
+    max_positions,
+    head_mask,
+    attention_mask,
+    add_casual_mask=None,
+):
+    attn_output = query.new_empty(
+        (query.shape[0], query.shape[2], query.shape[1], query.shape[3])
+    )
+    if query.dtype == torch.bfloat16:
+        attn_output.as_strided_(
+            attn_output.shape,
+            (
+                query.shape[1] * query.shape[2] * query.shape[3],
+                query.shape[3],
+                query.shape[2] * query.shape[3],
+                1,
+            ),
+        )
+    attn_weights = None
+    key_cache_out = query.new_empty(
+        (key_cache.shape[0], key_cache.shape[1], key.shape[2], key.shape[3])
+    )
+    value_cache_out = query.new_empty(
+        (value_cache.shape[0], value_cache.shape[1], value.shape[2], value.shape[3])
+    )
+    beam_idx_out = query.new_empty(beam_idx.shape)
+    return (attn_output, attn_weights, key_cache_out, value_cache_out, beam_idx_out)
+
+
+@register_meta("rotary_position_embedding")
+def meta_rotary_position_embedding(
+    t_in,
+    t_emb_pos,
+    t_pos,
+    N,
+    H,
+    offset,
+    rotary_ndims,
+):
+    ndims = t_in.dim()
+    stride_s = t_in.stride(1)
+    batch = t_in.shape[0]
+    seq_len = t_in.shape[1]
+    concat_qkv = False
+    if ndims == 3 and stride_s > N * H:
+        concat_qkv = True
+        kv_head = (t_in.shape[2] - N * H) // (2 * H)
+    if not concat_qkv:
+        return (
+            t_in.new_empty(t_in.shape).contiguous(),
+            None,
+            None,
+        )
+    else:
+        return (
+            torch.empty(batch, seq_len, N, H, dtype=t_in.dtype, device=t_in.device),
+            torch.empty(
+                batch, seq_len, kv_head, H, dtype=t_in.dtype, device=t_in.device
+            ),
+            torch.empty(
+                batch, seq_len, kv_head, H, dtype=t_in.dtype, device=t_in.device
+            ),
+        )
+
+
+@register_meta("rmsnorm")
+def meta_rmsnorm(
+    input,
+    weight,
+    eps,
+):
+    return input.new_empty(input.shape)

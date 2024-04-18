@@ -1,8 +1,7 @@
 from typing import Callable, List, Tuple, Any, Optional, Dict
 import torch
 import torch.nn.functional as F
-import intel_extension_for_pytorch._C as core
-from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
+from ..utils.utils import has_cpu
 
 from ._utils import (
     OpQuantizeabilityType,
@@ -29,6 +28,9 @@ from ._quantization_state_utils import (
 )
 from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
 
+
+if has_cpu():
+    from intel_extension_for_pytorch.nn.modules import MergedEmbeddingBagWithCat
 
 OpConvertInfo = Tuple[
     # quantized equivalent of original op (None means keep original)
@@ -391,7 +393,33 @@ class AutoQuantizationState(torch.nn.Module):
         act_key = str(self.idx)
         if act_key in self.idx_to_smooth_quant_scaling_factor:
             act_scaling_factors = self.idx_to_smooth_quant_scaling_factor[act_key]
-            if act_scaling_factors is not None:
+            # if users modifies qconf.json and cancals quantization of the linear,
+            # then any_arg_quant_or_dequant_needed[0] is False. Don't insert mul in this case.
+            if act_scaling_factors is not None and any_arg_quant_or_dequant_needed[0]:
+                w_key = str(self.idx) + "_0"
+                act_scaling_factors = (
+                    act_scaling_factors[w_key]
+                    if len(act_scaling_factors) > 1
+                    else next(iter(act_scaling_factors.values()))
+                )
+                # update arg_quant_infos
+                if isinstance(arg_quant_infos[0][0], dict):
+                    scale = (
+                        arg_quant_infos[0][0][w_key]
+                        if len(arg_quant_infos[0][0]) > 1
+                        else next(iter(arg_quant_infos[0][0].values()))
+                    )
+                    zp = (
+                        arg_quant_infos[0][1][w_key]
+                        if len(arg_quant_infos[0][1]) > 1
+                        else next(iter(arg_quant_infos[0][1].values()))
+                    )
+                else:
+                    # For backward compatibility
+                    assert isinstance(arg_quant_infos[0][0], torch.Tensor)
+                    scale = arg_quant_infos[0][0]
+                    zp = arg_quant_infos[0][1]
+                arg_quant_infos = [(scale, zp, arg_quant_infos[0][2])]
                 args = list(args)
                 new_act = torch.mul(args[0], act_scaling_factors)
                 args[0] = new_act
@@ -448,7 +476,7 @@ class AutoQuantizationState(torch.nn.Module):
                             weight = weight.to(w_dtype)
                 if (
                     torch.is_autocast_cpu_enabled()
-                    and core.get_autocast_dtype() == torch.bfloat16
+                    and torch.get_autocast_cpu_dtype() == torch.bfloat16
                 ):
                     if weight.dtype == torch.bfloat16:
                         weight = weight.to(dtype=torch.float32)
@@ -486,7 +514,7 @@ class AutoQuantizationState(torch.nn.Module):
                 weight = op.weight
                 if (
                     torch.is_autocast_cpu_enabled()
-                    and core.get_autocast_dtype() == torch.bfloat16
+                    and torch.get_autocast_cpu_dtype() == torch.bfloat16
                 ):
                     if weight.dtype == torch.bfloat16:
                         weight = weight.to(dtype=torch.float32)
@@ -514,7 +542,7 @@ class AutoQuantizationState(torch.nn.Module):
                     scale, zp, dtype = quant_info
                     if (
                         torch.is_autocast_cpu_enabled()
-                        and core.get_autocast_dtype() == torch.bfloat16
+                        and torch.get_autocast_cpu_dtype() == torch.bfloat16
                     ):
                         if weights[tensor_arg_idx].dtype == torch.bfloat16:
                             weights[tensor_arg_idx] = weights[tensor_arg_idx].to(
@@ -550,7 +578,7 @@ class AutoQuantizationState(torch.nn.Module):
                     ]
                     if (
                         torch.is_autocast_cpu_enabled()
-                        and core.get_autocast_dtype() == torch.bfloat16
+                        and torch.get_autocast_cpu_dtype() == torch.bfloat16
                     ):
                         weight_if_bf16 = w_ih.dtype == torch.bfloat16
                         if weight_if_bf16:
@@ -1050,19 +1078,29 @@ class AutoQuantizationState(torch.nn.Module):
                 str(seen_q_op_info.idx) + "_" + str(w_tensor_id)
             ]
             # Duplicate input:
-            # (1) In modules like MHA, multiple linear layers may share the same activation tensor
-            #   In other words, multiple weight tensors share one activation tensor
-            #   In this case, we regard these weights as a single big tensor (i.e., concat along OC axis).
-            #   When calculating scaling factor, consider per-IC min/max of the big tensor
-            #   So, these weights share the same per-IC observer
+            # (1) In some cases, multiple linear layers share the same activation (like QKV).
+            #   - If qconfig specifies share_weight_observers=True (default), we regard these
+            #     weights as a single big tensor (i.e., concat along OC axis) during
+            #     calibration. So, these weights share the same per-IC observer.
+            #     But weights are not actually concated for computation.
+            #   - If qconfig specifies share_weight_observers=False, they use different observers.
             # (2) It is also possible that linear shares activation with some non-weighted op.
             #   In that case, x_obs.weight_obs is not set. Also check it here.
+            w_id_str = str(seen_q_op_info.idx) + "_" + str(w_tensor_id)
             if not found_duplicate_input or x_obs.weight_obs is None:
-                x_obs.weight_obs = w_obs.ic_obs
+                x_obs.weight_obs = {w_id_str: w_obs.ic_obs}
             else:
-                # The input (activation) has been used by other linear ops
-                # Weight should share the same per-IC observer with that linear
-                w_obs.ic_obs = x_obs.weight_obs
+                # The input (activation) is shared by more than one linear layers
+                if getattr(qconfig, "share_weight_observers", True):
+                    # Weights of these layers share the same per-IC observer
+                    assert (
+                        isinstance(x_obs.weight_obs, dict)
+                        and len(x_obs.weight_obs) == 1
+                    )
+                    w_obs.ic_obs = next(iter(x_obs.weight_obs.values()))
+                else:
+                    # Weights of these layers use different observers
+                    x_obs.weight_obs.update({w_id_str: w_obs.ic_obs})
             # In all cases, weight observer holds a reference to activation's per-IC observer
             w_obs.act_obs = x_obs.ic_obs
             # For all linear ops, set smooth_quant_enabled to true

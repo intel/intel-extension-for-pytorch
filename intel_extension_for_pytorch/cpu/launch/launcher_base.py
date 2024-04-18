@@ -2,6 +2,7 @@ import os
 from os.path import expanduser
 import glob
 from .cpu_info import CPUPoolList
+from ...utils._logger import WarningType
 
 
 class Launcher:
@@ -75,7 +76,7 @@ class Launcher:
             help=f"Choose which OpenMP runtime to run the workloads with. Supported choices are {self.omp_supported}.",
         )
 
-    def verbose(self, level, msg):
+    def verbose(self, level, msg, warning_type=None):
         if self.logger:
             logging_fn = {
                 "warning": self.logger.warning,
@@ -84,7 +85,10 @@ class Launcher:
             assert (
                 level in logging_fn.keys()
             ), f"Unrecognized logging level {level} is detected. Available levels are {logging_fn.keys()}."
-            logging_fn[level](msg)
+            if warning_type:
+                logging_fn[level](msg, _type=warning_type)
+            else:
+                logging_fn[level](msg)
         else:
             print(msg)
 
@@ -118,8 +122,9 @@ class Launcher:
         if value != "" and value != env_value:
             self.verbose(
                 "warning",
-                f"{env_name} in environment variable is {os.environ[env_name]} while the value you would like to set \
-                    is {env_value}. Use the exsiting value.",
+                f"{env_name} in environment variable is {os.environ[env_name]} while the value you would like to set"
+                + f" is {env_value}. Use the exsiting value. Please unset the {env_name} if you wish ipex launcher set it ",
+                warning_type=WarningType.AmbiguousArgument,
             )
             self.environ_set[env_name] = os.environ[env_name]
         else:
@@ -165,17 +170,20 @@ class Launcher:
             name_local = supported[0]
             self.verbose(
                 "warning",
-                f"Designated {category} '{name_input}' is unknown. Changing it to '{name_local}'. \
-                    Supported {category} are {supported}.",
+                f"Designated {category} '{name_input}' is unknown. Changing it to '{name_local}'."
+                + f"Supported {category} are {supported}.",
+                warning_type=WarningType.WrongArgument,
             )
         if name_local in skip_list:
             name_local = supported[0]
             self.verbose(
                 "warning",
-                f"Designated {category} '{name_input}' is not applicable at this moment. Changing it to '{name_local}'\
-                    . Please choose another {category} from {supported}.",
+                f"Designated {category} '{name_input}' is not applicable at this moment. Changing it to '{name_local}'."
+                + f"Please choose another {category} from {supported}.",
+                warning_type=WarningType.WrongArgument,
             )
         if name_local == supported[0]:
+            self.verbose("info", "auto choosing bin...")
             for name in supported[2:]:
                 if name in skip_list:
                     continue
@@ -193,7 +201,7 @@ class Launcher:
                         msg = f"Neither of {supported[2:]} {category} is found"
                     else:
                         msg = f"None of {supported[2:]} {category} is found"
-                    self.verbose("warning", f"{msg} in {self.library_paths}.")
+                    self.verbose("info", f"{msg} in {self.library_paths}.")
                 if extra_warning_msg_with_default_choice != "":
                     extra_warning_msg_with_default_choice = (
                         f" {extra_warning_msg_with_default_choice}"
@@ -211,8 +219,9 @@ class Launcher:
                     )
                 self.verbose(
                     "warning",
-                    f"Unable to find the '{name_local}' {category} library file in {self.library_paths}.\
-                        {extra_warning_msg_install_guide}",
+                    f"Unable to find the '{name_local}' {category} library file in"
+                    + f"{self.library_paths}.{extra_warning_msg_install_guide}",
+                    warning_type=WarningType.MissingDependency,
                 )
                 name_local = supported[1]
                 if extra_warning_msg_with_default_choice != "":

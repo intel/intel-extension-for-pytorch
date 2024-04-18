@@ -119,9 +119,11 @@ def check_model(
     actual_flat, _ = tree_flatten(actual)
     if reference_in_float:
         correct_flat = tuple(
-            y.to(x.dtype)
-            if isinstance(y, torch.Tensor) and y.dtype.is_floating_point
-            else y
+            (
+                y.to(x.dtype)
+                if isinstance(y, torch.Tensor) and y.dtype.is_floating_point
+                else y
+            )
             for x, y in zip(actual_flat, correct_flat)
         )
         correct = tree_unflatten(correct_flat, correct_spec)

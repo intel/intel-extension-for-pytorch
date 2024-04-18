@@ -3,7 +3,7 @@ from typing import Set
 import functools
 import contextlib
 import types
-import warnings
+from ...utils._logger import logger, WarningType
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _using_dnnl,
     _using_tpp,
@@ -97,27 +97,46 @@ def IPEX_WEIGHT_CONVERT_MODULE_CPU(inference: bool, dtype: torch.bfloat16):
         torch.nn.Linear,
         torch.nn.Embedding,
         torch.nn.LSTM,
+        # TODO: why different with inference
         MergedEmbeddingBag,
         torch.nn.EmbeddingBag,
         _LSTM,
         torch.nn.ParameterList,
     ]
 
-    module_convert_list_fp16 = [
-        torch.nn.Conv1d,
+    module_convert_list_fp16_inference = [
         torch.nn.Conv2d,
         torch.nn.Conv3d,
+        torch.nn.ConvTranspose2d,
+        torch.nn.ConvTranspose3d,
         torch.nn.Linear,
+        torch.nn.Embedding,
         MergedEmbeddingBagWithCat,
         torch.nn.ParameterList,
     ]
 
+    module_convert_list_fp16_training = [
+        torch.nn.Conv1d,
+        torch.nn.Conv2d,
+        torch.nn.Conv3d,
+        torch.nn.ConvTranspose2d,
+        torch.nn.ConvTranspose3d,
+        torch.nn.Linear,
+        torch.nn.Embedding,
+        torch.nn.EmbeddingBag,
+        torch.nn.ParameterList,
+    ]
+
     if dtype == torch.float16:
-        return module_convert_list_fp16
-    elif inference:
-        return module_convert_list_bf16_inference
-    else:
-        return module_convert_list_bf16_training
+        if inference:
+            return module_convert_list_fp16_inference
+        else:
+            return module_convert_list_fp16_training
+    elif dtype == torch.bfloat16:
+        if inference:
+            return module_convert_list_bf16_inference
+        else:
+            return module_convert_list_bf16_training
 
 
 @functools.lru_cache(None)
@@ -214,8 +233,6 @@ def _should_prepack(module, is_training, is_xpu=False):
 
 
 def get_shared_parameter_status(module, shared_p):
-    if module is None:
-        return
     visited_wrapper = []
 
     # TODO: weight and bias of deepspeed modules are no longer
@@ -336,8 +353,9 @@ class ParameterWrapper(object):
             return True
         ori_dtype = self.parameter.dtype
         if ori_dtype not in (torch.float, torch.float32, torch.bfloat16, torch.float16):
-            warnings.warn(
-                f"WARNING: Can't convert model's parameters dtype from {ori_dtype} to {dtype}"
+            logger.warning(
+                f"Can't convert model's parameters dtype from {ori_dtype} to {dtype}",
+                _type=WarningType.NotSupported,
             )
             return False
 
@@ -370,8 +388,9 @@ class ParameterWrapper(object):
             torch.float,
             torch.float32,
         ):
-            warnings.warn(
-                f"WARNING: Can't convert model's parameters dtype from {ori_dtype} to {dtype}"
+            logger.warning(
+                f"Can't convert model's parameters dtype from {ori_dtype} to {dtype}",
+                _type=WarningType.NotSupported,
             )
             return False
 
@@ -627,12 +646,26 @@ class ParameterWrapper(object):
                     torch.float32,
                     torch.bfloat16,
                 ], "Only float, bf16 and fp16 are supported"
-                use_dnnl = True if not _using_tpp() else False
+                use_dnnl = True
+
         module.use_tpp = _using_tpp()
-        module.use_dnnl = use_dnnl
+        if not hasattr(module, "out_features"):
+            setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
+
+        if module.use_tpp:
+            from intel_extension_for_pytorch.nn.utils import (
+                Apply_TPPLinear_weight_prepack,
+            )
+
+            Apply_TPPLinear_weight_prepack(module, dtype=module.weight.dtype)
+            if module.tpp_fallback:
+                module.use_tpp = False
+            else:
+                self.parameter.data = module.weight.data
+                self.parameter = module.weight
+
+        module.use_dnnl = use_dnnl if not module.use_tpp else False
         if not module.use_tpp:
-            if not hasattr(module, "out_features"):
-                setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
             # prepare batch size
             module.batch_size_collapsed = None
             if hasattr(module, "input_shape"):
@@ -649,14 +682,6 @@ class ParameterWrapper(object):
                     module.weight, module.bias, module.batch_size_collapsed
                 )
             self.pack_weight(use_dnnl)
-        else:
-            from intel_extension_for_pytorch.nn.utils import (
-                Apply_TPPLinear_weight_prepack,
-            )
-
-            Apply_TPPLinear_weight_prepack(module, dtype=module.weight.dtype)
-            self.parameter.data = module.weight.data
-            self.parameter = module.weight
 
     def load_cast_and_prepack(self, module, param):
         # load from state dict

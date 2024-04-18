@@ -25,10 +25,8 @@ from packaging import version as pkg_version
 class OnDevice(object):
     """
     Create modules/tensors w. specific devices and dtypes. Examples:
-
     Create MyModule which consists of many different sub-modules and parameters. In this case we can create
     MyModule as a collection of 'meta' tensors by passing `device='meta'`.
-
     with OnDevice(dtype=torch.float16, device='meta'):
         model = MyModel()
     """

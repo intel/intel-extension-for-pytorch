@@ -1,7 +1,7 @@
 import functools
-import warnings
 import intel_extension_for_pytorch as ipex
 from .runtime_utils import get_core_list_of_node_id
+from ...utils._logger import logger, WarningType
 
 
 class CPUPool(object):
@@ -23,8 +23,10 @@ class CPUPool(object):
             return
         if core_ids is not None:
             if node_id is not None:
-                warnings.warn(
+                logger.warning(
                     "Both of core_ids and node_id are inputed. core_ids will be used with priority."
+                    + "You can eliminate this warning by only using one of them",
+                    _type=WarningType.AmbiguousArgument,
                 )
             if type(core_ids) is range:
                 core_ids = list(core_ids)

@@ -10,7 +10,7 @@ import sys
 import sysconfig
 import errno
 
-import warnings
+from ..utils._logger import logger, WarningType
 
 import torch
 from torch.utils.cpp_extension import _TORCH_PATH
@@ -55,10 +55,9 @@ TORCH_LIB_PATH = os.path.join(_TORCH_PATH, "lib")
 
 JIT_EXTENSION_VERSIONER = ExtensionVersioner()
 
+
 # Taken directly from python stdlib < 3.9
 # See https://github.com/pytorch/pytorch/issues/48617
-
-
 def _nt_quote_args(args: Optional[List[str]]) -> List[str]:
     """Quote command-line arguments for DOS/Windows conventions.
 
@@ -205,7 +204,10 @@ class DpcppBuildExtension(build_ext, object):
                 "{}. Falling back to using the slow distutils backend."
             )
             if not is_ninja_available():
-                warnings.warn(msg.format("we could not find ninja."))
+                logger.warning(
+                    msg.format("we could not find ninja."),
+                    _type=WarningType.MissingDependency,
+                )
                 self.use_ninja = False
 
     def finalize_options(self) -> None:
@@ -737,12 +739,13 @@ def check_compiler_abi_compatibility(compiler) -> bool:
 
     # First check if the compiler is one of the expected ones for the particular platform.
     if not check_compiler_ok_for_platform(compiler):
-        warnings.warn(
+        logger.warning(
             WRONG_COMPILER_WARNING.format(
                 user_compiler=compiler,
                 pytorch_compiler=_accepted_compilers_for_platform()[0],
                 platform=sys.platform,
-            )
+            ),
+            _type=WarningType.MissingDependency,
         )
         return False
 
@@ -766,14 +769,20 @@ def check_compiler_abi_compatibility(compiler) -> bool:
             version = ["0", "0", "0"] if match is None else list(match.groups())
     except Exception:
         _, error, _ = sys.exc_info()
-        warnings.warn(f"Error checking compiler version for {compiler}: {error}")
+        logger.warning(
+            f"Error checking compiler version for {compiler}: {error}",
+            _type=WarningType.MissingDependency,
+        )
         return False
 
     if tuple(map(int, version)) >= minimum_required_version:
         return True
 
     compiler = f'{compiler} {".".join(version)}'
-    warnings.warn(ABI_INCOMPATIBILITY_WARNING.format(compiler))
+    logger.warning(
+        ABI_INCOMPATIBILITY_WARNING.format(compiler),
+        _type=WarningType.MissingDependency,
+    )
 
     return False
 
@@ -802,12 +811,13 @@ def get_compiler_abi_compatibility_and_version(compiler) -> Tuple[bool, TorchVer
 
     # First check if the compiler is one of the expected ones for the particular platform.
     if not check_compiler_ok_for_platform(compiler):
-        warnings.warn(
+        logger.warning(
             WRONG_COMPILER_WARNING.format(
                 user_compiler=compiler,
                 pytorch_compiler=_accepted_compilers_for_platform()[0],
                 platform=sys.platform,
-            )
+            ),
+            _type=WarningType.MissingDependency,
         )
         return (False, TorchVersion("0.0.0"))
 
@@ -831,14 +841,20 @@ def get_compiler_abi_compatibility_and_version(compiler) -> Tuple[bool, TorchVer
             version = ["0", "0", "0"] if match is None else list(match.groups())
     except Exception:
         _, error, _ = sys.exc_info()
-        warnings.warn(f"Error checking compiler version for {compiler}: {error}")
+        logger.warning(
+            f"Error checking compiler version for {compiler}: {error}",
+            _type=WarningType.MissingDependency,
+        )
         return (False, TorchVersion("0.0.0"))
 
     if tuple(map(int, version)) >= minimum_required_version:
         return (True, TorchVersion(".".join(version)))
 
     compiler = f'{compiler} {".".join(version)}'
-    warnings.warn(ABI_INCOMPATIBILITY_WARNING.format(compiler))
+    logger.warning(
+        ABI_INCOMPATIBILITY_WARNING.format(compiler),
+        _type=WarningType.MissingDependency,
+    )
 
     return (False, TorchVersion(".".join(version)))
 

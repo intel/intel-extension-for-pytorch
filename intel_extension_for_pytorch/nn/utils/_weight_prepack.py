@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import logging
-import os
+import pkg_resources
 from intel_extension_for_pytorch import optim
 from intel_extension_for_pytorch.cpu.tpp.utils.blocked_layout import (
     BlockedParameter,
@@ -89,16 +89,23 @@ def may_import_deepspeed_modules():
         return None
 
 
+installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
+if "deepspeed" in installed_pkg:
+    from deepspeed import comm
+
+    def _all_reduce(self):
+        comm.inference_all_reduce(self, async_op=False)
+        return self
+
+    ds_comm = torch.library.Library("deepspeed_comm", "DEF")
+    ds_comm.define("all_reduce(Tensor self) -> Tensor")
+    ds_comm_lib_cpu = torch.library.Library("deepspeed_comm", "IMPL", "CPU")
+    ds_comm_lib_cpu.impl("all_reduce", _all_reduce)
+
+
 def _all_reduce_and_bias_add(mp_group, original_bias, output):
     if mp_group is not None:
-        torch.ops.deepspeed_comm.all_reduce(
-            output,
-            "sum",
-            "",
-            list(torch.arange(int(os.environ["WORLD_SIZE"]))),
-            int(os.environ["WORLD_SIZE"]),
-        )
-
+        torch.ops.deepspeed_comm.all_reduce(output)
     if original_bias is not None:
         output += original_bias
 
@@ -107,10 +114,14 @@ def _all_reduce_and_bias_add(mp_group, original_bias, output):
 
 def _pre_ipex_gemm(input, world_size, rank):
     assert "deepspeed" in installed_pkg, "_pre_ipex_gemm requires deepspeed installed"
-    from deepspeed.utils.tp_shard import get_shard_size, get_shard_size_list
-
-    input_shard_size = get_shard_size(input.shape[-1], world_size)
-    input_shard_offset = sum(get_shard_size_list(input.shape[-1], world_size)[0:rank])
+    try:
+        from deepspeed.module_inject.tp_shard import get_shard_size, get_shard_size_list
+    except ImportError:
+        from deepspeed.utils.tp_shard import get_shard_size, get_shard_size_list
+    input_shard_size = get_shard_size(input.shape[-1], world_size, "lm_head")
+    input_shard_offset = sum(
+        get_shard_size_list(input.shape[-1], world_size, "lm_head")[0:rank]
+    )
     return input[:, :, input_shard_offset : input_shard_offset + input_shard_size]
 
 
@@ -253,11 +264,11 @@ class _IPEXLinear(_IPEXPrepackModule):
                 x = x.to(self.weight.dtype).contiguous()
                 if self.bias is not None:
                     output = torch.ops.torch_ipex.tpp_linear_bias(
-                        x, self.weight, self.bias, self.out_features
+                        x, self.weight.detach(), self.bias.detach(), self.out_features
                     )
                 else:
                     output = torch.ops.torch_ipex.tpp_linear(
-                        x, self.weight, self.out_features
+                        x, self.weight.detach(), self.out_features
                     )
         else:
             output = torch.ops.torch_ipex.ipex_MKLSGEMM(
@@ -471,15 +482,15 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             all_reduce_bias = m.bias
             if isinstance(new_m, (_IPEXLinearAllreduce, _IPEXLmHeadLinearAllreduce)):
                 m.bias = None
-            if _using_tpp():
+            if _using_tpp() and hasattr(m, "tpp_fallback"):
                 weight_key = m.weight
                 param_wrapper.prepack(m, is_training)
                 if m.tpp_fallback:
                     new_m.tpp_fallback = True
                 else:
                     new_m.tpp_fallback = False
-                params_attr[m.weight] = params_attr.pop(weight_key)
-                del weight_key
+                    params_attr[m.weight] = params_attr.pop(weight_key)
+                    del weight_key
 
             else:
                 param_wrapper.prepack(m, is_training)
@@ -505,13 +516,13 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
             # workflow:
             # model.train() -> ipex.optimize(model) -> model.eval()
             new_m._ipex_module_empty_weight_tensor = torch.nn.Parameter(
-                torch.Tensor().to(dtype=new_m.weight.dtype)
+                torch.Tensor().to(dtype=new_m.weight.dtype), requires_grad=False
             )
             if new_m.bias is None:
                 new_m.register_parameter("_ipex_module_empty_bias_tensor", None)
             else:
                 new_m._ipex_module_empty_bias_tensor = torch.nn.Parameter(
-                    torch.Tensor().to(dtype=new_m.bias.dtype)
+                    torch.Tensor().to(dtype=new_m.bias.dtype), requires_grad=False
                 )
             return new_m
         else:

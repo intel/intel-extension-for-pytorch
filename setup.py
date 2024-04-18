@@ -1,5 +1,6 @@
-#!/usr/bin/env python
-# coding: UTF-8
+# This Python file uses the following encoding: utf-8
+# !/usr/bin/env python
+
 # Welcome to the Intel Extension for PyTorch setup.py.
 #
 # Environment variables you are probably interested in:

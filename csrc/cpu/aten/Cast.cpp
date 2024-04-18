@@ -149,7 +149,7 @@ void fp8_dequantize(
 }
 
 at::Tensor cast_from_fp8(
-    at::Tensor input,
+    at::Tensor& input,
     at::Tensor& scale_inv,
     int64_t fp8_tensor_index,
     int64_t itype,

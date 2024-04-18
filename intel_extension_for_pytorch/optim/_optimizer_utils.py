@@ -1,7 +1,7 @@
 import torch
 import copy
 import types
-import warnings
+from ..utils._logger import warn_if_user_explicitly_set
 from copy import deepcopy
 from itertools import chain
 from collections import defaultdict
@@ -129,7 +129,7 @@ def patch_step_for_master_weight_training(optimizer):
             assert (
                 _param.dtype != torch.bfloat16
             ), "GradScaler is not recommended for bf16 training"
-            if _param.requires_grad:
+            if _param.requires_grad and _param.grad is not None:
                 k.grad = _param.grad.detach().float()
 
     def step_sync_weight(self, closure=None):
@@ -360,7 +360,7 @@ def patch_state_dict(optimizer):
         )
 
 
-def optimizer_fusion(optimizer, master_weight_split, device_type):
+def optimizer_fusion(optimizer, device_type, user_explict_fuse):
     r"""
     Patch "step" method to choose IPEX optimized fused update kernel.
     """
@@ -373,20 +373,22 @@ def optimizer_fusion(optimizer, master_weight_split, device_type):
         elif device_type == "xpu":
             step = OPTIMIZER_FUSED_STEP_MAPPING_XPU[type(optimizer)]
         else:
-            warnings.warn(
+            msg = (
                 "IPEX does not support device type "
                 + str(device_type)
                 + ". For now, only support CPU, XPU."
             )
+            warn_if_user_explicitly_set(user_explict_fuse, msg)
             return optimizer
         if not hasattr(optimizer, "_original_step"):
             setattr(optimizer, "_original_step", optimizer.step)  # noqa: B010
         optimizer.step = types.MethodType(step, optimizer)
         setattr(optimizer, "fused", True)  # noqa: B010
     except KeyError:
-        warnings.warn(
+        msg = (
             "Does not suport fused step for "
             + str(type(optimizer))
             + ", will use non-fused step"
         )
+        warn_if_user_explicitly_set(user_explict_fuse, msg)
     return optimizer

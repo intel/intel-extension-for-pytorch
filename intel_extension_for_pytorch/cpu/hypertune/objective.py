@@ -1,6 +1,7 @@
 # reference: https://github.com/intel/neural-compressor/blob/\
 #            15477100cef756e430c8ef8ef79729f0c80c8ce6/neural_compressor/objective.py
 import subprocess
+from ...utils._logger import logger, WarningType
 
 
 class MultiObjective(object):
@@ -39,7 +40,10 @@ class MultiObjective(object):
         ), f"Configurations {deprecated} and {new} cannot be set at the same time."
         ret = default
         if v_deprecated != default:
-            print(f"[**Warning**] Configuration {deprecated} is deprecated by {new}.")
+            logger.warn(
+                f"[**Warning**] Configuration {deprecated} is deprecated by {new}.",
+                _type=WarningType.DeprecatedArgument,
+            )
             ret = v_deprecated
         if v_new != default:
             ret = v_new

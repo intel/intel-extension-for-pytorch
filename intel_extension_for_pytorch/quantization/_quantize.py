@@ -1,6 +1,6 @@
 import copy
 import functools
-import warnings
+from ..utils._logger import logger, WarningType
 
 import torch
 from torch.ao.quantization import PlaceholderObserver, QConfig, QConfigMapping
@@ -10,7 +10,6 @@ from torch.ao.quantization.quantization_mappings import (
 import torch.fx.experimental.optimization as optimization
 from torch.ao.nn.quantized.modules.utils import _quantize_weight
 import torch.ao.nn.quantized.dynamic as nnqd
-import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.cpu.utils.linear_bn_folding import linear_bn_fuse
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
@@ -40,6 +39,10 @@ def prepare(
             will be passed to the function while running to init quantization state. Only one of this
             argument or ``example_kwarg_inputs`` should be specified.
         inplace: (bool): It will change the given model in-place if True. The default value is ``False``.
+            Note that if ``bn_folding`` is ``True``, the returned model is a different object from the
+            original model even if ``inplace=True``. So, with the following code
+            >>> prepared_model = prepare(original_model, ..., inplace=True)
+            please use ``prepared_model`` for later operations to avoid unexpected behaviors.
         bn_folding: (bool): whether to perform ``conv_bn`` and ``linear_bn`` folding.
             The default value is ``True``.
         example_kwarg_inputs (dict):  A dict of example inputs that will be passed to the function while
@@ -56,11 +59,12 @@ def prepare(
         configure, QConfig
     ), f"IPEX quantization: prepare configure should be an instance of QConfigMapping or QConfig, but got {type(configure)}"
     if isinstance(configure, QConfig):
-        warnings.warn(
+        logger.warning(
             "\nIPEX quantization: QConfig are deprecated. Please use QConfigMapping instead.\nUsage:"
-            "\n    qconfig_mapping = ipex.quantization.default_static_qconfig_mapping # for static quantization"
-            "\n    qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping # for dynamic quantization"
-            "\n    prepared_model = ipex.quantization.prepare(model_fp32, qconfig_mapping, ...)"
+            + "\n    qconfig_mapping = ipex.quantization.default_static_qconfig_mapping # for static quantization"
+            + "\n    qconfig_mapping = ipex.quantization.default_dynamic_qconfig_mapping # for dynamic quantization"
+            + "\n    prepared_model = ipex.quantization.prepare(model_fp32, qconfig_mapping, ...)",
+            _type=WarningType.AmbiguousArgument,
         )
     if isinstance(configure, QConfigMapping):
         configure = configure.global_qconfig
@@ -91,7 +95,10 @@ def prepare(
             prepare_model = optimization.fuse(prepare_model, inplace=inplace)
             prepare_model = linear_bn_fuse(prepare_model, inplace=inplace)
         except BaseException:
-            warnings.warn("BatchNorm folding failed during the prepare process.")
+            logger.warning(
+                "BatchNorm folding failed during the prepare process.",
+                _type=WarningType.NotSupported,
+            )
 
     # replace dropout with identity to enable more fusion pattern.
     nn.utils._model_convert.replace_dropout_with_identity(prepare_model)
@@ -107,12 +114,7 @@ def prepare(
         assert isinstance(
             example_kwarg_inputs, Dict
         ), "IPEX quantization.prepare: example_kwarg_inputs must be type of Dict."
-    prepared_model = auto_prepare(
-        prepare_model, configure, example_inputs, example_kwarg_inputs
-    )
-    if inplace and hasattr(prepared_model, "save_qconf_summary"):
-        model.save_qconf_summary = prepared_model.save_qconf_summary
-    return prepared_model
+    return auto_prepare(prepare_model, configure, example_inputs, example_kwarg_inputs)
 
 
 def _may_insert_deepspeed_modules(
@@ -178,7 +180,7 @@ def IPEX_WEIGHT_ONLY_QUANTIZATION_MODULE_CPU():
     torch_modules = {}
     torch_modules = _may_insert_deepspeed_modules(
         torch_modules,
-        nn.modules.weight_only_quantization.IpexWoqLinear,
+        nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear,
         nn.modules.weight_only_quantization.IpexWoqLinearAllreduce,
         nn.modules.weight_only_quantization.IpexWoqLmHeadLinearAllreduce,
     )
@@ -422,7 +424,7 @@ def convert(model, inplace=False):
         }
         module_mappings = get_default_dynamic_quant_module_mappings().copy()
         module_mappings[torch.nn.Linear] = (
-            nn.modules.weight_only_quantization.IpexWoqLinear
+            nn.modules.weight_only_quantization.WeightOnlyQuantizedLinear
         )
 
         module_mappings, qconfig_spec = may_quantize_deepspeed_modules(
@@ -470,7 +472,10 @@ def convert(model, inplace=False):
     # Convert linear, conv, and Embedding's weight dtype when use autocast,
     # which will reduce the dtype conversion.
     # TODO: check whether can be removed or not?
-    if torch.is_autocast_cpu_enabled() and core.get_autocast_dtype() == torch.bfloat16:
+    if (
+        torch.is_autocast_cpu_enabled()
+        and torch.get_autocast_cpu_dtype() == torch.bfloat16
+    ):
         convert_model = nn.utils._model_convert.convert_model_data_type(
             convert_model, torch.bfloat16
         )[1]

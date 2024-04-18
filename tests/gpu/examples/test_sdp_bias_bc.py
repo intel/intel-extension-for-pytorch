@@ -25,11 +25,11 @@ class TestTorchMethod(TestCase):
             ):
                 print("seq_lenth is ", seq_lenth)
                 print("bias_size", bias_size)
-                query_states = torch.rand((b, n, q_len, attn_head_size))
-                key_states = torch.rand((b, n, kv_len, attn_head_size))
-                value_states = torch.rand((b, n, kv_len, attn_head_size))
-                grad = torch.rand((b, n, q_len, attn_head_size))
-                bias = torch.rand(bias_size)
+                query_states = torch.rand((b, n, q_len, attn_head_size), dtype=dtype)
+                key_states = torch.rand((b, n, kv_len, attn_head_size), dtype=dtype)
+                value_states = torch.rand((b, n, kv_len, attn_head_size), dtype=dtype)
+                grad = torch.rand((b, n, q_len, attn_head_size), dtype=dtype)
+                bias = torch.rand(bias_size, dtype=dtype)
 
                 query_states_xpu = query_states.to(dtype).xpu()
                 key_states_xpu = key_states.to(dtype).xpu()
@@ -56,25 +56,25 @@ class TestTorchMethod(TestCase):
                 r_cpu.backward(grad)
                 r_xpu.backward(grad_xpu)
 
-                self.assertEqual(r_cpu, r_xpu.cpu().float(), atol=1e-2, rtol=1e-1)
+                self.assertEqual(r_cpu.float(), r_xpu.cpu().float(), atol=1e-2, rtol=1e-1)
                 self.assertEqual(
-                    query_states.grad,
+                    query_states.grad.float(),
                     query_states_xpu.grad.cpu().float(),
                     atol=1e-2,
                     rtol=1e-1,
                 )
                 self.assertEqual(
-                    key_states.grad,
+                    key_states.grad.float(),
                     key_states_xpu.grad.cpu().float(),
                     atol=1e-2,
                     rtol=1e-1,
                 )
                 self.assertEqual(
-                    value_states.grad,
+                    value_states.grad.float(),
                     value_states_xpu.grad.cpu().float(),
                     atol=1e-2,
                     rtol=1e-1,
                 )
                 self.assertEqual(
-                    bias.grad, bias_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-1
+                    bias.grad.float(), bias_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-1
                 )

@@ -1,12 +1,39 @@
-# coding: utf-8
+# This Python file uses the following encoding: utf-8
 import re
+
 import torch
-import warnings
+
 
 try:
     import torchvision
 except ImportError:
     pass  # skip if torchvision is not available
+
+
+from ._version import (
+    __version__,
+    __ipex_gitrev__,
+    __torch_gitrev__,
+    __gpu_onednn_gitrev__,
+    __cpu_ideep_gitrev__,
+    __build_type__,
+)
+
+torch_version = ""
+ipex_version = ""
+matches = re.match(r"(\d+\.\d+).*", torch.__version__)
+if matches and len(matches.groups()) == 1:
+    torch_version = matches.group(1)
+matches = re.match(r"(\d+\.\d+).*", __version__)
+if matches and len(matches.groups()) == 1:
+    ipex_version = matches.group(1)
+if torch_version == "" or ipex_version == "" or torch_version != ipex_version:
+    print(
+        "ERROR! Intel® Extension for PyTorch* needs to work with PyTorch "
+        + f"{ipex_version}.*, but PyTorch {torch.__version__} is found. "
+        + "Please switch to the matching version and run again."
+    )
+    exit(127)
 
 
 import os
@@ -94,6 +121,10 @@ if sys.platform == "win32":
 
 from .utils._proxy_module import *
 from .utils.utils import has_cpu, has_xpu
+from .utils._logger import logger, WarningType
+
+if has_xpu():
+    from . import xpu
 
 if has_cpu():
     from . import cpu
@@ -103,18 +134,15 @@ if has_cpu():
     try:
         from .cpu import tpp
     except BaseException:
-        warnings.warn(
-            "Please install transformers repo when you want to use fast_bert API."
+        logger.warn(
+            "Please install transformers repo when you want to use fast_bert API.",
+            _type=WarningType.MissingDependency,
         )
-
-if has_xpu():
-    from . import xpu
 
 from . import nn
 from . import jit
 from . import optim
 from . import fx
-
 from . import _dynamo
 from . import _inductor
 from . import llm
@@ -140,37 +168,9 @@ if has_cpu():
     from ._init_on_device import OnDevice
 
 from . import _C
-from ._version import (
-    __version__,
-    __ipex_gitrev__,
-    __torch_gitrev__,
-    __gpu_onednn_gitrev__,
-    __cpu_ideep_gitrev__,
-    __build_type__,
-)
-
 
 # Path to folder containing CMake definitions for torch ipex package
 cmake_prefix_path = os.path.join(os.path.dirname(__file__), "share", "cmake")
-
-
-torch_version = ""
-ipex_version = ""
-matches = re.match(r"(\d+\.\d+).*", torch.__version__)
-if matches and len(matches.groups()) == 1:
-    torch_version = matches.group(1)
-matches = re.match(r"(\d+\.\d+).*", __version__)
-if matches and len(matches.groups()) == 1:
-    ipex_version = matches.group(1)
-if torch_version == "" or ipex_version == "" or torch_version != ipex_version:
-    print(
-        "ERROR! Intel® Extension for PyTorch* needs to work with PyTorch \
-      {0}.*, but PyTorch {1} is found. Please switch to the matching version \
-          and run again.".format(
-            ipex_version, torch.__version__
-        )
-    )
-    exit(127)
 
 
 if has_cpu():

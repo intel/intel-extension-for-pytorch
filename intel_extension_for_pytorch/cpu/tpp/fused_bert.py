@@ -7,11 +7,16 @@ from .utils.blocked_layout import (
     get_blocking_signature,
 )
 import pkg_resources
-import warnings
 from .optim import AdamW, SGD
 import intel_extension_for_pytorch._C as torch_ipex_cpp
 import copy
+from ...utils._logger import logger, WarningType
 
+try:
+    from transformers.modeling_utils import apply_chunking_to_forward
+    from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
+except ImportError:
+    pass
 USE_BF16_PARAMS = True
 layer_use_bf16 = False
 unpad = True
@@ -916,10 +921,6 @@ class BertLayer(nn.Module):
         seq_offsets=None,
         seq_sqr_offsets=None,
     ):
-        try:
-            from transformers.modeling_utils import apply_chunking_to_forward
-        except ImportError:
-            pass
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
         self_attn_past_key_value = (
             past_key_value[:2] if past_key_value is not None else None
@@ -1019,12 +1020,6 @@ class BertEncoder(nn.Module):
         output_hidden_states=False,
         return_dict=True,
     ):
-        try:
-            from transformers.modeling_outputs import (
-                BaseModelOutputWithPastAndCrossAttentions,
-            )
-        except ImportError:
-            pass
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
         all_cross_attentions = (
@@ -1052,7 +1047,8 @@ class BertEncoder(nn.Module):
                 if use_cache:
                     logger.warning(
                         "`use_cache=True` is incompatible with `config.gradient_checkpointing=True`. Setting "
-                        "`use_cache=False`..."
+                        + "`use_cache=False`...",
+                        _type=WarningType.WrongArgument,
                     )
                     use_cache = False
 
@@ -1221,6 +1217,12 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         seed(string): The seed used for the libxsmm kernel. In general it should be same
             to the torch.seed
 
+    .. note::
+
+        Currently ``ipex.fast_bert`` API is well optimized for training tasks.
+        It works for inference tasks, though, please use the ``ipex.optimize``
+        API with TorchScript to achieve the peak performance.
+
     .. warning::
 
         Please invoke ``fast_bert`` function AFTER loading weights to model via
@@ -1228,7 +1230,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
 
     .. warning::
 
-        This API can't be used when you have applied the ipex.optimize.
+        This API can't be used when you have applied the ``ipex.optimize``.
 
     .. warning::
 
@@ -1254,7 +1256,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     # tpp bert optimization depends on the transformers repo to implementate the related module
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.6.0"
-    max_version = "4.31.0"
+    max_version = "4.38.1"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "Please installed the transformers with version: between {} and {}".format(
@@ -1294,9 +1296,9 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
             torch.tensor(torch.initial_seed()).to(torch.int32).abs().item()
         )
     except BaseException:
-        warnings.warn(
-            "Set seed failed for libxsmm which may impact the training loss, you can call \
-                torch.manual_seed(N) before invoking fast_bert."
+        logger.warning(
+            "Set seed failed for libxsmm which may impact the training loss, you can call "
+            + "torch.manual_seed(N) before invoking fast_bert."
         )
     # replace the original transfomers module object with tpp module which has the same functionality but with more
     # operator fusion optimization
@@ -1333,8 +1335,9 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         )
         new_model.bert.encoder = BertEncoder(model.bert.config)
     else:
-        warnings.warn(
-            "fast_bert only supports instance of transformers.models.bert.modeling_bert.BertModel"
+        logger.warning(
+            "fast_bert only supports instance of transformers.models.bert.modeling_bert.BertModel",
+            _type=WarningType.NotSupported,
         )
         return model, optimizer
     new_model.load_state_dict(
@@ -1342,6 +1345,11 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     )  # copy the original params into the tpp module
     block(new_model)  # get block format weights/bias
     if optimizer is None:
+        logger.warning(
+            "Currently ipex.fast_bert API is well optimized for training tasks. It works for inference tasks, "
+            + "though, please use the ipex.optimize API with TorchScript to achieve the peak performance.",
+            _type=WarningType.NotSupported,
+        )
         return new_model
     # replace the original pytorch/transformer optimizer with tpp optimizer for SGD/AdamW
     # keep the original optimizer state and replace the params with the blocked tpp params
@@ -1349,8 +1357,9 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     for param_ori, param_tpp in zip(model.parameters(), new_model.parameters()):
         param_pair[param_ori] = param_tpp
     if type(optimizer) not in PT_OPTIMIZER_TO_TPP_OPTIMIZER:
-        warnings.warn(
-            "Still return the origin optimize, the fast_bert can only replace the SGD, AdamW optimizer"
+        logger.warning(
+            "Still return the origin optimize, the fast_bert can only replace the SGD, AdamW optimizer",
+            _type=WarningType.NotSupported,
         )
         new_optimizer = optimizer
     else:

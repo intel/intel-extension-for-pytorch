@@ -1,3 +1,4 @@
+from typing import Optional, Tuple
 import torch
 import sys
 from typing import Tuple
@@ -11,6 +12,7 @@ from intel_extension_for_pytorch.llm.modules import (
     RotaryEmbedding,
     RMSNorm,
     FastLayerNorm,
+    IndirectAccessKVCache,
     VarlenAttention,
 )
 
@@ -81,6 +83,81 @@ def fast_layer_norm(
 
     return FastLayerNorm.apply_function(
         hidden_states, normalized_shape, weight, bias, eps
+    )
+
+
+def indirect_access_kv_cache(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    scale_attn: float,
+    layer_past: Optional[Tuple[torch.Tensor]] = None,
+    head_mask: Optional[Tuple[torch.Tensor]] = None,
+    attention_mask: Optional[Tuple[torch.Tensor]] = None,
+    alibi: Optional[torch.Tensor] = None,
+    add_casual_mask: Optional[bool] = True,
+    seq_info: Optional[torch.Tensor] = None,
+    text_max_length: Optional[int] = 0,
+):
+    r"""
+    kv_cache is used to reduce computation for **Decoder** layer but it also brings memory overheads,
+    for example, when using beam search, the kv_cache should be reordered according to the latest beam
+    idx and the current key/value should also be concat with kv_cache in the attention layer to get entire
+    context to do scale dot product. When the sequence is very long, the memory overhead will be the
+    performance bottleneck. This module provides an Indirect Access KV_cache(IAKV), Firstly, IAKV pre-allocates
+    buffers(key and value use different buffers) to store all key/value hidden states and beam index information.
+    It can use beam index history to decide which beam should be used by a timestamp and this information will
+    generate an offset to access the kv_cache buffer.
+    Data Format:
+    - The shape of the pre-allocated key(value) buffer is [max_seq, beam*batch, head_num, head_size],
+      the hidden state of key/value which is the shape of [beam*batch, head_num, head_size] is stored token by token.
+      All beam idx information of every timestamp is also stored in a Tensor with the shape of [max_seq, beam*batch].
+
+    forward
+    - query (torch.Tensor): Query tensor; shape: (beam*batch, seq_len, head_num, head_dim).
+    - key (torch.Tensor): Key tensor; shape: (beam*batch, seq_len, head_num, head_dim).
+    - value (torch.Tensor): Value tensor; shape: (beam*batch, seq_len, head_num, head_dim).
+    - scale_attn (float):scale used by the attention layer. should be the  sqrt(head_size).
+    - layer_past (tuple(torch.Tensor)): tuple(seq_info, key_cache, value_cache, beam-idx).
+                                        key_cache: key cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);
+                                        value_cache: value cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);
+                                        beam-idx:  history beam idx, shape:(max_seq, beam*batch);
+                                        seq_info: Sequence info tensor, shape:(1, 1, max_seq, max_seq).
+    - head_mask (torch.Tensor): Head mask tensor which is not supported by kernel yet.
+    - attention_mask(torch.Tensor): Attention mask information.
+    - text_max_length (int) : the max length of kv cache to be used for generation (allocate the pre-cache buffer).
+
+    Return:
+    - attn_output:  weighted value which is the output of scale dot product. shape (beam*batch, seq_len, head_num, head_size).
+    - attn_weights:  The output tensor of the first matmul in scale dot product which is not supported by kernel now.
+    - new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).
+
+    Notes:
+    - How to reorder KV cache when using the format of IndirectAccessKVCache (e.g., on llama model
+      see https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318)
+        def _reorder_cache(
+            self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
+        ) -> Tuple[Tuple[torch.Tensor]]:
+            if (
+                len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1
+            ):
+                for layer_past in past_key_values:
+                    layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
+                return past_key_values
+
+    """
+    return IndirectAccessKVCache.apply_function(
+        query,
+        key,
+        value,
+        scale_attn,
+        layer_past,
+        head_mask,
+        attention_mask,
+        alibi,
+        add_casual_mask,
+        seq_info,
+        text_max_length,
     )
 
 

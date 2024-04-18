@@ -229,8 +229,8 @@ void fp8_dequantize_op(
 }
 
 at::Tensor cast_to_fp8(
-    const at::Tensor& input_,
-    const at::Tensor& scale,
+    at::Tensor& input_,
+    at::Tensor& scale,
     at::Tensor& amax,
     at::Tensor& scale_inv,
     int64_t fp8_tensor,
@@ -249,8 +249,8 @@ at::Tensor cast_to_fp8(
 }
 
 at::Tensor cast_from_fp8(
-    const at::Tensor& input_,
-    const at::Tensor& scale_inv,
+    at::Tensor& input_,
+    at::Tensor& scale_inv,
     int64_t fp8_tensor,
     int64_t itype,
     ScalarType otype) {
@@ -263,14 +263,12 @@ at::Tensor cast_from_fp8(
 
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
-      "cast_to_fp8.xpu",
-      at::AtenIpexTypeXPU::cast_to_fp8,
-      c10::DispatchKey::XPU);
+      "cast_to_fp8", at::AtenIpexTypeXPU::cast_to_fp8, c10::DispatchKey::XPU);
 }
 
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
-      "cast_from_fp8.xpu",
+      "cast_from_fp8",
       at::AtenIpexTypeXPU::cast_from_fp8,
       c10::DispatchKey::XPU);
 }

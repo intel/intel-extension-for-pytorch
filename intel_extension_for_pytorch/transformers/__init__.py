@@ -5,3 +5,12 @@ from ..utils.utils import has_cpu
 if has_cpu():
     from .models.cpu.modules.attentions import _IPEXAttentionCPU
     from .models.cpu.modules.decoder import _IPEXDecoderLayerCPU
+    from .tensor_parallel import (
+        shard_lm_head_weights,
+        shard_mha_weights,
+        shard_mlp_weights,
+        update_heads_info,
+        TensorParallelColumnLinear,
+        TensorParallelRowLinear,
+        TensorParallelLMhead,
+    )

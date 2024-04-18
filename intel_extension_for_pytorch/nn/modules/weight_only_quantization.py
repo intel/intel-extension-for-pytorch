@@ -1,61 +1,42 @@
 import torch
 from torch import nn
-from torch.ao.nn.quantized.modules.utils import _clamp_weights
-from ...quantization._qconfig import get_weight_only_quant_qconfig_mapping
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
     _all_reduce_and_bias_add,
     _pre_ipex_gemm,
 )
+from intel_extension_for_pytorch.quantization import (
+    QConfigWoq,
+    quantize_per_channel,
+    quantize_per_block,
+    WoqWeightDtype,
+)
+from ...utils._logger import logger, WarningType
 
 
-# Port from PyTorch with a few changes
-def _quantize_weight(float_wt, observer):
-    wt_scale, wt_zp = observer.calculate_qparams()
-    dtype = observer.dtype
-    if observer.qscheme in [torch.per_tensor_symmetric, torch.per_tensor_affine]:
-        qweight = torch.quantize_per_tensor(
-            float_wt, float(wt_scale), int(wt_zp), dtype
-        )
-        qweight = _clamp_weights(qweight, observer, wt_scale, wt_zp)
-    elif observer.qscheme in [torch.per_channel_symmetric, torch.per_channel_affine]:
-        wt_axis = observer.ch_axis
-        qweight = torch.quantize_per_channel(
-            float_wt, wt_scale.to(torch.double), wt_zp.to(torch.int64), wt_axis, dtype
-        )
-        qweight = _clamp_weights(qweight, observer, wt_scale, wt_zp)
-    elif observer.qscheme in [torch.per_channel_affine_float_qparams]:
-        qweight = torch.quantize_per_channel(
-            float_wt,
-            wt_scale.to(torch.float),
-            wt_zp.to(torch.float),
-            observer.ch_axis,
-            dtype,
-        )
-        qweight = _clamp_weights(qweight, observer, wt_scale, wt_zp)
-    else:
-        raise ValueError("Unexpected qscheme " + observer.qscheme)
-    return qweight
-
-
-class IpexWoqLinear(nn.Module):
+class WeightOnlyQuantizedLinear(nn.Module):
     r"""
     A weight-only quantized (WOQ) linear module with floating point tensor as inputs and outputs.
     Weight is dequantized at runtime for computation.
     """
 
-    # version used in this class is different from the parent class nnq.Linear
-    _version = 4
-
-    def __init__(self, in_features, out_features, bias_=True, dtype=torch.qint8):
+    def __init__(
+        self, in_features, out_features, bias_=True, dtype=WoqWeightDtype.INT8
+    ):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.bias = bias_
         self.dtype = dtype
+        # This weight attribute is for queries of dtype, shape, etc.
+        # It is a reference of the packed weight in self._op_context
+        # The shape is not necessarily = [out_features, in_features] due to packing
+        # Its dtype is torch.int8 for INT8 and torch.uint8 for INT4
+        self.weight = None
         self._op_context = None
         self._lowp_mode = 0
-        self._num_concats = 1
+        self._act_quant_mode = 0
+        self._group_size = -1
 
     def pre_ipex_gemm(self, input):
         return input
@@ -71,7 +52,7 @@ class IpexWoqLinear(nn.Module):
         return self.post_ipex_gemm(Y)
 
     def _get_name(self):
-        return "IpexWeightOnlyQuantizedLinear"
+        return "WeightOnlyQuantizedLinear"
 
     def extra_repr(self):
         extra_repr_str = "in_features={}, out_features={}, dtype={}".format(
@@ -79,16 +60,20 @@ class IpexWoqLinear(nn.Module):
         )
         extra_repr_str += ", bias={}".format(self.bias)
         extra_repr_str += ", lowp_mode={}".format(self._lowp_mode)
-        extra_repr_str += ", num_concats={}".format(self._num_concats)
+        extra_repr_str += ", act_quant_mode={}".format(self._act_quant_mode)
+        extra_repr_str += ", group_size={}".format(self._group_size)
         return extra_repr_str
 
     @classmethod
-    def from_float(cls, mod):
+    def from_float(cls, mod, scales=None, zero_points=None):
         r"""Create a weight-only quantized module from a float module or qparams_dict
 
         Args:
-            mod (Module): a float module, either produced by torch.ao.quantization
-                          utilities or provided by the user
+            mod (Module): an instance of nn.Linear or its subclasses.
+            scales: the scales Tensor for quantizing weight. If it is None,
+                scales are found by min/max of the weight.
+            zero_points: the zero points Tensor for quantizing weight. If it is None,
+                zero points are found by min/max of the weight.
         """
         float_modules = [torch.nn.Linear]
         deepspeed_modules = may_import_deepspeed_modules()
@@ -98,52 +83,61 @@ class IpexWoqLinear(nn.Module):
             float_modules.extend([type(mod)])
 
         assert type(mod) in float_modules, (
-            "IpexWoqLinear.from_float only works for one of"
+            "WeightOnlyQuantizedLinear.from_float only works for one of"
             + str([float_mod.__name__ for float_mod in float_modules])
             + f" or their subclasses, but found {type(mod)}"
         )
         assert hasattr(mod, "qconfig"), "Input float module must have qconfig defined"
-        lowp_mode = 0
-        if mod.qconfig is not None and mod.qconfig.weight is not None:
-            weight_observer = mod.qconfig.weight()
-            if hasattr(mod.qconfig, "lowp_mode"):
-                lowp_mode = mod.qconfig.lowp_mode
-                if mod.qconfig.lowp_mode == 3 and weight_observer.dtype == torch.qint8:
-                    # lowp_mode=3 (INT8) is not yet supported for INT8 weight
-                    # Fall back to lowp_mode=2 in this case
-                    # TODO(Weiwen) Support lowp_mode=3
-                    lowp_mode = 2
-                    print(
-                        "Warning: lowp_mode=3(INT8) is not supported yet in this case. "
-                        "Falling back to 2(BF16)."
-                    )
+        qconfig = mod.qconfig
+        if qconfig is None or not isinstance(qconfig, QConfigWoq):
+            return mod
+
+        lowp_mode = qconfig.lowp_mode
+        if qconfig.lowp_mode == 3 and qconfig.weight_dtype == WoqWeightDtype.INT8:
+            # lowp_mode=3 (INT8) is not supported for INT8 weight
+            # Fall back to lowp_mode=2 in such case
+            # TODO(Weiwen) Support lowp_mode=3
+            lowp_mode = 2
+            logger.warning(
+                "Warning: lowp_mode=3(INT8) is not supported yet for INT8 weight. "
+                + "Falling back to 2(BF16).",
+                _type=WarningType.NotSupported,
+            )
+        act_quant_mode = qconfig.act_quant_mode
+        dtype = qconfig.weight_dtype
+        group_size = qconfig.group_size
+
+        if group_size == -1:
+            qweight, scales, zero_points = quantize_per_channel(
+                mod.weight, dtype, scales, zero_points
+            )
         else:
-            weight_observer = (
-                get_weight_only_quant_qconfig_mapping().global_qconfig.weight()
+            qweight, scales, zero_points = quantize_per_block(
+                mod.weight, dtype, group_size, scales, zero_points
             )
-        num_concats = 1
-        if hasattr(mod, "_num_concats"):
-            num_concats = mod._num_concats
-        dtype = weight_observer.dtype
-        assert dtype in [torch.quint8, torch.qint8, torch.quint4x2], (
-            "The only supported dtypes for "
-            "weight-only quantized linear are quint8, qint8 and quint4x2 got: {}".format(
-                dtype
-            )
-        )
-        weight_observer(mod.weight)
-        qweight = _quantize_weight(mod.weight.float(), weight_observer)
         if not hasattr(mod, "in_features"):
             mod.in_features = mod.weight.size()[1]
         if not hasattr(mod, "out_features"):
             mod.out_features = mod.weight.size()[0]
 
-        qlinear = cls._init_cls(mod, dtype, qweight, lowp_mode, num_concats)
+        qlinear = cls._init_cls(
+            mod,
+            dtype,
+            qweight,
+            scales,
+            zero_points,
+            None,  # g_idx
+            group_size,
+            lowp_mode,
+            act_quant_mode,
+        )
         del qweight
         return qlinear
 
     @classmethod
-    def from_float_and_int4_weight(cls, mod, qweight, scales, zero_points, bias=None):
+    def from_float_and_int4_weight(
+        cls, mod, qweight, scales, zero_points, bias=None, group_size=-1, g_idx=None
+    ):
         r"""Create a weight-only quantized module from a float module and int4 weight
 
         Args:
@@ -153,6 +147,9 @@ class IpexWoqLinear(nn.Module):
             bias (Tensor or None): bias for linear
             scales (Tensor): scales for qweight
             zero_points (Tensor): zero points for qweight
+            group_size: Group size for weight quantization
+            g_idx: Indices of groups for each input channel of weight. Generated by
+                GPTQ with act-order.
         """
         float_modules = [torch.nn.Linear]
         deepspeed_modules = may_import_deepspeed_modules()
@@ -162,58 +159,96 @@ class IpexWoqLinear(nn.Module):
             float_modules.extend([type(mod)])
 
         assert type(mod) in float_modules, (
-            "IpexWoqLinear.from_float only works for one of"
+            "WeightOnlyQuantizedLinear.from_float only works for one of"
             + str([float_mod.__name__ for float_mod in float_modules])
             + f" or their subclasses, but found {type(mod)}"
         )
         assert hasattr(mod, "qconfig"), "Input float module must have qconfig defined"
 
         lowp_mode = 0
-        if mod.qconfig is not None and hasattr(mod.qconfig, "lowp_mode"):
-            lowp_mode = mod.qconfig.lowp_mode
-        num_concats = 1
-        if hasattr(mod, "_num_concats"):
-            num_concats = mod._num_concats
+        act_quant_mode = 0
+        if mod.qconfig is not None:
+            if hasattr(mod.qconfig, "lowp_mode"):
+                lowp_mode = mod.qconfig.lowp_mode
+            if hasattr(mod.qconfig, "act_quant_mode"):
+                act_quant_mode = mod.qconfig.act_quant_mode
 
         w_dtype = qweight.dtype
-        assert w_dtype in [
+        supported_qw_dtype = [
             torch.int32,
+            torch.uint8,
             torch.quint4x2,
             torch.bfloat16,
             torch.float32,
-        ], "Quantized int4 weight should have data type int32 or quint4x2, but got: {}".format(
-            w_dtype
+        ]
+        assert (
+            w_dtype in supported_qw_dtype
+        ), "Data type of int4 weight should be in {}, but got: {}".format(
+            supported_qw_dtype, w_dtype
         )
         if not hasattr(mod, "in_features"):
             mod.in_features = mod.weight.size()[1]
         if not hasattr(mod, "out_features"):
             mod.out_features = mod.weight.size()[0]
 
-        qlinear = cls(mod.in_features, mod.out_features, dtype=torch.quint4x2)
+        qlinear = cls(mod.in_features, mod.out_features, dtype=WoqWeightDtype.INT4)
         if bias is None:
             bias = mod.bias
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
-            qweight, scales, zero_points, bias, None, int(lowp_mode), num_concats
+            qweight,
+            scales,
+            zero_points,
+            bias,
+            g_idx,
+            None,
+            group_size,
+            int(lowp_mode),
+            act_quant_mode,
         )
+        qlinear.weight = qlinear._op_context.get_weight()
         qlinear._lowp_mode = lowp_mode
-        qlinear._num_concats = num_concats
+        qlinear._act_quant_mode = act_quant_mode
+        qlinear._group_size = group_size
         del qweight
         return qlinear
 
     @classmethod
-    def _init_cls(cls, mod, dtype, qweight, lowp_mode, num_concats):
+    def _init_cls(
+        cls,
+        mod,
+        dtype,
+        qweight,
+        scales,
+        zero_points,
+        g_idx,
+        group_size,
+        lowp_mode,
+        act_quant_mode,
+    ):
         qlinear = cls(
             mod.in_features, mod.out_features, mod.bias is not None, dtype=dtype
         )
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
-            qweight, mod.bias, None, int(lowp_mode), num_concats
+            qweight,
+            dtype,
+            [mod.out_features, mod.in_features],
+            scales,
+            zero_points,
+            mod.bias,
+            g_idx,
+            None,
+            group_size,
+            int(lowp_mode),
+            act_quant_mode,
         )
+        qlinear.weight = qlinear._op_context.get_weight()
         qlinear._lowp_mode = lowp_mode
-        qlinear._num_concats = num_concats
+        qlinear._act_quant_mode = act_quant_mode
+        qlinear._group_size = group_size
         return qlinear
 
 
-class IpexWoqLinearAllreduce(IpexWoqLinear):
+class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
     def __init__(
         self,
         in_features,
@@ -221,7 +256,7 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
         mp_group,
         bias_value,
         bias_=True,
-        dtype=torch.qint8,
+        dtype=WoqWeightDtype.INT8,
     ):
         # Save the original bias here
         # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce
@@ -240,16 +275,34 @@ class IpexWoqLinearAllreduce(IpexWoqLinear):
         )
 
     @classmethod
-    def _init_cls(cls, mod, dtype, qweight, lowp_mode, num_concats):
+    def _init_cls(
+        cls,
+        mod,
+        dtype,
+        qweight,
+        scales,
+        zero_points,
+        g_idx,
+        group_size,
+        lowp_mode,
+        act_quant_mode,
+    ):
         qlinear = cls._init_from_mod(mod, dtype)
 
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack(
             qweight,
+            dtype,
+            [mod.out_features, mod.in_features],
+            scales,
+            zero_points,
             None,  # Set bias to None when prepacking. Please refer to the comment in __init__ of _IPEXLinearAllreduce
+            g_idx,
             None,  # batch_size
+            group_size,
             lowp_mode,
-            num_concats,
+            act_quant_mode,
         )
+        qlinear.weight = qlinear._op_context.get_weight()
 
         return qlinear
 
@@ -267,7 +320,7 @@ class IpexWoqLmHeadLinearAllreduce(IpexWoqLinearAllreduce):
         world_size,
         bias_value,
         bias_=True,
-        dtype=torch.qint8,
+        dtype=WoqWeightDtype.INT8,
     ):
         # Save the original bias here
         # For bias handling, please refer to the comment in __init__ of _IPEXLinearAllreduce

@@ -4,7 +4,7 @@ import torch.fx as fx
 import torch.fx.experimental.optimization as optimization
 import _operator
 import copy
-import warnings
+from ..utils._logger import logger, WarningType
 
 
 def concat_linear(model: fx.GraphModule, inplace=False) -> fx.GraphModule:
@@ -187,7 +187,10 @@ def _concat_linear(model: torch.nn.Module, inplace=False) -> fx.GraphModule:
                 apply_concat_linear_on_unet(model)
                 return model
         except BaseException:
-            warnings.warn("failed to apply concat_linear on unet, please report bugs")
+            logger.warning(
+                "failed to apply concat_linear on unet, please report bugs",
+                _type=WarningType.NotSupported,
+            )
 
     if "transformers" in sys.modules:
 
@@ -200,8 +203,9 @@ def _concat_linear(model: torch.nn.Module, inplace=False) -> fx.GraphModule:
                 from transformers.utils.fx import symbolic_trace as hf_symbolic_trace
             except ImportError:
                 # fx are not exposed in transformers.utils
-                warnings.warn(
-                    "failed to import transformers symbolic_trace, cannnot apply concat linear"
+                logger.warning(
+                    "failed to import transformers symbolic_trace, cannnot apply concat linear",
+                    _type=WarningType.NotSupported,
                 )
             try:
                 model: fx.GraphModule = hf_symbolic_trace(
@@ -209,15 +213,17 @@ def _concat_linear(model: torch.nn.Module, inplace=False) -> fx.GraphModule:
                 )
                 return concat_linear(model, inplace)
             except BaseException:
-                warnings.warn(
-                    "failed to symbolic trace model with transformers symbolic_trace, cannnot apply concat linear"
+                logger.warning(
+                    "failed to symbolic trace model with transformers symbolic_trace, cannnot apply concat linear",
+                    _type=WarningType.NotSupported,
                 )
     else:
         try:
             model: fx.GraphModule = fx.symbolic_trace(model)
             return concat_linear(model, inplace)
         except BaseException:
-            warnings.warn(
-                "pytorch native symbolic trace failed, may cannnot apply concat linear"
+            logger.warning(
+                "pytorch native symbolic trace failed, may cannnot apply concat linear",
+                _type=WarningType.NotSupported,
             )
     return model

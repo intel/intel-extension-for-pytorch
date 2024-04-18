@@ -7,9 +7,9 @@ from enum import IntEnum
 from typing import List
 
 import functools
-import logging
 import threading
 import warnings
+from ..utils._logger import logger, WarningType
 
 
 class RunMethods(IntEnum):
@@ -37,7 +37,10 @@ class GraphCapture(object):
                     traced_model = torch.jit.freeze(traced_model)
                 return traced_model
             except Exception:
-                warnings.warn("JIT trace failed during the 'compiler' process.")
+                logger.warning(
+                    "JIT trace failed during the 'compiler' process.",
+                    _type=WarningType.NotSupported,
+                )
                 return gm
 
         @functools.wraps(func)
@@ -62,8 +65,9 @@ class GraphCapture(object):
                             else:
                                 return self.model(*input, **kwargs)
                         if self.train:
-                            warnings.warn(
-                                "graph capture does not support training yet."
+                            logger.warning(
+                                "graph capture does not support training yet.",
+                                _type=WarningType.NotSupported,
                             )
                             self.method = RunMethods.EagerTrain
                             return func(*input, **kwargs)
@@ -89,7 +93,7 @@ class GraphCapture(object):
                                     output = traced_model(*input, **kwargs)
                                     self.model = traced_model
                                     self.method = RunMethods.JIT
-                                    logging.debug("generate graph by JIT trace.")
+                                    logger.debug("generate graph by JIT trace.")
                                     return output
                             except BaseException:
                                 try:
@@ -101,11 +105,12 @@ class GraphCapture(object):
                                     output = dynamo_model(*input, **kwargs)
                                     self.model = dynamo_model
                                     self.method = RunMethods.TorchDynamo
-                                    logging.debug("generate graph by TorchDynamo.")
+                                    logger.debug("generate graph by TorchDynamo.")
                                     return output
                                 except BaseException:
-                                    warnings.warn(
-                                        "Both JIT and TorchDynamo failed, fallback to original model."
+                                    logger.warning(
+                                        "Both JIT and TorchDynamo failed, fallback to original model.",
+                                        _type=WarningType.NotSupported,
                                     )
                                     self.method = RunMethods.EagerInfer
                                     torch._dynamo.reset()

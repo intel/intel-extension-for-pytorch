@@ -1,6 +1,5 @@
 # This Python file uses the following encoding: utf-8
 import copy
-import warnings
 
 import torch
 import torch._dynamo
@@ -36,6 +35,7 @@ from .cpu._auto_kernel_selection import (
 from .fx.concat_linear import _concat_linear
 
 import intel_extension_for_pytorch._C as core
+from .utils._logger import logger, WarningType, warn_if_user_explicitly_set
 
 
 def _copy_model_and_optimizer(model, optimizer):
@@ -405,44 +405,48 @@ def optimize(
     if device_type == "xpu":
         if opt_properties.split_master_weight_for_bf16:
             # currently split master weight for xpu only support sgd
-            if type(optimizer) is torch.optim.SGD:
-                opt_properties.split_master_weight_for_bf16 = True
-            else:
+            if type(optimizer) != torch.optim.SGD:
+                msg = "Currently split master weight for xpu only support sgd"
                 opt_properties.split_master_weight_for_bf16 = False
+                warn_if_user_explicitly_set(split_master_weight_for_bf16, msg)
 
         # throw warnings when users manually choose the unsupported optimization
         if opt_properties.opt_level == "O0":
             if opt_properties.auto_kernel_selection:
-                warnings.warn(
-                    "Auto Kernel Selection feature is not supported on XPU, disabled."
-                )
+                msg = "Auto Kernel Selection feature is not supported on XPU, disabled."
+                warn_if_user_explicitly_set(auto_kernel_selection, msg)
             if opt_properties.graph_mode:
-                warnings.warn(
+                msg = (
                     "Out-of-Box (OOB) solution for inference supposes to trace a model outside "
                     + "the torch.xpu.optimize on XPU, disabled the graph mode."
                 )
+                warn_if_user_explicitly_set(graph_mode, msg)
             if not inplace:
-                warnings.warn(
+                msg = (
                     "To reduce device memory usage on XPU, optimization are done inplace,"
                     + " setting the inplace argument to True."
                 )
+                warn_if_user_explicitly_set(not inplace, msg)
+            # for XPU, weight prepack is unsupported, so sample input is useless
             if opt_properties.weights_prepack or sample_input is not None:
-                warnings.warn(
+                msg = (
                     "Weight Prepack and Sample Input are both disabled on XPU. The Onednn Layout"
                     + " is automatically applied."
                 )
+                warn_if_user_explicitly_set(weights_prepack, msg)
             if opt_properties.optimize_lstm is not None:
-                warnings.warn(
+                msg = (
                     "For XPU, the optimize_lstm(replace lstm with ipex_lstm) is unsupported,"
                     + " so disable it"
                 )
+                warn_if_user_explicitly_set(optimize_lstm, msg)
 
+        opt_properties.auto_kernel_selection = False
         opt_properties.graph_mode = False
         inplace = True
         opt_properties.weights_prepack = False
         sample_input = None
         opt_properties.optimize_lstm = False
-        opt_properties.auto_kernel_selection = False
 
     if inplace:
         optimized_model = model
@@ -462,16 +466,14 @@ def optimize(
             try:
                 optimized_model = optimization.fuse(optimized_model, inplace=True)
             except:  # noqa E722
-                warnings.warn(
-                    "Conv BatchNorm folding failed during the optimize process."
-                )
+                msg = "Conv BatchNorm folding failed during the optimize process."
+                warn_if_user_explicitly_set(conv_bn_folding, msg)
         if opt_properties.linear_bn_folding:
             try:
                 optimized_model = linear_bn_fuse(optimized_model, inplace=True)
             except BaseException:
-                warnings.warn(
-                    "Linear BatchNorm folding failed during the optimize process."
-                )
+                msg = "Linear BatchNorm folding failed during the optimize process."
+                warn_if_user_explicitly_set(linear_bn_folding, msg)
         if opt_properties.replace_dropout_with_identity:
             utils._model_convert.replace_dropout_with_identity(optimized_model)
         if opt_properties.concat_linear:
@@ -487,6 +489,7 @@ def optimize(
     if opt_properties.optimize_lstm:
         replace_lstm_with_ipex_lstm(optimized_model, optimized_optimizer)
         torch._dynamo.allow_in_graph(_LSTM)
+
     if (
         model.training
         and opt_properties.split_master_weight_for_bf16
@@ -494,22 +497,26 @@ def optimize(
     ):
         if not opt_properties.fuse_update_step:
             opt_properties.split_master_weight_for_bf16 = False
-            warnings.warn(
+            msg = (
                 "IPEX does not non-fused split master weight for bf16 training, "
                 + "have reset split_master_weight_for_bf16 flag to False. "
                 + "If you want to use split_master_weight_for_bf16. "
                 + "Please set both split_master_weight_for_bf16 and fuse_update_step to True."
             )
+            warn_if_user_explicitly_set(split_master_weight_for_bf16, msg)
         elif (
             type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_CPU
             and device_type == "cpu"
         ):
             opt_properties.split_master_weight_for_bf16 = False
             opt_properties.fuse_update_step = False
-            warnings.warn(
+            msg = (
                 "IPEX CPU does not support fused/fused split update for "
                 + str(type(optimizer))
                 + " will use non-fused master weight update for bf16 training on CPU."
+            )
+            warn_if_user_explicitly_set(
+                fuse_update_step or split_master_weight_for_bf16, msg
             )
         elif (
             type(optimizer) not in IPEX_FUSED_OPTIMIZER_LIST_XPU
@@ -517,10 +524,13 @@ def optimize(
         ):
             opt_properties.split_master_weight_for_bf16 = False
             opt_properties.fuse_update_step = False
-            warnings.warn(
+            msg = (
                 "IPEX XPU does not support fused/fused split update for "
                 + str(type(optimizer))
                 + " will use non-fused master weight update for bf16 training on XPU."
+            )
+            warn_if_user_explicitly_set(
+                fuse_update_step or split_master_weight_for_bf16, msg
             )
 
     if model.training:
@@ -552,12 +562,14 @@ def optimize(
         if dtype == torch.bfloat16:
             assert core.onednn_has_bf16_support(), (
                 "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, "
-                + "please set dtype to torch.float or set weights_prepack to False."
+                + "but the desired instruction sets are not available. "
+                + "Please set dtype to torch.float or set weights_prepack to False."
             )
         if dtype == torch.half:
             assert core.onednn_has_fp16_support(), (
                 "FP16 weight prepack needs the cpu support avx512_core_fp16, "
-                + "please set dtype to torch.float or set weights_prepack to False."
+                + "but the desired instruction sets are not available. "
+                + "Please set dtype to torch.float or set weights_prepack to False."
             )
         (
             optimized_model,
@@ -590,8 +602,8 @@ def optimize(
     if opt_properties.fuse_update_step:
         optimized_optimizer = optimizer_fusion(
             optimized_optimizer,
-            opt_properties.split_master_weight_for_bf16,
             device_type,
+            fuse_update_step,
         )
     return optimized_model, optimized_optimizer
 
@@ -667,10 +679,11 @@ def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
         elif mode == FP32MathMode.FP32:
             core.set_fp32_math_mode(core.FP32MathMode.FP32)
         else:
-            warnings.warn(
-                "For CPU device, IPEX does not support mode except \
-                    FP32MathMode.FP32 and FP32MathMode.BF32 for fpmath_mode right now."
+            msg = (
+                "For CPU device, IPEX does not support mode except"
+                + "FP32MathMode.FP32 and FP32MathMode.BF32 for fpmath_mode right now."
             )
+            logger.warning(msg, _type=WarningType.NotSupported)
     elif device == "xpu":
         if mode == FP32MathMode.BF32:
             torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.BF32)
@@ -679,10 +692,11 @@ def set_fp32_math_mode(mode=FP32MathMode.FP32, device="cpu"):
         elif mode == FP32MathMode.TF32:
             torch.xpu.set_fp32_math_mode(torch.xpu.FP32MathMode.TF32)
         else:
-            warnings.warn(
-                "For XPU device, IPEX does not support mode except \
-                    FP32MathMode.FP32, FP32MathMode.BF32 and FP32MathMode.TF32 for fpmath_mode right now."
+            msg = (
+                "For XPU device, IPEX does not support mode except"
+                + "FP32MathMode.FP32, FP32MathMode.BF32 and FP32MathMode.TF32 for fpmath_mode right now."
             )
+            logger.warning(msg, _type=WarningType.NotSupported)
     else:
         raise RuntimeError(
             "Unexpected device type {}. ".format(device) + "Supported are 'cpu', 'xpu'."

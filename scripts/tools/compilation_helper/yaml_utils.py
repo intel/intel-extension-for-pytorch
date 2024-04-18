@@ -29,8 +29,8 @@ def main():
             result[args.dependency][args.key] = args.value
             yaml.dump(result, f)
     else:
-        return result[args.dependency][args.key]
+        print(result[args.dependency][args.key])
 
 if __name__ == '__main__':
-    print(main())
+    main()
 

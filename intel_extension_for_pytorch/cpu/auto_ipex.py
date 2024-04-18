@@ -1,16 +1,12 @@
 import os
 import platform
 import glob
-import logging
+from ..utils._logger import logger, WarningType
 import sys
 from argparse import ArgumentParser, REMAINDER
 from argparse import RawTextHelpFormatter
 from tempfile import mkstemp
 import uuid
-
-format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-logging.basicConfig(level=logging.INFO, format=format_str)
-logger = logging.getLogger(__name__)
 
 
 def apply_monkey_patch(program, dtype, auto_ipex_verbose, disable_ipex_graph_mode):
@@ -213,7 +209,9 @@ def main():
                     lst_valid.append(item)
                 else:
                     logger.warning(
-                        "{} doesn't exist. Removing it from LD_PRELOAD.".format(item)
+                        f"You have set {item} into LD_PRELOAD but it doesn't exist. Removing it from LD_PRELOAD."
+                        + "please install it if you want it or remove it from LD_PRELOAD if you don't",
+                        _type=WarningType.MissingDependency,
                     )
         if len(lst_valid) > 0:
             os.environ["LD_PRELOAD"] = ":".join(lst_valid)
