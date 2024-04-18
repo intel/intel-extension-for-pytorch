@@ -185,7 +185,7 @@ bash<span class="w"> </span>./tools/env_setup.sh<span class="w"> </span><span cl
 </tr>
 <tr>
 <td>input tokens</td>
-<td>default: 32, provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [1024, 2048, 4096, 8192]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs</td>
+<td>provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [1024, 2048, 4096, 8192]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs</td>
 </tr>
 <tr>
 <td>output tokens</td>
@@ -229,7 +229,8 @@ bash<span class="w"> </span>./tools/env_setup.sh<span class="w"> </span><span cl
 <ul class="simple">
 <li><p>Command:</p></li>
 </ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>num&gt;<span class="w"> </span>numactl<span class="w"> </span>-m<span class="w"> </span>&lt;node<span class="w"> </span>N&gt;<span class="w"> </span>-C<span class="w"> </span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>list&gt;<span class="w">  </span>python<span class="w"> </span>run.py<span class="w">  </span>--benchmark<span class="w"> </span>-m<span class="w"> </span>&lt;LLAMA3_MODEL_ID_OR_LOCAL_PATH&gt;<span class="w"> </span>--ipex-weight-only-quantization<span class="w"> </span>--weight-dtype<span class="w"> </span>INT8<span class="w"> </span>--quant-with-amp<span class="w"> </span>--output-dir<span class="w"> </span><span class="s2">&quot;saved_results&quot;</span><span class="w">  </span>--greedy<span class="w"> </span>--input-tokens<span class="w"> </span>&lt;INPUT_LENGTH&gt;<span class="w"> </span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>num&gt;<span class="w"> </span>numactl<span class="w"> </span>-m<span class="w"> </span>&lt;node<span class="w"> </span>N&gt;<span class="w"> </span>-C<span class="w"> </span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>list&gt;<span class="w">  </span>python<span class="w"> </span>run.py<span class="w">  </span>--benchmark<span class="w"> </span>-m<span class="w"> </span>&lt;LLAMA3_MODEL_ID_OR_LOCAL_PATH&gt;<span class="w"> </span>--ipex-weight-only-quantization<span class="w"> </span>--weight-dtype<span class="w"> </span>INT8<span class="w"> </span>--quant-with-amp<span class="w"> </span>--output-dir<span class="w"> </span><span class="s2">&quot;saved_results&quot;</span><span class="w">  </span>--greedy<span class="w"> </span>--input-tokens<span class="w"> </span>&lt;INPUT_LENGTH&gt;
+<span class="c1"># Note: you can add &quot;--group-size&quot; to tune good accuracy, suggested range as one of [32, 64, 128, 256, 512].</span>
 </pre></div>
 </div>
 </section>
@@ -268,6 +269,7 @@ For weight-only quantization with deepspeed, we quantize the model then run the 
 <li><p>Command:</p></li>
 </ul>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>deepspeed<span class="w"> </span>--bind_cores_to_rank<span class="w"> </span>run.py<span class="w">  </span>--benchmark<span class="w"> </span>-m<span class="w"> </span>&lt;LLAMA3_MODEL_ID_OR_LOCAL_PATH&gt;<span class="w"> </span>--ipex<span class="w"> </span>--ipex-weight-only-quantization<span class="w"> </span>--weight-dtype<span class="w"> </span>INT8<span class="w"> </span>--quant-with-amp<span class="w"> </span>--greedy<span class="w"> </span>--input-tokens<span class="w"> </span>&lt;INPUT_LENGTH&gt;<span class="w">  </span>--autotp<span class="w"> </span>--shard-model<span class="w"> </span>--output-dir<span class="w"> </span><span class="s2">&quot;saved_results&quot;</span>
+<span class="c1"># Note: you can add &quot;--group-size&quot; to tune good accuracy, suggested range as one of [32, 64, 128, 256, 512].</span>
 </pre></div>
 </div>
 </section>
@@ -303,7 +305,7 @@ For weight-only quantization with deepspeed, we quantize the model then run the 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f3596b77550> 
+   <jinja2.runtime.BlockReference object at 0x7f9b865a0c70> 
   <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 

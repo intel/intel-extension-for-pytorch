@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.20+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                2.1.20+xpu
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"><ul>
+<li><a class="reference internal" href="#">Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models</a></li>
+<li><a class="reference internal" href="#environment-setup">1. Environment Setup</a><ul>
+<li><a class="reference internal" href="#conda-based-environment-setup-with-pre-built-wheels-on-windows-11-home">1.1 Conda-based environment setup with pre-built wheels on Windows 11 Home</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#how-to-run-llama-3">2. How To Run Llama 3</a><ul>
+<li><a class="reference internal" href="#usage-of-running-llama-3-models">2.1 Usage of running Llama 3 models</a><ul>
+<li><a class="reference internal" href="#int4-woq-model">2.1.1 INT4 WOQ Model</a></li>
+<li><a class="reference internal" href="#measure-llama-3-woq-int4-performance-on-windows-11-home">2.1.2 Measure Llama 3 WOQ INT4 Performance on Windows 11 Home</a></li>
+<li><a class="reference internal" href="#validate-llama-3-woq-int4-accuracy-on-windows-11-home">2.1.3 Validate Llama 3 WOQ INT4 Accuracy on Windows 11 Home</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#miscellaneous-tips">Miscellaneous Tips</a></li>
+</ul>
+</li>
+</ul>
+</div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="intel-extension-for-pytorch-large-language-model-llm-feature-get-started-for-llama-3-models">
+<h1>Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models<a class="headerlink" href="#intel-extension-for-pytorch-large-language-model-llm-feature-get-started-for-llama-3-models" title="Link to this heading"></a></h1>
+<p>Intel® Extension for PyTorch* provides dedicated optimization for running Llama 3 models on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, including weight-only quantization (WOQ), Rotary Position Embedding fusion, etc. You are welcomed to have a try with these optimizations on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics.</p>
+</section>
+<section id="environment-setup">
+<h1>1. Environment Setup<a class="headerlink" href="#environment-setup" title="Link to this heading"></a></h1>
+<section id="conda-based-environment-setup-with-pre-built-wheels-on-windows-11-home">
+<h2>1.1 Conda-based environment setup with pre-built wheels on Windows 11 Home<a class="headerlink" href="#conda-based-environment-setup-with-pre-built-wheels-on-windows-11-home" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install Visual Studio 2022</span>
+https://visualstudio.microsoft.com/zh-hans/thank-you-downloading-visual-studio/?sku<span class="o">=</span>Community<span class="p">&amp;</span><span class="nv">channel</span><span class="o">=</span>Release<span class="p">&amp;</span><span class="nv">version</span><span class="o">=</span>VS2022<span class="p">&amp;</span><span class="nv">source</span><span class="o">=</span>VSLandingPage<span class="p">&amp;</span><span class="nv">cid</span><span class="o">=</span><span class="m">2030</span><span class="p">&amp;</span><span class="nv">passive</span><span class="o">=</span><span class="nb">false</span>
+
+<span class="c1"># Install Intel® oneAPI Base Toolkit 2024.1</span>
+https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html?operatingsystem<span class="o">=</span>window
+
+<span class="c1"># Install Intel® Core™ Ultra Processors with Intel® Arc™ Graphics driver</span>
+https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html
+
+<span class="c1"># Create a conda environment (pre-built wheel only available with python=3.9)</span>
+conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>llm<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.9<span class="w"> </span>-y
+conda<span class="w"> </span>activate<span class="w"> </span>llm
+conda<span class="w"> </span>install<span class="w"> </span>libuv
+
+<span class="c1"># Set environment variable</span>
+call<span class="w"> </span><span class="s2">&quot;C:\Program Files (x86)\Intel\oneAPI\setvars.bat&quot;</span>
+
+<span class="c1"># Install PyTorch*</span>
+pip<span class="w"> </span>install<span class="w"> </span>https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/xpu/torch-2.1.0a0%2Bgit04048c2-cp39-cp39-win_amd64.whl
+
+<span class="c1"># Install Intel® Extension for PyTorch*</span>
+pip<span class="w"> </span>install<span class="w"> </span>https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/xpu/intel_extension_for_pytorch-2.1.30%2Bgit03c5535-cp39-cp39-win_amd64.whl
+
+<span class="c1"># Install Intel® Extension for Transformers*</span>
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/intel/intel-extension-for-transformers.git<span class="w"> </span>intel-extension-for-transformers<span class="w"> </span>-b<span class="w"> </span>xpu_lm_head<span class="w"> </span>
+<span class="nb">cd</span><span class="w"> </span>intel-extension-for-transformers<span class="w"> </span>
+pip<span class="w"> </span>install<span class="w"> </span>-v<span class="w"> </span>.
+
+<span class="c1"># Install dependencies</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="nv">transformers</span><span class="o">==</span><span class="m">4</span>.35
+pip<span class="w"> </span>install<span class="w"> </span><span class="nv">huggingface_hub</span><span class="o">==</span><span class="m">0</span>.22
+pip<span class="w"> </span>install<span class="w"> </span><span class="nv">lm_eval</span><span class="o">==</span><span class="m">0</span>.4.2<span class="w"> </span>--no-deps
+pip<span class="w"> </span>install<span class="w"> </span>accelerate<span class="w"> </span>datasets<span class="w"> </span>diffusers
+</pre></div>
+</div>
+</section>
+</section>
+<section id="how-to-run-llama-3">
+<h1>2. How To Run Llama 3<a class="headerlink" href="#how-to-run-llama-3" title="Link to this heading"></a></h1>
+<p><strong>Intel® Extension for PyTorch* provides a single script <code class="docutils literal notranslate"><span class="pre">run_generation_gpu_woq_for_llama.py</span></code> to facilitate running generation tasks as below:</strong></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">intel</span><span class="o">/</span><span class="n">intel</span><span class="o">-</span><span class="n">extension</span><span class="o">-</span><span class="k">for</span><span class="o">-</span><span class="n">pytorch</span><span class="o">.</span><span class="n">git</span>
+<span class="n">cd</span> <span class="n">intel</span><span class="o">-</span><span class="n">extension</span><span class="o">-</span><span class="k">for</span><span class="o">-</span><span class="n">pytorch</span>
+<span class="n">git</span> <span class="n">checkout</span> <span class="n">dev</span><span class="o">/</span><span class="n">llama</span><span class="o">-</span><span class="n">int4</span>
+<span class="n">cd</span> <span class="n">intel</span><span class="o">-</span><span class="n">extension</span><span class="o">-</span><span class="k">for</span><span class="o">-</span><span class="n">pytorch</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">gpu</span><span class="o">/</span><span class="n">inference</span><span class="o">/</span><span class="n">python</span><span class="o">/</span><span class="n">llm</span>
+</pre></div>
+</div>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>Key args of run_generation_gpu_woq_for_llama.py</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>model id</td>
+<td>"--model" or "-m" to specify the <LLAMA3_MODEL_ID_OR_LOCAL_PATH>, it is model id from Huggingface or downloaded local path</td>
+</tr>
+<tr>
+<td>benchmark</td>
+<td>"--benchmark" to specify whether to generate sentences using model.generate</td>
+</tr>
+<tr>
+<td>accuracy</td>
+<td>"--accuracy" to specify whether to use the dataset to detect accuracy</td>
+</tr>
+<tr>
+<td>output tokens</td>
+<td>default: 32, use "--max-new-tokens" to choose any other size</td>
+</tr>
+<tr>
+<td>token latency</td>
+<td>enable "--profile_token_latency" to print out the first or next token latency</td>
+</tr>
+<tr>
+<td>generation iterations</td>
+<td>use "--iters" and "--num-warmup" to control the repeated iterations of generation, default: 10-iter/3-warmup</td>
+</tr>
+</tbody>
+</table><section id="usage-of-running-llama-3-models">
+<h2>2.1 Usage of running Llama 3 models<a class="headerlink" href="#usage-of-running-llama-3-models" title="Link to this heading"></a></h2>
+<section id="int4-woq-model">
+<h3>2.1.1 INT4 WOQ Model<a class="headerlink" href="#int4-woq-model" title="Link to this heading"></a></h3>
+<p>LLM quantization procedure is heavily constrained by client memory and computation capabilities. If you plan to create an INT4 WOQ model by your own, please use a powerful machine, for example, Intel® Xeon® Server, then execute the following steps. Otherwise, it is highly recommended waiting for INT4 model available in HuggingFace Model Hub.</p>
+<p>Environment installation:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cd ${YourWorkSpace}
+git clone https://github.com/intel/neural-compressor.git neural-compressor
+cd neural-compressor
+git checkout xpu_export
+python setup.py develop
+cd ..
+git clone https://github.com/intel/intel-extension-for-transformers.git intel-extension-for-transformers
+cd intel-extension-for-transformers
+git checkout xpu_int4
+python setup.py develop
+cd ..
+git clone https://github.com/intel/auto-round.git auto-round
+cd auto-round
+git checkout lm-head-quant
+python setup.py develop
+cd ..
+pip install schema==0.7.5
+</pre></div>
+</div>
+<p>Command to quantize:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cd ${YourWorkSpace}/intel-extension-for-transformers/examples/huggingface/pytorch/text-generation/quantization
+
+python run_generation_gpu_woq.py \
+    --model $model_path \
+    --woq --woq_algo AutoRound  \
+    --use_quant_input \
+    --calib_iters 200  \
+    --lr 5e-3 \
+    --minmax_lr 1e-2 \
+    --output_dir llama3_all_int4  \
+    --nsamples 512
+</pre></div>
+</div>
+<p>The int4 model is saved in folder ~/llama3_all_int4.</p>
+</section>
+<section id="measure-llama-3-woq-int4-performance-on-windows-11-home">
+<h3>2.1.2 Measure Llama 3 WOQ INT4 Performance on Windows 11 Home<a class="headerlink" href="#measure-llama-3-woq-int4-performance-on-windows-11-home" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Command:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">unset</span><span class="w"> </span>LLM_ACC_TEST
+python<span class="w"> </span>run_generation_gpu_woq_for_llama.py<span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">PATH</span><span class="p">/TO/MODEL</span><span class="si">}</span><span class="w"> </span>--benchmark<span class="w"> </span>--profile_token_latency
+*Note:*<span class="w"> </span>replace<span class="w"> </span><span class="si">${</span><span class="nv">PATH</span><span class="p">/TO/MODEL</span><span class="si">}</span><span class="w"> </span>with<span class="w"> </span>actual<span class="w"> </span>Llama<span class="w"> </span><span class="m">3</span><span class="w"> </span>INT4<span class="w"> </span>model<span class="w"> </span><span class="nb">local</span><span class="w"> </span>path
+</pre></div>
+</div>
+</section>
+<section id="validate-llama-3-woq-int4-accuracy-on-windows-11-home">
+<h3>2.1.3 Validate Llama 3 WOQ INT4 Accuracy on Windows 11 Home<a class="headerlink" href="#validate-llama-3-woq-int4-accuracy-on-windows-11-home" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Command:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">set</span><span class="w"> </span><span class="nv">LLM_ACC_TEST</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>
+python<span class="w"> </span>run_generation_gpu_woq_for_llama.py<span class="w"> </span>--model<span class="w"> </span><span class="si">${</span><span class="nv">PATH</span><span class="p">/TO/MODEL</span><span class="si">}</span><span class="w"> </span>--accuracy<span class="w"> </span>--task<span class="w"> </span><span class="s2">&quot;piqa&quot;</span>
+*Note:*<span class="w"> </span>replace<span class="w"> </span><span class="si">${</span><span class="nv">PATH</span><span class="p">/TO/MODEL</span><span class="si">}</span><span class="w"> </span>with<span class="w"> </span>actual<span class="w"> </span>Llama<span class="w"> </span><span class="m">3</span><span class="w"> </span>INT4<span class="w"> </span>model<span class="w"> </span><span class="nb">local</span><span class="w"> </span>path
+</pre></div>
+</div>
+</section>
+</section>
+<section id="miscellaneous-tips">
+<h2>Miscellaneous Tips<a class="headerlink" href="#miscellaneous-tips" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* also provides dedicated optimization for many other Large Language Models (LLM), which covers a set of data types for supporting various scenarios. For more details, please check <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/llm.html">Large Language Models (LLM) Optimizations Overview</a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f6b47dc1540> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
