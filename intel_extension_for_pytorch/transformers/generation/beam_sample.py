@@ -188,6 +188,7 @@ def _beam_sample(
             "QWenLMHeadModel",
             "GitForCausalLM",
             "LlavaLlamaForCausalLM",
+            "YuanForCausalLM",
         ]:
             first_token = False
             if model_inputs["past_key_values"] is None:
@@ -309,6 +310,8 @@ def _beam_sample(
                 self, "prepare_inputs_labels_for_multimodal"
             ):
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
+            if first_token and self.model_backbone == "YuanForCausalLM":
+                model_inputs.pop("past_key_values", None)
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)

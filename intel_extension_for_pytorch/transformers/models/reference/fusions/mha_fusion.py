@@ -154,6 +154,7 @@ class _IPEXRopeRef(nn.Module):
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "LlavaLlamaForCausalLM",
+            "YuanForCausalLM",
         ]:
             x = x.transpose(1, 2)
             x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
@@ -294,6 +295,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             "MixtralForCausalLM",
             "StableLmForCausalLM",
             "LlavaLlamaForCausalLM",
+            "YuanForCausalLM",
         ]:
             self.num_key_value_groups = (
                 module.num_key_value_groups
@@ -508,6 +510,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",
+            "YuanForCausalLM",
         ]:
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)

@@ -4,6 +4,101 @@ from ..cpu import comm as ipex_comm
 import os
 
 
+class TensorParallelConv2d(nn.Module):
+    def __init__(self, conv, rank, world_size, shard_by_oc):
+        super().__init__()
+        self.rank = rank
+        self.world_size = world_size
+        self.shard_by_oc = shard_by_oc
+        self.shard_weights(conv)
+
+    def shard_weights(self, conv):
+        if self.world_size == 1:
+            return
+        if self.shard_by_oc:
+            total_size = conv.weight.shape[0]
+        else:
+            total_size = conv.weight.shape[1]
+        bias_data = None
+        cols_per_rank = [0]
+        for i in range(self.world_size - 1, -1, -1):
+            cols = total_size // self.world_size
+            if i < total_size % self.world_size:
+                cols += 1
+            cols_per_rank.append(cols_per_rank[-1] + cols)
+        weight_data = conv.weight.data
+        if self.shard_by_oc:
+            weight_data = weight_data[
+                cols_per_rank[self.rank] : cols_per_rank[self.rank + 1]
+            ]
+            if conv.bias is not None:
+                bias_data = conv.bias.data[
+                    cols_per_rank[self.rank] : cols_per_rank[self.rank + 1]
+                ]
+        else:
+            weight_data = weight_data[
+                :, cols_per_rank[self.rank] : cols_per_rank[self.rank + 1]
+            ]
+            if conv.bias is not None:
+                bias_data = conv.bias.data / float(self.world_size)
+        self.conv = nn.Conv2d(
+            weight_data.shape[1],
+            weight_data.shape[0],
+            conv.kernel_size,
+            conv.stride,
+            conv.padding,
+            conv.dilation,
+            conv.groups,
+            conv.bias is not None,
+            conv.padding_mode,
+        )
+        self.conv.weight = torch.nn.Parameter(weight_data)
+        if conv.bias is not None:
+            self.conv.bias = torch.nn.Parameter(bias_data)
+        del conv
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        return self.conv(input)
+
+
+class TensorParallelOcShardConv2d(TensorParallelConv2d):
+    def __init__(self, conv, rank, world_size):
+        super().__init__(conv, rank, world_size, True)
+
+
+class TensorParallelIcShardConv2d(TensorParallelConv2d):
+    def __init__(self, conv, rank, world_size):
+        super().__init__(conv, rank, world_size, False)
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        out = self.conv(input)
+        if self.world_size > 1:
+            ipex_comm.allreduce_add(out)
+        return out
+
+
+def shard_local_filtering_Conv2d_weights(model, target_m, rank, world_size):
+    if world_size == 1:
+        return
+    for name, sub_m in model.named_children():
+        for l_name, l_sub_m in sub_m.named_children():
+            if l_name in ["conv1"]:
+                TPConv2d = TensorParallelOcShardConv2d(
+                    l_sub_m,
+                    rank,
+                    world_size,
+                )
+                setattr(sub_m, l_name, TPConv2d)
+            if l_name in ["conv2"]:
+                TPConv2d = TensorParallelIcShardConv2d(
+                    l_sub_m,
+                    rank,
+                    world_size,
+                )
+                setattr(sub_m, l_name, TPConv2d)
+        shard_local_filtering_Conv2d_weights(sub_m, target_m, rank, world_size)
+
+
 class TensorParallellLinear(nn.Module):
     def __init__(
         self,
@@ -15,6 +110,7 @@ class TensorParallellLinear(nn.Module):
         world_size,
         shard_by_head,
         shard_by_col,
+        value_with_share_qk=False,
     ):
         super().__init__()
         self.num_kv_heads = num_kv_heads
@@ -25,7 +121,7 @@ class TensorParallellLinear(nn.Module):
         self.shard_by_head = shard_by_head
         self.shard_by_col = shard_by_col
         self.cols_per_rank = None
-        self.shard_weights(linear)
+        self.shard_weights(linear, value_with_share_qk)
 
     def shard_weights_by_head(
         self,
@@ -60,6 +156,15 @@ class TensorParallellLinear(nn.Module):
             if i < num_kv_heads % world_size:
                 kv_head_this_rank += 1
             kv_head_range.append(kv_head_range[-1] + kv_head_this_rank)
+        cols_per_rank = [0]
+        for i in range(world_size):
+            q_head_start = kv_head_range[i] * kv_group_size
+            q_head_end = (
+                q_head_start + (kv_head_range[i + 1] - kv_head_range[i]) * kv_group_size
+            )
+            cols_per_rank.append(
+                cols_per_rank[-1] + (q_head_end - q_head_start) * head_dim
+            )
         weight_data = linear.weight.data
         q_head_start = kv_head_range[rank] * kv_group_size
         q_head_end = (
@@ -75,7 +180,7 @@ class TensorParallellLinear(nn.Module):
         else:
             q = weight_data[:, q_head_start * head_dim : q_head_end * head_dim]
         if not concat_qkv:
-            return torch.nn.Parameter(q), torch.nn.Parameter(q_bias)
+            return torch.nn.Parameter(q), torch.nn.Parameter(q_bias), cols_per_rank
 
         k_head_start = num_heads + kv_head_range[rank]
         k_head_end = k_head_start + (kv_head_range[rank + 1] - kv_head_range[rank])
@@ -98,7 +203,11 @@ class TensorParallellLinear(nn.Module):
             if linear.bias is not None:
                 bias_data = linear.bias.data
         weight_data = torch.cat([q, k, v], dim=0)
-        return torch.nn.Parameter(weight_data), torch.nn.Parameter(bias_data)
+        return (
+            torch.nn.Parameter(weight_data),
+            torch.nn.Parameter(bias_data),
+            None,
+        )
 
     def shard_weights_by_block(
         self, linear, rank, world_size, shard_by_col=True, block_size=64
@@ -138,11 +247,118 @@ class TensorParallellLinear(nn.Module):
             cols_per_rank,
         )
 
-    def shard_weights(self, linear):
+    def shard_value_with_share_qk(
+        self,
+        linear,
+        num_heads,
+        head_dim,
+        rank,
+        world_size,
+        # shard_by_col=True,
+    ):
+
+        total_size = linear.weight.shape[0]
+        if world_size == 1:
+            return
+        assert num_heads % world_size == 0
+        if world_size > num_heads // 2:
+            RuntimeError(
+                f"world_size {world_size} is larger than half of num_heads {num_heads}"
+            )
+        head_per_rank = num_heads // world_size
+        q_head_start = rank * head_per_rank
+        # mapping q_head to v_head
+        v_head_ids = []
+        i = 0
+        # mapping neighbor q_head to v_head
+        while i < head_per_rank:
+            v_head_ids.append(q_head_start // 2)
+            q_head_start += 2
+            i = i + 2
+
+        # mapping neighbor k_head to v_head
+        v_head_ids.extend([i + num_heads // 2 for i in v_head_ids])
+        weight_data = linear.weight.data
+        sharded_weight = []
+        sharded_bias = []
+        for head_id in v_head_ids:
+            sharded_weight.append(
+                weight_data[head_id * head_dim : (head_id + 1) * head_dim]
+            )
+            if linear.bias is not None:
+                sharded_bias.append(
+                    linear.bias.data[head_id * head_dim : (head_id + 1) * head_dim]
+                )
+        sharded_weight = torch.cat(sharded_weight, dim=0)
+        if linear.bias is not None:
+            sharded_bias = torch.cat(sharded_bias, dim=0)
+        else:
+            sharded_bias = None
+        return torch.nn.Parameter(sharded_weight), torch.nn.Parameter(sharded_bias)
+
+    def shard_oproj_with_share_qk(
+        self,
+        linear,
+        num_heads,
+        head_dim,
+        rank,
+        world_size,
+    ):
+
+        total_size = linear.weight.shape[1]
+        if world_size == 1:
+            return
+        assert num_heads % world_size == 0
+        if world_size > num_heads // 2:
+            RuntimeError(
+                f"world_size {world_size} is larger than half of num_heads {num_heads}"
+            )
+        head_per_rank = num_heads // world_size
+        q_head_start = rank * head_per_rank
+        # mapping q_head to v_head
+        v_head_ids = []
+        i = 0
+        # mapping neighbor q_head to v_head
+        while i < head_per_rank:
+            v_head_ids.append(q_head_start // 2)
+            q_head_start += 2
+            i = i + 2
+
+        # mapping neighbor k_head to v_head
+        v_head_ids.extend([i + num_heads // 2 for i in v_head_ids])
+        weight_data = linear.weight.data
+        sharded_weight = []
+        for head_id in v_head_ids:
+            sharded_weight.append(
+                weight_data[:, head_id * head_dim : (head_id + 1) * head_dim]
+            )
+        sharded_weight = torch.cat(sharded_weight, dim=1)
+        if linear.bias is not None:
+            linear.bias = linear.bias / float(world_size)
+        return torch.nn.Parameter(sharded_weight), torch.nn.Parameter(linear.bias)
+
+    def shard_weights(self, linear, value_with_share_qk=False):
         if self.world_size == 1:
             return
-        if self.shard_by_head:
-            weight, bias = self.shard_weights_by_head(
+        if self.shard_by_head and value_with_share_qk:
+            if self.shard_by_col:
+                weight, bias = self.shard_value_with_share_qk(
+                    linear,
+                    self.num_heads,
+                    self.head_dim,
+                    self.rank,
+                    self.world_size,
+                )
+            else:
+                weight, bias = self.shard_oproj_with_share_qk(
+                    linear,
+                    self.num_heads,
+                    self.head_dim,
+                    self.rank,
+                    self.world_size,
+                )
+        elif self.shard_by_head:
+            weight, bias, self.cols_per_rank = self.shard_weights_by_head(
                 linear,
                 self.num_kv_heads,
                 self.num_heads,
@@ -181,6 +397,7 @@ class TensorParallelColumnLinear(TensorParallellLinear):
         rank,
         world_size,
         shard_by_head=True,
+        value_with_share_qk=False,
     ):
         super().__init__(
             linear,
@@ -191,6 +408,7 @@ class TensorParallelColumnLinear(TensorParallellLinear):
             world_size,
             shard_by_head,
             shard_by_col=True,
+            value_with_share_qk=value_with_share_qk,
         )
 
 
@@ -204,6 +422,7 @@ class TensorParallelRowLinear(TensorParallellLinear):
         rank,
         world_size,
         shard_by_head=True,
+        value_with_share_qk=False,
     ):
         super().__init__(
             linear,
@@ -214,6 +433,7 @@ class TensorParallelRowLinear(TensorParallellLinear):
             world_size,
             shard_by_head,
             shard_by_col=False,
+            value_with_share_qk=value_with_share_qk,
         )
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -264,8 +484,18 @@ class TensorParallelLMhead(TensorParallellLinear):
 
 
 def shard_mha_weights(
-    model, target_m, num_heads, num_kv_heads, head_dim, rank, world_size
+    model,
+    target_m,
+    num_heads,
+    num_kv_heads,
+    head_dim,
+    rank,
+    world_size,
+    value_with_share_qk=False,
+    shard_local_filtering=False,
 ):
+    if shard_local_filtering:
+        shard_local_filtering_Conv2d_weights(model, target_m, rank, world_size)
     if world_size == 1:
         return
     for name, sub_m in model.named_children():
@@ -282,8 +512,8 @@ def shard_mha_weights(
                         shard_by_head=True,
                     )
                     # del sub_m.__dict__["_modules"][l_name]
-                    setattr(sub_m, l_name, TPLinear.linear)
-                if l_name in ["k_proj", "v_proj"]:
+                    setattr(sub_m, l_name, TPLinear)
+                if l_name in ["k_proj"]:
                     TPLinear = TensorParallelColumnLinear(
                         l_sub_m,
                         num_kv_heads,
@@ -294,8 +524,21 @@ def shard_mha_weights(
                         shard_by_head=True,
                     )
                     # del sub_m.__dict__["_modules"][l_name]
-                    setattr(sub_m, l_name, TPLinear.linear)
-                if l_name in ["out_proj", "o_proj"]:
+                    setattr(sub_m, l_name, TPLinear)
+                if l_name in ["v_proj"]:
+                    TPLinear = TensorParallelColumnLinear(
+                        l_sub_m,
+                        num_kv_heads,
+                        num_kv_heads,
+                        head_dim,
+                        rank,
+                        world_size,
+                        True,
+                        value_with_share_qk,
+                    )
+                    # del sub_m.__dict__["_modules"][l_name]
+                    setattr(sub_m, l_name, TPLinear)
+                if l_name in ["out_proj"]:
                     TPLinear = TensorParallelRowLinear(
                         l_sub_m,
                         num_kv_heads,
@@ -307,9 +550,29 @@ def shard_mha_weights(
                     )
                     # del sub_m.__dict__["_modules"][l_name]
                     setattr(sub_m, l_name, TPLinear)
+                if l_name in ["o_proj"]:
+                    TPLinear = TensorParallelRowLinear(
+                        l_sub_m,
+                        num_kv_heads,
+                        num_heads,
+                        head_dim,
+                        rank,
+                        world_size,
+                        shard_by_head=True,
+                        value_with_share_qk=True,
+                    )
+                    # del sub_m.__dict__["_modules"][l_name]
+                    setattr(sub_m, l_name, TPLinear)
 
         shard_mha_weights(
-            sub_m, target_m, num_heads, num_kv_heads, head_dim, rank, world_size
+            sub_m,
+            target_m,
+            num_heads,
+            num_kv_heads,
+            head_dim,
+            rank,
+            world_size,
+            value_with_share_qk,
         )
 
 

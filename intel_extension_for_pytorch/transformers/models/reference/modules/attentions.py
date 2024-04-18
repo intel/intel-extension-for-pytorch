@@ -1746,6 +1746,138 @@ def _CLIPAttention_forward(
     return attn_output, attn_weights
 
 
+def _YuanAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    before_hidden_states = None
+    if past_key_value is None:
+        inference_hidden_states_memory = torch.zeros(
+            bsz, 2, hidden_states.shape[2], dtype=hidden_states.dtype
+        )
+        target = hidden_states[:, q_len - 2 :, :]
+        inference_hidden_states_memory[:, -target.shape[1] :, :] = target
+    else:
+        before_hidden_states = past_key_value[-1][0]
+        hidden_states_tmp = before_hidden_states[:, -1:, :]
+        inference_hidden_states_memory = torch.cat(
+            (hidden_states_tmp, hidden_states), dim=1
+        )
+
+    value_states = self.v_proj(hidden_states).view(
+        bsz, q_len, self.num_heads, self.head_dim
+    )
+    if self.use_shareqk:
+        qk_states = self.qk_proj(hidden_states).view(
+            bsz, q_len, self.num_heads * self.head_dim
+        )
+        query_key = qk_states.unsqueeze(2) * self.qk_weight + self.qk_bias
+        query_states, key_states = torch.unbind(query_key, dim=2)
+
+        query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim)
+        key_states = key_states.view(bsz, q_len, self.num_heads, self.head_dim)
+    else:
+        hidden_states = self.lf_gate(hidden_states, before_hidden_states)
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        if self.distributed:
+            import torch.distributed as dist
+
+            world_size = dist.get_world_size()
+            if world_size > 1:
+                query_gather_list = [
+                    torch.zeros_like(query_states) for _ in range(dist.get_world_size())
+                ]
+                key_gather_list = [
+                    torch.zeros_like(key_states) for _ in range(dist.get_world_size())
+                ]
+                dist.all_gather(query_gather_list, query_states)
+                dist.all_gather(key_gather_list, key_states)
+                query_states = torch.cat(query_gather_list, -1)
+                key_states = torch.cat(key_gather_list, -1)
+                qk_states = torch.cat([query_states, key_states], dim=-1)
+                qk_states = qk_states.view(
+                    bsz,
+                    q_len,
+                    self.num_heads * world_size,
+                    int(qk_states.shape[-1] // (self.num_heads * world_size)),
+                )
+                qk_chunk = torch.chunk(qk_states, 2, dim=-1)
+                rank = dist.get_rank()
+                stride = 64 // world_size
+                start = rank * stride
+                end = (rank + 1) * stride
+                query_states = qk_chunk[0][:, :, start:end, :].transpose(1, 2)
+                key_states = qk_chunk[1][:, :, start:end, :].transpose(1, 2)
+            else:
+                qk_states = torch.cat([query_states, key_states], dim=-1)
+                qk_states = qk_states.view(
+                    bsz,
+                    q_len,
+                    self.num_heads,
+                    int(qk_states.shape[-1] // self.num_heads),
+                )
+                (query_states, key_states) = torch.chunk(qk_states, 2, dim=-1)
+                query_states = query_states.transpose(1, 2)
+                key_states = key_states.transpose(1, 2)
+        else:
+            qk_states = torch.cat([query_states, key_states], dim=-1)
+            qk_states = qk_states.view(
+                bsz, q_len, self.num_heads, int(qk_states.shape[-1] // self.num_heads)
+            )
+            (query_states, key_states) = torch.chunk(qk_states, 2, dim=-1)
+
+    kv_seq_len = key_states.shape[-2]
+    if past_key_value is not None:
+        kv_seq_len += past_key_value[0].shape[-2]
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+
+    key_states = self._IPEXROPE(
+        key_states,
+        position_ids,
+        self.num_key_value_heads,
+        self.head_dim,
+        self.head_dim // 2,
+        self.head_dim,
+        kv_seq_len,
+    )
+    query_states = self._IPEXROPE(
+        query_states,
+        position_ids,
+        self.num_heads,
+        self.head_dim,
+        self.head_dim // 2,
+        self.head_dim,
+        kv_seq_len,
+    )
+    (attn_output, attn_weights, present) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        math.sqrt(self.head_dim),
+        past_key_value,
+        None,
+        attention_mask,
+    )
+
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+    # attn_output = self.o_proj(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+    past_key_value = present + (inference_hidden_states_memory.unsqueeze(0),)
+    return attn_output, attn_weights, past_key_value
+
+
 def _create_attention_mask_for_git(
     self, tgt, memory, tgt_mask, past_key_values_length, memory_key_padding_mask=None
 ):
@@ -1816,6 +1948,7 @@ class _IPEXAttentionRef(nn.Module):
             setattr(self.__class__, k, getattr(module.__class__, k))
 
         self.model_backbone = config.architectures[0]
+        self.distributed = distributed
 
         # common known as hidden_size
         if hasattr(module, "hidden_size"):
@@ -2313,6 +2446,16 @@ class _IPEXAttentionRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
+        elif self.model_backbone == "YuanForCausalLM":
+            return _YuanAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2331,6 +2474,20 @@ def _reorder_cache(
             layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
             layer_past[7][layer_past[0].size(-2) - 1] = beam_idx
         return past_key_values
+    elif len(past_key_values[0]) == 5:
+        for layer_past in past_key_values:
+            layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
+            layer_past[-1][0] = layer_past[-1][0].index_select(0, beam_idx)
+        return past_key_values
+    elif len(past_key_values[0]) == 3:
+        return tuple(
+            (
+                layer_past[0].index_select(0, beam_idx),
+                layer_past[1].index_select(0, beam_idx),
+                layer_past[2][0].index_select(0, beam_idx).unsqueeze(0),
+            )
+            for layer_past in past_key_values
+        )
     else:
         return tuple(
             tuple(

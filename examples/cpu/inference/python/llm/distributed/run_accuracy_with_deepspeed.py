@@ -67,6 +67,7 @@ MODEL_CLASSES = {
     "stablelm": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "git": (AutoModelForCausalLM, AutoProcessor),
+    "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

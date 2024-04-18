@@ -53,6 +53,7 @@ MODEL_CLASSES = {
     "stablelm": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "git": (AutoModelForCausalLM, AutoProcessor),
+    "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -145,7 +146,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--weight-dtype",
-    choices=["INT8", "INT4"],
+    choices=["INT8", "INT4", "NF4"],
     default="INT8",
     type=str,
     help="weight data type for weight only quantization. Unrelated to activation data type or lowp-mode.",
@@ -342,7 +343,7 @@ if args.benchmark:
 if model_type in ["llava"]:
     tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_id)
     model.config = config
-elif world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode", "git", "qwen"]:
+elif world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode", "git", "qwen", "yuan"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
@@ -427,9 +428,13 @@ if use_ipex:
     ipex_woq_enabled = args.ipex_weight_only_quantization
     if ipex_woq_enabled:
         from intel_extension_for_pytorch.quantization import WoqWeightDtype
-        weight_dtype = (
-            WoqWeightDtype.INT4 if args.weight_dtype == "INT4" else WoqWeightDtype.INT8
-        )
+        if args.weight_dtype == "INT8":
+            weight_dtype = WoqWeightDtype.INT8
+        elif args.weight_dtype == "INT4":
+            weight_dtype = WoqWeightDtype.INT4
+        else:
+            assert args.weight_dtype == "NF4"
+            weight_dtype = WoqWeightDtype.NF4
         if args.lowp_mode == "INT8":
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
         elif args.lowp_mode == "FP32":
