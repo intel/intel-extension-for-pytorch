@@ -39,6 +39,7 @@ static constexpr int kQueueTypeBits = 3;
 
 // Please keep synchronized with QueueIndex in aten/core/Stream.h
 using QueueIndex = uint8_t;
+static constexpr QueueIndex kInvalidQueueIndex = 0xFF;
 
 enum class QueueType : uint8_t {
   UNUSED = 0x0,
@@ -67,10 +68,13 @@ void dpcppInitQueueStateOnce();
 void dpcppInitDeviceQueueOnce(DeviceIndex device_index);
 
 // Helper to determine the index of the queue to return.
-uint32_t dpcppGetQueueIndex(DeviceIndex device_index);
+uint32_t dpcppAllocQueueIndex(DeviceIndex device_index);
 
 // Retrieve sycl queue reference from the queue pool.
 sycl::queue& dpcppGetRawQueue(DeviceIndex device_index, QueueIndex queue_index);
+
+// Returns queue index for given queue.
+QueueIndex dpcppGetQueueIndex(DeviceId device_index, const sycl::queue& queue);
 
 } // namespace dpcpp
 } // namespace xpu

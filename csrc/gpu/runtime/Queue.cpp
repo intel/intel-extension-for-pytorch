@@ -30,6 +30,8 @@ static std::once_flag init_flag;
 static std::deque<std::once_flag> device_flags;
 static std::vector<std::array<std::unique_ptr<sycl::queue>, kQueuesPerPool>>
     reserved_queues;
+static std::vector<std::unordered_map<sycl::queue, QueueIndex>>
+    queue_to_idx_map;
 static std::deque<std::atomic<uint32_t>> reserved_counters;
 
 } // anonymous namespace
@@ -43,6 +45,7 @@ static void initGlobalQueueState() {
 
   device_flags.resize(num_devices);
   reserved_queues.resize(num_devices);
+  queue_to_idx_map.resize(num_devices);
   reserved_counters.resize(num_devices);
 }
 
@@ -57,6 +60,8 @@ static void initDeviceQueue(DeviceId device_index) {
             dpcppAsyncHandler,
             {sycl::property::queue::in_order(),
              sycl::property::queue::enable_profiling()}));
+    const auto& queue_ptr = reserved_queues[device_index][i];
+    queue_to_idx_map[device_index][*queue_ptr] = i;
   }
 
   reserved_counters[device_index] = 0;
@@ -75,7 +80,7 @@ void dpcppInitDeviceQueueOnce(DeviceId device_index) {
 
 // Helper to determine the index of the queue to return.
 // Note: Queues are returned round-robin (see note in Queue.h)
-uint32_t dpcppGetQueueIndex(DeviceId device_index) {
+uint32_t dpcppAllocQueueIndex(DeviceId device_index) {
   auto raw_idx = reserved_counters[device_index]++;
   return raw_idx % kQueuesPerPool;
 }
@@ -84,6 +89,14 @@ uint32_t dpcppGetQueueIndex(DeviceId device_index) {
 // the corresponding queue from the pool.
 sycl::queue& dpcppGetRawQueue(DeviceId device_index, QueueIndex queue_index) {
   return *reserved_queues[device_index][queue_index];
+}
+
+QueueIndex dpcppGetQueueIndex(DeviceId device_index, const sycl::queue& queue) {
+  auto it = queue_to_idx_map[device_index].find(queue);
+  TORCH_CHECK(
+      it != queue_to_idx_map[device_index].end(),
+      "Queue not found in queue pool");
+  return it->second;
 }
 
 } // namespace dpcpp

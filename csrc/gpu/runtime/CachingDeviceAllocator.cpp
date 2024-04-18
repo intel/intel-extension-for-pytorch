@@ -88,10 +88,10 @@ void CachingDeviceAllocator::update_stat_array(
 
 CachingDeviceAllocator::Block::Block(
     DeviceId device,
-    sycl::queue* queue,
+    QueueIndex queue_idx,
     size_t size)
     : m_device(device),
-      m_queue(queue),
+      m_queue_idx(queue_idx),
       m_queue_uses(),
       m_size(size),
       m_pool_type(PoolType::UNDEF),
@@ -107,12 +107,12 @@ CachingDeviceAllocator::Block::Block(
 
 CachingDeviceAllocator::Block::Block(
     DeviceId device,
-    sycl::queue* queue,
+    QueueIndex queue_idx,
     size_t size,
     PoolType pool_type,
     void* buffer)
     : m_device(device),
-      m_queue(queue),
+      m_queue_idx(queue_idx),
       m_queue_uses(),
       m_size(size),
       m_pool_type(pool_type),
@@ -167,6 +167,21 @@ int CachingDeviceAllocator::malloc_with_retry(
   return DPCPP_SUCCESS;
 }
 
+bool CachingDeviceAllocator::Block::Comparator(const Block* a, const Block* b) {
+  if (a->m_device != b->m_device) {
+    return a->m_device < b->m_device;
+  }
+
+  if (a->m_queue_idx != b->m_queue_idx) {
+    return a->m_queue_idx < b->m_queue_idx;
+  }
+
+  if (a->m_size != b->m_size) {
+    return a->m_size < b->m_size;
+  }
+  return (uintptr_t)a->m_buffer < (uintptr_t)b->m_buffer;
+}
+
 void CachingDeviceAllocator::malloc(
     void** devPtr,
     size_t asize,
@@ -175,6 +190,8 @@ void CachingDeviceAllocator::malloc(
 
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  const QueueIndex queue_idx = dpcppGetQueueIndex(curDevID, *queue);
+
   process_events();
 
   auto size = (asize < kMinBlockSize)
@@ -214,11 +231,11 @@ void CachingDeviceAllocator::malloc(
     pool = &large_blocks;
   }
 
-  Block search_key(curDevID, queue, size);
+  Block search_key(curDevID, queue_idx, size);
   auto find_free_block = [&]() -> Block* {
     auto it = pool->lower_bound(&search_key);
     if (it != pool->end() && (*it)->m_device == curDevID &&
-        *((*it)->m_queue) == *queue) {
+        (*it)->m_queue_idx == queue_idx) {
       Block* block = *it;
       pool->erase(it);
       return block;
@@ -243,7 +260,7 @@ void CachingDeviceAllocator::malloc(
     int err = malloc_with_retry(curDevID, &buffer, alloc_size);
 
     if (err == DPCPP_SUCCESS) {
-      block = new Block(curDevID, queue, alloc_size, pool_type, buffer);
+      block = new Block(curDevID, queue_idx, alloc_size, pool_type, buffer);
       update_stat_array(stats.segment, 1, stat_types);
       update_stat_array(stats.reserved_bytes, alloc_size, stat_types);
     } else {
@@ -278,7 +295,7 @@ void CachingDeviceAllocator::malloc(
   if (block->should_split(size)) {
     remaining = block;
 
-    block = new Block(curDevID, queue, size, pool_type, block->m_buffer);
+    block = new Block(curDevID, queue_idx, size, pool_type, block->m_buffer);
     block->m_prev = remaining->m_prev;
     if (block->m_prev) {
       block->m_prev->m_next = block;
@@ -371,9 +388,16 @@ void CachingDeviceAllocator::recordQueue(void* buffer, sycl::queue* queue) {
 
   Block* block = find_allocated_block(buffer);
   TORCH_INTERNAL_ASSERT(block != nullptr, "No allocated block can be found");
-  if (*queue == *block->m_queue) {
+
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  const sycl::queue& block_queue =
+      dpcppGetRawQueue(curDevID, block->m_queue_idx);
+
+  if (*queue == block_queue) {
     return;
   }
+
   block->m_queue_uses.insert(*queue);
 }
 
@@ -603,8 +627,8 @@ void CachingDeviceAllocator::free_blocks(
 void CachingDeviceAllocator::free_cached_blocks(DeviceId di) {
   synchronize_and_free_events(di);
 
-  Block lower_bound(di, nullptr, 0);
-  Block upper_bound(di + 1, nullptr, 0);
+  Block lower_bound(di, kInvalidQueueIndex, 0);
+  Block upper_bound(di + 1, kInvalidQueueIndex, 0);
 
   /*
    * See Note [Safe to Free Blocks on BlockPool]
