@@ -257,6 +257,9 @@ static void initDeviceProperty(DeviceId device_id) {
   device_prop.single_fp_config = device.get_info<dpcpp_dev_single_fp_config>();
   device_prop.double_fp_config = device.get_info<dpcpp_dev_double_fp_config>();
   device_prop.global_mem_size = device.get_info<dpcpp_dev_global_mem_size>();
+#if (defined(__INTEL_LLVM_COMPILER) && __INTEL_LLVM_COMPILER >= 20240100)
+  device_prop.device_arch = device.get_info<dpcpp_dev_architecture>();
+#endif
   device_prop.global_mem_cache_type =
       device.get_info<dpcpp_dev_global_mem_cache_type>();
   device_prop.global_mem_cache_size =
@@ -353,7 +356,11 @@ static void initDeviceProperty(DeviceId device_id) {
   dev_info.max_num_sub_groups = device_prop.max_num_subgroup;
   dev_info.sub_group_sizes = device_prop.subgroup_sizes;
   dev_info.support_fp64 = device_prop.support_fp64;
-
+#if (defined(__INTEL_LLVM_COMPILER) && __INTEL_LLVM_COMPILER >= 20240100)
+  dev_info.device_arch = static_cast<uint64_t>(device_prop.device_arch);
+#else
+  dev_info.device_arch = (uint64_t)0;
+#endif
   device_info[device_id] = dev_info;
 }
 

@@ -26,6 +26,7 @@ struct DeviceInfo {
   std::string version;
   uint32_t device_id;
   uint64_t global_mem_size;
+  uint64_t device_arch;
   uint32_t max_compute_units;
   uint32_t gpu_eu_count;
   uint32_t gpu_subslice_count;
