@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama3 models &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
+  <title>Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=69107c99" />
@@ -52,14 +52,14 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <!-- Local TOC -->
               <div class="local-toc"><ul>
-<li><a class="reference internal" href="#">Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama3 models</a></li>
+<li><a class="reference internal" href="#">Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models</a></li>
 <li><a class="reference internal" href="#environment-setup">1. Environment Setup</a><ul>
 <li><a class="reference internal" href="#recommended-docker-based-environment-setup-with-pre-built-wheels">1.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels</a></li>
 <li><a class="reference internal" href="#conda-based-environment-setup-with-pre-built-wheels">1.2 Conda-based environment setup with pre-built wheels</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#how-to-run-llama3-with-ipex-llm">2. How To Run Llama3 with ipex.llm</a><ul>
-<li><a class="reference internal" href="#usage-of-running-llama3-models">2.1 Usage of running Llama3 models</a><ul>
+<li><a class="reference internal" href="#how-to-run-llama-3-with-ipex-llm">2. How To Run Llama 3 with ipex.llm</a><ul>
+<li><a class="reference internal" href="#usage-of-running-llama-3-models">2.1 Usage of running Llama 3 models</a><ul>
 <li><a class="reference internal" href="#run-generation-with-one-socket-inference">2.1.1 Run generation with one socket inference</a><ul>
 <li><a class="reference internal" href="#bf16">2.1.1.1 BF16:</a></li>
 <li><a class="reference internal" href="#weight-only-quantization-int8">2.1.1.2 Weight-only quantization (INT8):</a></li>
@@ -94,7 +94,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama3 models</li>
+      <li class="breadcrumb-item active">Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/index.md.txt" rel="nofollow"> View page source</a>
       </li>
@@ -104,9 +104,9 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="intel-extension-for-pytorch-large-language-model-llm-feature-get-started-for-llama3-models">
-<h1>Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama3 models<a class="headerlink" href="#intel-extension-for-pytorch-large-language-model-llm-feature-get-started-for-llama3-models" title="Link to this heading"></a></h1>
-<p>Intel® Extension for PyTorch* provides dedicated optimization for running Llama3 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization, etc. You are welcome to have a try on AWS m7i.metal-48xl instance with Ubuntu 22.04.</p>
+  <section id="intel-extension-for-pytorch-large-language-model-llm-feature-get-started-for-llama-3-models">
+<h1>Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models<a class="headerlink" href="#intel-extension-for-pytorch-large-language-model-llm-feature-get-started-for-llama-3-models" title="Link to this heading"></a></h1>
+<p>Intel® Extension for PyTorch* provides dedicated optimization for running Llama 3 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization, etc. You are welcome to have a try on AWS m7i.metal-48xl instance with Ubuntu 22.04.</p>
 </section>
 <section id="environment-setup">
 <h1>1. Environment Setup<a class="headerlink" href="#environment-setup" title="Link to this heading"></a></h1>
@@ -158,8 +158,8 @@ bash<span class="w"> </span>./tools/env_setup.sh<span class="w"> </span><span cl
 </div>
 <br></section>
 </section>
-<section id="how-to-run-llama3-with-ipex-llm">
-<h1>2. How To Run Llama3 with ipex.llm<a class="headerlink" href="#how-to-run-llama3-with-ipex-llm" title="Link to this heading"></a></h1>
+<section id="how-to-run-llama-3-with-ipex-llm">
+<h1>2. How To Run Llama 3 with ipex.llm<a class="headerlink" href="#how-to-run-llama-3-with-ipex-llm" title="Link to this heading"></a></h1>
 <p><strong>ipex.llm provides a single script to facilitate running generation tasks as below:</strong></p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># if you are using a docker container built from commands above in Sec. 1.1, the placeholder LLM_DIR below is /home/ubuntu/llm</span>
 <span class="c1"># if you are using a conda env created with commands above in Sec. 1.2, the placeholder LLM_DIR below is intel-extension-for-pytorch/examples/cpu/inference/python/llm</span>
@@ -209,9 +209,9 @@ bash<span class="w"> </span>./tools/env_setup.sh<span class="w"> </span><span cl
 </tr>
 </tbody>
 </table><p><em>Note:</em> You may need to log in your HuggingFace account to access the model files. Please refer to <a class="reference external" href="https://huggingface.co/docs/huggingface_hub/quick-start#login">HuggingFace login</a>.</p>
-<section id="usage-of-running-llama3-models">
-<h2>2.1 Usage of running Llama3 models<a class="headerlink" href="#usage-of-running-llama3-models" title="Link to this heading"></a></h2>
-<p>The <em>&lt;LLAMA3_MODEL_ID_OR_LOCAL_PATH&gt;</em> in the below commands specifies the Llama3 model you will run, which can be found from <a class="reference external" href="https://huggingface.co/models">HuggingFace Models</a>.</p>
+<section id="usage-of-running-llama-3-models">
+<h2>2.1 Usage of running Llama 3 models<a class="headerlink" href="#usage-of-running-llama-3-models" title="Link to this heading"></a></h2>
+<p>The <em>&lt;LLAMA3_MODEL_ID_OR_LOCAL_PATH&gt;</em> in the below commands specifies the Llama 3 model you will run, which can be found from <a class="reference external" href="https://huggingface.co/models">HuggingFace Models</a>.</p>
 <section id="run-generation-with-one-socket-inference">
 <h3>2.1.1 Run generation with one socket inference<a class="headerlink" href="#run-generation-with-one-socket-inference" title="Link to this heading"></a></h3>
 <section id="bf16">
@@ -285,7 +285,7 @@ For weight-only quantization with deepspeed, we quantize the model then run the 
 </section>
 <section id="miscellaneous-tips">
 <h2>Miscellaneous Tips<a class="headerlink" href="#miscellaneous-tips" title="Link to this heading"></a></h2>
-<p>Intel® Extension for PyTorch* also provides dedicated optimization for many other Large Language Models (LLM), which cover a set of data types that are supported for various scenarios. For more details, please check this <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/release/2.3/README.md">IPEX doc</a>.</p>
+<p>Intel® Extension for PyTorch* also provides dedicated optimization for many other Large Language Models (LLM), which cover a set of data types that are supported for various scenarios. For more details, please check this <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/release/2.3/README.md">Intel® Extension for PyTorch* doc</a>.</p>
 </section>
 </section>
 
@@ -303,7 +303,7 @@ For weight-only quantization with deepspeed, we quantize the model then run the 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f4946ba0460> 
+   <jinja2.runtime.BlockReference object at 0x7f3596b77550> 
   <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 

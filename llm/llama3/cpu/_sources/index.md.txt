@@ -1,6 +1,6 @@
-# Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama3 models
+# Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models
 
-Intel® Extension for PyTorch* provides dedicated optimization for running Llama3 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization, etc. You are welcome to have a try on AWS m7i.metal-48xl instance with Ubuntu 22.04.
+Intel® Extension for PyTorch* provides dedicated optimization for running Llama 3 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization, etc. You are welcome to have a try on AWS m7i.metal-48xl instance with Ubuntu 22.04.
 
 # 1. Environment Setup
 
@@ -53,7 +53,7 @@ source ./tools/env_activate.sh
 ```
 <br>
 
-# 2. How To Run Llama3 with ipex.llm
+# 2. How To Run Llama 3 with ipex.llm
 
 **ipex.llm provides a single script to facilitate running generation tasks as below:**
 
@@ -77,9 +77,9 @@ python run.py --help # for more detailed usages
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
-## 2.1 Usage of running Llama3 models
+## 2.1 Usage of running Llama 3 models
 
-The _\<LLAMA3_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Llama3 model you will run, which can be found from [HuggingFace Models](https://huggingface.co/models).
+The _\<LLAMA3_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Llama 3 model you will run, which can be found from [HuggingFace Models](https://huggingface.co/models).
 
 ### 2.1.1 Run generation with one socket inference
 #### 2.1.1.1 BF16:
@@ -148,4 +148,4 @@ python create_shard_model.py -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH>  --save-path ./l
 ```
 
 ## Miscellaneous Tips
-Intel® Extension for PyTorch* also provides dedicated optimization for many other Large Language Models (LLM), which cover a set of data types that are supported for various scenarios. For more details, please check this [IPEX doc](https://github.com/intel/intel-extension-for-pytorch/blob/release/2.3/README.md).
+Intel® Extension for PyTorch* also provides dedicated optimization for many other Large Language Models (LLM), which cover a set of data types that are supported for various scenarios. For more details, please check this [Intel® Extension for PyTorch* doc](https://github.com/intel/intel-extension-for-pytorch/blob/release/2.3/README.md).
