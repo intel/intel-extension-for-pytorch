@@ -111,6 +111,12 @@ def is_available() -> bool:
     return device_count() > 0
 
 
+def is_bf16_supported() -> bool:
+    r"""Returns a bool indicating if the current xpu device supports dtype bfloat16"""
+    # currently, add device support bf16 dtype
+    return True
+
+
 class _DeviceGuard:
     def __init__(self, index: int):
         self.idx = index
