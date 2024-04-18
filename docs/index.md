@@ -1,4 +1,4 @@
-# Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models
+# Intel® Extension for PyTorch\* Large Language Model (LLM) Feature Get Started For Llama 3 models
 
 Intel® Extension for PyTorch* provides dedicated optimization for running Llama 3 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization, etc. You are welcome to have a try on AWS m7i.metal-48xl instance with Ubuntu 22.04.
 
