@@ -131,7 +131,7 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
             is_decoder=False,
             do_norm_before=None,
             ln_elementwise_affine=None,
-            positional_embedding_base=10000,
+            positional_embedding_base=self.config.rope_theta,
             device=self.device,
             dtype=dtype,
             impl=impl_mode,
