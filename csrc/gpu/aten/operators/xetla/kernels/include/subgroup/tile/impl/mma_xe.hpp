@@ -38,7 +38,7 @@ struct tile_mma_t<
     matA_t_,
     mma_engine::xmx,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<arch_has_xmx(arch_tag_)>> {
   using matA_t = matA_t_;
   using matB_t = matB_t_;
   using matSrc_t = matAcc_src_t_;

@@ -109,11 +109,11 @@ class fmha_backward_t {
           uH(head_size),
           uF(num_queries),
           uT(num_keys),
-          uMT(attn_mask_padded_block_size),
-          sm_scale(sm_scale),
           bias_strideB(bias_strideB),
           bias_strideN(bias_strideN),
           bias_strideF(bias_strideF),
+          uMT(attn_mask_padded_block_size),
+          sm_scale(sm_scale),
           seed(seed),
           offset(offset),
           is_bias_add(bias_strideF == 0) {}

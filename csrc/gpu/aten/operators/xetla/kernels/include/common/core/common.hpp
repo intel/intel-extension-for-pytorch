@@ -72,8 +72,13 @@ __XETLA_API int32_t xetla_get_subdevice_id() {
 namespace gpu::xetla {
 
 enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2 };
+
 inline constexpr bool arch_has_xmx(gpu_arch arch) {
   return arch >= gpu_arch::XeHpg;
+}
+
+inline constexpr bool arch_has_2d_load_store(gpu_arch arch) {
+  return arch >= gpu_arch::XeHpc;
 }
 
 enum class grf_mode : uint8_t { normal = 0, double_grf = 1 };

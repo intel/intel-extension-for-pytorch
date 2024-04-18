@@ -28,6 +28,7 @@ namespace gpu::xetla {
 
 template <msg_type message_type, gpu_arch arch_tag>
 struct load_store_attr_t {};
+
 template <>
 struct load_store_attr_t<msg_type::block_2d, gpu_arch::XeHpc> {
   /// HW limitation checks https://gfxspecs.intel.com/Predator/Home/Index/55490
@@ -75,11 +76,18 @@ struct load_store_attr_t<msg_type::block_2d, gpu_arch::XeHpg>
     : public client_load_store_attr_base_t<
           msg_type::block_2d,
           gpu_arch::XeHpg> {};
+
 template <>
 struct load_store_attr_t<msg_type::block_2d, gpu_arch::XeLpg>
     : public client_load_store_attr_base_t<
           msg_type::block_2d,
           gpu_arch::XeLpg> {};
+
+template <gpu_arch arch_tag>
+struct load_store_attr_t<msg_type::block_1d, arch_tag> {
+  static constexpr uint32_t max_load_vec_len = 64;
+  static constexpr uint32_t max_store_vec_len = 64;
+};
 
 template <gpu_arch arch_tag>
 struct mma_attr_t {};
