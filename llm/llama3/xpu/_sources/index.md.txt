@@ -51,7 +51,7 @@ pip install accelerate datasets diffusers
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
 git checkout dev/llama-int4
-cd intel-extension-for-pytorch/examples/gpu/inference/python/llm
+cd examples/gpu/inference/python/llm
 ```
 
 | Key args of run_generation_gpu_woq_for_llama.py | Notes |
