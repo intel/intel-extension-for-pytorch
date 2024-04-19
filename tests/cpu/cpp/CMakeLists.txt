@@ -69,5 +69,13 @@ target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC c10)
 # Link IPEX
 target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC intel-ext-pt-cpu)
 
+find_package(PythonLibs)
+if(${PYTHONLIBS_FOUND})
+  target_link_libraries(${CPU_CPP_TEST_NAME} PUBLIC ${PYTHON_LIBRARIES})
+endif()
+
+find_library(TORCH_PYTHON_LIBRARY torch_python PATH "${TORCH_INSTALL_PREFIX}/lib")
+target_link_libraries(${CPU_CPP_TEST_NAME}  PRIVATE ${TORCH_LIBRARIES} ${TORCH_PYTHON_LIBRARY})
+
 install(TARGETS ${CPU_CPP_TEST_NAME}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

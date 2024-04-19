@@ -18,7 +18,8 @@ at::Tensor mixtral_moe_tpp(
     const at::Tensor& down_wei,
     bool tpp_fallback,
     const at::Tensor& routing_weights,
-    at::Tensor& output) {
+    at::Tensor& output,
+    bool is_distributed) {
   RECORD_FUNCTION("ipex::mixtral_moe_tpp", c10::ArrayRef<c10::IValue>({}));
 
   if (top_x.sizes()[0] == 0)
@@ -33,7 +34,8 @@ at::Tensor mixtral_moe_tpp(
       down_wei,
       tpp_fallback,
       routing_weights,
-      output);
+      output,
+      is_distributed);
 }
 
 at::Tensor mixtral_moe(
@@ -48,7 +50,8 @@ at::Tensor mixtral_moe(
     const at::Tensor& down_op_ctx,
     bool use_dnnl,
     const at::Tensor& routing_weights,
-    at::Tensor& output) {
+    at::Tensor& output,
+    bool is_distributed) {
   RECORD_FUNCTION("ipex::mixtral_moe", c10::ArrayRef<c10::IValue>({}));
 
   if (top_x.sizes()[0] == 0)
@@ -66,7 +69,8 @@ at::Tensor mixtral_moe(
       down_op_ctx,
       use_dnnl,
       routing_weights,
-      output);
+      output,
+      is_distributed);
 }
 at::Tensor mixtral_moe_woq(
     const at::Tensor& hidden_states,
@@ -76,7 +80,8 @@ at::Tensor mixtral_moe_woq(
     const at::Tensor& up_wei,
     const at::Tensor& down_wei,
     const at::Tensor& routing_weights,
-    at::Tensor& output) {
+    at::Tensor& output,
+    bool is_distributed) {
   RECORD_FUNCTION("ipex::mixtral_moe_woq", c10::ArrayRef<c10::IValue>({}));
 
   if (top_x.sizes()[0] == 0)
@@ -90,7 +95,8 @@ at::Tensor mixtral_moe_woq(
       up_wei,
       down_wei,
       routing_weights,
-      output);
+      output,
+      is_distributed);
 }
 } // namespace cpu
 } // namespace torch_ipex
@@ -101,7 +107,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "mixtral_moe_tpp(Tensor hidden_states, Tensor top_x, Tensor idx, Tensor gate_wei, \
       Tensor up_wei, Tensor down_wei, bool tpp_fallback, Tensor routing_weights, \
-      Tensor output) -> Tensor");
+      Tensor output, bool is_distributed) -> Tensor");
   m.impl(
       "mixtral_moe_tpp",
       c10::DispatchKey::CPU,
@@ -109,11 +115,11 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "mixtral_moe(Tensor hidden_states, Tensor top_x, Tensor idx, Tensor gate_wei, \
       Tensor gate_op_ctx, Tensor up_wei, Tensor up_op_ctx, Tensor down_wei, \
-      Tensor down_op_ctx, bool use_dnnl, Tensor routing_weights, Tensor output) -> Tensor");
+      Tensor down_op_ctx, bool use_dnnl, Tensor routing_weights, Tensor output, bool is_distributed) -> Tensor");
   m.impl("mixtral_moe", c10::DispatchKey::CPU, torch_ipex::cpu::mixtral_moe);
   m.def(
       "mixtral_moe_woq(Tensor hidden_states, Tensor top_x, Tensor idx, Tensor gate_wei, \
-      Tensor up_wei, Tensor down_wei, Tensor routing_weights, Tensor output) -> Tensor");
+      Tensor up_wei, Tensor down_wei, Tensor routing_weights, Tensor output, bool is_distributed) -> Tensor");
   m.impl(
       "mixtral_moe_woq",
       c10::DispatchKey::CPU,
