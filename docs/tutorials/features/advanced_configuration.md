@@ -25,6 +25,12 @@ The following launch options are supported in Intel® Extension for PyTorch\*. U
 | **Launch Option<br>Experimental** | **Default<br>Value** | **Description** |
 | ------ | ------ | ------ |
 
+| **Distributed Option<br>GPU ONLY** | **Default<br>Value** | **Description** |
+| ------ | ------ | ------ |
+| TORCH_LLM_ALLREDUCE | 0 | This is a prototype feature to provide better scale-up performance by enabling optimized collective algorithms in oneCCL and asynchronous execution in torch-ccl. This feature requires XeLink enabled for cross-cards communication. By default, this feature is not enabled with setting 0. |
+| CCL_BLOCKING_WAIT | 0 | This is a prototype feature to control over whether collectives execution on XPU is host blocking or non-blocking. By default, setting 0 enables blocking behavior. |
+| CCL_SAME_STREAM | 0 | This is a prototype feature to allow using a computation stream as communication stream to minimize overhead for streams synchronization. By default, setting 0 uses separate streams for communication. |
+
 For above launch options which can be configured to 1 or 0, users can configure them to ON or OFF also, while ON equals to 1 and OFF equals to 0.
 
 Examples to configure the launch options:</br>
