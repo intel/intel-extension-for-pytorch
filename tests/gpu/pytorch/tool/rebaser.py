@@ -297,7 +297,7 @@ def main():
         f"Source directory of Intel® Extension for PyTorch*'s"
         f" pytorch tests does not exist."
         f" Please re-check --ipex-dir flag.\nError directory: "
-        f"{ipex_root_dir}"
+        f"{ipex_test_dir}"
     )
     target_test_dir = args.target_dir if args.target_dir is not None else ipex_test_dir
 
