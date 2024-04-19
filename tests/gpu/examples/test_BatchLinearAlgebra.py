@@ -273,7 +273,7 @@ class TestTorchMethod(TestCase):
                 print("A = ", A_xpu.cpu())
                 print("Q = ", q_xpu.cpu())
                 print("R = ", r_xpu.cpu())
-                if not A_cpu.is_complex:
+                if not A_xpu.is_complex:
                     _validate(A_xpu, q_xpu, r_xpu)
 
                 self.assertEqual(r_cpu, r_xpu, rtol=1.3e-6, atol=5e-5)

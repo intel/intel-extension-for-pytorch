@@ -701,7 +701,7 @@ for test_param in supported_tests:
         raise RuntimeError('Found two tests with the same name: ' + test_name)
     test_name_multi_input = test.get_name() + "_multiple_inputs"
     if hasattr(TestExpandedWeightModule, test_name_multi_input):
-        raise RuntimeError('Found two tests with the same name: ' + test_name)
+        raise RuntimeError('Found two tests with the same name: ' + test_name_multi_input)
     if decorator is not None:
         fn = decorator(fn)
     if test.test_cpu:
