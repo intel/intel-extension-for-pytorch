@@ -14,7 +14,8 @@ at::Tensor mixtral_moe_tpp(
     const at::Tensor&,
     bool,
     const at::Tensor&,
-    at::Tensor&);
+    at::Tensor&,
+    bool);
 at::Tensor mixtral_moe_woq(
     const at::Tensor&,
     const at::Tensor&,
@@ -23,7 +24,8 @@ at::Tensor mixtral_moe_woq(
     const at::Tensor&,
     const at::Tensor&,
     const at::Tensor&,
-    at::Tensor&);
+    at::Tensor&,
+    bool);
 at::Tensor mixtral_moe(
     const at::Tensor&,
     const at::Tensor&,
@@ -36,7 +38,8 @@ at::Tensor mixtral_moe(
     const at::Tensor&,
     bool,
     const at::Tensor&,
-    at::Tensor&);
+    at::Tensor&,
+    bool);
 using mixtral_moe_tpp_kernel_fn = at::Tensor (*)(
     const at::Tensor& hidden_states,
     const at::Tensor& top_x,
@@ -46,7 +49,8 @@ using mixtral_moe_tpp_kernel_fn = at::Tensor (*)(
     const at::Tensor& down_wei,
     bool tpp_fallback,
     const at::Tensor& routing_weights,
-    at::Tensor& output);
+    at::Tensor& output,
+    bool is_distributed);
 using mixtral_moe_woq_kernel_fn = at::Tensor (*)(
     const at::Tensor& hidden_states,
     const at::Tensor& top_x,
@@ -55,7 +59,8 @@ using mixtral_moe_woq_kernel_fn = at::Tensor (*)(
     const at::Tensor& up_wei,
     const at::Tensor& down_wei,
     const at::Tensor& routing_weights,
-    at::Tensor& output);
+    at::Tensor& output,
+    bool is_distributed);
 using mixtral_moe_kernel_fn = at::Tensor (*)(
     const at::Tensor& hidden_states,
     const at::Tensor& top_x,
@@ -68,7 +73,8 @@ using mixtral_moe_kernel_fn = at::Tensor (*)(
     const at::Tensor& down_op_ctx,
     bool use_dnnl,
     const at::Tensor& routing_weights,
-    at::Tensor& output);
+    at::Tensor& output,
+    bool is_distributed);
 IPEX_DECLARE_DISPATCH(mixtral_moe_tpp_kernel_fn, mixtral_moe_tpp_kernel_stub);
 IPEX_DECLARE_DISPATCH(mixtral_moe_woq_kernel_fn, mixtral_moe_woq_kernel_stub);
 IPEX_DECLARE_DISPATCH(mixtral_moe_kernel_fn, mixtral_moe_kernel_stub);

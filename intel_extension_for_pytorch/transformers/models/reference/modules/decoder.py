@@ -789,6 +789,7 @@ def MixtralDecoderLayer_forward(
                 expert_layer.w2._op_context.get_data_handle(),
                 routing_weights,
                 final_hidden_states,
+                self.distributed,
             )
         elif hasattr(expert_layer.w1, "use_dnnl") and expert_layer.w1.use_dnnl:
             final_hidden_states = torch.ops.torch_ipex.mixtral_moe(
@@ -804,6 +805,7 @@ def MixtralDecoderLayer_forward(
                 hasattr(expert_layer.w1, "use_dnnl") and expert_layer.w1.use_dnnl,
                 routing_weights,
                 final_hidden_states,
+                self.distributed,
             )
         else:
             final_hidden_states = torch.ops.torch_ipex.mixtral_moe_tpp(
@@ -820,6 +822,7 @@ def MixtralDecoderLayer_forward(
                 ),
                 routing_weights,
                 final_hidden_states,
+                self.distributed,
             )
     final_hidden_states = final_hidden_states.reshape(
         batch_size, sequence_length, hidden_dim
