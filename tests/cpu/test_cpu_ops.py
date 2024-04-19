@@ -1483,6 +1483,37 @@ class CPUOPsTester(TestCase):
                         math_ref = math_ref.to(dtype)
                     torch.testing.assert_close(actual, math_ref, atol=atol, rtol=rtol)
 
+    def test_flash_attention_stride0(self):
+        input_shape = (
+            1,
+            16,
+            1,
+            48,
+        )
+        input_stride = (
+            0,
+            48,
+            0,
+            1,
+        )
+        q = torch.randn(
+            input_shape, device="cpu", dtype=torch.float32, requires_grad=False
+        ).as_strided(input_shape, input_stride)
+        k = torch.randn(
+            input_shape, device="cpu", dtype=torch.float32, requires_grad=False
+        ).as_strided(input_shape, input_stride)
+        v = torch.randn(
+            input_shape, device="cpu", dtype=torch.float32, requires_grad=False
+        ).as_strided(input_shape, input_stride)
+        atol = 1e-5
+        rtol = 5e-6
+        q2 = q.clone()
+        k2 = k.clone()
+        v2 = v.clone()
+        actual = torch.ops.torch_ipex.flash_attention(q, k, v)[0]
+        math_ref = torch._scaled_dot_product_attention_math(q2, k2, v2)[0]
+        torch.testing.assert_close(actual, math_ref, atol=1e-5, rtol=5e-6)
+
 
 if __name__ == "__main__":
     test = unittest.main()
