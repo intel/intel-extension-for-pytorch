@@ -28,7 +28,7 @@ call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
 pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/xpu/torch-2.1.0a0%2Bgit04048c2-cp39-cp39-win_amd64.whl
 
 # Install Intel® Extension for PyTorch*
-pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/xpu/intel_extension_for_pytorch-2.1.30%2Bgit03c5535-cp39-cp39-win_amd64.whl
+pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/xpu/intel_extension_for_pytorch-2.1.30%2Bgit6661060-cp39-cp39-win_amd64.whl
 
 # Install Intel® Extension for Transformers*
 git clone https://github.com/intel/intel-extension-for-transformers.git intel-extension-for-transformers -b xpu_lm_head 
@@ -121,8 +121,14 @@ python run_generation_gpu_woq_for_llama.py --model ${PATH/TO/MODEL} --benchmark 
 - Command:
 ```bash
 set LLM_ACC_TEST=1 
+python run_generation_gpu_woq_for_llama.py --model ${PATH/TO/MODEL} --accuracy --task "openbookqa"
 python run_generation_gpu_woq_for_llama.py --model ${PATH/TO/MODEL} --accuracy --task "piqa"
+python run_generation_gpu_woq_for_llama.py --model ${PATH/TO/MODEL} --accuracy --task "rte"
+python run_generation_gpu_woq_for_llama.py --model ${PATH/TO/MODEL} --accuracy --task "truthfulqa_mc1"
+
 *Note:* replace ${PATH/TO/MODEL} with actual Llama 3 INT4 model local path
+*Note:* you may validate the Llama 3 WOQ INT4 accuracy using any task listed above, such as the first command with "openbookqa" only,
+or validate all of them, depending on your needs. Please expect more time needed for executing more than one task.
 ```
 
 ## Miscellaneous Tips
