@@ -1,6 +1,6 @@
 # Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Llama 3 models
 
-Intel® Extension for PyTorch* provides dedicated optimization for running Llama 3 models on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, including weight-only quantization (WOQ), Rotary Position Embedding fusion, etc. You are welcomed to have a try with these optimizations on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics.
+Intel® Extension for PyTorch* provides dedicated optimization for running Llama 3 models on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, including weight-only quantization (WOQ), Rotary Position Embedding fusion, etc. You are welcomed to have a try with these optimizations on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics. This document shows how to run Llama 3 with a preview version of Intel® Extension for PyTorch*.
 
 # 1. Environment Setup
 
@@ -126,4 +126,4 @@ python run_generation_gpu_woq_for_llama.py --model ${PATH/TO/MODEL} --accuracy -
 ```
 
 ## Miscellaneous Tips
-Intel® Extension for PyTorch* also provides dedicated optimization for many other Large Language Models (LLM), which covers a set of data types for supporting various scenarios. For more details, please check [Large Language Models (LLM) Optimizations Overview](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/llm.html).
+Intel® Extension for PyTorch* also provides dedicated optimization for many other Large Language Models (LLM), which covers a set of data types for supporting various scenarios. For more details, please check [Large Language Models (LLM) Optimizations Overview](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/llm.html). To replicate Llama 3 performance numbers on Intel ARC A770, please take advantage of [IPEX-LLM](https://github.com/intel-analytics/ipex-llm).
