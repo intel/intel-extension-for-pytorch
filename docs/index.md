@@ -4,7 +4,7 @@ Intel® Extension for PyTorch* provides dedicated optimization for running Llama
 
 # 1. Environment Setup
 
-## 1.1 Conda-based environment setup with pre-built wheels on Windows 11 Home
+## 1.1 Conda-based environment setup with pre-built wheels on Windows 11
 
 ```bash
 # Install Visual Studio 2022
@@ -107,7 +107,7 @@ python run_generation_gpu_woq.py \
 
 The int4 model is saved in folder ~/llama3_all_int4.
 
-### 2.1.2 Measure Llama 3 WOQ INT4 Performance on Windows 11 Home
+### 2.1.2 Measure Llama 3 WOQ INT4 Performance on Windows 11
 
 - Command:
 ```bash
@@ -116,7 +116,7 @@ python run_generation_gpu_woq_for_llama.py --model ${PATH/TO/MODEL} --benchmark 
 *Note:* replace ${PATH/TO/MODEL} with actual Llama 3 INT4 model local path
 ```
 
-### 2.1.3 Validate Llama 3 WOQ INT4 Accuracy on Windows 11 Home
+### 2.1.3 Validate Llama 3 WOQ INT4 Accuracy on Windows 11
 
 - Command:
 ```bash
