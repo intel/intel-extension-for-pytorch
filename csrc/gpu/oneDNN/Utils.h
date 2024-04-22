@@ -641,13 +641,16 @@ static inline int get_memory_layout_for_conv(
     const at::Tensor& src,
     const at::Tensor& weight,
     bool is_transpose) {
+  DeviceIndex curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+
   if (!src.defined() || src.is_sparse()) {
     // suggest channels_first
     return MEMORY_LAYOUT_FOR_CONV::ChannelsFirst;
   }
 
   if (is_transpose || src.is_quantized() || weight.is_quantized() ||
-      (!dpcppSupportFP64())) {
+      (!Settings::I().has_2d_block_array(curDevID))) {
     if (Settings::I().is_onednn_layout_enabled()) {
       // suggest blocked
       return MEMORY_LAYOUT_FOR_CONV::Blocked;
@@ -663,7 +666,8 @@ static inline int get_memory_layout_for_conv(
 
   // inference workloads on ATSM platform, the conv will use blocked format
   // used double support to distinguish is atsm or not
-  auto suggest_block_format = !dpcppSupportFP64() // on ATSM platform
+  auto suggest_block_format =
+      !Settings::I().has_2d_block_array(curDevID) // on ATSM platform
       && (c10::InferenceMode::is_enabled() ||
           !at::GradMode::is_enabled()); // for inference workload
   if (suggest_block_format) {
