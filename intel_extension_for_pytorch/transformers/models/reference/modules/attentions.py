@@ -2052,22 +2052,26 @@ class _IPEXAttentionRef(nn.Module):
             "StableLmForCausalLM",
             "LlavaLlamaForCausalLM",
         ]:
+            supported_linear_types = [
+                torch.nn.Linear,
+                WeightOnlyQuantizedLinear,
+            ]
+            try:
+                import deepspeed
+
+                supported_linear_types.append(
+                    deepspeed.module_inject.layers.LinearLayer
+                )
+            except ImportError:
+                pass
+            supported_linear_types = tuple(supported_linear_types)
             if (
                 hasattr(module, "q_proj")
                 and hasattr(module, "k_proj")
                 and hasattr(module, "v_proj")
-                and (
-                    isinstance(module.q_proj, torch.nn.Linear)
-                    or isinstance(module.q_proj, WeightOnlyQuantizedLinear)
-                )
-                and (
-                    isinstance(module.k_proj, torch.nn.Linear)
-                    or isinstance(module.k_proj, WeightOnlyQuantizedLinear)
-                )
-                and (
-                    isinstance(module.v_proj, torch.nn.Linear)
-                    or isinstance(module.v_proj, WeightOnlyQuantizedLinear)
-                )
+                and (isinstance(module.q_proj, supported_linear_types))
+                and (isinstance(module.k_proj, supported_linear_types))
+                and (isinstance(module.v_proj, supported_linear_types))
             ) and not (hasattr(self, "use_qk_layernorm") and self.use_qk_layernorm):
                 # we support MHA, GQA, MQA for concat linear
                 self.concat_qkv = _IPEXConcatLinearRef(

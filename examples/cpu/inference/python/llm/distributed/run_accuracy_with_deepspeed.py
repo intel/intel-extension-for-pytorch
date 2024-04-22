@@ -129,7 +129,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--weight-dtype",
-    choices=["INT8", "INT4"],
+    choices=["INT8", "INT4", "NF4"],
     default="INT8",
     type=str,
     help="weight data type for weight only quantization. Unrelated to activation data type or lowp-mode.",
@@ -290,6 +290,8 @@ class HuggingFaceModel(BaseLM):
         def get_repo_root(model_name_or_path):
             if os.path.exists(model_name_or_path):
                 # local path
+                # use absolute path here to avoid path error in deepspeed
+                model_name_or_path = os.path.abspath(model_name_or_path)
                 return model_name_or_path
             # checks if online or not
             if is_offline_mode():
@@ -355,9 +357,13 @@ class HuggingFaceModel(BaseLM):
             ipex_woq_enabled = args.ipex_weight_only_quantization
             if ipex_woq_enabled:
                 from intel_extension_for_pytorch.quantization import WoqWeightDtype
-                weight_dtype = (
-                    WoqWeightDtype.INT4 if args.weight_dtype == "INT4" else WoqWeightDtype.INT8
-                )
+                if args.weight_dtype == "INT8":
+                    weight_dtype = WoqWeightDtype.INT8
+                elif args.weight_dtype == "INT4":
+                    weight_dtype = WoqWeightDtype.INT4
+                else:
+                    assert args.weight_dtype == "NF4"
+                    weight_dtype = WoqWeightDtype.NF4
 
                 if args.lowp_mode == "INT8":
                     lowp_mode = ipex.quantization.WoqLowpMode.INT8
