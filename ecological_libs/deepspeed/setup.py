@@ -6,6 +6,7 @@ from setuptools import setup
 
 PACKAGE_NAME = "intel_extension_for_pytorch_deepspeed"
 
+
 @lru_cache(maxsize=128)
 def _get_build_target():
     build_target = ""
@@ -20,12 +21,14 @@ def _get_build_target():
             build_target = "python"
     return build_target
 
+
 if _get_build_target() in ["develop", "python", "bdist_wheel"]:
     try:
         import intel_extension_for_pytorch
         from torch.xpu.cpp_extension import DPCPPExtension, DpcppBuildExtension
     except ImportError as e:
         raise RuntimeError("Fail to import intel_extension_for_pytorch!")
+
 
 def get_version_num():
     versions = {}
@@ -46,6 +49,7 @@ def get_version_num():
         + versions["VERSION_PATCH"]
     )
     return version
+
 
 def get_build_version():
     ipex_ds_version = get_version_num()
@@ -139,11 +143,23 @@ def _build_installation_dependency():
     return install_requires
 
 
+def check_onemkl():
+    if os.getenv("MKLROOT"):
+        return True
+    elif os.getenv("MKL_ROOT"):
+        return True
+    else:
+        return False
+
+
 ext_modules = []
 cmdclass = {}
 if _get_build_target() in ["develop", "python", "bdist_wheel"]:
-    ext_modules += create_ext_modules()
-    cmdclass["build_ext"] = DpcppBuildExtension
+    if check_onemkl():
+        ext_modules += create_ext_modules()
+        cmdclass["build_ext"] = DpcppBuildExtension
+    else:
+        raise OSError("MKLROOT is not set. Please source oneAPI MKL environment variables.")
 
 long_description = ""
 this_directory = os.path.abspath(os.path.dirname(__file__))

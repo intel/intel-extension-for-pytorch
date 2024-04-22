@@ -1525,6 +1525,8 @@ def _get_dpcpp_root():
 def _get_onemkl_root():
     # TODO: Need to decouple with toolchain env scripts
     path = os.getenv("MKLROOT")
+    if path is None:
+        path = os.getenv("MKL_ROOT")
     return path
 
 
