@@ -12,6 +12,7 @@ from intel_extension_for_pytorch.transformers import (
     update_heads_info,
     TensorParallelRowLinear,
     TensorParallelLMhead,
+    TensorParallelConv2d,
 )
 from intel_extension_for_pytorch.cpu import comm as ipex_comm
 
@@ -31,21 +32,42 @@ torch.manual_seed(128)
 
 curpath = os.path.abspath(os.path.dirname(__file__))
 
+from hf_configs.yuan.yuan_hf_model import YuanForCausalLM
+from hf_configs.phi.modeling_phi import PhiForCausalLM
+
 
 class TensorParallelTester(TestCase):
     def _shard_model(self, model):
         rank = ipex_comm.get_rank()
         world_size = ipex_comm.get_world_size()
-        for supported_mha_class in [
+        supported_mha_classes = [
             transformers.models.llama.modeling_llama.LlamaAttention,
             transformers.models.gptj.modeling_gptj.GPTJAttention,
-        ]:
+        ]
+        supported_mlp_classes = [
+            transformers.models.llama.modeling_llama.LlamaMLP,
+            transformers.models.gptj.modeling_gptj.GPTJMLP,
+        ]
+        supported_model_classes = [
+            transformers.models.llama.modeling_llama.LlamaForCausalLM,
+            transformers.models.gptj.modeling_gptj.GPTJForCausalLM,
+        ]
+        yuan_attention = None
+        if isinstance(model, YuanForCausalLM):
+            yuan_attention = type(model.model.layers[0].self_attn)
+        if isinstance(model, YuanForCausalLM) or isinstance(model, PhiForCausalLM):
+            supported_mha_classes.append(type(model.model.layers[0].self_attn))
+            supported_mlp_classes.append(type(model.model.layers[0].mlp))
+            supported_model_classes.append(type(model))
+        for supported_mha_class in supported_mha_classes:
             num_heads = model.config.num_attention_heads
             num_kv_heads = num_heads
             for name in ["num_key_value_heads"]:
                 if hasattr(model.config, name):
                     num_kv_heads = getattr(model.config, name)
             head_dim = model.config.hidden_size // num_heads
+            value_with_share_qk = supported_mha_class == yuan_attention
+            shard_local_filtering = supported_mha_class == yuan_attention
             shard_mha_weights(
                 model,
                 supported_mha_class,
@@ -54,11 +76,10 @@ class TensorParallelTester(TestCase):
                 head_dim,
                 rank,
                 world_size,
+                value_with_share_qk,
+                shard_local_filtering,
             )
-        for supported_mlp_class in [
-            transformers.models.llama.modeling_llama.LlamaMLP,
-            transformers.models.gptj.modeling_gptj.GPTJMLP,
-        ]:
+        for supported_mlp_class in supported_mlp_classes:
             shard_mlp_weights(
                 model,
                 supported_mlp_class,
@@ -68,14 +89,11 @@ class TensorParallelTester(TestCase):
                 rank,
                 world_size,
             )
-        for supported_model_calss in [
-            transformers.models.llama.modeling_llama.LlamaForCausalLM,
-            transformers.models.gptj.modeling_gptj.GPTJForCausalLM,
-        ]:
-            if isinstance(model, supported_model_calss):
+        for supported_model_class in supported_model_classes:
+            if isinstance(model, supported_model_class):
                 shard_lm_head_weights(
                     model,
-                    supported_model_calss,
+                    supported_model_class,
                     num_heads,
                     num_kv_heads,
                     head_dim,
@@ -134,6 +152,52 @@ class TensorParallelTester(TestCase):
         )
         self.assertTrue(
             isinstance(tp_model.model.layers[0].mlp.down_proj, TensorParallelRowLinear)
+        )
+        self.assertTrue(isinstance(tp_model.lm_head, TensorParallelLMhead))
+        self.assertTrue(tp_model.lm_head, TensorParallelLMhead)
+        self.tensor_parallel_with_optimize_transformers(model)
+
+    def test_tensor_parallel_replace_check_yuan(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/yuan", return_dict=False, trust_remote_code=True
+        )
+        model = YuanForCausalLM(config).eval()
+        tp_model = self._shard_model(copy.deepcopy(model))
+        self.assertTrue(
+            isinstance(
+                tp_model.model.layers[0].self_attn.o_proj, TensorParallelRowLinear
+            )
+        )
+        self.assertTrue(
+            isinstance(tp_model.model.layers[0].mlp.down_proj, TensorParallelRowLinear)
+        )
+        self.assertTrue(
+            isinstance(
+                tp_model.model.layers[0].self_attn.lf_gate.conv1, TensorParallelConv2d
+            )
+        )
+        self.assertTrue(
+            isinstance(
+                tp_model.model.layers[0].self_attn.lf_gate.conv2, TensorParallelConv2d
+            )
+        )
+        self.assertTrue(isinstance(tp_model.lm_head, TensorParallelLMhead))
+        self.assertTrue(tp_model.lm_head, TensorParallelLMhead)
+        self.tensor_parallel_with_optimize_transformers(model)
+
+    def test_tensor_parallel_replace_check_phi(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/phi", return_dict=False, trust_remote_code=True
+        )
+        model = PhiForCausalLM(config).eval()
+        tp_model = self._shard_model(copy.deepcopy(model))
+        self.assertTrue(
+            isinstance(
+                tp_model.model.layers[0].self_attn.dense, TensorParallelRowLinear
+            )
+        )
+        self.assertTrue(
+            isinstance(tp_model.model.layers[0].mlp.fc2, TensorParallelRowLinear)
         )
         self.assertTrue(isinstance(tp_model.lm_head, TensorParallelLMhead))
         self.assertTrue(tp_model.lm_head, TensorParallelLMhead)

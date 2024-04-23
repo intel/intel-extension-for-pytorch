@@ -19,7 +19,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             if k.startswith("__"):
                 continue
             setattr(self.__class__, k, getattr(module.__class__, k))
-        if self.model_backbone == "GPTJForCausalLM":
+        if self.model_backbone in ["GPTJForCausalLM", "PhiForCausalLM"]:
             if not self.distributed:
                 self.linear_add_add = _IPEXlinearAddAddCPU(
                     module.linear_add_add.linear, tpp=tpp, woq=woq

@@ -36,6 +36,7 @@ from llm.utils.model_class.stablelm import StableLMConfig
 from llm.utils.model_class.qwen import QwenConfig
 from llm.utils.model_class.git import GitConfig
 from llm.utils.model_class.llava import LlavaConfig
+from llm.utils.model_class.phi import PhiConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -278,6 +279,8 @@ elif re.search("llava", config.architectures[0], re.IGNORECASE):
         roles = ('user', 'assistant')
     else:
         roles = conv.roles
+elif re.search("phi", config.architectures[0], re.IGNORECASE):
+    model = PhiConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 

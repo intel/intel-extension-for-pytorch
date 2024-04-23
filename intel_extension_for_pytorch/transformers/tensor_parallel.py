@@ -179,6 +179,8 @@ class TensorParallellLinear(nn.Module):
                 ]
         else:
             q = weight_data[:, q_head_start * head_dim : q_head_end * head_dim]
+            if linear.bias is not None:
+                q_bias = linear.bias.data / float(world_size)
         if not concat_qkv:
             return torch.nn.Parameter(q), torch.nn.Parameter(q_bias), cols_per_rank
 
@@ -538,7 +540,7 @@ def shard_mha_weights(
                     )
                     # del sub_m.__dict__["_modules"][l_name]
                     setattr(sub_m, l_name, TPLinear)
-                if l_name in ["out_proj"]:
+                if l_name in ["out_proj", "dense"]:
                     TPLinear = TensorParallelRowLinear(
                         l_sub_m,
                         num_kv_heads,
@@ -584,7 +586,7 @@ def shard_mlp_weights(
     for _, sub_m in model.named_children():
         if isinstance(sub_m, target_m):
             for l_name, l_sub_m in sub_m.named_children():
-                if l_name in ["gate_proj", "up_proj", "fc_in"]:
+                if l_name in ["gate_proj", "up_proj", "fc_in", "fc1"]:
                     TPLinear = TensorParallelColumnLinear(
                         l_sub_m,
                         num_kv_heads,
@@ -595,7 +597,7 @@ def shard_mlp_weights(
                         shard_by_head=False,
                     )
                     setattr(sub_m, l_name, TPLinear.linear)
-                if l_name in ["down_proj", "fc_out"]:
+                if l_name in ["down_proj", "fc_out", "fc2"]:
                     TPLinear = TensorParallelRowLinear(
                         l_sub_m,
                         num_kv_heads,

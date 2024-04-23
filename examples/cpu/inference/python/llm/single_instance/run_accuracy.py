@@ -34,6 +34,7 @@ MODEL_CLASSES = {
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "git": (AutoModelForCausalLM, AutoProcessor),
     "yuan": (AutoModelForCausalLM, AutoTokenizer),
+    "phi": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

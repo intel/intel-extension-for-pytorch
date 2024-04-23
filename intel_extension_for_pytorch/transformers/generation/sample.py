@@ -178,6 +178,7 @@ def _sample(
             "GitForCausalLM",
             "LlavaLlamaForCausalLM",
             "YuanForCausalLM",
+            "PhiForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
