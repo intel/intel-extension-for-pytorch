@@ -2685,7 +2685,7 @@ def LlavaLlamaForCausalLM_forward(
     images: Optional[torch.FloatTensor] = None,
     labels: Optional[torch.LongTensor] = None,
     input_ids: torch.LongTensor = None,
-    use_cache: Optional[bool] = None,
+    use_cache: Optional[bool] = True,
     output_attentions: Optional[bool] = None,
     output_hidden_states: Optional[bool] = None,
     return_dict: Optional[bool] = None,

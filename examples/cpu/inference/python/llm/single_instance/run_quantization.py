@@ -432,7 +432,7 @@ def get_example_inputs(model):
         input_embeds = torch.zeros(batch_size, 1, 4096).to(amp_dtype)
         example_inputs = (
             input_embeds,
-            attention_mask.unsqueeze(0).repeat(batch_size,1),
+            torch.ones((batch_size, 1), dtype=torch.long),
             tuple(past_key_value),
         )
     else:
