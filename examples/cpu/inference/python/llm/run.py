@@ -479,6 +479,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             MODEL_CLASSES = {
                 "gpt-j": ("/gptj_local_shard"),
                 "gpt-neox": ("/gptneox_local_shard"),
+                "llava": ("/llava_local_shard"),
                 "llama": ("/llama_local_shard"),
                 "opt": ("/opt_local_shard"),
                 "falcon": ("/falcon_local_shard"),
@@ -488,15 +489,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "chatglm": ("/chatglm_local_shard"),
                 "starcoder": ("/starcoder_local_shard"),
                 "t5": ("/t5_local_shard"),
-                "mistral": ("/mistral_local_shard"),
                 "mixtral": ("/mixtral_local_shard"),
+                "mistral": ("/mistral_local_shard"),
                 "mpt": ("/mpt_local_shard"),
                 "stablelm": ("/stablelm_local_shard"),
                 "dolly": ("/dolly_local_shard"),
                 "qwen": ("/qwen_local_shard"),
                 "git": ("/git_local_shard"),
                 "yuan": ("/yuan_local_shard"),
-                "llava": ("/llava_local_shard"),
+                "phi": ("/phi_local_shard"),
             }
             model_type = next(
                 (x for x in MODEL_CLASSES.keys() if x in args.model_name_or_path.lower()), "auto"

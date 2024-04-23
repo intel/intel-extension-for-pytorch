@@ -1878,6 +1878,94 @@ def _YuanAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _PhiAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    concat_qkv = None
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+    else:
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+
+    if self.qk_layernorm:
+        query_states = self.q_layernorm(query_states)
+        key_states = self.k_layernorm(key_states)
+
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+    if concat_qkv is not None and type(concat_qkv) is not tuple:
+        query_states, key_states, value_states = self._IPEXROPE(
+            concat_qkv,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.pos_embd_dim // 2,
+            self.pos_embd_dim,
+            kv_seq_len,
+            self.concat_qkv.num_concat,
+        )
+    else:
+        if concat_qkv is not None:
+            query_states, key_states, value_states = concat_qkv
+        query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim)
+        key_states = key_states.view(
+            bsz, q_len, self.num_key_value_heads, self.head_dim
+        )
+        value_states = value_states.view(
+            bsz, q_len, self.num_key_value_heads, self.head_dim
+        )
+        key_states = self._IPEXROPE(
+            key_states,
+            position_ids,
+            self.num_key_value_heads,
+            self.head_dim,
+            self.pos_embd_dim // 2,
+            self.pos_embd_dim,
+            kv_seq_len,
+        )
+        query_states = self._IPEXROPE(
+            query_states,
+            position_ids,
+            self.num_attention_heads,
+            self.head_dim,
+            self.pos_embd_dim // 2,
+            self.pos_embd_dim,
+            kv_seq_len,
+        )
+
+    key_states = _repeat_kv(key_states, self.num_key_value_groups)
+    value_states = _repeat_kv(value_states, self.num_key_value_groups)
+
+    (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        math.sqrt(self.head_dim),
+        past_key_value,
+        None,
+        attention_mask,
+    )
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    attn_output = self.dense(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
 def _create_attention_mask_for_git(
     self, tgt, memory, tgt_mask, past_key_values_length, memory_key_padding_mask=None
 ):
@@ -2028,7 +2116,7 @@ class _IPEXAttentionRef(nn.Module):
                     else config.kv_channels
                 )
                 self.pos_embd_dim = rotary_dim // 2
-            elif self.model_backbone == "StableLmForCausalLM":
+            elif self.model_backbone in ["StableLmForCausalLM", "PhiForCausalLM"]:
                 self.pos_embd_dim = self.rotary_emb.dim
             else:
                 self.pos_embd_dim = self.head_dim
@@ -2051,6 +2139,7 @@ class _IPEXAttentionRef(nn.Module):
             "MixtralForCausalLM",
             "StableLmForCausalLM",
             "LlavaLlamaForCausalLM",
+            "PhiForCausalLM",
         ]:
             supported_linear_types = [
                 torch.nn.Linear,
@@ -2452,6 +2541,16 @@ class _IPEXAttentionRef(nn.Module):
             )
         elif self.model_backbone == "YuanForCausalLM":
             return _YuanAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "PhiForCausalLM":
+            return _PhiAttention_forward(
                 self,
                 hidden_states,
                 attention_mask,

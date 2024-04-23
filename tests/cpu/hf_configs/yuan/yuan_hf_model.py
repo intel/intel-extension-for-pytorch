@@ -38,7 +38,8 @@ from transformers.utils import (
     replace_return_docstrings,
 )
 from .configuration_yuan import YuanConfig
-from einops import rearrange
+
+# from einops import rearrange
 
 # from flash_attn import flash_attn_varlen_func as flash_attn_unpadded_func
 # from flash_attn import flash_attn_func
@@ -461,7 +462,8 @@ class YuanAttention(nn.Module):
             seqlen_k = key_states.shape[1]
 
             q, k, v = [
-                rearrange(x, "b s ... -> (b s) ...")
+                # rearrange(x, "b s ... -> (b s) ...")
+                x.view(-1, *x.shape[2:])
                 for x in [query_states, key_states, value_states]
             ]
 
@@ -500,7 +502,9 @@ class YuanAttention(nn.Module):
                 causal=is_causal,
             )
 
-            attn_output = rearrange(output, "(b s) ... -> b s ...", b=batch_size)
+            # attn_output = rearrange(output, "(b s) ... -> b s ...", b=batch_size)
+            shapes = (batch_size, -1, *output.shape[1:])
+            attn_output = output.view(shapes)
         else:
             attn_weights = torch.matmul(
                 query_states, key_states.transpose(2, 3)

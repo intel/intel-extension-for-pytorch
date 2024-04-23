@@ -10,4 +10,5 @@ from .tensor_parallel import (
     TensorParallelColumnLinear,
     TensorParallelRowLinear,
     TensorParallelLMhead,
+    TensorParallelConv2d,
 )

@@ -189,6 +189,7 @@ def _beam_sample(
             "GitForCausalLM",
             "LlavaLlamaForCausalLM",
             "YuanForCausalLM",
+            "PhiForCausalLM",
         ]:
             first_token = False
             if model_inputs["past_key_values"] is None:

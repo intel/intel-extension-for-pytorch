@@ -184,6 +184,8 @@ def model_convert_reference(_model):
         LlavaLlamaForCausalLM_forward,
         YuanForCausalLM_forward,
         YuanModel_forward,
+        PhiForCausalLM_forward,
+        PhiModel_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
         prepare_inputs_for_generation_llama,
@@ -377,8 +379,9 @@ def model_convert_reference(_model):
     yuan_attention = None
     if _model.config.architectures[0] == "YuanForCausalLM":
         yuan_attention = type(_model.model.layers[0].self_attn)
-        supported_mha_classes.append(yuan_attention)
-        ipex_tp_supported_mha_classes.append(yuan_attention)
+    if _model.config.architectures[0] in ["YuanForCausalLM", "PhiForCausalLM"]:
+        supported_mha_classes.append(type(_model.model.layers[0].self_attn))
+        ipex_tp_supported_mha_classes.append(type(_model.model.layers[0].self_attn))
         ipex_tp_supported_mlp_classes.append(type(_model.model.layers[0].mlp))
         ipex_tp_supported_model_classes.append(type(_model))
     # model-wise optimizations - MHA module
@@ -745,7 +748,23 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-
+    elif _model.config.architectures[0] == "PhiForCausalLM":
+        convert_function(_model, "forward", PhiForCausalLM_forward)
+        convert_function(_model.model, "forward", PhiModel_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     return _model
 
 
@@ -1171,7 +1190,7 @@ def optimize(
 
     Well supported model family with full functionalities:
     Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
-    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan.
+    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi.
 
     For the model that is not in the scope of supported model family above, will try to
     apply default ipex.optimize transparently to get benifits (not include quantizations,
@@ -1259,6 +1278,7 @@ def optimize(
                 "GitForCausalLM",
                 "LlavaLlamaForCausalLM",
                 "YuanForCausalLM",
+                "PhiForCausalLM",
             ]
 
         if well_supported_model:
@@ -1267,8 +1287,8 @@ def optimize(
             if quantization_config is not None:
                 logger.warning(
                     "ipex.llm.optimize supports quantizations on Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen,"
-                    + " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, Llava, and Yuan"
-                    + "fallback to origin model"
+                    + " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, Llava, Yuan, "
+                    + "and Phi, fallback to origin model"
                 )
                 return model
 
