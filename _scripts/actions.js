@@ -274,9 +274,9 @@ $(document).ready(function() {
           //   note += $.ul_gen(data.preparation.basekit.notinstall);
           //   notes.push(note);
           // }
-          var activate_script = "servars.sh";
+          var activate_script = "setvars.sh";
           if(data.os == "Windows")
-            activate_script = "servars.bat";
+            activate_script = "setvars.bat";
           var note = "<p>Use either individual component-specific activation scripts to activate required components listed below one-by-one, or use the oneAPI bundle script <code>" + activate_script + "</code> to activate the whole oneAPI environment. Check the <i>Sanity Test</i> section below for a usage example.</p>";
           if($.pkgInArray(data.package, ["source"])) {
             var note = "<p>Use individual component-specific activation scripts to activate required components listed below one-by-one. Check the <i>Sanity Test</i> section below for a usage example.</p>";
