@@ -142,8 +142,6 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "mpt" and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
-if model_type == "llava":
-    config.use_cache=True
 
 if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True

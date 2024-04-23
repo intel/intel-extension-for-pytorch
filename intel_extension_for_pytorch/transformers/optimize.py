@@ -917,13 +917,17 @@ def get_dummy_input(_model, return_dict=False):
         )
         if return_dict:
             sample_inputs.pop("input_ids", None)
+            sample_inputs["attention_mask"] = torch.ones(
+                (batch_size, 1), dtype=torch.long
+            )
             sample_inputs["inputs_embeds"] = torch.zeros(batch_size, 1, 4096).to(
                 _model.dtype
             )
         else:
             sample_inputs = (
                 torch.zeros(batch_size, 1, 4096).to(_model.dtype),
-            ) + sample_inputs[1:]
+                torch.ones((batch_size, 1), dtype=torch.long),
+            ) + sample_inputs[2:]
     if _model.config.architectures[0] == "YuanForCausalLM":
         hidden_size = _model.config.hidden_size
         if _model.device.type == "cpu":
