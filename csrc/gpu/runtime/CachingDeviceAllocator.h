@@ -1,7 +1,6 @@
 #pragma once
 
 #include <runtime/Device.h>
-#include <runtime/Queue.h>
 #include <utils/DPCPP.h>
 
 #include <core/AllocationInfo.h>
@@ -31,11 +30,11 @@ class CachingDeviceAllocator final {
   };
 
   struct Block {
-    Block(DeviceId device, QueueIndex queue_idx, size_t size);
+    Block(DeviceId device, sycl::queue queue, size_t size);
 
     Block(
         DeviceId device,
-        QueueIndex queue_idx,
+        sycl::queue queue,
         size_t size,
         PoolType pool_type,
         void* buffer);
@@ -44,10 +43,25 @@ class CachingDeviceAllocator final {
 
     bool should_split(size_t size);
 
-    static bool Comparator(const Block* a, const Block* b);
+    static bool Comparator(const Block* a, const Block* b) {
+      if (a->m_device != b->m_device) {
+        return a->m_device < b->m_device;
+      }
+
+      if (a->m_queue != b->m_queue) {
+        auto a_hash = std::hash<sycl::queue>{}(a->m_queue);
+        auto b_hash = std::hash<sycl::queue>{}(b->m_queue);
+        return a_hash < b_hash;
+      }
+
+      if (a->m_size != b->m_size) {
+        return a->m_size < b->m_size;
+      }
+      return (uintptr_t)a->m_buffer < (uintptr_t)b->m_buffer;
+    }
 
     DeviceId m_device;
-    QueueIndex m_queue_idx;
+    sycl::queue m_queue;
     std::unordered_set<sycl::queue> m_queue_uses;
     size_t m_size;
     PoolType m_pool_type;
@@ -85,6 +99,12 @@ class CachingDeviceAllocator final {
   void free_blocks(
       BlockPool& blocks,
       BlockPool::iterator it,
+      BlockPool::iterator end);
+
+  void find_cached_blocks_bound(
+      DeviceId di,
+      BlockPool& pool,
+      BlockPool::iterator begin,
       BlockPool::iterator end);
 
   void free_cached_blocks(DeviceId di);

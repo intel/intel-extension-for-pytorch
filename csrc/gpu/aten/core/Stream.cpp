@@ -153,7 +153,7 @@ DPCPPStream getStreamFromPool(
   dpcppInitDeviceQueueOnce(device_index);
   return DPCPPStreamForId(
       device_index,
-      makeStreamId(QueueType::RESERVED, dpcppAllocQueueIndex(device_index)));
+      makeStreamId(QueueType::RESERVED, dpcppGetQueueIndex(device_index)));
 }
 
 // Note: when called the first time on a device, this will create the queue pool

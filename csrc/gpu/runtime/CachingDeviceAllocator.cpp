@@ -87,10 +87,10 @@ void CachingDeviceAllocator::update_stat_array(
 
 CachingDeviceAllocator::Block::Block(
     DeviceId device,
-    QueueIndex queue_idx,
+    sycl::queue queue,
     size_t size)
     : m_device(device),
-      m_queue_idx(queue_idx),
+      m_queue(queue),
       m_queue_uses(),
       m_size(size),
       m_pool_type(PoolType::UNDEF),
@@ -106,12 +106,12 @@ CachingDeviceAllocator::Block::Block(
 
 CachingDeviceAllocator::Block::Block(
     DeviceId device,
-    QueueIndex queue_idx,
+    sycl::queue queue,
     size_t size,
     PoolType pool_type,
     void* buffer)
     : m_device(device),
-      m_queue_idx(queue_idx),
+      m_queue(queue),
       m_queue_uses(),
       m_size(size),
       m_pool_type(pool_type),
@@ -166,21 +166,6 @@ int CachingDeviceAllocator::malloc_with_retry(
   return DPCPP_SUCCESS;
 }
 
-bool CachingDeviceAllocator::Block::Comparator(const Block* a, const Block* b) {
-  if (a->m_device != b->m_device) {
-    return a->m_device < b->m_device;
-  }
-
-  if (a->m_queue_idx != b->m_queue_idx) {
-    return a->m_queue_idx < b->m_queue_idx;
-  }
-
-  if (a->m_size != b->m_size) {
-    return a->m_size < b->m_size;
-  }
-  return (uintptr_t)a->m_buffer < (uintptr_t)b->m_buffer;
-}
-
 void CachingDeviceAllocator::malloc(
     void** devPtr,
     size_t asize,
@@ -189,7 +174,6 @@ void CachingDeviceAllocator::malloc(
 
   DeviceId curDevID;
   AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  const QueueIndex queue_idx = dpcppGetQueueIndex(curDevID, *queue);
 
   process_events();
 
@@ -230,11 +214,11 @@ void CachingDeviceAllocator::malloc(
     pool = &large_blocks;
   }
 
-  Block search_key(curDevID, queue_idx, size);
+  Block search_key(curDevID, *queue, size);
   auto find_free_block = [&]() -> Block* {
     auto it = pool->lower_bound(&search_key);
     if (it != pool->end() && (*it)->m_device == curDevID &&
-        (*it)->m_queue_idx == queue_idx) {
+        (*it)->m_queue == *queue) {
       Block* block = *it;
       pool->erase(it);
       return block;
@@ -259,7 +243,7 @@ void CachingDeviceAllocator::malloc(
     int err = malloc_with_retry(curDevID, &buffer, alloc_size);
 
     if (err == DPCPP_SUCCESS) {
-      block = new Block(curDevID, queue_idx, alloc_size, pool_type, buffer);
+      block = new Block(curDevID, *queue, alloc_size, pool_type, buffer);
       update_stat_array(stats.segment, 1, stat_types);
       update_stat_array(stats.reserved_bytes, alloc_size, stat_types);
     } else {
@@ -294,7 +278,7 @@ void CachingDeviceAllocator::malloc(
   if (block->should_split(size)) {
     remaining = block;
 
-    block = new Block(curDevID, queue_idx, size, pool_type, block->m_buffer);
+    block = new Block(curDevID, *queue, size, pool_type, block->m_buffer);
     block->m_prev = remaining->m_prev;
     if (block->m_prev) {
       block->m_prev->m_next = block;
@@ -385,13 +369,7 @@ void CachingDeviceAllocator::recordQueue(void* buffer, sycl::queue* queue) {
 
   Block* block = find_allocated_block(buffer);
   TORCH_INTERNAL_ASSERT(block != nullptr, "No allocated block can be found");
-
-  DeviceId curDevID;
-  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
-  const sycl::queue& block_queue =
-      dpcppGetRawQueue(curDevID, block->m_queue_idx);
-
-  if (*queue == block_queue) {
+  if (*queue == block->m_queue) {
     return;
   }
 
@@ -540,9 +518,9 @@ void CachingDeviceAllocator::cache_info_aux(
     DeviceId di,
     size_t* total,
     size_t* largest) {
-  Block search_key(di, 0, 0);
-  auto it = blocks.lower_bound(&search_key);
-  for (; it != blocks.end() && *it && (*it)->m_device == di; ++it) {
+  for (auto it = blocks.begin();
+       it != blocks.end() && *it && (*it)->m_device == di;
+       ++it) {
     size_t blocksize = (*it)->m_size;
     *total += blocksize;
     if (blocksize > *largest) {
@@ -619,25 +597,50 @@ void CachingDeviceAllocator::free_blocks(
   }
 }
 
+// find the boundary of the pool allocated on the specific device
+void CachingDeviceAllocator::find_cached_blocks_bound(
+    DeviceId di,
+    BlockPool& pool,
+    BlockPool::iterator begin,
+    BlockPool::iterator end) {
+  bool find_begin = false;
+  bool find_end = false;
+  // pool is a set stored as an ascending by device index. We would like to find
+  // the blocks within the range [di, di+1).
+  for (auto it = pool.begin(); it != pool.end(); it++) {
+    if ((*it)->m_device == di && !find_begin) {
+      // find the begin, that is the leftmost block allocated on device di.
+      begin = it;
+      find_begin = true;
+    } else if ((*it)->m_device > di && find_begin) {
+      // find the end, that is the leftmost block allocated on device larger
+      // than di. It may be di+1, di+2, ... Why does it probably equals to di+2,
+      // because it is possible that no allocation on di+1.
+      end = it;
+      find_end = true;
+      break;
+    }
+  }
+  if (!find_begin)
+    begin = pool.end();
+  if (!find_begin || !find_end)
+    end = pool.end();
+}
+
 void CachingDeviceAllocator::free_cached_blocks(DeviceId di) {
   synchronize_and_free_events(di);
-
-  Block lower_bound(di, kInvalidQueueIndex, 0);
-  Block upper_bound(di + 1, kInvalidQueueIndex, 0);
 
   /*
    * See Note [Safe to Free Blocks on BlockPool]
    */
   xpu::dpcpp::deviceSynchronize(di);
 
-  free_blocks(
-      large_blocks,
-      large_blocks.lower_bound(&lower_bound),
-      large_blocks.lower_bound(&upper_bound));
-  free_blocks(
-      small_blocks,
-      small_blocks.lower_bound(&lower_bound),
-      small_blocks.lower_bound(&upper_bound));
+  BlockPool::iterator begin;
+  BlockPool::iterator end;
+  find_cached_blocks_bound(di, large_blocks, begin, end);
+  free_blocks(large_blocks, begin, end);
+  find_cached_blocks_bound(di, small_blocks, begin, end);
+  free_blocks(small_blocks, begin, end);
 }
 
 void CachingDeviceAllocator::synchronize_and_free_events(
