@@ -2,6 +2,7 @@
 #include <ATen/TensorSubclassLikeUtils.h>
 #include <ATen/cpp_custom_type_hack.h>
 #include <ATen/native/nested/NestedTensorUtils.h>
+#include <ATen/native/transformers/attention.h>
 #include <ATen/record_function.h>
 #include <CL/sycl.hpp>
 #include <core/Generator.h>
@@ -1680,6 +1681,208 @@ std::tuple<Tensor, Tensor, Tensor> _transform_bias_rescale_qkv(
   return std::make_tuple(q_k_v_s[0], q_k_v_s[1], q_k_v_s[2]);
 }
 
+bool check_for_seq_len_1_nested_tensor(sdp::sdp_params params, bool debug) {
+  // When this function is called we are assured that the nt is dim==4
+  if (!params.query.is_nested()) {
+    return true;
+  }
+
+  const auto nt_q_tensor_impl =
+      at::native::get_nested_tensor_impl(params.query);
+  const at::Tensor& sizes = nt_q_tensor_impl->get_nested_sizes();
+  auto* sizes_ptr = sizes.data_ptr<int64_t>();
+  const int64_t n_tensors = params.query.size(0);
+  const int64_t size_tensor_stride = sizes.stride(0);
+
+  // This is being called inside sdp with shape [batch, heads, {seq_len}, dim]
+  for (const auto i : c10::irange(n_tensors)) {
+    if (sizes_ptr[(i * size_tensor_stride) + 1] <= 1) {
+      if (debug) {
+        TORCH_WARN(
+            "Packed projection for fused kernels does not support sequence_length <= 1");
+      }
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// B for batch size
+// T for seq length
+// D for embed_dimension
+std::tuple<Tensor, Tensor> _native_multi_head_attention(
+    // query shape: [B, T, D]
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const int64_t embed_dim,
+    const int64_t num_head,
+    // qkv_weight shape: [3 * D, D]
+    const Tensor& qkv_weight,
+    const Tensor& qkv_bias,
+    const Tensor& proj_weight,
+    const Tensor& proj_bias,
+    const c10::optional<Tensor>& mask,
+    bool need_weights,
+    bool average_attn_weights,
+    const c10::optional<int64_t> mask_type) {
+  TORCH_CHECK(
+      !mask || !query.is_nested(),
+      "NestedTensor with mask is not supported yet");
+  const auto D = embed_dim;
+  TORCH_CHECK(
+      query.dim() == 3, "expected 3-D `query`, got ", query.dim(), "-D tensor");
+  TORCH_CHECK(
+      query.is_nested() || query.sizes()[2] == embed_dim,
+      "passed-in embed_dim ",
+      embed_dim,
+      " didn't match last dim of query ",
+      query.sizes()[2]);
+  TORCH_CHECK(
+      key.dim() == 3, "expected 3-D `key`, got ", key.dim(), "-D tensor");
+  TORCH_CHECK(
+      value.dim() == 3, "expected 3-D `value`, got ", value.dim(), "-D tensor");
+  TORCH_CHECK(
+      query.is_nested() || key.is_nested() || value.is_nested() ||
+          (query.sizes() == key.sizes() && key.sizes() == value.sizes()),
+      "expected `query`/`key`/`value` shapes to match");
+  TORCH_CHECK(
+      qkv_weight.dim() == 2,
+      "expected 2-D `qkv_weight`, got ",
+      qkv_weight.dim(),
+      "-D tensor");
+  TORCH_CHECK(
+      D * 3 == qkv_weight.sizes()[0],
+      "expected `qkv_weight` first dim to be 3x embed_dim");
+  TORCH_CHECK(
+      D == qkv_weight.sizes()[1],
+      "expected `qkv_weight` second dim to be embed_Dim");
+  TORCH_CHECK(
+      qkv_bias.dim() == 1,
+      "expected 1-D `qkv_bias`, got ",
+      qkv_bias.dim(),
+      "-D tensor");
+  TORCH_CHECK(
+      qkv_bias.sizes()[0] == 3 * D,
+      "expected `qkv_bias` first dim and first dim of query to be equal");
+  TORCH_CHECK(
+      D % num_head == 0, "`embed_dim` must divide evenly by `num_heads`");
+
+  const auto B = query.is_nested()
+      ? native::get_nested_tensor_impl(query)->get_nested_sizes().size(0)
+      : query.sizes()[0];
+  auto T = query.is_nested() ? 0 : query.sizes()[1];
+  const auto dim_per_head = D / num_head;
+
+  if ((query.is_same(key) && key.is_same(value)) && dim_per_head % 8 == 0 &&
+      !need_weights) {
+    // We have not done linear projection yet but the input for SDP
+    // Is expected to be 4 dimensional. We "cheaply" create view tensors
+    // That will then be used for checking hot path conditions with
+    // select_sd_backend
+    auto q =
+        query.view({query.size(0), -1, num_head, dim_per_head}).transpose(1, 2);
+    auto k =
+        key.view({key.size(0), -1, num_head, dim_per_head}).transpose(1, 2);
+    auto v =
+        value.view({value.size(0), -1, num_head, dim_per_head}).transpose(1, 2);
+
+    auto backend = static_cast<sdp::SDPBackend>(
+        _fused_sdp_choice(q, k, v, mask, 0.0, false));
+    sdp::sdp_params kernel_params{q, k, v, mask, 0.0, false};
+
+    bool no_seq_len_1_nested = query.is_nested()
+        ? check_for_seq_len_1_nested_tensor(kernel_params, false)
+        : true;
+    if (!mask.has_value() && no_seq_len_1_nested &&
+        (backend == sdp::SDPBackend::flash_attention ||
+         backend == sdp::SDPBackend::efficient_attention)) {
+      auto x = at::linear(query, qkv_weight, qkv_bias);
+      auto chunks = x.chunk(3, -1);
+      auto x_size_0 = x.size(0);
+
+      chunks[0] = (chunks[0].view({x_size_0, -1, num_head, dim_per_head}))
+                      .transpose(1, 2);
+      chunks[1] = (chunks[1].view({x_size_0, -1, num_head, dim_per_head}))
+                      .transpose(1, 2);
+      chunks[2] = (chunks[2].view({x_size_0, -1, num_head, dim_per_head}))
+                      .transpose(1, 2);
+
+      auto y = at::scaled_dot_product_attention(
+          chunks[0], chunks[1], chunks[2], mask, 0.0, false, c10::nullopt);
+
+      auto past_sdp = y.transpose(1, 2).reshape({x_size_0, -1, embed_dim});
+      return std::make_tuple(
+          at::linear(past_sdp, proj_weight, proj_bias), Tensor());
+    }
+  }
+
+  auto qkv = native::qkv_projection(query, key, value, embed_dim, qkv_weight);
+
+  if (!qkv.is_nested() && qkv.numel() == 0) {
+    if (query.is_nested()) {
+      return std::make_tuple(Tensor(), Tensor());
+    }
+    return std::make_tuple(at::empty_like(query), Tensor());
+  }
+
+  // for non-nested tensor, the size is ir-regular, so just get the size(1) is
+  // legal
+  if (!query.is_nested() || !qkv.is_nested()) {
+    if (query.is_nested()) {
+      T = qkv.size(1);
+    }
+    native::debug_assert_shape(__LINE__, qkv, {B, T, 3 * D});
+  }
+
+  auto q_k_v = AtenIpexTypeNestedTensorXPU::_transform_bias_rescale_qkv(
+      qkv, qkv_bias, num_head);
+  qkv = Tensor(); // Not used any more, allow free
+  auto& q = std::get<0>(q_k_v);
+  const auto& k = std::get<1>(q_k_v);
+  const auto& v = std::get<2>(q_k_v);
+  native::debug_assert_shape(__LINE__, q, {B, num_head, T, dim_per_head});
+  native::debug_assert_shape(__LINE__, k, {B, num_head, T, dim_per_head});
+  native::debug_assert_shape(__LINE__, v, {B, num_head, T, dim_per_head});
+
+  // shape: [B, num_head, T, T]
+  auto qkt = native::bmm_nt(q, k);
+  // q & k are dead but cannot be freed because they were packed with v
+  native::debug_assert_shape(__LINE__, qkt, {B, num_head, T, T});
+
+  // shape: [B, num_head, T, T]
+  // TODO: long-term, have a kernel that works with
+  // NestedTensor directly if there is no mask passed
+  qkt = native::masked_softmax(qkt, mask, query, mask_type);
+
+  // shape: [B, num_head, T, dim_per_head]
+  // reuse storage for q; we're done with it
+  auto attn_ctx = native::bmm_nn(q, qkt, v);
+  // qkv is not dead; we just reused storage for q!
+  if (!need_weights) {
+    qkt = Tensor();
+  }
+
+  native::debug_assert_shape(
+      __LINE__, attn_ctx, {B, num_head, T, dim_per_head});
+
+  // shape: [B, T, D]
+  // Fuse transform_0213 inside
+  auto proj = native::transform0213_gemm_nt_bias(
+      attn_ctx, proj_weight, proj_bias, query);
+  native::debug_assert_shape(__LINE__, proj, {B, T, D});
+
+  if (need_weights && average_attn_weights) {
+    // weights are not needed for full transformer, so don't worry too
+    // much about performance -- we implement this just to make use
+    // cases that don't disable need_weights still get some speedup.
+    qkt = qkt.sum(1);
+    qkt /= num_head;
+  }
+
+  return std::make_tuple(std::move(proj), std::move(qkt));
+}
 } // namespace AtenIpexTypeNestedTensorXPU
 
 namespace AtenIpexTypeXPU {
@@ -1689,6 +1892,38 @@ std::tuple<Tensor, Tensor, Tensor> _transform_bias_rescale_qkv(
     int64_t num_head) {
   return at::AtenIpexTypeNestedTensorXPU::_transform_bias_rescale_qkv(
       qkv, qkv_bias, num_head);
+}
+
+std::tuple<Tensor, Tensor> _native_multi_head_attention(
+    // query shape: [B, T, D]
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const int64_t embed_dim,
+    const int64_t num_head,
+    // qkv_weight shape: [3 * D, D]
+    const Tensor& qkv_weight,
+    const Tensor& qkv_bias,
+    const Tensor& proj_weight,
+    const Tensor& proj_bias,
+    const c10::optional<Tensor>& mask,
+    bool need_weights,
+    bool average_attn_weights,
+    const c10::optional<int64_t> mask_type) {
+  return at::AtenIpexTypeNestedTensorXPU::_native_multi_head_attention(
+      query,
+      key,
+      value,
+      embed_dim,
+      num_head,
+      qkv_weight,
+      qkv_bias,
+      proj_weight,
+      proj_bias,
+      mask,
+      need_weights,
+      average_attn_weights,
+      mask_type);
 }
 
 } // namespace AtenIpexTypeXPU
@@ -1715,6 +1950,13 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "_transform_bias_rescale_qkv",
       at::AtenIpexTypeXPU::_transform_bias_rescale_qkv,
+      c10::DispatchKey::XPU);
+}
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "_native_multi_head_attention",
+      at::AtenIpexTypeXPU::_native_multi_head_attention,
       c10::DispatchKey::XPU);
 }
 

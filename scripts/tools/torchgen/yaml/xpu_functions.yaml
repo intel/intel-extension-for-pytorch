@@ -872,6 +872,7 @@ supported:
   - _scaled_dot_product_efficient_attention
   - _scaled_dot_product_efficient_attention_backward
   - _transform_bias_rescale_qkv
+  - _native_multi_head_attention
   - _nested_from_padded
 autograd:
   - cdist
