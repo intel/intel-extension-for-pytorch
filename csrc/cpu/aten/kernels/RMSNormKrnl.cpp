@@ -52,8 +52,17 @@ at::Tensor rmsnorm_kernel_impl(
       c10::nullopt /* device */,
       c10::nullopt /* pin_memory */,
       at::MemoryFormat::Contiguous);
-  if (input.scalar_type() == at::ScalarType::Float) {
+  if (input.scalar_type() == at::ScalarType::Float &&
+      b.scalar_type() == at::ScalarType::Float) {
     RMSNormKernelImpl<float, float>(X, b, M, N, eps, Y);
+  } else if (
+      input.scalar_type() == at::ScalarType::Float &&
+      b.scalar_type() == at::ScalarType::BFloat16) {
+    RMSNormKernelImpl<float, at::BFloat16>(X, b, M, N, eps, Y);
+  } else if (
+      input.scalar_type() == at::ScalarType::Float &&
+      b.scalar_type() == at::ScalarType::Half) {
+    RMSNormKernelImpl<float, at::Half>(X, b, M, N, eps, Y);
   } else if (
       input.scalar_type() == at::ScalarType::BFloat16 &&
       b.scalar_type() == at::ScalarType::Float) {
@@ -62,6 +71,22 @@ at::Tensor rmsnorm_kernel_impl(
       input.scalar_type() == at::ScalarType::BFloat16 &&
       b.scalar_type() == at::ScalarType::BFloat16) {
     RMSNormKernelImpl<at::BFloat16, at::BFloat16>(X, b, M, N, eps, Y);
+  } else if (
+      input.scalar_type() == at::ScalarType::BFloat16 &&
+      b.scalar_type() == at::ScalarType::Half) {
+    RMSNormKernelImpl<at::BFloat16, at::Half>(X, b, M, N, eps, Y);
+  } else if (
+      input.scalar_type() == at::ScalarType::Half &&
+      b.scalar_type() == at::ScalarType::Half) {
+    RMSNormKernelImpl<at::Half, at::Half>(X, b, M, N, eps, Y);
+  } else if (
+      input.scalar_type() == at::ScalarType::Half &&
+      b.scalar_type() == at::ScalarType::BFloat16) {
+    RMSNormKernelImpl<at::Half, at::BFloat16>(X, b, M, N, eps, Y);
+  } else if (
+      input.scalar_type() == at::ScalarType::Half &&
+      b.scalar_type() == at::ScalarType::Float) {
+    RMSNormKernelImpl<at::Half, float>(X, b, M, N, eps, Y);
   } else {
     TORCH_CHECK(false, "Unsupported input type");
   }

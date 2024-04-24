@@ -305,9 +305,14 @@ if model_type == "falcon":
     tokenizer.model_input_names = model_input_names
 
 if args.config_file is None:
-    config = AutoConfig.from_pretrained(
-        args.model_id, torchscript=True, trust_remote_code=True
-    )
+    if model_type == "chatglm":
+        config = AutoConfig.from_pretrained(
+            args.model_id, torchscript=True, trust_remote_code=True, torch_dtype=load_dtype,
+        )
+    else:
+        config = AutoConfig.from_pretrained(
+            args.model_id, torchscript=True, trust_remote_code=True
+        )
 else:
     config = AutoConfig.from_pretrained(
         args.config_file, torchscript=True, trust_remote_code=True

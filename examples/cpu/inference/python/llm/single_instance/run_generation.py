@@ -131,12 +131,18 @@ model_type = next(
 )
 model_class = MODEL_CLASSES[model_type]
 if args.config_file is None:
-    config = AutoConfig.from_pretrained(
-        args.model_id, torchscript=args.deployment_mode, trust_remote_code=True
-    )
+    if model_type == "chatglm":
+        # chatglm modeling is from remote hub and its torch_dtype in config.json need to be overrided
+        config = AutoConfig.from_pretrained(
+            args.model_id, torchscript=args.deployment_mode, trust_remote_code=True, torch_dtype=amp_dtype,
+        )
+    else:
+        config = AutoConfig.from_pretrained(
+            args.model_id, torchscript=args.deployment_mode, trust_remote_code=True,
+        )
 else:
     config = AutoConfig.from_pretrained(
-        args.config_file, torchscript=args.deployment_mode, trust_remote_code=True
+        args.config_file, torchscript=args.deployment_mode, trust_remote_code=True, torch_dtype=amp_dtype,
     )
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
@@ -159,7 +165,6 @@ else:
     tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_id)
 model = model.eval()
 model = model.to(memory_format=torch.channels_last)
-
 num_beams = 1 if args.greedy else 4
 # generate args
 if args.streaming:
@@ -215,7 +220,6 @@ if args.ipex:
         inplace=True,
         deployment_mode=args.deployment_mode,
     )
-
 if args.torch_compile:
     if args.deployment_mode:
         raise SystemExit("[ERROR] deployment_mode cannot co-work with torch.compile, please set deployment_mode to False if want to use torch.compile.")
