@@ -199,6 +199,9 @@ bool dpcpp_tensor_histogram(
   }
 
   auto totalElements = b.numel();
+  if (totalElements == 0) {
+    return false;
+  }
 
   using IndexType = int64_t;
   auto aInfo = getTensorInfo<output_t, IndexType>(a);
@@ -319,7 +322,10 @@ Tensor histc(
     const Scalar& min,
     const Scalar& max) {
   TORCH_CHECK(bins > 0, "bins should be > 0, but is ", bins, " instead");
-  return IPEX_DISPATCH_FLOATING_TYPES(self.scalar_type(), "histc", [&] {
+  if (self.scalar_type() == ScalarType::Half) {
+    AT_ERROR("HalfTensor is not supported");
+  }
+  return IPEX_DISPATCH_ALL_TYPES(self.scalar_type(), "histc", [&] {
     return impl::histc_template<scalar_t>(
         self, bins, min.to<scalar_t>(), max.to<scalar_t>());
   });
