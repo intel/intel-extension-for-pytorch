@@ -50,6 +50,40 @@ void indexSelect(
     const Tensor& src,
     int dim,
     const Tensor& indices) {
+  IPEX_DISPATCH_INDEX_TYPES(indices.scalar_type(), "indexSelect", [&] {
+    TensorInfo<index_t, int64_t> indices_info =
+        tensorInfoIfScalar(getTensorInfo<index_t, int64_t>(indices));
+    indices_info.collapseDims();
+
+    TensorInfo<scalar_t, int64_t> dst_info =
+        tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(dst));
+    TensorInfo<scalar_t, int64_t> src_info =
+        tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(src.contiguous()));
+    int new_indexing_dim = src_info.collapseDims(dim);
+
+    if (dst.is_contiguous() && indices.is_contiguous())
+      _index_select_kernel<
+          decltype(src_info),
+          decltype(dst_info),
+          decltype(indices_info),
+          /* TrivialOffCal */ true>(
+          src_info, dst_info, indices_info, new_indexing_dim);
+    else
+      _index_select_kernel<
+          decltype(src_info),
+          decltype(dst_info),
+          decltype(indices_info),
+          /* TrivialOffCal */ false>(
+          src_info, dst_info, indices_info, new_indexing_dim);
+  });
+  return;
+}
+template <typename scalar_t>
+void index_select_impl(
+    const Tensor& dst,
+    const Tensor& src,
+    int dim,
+    const Tensor& indices) {
   at::assert_no_internal_overlap(dst);
   at::assert_no_overlap(dst, src);
   at::assert_no_overlap(dst, indices);
@@ -86,45 +120,47 @@ void indexSelect(
       src.scalar_type() == dst.scalar_type(),
       "index_select(): Source and result must have the same scalar type");
 
-  IPEX_DISPATCH_INDEX_TYPES(indices.scalar_type(), "indexSelect", [&] {
-    TensorInfo<index_t, int64_t> indices_info =
-        tensorInfoIfScalar(getTensorInfo<index_t, int64_t>(indices));
-    indices_info.collapseDims();
+  auto new_size = src.sizes().vec();
 
-    auto new_size = src.sizes().vec();
+  if (src.dim() > 0) {
+    new_size[dim] = indices.numel();
+  }
 
-    if (src.dim() > 0) {
-      new_size[dim] = indices.numel();
+  at::native::resize_output(dst, new_size);
+
+  ptrdiff_t dst_num_elem = dst.numel();
+  if (dst_num_elem == 0) {
+    return;
+  }
+
+  if (!canUse32BitIndexMath(dst)) {
+    auto MaxInt32 = std::numeric_limits<int32_t>::max();
+    int32_t iter_number = (dst_num_elem + MaxInt32 - 1) / MaxInt32;
+    int64_t slice_offset = indices.numel() / iter_number;
+
+    int64_t start_id = 0;
+    int64_t end_id = 0;
+    for (int32_t i = 0; i < iter_number; i++) {
+      start_id = 0 + slice_offset * i;
+      end_id = start_id + slice_offset;
+      if (end_id <= indices.numel()) {
+        indexSelect<scalar_t>(
+            dst.slice(dim, start_id, end_id),
+            src,
+            dim,
+            indices.slice(0, start_id, end_id));
+      } else {
+        indexSelect<scalar_t>(
+            dst.slice(dim, start_id), src, dim, indices.slice(0, start_id));
+      }
     }
-
-    at::native::resize_output(dst, new_size);
-
-    ptrdiff_t dst_num_elem = dst.numel();
-    if (dst_num_elem == 0) {
-      return;
+    if (end_id < indices.numel()) {
+      indexSelect<scalar_t>(
+          dst.slice(dim, end_id), src, dim, indices.slice(0, end_id));
     }
-
-    TensorInfo<scalar_t, int64_t> dst_info =
-        tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(dst));
-    TensorInfo<scalar_t, int64_t> src_info =
-        tensorInfoIfScalar(getTensorInfo<scalar_t, int64_t>(src.contiguous()));
-    int new_indexing_dim = src_info.collapseDims(dim);
-
-    if (dst.is_contiguous() && indices.is_contiguous())
-      _index_select_kernel<
-          decltype(src_info),
-          decltype(dst_info),
-          decltype(indices_info),
-          /* TrivialOffCal */ true>(
-          src_info, dst_info, indices_info, new_indexing_dim);
-    else
-      _index_select_kernel<
-          decltype(src_info),
-          decltype(dst_info),
-          decltype(indices_info),
-          /* TrivialOffCal */ false>(
-          src_info, dst_info, indices_info, new_indexing_dim);
-  });
+  } else {
+    indexSelect<scalar_t>(dst, src, dim, indices);
+  }
   return;
 }
 
@@ -1439,8 +1475,8 @@ Tensor& index_select_out(
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
       self.scalar_type(),
-      "indexSelect",
-      [=]() { impl::indexSelect<scalar_t>(out, self, dim, index); });
+      "index_select_impl",
+      [=]() { impl::index_select_impl<scalar_t>(out, self, dim, index); });
   return out;
 }
 
