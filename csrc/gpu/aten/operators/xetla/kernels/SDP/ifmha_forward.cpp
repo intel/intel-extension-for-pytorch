@@ -8,7 +8,8 @@ template <
     typename T,
     bool kUseAlibi,
     bool kUseBias,
-    bool kIsTraining>
+    bool kIsTraining,
+    bool kIsBiasBroadcast>
 class IfmhaForwardKernel;
 
 template <typename ifmha_forward_op_t, typename T>
@@ -112,7 +113,8 @@ template <
     typename T,
     bool kUseAlibi,
     bool kUseBias,
-    bool kIsTraining>
+    bool kIsTraining,
+    bool kIsBiasBroadcast>
 void ifmha_forward_impl(
     sycl::queue& q,
     T* query,
@@ -137,7 +139,7 @@ void ifmha_forward_impl(
     uint32_t attn_mask_padding) {
 #ifdef SDP_DBG
   printf(
-      "B, Bm, N, F, T0, T1, H: %d, %d, %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsTraining: %d, uAT %d, uPT %d, scale %f alibi @ 0x%llx\n",
+      "B, Bm, N, F, T0, T1, H: %d, %d, %d, %d, %d, %d, %d, UseAlibi: %d, UseBias: %d, IsTraining: %d, IsBiasBc: %d, uAT %d, uPT %d, scale %f alibi @ 0x%llx\n",
       num_batches,
       beam,
       num_heads,
@@ -148,14 +150,20 @@ void ifmha_forward_impl(
       kUseAlibi,
       kUseBias,
       kIsTraining,
+      kIsBiasBroadcast,
       alibi_padding,
       attn_mask_padding,
       sm_scale,
       (unsigned long long)alibi);
 #endif
   // ifmha forward kernel
-  using ifmha_forward_op_t =
-      ifmha_forward_t<ifmha_policy, T, kUseAlibi, kUseBias, kIsTraining>;
+  using ifmha_forward_op_t = ifmha_forward_t<
+      ifmha_policy,
+      T,
+      kUseAlibi,
+      kUseBias,
+      kIsTraining,
+      kIsBiasBroadcast>;
 
   sycl::nd_range<2> NdRange =
       ifmha_forward_op_t::get_nd_range(num_batches, beam, num_heads);
@@ -187,39 +195,51 @@ void ifmha_forward_impl(
         T,
         kUseAlibi,
         kUseBias,
-        kIsTraining>>(NdRange, kfn);
+        kIsTraining,
+        kIsBiasBroadcast>>(NdRange, kfn);
   };
   DPCPP_Q_SUBMIT(q, cgf);
 }
 
 } // namespace fmha
 
-#define CALL_IMPL_FUNC(P)                                           \
-  fmha::ifmha_forward_impl<P, T, kUseAlibi, kUseBias, kIsTraining>( \
-      q,                                                            \
-      query,                                                        \
-      key0,                                                         \
-      key1,                                                         \
-      value0,                                                       \
-      value1,                                                       \
-      index,                                                        \
-      alibi,                                                        \
-      bias,                                                         \
-      dropout,                                                      \
-      dropout_prob,                                                 \
-      sm_scale,                                                     \
-      out,                                                          \
-      num_batches,                                                  \
-      beam,                                                         \
-      num_heads,                                                    \
-      head_size,                                                    \
-      kv_len0,                                                      \
-      kv_len1,                                                      \
-      alibi_padding,                                                \
+#define CALL_IMPL_FUNC(P)   \
+  fmha::ifmha_forward_impl< \
+      P,                    \
+      T,                    \
+      kUseAlibi,            \
+      kUseBias,             \
+      kIsTraining,          \
+      kIsBiasBroadcast>(    \
+      q,                    \
+      query,                \
+      key0,                 \
+      key1,                 \
+      value0,               \
+      value1,               \
+      index,                \
+      alibi,                \
+      bias,                 \
+      dropout,              \
+      dropout_prob,         \
+      sm_scale,             \
+      out,                  \
+      num_batches,          \
+      beam,                 \
+      num_heads,            \
+      head_size,            \
+      kv_len0,              \
+      kv_len1,              \
+      alibi_padding,        \
       attn_mask_padding)
 
 /// @brief Main execution function for indexed flash mha forward.
-template <typename T, bool kUseAlibi, bool kUseBias, bool kIsTraining>
+template <
+    typename T,
+    bool kUseAlibi,
+    bool kUseBias,
+    bool kIsTraining,
+    bool kIsBiasBroadcast>
 void ifmha_forward(
     sycl::queue& q,
     T* query,
@@ -283,7 +303,8 @@ void fmha_forward_index_kernel(
     uint32_t num_keys_out,
     uint32_t alibi_padding,
     uint32_t attn_mask_padding,
-    bool is_causal) {
+    bool is_causal,
+    bool is_bias_broadcast) {
   using T = sycl::half;
   TORCH_CHECK(
       num_queries == 1,
@@ -292,41 +313,57 @@ void fmha_forward_index_kernel(
       is_causal == false,
       "SDP Index fusion kernel doesn't support causal so far ...");
 
-#define DISPATCH_TEMPLATE(T, USE_ALIBI, USE_BIAS, IS_TRAINING) \
-  ifmha_forward<T, USE_ALIBI, USE_BIAS, IS_TRAINING>(          \
-      q,                                                       \
-      (T*)query,                                               \
-      (T*)key,                                                 \
-      (T*)key_cache,                                           \
-      (T*)value,                                               \
-      (T*)value_cache,                                         \
-      index,                                                   \
-      (T*)alibi,                                               \
-      (T*)attn_mask,                                           \
-      dropout,                                                 \
-      dropout_p,                                               \
-      alpha,                                                   \
-      (T*)out,                                                 \
-      num_batches,                                             \
-      beam_width,                                              \
-      num_heads,                                               \
-      head_dim,                                                \
-      num_keys_in,                                             \
-      num_keys_out,                                            \
-      alibi_padding,                                           \
+#define DISPATCH_TEMPLATE(T, USE_ALIBI, USE_BIAS, IS_TRAINING, IS_BROADCAST) \
+  ifmha_forward<T, USE_ALIBI, USE_BIAS, IS_TRAINING, IS_BROADCAST>(          \
+      q,                                                                     \
+      (T*)query,                                                             \
+      (T*)key,                                                               \
+      (T*)key_cache,                                                         \
+      (T*)value,                                                             \
+      (T*)value_cache,                                                       \
+      index,                                                                 \
+      (T*)alibi,                                                             \
+      (T*)attn_mask,                                                         \
+      dropout,                                                               \
+      dropout_p,                                                             \
+      alpha,                                                                 \
+      (T*)out,                                                               \
+      num_batches,                                                           \
+      beam_width,                                                            \
+      num_heads,                                                             \
+      head_dim,                                                              \
+      num_keys_in,                                                           \
+      num_keys_out,                                                          \
+      alibi_padding,                                                         \
       attn_mask_padding);
 
   if (alibi) {
     if (attn_mask) {
-      DISPATCH_TEMPLATE(T, true, true, false)
+      if (is_bias_broadcast) {
+        DISPATCH_TEMPLATE(T, true, true, false, true)
+      } else {
+        DISPATCH_TEMPLATE(T, true, true, false, false)
+      }
     } else {
-      DISPATCH_TEMPLATE(T, true, false, false)
+      if (is_bias_broadcast) {
+        DISPATCH_TEMPLATE(T, true, false, false, true)
+      } else {
+        DISPATCH_TEMPLATE(T, true, false, false, false)
+      }
     }
   } else {
     if (attn_mask) {
-      DISPATCH_TEMPLATE(T, false, true, false)
+      if (is_bias_broadcast) {
+        DISPATCH_TEMPLATE(T, false, true, false, true)
+      } else {
+        DISPATCH_TEMPLATE(T, false, true, false, false)
+      }
     } else {
-      DISPATCH_TEMPLATE(T, false, false, false)
+      if (is_bias_broadcast) {
+        DISPATCH_TEMPLATE(T, false, false, false, true)
+      } else {
+        DISPATCH_TEMPLATE(T, false, false, false, false)
+      }
     }
   }
 }

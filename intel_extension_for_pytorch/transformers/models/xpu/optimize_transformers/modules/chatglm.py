@@ -30,8 +30,6 @@ from .transformer_modules.Decoderblock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
 import sys
 
-import os
-
 
 # return repeat_interleave of cache compared to original
 class NewIPEXRotaryEmbedding(nn.Module):
@@ -117,15 +115,6 @@ def prepare_inputs_for_generation(
         "return_last_logit": True,
         "use_cache": use_cache,
     }
-
-
-acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in [
-    "1",
-    "ON",
-    "Y",
-    "YES",
-    "TRUE",
-]
 
 
 class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
@@ -294,7 +283,7 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
             return
 
         IPEXTransformerAttn.beam_size = beam
-        first_token = True if acc_test or kv_cache is None else False
+        first_token = True if kv_cache is None else False
 
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]

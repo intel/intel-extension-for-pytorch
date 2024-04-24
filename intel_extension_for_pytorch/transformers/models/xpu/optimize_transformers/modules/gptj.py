@@ -24,13 +24,6 @@ enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in [
     "YES",
     "TRUE",
 ]
-acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in [
-    "1",
-    "ON",
-    "Y",
-    "YES",
-    "TRUE",
-]
 
 
 class NewIPEXGPTJBlock(IPEXTransformerBlock):

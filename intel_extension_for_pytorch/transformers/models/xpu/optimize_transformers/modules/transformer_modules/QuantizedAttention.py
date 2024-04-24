@@ -169,6 +169,24 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         )
         self.qkv_proj_quant.blocksize = self.q_proj_quant.blocksize
 
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
+
+        self.q_proj_quant.qweight.data = self.qkv_proj_quant.qweight[0, :, :]
+        self.k_proj_quant.qweight.data = self.qkv_proj_quant.qweight[1, :, :]
+        self.v_proj_quant.qweight.data = self.qkv_proj_quant.qweight[2, :, :]
+        self.q_proj_quant.scales.data = self.qkv_proj_quant.scales[0, :, :]
+        self.k_proj_quant.scales.data = self.qkv_proj_quant.scales[1, :, :]
+        self.v_proj_quant.scales.data = self.qkv_proj_quant.scales[2, :, :]
+        self.q_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros[0, :, :]
+        self.k_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros[1, :, :]
+        self.v_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros[2, :, :]
+
+        if self.qkv_proj_quant.bias is not None:
+            self.q_proj_quant.bias.data = self.qkv_proj_quant.bias[0, :, :]
+            self.k_proj_quant.bias.data = self.qkv_proj_quant.bias[1, :, :]
+            self.v_proj_quant.bias.data = self.qkv_proj_quant.bias[2, :, :]
+
     def compute_qkv_gemm(self, hidden_states, query, key, value):
         torch.ops.torch_ipex.mm_qkv_out_int4(
             hidden_states,

@@ -893,16 +893,21 @@ Tensor xetla_fsdp_index_forward(
 
   // check attn_mask padded
   uint32_t attn_mask_padding = 0;
+  bool is_broadcast = false;
   if (attn_mask.has_value()) {
     attn_mask_padding = attn_mask.value().size(-1);
     TORCH_CHECK(
         attn_mask->size(0) == query.size(0) &&
-            attn_mask->size(1) == query.size(1) &&
             attn_mask->size(2) == query.size(2),
         "unsupported attention mask size");
     TORCH_CHECK(
+        attn_mask->size(1) == 1 || attn_mask->size(1) == query.size(1),
+        "SDP index only supports attn_mask second dim with size 1 or num heads");
+    TORCH_CHECK(
         (attn_mask_padding * key.itemsize() % 8 == 0),
         "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");
+    if (attn_mask->size(1) == query.size(1))
+      is_broadcast = true;
   }
 
   uint32_t beam_width = query.size(0) / key.size(0);
@@ -944,7 +949,8 @@ Tensor xetla_fsdp_index_forward(
       num_keys_out,
       alibi_padding,
       attn_mask_padding,
-      is_causal);
+      is_causal,
+      is_broadcast);
 #else
   AT_ERROR("SDP: xetla library not found in compilation");
 #endif

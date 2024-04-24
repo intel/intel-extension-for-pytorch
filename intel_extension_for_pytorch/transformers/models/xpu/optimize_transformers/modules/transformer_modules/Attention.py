@@ -448,10 +448,9 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 if query.shape[2] != 1:
                     is_causal = True
             else:
+                assert seq_len == attention_mask.size(-1)
                 blocked_attn_mask = self.get_blocked_attn_mask(
-                    attention_mask.expand(
-                        [query.size(0), query.size(1), query.size(2), seq_len]
-                    ),
+                    attention_mask,
                     seq_len,
                 )
         blocked_alibi = None
@@ -697,15 +696,10 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         return IPEXTransformerAttnOptimizedFp16.blocked_alibi
 
     def get_blocked_attn_mask(self, attn_mask_, seq_len):
-        alignment = 8
+        alignment = 64
         if self.layer_id == 0:
             attn_mask = attn_mask_.contiguous()
-            cache_len = (
-                self.max_position
-                if self.max_position > seq_len
-                else seq_len + self.runtime_cache_size
-            )
-            align_cache_len = (cache_len + alignment - 1) // alignment * alignment
+            align_cache_len = (seq_len + alignment - 1) // alignment * alignment
             IPEXTransformerAttnOptimizedFp16.blocked_attn_mask = torch.empty(
                 (
                     attn_mask.shape[0],
