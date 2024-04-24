@@ -286,6 +286,7 @@ def auto_prepare(
 
                     hook_type = get_module_hook_type(parent_module, cur_module)
                     if hook_type is HookType.OP_HOOKS:
+                        assert parent_module is not None
                         parent_qstate: AutoQuantizationState = (
                             parent_module._auto_quant_state
                         )  # type: ignore[union-attr, assignment]
@@ -674,6 +675,7 @@ def auto_convert(
                     hook_type = get_module_hook_type(parent_module, cur_module)
                     if hook_type is HookType.OP_HOOKS:
                         # before hooks
+                        assert parent_module is not None
                         qstate: AutoQuantizationState = (
                             parent_module._auto_quant_state
                         )  # type: ignore[union-attr, assignment]
