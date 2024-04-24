@@ -349,6 +349,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 quant_cmd = ["python", qpath]
                 quant_cmd.extend(["-m", str(args.model_name_or_path)])
                 quant_cmd.extend(["--output-dir", str(args.output_dir)])
+                quant_cmd.extend(["--input-tokens", str(args.input_tokens)])
+                quant_cmd.extend(["--max-new-tokens", str(args.max_new_tokens)])
                 if args.config_file is not None:
                     quant_cmd.extend(["--config-file", str(args.config_file)])
                 if args.quant_with_amp:
