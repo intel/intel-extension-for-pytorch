@@ -372,14 +372,15 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
         batch_size = hidden_states.shape[0]
 
         if self.use_layer_norm:
-            # norm_hidden_states = self.norm1(hidden_states)
-            norm_hidden_states = torch.ops.torch_ipex.fast_layer_norm(
-                hidden_states,
-                self.norm1.normalized_shape,
-                self.norm1.weight,
-                self.norm1.bias,
-                self.norm1.eps,
-            )
+            # native layernorm performs better than `fast_layer_norm` in stable diffusion
+            norm_hidden_states = self.norm1(hidden_states)
+            # norm_hidden_states = torch.ops.torch_ipex.fast_layer_norm(
+            #     hidden_states,
+            #     self.norm1.normalized_shape,
+            #     self.norm1.weight,
+            #     self.norm1.bias,
+            #     self.norm1.eps,
+            # )
         else:
             raise ValueError("Incorrect norm used")
 
@@ -419,13 +420,15 @@ class NewIPEXBasicTransformerBlock(IPEXTransformerBlock):
         # 3. Cross-Attention
         if self.attn2 is not None:
             if self.use_layer_norm:
-                norm_hidden_states = torch.ops.torch_ipex.fast_layer_norm(
-                    hidden_states,
-                    self.norm2.normalized_shape,
-                    self.norm2.weight,
-                    self.norm2.bias,
-                    self.norm2.eps,
-                )
+                # native layernorm performs better than `fast_layer_norm` in stable diffusion
+                norm_hidden_states = self.norm2(hidden_states)
+                # norm_hidden_states = torch.ops.torch_ipex.fast_layer_norm(
+                #     hidden_states,
+                #     self.norm2.normalized_shape,
+                #     self.norm2.weight,
+                #     self.norm2.bias,
+                #     self.norm2.eps,
+                # )
             else:
                 raise ValueError("Incorrect norm")
 
