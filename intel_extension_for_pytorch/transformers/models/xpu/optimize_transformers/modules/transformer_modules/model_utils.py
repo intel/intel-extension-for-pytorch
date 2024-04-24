@@ -133,7 +133,10 @@ def qwen_sdp(self, query, key, value, attention_mask, head_mask, alibi):
                 attention_mask.logical_not(), torch.finfo(query.dtype).min
             )
     if not ipex._C._has_2d_block_array(0):
-        return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
+        attn_output, attn_weight = self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
+        if not self.is_beam_search():
+            attn_output = attn_output.permute(1, 0, 2)
+        return attn_output, attn_weight
     key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
     (
         dropout,
