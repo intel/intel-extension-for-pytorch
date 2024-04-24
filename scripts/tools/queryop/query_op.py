@@ -6,9 +6,8 @@ if key == 'CPU' or 'CUDA:
 "pytorch: https://github.com/pytorch/pytorch/tree/release/2.1"
 
 if key == 'XPU':
-"Please set up your XPU environment: install pytorch-2.1 and ipex GPU",
-"pytorch: https://github.com/intel-innersource/frameworks.ai.pytorch.private-gpu.git"
-"ipex GPU: rebase/ipex-2.1 https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-gpu.git"
+"Please set up your XPU environment: install pytorch-2.1 and Intel® Extension for PyTorch* GPU"
+"Intel® Extension for PyTorch* GPU: https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main"
 
 usage example:
 if key == CPU or CUDA:
