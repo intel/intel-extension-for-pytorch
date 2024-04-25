@@ -140,16 +140,19 @@ set "CMAKE_PREFIX_PATH="
 call conda remove mkl-static mkl-include -y
 for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
 
+call "%DPCPP_ENV%"
+call "%ONEMKL_ENV%"
+
 rem TorchVision 
 cd ..\vision
 call conda install -y --force-reinstall libpng libjpeg-turbo -c conda-forge
+set "DISTUTILS_USE_SDK=1"
 python setup.py clean
 python setup.py bdist_wheel
 
+set "DISTUTILS_USE_SDK="
 for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
 
-call "%DPCPP_ENV%"
-call "%ONEMKL_ENV%"
 
 rem TorchAudio 
 cd ..\audio
