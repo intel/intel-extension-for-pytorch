@@ -31,6 +31,7 @@ if has_triton_package():
 
     try:
         from triton.compiler.compiler import ASTSource
+        from triton.backends.compiler import GPUTarget
     except ImportError:
         warnings.warn(
             "XPU: Import error on ASTSource, if this is not the case, \
@@ -128,7 +129,8 @@ class XPUCachingAutotuner(CachingAutotuner):
                 ),
             )
 
-            target = (compile_meta["device_type"], cc)
+            warp_size = 32
+            target = GPUTarget(compile_meta["device_type"], cc, warp_size)
             options = {
                 "num_warps": compile_meta["num_warps"],
                 "num_stages": compile_meta["num_stages"],
