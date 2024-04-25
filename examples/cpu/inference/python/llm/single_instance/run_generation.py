@@ -275,24 +275,6 @@ if args.benchmark:
     with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
         enabled=amp_enabled
     ):
-        if args.profile:
-            with torch.profiler.profile(
-                activities=[torch.profiler.ProfilerActivity.CPU],
-                schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
-                on_trace_ready=trace_handler,
-            ) as prof:
-                for i in range(5):
-                    if model_type == "llava":
-                        input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in prompt])
-                        image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(amp_dtype) for img in image]
-                        output = model.generate(input_ids, images=image_tensor, **generate_kwargs)
-                    elif model_type == "git":
-                        input_ids=tokenizer(images=prompt, return_tensors="pt").pixel_values
-                        output = model.generate(pixel_values=input_ids, **generate_kwargs)
-                    else:
-                        input_ids = tokenizer(prompt, return_tensors="pt").input_ids
-                        output = model.generate(input_ids, **generate_kwargs)
-                    prof.step()
         for i in range(num_iter):
             tic = time.time()
             if model_type == "llava":
@@ -321,6 +303,25 @@ if args.benchmark:
                 total_time += toc - tic
                 if args.token_latency:
                     total_list.append(output[1])
+
+        if args.profile:
+            with torch.profiler.profile(
+                activities=[torch.profiler.ProfilerActivity.CPU],
+                schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
+                on_trace_ready=trace_handler,
+            ) as prof:
+                for i in range(5):
+                    if model_type == "llava":
+                        input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in prompt])
+                        image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(amp_dtype) for img in image]
+                        output = model.generate(input_ids, images=image_tensor, **generate_kwargs)
+                    elif model_type == "git":
+                        input_ids=tokenizer(images=prompt, return_tensors="pt").pixel_values
+                        output = model.generate(pixel_values=input_ids, **generate_kwargs)
+                    else:
+                        input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+                        output = model.generate(input_ids, **generate_kwargs)
+                    prof.step()
 
     print("\n", "-" * 10, "Summary:", "-" * 10)
     latency = total_time / (num_iter - num_warmup)

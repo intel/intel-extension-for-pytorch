@@ -634,15 +634,6 @@ else:
     cycles = args.num_iter
     warmup = args.num_warmup
     total_list = []
-    if args.profile:
-        with torch.profiler.profile(
-            activities=[torch.profiler.ProfilerActivity.CPU],
-            schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
-            on_trace_ready=trace_handler,
-        ) as prof:
-            for i in range(5):
-                gen_ids, outputs = generate()
-                prof.step()
     # latency
     for i in range(cycles):
         t0 = time.time()
@@ -655,6 +646,16 @@ else:
             total_time += t1 - t0
             if args.token_latency:
                 total_list.append(outputs[1])
+
+    if args.profile:
+        with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU],
+            schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
+            on_trace_ready=trace_handler,
+        ) as prof:
+            for i in range(5):
+                gen_ids, outputs = generate()
+                prof.step()
 
     latency = total_time / (cycles - warmup)
     print_rank0("\n", "-" * 10, "Summary:", "-" * 10)
