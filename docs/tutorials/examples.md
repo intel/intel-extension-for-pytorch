@@ -38,17 +38,30 @@ model = Model()
 criterion = ...
 optimizer = ...
 model.train()
+# Move model and loss criterion to xpu before calling ipex.optimize()
+model = model.to("xpu")
+criterion = criterion.to("xpu")
+
 # For Float32
 model, optimizer = ipex.optimize(model, optimizer=optimizer)
 # For BFloat16
 model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
 ...
-# For Float32
-output = model(data)
-...
-# For BFloat16
-with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
-  output = model(input)
+dataloader = ...
+for (input, target) in dataloader:
+    input = input.to("xpu")
+    target = target.to("xpu")
+    optimizer.zero_grad()
+    # For Float32
+    output = model(input)
+
+    # For BFloat16
+    with torch.xpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+        output = model(input)
+
+    loss = criterion(output, target)
+    loss.backward()
+    optimizer.step()
 ...
 ```
 
