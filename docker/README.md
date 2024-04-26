@@ -28,22 +28,22 @@ docker build -f docker/Dockerfile.compile --build-arg GID_RENDER=$(getent group 
 Alternatively, `./build.sh` script has docker build command to install prebuilt wheel files, update all the relevant build arguments and execute the script. Run the command below in current directory.
 
 ```bash
+export IMAGE_TYPE="xpu"
 ./build.sh 
 ```
 To pull docker images use the following command:
 
 ```bash
-docker pull intel/intel-extension-for-pytorch:xpu
+docker pull intel/intel-extension-for-pytorch:2.1.30-xpu
 ```
 ### Running container:
 
 Run the following commands to start Intel® Extension for PyTorch\* GPU container. You can use `-v` option to mount your
 local directory into the container. The `-v` argument can be omitted if you do not need
-access to a local directory in the container. Pass the video and render groups to your
-docker container so that the GPU is accessible.
+access to a local directory in the container. 
 
 ```
-IMAGE_NAME=intel/intel-extension-for-pytorch:xpu
+IMAGE_NAME=intel/intel-extension-for-pytorch:2.1.30-xpu
 ```
 ```bash
 docker run --rm \
@@ -87,18 +87,13 @@ python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch
 ```
 
 Sample output looks like below:
+```bash
+2.1.0.post2+cxx11.abi
+2.1.30+xpu
+[0]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu', driver_version='1.3.27642', has_fp64=1, total_memory=65536MB, max_compute_units=448, gpu_eu_count=448)
+[1]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu', driver_version='1.3.27642', has_fp64=1, total_memory=65536MB, max_compute_units=448, gpu_eu_count=448)
 ```
-2.1.0a0+cxx11.abi
-2.1.10+xpu
-[0]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
-[1]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
-[2]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
-[3]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
-[4]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
-[5]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
-[6]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
-[7]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu, support_fp64=1, total_memory=65536MB, max_compute_units=512, gpu_eu_count=512)
-```
+
 #### Running your own script
 
 Now you are inside container with Python 3.10, PyTorch, and Intel® Extension for PyTorch\* preinstalled. You can run your own script
