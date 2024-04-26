@@ -19,18 +19,21 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 |LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
-|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
-|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟨 | 🟩 |   |
 |GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
+|FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 |   |
 |FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Bloom| bigscience/bloom-1b7 | 🟩 | 🟨 | 🟩 | 🟩  | 🟨 |
 |CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
 |Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |    |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |    |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |    |
 |Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 |    |
 |ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
 |ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
@@ -38,9 +41,15 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 |T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 | 🟩 |    |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
-|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  |  🟩 |  |
-|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |  |  🟨 |  |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |  |  🟩 |  |
+|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  |  🟩 | 🟨 |
+|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 |  🟩 |  |
+|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|GIT| microsoft/git-base | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 |    |
 
 - 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
 
