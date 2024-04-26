@@ -131,6 +131,7 @@ git submodule update --init --recursive
 
 python -m pip install pyyaml
 COMMIT_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k commit)
+VERSION_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
 COMMIT_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k commit)
 COMMIT_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k commit)
 REPO_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
@@ -226,7 +227,7 @@ cd pytorch
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
 python -m pip install -r requirements.txt
 conda install --force-reinstall intel::mkl-static intel::mkl-include -y
-export PYTORCH_BUILD_VERSION="${COMMIT_TORCH:1}.post0+cxx11.abi"
+export PYTORCH_BUILD_VERSION=${VERSION_TORCH}
 export PYTORCH_BUILD_NUMBER=0
 # Ensure cmake can find python packages when using conda or virtualenv
 if [ -n "${CONDA_PREFIX-}" ]; then
