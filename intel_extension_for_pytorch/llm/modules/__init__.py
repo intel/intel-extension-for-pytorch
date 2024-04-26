@@ -13,7 +13,7 @@ from .mha_fusion import (
     RotaryEmbedding,
     RMSNorm,
     FastLayerNorm,
-    IndirectAccessKVCache,
+    IndirectAccessKVCacheAttention,
     PagedAttention,
     VarlenAttention,
 )

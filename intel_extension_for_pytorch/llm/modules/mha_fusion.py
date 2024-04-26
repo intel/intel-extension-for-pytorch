@@ -77,31 +77,6 @@ class RotaryEmbedding(nn.Module):
         self.pos_embd_dim = pos_embd_dim
         self.base = base
 
-    @classmethod
-    def apply_function(
-        cls,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        sin: torch.Tensor,
-        cos: torch.Tensor,
-        rotary_dim: int,
-        rotary_half: bool,
-        position_ids: torch.Tensor = None,
-    ):
-        # query, key (in/out shape) torch.Tensor :
-        #    4D: [bs, seqlen, num_head/num_kv_head, head_dim]
-        #    3D: [num_tokens, num_head/num_kv_head, head_dim]
-        # sin, cos: torch.Tensor [num_tokens, rotary_dim]
-        # position_ids (optional): torch.Tensor [bs, seqlen]
-
-        runtime_module = cls.runtime_ops.get_module_from_device(
-            query.device.type, IPEXCustomOpType.ROPE, False
-        )
-        query, key = runtime_module.rotary_embedding(
-            query, key, sin, cos, rotary_dim, rotary_half, position_ids
-        )
-        return query, key
-
     def forward(
         self,
         x: torch.Tensor,
@@ -143,6 +118,31 @@ class RotaryEmbedding(nn.Module):
             seq_len,
             num_concats,
         )
+
+    @classmethod
+    def apply_function(
+        cls,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        sin: torch.Tensor,
+        cos: torch.Tensor,
+        rotary_dim: int,
+        rotary_half: bool,
+        position_ids: torch.Tensor = None,
+    ):
+        # query, key (in/out shape) torch.Tensor :
+        #    4D: [batch, seqlen, num_head/num_kv_head, head_dim]
+        #    3D: [num_tokens, num_head/num_kv_head, head_dim]
+        # sin, cos: torch.Tensor [num_tokens, rotary_dim]
+        # position_ids (optional): torch.Tensor [batch, seqlen]
+
+        runtime_module = cls.runtime_ops.get_module_from_device(
+            query.device.type, IPEXCustomOpType.ROPE, False
+        )
+        query, key = runtime_module.rotary_embedding(
+            query, key, sin, cos, rotary_dim, rotary_half, position_ids
+        )
+        return query, key
 
 
 class FastLayerNorm(nn.Module):
@@ -501,7 +501,7 @@ class PagedAttention:
         )
 
 
-class IndirectAccessKVCache(nn.Module):
+class IndirectAccessKVCacheAttention(nn.Module):
     r"""
     kv_cache is used to reduce computation for **Decoder** layer but it also brings memory overheads,
     for example, when using beam search, the kv_cache should be reordered according to the latest beam
@@ -540,7 +540,7 @@ class IndirectAccessKVCache(nn.Module):
     - new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).
 
     Notes:
-    - How to reorder KV cache when using the format of IndirectAccessKVCache (e.g., on llama model
+    - How to reorder KV cache when using the format of IndirectAccessKVCacheAttention (e.g., on llama model
       see https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318)
         def _reorder_cache(
             self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
@@ -552,7 +552,7 @@ class IndirectAccessKVCache(nn.Module):
                     layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
                 return past_key_values
 
-    [Direct function call] This module also provides a `.apply_function` function call to apply IndirectAccessKVCache
+    [Direct function call] This module also provides a `.apply_function` function call to apply IndirectAccessKVCacheAttention
                            without initializing the module.
     Args:
     - The parameters are the same as the forward call.
@@ -581,7 +581,7 @@ class IndirectAccessKVCache(nn.Module):
         text_max_length: Optional[int] = 0,
     ):
         return cls.runtime_ops.get_module_from_device(
-            query.device.type, IPEXCustomOpType.INDIRECTACCESS_KVCACHE, False
+            query.device.type, IPEXCustomOpType.INDIRECTACCESS_KVCACHE_ATTENTION, False
         ).apply_function(
             query,
             key,
@@ -627,7 +627,7 @@ class IndirectAccessKVCache(nn.Module):
 
         runtime_module = self.runtime_ops.get_module_from_device(
             query.device.type,
-            IPEXCustomOpType.INDIRECTACCESS_KVCACHE,
+            IPEXCustomOpType.INDIRECTACCESS_KVCACHE_ATTENTION,
             True,
             self.text_max_length,
         )

@@ -44,7 +44,7 @@ class IPEXCustomOpType(Enum):
     PAGED_ATTENTION: int = 11
     FAST_LAYERNORM: int = 12
     VARLEN_ATTENTION: int = 13
-    INDIRECTACCESS_KVCACHE: int = 14
+    INDIRECTACCESS_KVCACHE_ATTENTION: int = 14
 
 
 CPU_fusion_modules = {
@@ -53,7 +53,7 @@ CPU_fusion_modules = {
     IPEXCustomOpType.PAGED_ATTENTION: _IPEXPagedAttentionCPU,
     IPEXCustomOpType.FAST_LAYERNORM: _IPEXFastLayerNormCPU,
     IPEXCustomOpType.VARLEN_ATTENTION: _IPEXVarlenScaledDotProductCPU,
-    IPEXCustomOpType.INDIRECTACCESS_KVCACHE: _IPEXScaleDotProductCPU,
+    IPEXCustomOpType.INDIRECTACCESS_KVCACHE_ATTENTION: _IPEXScaleDotProductCPU,
     IPEXCustomOpType.LINEAR_SILU: _IPEXlinearSiluCPU,
     IPEXCustomOpType.LINEAR_SILU_MUL: _IPEXlinearSiluAndMulCPU,
     IPEXCustomOpType.LINEAR2_SILU_MUL: _IPEXlinearSiluMulCPU,

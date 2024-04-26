@@ -11,7 +11,7 @@ from intel_extension_for_pytorch.llm.modules import (
     RotaryEmbedding,
     RMSNorm,
     FastLayerNorm,
-    IndirectAccessKVCache,
+    IndirectAccessKVCacheAttention,
     VarlenAttention,
 )
 
@@ -44,6 +44,7 @@ def rotary_embedding(
     Return
     - query, key (torch.Tensor): [batch size, sequence length, num_head/num_kv_head, head_dim]
                                  or [num_tokens, num_head/num_kv_head, head_dim].
+
     """
     return RotaryEmbedding.apply_function(
         query, key, sin, cos, rotary_dim, rotary_half, position_ids
@@ -58,6 +59,7 @@ def rms_norm(hidden_states: torch.Tensor, weight: torch.Tensor, eps: float):
     - hidden_states(torch.Tensor) : the input tensor to apply RMSNorm.
     - weight (torch.Tensor): the weight to apply RMSnorm.
     - eps (float) : the variance_epsilon to apply RMSnorm.
+
     """
     return RMSNorm.apply_function(hidden_states, weight, eps)
 
@@ -78,6 +80,7 @@ def fast_layer_norm(
     - weight (torch.Tensor): the weight to apply normalization.
     - bias (torch.Tensor): an additive bias for normalization.
     - eps (float): a value added to the denominator for numerical stability.
+
     """
 
     return FastLayerNorm.apply_function(
@@ -85,7 +88,7 @@ def fast_layer_norm(
     )
 
 
-def indirect_access_kv_cache(
+def indirect_access_kv_cache_attention(
     query: torch.Tensor,
     key: torch.Tensor,
     value: torch.Tensor,
@@ -132,7 +135,7 @@ def indirect_access_kv_cache(
     - new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).
 
     Notes:
-    - How to reorder KV cache when using the format of IndirectAccessKVCache (e.g., on llama model
+    - How to reorder KV cache when using the format of IndirectAccessKVCacheAttention (e.g., on llama model
       see https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318)
         def _reorder_cache(
             self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
@@ -145,7 +148,7 @@ def indirect_access_kv_cache(
                 return past_key_values
 
     """
-    return IndirectAccessKVCache.apply_function(
+    return IndirectAccessKVCacheAttention.apply_function(
         query,
         key,
         value,
@@ -180,6 +183,7 @@ def varlen_attention(
     Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value
                               (see https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html),
                               and accept the variant (different) sequence length among the query, key and value.
+
     Args:
         module init: this module does not have args for module init
         forward:
@@ -194,6 +198,7 @@ def varlen_attention(
         - pdropout (float): dropout probability; if greater than 0.0, dropout is applied, default is 0.0.
         - softmax_scale (float): scaling factor applied is prior to softmax.
         - is_causal (bool): whether to apply causal attention masking, default is True.
+
     """
     return VarlenAttention.apply_function(
         query,
