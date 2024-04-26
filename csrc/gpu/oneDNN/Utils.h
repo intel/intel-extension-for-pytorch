@@ -269,6 +269,15 @@ inline bool onednn_strides_check(const Tensor& src) {
   dnnl_memory_desc_query(md, dnnl_query_format_kind, &md_fmt_kind);
   dnnl_memory_desc_query(md, dnnl_query_ndims_s32, &md_ndims);
   dnnl_memory_desc_query(md, dnnl_query_padded_dims, &md_padded_dims);
+  auto block_size = 1;
+  // const auto& blk = md->format_desc.blocking;
+  dnnl_dims_t md_inner_blks;
+  dnnl_dims_t md_blk_inner_idxs;
+  dnnl_memory_desc_query(md, dnnl_query_inner_idxs, &md_blk_inner_idxs);
+  dnnl_memory_desc_query(md, dnnl_query_inner_blks, &md_inner_blks);
+
+  dnnl_memory_desc_destroy(md);
+
   if (strides == nullptr || md_ndims == 0 ||
       md_fmt_kind != dnnl_format_kind_t::dnnl_blocked)
     return true;
@@ -288,12 +297,6 @@ inline bool onednn_strides_check(const Tensor& src) {
     blocks[d] = 1;
   }
 
-  auto block_size = 1;
-  // const auto& blk = md->format_desc.blocking;
-  dnnl_dims_t md_inner_blks;
-  dnnl_dims_t md_blk_inner_idxs;
-  dnnl_memory_desc_query(md, dnnl_query_inner_idxs, &md_blk_inner_idxs);
-  dnnl_memory_desc_query(md, dnnl_query_inner_blks, &md_inner_blks);
   for (int iblk = 0; iblk < md_inner_nblks; ++iblk) {
     blocks[md_blk_inner_idxs[iblk]] *= md_inner_blks[iblk];
     block_size *= md_inner_blks[iblk];
