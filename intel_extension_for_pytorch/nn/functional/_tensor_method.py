@@ -3,14 +3,14 @@ from torch.overrides import has_torch_function_unary, handle_torch_function
 from ...utils._logger import logger
 
 
-def _numpy(x):
+def _numpy(x, force=False):
     if x.dtype == torch.bfloat16:
         logger.warning(
             "calling in ipex numpy which is not share memory with torch tensor for bfloat16 input."
         )
-        return torch._C._TensorBase.numpy(x.float())
+        return torch._C._TensorBase.numpy(x.float(), force=force)
     else:
-        return torch._C._TensorBase.numpy(x)
+        return torch._C._TensorBase.numpy(x, force=force)
 
 
 # Fix https://github.com/pytorch/pytorch/issues/82764

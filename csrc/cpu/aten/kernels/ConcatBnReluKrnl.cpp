@@ -92,7 +92,8 @@ at::Tensor concat_bn_relu_kernel_impl(
   }
 #if defined(CPU_CAPABILITY_AVX512)
   if (tensor_check) {
-    at::Tensor output = at::empty(output_dim, a[0].options());
+    at::Tensor output = at::empty(
+        output_dim, a[0].options().memory_format(a[0].suggest_memory_format()));
     if (a[0].scalar_type() == at::kBFloat16) {
       ConcatBnReluKernelImpl_ChannelsLast<at::BFloat16>(
           a, bn_scale, bn_beta, output);
