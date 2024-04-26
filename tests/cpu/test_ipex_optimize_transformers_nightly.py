@@ -15,6 +15,7 @@ from hf_configs.qwen.modeling_qwen import QWenLMHeadModel
 from hf_configs.llava.modeling_llavallama import LlavaLlamaForCausalLM
 from hf_configs.yuan.yuan_hf_model import YuanForCausalLM
 from hf_configs.phi.modeling_phi import PhiForCausalLM
+from hf_configs.phi3.modeling_phi3 import Phi3ForCausalLM
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _disable_tpp
 
 try:
@@ -160,6 +161,13 @@ supported_models = [
     model_info(
         "phi",
         PhiForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
+        "phi3",
+        Phi3ForCausalLM,
         True,
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,

@@ -192,6 +192,7 @@ def _beam_search(
             "LlavaLlamaForCausalLM",
             "YuanForCausalLM",
             "PhiForCausalLM",
+            "Phi3ForCausalLM",
         ]:
             first_token = False
             has_position_id = model_inputs.get("position_ids", None) is not None

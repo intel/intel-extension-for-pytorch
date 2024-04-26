@@ -6,9 +6,34 @@ from torch.nn import functional as F
 
 
 class RotaryEmbedding(torch.nn.Module):
-    def __init__(self, max_position_embeddings, dim, backbone, base=10000):
+    def __init__(self, max_position_embeddings, dim, backbone, base=10000, kwargs=None):
         super().__init__()
-        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        self.scaling_factor = 1.0
+        if kwargs is not None and "short_factor" in kwargs:
+            self.short_factor = kwargs["short_factor"]
+            ext_factors = torch.tensor(self.short_factor, dtype=torch.float32)
+            inv_freq = 1.0 / (
+                ext_factors * base ** (torch.arange(0, dim, 2).float() / dim)
+            )
+        else:
+            inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        if kwargs is not None and "long_factor" in kwargs:
+            self.long_factor = kwargs["long_factor"]
+            new_ext_factors = torch.tensor(self.long_factor, dtype=torch.float32)
+            new_inv_freq = 1.0 / (
+                new_ext_factors * base ** (torch.arange(0, dim, 2).float() / dim)
+            )
+            self.new_inv_freq = new_inv_freq
+        if kwargs is not None and "original_max_position_embeddings" in kwargs:
+            self.original_max_position_embeddings = kwargs[
+                "original_max_position_embeddings"
+            ]
+            scale = max_position_embeddings / self.original_max_position_embeddings
+            if scale > 1.0:
+                self.scaling_factor = math.sqrt(
+                    1
+                    + math.log(scale) / math.log(self.original_max_position_embeddings)
+                )
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         self.max_seq_len_cached = max_position_embeddings
         t = torch.arange(
@@ -28,20 +53,30 @@ class RotaryEmbedding(torch.nn.Module):
             self.cos_cached = self.emb.cos()[None, :, :]
             self.sin_cached = self.emb.sin()[None, :, :]
         else:
-            self.sin_cos = torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
+            self.sin_cos = (
+                torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
+                * self.scaling_factor
+            )
             self.emb = torch.cat((freqs, freqs), dim=-1)
             self.register_buffer(
-                "cos_cached", self.emb.cos()[None, None, :, :], persistent=False
+                "cos_cached",
+                self.emb.cos()[None, None, :, :] * self.scaling_factor,
+                persistent=False,
             )
             self.register_buffer(
-                "sin_cached", self.emb.sin()[None, None, :, :], persistent=False
+                "sin_cached",
+                self.emb.sin()[None, None, :, :] * self.scaling_factor,
+                persistent=False,
             )
 
     def forward(self, seq_len=None):
         if seq_len is not None and seq_len > self.max_seq_len_cached:
             self.max_seq_len_cached = seq_len
             t = torch.arange(self.max_seq_len_cached, dtype=self.inv_freq.dtype)
-            freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+            if hasattr(self, "long_factor"):
+                freqs = torch.einsum("i,j->ij", t, self.new_inv_freq)
+            else:
+                freqs = torch.einsum("i,j->ij", t, self.inv_freq)
             if (
                 self.model_backbone == "FalconForCausalLM"
                 or self.model_backbone == "RWForCausalLM"
@@ -53,10 +88,13 @@ class RotaryEmbedding(torch.nn.Module):
                 self.cos_cached = self.emb.cos()[None, :, :]
                 self.sin_cached = self.emb.sin()[None, :, :]
             else:
-                self.sin_cos = torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
+                self.sin_cos = (
+                    torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
+                    * self.scaling_factor
+                )
                 self.emb = torch.cat((freqs, freqs), dim=-1)
-                self.cos_cached = self.emb.cos()[None, None, :, :]
-                self.sin_cached = self.emb.sin()[None, None, :, :]
+                self.cos_cached = self.emb.cos()[None, None, :, :] * self.scaling_factor
+                self.sin_cached = self.emb.sin()[None, None, :, :] * self.scaling_factor
                 self.cos_cached[:, :, :seq_len, ...]
                 self.sin_cached[:, :, :seq_len, ...]
         return self.sin_cos, self.sin_cached, self.cos_cached
@@ -69,11 +107,12 @@ class _IPEXRopeRef(nn.Module):
         pos_embd_dim,
         base=10000,
         backbone=None,
+        kwargs=None,
     ):
         super().__init__()
         self.model_backbone = backbone
         self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, backbone, base
+            max_position_embeddings, pos_embd_dim, backbone, base, kwargs
         )
 
     def rotate_every_two(self, x: torch.Tensor) -> torch.Tensor:
@@ -216,6 +255,12 @@ class _IPEXRopeRef(nn.Module):
                 ),
                 dim=-1,
             )
+        elif self.model_backbone == "Phi3ForCausalLM":
+            x = x.view(x.shape[0], -1, num_head, head_dim)
+            x = x.transpose(1, 2)
+            cos = _cos[..., seq_len - x.shape[2] : seq_len, :]
+            sin = _sin[..., seq_len - x.shape[2] : seq_len, :]
+            x = (x * cos) + (self.rotate_half(x) * sin)
         elif self.model_backbone == "QWenLMHeadModel":
             x = x.view(x.size(0), x.size(1), num_head, head_dim)
             b, sq, np, hn = x.size(0), x.size(1), x.size(2), x.size(3)
@@ -297,6 +342,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             "LlavaLlamaForCausalLM",
             "YuanForCausalLM",
             "PhiForCausalLM",
+            "Phi3ForCausalLM",
         ]:
             self.num_key_value_groups = (
                 module.num_key_value_groups
@@ -513,6 +559,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             "StableLmForCausalLM",
             "YuanForCausalLM",
             "PhiForCausalLM",
+            "Phi3ForCausalLM",
         ]:
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)

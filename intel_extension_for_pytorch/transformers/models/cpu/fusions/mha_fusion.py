@@ -11,10 +11,11 @@ class _IPEXRopeCPU(nn.Module):
         pos_embd_dim,
         base=10000,
         backbone=None,
+        kwargs=None,
     ):
         super().__init__()
         self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, backbone, base
+            max_position_embeddings, pos_embd_dim, backbone, base, kwargs
         )
 
     def forward(

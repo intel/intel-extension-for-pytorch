@@ -206,5 +206,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
                     tpp=tpp,
                     woq=woq,
                 )
+        elif self.model_backbone == "Phi3ForCausalLM":
+            if not self.distributed:
+                self.mlp_linear_add = _IPEXlinearAddCPU(
+                    module.mlp_linear_add.linear, tpp=tpp, woq=woq
+                )
+                self.mha_linear_add = _IPEXlinearAddCPU(
+                    module.mha_linear_add.linear, tpp=tpp, woq=woq
+                )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
