@@ -252,7 +252,7 @@ class HuggingFaceModel(BaseLM):
 
         # For now, Falcon, baichuan and gptbigcode have accuracy issue with from_config with deepspeed meta device load.
         # TODO: we will change the scope once deepspeed providing the support
-        if world_size == 1 or model_type in ["falcon", "baichuan", "gptbigcode", "qwen"]:
+        if world_size == 1 or model_type in ["falcon", "baichuan", "gptbigcode", "qwen", "yuan"]:
             self.model = model_class[0].from_pretrained(
                 model_id,
                 config=self.config,
@@ -578,6 +578,8 @@ class HuggingFaceModel(BaseLM):
 
     @property
     def max_gen_toks(self):
+        if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
+            return 1024
         return 256
 
     @property
@@ -603,6 +605,67 @@ class HuggingFaceModel(BaseLM):
             generation_kwargs["eos_token_id"] = eos_token_id
             generation_kwargs["pad_token_id"] = eos_token_id
         return self.model.generate(context, **generation_kwargs)
+
+    def greedy_until(self, requests):
+        res = []
+
+        def _collate(x):
+            # the negative sign on len(toks) sorts descending - this has a few advantages:
+            # - time estimates will always be over not underestimates, which is more useful for planning
+            # - to know the size of a batch when going through the list, you know the first one is always the batch
+            #   padded context length. this is useful to simplify the batching logic and more importantly to make
+            #   automatic adaptive batches much much easier to implement
+            # - any OOMs will happen right away rather than near the end
+
+            toks = self.tok_encode(x[0])
+            return -len(toks), x[0]
+
+        re_ord = utils.Reorderer(requests, _collate)
+
+        warn_stop_seq = False
+        for context, request_args in tqdm(re_ord.get_reordered()):
+            until = request_args["until"]
+            if isinstance(until, str):
+                until = [until]
+
+            if until:
+                try:
+                    (primary_until,) = self.tok_encode(until[0])
+                except ValueError:
+                    if not warn_stop_seq:
+                        print(
+                            "Warning: a primary stop sequence is multi-token! Will default to EOS token for this tokenizer. Consider using `hf-causal-experimental` for multi-token stop sequence support for the time being."
+                        )
+                        warn_stop_seq = True
+                    primary_until = self.eot_token_id
+            else:
+                primary_until = None
+            if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
+                context = "详细分析并求解以下数学问题。\n" + context.replace("问题: ", "").replace("\n逐步解答:", "<sep>")
+            context_enc = torch.tensor(
+                [self.tok_encode(context)[self.max_gen_toks - self.max_length :]]
+            ).to(self.device)
+
+            max_gen_tokens = min(
+                self.max_gen_toks, request_args.get("max_length", self.max_gen_toks)
+            )
+            cont = self._model_generate(
+                context_enc, context_enc.shape[1] + max_gen_tokens, primary_until
+            )
+
+            s = self.tok_decode(cont[0].tolist()[context_enc.shape[1] :])
+            if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
+                s = s.replace("\n", "").split("<eod>")[0]
+
+            for term in until:
+                s = s.split(term)[0]
+
+            # partial caching
+            self.cache_hook.add_partial("greedy_until", (context, until), s)
+
+            res.append(s)
+
+        return re_ord.get_original(res)
 
 class HuggingFaceSeq2SeqModel(HuggingFaceModel):
     """Seq2Seq language modeling.
