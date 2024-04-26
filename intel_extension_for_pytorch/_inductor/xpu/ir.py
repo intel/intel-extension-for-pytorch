@@ -2,7 +2,6 @@ import torch
 from typing import List, Optional, Any, Set
 from torch._inductor.ir import (
     ExternKernelAlloc,
-    MutationLayout,
     Layout,
     FixedLayout,
     FlexibleLayout,

@@ -1,7 +1,6 @@
 from typing import Optional, Tuple
 import torch
 import sys
-from typing import Tuple
 from intel_extension_for_pytorch.transformers.models.xpu.fusions.activation_fusion import (  # noqa F401
     silu_mul_xpu,
     gelu_mul_xpu,

@@ -1,11 +1,8 @@
 import functools
 import multiprocessing
 import os
-import signal
 import sys
 from concurrent.futures import ProcessPoolExecutor
-from threading import Thread
-from time import sleep
 from types import ModuleType
 
 from typing import Union, Set

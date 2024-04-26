@@ -10,14 +10,11 @@ from typing import Any, Callable, Dict, List, Optional
 
 import torch
 
-from torch._dynamo.utils import dynamo_timed, get_first_attr
+from torch._dynamo.utils import get_first_attr
 from torch._inductor import config
 from torch._inductor.ir import ReductionHint, TileHint
 from torch._inductor.triton_heuristics import AutotuneHint  # noqa
 from torch._inductor.utils import get_num_bytes, create_bandwidth_info_str, do_bench
-
-from .utils import has_triton
-from torch._C import _xpu_getCurrentRawStream as get_xpu_stream
 
 from torch.utils._triton import has_triton_package
 

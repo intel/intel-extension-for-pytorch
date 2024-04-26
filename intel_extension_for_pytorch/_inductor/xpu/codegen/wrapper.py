@@ -1,5 +1,4 @@
 import contextlib
-import dataclasses
 import sympy
 
 from torch._dynamo.utils import dynamo_timed

@@ -2,83 +2,6 @@ import torch
 import torch.nn as nn
 from typing import Optional, Tuple
 from .utils import IPEXRuntimeCustomOps, IPEXCustomOpType
-from enum import Enum
-from intel_extension_for_pytorch.transformers.models.cpu.fusions.mha_fusion import (
-    _IPEXRopeCPU,
-    _IPEXRMSNormCPU,
-    _IPEXPagedAttentionCPU,
-    _IPEXVarlenScaledDotProductCPU,
-    _IPEXFastLayerNormCPU,
-)
-
-from intel_extension_for_pytorch.transformers.models.xpu.fusions.mha_fusion import (
-    _IPEXFastLayerNormXPU,
-    _IPEXRopeXPU,
-    _IPEXRMSNormXPU,
-    _IPEXPagedAttentionXPU,
-    _IPEXVarlenScaledDotProductXPU,
-)
-
-
-class IPEXCustomOpType(Enum):
-    ROPE: int = 0
-    RMS_NORM: int = 1
-    PAGED_ATTENTION: int = 2
-    FAST_LAYERNORM: int = 3
-    VARLEN_ATTENTION: int = 4
-
-
-CPU_mha_fusion_modules = {
-    IPEXCustomOpType.ROPE: _IPEXRopeCPU,
-    IPEXCustomOpType.RMS_NORM: _IPEXRMSNormCPU,
-    IPEXCustomOpType.PAGED_ATTENTION: _IPEXPagedAttentionCPU,
-    IPEXCustomOpType.FAST_LAYERNORM: _IPEXFastLayerNormCPU,
-    IPEXCustomOpType.VARLEN_ATTENTION: _IPEXVarlenScaledDotProductCPU,
-}
-
-XPU_mha_fusion_modules = {
-    IPEXCustomOpType.ROPE: _IPEXRopeXPU,
-    IPEXCustomOpType.RMS_NORM: _IPEXRMSNormXPU,
-    IPEXCustomOpType.PAGED_ATTENTION: _IPEXPagedAttentionXPU,
-    IPEXCustomOpType.FAST_LAYERNORM: _IPEXFastLayerNormXPU,
-    IPEXCustomOpType.VARLEN_ATTENTION: _IPEXVarlenScaledDotProductXPU,
-}
-
-
-class IPEXRuntimeCustomOps:
-    def __init__(self):
-        super().__init__()
-        self.device_type = None
-        self.runtime_module = None
-        self.mha_fusion_modules = {
-            "cpu": CPU_mha_fusion_modules,
-            "xpu": XPU_mha_fusion_modules,
-        }
-
-    def get_module_from_device(
-        self,
-        device_type: str,
-        ops: IPEXCustomOpType,
-        is_instance: bool,
-        *args,
-        **kwargs,
-    ):
-        if device_type is not self.device_type:
-            assert device_type in [
-                "cpu",
-                "xpu",
-            ], f"""The input parameter's device is not supported in ipex, we only support XPU and CPU device,
-                "but what we get is {device_type}."""
-            if not is_instance:
-                self.runtime_module = self.mha_fusion_modules[device_type][ops]
-                return self.runtime_module
-            else:
-                self.runtime_module = self.mha_fusion_modules[device_type][ops](
-                    *args, **kwargs
-                )
-                return self.runtime_module
-
-        return self.runtime_module
 
 
 class RotaryEmbedding(nn.Module):
@@ -220,31 +143,6 @@ class RotaryEmbedding(nn.Module):
             seq_len,
             num_concats,
         )
-
-    @classmethod
-    def apply_function(
-        cls,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        sin: torch.Tensor,
-        cos: torch.Tensor,
-        rotary_dim: int,
-        rotary_half: bool,
-        position_ids: torch.Tensor = None,
-    ):
-        # query, key (in/out shape) torch.Tensor :
-        #    4D: [batch, seqlen, num_head/num_kv_head, head_dim]
-        #    3D: [num_tokens, num_head/num_kv_head, head_dim]
-        # sin, cos: torch.Tensor [num_tokens, rotary_dim]
-        # position_ids (optional): torch.Tensor [batch, seqlen]
-
-        runtime_module = cls.runtime_ops.get_module_from_device(
-            query.device.type, IPEXCustomOpType.ROPE, False
-        )
-        query, key = runtime_module.rotary_embedding(
-            query, key, sin, cos, rotary_dim, rotary_half, position_ids
-        )
-        return query, key
 
 
 class FastLayerNorm(nn.Module):

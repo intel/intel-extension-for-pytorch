@@ -56,7 +56,9 @@ class TestTorchMethod(TestCase):
                 r_cpu.backward(grad)
                 r_xpu.backward(grad_xpu)
 
-                self.assertEqual(r_cpu.float(), r_xpu.cpu().float(), atol=1e-2, rtol=1e-1)
+                self.assertEqual(
+                    r_cpu.float(), r_xpu.cpu().float(), atol=1e-2, rtol=1e-1
+                )
                 self.assertEqual(
                     query_states.grad.float(),
                     query_states_xpu.grad.cpu().float(),

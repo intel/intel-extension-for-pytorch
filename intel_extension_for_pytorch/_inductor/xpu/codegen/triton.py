@@ -6,12 +6,11 @@ import torch  # noqa
 import torch._logging
 
 from functools import lru_cache
-from torch.utils._sympy.value_ranges import ValueRanges
 from torch._dynamo.utils import counters
 from torch._inductor.ir import ReductionHint
 from torch._inductor.codecache import code_hash
 
-from torch._inductor.virtualized import ops, V
+from torch._inductor.virtualized import V
 from torch._inductor.codegen.multi_kernel import MultiKernel
 from torch._inductor.codegen.common import (
     IndentedBuffer,

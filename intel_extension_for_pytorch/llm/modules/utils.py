@@ -20,6 +20,14 @@ from intel_extension_for_pytorch.transformers.models.cpu.fusions.mha_fusion impo
     _IPEXPagedAttentionCPU,
 )
 
+from intel_extension_for_pytorch.transformers.models.xpu.fusions.mha_fusion import (
+    _IPEXFastLayerNormXPU,
+    _IPEXRopeXPU,
+    _IPEXRMSNormXPU,
+    _IPEXPagedAttentionXPU,
+    _IPEXVarlenScaledDotProductXPU,
+)
+
 
 class IPEXCustomOpType(Enum):
     LINEAR_SILU: int = 0
@@ -58,6 +66,15 @@ CPU_fusion_modules = {
 }
 
 
+XPU_fusion_modules = {
+    IPEXCustomOpType.ROPE: _IPEXRopeXPU,
+    IPEXCustomOpType.RMS_NORM: _IPEXRMSNormXPU,
+    IPEXCustomOpType.PAGED_ATTENTION: _IPEXPagedAttentionXPU,
+    IPEXCustomOpType.FAST_LAYERNORM: _IPEXFastLayerNormXPU,
+    IPEXCustomOpType.VARLEN_ATTENTION: _IPEXVarlenScaledDotProductXPU,
+}
+
+
 class IPEXRuntimeCustomOps:
     def __init__(self):
         super().__init__()
@@ -65,6 +82,7 @@ class IPEXRuntimeCustomOps:
         self.runtime_module = None
         self.fusion_modules = {
             "cpu": CPU_fusion_modules,
+            "xpu": XPU_fusion_modules,
         }
 
     def get_module_from_device(
@@ -78,7 +96,8 @@ class IPEXRuntimeCustomOps:
         if device_type is not self.device_type:
             assert device_type in [
                 "cpu",
-            ], f"""The input parameter's device is not supported in ipex, we only support CPU device,
+                "xpu",
+            ], f"""The input parameter's device is not supported in ipex, we only support XPU and CPU device,
                 "but what we get is {device_type}."""
             self.device_type = device_type
             if not is_instance:

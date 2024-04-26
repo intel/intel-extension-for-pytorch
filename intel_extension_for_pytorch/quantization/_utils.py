@@ -708,9 +708,9 @@ def save_quant_state(quant_state_map, configure_file):
                                 cur_tensor_infos["scale"] = v.tensor_id_to_scale_zp[
                                     tensor_info.id
                                 ][0].tolist()
-                                cur_tensor_infos[
-                                    "zero_point"
-                                ] = v.tensor_id_to_scale_zp[tensor_info.id][1].tolist()
+                                cur_tensor_infos["zero_point"] = (
+                                    v.tensor_id_to_scale_zp[tensor_info.id][1].tolist()
+                                )
                             else:
                                 scales_dict = v.tensor_id_to_scale_zp[tensor_info.id][0]
                                 zp_dict = v.tensor_id_to_scale_zp[tensor_info.id][1]
@@ -742,9 +742,9 @@ def save_quant_state(quant_state_map, configure_file):
                             scaling_factors_to_save = {}
                             for key, val in scaling_factor_dict.items():
                                 scaling_factors_to_save.update({key: val.tolist()})
-                            cur_tensor_infos[
-                                "smooth_quant_scaling_factor"
-                            ] = scaling_factors_to_save
+                            cur_tensor_infos["smooth_quant_scaling_factor"] = (
+                                scaling_factors_to_save
+                            )
                             smooth_quant_enabled = True
                     input_tensor_infos.append(cur_tensor_infos)
                 info["input_tensor_infos"] = input_tensor_infos
@@ -773,11 +773,11 @@ def save_quant_state(quant_state_map, configure_file):
                                 ]
                                 is not None
                             ):
-                                cur_tensor_infos[
-                                    "smooth_quant_scaling_factor"
-                                ] = v.weight_tensor_id_to_smooth_quant_scaling_factor[
-                                    weight_idx
-                                ].tolist()
+                                cur_tensor_infos["smooth_quant_scaling_factor"] = (
+                                    v.weight_tensor_id_to_smooth_quant_scaling_factor[
+                                        weight_idx
+                                    ].tolist()
+                                )
                     weight_tensor_infos.append(cur_tensor_infos)
                 info["weight_tensor_infos"] = weight_tensor_infos
                 # output infos
@@ -795,9 +795,9 @@ def save_quant_state(quant_state_map, configure_file):
                                 cur_tensor_infos["scale"] = v.tensor_id_to_scale_zp[
                                     tensor_info.id
                                 ][0].tolist()
-                                cur_tensor_infos[
-                                    "zero_point"
-                                ] = v.tensor_id_to_scale_zp[tensor_info.id][1].tolist()
+                                cur_tensor_infos["zero_point"] = (
+                                    v.tensor_id_to_scale_zp[tensor_info.id][1].tolist()
+                                )
                             else:
                                 scales_dict = v.tensor_id_to_scale_zp[tensor_info.id][0]
                                 zp_dict = v.tensor_id_to_scale_zp[tensor_info.id][1]
@@ -829,9 +829,9 @@ def save_quant_state(quant_state_map, configure_file):
                                 scaling_factors_to_save = {}
                                 for key, val in scaling_factors.items():
                                     scaling_factors_to_save.update({key: val.tolist()})
-                            cur_tensor_infos[
-                                "smooth_quant_scaling_factor"
-                            ] = scaling_factors_to_save
+                            cur_tensor_infos["smooth_quant_scaling_factor"] = (
+                                scaling_factors_to_save
+                            )
                     output_tensor_infos.append(cur_tensor_infos)
                 info["output_tensor_infos"] = output_tensor_infos
                 # qconfig
@@ -847,9 +847,9 @@ def save_quant_state(quant_state_map, configure_file):
                     info["activation_observer"]["act_observer"] = _get_observer_setting(
                         op_info.qconfig.activation().act_obs
                     )
-                    info["activation_observer"][
-                        "act_ic_observer"
-                    ] = _get_observer_setting(op_info.qconfig.activation().ic_obs)
+                    info["activation_observer"]["act_ic_observer"] = (
+                        _get_observer_setting(op_info.qconfig.activation().ic_obs)
+                    )
                     info["share_weight_observers"] = getattr(
                         op_info.qconfig, "share_weight_observers", True
                     )
