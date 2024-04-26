@@ -1224,6 +1224,55 @@ def PhiDecoderLayer_forward(
     return outputs
 
 
+def Phi3DecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+    hidden_states = self.input_layernorm(hidden_states)
+    # Self Attention
+    attn_outputs, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(attn_outputs, residual)
+    else:
+        attn_outputs = self.self_attn.o_proj(attn_outputs)
+        hidden_states = residual + attn_outputs
+
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+    # hidden_states = self.mlp(hidden_states)
+    up_states = self.mlp.gate_up_proj(hidden_states)
+    gate, up_states = up_states.chunk(2, dim=-1)
+    up_states = up_states * self.mlp.activation_fn(gate)
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(up_states, residual)
+    else:
+        hidden_states = self.mlp.down_proj(up_states)
+        hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1415,6 +1464,12 @@ class _IPEXDecoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["mlp"].fc2
             self.linear_gelu = _IPEXlinearNewGeluRef(module.mlp.fc1)
             del self.__dict__["_modules"]["mlp"].fc1
+        elif self.model_backbone == "Phi3ForCausalLM":
+            if not self.distributed:
+                self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
+                del self.__dict__["_modules"]["mlp"].down_proj
+                self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
+                del self.__dict__["_modules"]["self_attn"].o_proj
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -1637,6 +1692,16 @@ class _IPEXDecoderLayerRef(nn.Module):
             )
         elif self.model_backbone == "PhiForCausalLM":
             return PhiDecoderLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                output_attentions,
+                use_cache,
+                past_key_value,
+            )
+        elif self.model_backbone == "Phi3ForCausalLM":
+            return Phi3DecoderLayer_forward(
                 self,
                 hidden_states,
                 attention_mask,

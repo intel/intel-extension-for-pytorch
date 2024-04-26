@@ -186,6 +186,7 @@ def model_convert_reference(_model):
         YuanModel_forward,
         PhiForCausalLM_forward,
         PhiModel_forward,
+        Phi3Model_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
         prepare_inputs_for_generation_llama,
@@ -379,7 +380,10 @@ def model_convert_reference(_model):
     yuan_attention = None
     if _model.config.architectures[0] == "YuanForCausalLM":
         yuan_attention = type(_model.model.layers[0].self_attn)
-    if _model.config.architectures[0] in ["YuanForCausalLM", "PhiForCausalLM"]:
+    if _model.config.architectures[0] in [
+        "YuanForCausalLM",
+        "PhiForCausalLM",
+    ]:
         supported_mha_classes.append(type(_model.model.layers[0].self_attn))
         ipex_tp_supported_mha_classes.append(type(_model.model.layers[0].self_attn))
         ipex_tp_supported_mlp_classes.append(type(_model.model.layers[0].mlp))
@@ -765,6 +769,24 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "Phi3ForCausalLM":
+        convert_function(_model, "forward", PhiForCausalLM_forward)
+        convert_function(_model.model, "forward", Phi3Model_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+
     return _model
 
 
@@ -1049,6 +1071,7 @@ def model_convert_lowering(
             if _model.config.architectures[0] in [
                 "BaichuanForCausalLM",
                 "YuanForCausalLM",
+                "Phi3ForCausalLM",
             ]:
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
             if (
@@ -1283,6 +1306,7 @@ def optimize(
                 "LlavaLlamaForCausalLM",
                 "YuanForCausalLM",
                 "PhiForCausalLM",
+                "Phi3ForCausalLM",
             ]
 
         if well_supported_model:

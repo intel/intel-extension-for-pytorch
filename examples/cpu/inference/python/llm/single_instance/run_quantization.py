@@ -37,6 +37,8 @@ from llm.utils.model_class.qwen import QwenConfig
 from llm.utils.model_class.git import GitConfig
 from llm.utils.model_class.llava import LlavaConfig
 from llm.utils.model_class.phi import PhiConfig
+from llm.utils.model_class.phi import Phi3Config
+from llm.utils.model_class.yuan import YuanConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -285,8 +287,12 @@ elif re.search("llava", config.architectures[0], re.IGNORECASE):
         roles = ('user', 'assistant')
     else:
         roles = conv.roles
+elif re.search("phi3", config.architectures[0], re.IGNORECASE):
+    model = Phi3Config(args.model_id)
 elif re.search("phi", config.architectures[0], re.IGNORECASE):
     model = PhiConfig(args.model_id)
+elif re.search("yuan", config.architectures[0], re.IGNORECASE):
+    model = YuanConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -350,6 +356,19 @@ global_past_key_value = [
     )
     for i in range(n_layers)
 ]
+if model.name == "yuan":
+    global_past_key_value = tuple(
+        [
+            (
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros(1, 4, dtype=torch.long),
+                torch.zeros(1, 1, 2, hidden_size),
+            )
+            for i in range(n_layers)
+        ]
+    )
 
 def get_example_inputs(model):
     if model.use_global_past_key_value:
@@ -359,12 +378,20 @@ def get_example_inputs(model):
     attention_mask = torch.ones(len(input_ids))
     if model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_POS_KV:
         position_ids = torch.arange(len(input_ids))
-        example_inputs = (
-            input_ids.unsqueeze(0),
-            attention_mask.unsqueeze(0),
-            position_ids.unsqueeze(0),
-            tuple(global_past_key_value),
-        )
+        if model.name == "yuan":
+            example_inputs = (
+                input_ids.unsqueeze(0)[:, -1:],
+                attention_mask.unsqueeze(0)[:, -1:],
+                position_ids.unsqueeze(0)[:, -1:],
+                tuple(global_past_key_value),
+            )
+        else:
+            example_inputs = (
+                input_ids.unsqueeze(0),
+                attention_mask.unsqueeze(0),
+                position_ids.unsqueeze(0),
+                tuple(global_past_key_value),
+            )
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.MASK_KV_POS:
         position_ids = torch.arange(len(input_ids))
         example_inputs = (
@@ -683,6 +710,14 @@ if args.ipex_smooth_quant:
             pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
             self_jit.save(args.output_dir + "/" + args.quant_model_name)
             quant_model = self_jit
+            if model.name == "yuan":
+                input_bs = int(args.batch_size * num_beams)
+                example_inputs = (example_inputs[0].repeat(input_bs, 1), example_inputs[1].repeat(input_bs, 1), example_inputs[2].repeat(input_bs, 1))
+                self_jit_first = torch.jit.trace(
+                    convert_model.eval(), example_inputs, strict=False, check_trace=False
+                )
+                self_jit_first = torch.jit.freeze(self_jit_first.eval())
+                self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
 
 elif args.ipex_weight_only_quantization:
     from intel_extension_for_pytorch.quantization import WoqWeightDtype
@@ -748,6 +783,14 @@ elif args.ipex_weight_only_quantization:
         pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         self_jit.save(args.output_dir + "/" + args.quant_model_name)
         quant_model = self_jit
+        if model.name == "yuan":
+            input_bs = int(args.batch_size * num_beams)
+            example_inputs = (example_inputs[0].repeat(input_bs, 1), example_inputs[1].repeat(input_bs, 1), example_inputs[2].repeat(input_bs, 1))
+            self_jit_first = torch.jit.trace(
+                user_model.eval(), example_inputs, strict=False, check_trace=False
+            )
+            self_jit_first = torch.jit.freeze(self_jit_first.eval())
+            self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
 
 
 if args.benchmark:
@@ -765,10 +808,16 @@ if args.benchmark:
         try:
             self_jit = torch.jit.load(args.quantized_model_path)
             self_jit = torch.jit.freeze(self_jit.eval())
+            if model.name == "yuan":
+                self_jit_first = torch.jit.load(args.quantized_model_path + "2")
+                self_jit_first = torch.jit.freeze(self_jit_first.eval())
         except Exception as e:
             print("warning: loading failed.", e)
             self_jit = quant_model
-        ipex._set_optimized_model_for_generation(user_model, optimized_model=self_jit)
+        if model.name == "yuan":
+            ipex._set_optimized_model_for_generation(user_model, optimized_model=self_jit, first_token_optimized_model=self_jit_first)
+        else:
+            ipex._set_optimized_model_for_generation(user_model, optimized_model=self_jit)
 
     if model.name == "git":
         prompt = Image.open(requests.get(args.image_url, stream=True).raw)

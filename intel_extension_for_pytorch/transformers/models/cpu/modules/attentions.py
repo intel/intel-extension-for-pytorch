@@ -30,12 +30,33 @@ class _IPEXAttentionCPU(nn.Module):
             or self.model_backbone == "BaichuanForCausalLM"
             and hasattr(module, "rotary_emb")
         ):
-            self._IPEXROPE = _IPEXRopeCPU(
-                self.max_position_embeddings,
-                self.pos_embd_dim,
-                self.rope_base,
-                self.model_backbone,
-            )
+            if self.model_backbone in ["Phi3ForCausalLM"]:
+                extra_inputs = {}
+                if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
+                    if "short_factor" in config.rope_scaling:
+                        extra_inputs["short_factor"] = config.rope_scaling[
+                            "short_factor"
+                        ]
+                    if "long_factor" in config.rope_scaling:
+                        extra_inputs["long_factor"] = config.rope_scaling["long_factor"]
+                if hasattr(config, "original_max_position_embeddings"):
+                    extra_inputs["original_max_position_embeddings"] = (
+                        config.original_max_position_embeddings
+                    )
+                self._IPEXROPE = _IPEXRopeCPU(
+                    self.max_position_embeddings,
+                    self.pos_embd_dim,
+                    self.rope_base,
+                    self.model_backbone,
+                    extra_inputs,
+                )
+            else:
+                self._IPEXROPE = _IPEXRopeCPU(
+                    self.max_position_embeddings,
+                    self.pos_embd_dim,
+                    self.rope_base,
+                    self.model_backbone,
+                )
         if self.model_backbone in [
             "GPTJForCausalLM",
             "LlamaForCausalLM",

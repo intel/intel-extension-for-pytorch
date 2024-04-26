@@ -1966,6 +1966,53 @@ def _PhiAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _Phi3Attention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    qkv = self.qkv_proj(hidden_states)
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+    query_states, key_states, value_states = self._IPEXROPE(
+        qkv,
+        position_ids,
+        self.num_heads,
+        self.head_dim,
+        self.pos_embd_dim // 2,
+        self.pos_embd_dim,
+        kv_seq_len,
+        3,
+    )
+    value_states = value_states.view(
+        bsz, q_len, self.num_key_value_heads, self.head_dim
+    )
+    key_states = _repeat_kv(key_states, self.num_key_value_groups)
+    value_states = _repeat_kv(value_states, self.num_key_value_groups)
+    (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        math.sqrt(self.head_dim),
+        past_key_value,
+        None,
+        attention_mask,
+    )
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    # attn_output = self.o_proj(attn_output)
+    if not output_attentions:
+        attn_weights = None
+    return attn_output, attn_weights, past_key_value
+
+
 def _create_attention_mask_for_git(
     self, tgt, memory, tgt_mask, past_key_values_length, memory_key_padding_mask=None
 ):
@@ -2125,12 +2172,33 @@ class _IPEXAttentionRef(nn.Module):
                 self.rope_base = config.rotary_emb_base
             elif hasattr(config, "rope_theta"):
                 self.rope_base = config.rope_theta
-            self._IPEXROPE = _IPEXRopeRef(
-                self.max_position_embeddings,
-                self.pos_embd_dim,
-                self.rope_base,
-                self.model_backbone,
-            )
+            if self.model_backbone in ["Phi3ForCausalLM"]:
+                extra_inputs = {}
+                if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
+                    if "short_factor" in config.rope_scaling:
+                        extra_inputs["short_factor"] = config.rope_scaling[
+                            "short_factor"
+                        ]
+                    if "long_factor" in config.rope_scaling:
+                        extra_inputs["long_factor"] = config.rope_scaling["long_factor"]
+                if hasattr(config, "original_max_position_embeddings"):
+                    extra_inputs["original_max_position_embeddings"] = (
+                        config.original_max_position_embeddings
+                    )
+                self._IPEXROPE = _IPEXRopeRef(
+                    self.max_position_embeddings,
+                    self.pos_embd_dim,
+                    self.rope_base,
+                    self.model_backbone,
+                    extra_inputs,
+                )
+            else:
+                self._IPEXROPE = _IPEXRopeRef(
+                    self.max_position_embeddings,
+                    self.pos_embd_dim,
+                    self.rope_base,
+                    self.model_backbone,
+                )
 
         if self.model_backbone in [
             "GPTJForCausalLM",
@@ -2551,6 +2619,16 @@ class _IPEXAttentionRef(nn.Module):
             )
         elif self.model_backbone == "PhiForCausalLM":
             return _PhiAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "Phi3ForCausalLM":
+            return _Phi3Attention_forward(
                 self,
                 hidden_states,
                 attention_mask,
