@@ -834,8 +834,9 @@ class TestFusionPattern(JitLlgaTestCase):
         graph, _ = self.checkTrace(m, [x])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
+    # oneDNN Graph DNNL backend now supports standalone Select op
     @llga_fp32_bf16_test_env
-    def test_do_not_map_select(self):
+    def test_map_select(self):
         class M(nn.Module):
             def __init__(
                 self,
@@ -851,7 +852,7 @@ class TestFusionPattern(JitLlgaTestCase):
         x = torch.randn(3, 32, 32, 32)
         y = torch.randn(3, 32, 32, 1).to(torch.bool)
         graph, _ = self.checkTrace(m, [x, y])
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
     def test_avg_pool2d_add(self):
