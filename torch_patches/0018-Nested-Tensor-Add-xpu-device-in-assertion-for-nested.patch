@@ -1,7 +1,7 @@
 From 5c5feeef2804f452bda93462633be85cff9c8bcd Mon Sep 17 00:00:00 2001
 From: zejun <zejun.chen@intel.com>
 Date: Wed, 29 Nov 2023 15:10:32 +0800
-Subject: [PATCH 18/29] [Nested Tensor] Add xpu device in assertion for nested
+Subject: [PATCH 18/30] [Nested Tensor] Add xpu device in assertion for nested
  tensor creation (#197)
 
 * [Nested Tensor] Add xpu device in assertion for nested tensor creation
