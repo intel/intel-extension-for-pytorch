@@ -482,9 +482,9 @@ else:
 generate_kwargs = dict(do_sample=False, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens, streamer=streamer)
 
 
-if args.token_latency and not args.ipex:
+if args.token_latency and not use_ipex:
     args.token_latency = False
-    logger.warning("--token-latency requires --ipex. Disabling --token-latency.")
+    logger.warning("--token-latency requires using ipex (--ipex or --ipex-weight-only-quantization). Disabling --token-latency.")
 if args.token_latency:
     if not hasattr(model.config, "token_latency"):
         model.config.token_latency = True
@@ -649,6 +649,8 @@ else:
                 total_list.append(outputs[1])
 
     if args.profile:
+        # Wait for all ranks to finish before move on
+        deepspeed.comm.barrier()
         with torch.profiler.profile(
             activities=[torch.profiler.ProfilerActivity.CPU],
             schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
@@ -657,6 +659,8 @@ else:
             for i in range(5):
                 gen_ids, outputs = generate()
                 prof.step()
+        # Wait for all ranks to finish before move on
+        deepspeed.comm.barrier()
 
     latency = total_time / (cycles - warmup)
     print_rank0("\n", "-" * 10, "Summary:", "-" * 10)
