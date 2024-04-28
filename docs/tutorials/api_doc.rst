@@ -37,6 +37,7 @@ Quantization
 
 .. automodule:: intel_extension_for_pytorch.quantization
 .. autofunction:: get_smooth_quant_qconfig_mapping
+.. autofunction:: get_weight_only_quant_qconfig_mapping
 .. autofunction:: prepare
 .. autofunction:: convert
 
