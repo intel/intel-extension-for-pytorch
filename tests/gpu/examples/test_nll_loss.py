@@ -192,3 +192,25 @@ class TestNNMethod(TestCase):
         input.grad.zero_()
         input_dpcpp.grad.detach_()
         input_dpcpp.grad.zero_()
+
+    def test_nll_loss_corner_case(self, dtype=torch.float16):
+        def fn_forward(a, b1):
+            return torch.ops.aten.nll_loss_forward(a, b1, None, 1, -100)
+
+        labels = (
+            torch.zeros([5], dtype=torch.int64, device="xpu"),
+            torch.tensor([-100, -100, 3, -100, -100], dtype=torch.int64, device="xpu"),
+        )
+        inps = (torch.randn(5, 5, device="xpu"), torch.randn(5, 5, device="xpu"))
+
+        for a, b in zip(inps, labels):
+            fn_forward(a, b)
+
+        def fn_backward(a, b, c):
+            return torch.ops.aten.nll_loss_backward(
+                a, b, c, None, 1, -100, torch.tensor(1.0, device="xpu")
+            )
+
+        grad_outs = (torch.randn((), device="xpu"), torch.randn((), device="xpu"))
+        for a, b, c in zip(grad_outs, inps, labels):
+            fn_backward(a, b, c)

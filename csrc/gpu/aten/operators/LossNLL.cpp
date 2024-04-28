@@ -272,7 +272,9 @@ void ClassNLLCriterion_updateOutput(
   int64_t num_targets = target.size(0);
   int64_t target_stride = target.stride(0);
 
-  const Tensor weights_val = weights.value();
+  c10::MaybeOwned<Tensor> weights_maybe_owned =
+      at::borrow_from_optional_tensor(weights);
+  const Tensor& weights_val = *weights_maybe_owned;
   TORCH_CHECK(
       !weights_val.defined() ||
           (weights_val.dim() == 1 && weights_val.numel() == n_classes),
@@ -647,7 +649,9 @@ void ClassNLLCriterion_updateGradInput(
       batch_size == num_targets,
       "mismatch between the batch size of input and that of target")
 
-  const Tensor weights_val = weights.value();
+  c10::MaybeOwned<Tensor> weights_maybe_owned =
+      at::borrow_from_optional_tensor(weights);
+  const Tensor& weights_val = *weights_maybe_owned;
   TORCH_CHECK(
       !weights_val.defined() || weights_val.numel() == input.size(-1),
       "weight tensor should be defined either for all or no classes");
