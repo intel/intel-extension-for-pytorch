@@ -5,7 +5,6 @@ import pathlib
 import argparse
 from transformers import (
     AutoTokenizer,
-    LlamaTokenizer,
     AutoModelForCausalLM,
 )
 import transformers
@@ -22,7 +21,7 @@ transformers.models.opt.modeling_opt.OPTForCausalLM = IPEXOPTForCausalLM
 
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, LlamaTokenizer),
+    "llama": (AutoModelForCausalLM, AutoTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
 }
 
