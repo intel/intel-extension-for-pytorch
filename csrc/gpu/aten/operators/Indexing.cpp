@@ -1470,10 +1470,12 @@ Tensor& index_select_out(
     int64_t dim,
     const Tensor& index,
     Tensor& out) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
+      at::ScalarType::Float8_e4m3fn,
+      at::ScalarType::Float8_e5m2,
       self.scalar_type(),
       "index_select_impl",
       [=]() { impl::index_select_impl<scalar_t>(out, self, dim, index); });
@@ -1621,10 +1623,12 @@ at::Tensor& index_copy_out(
         false, "index_copy is not implemented with deterministic algorithm.");
   }
 
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5(
       at::ScalarType::Half,
-      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
+      at::ScalarType::Bool,
+      at::ScalarType::Float8_e4m3fn,
+      at::ScalarType::Float8_e5m2,
       out.scalar_type(),
       "index_copy",
       [&]() { impl::_index_copy<scalar_t>(out, dim, index, source); });

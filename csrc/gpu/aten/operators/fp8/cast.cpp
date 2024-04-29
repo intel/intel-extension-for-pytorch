@@ -229,13 +229,14 @@ void fp8_dequantize_op(
 }
 
 at::Tensor cast_to_fp8(
-    const at::Tensor& input,
+    const at::Tensor& input_,
     const at::Tensor& scale,
     at::Tensor& amax,
     at::Tensor& scale_inv,
     int64_t fp8_tensor,
     int64_t otype) {
   at::ScalarType out_type = convert_to_dtype(otype);
+  auto input = input_.is_contiguous() ? input_ : input_.contiguous();
   auto output = at::empty(input.sizes(), input.options().dtype(out_type));
   fp8_quantize_op(
       input,
@@ -248,11 +249,12 @@ at::Tensor cast_to_fp8(
 }
 
 at::Tensor cast_from_fp8(
-    const at::Tensor& input,
+    const at::Tensor& input_,
     const at::Tensor& scale_inv,
     int64_t fp8_tensor,
     int64_t itype,
     ScalarType otype) {
+  auto input = input_.is_contiguous() ? input_ : input_.contiguous();
   auto output = at::empty(input.sizes(), input.options().dtype(otype));
   fp8_dequantize_op(
       input, output, itype, scale_inv[fp8_tensor].data_ptr<float>());
