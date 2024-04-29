@@ -1,7 +1,7 @@
 From 1aa638adaa6c4424faa5e5c7dfc8473118589198 Mon Sep 17 00:00:00 2001
 From: "Weishi.Deng" <weishi.deng@intel.com>
 Date: Fri, 12 Jan 2024 16:06:31 +0800
-Subject: [PATCH 22/30] Dynamo: handle the .tolist method of np.arrays in
+Subject: [PATCH 22/31] Dynamo: handle the .tolist method of np.arrays in
  dynamo (#201)
 
 ---

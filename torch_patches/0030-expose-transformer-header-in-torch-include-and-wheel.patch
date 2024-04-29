@@ -1,0 +1,50 @@
+From 5469c57ff2b1964229542d2224bb9579e093548b Mon Sep 17 00:00:00 2001
+From: Lei Zhenyuan <zhenyuan.lei@intel.com>
+Date: Wed, 3 Apr 2024 10:30:46 +0800
+Subject: [PATCH 30/31] expose transformer header in torch/include and wheel
+ (#213)
+
+* expose nested header to wheel
+
+* expose transformer header to wheel and camke
+---
+ aten/src/ATen/CMakeLists.txt | 3 ++-
+ setup.py                     | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/aten/src/ATen/CMakeLists.txt b/aten/src/ATen/CMakeLists.txt
+index 063f9eccc97..5499229d011 100644
+--- a/aten/src/ATen/CMakeLists.txt
++++ b/aten/src/ATen/CMakeLists.txt
+@@ -48,6 +48,7 @@ endif()
+ # NB: If you edit these globs, you'll have to update setup.py package_data as well
+ file(GLOB_RECURSE ATen_CORE_HEADERS  "core/*.h")
+ file(GLOB_RECURSE ATen_NESTED_HEADERS "native/nested/*.h")
++file(GLOB_RECURSE ATen_TRANSFORMER_HEDERS "native/transformers/*.h")
+ file(GLOB_RECURSE ATen_CORE_SRCS "core/*.cpp")
+ if(NOT BUILD_LITE_INTERPRETER)
+   file(GLOB_RECURSE ATen_CORE_TEST_SRCS "core/*_test.cpp")
+@@ -540,7 +541,7 @@ configure_file(ATenConfig.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/cmake-exports/AT
+ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cmake-exports/ATenConfig.cmake"
+   DESTINATION "${AT_INSTALL_SHARE_DIR}/cmake/ATen")
+ 
+-set(INSTALL_HEADERS ${base_h} ${ATen_CORE_HEADERS} ${ATen_NESTED_HEADERS})
++set(INSTALL_HEADERS ${base_h} ${ATen_CORE_HEADERS} ${ATen_NESTED_HEADERS} ${ATen_TRANSFORMER_HEDERS})
+ if(NOT INTERN_BUILD_MOBILE)
+   list(APPEND INSTALL_HEADERS ${native_h} ${native_cpu_h} ${native_ao_sparse_h} ${native_quantized_h} ${cuda_h} ${native_cuda_h} ${native_hip_h} ${cudnn_h} ${hip_h} ${mps_h} ${native_mps_h} ${native_utils_h} ${miopen_h})
+   # Metal
+diff --git a/setup.py b/setup.py
+index b58603edd6d..a091ab8fe8c 100644
+--- a/setup.py
++++ b/setup.py
+@@ -1239,6 +1239,7 @@ def main():
+         "include/ATen/native/nested/*.h",
+         "include/ATen/native/quantized/*.h",
+         "include/ATen/native/quantized/cpu/*.h",
++        "include/ATen/native/transformers/*.h",
+         "include/ATen/native/utils/*.h",
+         "include/ATen/quantized/*.h",
+         "include/caffe2/serialize/*.h",
+-- 
+2.34.1
+

@@ -1,7 +1,7 @@
 From a2a7717a2d25ab71869a33600a28b4728fb8b70d Mon Sep 17 00:00:00 2001
 From: majing <jing1.ma@intel.com>
 Date: Mon, 23 Oct 2023 11:33:05 +0800
-Subject: [PATCH 14/30] ATen scaled_dot_product_attention: follow supposed
+Subject: [PATCH 14/31] ATen scaled_dot_product_attention: follow supposed
  (CUDA/CPU) operators registration strategy (#177)
 
 * Enable XPU backend implementation for scaled_dot_product_attention

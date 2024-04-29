@@ -1,7 +1,7 @@
 From 1b1c17bb765537fa099e8faea12c86f4254323bf Mon Sep 17 00:00:00 2001
 From: "Cui, Yifeng" <yifeng.cui@intel.com>
 Date: Mon, 11 Mar 2024 19:46:04 +0800
-Subject: [PATCH 28/30] Fix Windows Build (#214)
+Subject: [PATCH 28/31] Fix Windows Build (#214)
 
 ---
  cmake/public/mkl.cmake | 20 +++++++++++---------

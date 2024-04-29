@@ -1,7 +1,7 @@
 From 56978c02bd83816bc92f4dbc34c93e2f3169e5b7 Mon Sep 17 00:00:00 2001
 From: zejun <zejun.chen@intel.com>
 Date: Wed, 18 Oct 2023 15:19:50 +0800
-Subject: [PATCH 12/30] Cherry-pick:
+Subject: [PATCH 12/31] Cherry-pick:
  https://github.com/pytorch/pytorch/pull/108312 (#175)
 
 Signed-off-by: Chen, Zejun <zejun.chen@intel.com>
