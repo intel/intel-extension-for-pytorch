@@ -432,3 +432,85 @@ class TestNNMethod(TestCase):
         grad_xpu = grad_cpu.detach().clone().to(dpcpp_device)
         output_xpu.backward(grad_xpu)
         self.assertEqual(input_cpu.grad, input_xpu.grad.to(cpu_device))
+
+    def test_max_pool_backward_deterministic(self, dtype=torch.float):
+        torch.use_deterministic_algorithms(True)
+        x_cpu = torch.randn([32, 32, 64, 64], device=cpu_device, dtype=dtype)
+
+        x_dpcpp = x_cpu.to("xpu")
+        max_pool = nn.MaxPool2d(kernel_size=4, stride=1, padding=1, return_indices=True)
+
+        # cpu
+        x_cpu.requires_grad_(True)
+        y_cpu = max_pool(x_cpu)
+        grad_cpu = torch.randn(y_cpu[0].shape, device="cpu", dtype=dtype)
+        y_cpu[0].backward(grad_cpu)
+
+        # xpu
+        x_dpcpp.requires_grad_(True)
+        max_pool.to(dpcpp_device)
+        y_dpcpp = max_pool(x_dpcpp)
+        grad_dpcpp = grad_cpu.to("xpu")
+        y_dpcpp[0].backward(grad_dpcpp)
+
+        # test accuracy
+        self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
+        self.assertEqual(y_cpu[1], y_dpcpp[1].cpu())
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+        # xpu second run
+        x_dpcpp2 = x_dpcpp.clone().detach()
+        x_dpcpp2.requires_grad_(True)
+        y_dpcpp2 = max_pool(x_dpcpp2)
+        grad_dpcpp2 = grad_dpcpp.clone().detach()
+        y_dpcpp2[0].backward(grad_dpcpp2)
+
+        # test deterministic
+        self.assertEqual(y_dpcpp[0], y_dpcpp2[0])
+        self.assertEqual(y_dpcpp[1], y_dpcpp2[1])
+        self.assertEqual(x_dpcpp.grad, x_dpcpp2.grad, atol=0, rtol=0)
+
+        torch.use_deterministic_algorithms(False)
+
+    def test_max_pool_backward_deterministic_channels_last(self, dtype=torch.float):
+        torch.use_deterministic_algorithms(True)
+        x_cpu = torch.randn([32, 32, 64, 64], device=cpu_device, dtype=dtype).to(
+            memory_format=torch.channels_last
+        )
+
+        x_dpcpp = x_cpu.to("xpu")
+        max_pool = nn.MaxPool2d(kernel_size=4, stride=1, padding=1, return_indices=True)
+
+        # cpu
+        x_cpu.requires_grad_(True)
+        y_cpu = max_pool(x_cpu)
+        grad_cpu = torch.randn(y_cpu[0].shape, device="cpu", dtype=dtype).to(
+            memory_format=torch.channels_last
+        )
+        y_cpu[0].backward(grad_cpu)
+
+        # xpu
+        x_dpcpp.requires_grad_(True)
+        max_pool.to(dpcpp_device)
+        y_dpcpp = max_pool(x_dpcpp)
+        grad_dpcpp = grad_cpu.to("xpu")
+        y_dpcpp[0].backward(grad_dpcpp)
+
+        # test accuracy
+        self.assertEqual(y_cpu[0], y_dpcpp[0].cpu())
+        self.assertEqual(y_cpu[1], y_dpcpp[1].cpu())
+        self.assertEqual(x_cpu.grad, x_dpcpp.grad.cpu())
+
+        # xpu second run
+        x_dpcpp2 = x_dpcpp.clone().detach()
+        x_dpcpp2.requires_grad_(True)
+        y_dpcpp2 = max_pool(x_dpcpp2)
+        grad_dpcpp2 = grad_dpcpp.clone().detach()
+        y_dpcpp2[0].backward(grad_dpcpp2)
+
+        # test deterministic
+        self.assertEqual(y_dpcpp[0], y_dpcpp2[0])
+        self.assertEqual(y_dpcpp[1], y_dpcpp2[1])
+        self.assertEqual(x_dpcpp.grad, x_dpcpp2.grad, atol=0, rtol=0)
+
+        torch.use_deterministic_algorithms(False)

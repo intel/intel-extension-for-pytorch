@@ -48,6 +48,21 @@ std::vector<int64_t> pool_output_sizes(
   return output_size;
 }
 
+static inline int p_start(
+    int size,
+    int pad,
+    int kernel,
+    int dilation,
+    int stride) {
+  return (size + pad < ((kernel - 1) * dilation + 1))
+      ? 0
+      : (size + pad - ((kernel - 1) * dilation + 1)) / stride + 1;
+}
+
+static inline int p_end(int size, int pad, int pooled_size, int stride) {
+  return std::min((size + pad) / stride + 1, pooled_size);
+}
+
 template <typename scalar_t, bool is_channels_last>
 struct MaxPool2dOutFrameKernelFunctor {
   void operator()(sycl::nd_item<2> item) const {
@@ -226,7 +241,7 @@ void max_pool2d_out_frame(
 }
 
 template <typename scalar_t, bool is_channels_last>
-struct MaxPool2dBackwardOutFrameKernelFunctor {
+struct MaxPool2dBackwardOutKernelFunctor {
   void operator()(sycl::nd_item<2> item) const {
     auto desc = cfg.get_item_desc(item);
 
@@ -255,7 +270,7 @@ struct MaxPool2dBackwardOutFrameKernelFunctor {
       }
     } while (cfg.next(item, desc));
   }
-  MaxPool2dBackwardOutFrameKernelFunctor(
+  MaxPool2dBackwardOutKernelFunctor(
       scalar_t* gradInput_,
       scalar_t* gradOutput_,
       int64_t* indices_,
@@ -303,6 +318,127 @@ struct MaxPool2dBackwardOutFrameKernelFunctor {
 };
 
 template <typename scalar_t, bool is_channels_last>
+struct MaxPool2dBackwardOutDeterministicKernelFunctor {
+  void operator()(sycl::nd_item<2> item) const {
+    auto desc = cfg.get_item_desc(item);
+    do {
+      if (desc.glb_problem < cfg.problem_) {
+        int inputIndex = desc.glb_problem;
+        int batch = inputIndex / in_n_stride;
+        int plane;
+        int64_t input_hw_index;
+        if constexpr (is_channels_last) {
+          plane = inputIndex % numPlane;
+          input_hw_index = ((inputIndex % in_n_stride) - plane) / numPlane;
+        } else {
+          plane = inputIndex / in_cf_c_stride % numPlane;
+          input_hw_index = ((inputIndex % in_n_stride)) % in_cf_c_stride;
+        }
+        int inputW = input_hw_index % gradInputSizeW;
+        int inputH = input_hw_index / gradInputSizeW;
+        int phstart = p_start(inputH, pad_h, kernel_h, dilation_h, stride_h);
+        int phend = p_end(inputH, pad_h, gradOutputSizeH, stride_h);
+        int pwstart = p_start(inputW, pad_w, kernel_w, dilation_w, stride_w);
+        int pwend = p_end(inputW, pad_w, gradOutputSizeW, stride_w);
+        if constexpr (is_channels_last) {
+          int offset = batch * out_n_stride + plane;
+          for (int ph = phstart; ph < phend; ++ph) {
+            for (int pw = pwstart; pw < pwend; ++pw) {
+              if (indices[offset + (ph * gradOutputSizeW + pw) * numPlane] ==
+                  input_hw_index) {
+                gradInput[inputIndex] += static_cast<scalar_t>(
+                    gradOutput
+                        [offset + (ph * gradOutputSizeW + pw) * numPlane]);
+              }
+            }
+          }
+        } else {
+          int offset = batch * out_n_stride + plane * out_cf_c_stride;
+          for (int ph = phstart; ph < phend; ++ph) {
+            for (int pw = pwstart; pw < pwend; ++pw) {
+              if (indices[offset + ph * gradOutputSizeW + pw] ==
+                  input_hw_index) {
+                gradInput[inputIndex] += static_cast<scalar_t>(
+                    gradOutput[offset + ph * gradOutputSizeW + pw]);
+              }
+            }
+          }
+        }
+      }
+    } while (cfg.next(item, desc));
+  }
+  MaxPool2dBackwardOutDeterministicKernelFunctor(
+      scalar_t* gradInput_,
+      scalar_t* gradOutput_,
+      int64_t* indices_,
+      int numPlane_,
+      int gradInputSizeH_,
+      int gradInputSizeW_,
+      int gradOutputSizeH_,
+      int gradOutputSizeW_,
+      int64_t gradInputSize_,
+      int out_cf_c_stride_,
+      int in_cf_c_stride_,
+      int out_n_stride_,
+      int in_n_stride_,
+      int kernel_h_,
+      int kernel_w_,
+      int stride_h_,
+      int stride_w_,
+      int pad_h_,
+      int pad_w_,
+      int dilation_h_,
+      int dilation_w_,
+      BatchKernelConfig cfg_)
+      : gradInput(gradInput_),
+        gradOutput(gradOutput_),
+        indices(indices_),
+        numPlane(numPlane_),
+        gradInputSizeH(gradInputSizeH_),
+        gradInputSizeW(gradInputSizeW_),
+        gradOutputSizeH(gradOutputSizeH_),
+        gradOutputSizeW(gradOutputSizeW_),
+        gradInputSize(gradInputSize_),
+        out_cf_c_stride(out_cf_c_stride_),
+        in_cf_c_stride(in_cf_c_stride_),
+        out_n_stride(out_n_stride_),
+        in_n_stride(in_n_stride_),
+        kernel_h(kernel_h_),
+        kernel_w(kernel_w_),
+        stride_h(stride_h_),
+        stride_w(stride_w_),
+        pad_h(pad_h_),
+        pad_w(pad_w_),
+        dilation_h(dilation_h_),
+        dilation_w(dilation_w_),
+        cfg(cfg_) {}
+
+ private:
+  scalar_t* gradInput;
+  scalar_t* gradOutput;
+  int64_t* indices;
+  int numPlane;
+  int gradInputSizeH;
+  int gradInputSizeW;
+  int gradOutputSizeH;
+  int gradOutputSizeW;
+  int64_t gradInputSize;
+  int out_cf_c_stride;
+  int in_cf_c_stride;
+  int out_n_stride;
+  int in_n_stride;
+  int kernel_h;
+  int kernel_w;
+  int stride_h;
+  int stride_w;
+  int pad_h;
+  int pad_w;
+  int dilation_h;
+  int dilation_w;
+  BatchKernelConfig cfg;
+};
+
+template <typename scalar_t, bool is_channels_last>
 void max_pool2d_backward_out_frame(
     scalar_t* gradInput,
     scalar_t* gradOutput,
@@ -312,36 +448,78 @@ void max_pool2d_backward_out_frame(
     int gradInputSizeH,
     int gradInputSizeW,
     int gradOutputSizeH,
-    int gradOutputSizeW) {
+    int gradOutputSizeW,
+    int kernel_h,
+    int kernel_w,
+    int stride_h,
+    int stride_w,
+    int pad_h,
+    int pad_w,
+    int dilation_h,
+    int dilation_w) {
   auto& queue = dpcppGetCurrentQueue();
   int64_t gradOutputSize =
       numBatch * numPlane * gradOutputSizeH * gradOutputSizeW;
+  int64_t gradInputSize = numBatch * numPlane * gradInputSizeH * gradInputSizeW;
   auto out_cf_c_stride = gradOutputSizeH * gradOutputSizeW;
   auto in_cf_c_stride = gradInputSizeH * gradInputSizeW;
   auto out_n_stride = numPlane * out_cf_c_stride;
   auto in_n_stride = numPlane * in_cf_c_stride;
-  BatchKernelConfig cfg = {
-      1, gradOutputSize, 1, 1, true, BatchKernelConfig::Policy::pAdaptive};
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    MaxPool2dBackwardOutFrameKernelFunctor<scalar_t, is_channels_last> kfn(
-        gradInput,
-        gradOutput,
-        indices,
-        numPlane,
-        gradInputSizeH,
-        gradInputSizeW,
-        gradOutputSizeH,
-        gradOutputSizeW,
-        gradOutputSize,
-        out_cf_c_stride,
-        in_cf_c_stride,
-        out_n_stride,
-        in_n_stride,
-        cfg);
-    cgh.parallel_for<decltype(kfn)>(
-        sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
+  if (globalContext().deterministicAlgorithms()) {
+    BatchKernelConfig cfg = {
+        1, gradInputSize, 1, 1, true, BatchKernelConfig::Policy::pAdaptive};
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      MaxPool2dBackwardOutDeterministicKernelFunctor<scalar_t, is_channels_last>
+          kfn(gradInput,
+              gradOutput,
+              indices,
+              numPlane,
+              gradInputSizeH,
+              gradInputSizeW,
+              gradOutputSizeH,
+              gradOutputSizeW,
+              gradInputSize,
+              out_cf_c_stride,
+              in_cf_c_stride,
+              out_n_stride,
+              in_n_stride,
+              kernel_h,
+              kernel_w,
+              stride_h,
+              stride_w,
+              pad_h,
+              pad_w,
+              dilation_h,
+              dilation_w,
+              cfg);
+      cgh.parallel_for<decltype(kfn)>(
+          sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+    };
+    DPCPP_Q_SUBMIT(queue, cgf);
+  } else {
+    BatchKernelConfig cfg = {
+        1, gradOutputSize, 1, 1, true, BatchKernelConfig::Policy::pAdaptive};
+    auto cgf = DPCPP_Q_CGF(cgh) {
+      MaxPool2dBackwardOutKernelFunctor<scalar_t, is_channels_last> kfn(
+          gradInput,
+          gradOutput,
+          indices,
+          numPlane,
+          gradInputSizeH,
+          gradInputSizeW,
+          gradOutputSizeH,
+          gradOutputSizeW,
+          gradOutputSize,
+          out_cf_c_stride,
+          in_cf_c_stride,
+          out_n_stride,
+          in_n_stride,
+          cfg);
+      cgh.parallel_for<decltype(kfn)>(
+          sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
+    };
+    DPCPP_Q_SUBMIT(queue, cgf);
+  }
 } // namespace impl
 
 void max_pool2d_with_indices_out_template(
@@ -785,7 +963,15 @@ Tensor& max_pool2d_with_indices_backward_out_template(
                 inputHeight,
                 inputWidth,
                 outputHeight,
-                outputWidth);
+                outputWidth,
+                kH,
+                kW,
+                dH,
+                dW,
+                padH,
+                padW,
+                dilationH,
+                dilationW);
           } else {
             max_pool2d_backward_out_frame<scalar_t, false>(
                 gradInput.data_ptr<scalar_t>(),
@@ -796,7 +982,15 @@ Tensor& max_pool2d_with_indices_backward_out_template(
                 inputHeight,
                 inputWidth,
                 outputHeight,
-                outputWidth);
+                outputWidth,
+                kH,
+                kW,
+                dH,
+                dW,
+                padH,
+                padW,
+                dilationH,
+                dilationW);
           }
         });
   }
