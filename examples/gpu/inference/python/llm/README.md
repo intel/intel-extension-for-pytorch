@@ -7,8 +7,9 @@ Here you can find the inference benchmarking scripts for large language models (
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
 
-
 ## Optimized Models
+
+Currently, only support Transformers 4.31.0. Support for newer versions of Transformers and more models will be available in the future.
 
 | MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Arc™ A-Series Graphics (A770) |
 |---|:---:|:---:|:---:|:---:|:---:|
@@ -23,12 +24,10 @@ Here you can find the inference benchmarking scripts for large language models (
 
 ## Supported Platforms
 
-\* Intel® Data Center GPU Max Series (1550/1100) and Optimized on Intel® Arc™ A-Series Graphics (A770) : support all the models in the model list above<br /> 
+\* Intel® Data Center GPU Max Series (1550/1100) and Optimized on Intel® Arc™ A-Series Graphics (A770) : support all the models in the model list above.<br />
 
 
 ## Environment Setup
-
-Note: The instructions in this section will setup an environment with a latest source build of IPEX on `release/xpu/2.1.30` branch.
 
 ### [Recommended] Docker-based environment setup with prebuilt wheels
 
@@ -120,7 +119,7 @@ where <br />
 
 
  
-## Run Models Generation
+## Run Models
 
 | Benchmark mode | FP16 | Weight only quantization INT4 |
 |---|:---:|:---:|
@@ -128,11 +127,11 @@ where <br />
 | Distributed (autotp) |  ✅ | ❎ |
 
 
-Note: During usage, you may need to log in to your Hugging Face account to access model files. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
+Note: During the execution, you may need to log in your Hugging Face account to access model files. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
 
 ### Run with Bash Script
 
-For all inference cases, can run LLM with the one-click bash script `run_benchmark.sh`:
+Run all inference cases with the one-click bash script `run_benchmark.sh`:
 ```
 bash run_benchmark.sh
 ```
@@ -188,7 +187,7 @@ LLM_ACC_TEST=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspe
 ```
 
 
-### Weight only quantization with low precision checkpoint (Prototype)
+### Weight Only Quantization with low precision checkpoint (Prototype)
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 may result in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. You may generate modified weights and quantization info (scales, zero points) for a Llama 2/GPT-J/Qwen models with a dataset for specified tasks by such algorithms. We recommend intel extension for transformer to quantize the LLM model.
 

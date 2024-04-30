@@ -168,3 +168,13 @@ prof.export_chrome_trace("trace_file.json")
 You can examine the sequence of profiled operators, runtime functions and XPU kernels in these trace viewers. Here shows a trace result for ResNet50 run on XPU backend viewed by Perfetto viewer:
 
 ![profiler_kineto_result_perfetto_viewer](../../images/profiler_kineto/profiler_kineto_result_perfetto_viewer.png)
+
+## Known issues
+
+You may meet an issue that cannot collect profiling information of XPU kernels and device memory operations due to the failures in creating the tracers, when using Kineto profiler based on oneTrace. If you meet such failures that any tracer or collector could not be successfully created, please try the following workaround.
+
+```bash
+export ZE_ENABLE_TRACING_LAYER=1
+```
+
+> Note that this environment variable should be set as global before running any user level applications.

@@ -137,19 +137,6 @@ For more detailed information, check `torch.compile for GPU <features/torch_comp
 
    features/torch_compile_gpu
 
-Legacy Profiler Tool (Prototype)
---------------------------------
-
-The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators' overhead on XPU devices. With this tool, you can get the information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch* with profiler support as default and enable this tool by adding a `with` statement before the code segment.
-
-For more detailed information, check `Legacy Profiler Tool <features/profiler_legacy.md>`_.
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
-   features/profiler_legacy
-
 Simple Trace Tool (Prototype)
 -----------------------------
 
@@ -191,14 +178,13 @@ For more detailed information, check `Compute Engine <features/compute_engine.md
    features/compute_engine
 
 
+``IPEX_LOGGING`` (Prototype feature for debug)
+----------------------------------------------
 
 
-IPEX LOG (Prototype)
---------------------
+``IPEX_LOGGING`` provides the capability to log verbose information from Intel® Extension for PyTorch\* . Please use ``IPEX_LOGGING`` to get the log information or trace the execution from Intel® Extension for PyTorch\*. Please continue using PyTorch\* macros such as ``TORCH_CHECK``, ``TORCH_ERROR``, etc. to get the log information from PyTorch\*.
 
-IPEX_LOGGING provides the capacity to log IPEX internal information. If you would like to use torch-style log, that is, the log/verbose is introduced by torch, and refer to cuda code, pls still use torch macro to show the log. For example, TORCH_CHECK, TORCH_ERROR. If the log is IPEX specific, or is going to trace IPEX execution, pls use IPEX_LOGGING. For some part of usage are still discussed with habana side, if has change some feature will update here.
-
-For more detailed information, check `IPEX LOG <features/ipex_log.md>`_.
+For more detailed information, check `IPEX_LOGGING <features/ipex_log.md>`_.
 
 .. toctree::
    :hidden:
