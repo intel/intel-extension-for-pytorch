@@ -19,10 +19,10 @@ Run the following commands to build a docker image by compiling from source.
 ```
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout xpu-main
+git checkout release/xpu/2.1.30
 git submodule sync
 git submodule update --init --recursive
-docker build -f docker/Dockerfile.compile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t intel-extension-for-pytorch:xpu .
+docker build -f docker/Dockerfile.compile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t intel/intel-extension-for-pytorch:2.1.30-xpu .
 ```
 
 Alternatively, `./build.sh` script has docker build command to install prebuilt wheel files, update all the relevant build arguments and execute the script. Run the command below in current directory.
@@ -98,3 +98,4 @@ Sample output looks like below:
 
 Now you are inside container with Python 3.10, PyTorch, and Intel® Extension for PyTorch\* preinstalled. You can run your own script
 to run on Intel GPU.
+

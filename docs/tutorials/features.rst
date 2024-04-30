@@ -178,7 +178,7 @@ For more detailed information, check `Profiler Kineto <features/profiler_kineto.
 
 
 Compute Engine (Prototype feature for debug)
------------------------------------------------
+--------------------------------------------
 
 Compute engine is a prototype feature which provides the capacity to choose specific backend for operators with multiple implementations.
 
@@ -189,5 +189,21 @@ For more detailed information, check `Compute Engine <features/compute_engine.md
    :maxdepth: 1
 
    features/compute_engine
+
+
+
+
+IPEX LOG (Prototype)
+--------------------
+
+IPEX_LOGGING provides the capacity to log IPEX internal information. If you would like to use torch-style log, that is, the log/verbose is introduced by torch, and refer to cuda code, pls still use torch macro to show the log. For example, TORCH_CHECK, TORCH_ERROR. If the log is IPEX specific, or is going to trace IPEX execution, pls use IPEX_LOGGING. For some part of usage are still discussed with habana side, if has change some feature will update here.
+
+For more detailed information, check `IPEX LOG <features/ipex_log.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/ipex_log
 
 

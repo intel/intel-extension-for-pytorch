@@ -14,10 +14,12 @@ torchvision:
   commit: v0.16.0
 torch-ccl:
   repo: https://github.com/intel/torch-ccl.git
-  commit: a2164779c09bc421ad171968d5b7a9b26dcd8f0b
+  commit: 1053f1354f6293abc11e93af085524fe3664219f
   version: 2.1.300+xpu
 deepspeed:
   version: 0.14.0
+intel-extension-for-deepspeed:
+  version: 2.1.30
 transformers:
   version: 4.31.0
   commit: v4.31.0

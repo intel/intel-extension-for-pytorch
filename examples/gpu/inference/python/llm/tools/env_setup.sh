@@ -59,8 +59,7 @@ AUX_INSTALL_SCRIPT=${WHEELFOLDER}/aux_install.sh
 cd ${BASEFOLDER}/..
 
 if [ $((${MODE} & 0x02)) -eq 0 ] &&
-   ([ ! -f ${WHEELFOLDER}/transformers*.whl ] ||
-   [ ! -f ${WHEELFOLDER}/intel_extension_for_deepspeed*.whl ]); then
+   ([ ! -f ${WHEELFOLDER}/transformers*.whl ]); then
     (( MODE |= 0x02 ))
     echo "Expected wheel files are not found. Swith to source code compilation."
 fi
@@ -88,8 +87,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
     python -m pip install pyyaml
     VER_DS=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k version)
-    IDEX_REPO=$(python tools/yaml_utils.py -f dependency_version.yml -d intel-extension-for-deepspeed -k repo)
-    IDEX_COMMIT=$(python tools/yaml_utils.py -f dependency_version.yml -d intel-extension-for-deepspeed -k commit)
+    VER_IDEX=$(python tools/yaml_utils.py -f dependency_version.yml -d intel-extension-for-deepspeed -k version)
     VER_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k version)
     VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
     VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
@@ -120,8 +118,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${AUX_INSTALL_SCRIPT}
-        python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch-deepspeed==${VER_IDEX} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${AUX_INSTALL_SCRIPT}
+        python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch-deepspeed==${VER_IDEX} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
     else
         if [ ! -f ${ONECCL_ROOT}/env/vars.sh ]; then
             echo "oneCCL environment ${ONECCL_ROOT} doesn't seem to exist."
@@ -146,8 +144,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     #echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install cpuid accelerate datasets sentencepiece diffusers protobuf==${VER_PROTOBUF} lm_eval==${VER_LM_EVAL} huggingface_hub deepspeed==${VER_DS}" >> ${AUX_INSTALL_SCRIPT}
-    #echo "python -m pip install lm_eval==${VER_LM_EVAL}" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate datasets sentencepiece diffusers mpi4py protobuf==${VER_PROTOBUF} lm_eval==${VER_LM_EVAL} huggingface_hub py-cpuinfo " >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install deepspeed==${VER_DS}" >> ${AUX_INSTALL_SCRIPT}
 
     # Install Transformers
     if [ -d transformers ]; then
@@ -162,24 +160,11 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd ..
     rm -rf transformers
 
-    # Install DeepSpeed
-    python -m pip install deepspeed==${VER_DS}
-    source ${MPI_ROOT}/env/vars.sh
-    if [ -d intel-extension-for-deepspeed ]; then
-        rm -rf intel-extension-for-deepspeed
-    fi
-    git clone ${IDEX_REPO}
-    cd intel-extension-for-deepspeed
-    git checkout ${IDEX_COMMIT}
-    python setup.py bdist_wheel
-    python -m pip install dist/*.whl
-    cp dist/*.whl ${WHEELFOLDER}
-    cd ..
-    rm -rf intel-extension-for-deepspeed
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
+    source ${ONECCL_ROOT}/env/vars.sh
+    source ${MPI_ROOT}/env/vars.sh
     python -m pip install ${WHEELFOLDER}/*.whl
-    python -m pip install --force-reinstall ${WHEELFOLDER}/intel_extension_for_pytorch_deepspeed*.whl
     bash ${AUX_INSTALL_SCRIPT}
     rm -rf ${WHEELFOLDER}
 fi
