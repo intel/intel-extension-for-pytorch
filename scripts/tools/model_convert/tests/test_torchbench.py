@@ -2,21 +2,21 @@
 # under the torchbench folder and python -u test_torchbench.py
 # run single model usage:
 # bs is 0 means use the default value
-# python -u run.py -d cuda -t train --bs 0 --metrics None Model_name
+# python -u run.py -d xpu -t train --bs 0 --metrics None Model_name
 # bs is 4 means set the bs to 4
-# python -u run.py -d cuda -t train --bs 4 --metrics None Model_name
+# python -u run.py -d xpu -t train --bs 4 --metrics None Model_name
 
 import os
-from subprocess import Popen, TimeoutExpired, PIPE
+import subprocess
 from typing import List, Dict, Any
 import sys
 import time
 
 # config
 run_bs = 4 # default 4, it is used the batch size which model can be set
-run_timeout = 300 # unit: s, default 5 min
 executor = sys.executable
-device = 'cuda' # default cuda
+device = 'xpu' # default xpu
+unsupported_str_list = ["train", "notimplement", "support"]
 mode = os.getenv('TEST_TORCHBENCH_MODE')
 # default is testing train/inf
 if mode is None:
@@ -31,6 +31,7 @@ MODEL_BLANK_SPACE = 50
 CMD_BLANK_SPACE = 150
 
 # all models scope in torchbench
+# TODO: maybe need some methods to get all models enabled in torchbench
 all_models_list = [
     "BERT_pytorch",
     "Background_Matting",
@@ -157,29 +158,6 @@ models_list_unsupport_manual_bs = [
 
 # This list contains the model which is unsupported to train
 # the train function is not implemented by torchbench
-models_list_unsupport_train = [
-    "doctr_det_predictor",
-    "doctr_reco_predictor",
-    "hf_distil_whisper",
-    "maml",
-    "stable_diffusion_text_encoder",
-    "stable_diffusion_unet",
-    "pyhpc_turbulent_kinetic_energy",
-    "pyhpc_isoneutral_mixing",
-    "pyhpc_equation_of_state",
-    "hf_T5_generate",
-    "hf_Whisper",
-]
-
-# This list contains the model which is unsupported to inf
-models_list_unsupport_inf = [
-    "Background_Matting",
-    "mobilenet_v2_quantized_qat",
-    "resnet50_quantized_qat",
-]
-
-# This list contains the model which is unsupported to train
-# the train function is not implemented by torchbench
 models_list_unsupport_eager_mode = [
     "simple_gpt",
     "simple_gpt_tp_manual",
@@ -202,20 +180,17 @@ models_list: Dict[str, Dict[str, Any]] = {}
 
 pass_model_cnt = 0
 fail_model_cnt = 0
+not_supported_model_cnt = 0
 # example: {"BERT_pytorch": {"result_key": {"pass"  : True}}}
 #          {"BERT_pytorch": {"result_key": {"failed": "error message"}}}
+#          {"BERT_pytorch": {"result_key": {"Notsupported": "not supported message"}}}
 #          {"BERT_pytorch": {"duration": int}}
 results_summary: Dict[str, Dict[str, Any]] = {}
 
 def is_eligible_for_test(mode, model):
     if model in models_list_unsupport_eager_mode:
         return False
-    if mode == 'all':
-        return model not in models_list_unsupport_train or model not in models_list_unsupport_inf
-    if mode == 'train':
-        return model not in models_list_unsupport_train
-    if mode == 'inf':
-        return model not in models_list_unsupport_inf
+    return True
 
 def set_the_running_mode(model):
     if mode == 'train':
@@ -225,8 +200,8 @@ def set_the_running_mode(model):
         models_list[model]['train'] = False
         models_list[model]['inf'] = True
     elif mode == 'all':
-        models_list[model]['train'] = bool(model not in models_list_unsupport_train)
-        models_list[model]['inf'] = bool(model not in models_list_unsupport_inf)
+        models_list[model]['train'] = True
+        models_list[model]['inf'] = True
     else:
         raise RuntimeError("[error] no mode is specified, please check env flag TEST_TORCHBENCH_MODE")
 
@@ -258,7 +233,6 @@ print('[info] using python executor: ', executor)
 print('[info] mode: ', mode)
 print('[info] device: ', device)
 print('[info] bs: ', run_bs)
-print('[info] timeout: ', run_timeout, ' s')
 print('[info] multi card: ', multi_card)
 print('[info] running models list:')
 for idx, elem in enumerate(models_list.items()):
@@ -314,56 +288,60 @@ def generate_command(model, test_mode='train'):
         str_cmd += elem + ' '
     return cmd, str_cmd.rstrip()
 
-def run_model_command(command, required_env):
-    process = Popen(command,
-                    encoding="utf-8",
-                    stdout=PIPE,
-                    stderr=PIPE,
-                    env=required_env)
-    return process
-
 def testing(model, test_mode, count):
     global pass_model_cnt
     global fail_model_cnt
-    timeout_event = False
+    global not_supported_model_cnt
     result_key = test_mode + '_result'
-    results_summary[model] = {}
-    results_summary[model][result_key] = {}
+    if model not in results_summary:
+        results_summary[model] = {}
+    if result_key not in results_summary[model]:
+        results_summary[model][result_key] = {}
+
     cmd, str_cmd = generate_command(model, test_mode)
     env = generate_required_env(model)
+    stderr_msg = None
+    returncode = 0
+    is_not_supported = False
     time_start = time.time()
     try:
         # start run the model
-        process = run_model_command(cmd, env)
-        returncode = process.wait(timeout=run_timeout)
-    except TimeoutExpired:
-        process.kill()
-        timeout_event = True
-        print('[error] timeout model: ', model)
+        subprocess.run(cmd, encoding="utf-8", capture_output=True, check=True, env=env)
+    except subprocess.CalledProcessError as e:
+        returncode = e.returncode
+        if returncode != 0:
+            stderr_msg = e.stderr
+            # check if it is not implemented
+            is_not_supported = all([key.lower() in stderr_msg.lower() for key in unsupported_str_list])
+
     time_end = time.time()
     # set the duration
     duration = round(time_end - time_start, 2)
     results_summary[model]['duration'] = duration
 
+    # for log alignment
     model_space = MODEL_BLANK_SPACE
     model_space = ' ' * (model_space - len(model))
     cmd_space = CMD_BLANK_SPACE
     cmd_space = ' ' * (cmd_space - len(str_cmd))
-    # for log aligment
     if test_mode == 'inf':
         test_mode += ' ' * 2
-    if not process.returncode and not timeout_event:
+
+    # pass
+    if returncode == 0:
         print('[', count, '][', test_mode, '][success] pass model: ', model, model_space, 'cmd: ', str_cmd, cmd_space, 'time(s): ', duration)
         pass_model_cnt += 1
         results_summary[model][result_key]['pass'] = True
     else:
         print('[', count, '][', test_mode, '][error]   fail model: ', model, model_space, 'cmd: ', str_cmd, cmd_space, 'time(s): ', duration)
-        fail_model_cnt += 1
-        stdout, stderr = process.communicate()
-        if timeout_event:
-            results_summary[model][result_key]['failed'] = 'Timeout\n' + stderr
+        # not supported train or inf
+        if is_not_supported:
+            not_supported_model_cnt += 1
+            results_summary[model][result_key]['Notsupported'] = stderr_msg
         else:
-            results_summary[model][result_key]['failed'] = stderr
+            # real failed
+            fail_model_cnt += 1
+            results_summary[model][result_key]['failed'] = stderr_msg
 
 print('[info] running models number: ', num_models)
 print('[info] begin test all models......')
@@ -395,6 +373,8 @@ for idx, model in enumerate(results_summary.keys()):
                 print('[', idx, '] model ', model, model_space, test_mode, ' pass')
             elif 'failed' in results_summary[model][result_key]:
                 print('[', idx, '] model ', model, model_space, test_mode, ' failed:\n', results_summary[model][result_key]['failed'])
+            elif 'Notsupported' in results_summary[model][result_key]:
+                print('[', idx, '] model ', model, model_space, test_mode, ' not supported:\n', results_summary[model][result_key]['Notsupported'])
             else:
                 raise RuntimeError("model {} is not recorded into the results, check if it is running".format(model))
 
@@ -408,13 +388,21 @@ for idx, model in enumerate(results_summary.keys()):
                 print('[', idx, '] model ', model, test_mode, ' pass')
             elif 'failed' in results_summary[model][result_key]:
                 print('[', idx, '] model ', model, test_mode, ' failed')
+            elif 'Notsupported' in results_summary[model][result_key]:
+                print('[', idx, '] model ', model, test_mode, ' not supported')
             else:
-                raise RuntimeError("model {} is not recorded into the results, check if it is running".format(model))
+                raise RuntimeError("model {} is not recorded with the results, check if it run or not".format(model))
 
+# [watch] calculate the pass rate not includes the not supported model
+if pass_model_cnt == 0 and fail_model_cnt == 0:
+    print('[Error] No pass models or failed models are found')
+    sys.exit()
 pass_rate = pass_model_cnt / (pass_model_cnt + fail_model_cnt) * 100.0
 print('[info] eligible testing model number = ', num_models)
-print('[info] pass number = ', pass_model_cnt)
-print('[info] fail number = ', fail_model_cnt)
+print('[info] pass total number = ', pass_model_cnt)
+print('[info] fail total number = ', fail_model_cnt)
+print('[info] not supported total number = ', not_supported_model_cnt)
+
 print('[info] pass rate = ', round(pass_rate, 3), ' %')
 global_duration = global_duration / 60.0 # unit: min
 print('[info] testing total duration = ', round(global_duration, 2), ' min')
