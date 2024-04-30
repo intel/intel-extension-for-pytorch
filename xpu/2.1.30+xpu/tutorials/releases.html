@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Releases &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.30+xpu documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Troubleshooting" href="known_issues.html" />
+    <link rel="prev" title="ipex.optimize Frontend API" href="technical_details/ipex_optimize.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../">2.1.30+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="technical_details.html">Technical Details</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Releases</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#xpu">2.1.30+xpu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#known-issues">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id1">2.1.20+xpu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id2">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id4">2.1.10+xpu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id5">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id6">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id7">2.0.110+xpu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id8">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id9">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id10">1.13.120+xpu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id11">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id12">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#id13">1.13.10+xpu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id14">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id15">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#gpu">1.10.200+gpu</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id16">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id17">Known Issues</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Releases</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/releases.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="releases">
+<h1>Releases<a class="headerlink" href="#releases" title="Permalink to this heading"></a></h1>
+<section id="xpu">
+<h2>2.1.30+xpu<a class="headerlink" href="#xpu" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* v2.1.30+xpu is an update release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch* 2.1.0.</p>
+<section id="highlights">
+<h3>Highlights<a class="headerlink" href="#highlights" title="Permalink to this heading"></a></h3>
+<ul class="simple">
+<li><p>Intel® oneDNN v3.4.1 integration</p></li>
+<li><p>Intel® oneAPI Base Toolkit 2024.1 compatibility</p></li>
+<li><p>Large Language Model (LLM) optimizations for FP16 inference on Intel® Data Center GPU Max Series (Beta): Intel® Extension for PyTorch* provides a lot of specific optimizations for LLM workloads in this release on Intel® Data Center GPU Max Series.  In operator level, we provide highly efficient GEMM kernel to speed up Linear layer and customized fused operators to reduce HBM access/kernel launch overhead. To reduce memory footprint, we define a segment KV Cache policy to save device memory and improve the throughput. Such optimizations are added in this release to enhance existing optimized LLM FP16 models and more Chinese LLM models such as Baichuan2-13B, ChatGLM3-6B and Qwen-7B.</p></li>
+<li><p>LLM optimizations for INT4 inference on Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics (Prototype): Intel® Extension for PyTorch* shows remarkable performance when executing LLM models on Intel® GPU. However, deploying such models on GPUs with limited resources is challenging due to their high computational and memory requirements. To achieve a better trade-off, a low-precision solution, e.g., weight-only-quantization for INT4 is enabled to allow Llama 2-7B, GPT-J-6B and Qwen-7B to be executed efficiently on Intel® Arc™ A-Series Graphics. The same optimization makes INT4 models achieve 1.5x speeded up in total latency performance compared with FP16 models with the same configuration and parameters on Intel® Data Center GPU Max Series.</p></li>
+<li><p>Opt-in collective performance optimization with oneCCL Bindings for Pytorch*: This opt-in feature can be enabled by setting <code class="docutils literal notranslate"><span class="pre">TORCH_LLM_ALLREDUCE=1</span></code> to provide better scale-up performance by enabling optimized collectives such as <code class="docutils literal notranslate"><span class="pre">allreduce</span></code>, <code class="docutils literal notranslate"><span class="pre">allgather</span></code>, <code class="docutils literal notranslate"><span class="pre">reducescatter</span></code> algorithms in Intel® oneCCL. This feature requires XeLink enabled for cross-cards communication.</p></li>
+</ul>
+</section>
+<section id="known-issues">
+<h3>Known Issues<a class="headerlink" href="#known-issues" title="Permalink to this heading"></a></h3>
+<p>Please refer to <a class="reference internal" href="known_issues.html"><span class="doc">Known Issues webpage</span></a>.</p>
+</section>
+</section>
+<section id="id1">
+<h2>2.1.20+xpu<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* v2.1.20+xpu is a minor release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch* 2.1.0.</p>
+<section id="id2">
+<h3>Highlights<a class="headerlink" href="#id2" title="Permalink to this heading"></a></h3>
+<ul class="simple">
+<li><p>Intel® oneAPI Base Toolkit 2024.1 compatibility</p></li>
+<li><p>Intel® oneDNN v3.4 integration</p></li>
+<li><p>LLM inference scaling optimization based on Intel® oneCCL 2021.12 (Prototype)</p></li>
+<li><p>Bug fixing and other optimization</p>
+<ul>
+<li><p>Uplift XeTLA to v0.3.4.1 <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/dc0f6d39739404d38226ccf444c421706f14f2de">#3696</a></p></li>
+<li><p>[SDP] Fallback unsupported bias size to native impl <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/d897ebd585da05a90295165584efc448e265a38d">#3706</a></p></li>
+<li><p>Error handling enhancement <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/bd034e7a37822f84706f0068ec85d989fb766529">#3788</a>, <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/7d4f297ecb4c076586a22908ecadf4689cb2d5ef">#3841</a></p></li>
+<li><p>Fix beam search accuracy issue in workgroup reduce <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/f2f20a523ee85ed1f44c7fa6465b8e5e1e2edfea">#3796</a></p></li>
+<li><p>Support int32 index tensor in index operator <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/f7bb4873c0416a9f56d1f7ecfbcdbe7ad58b47cd">#3808</a></p></li>
+<li><p>Add deepspeed in LLM dockerfile <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/6266f89833f8010d6c683f9b45cfb2031575ad92">#3829</a></p></li>
+<li><p>Fix batch norm accuracy issue <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/a1e2271717ff61dc3ea7d8d471c2356b3e469b93">#3882</a></p></li>
+<li><p>Prebuilt wheel dockerfile update <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/8d5d71522910c1f622dac6a52cb0025e469774b2#diff-022fb5910f470cc5c44ab38cb20586d014f37c06ac8f3378e146ed35ee202a46">#3887</a>, <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/commit/54b8171940cd694ba91c928c99acc440c9993881">#3970</a></p></li>
+<li><p>Fix windows build failure with Intel® oneMKL 2024.1 in torch_patches <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.1.20/torch_patches/0018-use-ONEMKL_LIBRARIES-for-mkl-libs-in-torch-to-not-ov.patch">#18</a></p></li>
+<li><p>Fix FFT core dump issue with Intel® oneMKL 2024.1 in torch_patches <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.1.20/torch_patches/0020-Hide-MKL-symbols-211-212.patch">#20</a>, <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.1.20/torch_patches/0021-Fix-Windows-Build-214-215.patch">#21</a></p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="id3">
+<h3>Known Issues<a class="headerlink" href="#id3" title="Permalink to this heading"></a></h3>
+<p>Please refer to <a class="reference internal" href="known_issues.html"><span class="doc">Known Issues webpage</span></a>.</p>
+</section>
+</section>
+<section id="id4">
+<h2>2.1.10+xpu<a class="headerlink" href="#id4" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* v2.1.10+xpu is the new Intel® Extension for PyTorch* release supports both CPU platforms and GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch* 2.1.0. It extends PyTorch* 2.1.0 with up-to-date features and optimizations on <code class="docutils literal notranslate"><span class="pre">xpu</span></code> for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.</p>
+<section id="id5">
+<h3>Highlights<a class="headerlink" href="#id5" title="Permalink to this heading"></a></h3>
+<p>This release provides the following features:</p>
+<ul>
+<li><p>Large Language Model (LLM) optimizations for FP16 inference on Intel® Data Center GPU Max Series (Prototype): Intel® Extension for PyTorch* provides a lot of specific optimizations for LLM workloads on Intel® Data Center GPU Max Series in this release. In operator level, we provide highly efficient GEMM kernel to speedup Linear layer and customized fused operators to reduce HBM access and kernel launch overhead. To reduce memory footprint, we define a segment KV Cache policy to save device memory and improve the throughput. To better trade-off the performance and accuracy, low-precision solution e.g., weight-only-quantization for INT4 is enabled. Besides, tensor parallel can also be adopted to get lower latency for LLMs.</p>
+<ul>
+<li><p>A new API function, <code class="docutils literal notranslate"><span class="pre">ipex.optimize_transformers</span></code>, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on LLMs. It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the <code class="docutils literal notranslate"><span class="pre">ipex.optimize_transformers</span></code> API instead of the <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> API to apply all optimizations transparently. More detailed information can be found at <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/xpu/2.1.10+xpu/tutorials/llm.html">Large Language Model optimizations overview</a>.</p></li>
+<li><p>A typical usage of this new feature is quite simple as below:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="o">...</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize_transformers</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Torch.compile</span></code> functionality on Intel® Data Center GPU Max Series (Beta): Extends Intel® Extension for PyTorch* capabilities to support <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile">torch.compile</a> APIs on Intel® Data Center GPU Max Series. And provides Intel GPU support on top of <a class="reference external" href="https://github.com/openai/triton">Triton*</a> compiler to reach competitive performance speed-up over eager mode by default “inductor” backend of Intel® Extension for PyTorch*.</p></li>
+<li><p>Intel® Arc™ A-Series Graphics on WSL2, native Windows and native Linux are officially supported in this release. Intel® Arc™ A770 Graphic card has been used as primary verification vehicle for product level test.</p></li>
+<li><p>Other features are listed as following, more detailed information can be found in <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/xpu/2.1.10+xpu/">public documentation</a>:</p>
+<ul class="simple">
+<li><p>FP8 datatype support (Prototype): Add basic data type and FP8 Linear operator support based on emulation kernel.</p></li>
+<li><p>Kineto Profiling (Prototype): An extension of PyTorch* profiler for profiling operators on Intel® GPU devices.</p></li>
+<li><p>Fully Sharded Data Parallel (FSDP):  Support new PyTorch* <a class="reference external" href="https://pytorch.org/docs/stable/fsdp.html">FSDP</a> API which provides an industry-grade solution for large-scale model training.</p></li>
+<li><p>Asymmetric INT8 quantization: Support asymmetric quantization to align with stock PyTorch* and provide better accuracy in INT8.</p></li>
+</ul>
+</li>
+<li><p>CPU support has been merged in this release. CPU features and optimizations are equivalent to what has been released in <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/releases/tag/v2.1.0+cpu">Intel® Extension for PyTorch* v2.1.0+cpu release</a> that was made publicly available in Oct 2023. For customers who would like to evaluate workloads on both GPU and CPU, they can use this package. For customers who are focusing on CPU only, we still recommend them to use Intel® Extension for PyTorch* v2.1.0+cpu release for smaller footprint, less dependencies and broader OS support.</p></li>
+</ul>
+</section>
+<section id="id6">
+<h3>Known Issues<a class="headerlink" href="#id6" title="Permalink to this heading"></a></h3>
+<p>Please refer to <a class="reference internal" href="known_issues.html"><span class="doc">Known Issues webpage</span></a>.</p>
+</section>
+</section>
+<section id="id7">
+<h2>2.0.110+xpu<a class="headerlink" href="#id7" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* v2.0.110+xpu is the new Intel® Extension for PyTorch* release supports both CPU platforms and GPU platforms (Intel® Data Center GPU Flex Series and Intel® Data Center GPU Max Series) based on PyTorch* 2.0.1. It extends PyTorch* 2.0.1 with up-to-date features and optimizations on <code class="docutils literal notranslate"><span class="pre">xpu</span></code> for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.</p>
+<section id="id8">
+<h3>Highlights<a class="headerlink" href="#id8" title="Permalink to this heading"></a></h3>
+<p>This release introduces specific XPU solution optimizations on Intel discrete GPUs which include Intel® Data Center GPU Flex Series and Intel® Data Center GPU Max Series. Optimized operators and kernels are implemented and registered through PyTorch* dispatching mechanism for the <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device. These operators and kernels are accelerated on Intel GPU hardware from the corresponding native vectorization and matrix calculation features. In graph mode, additional operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.</p>
+<p>This release provides the following features:</p>
+<ul class="simple">
+<li><p>oneDNN 3.3 API integration and adoption</p></li>
+<li><p>Libtorch support</p></li>
+<li><p>ARC support on Windows, WSL2 and Ubuntu (Prototype)</p></li>
+<li><p>OOB models improvement</p>
+<ul>
+<li><p>More fusion patterns enabled for optimizing OOB models</p></li>
+</ul>
+</li>
+<li><p>CPU support is merged in this release:</p>
+<ul>
+<li><p>CPU features and optimizations are equivalent to what has been released in Intel® Extension for PyTorch* v2.0.100+cpu release that was made publicly available in May 2023. For customers who would like to evaluate workloads on both GPU and CPU, they can use this package. For customers who are focusing on CPU only, we still recommend them to use Intel® Extension for PyTorch* v2.0.100+cpu release for smaller footprint, less dependencies and broader OS support.</p></li>
+</ul>
+</li>
+</ul>
+<p>This release adds the following fusion patterns in PyTorch* JIT mode for Intel GPU:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">add</span></code> + <code class="docutils literal notranslate"><span class="pre">softmax</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">add</span></code> + <code class="docutils literal notranslate"><span class="pre">view</span></code> + <code class="docutils literal notranslate"><span class="pre">softmax</span></code></p></li>
+</ul>
+</section>
+<section id="id9">
+<h3>Known Issues<a class="headerlink" href="#id9" title="Permalink to this heading"></a></h3>
+<p>Please refer to <a class="reference internal" href="known_issues.html"><span class="doc">Known Issues webpage</span></a>.</p>
+</section>
+</section>
+<section id="id10">
+<h2>1.13.120+xpu<a class="headerlink" href="#id10" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* v1.13.120+xpu is the updated Intel® Extension for PyTorch* release supports both CPU platforms and GPU platforms (Intel® Data Center GPU Flex Series and Intel® Data Center GPU Max Series) based on PyTorch* 1.13.1. It extends PyTorch* 1.13.1 with up-to-date features and optimizations on <code class="docutils literal notranslate"><span class="pre">xpu</span></code> for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.</p>
+<section id="id11">
+<h3>Highlights<a class="headerlink" href="#id11" title="Permalink to this heading"></a></h3>
+<p>This release introduces specific XPU solution optimizations on Intel discrete GPUs which include Intel® Data Center GPU Flex Series and Intel® Data Center GPU Max Series. Optimized operators and kernels are implemented and registered through PyTorch* dispatching mechanism for the <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device. These operators and kernels are accelerated on Intel GPU hardware from the corresponding native vectorization and matrix calculation features. In graph mode, additional operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.</p>
+<p>This release provides the following features:</p>
+<ul class="simple">
+<li><p>oneDNN 3.1 API integration and adoption</p></li>
+<li><p>OOB models improvement</p>
+<ul>
+<li><p>More fusion patterns enabled for optimizing OOB models</p></li>
+</ul>
+</li>
+<li><p>CPU support is merged in this release:</p>
+<ul>
+<li><p>CPU features and optimizations are equivalent to what has been released in Intel® Extension for PyTorch* v1.13.100+cpu release that was made publicly available in Feb 2023. For customers who would like to evaluate workloads on both GPU and CPU, they can use this package. For customers who are focusing on CPU only, we still recommend them to use Intel® Extension for PyTorch* v1.13.100+cpu release for smaller footprint, less dependencies and broader OS support.</p></li>
+</ul>
+</li>
+</ul>
+<p>This release adds the following fusion patterns in PyTorch* JIT mode for Intel GPU:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Matmul</span></code> + UnaryOp(<code class="docutils literal notranslate"><span class="pre">abs</span></code>, <code class="docutils literal notranslate"><span class="pre">sqrt</span></code>, <code class="docutils literal notranslate"><span class="pre">square</span></code>, <code class="docutils literal notranslate"><span class="pre">exp</span></code>, <code class="docutils literal notranslate"><span class="pre">log</span></code>, <code class="docutils literal notranslate"><span class="pre">round</span></code>, <code class="docutils literal notranslate"><span class="pre">Log_Sigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">Hardswish</span></code>, <code class="docutils literal notranslate"><span class="pre">HardSigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">Pow</span></code>, <code class="docutils literal notranslate"><span class="pre">ELU</span></code>, <code class="docutils literal notranslate"><span class="pre">SiLU</span></code>, <code class="docutils literal notranslate"><span class="pre">hardtanh</span></code>, <code class="docutils literal notranslate"><span class="pre">Leaky_relu</span></code>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Conv2d</span></code> + BinaryOp(<code class="docutils literal notranslate"><span class="pre">add</span></code>, <code class="docutils literal notranslate"><span class="pre">sub</span></code>, <code class="docutils literal notranslate"><span class="pre">mul</span></code>, <code class="docutils literal notranslate"><span class="pre">div</span></code>, <code class="docutils literal notranslate"><span class="pre">max</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>, <code class="docutils literal notranslate"><span class="pre">eq</span></code>, <code class="docutils literal notranslate"><span class="pre">ne</span></code>, <code class="docutils literal notranslate"><span class="pre">ge</span></code>, <code class="docutils literal notranslate"><span class="pre">gt</span></code>, <code class="docutils literal notranslate"><span class="pre">le</span></code>, <code class="docutils literal notranslate"><span class="pre">lt</span></code>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Linear</span></code> + BinaryOp(<code class="docutils literal notranslate"><span class="pre">add</span></code>, <code class="docutils literal notranslate"><span class="pre">sub</span></code>, <code class="docutils literal notranslate"><span class="pre">mul</span></code>, <code class="docutils literal notranslate"><span class="pre">div</span></code>, <code class="docutils literal notranslate"><span class="pre">max</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Conv2d</span></code> + <code class="docutils literal notranslate"><span class="pre">mul</span></code> + <code class="docutils literal notranslate"><span class="pre">add</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Conv2d</span></code> + <code class="docutils literal notranslate"><span class="pre">mul</span></code> + <code class="docutils literal notranslate"><span class="pre">add</span></code> + <code class="docutils literal notranslate"><span class="pre">relu</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Conv2d</span></code> + <code class="docutils literal notranslate"><span class="pre">sigmoid</span></code> + <code class="docutils literal notranslate"><span class="pre">mul</span></code> + <code class="docutils literal notranslate"><span class="pre">add</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Conv2d</span></code> + <code class="docutils literal notranslate"><span class="pre">sigmoid</span></code> + <code class="docutils literal notranslate"><span class="pre">mul</span></code> + <code class="docutils literal notranslate"><span class="pre">add</span></code> + <code class="docutils literal notranslate"><span class="pre">relu</span></code></p></li>
+</ul>
+</section>
+<section id="id12">
+<h3>Known Issues<a class="headerlink" href="#id12" title="Permalink to this heading"></a></h3>
+<p>Please refer to <a class="reference internal" href="known_issues.html"><span class="doc">Known Issues webpage</span></a>.</p>
+</section>
+</section>
+<section id="id13">
+<h2>1.13.10+xpu<a class="headerlink" href="#id13" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* v1.13.10+xpu is the first Intel® Extension for PyTorch* release supports both CPU platforms and GPU platforms (Intel® Data Center GPU Flex Series and Intel® Data Center GPU Max Series) based on PyTorch* 1.13. It extends PyTorch* 1.13 with up-to-date features and optimizations on <code class="docutils literal notranslate"><span class="pre">xpu</span></code> for an extra performance boost on Intel hardware. Optimizations take advantage of AVX-512 Vector Neural Network Instructions (AVX512 VNNI) and Intel® Advanced Matrix Extensions (Intel® AMX) on Intel CPUs as well as Intel Xe Matrix Extensions (XMX) AI engines on Intel discrete GPUs. Moreover, through PyTorch* <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device, Intel® Extension for PyTorch* provides easy GPU acceleration for Intel discrete GPUs with PyTorch*.</p>
+<section id="id14">
+<h3>Highlights<a class="headerlink" href="#id14" title="Permalink to this heading"></a></h3>
+<p>This release introduces specific XPU solution optimizations on Intel discrete GPUs which include Intel® Data Center GPU Flex Series and Intel® Data Center GPU Max Series. Optimized operators and kernels are implemented and registered through PyTorch* dispatching mechanism for the <code class="docutils literal notranslate"><span class="pre">xpu</span></code> device. These operators and kernels are accelerated on Intel GPU hardware from the corresponding native vectorization and matrix calculation features. In graph mode, additional operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.</p>
+<p>This release provides the following features:</p>
+<ul class="simple">
+<li><p>Distributed Training on GPU:</p>
+<ul>
+<li><p>support of distributed training with DistributedDataParallel (DDP) on Intel GPU hardware</p></li>
+<li><p>support of distributed training with Horovod (prototype feature) on Intel GPU hardware</p></li>
+</ul>
+</li>
+<li><p>Automatic channels last format conversion on GPU:</p>
+<ul>
+<li><p>Automatic channels last format conversion is enabled. Models using <code class="docutils literal notranslate"><span class="pre">torch.xpu.optimize</span></code> API running on Intel® Data Center GPU Max Series will be converted to channels last memory format, while models running on Intel® Data Center GPU Flex Series will choose oneDNN block format.</p></li>
+</ul>
+</li>
+<li><p>CPU support is merged in this release:</p>
+<ul>
+<li><p>CPU features and optimizations are equivalent to what has been released in Intel® Extension for PyTorch* v1.13.0+cpu release that was made publicly available in Nov 2022. For customers who would like to evaluate workloads on both GPU and CPU, they can use this package. For customers who are focusing on CPU only, we still recommend them to use Intel® Extension for PyTorch* v1.13.0+cpu release for smaller footprint, less dependencies and broader OS support.</p></li>
+</ul>
+</li>
+</ul>
+<p>This release adds the following fusion patterns in PyTorch* JIT mode for Intel GPU:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Conv2D</span></code> + UnaryOp(<code class="docutils literal notranslate"><span class="pre">abs</span></code>, <code class="docutils literal notranslate"><span class="pre">sqrt</span></code>, <code class="docutils literal notranslate"><span class="pre">square</span></code>, <code class="docutils literal notranslate"><span class="pre">exp</span></code>, <code class="docutils literal notranslate"><span class="pre">log</span></code>, <code class="docutils literal notranslate"><span class="pre">round</span></code>, <code class="docutils literal notranslate"><span class="pre">GeLU</span></code>, <code class="docutils literal notranslate"><span class="pre">Log_Sigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">Hardswish</span></code>, <code class="docutils literal notranslate"><span class="pre">Mish</span></code>, <code class="docutils literal notranslate"><span class="pre">HardSigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">Tanh</span></code>, <code class="docutils literal notranslate"><span class="pre">Pow</span></code>, <code class="docutils literal notranslate"><span class="pre">ELU</span></code>, <code class="docutils literal notranslate"><span class="pre">hardtanh</span></code>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Linear</span></code> + UnaryOp(<code class="docutils literal notranslate"><span class="pre">abs</span></code>, <code class="docutils literal notranslate"><span class="pre">sqrt</span></code>, <code class="docutils literal notranslate"><span class="pre">square</span></code>, <code class="docutils literal notranslate"><span class="pre">exp</span></code>, <code class="docutils literal notranslate"><span class="pre">log</span></code>, <code class="docutils literal notranslate"><span class="pre">round</span></code>, <code class="docutils literal notranslate"><span class="pre">Log_Sigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">Hardswish</span></code>, <code class="docutils literal notranslate"><span class="pre">HardSigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">Pow</span></code>, <code class="docutils literal notranslate"><span class="pre">ELU</span></code>, <code class="docutils literal notranslate"><span class="pre">SiLU</span></code>, <code class="docutils literal notranslate"><span class="pre">hardtanh</span></code>, <code class="docutils literal notranslate"><span class="pre">Leaky_relu</span></code>)</p></li>
+</ul>
+</section>
+<section id="id15">
+<h3>Known Issues<a class="headerlink" href="#id15" title="Permalink to this heading"></a></h3>
+<p>Please refer to <a class="reference internal" href="known_issues.html"><span class="doc">Known Issues webpage</span></a>.</p>
+</section>
+</section>
+<section id="gpu">
+<h2>1.10.200+gpu<a class="headerlink" href="#gpu" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* v1.10.200+gpu extends PyTorch* 1.10 with up-to-date features and optimizations on XPU for an extra performance boost on Intel Graphics cards. XPU is a user visible device that is a counterpart of the well-known CPU and CUDA in the PyTorch* community. XPU represents an Intel-specific kernel and graph optimizations for various “concrete” devices. The XPU runtime will choose the actual device when executing AI workloads on the XPU device. The default selected device is Intel GPU. XPU kernels from Intel® Extension for PyTorch* are written in <a class="reference external" href="https://github.com/intel/llvm#oneapi-dpc-compiler">DPC++</a> that supports <a class="reference external" href="https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html">SYCL language</a> and also a number of <a class="reference external" href="https://github.com/intel/llvm/tree/sycl/sycl/doc/extensions">DPC++ extensions</a>.</p>
+<section id="id16">
+<h3>Highlights<a class="headerlink" href="#id16" title="Permalink to this heading"></a></h3>
+<p>This release introduces specific XPU solution optimizations on Intel® Data Center GPU Flex Series 170. Optimized operators and kernels are implemented and registered through PyTorch* dispatching mechanism for the XPU device. These operators and kernels are accelerated on Intel GPU hardware from the corresponding native vectorization and matrix calculation features. In graph mode, additional operator fusions are supported to reduce operator/kernel invocation overheads, and thus increase performance.</p>
+<p>This release provides the following features:</p>
+<ul class="simple">
+<li><p>Auto Mixed Precision (AMP)</p>
+<ul>
+<li><p>support of AMP with BFloat16 and Float16 optimization of GPU operators</p></li>
+</ul>
+</li>
+<li><p>Channels Last</p>
+<ul>
+<li><p>support of channels_last (NHWC) memory format for most key GPU operators</p></li>
+</ul>
+</li>
+<li><p>DPC++ Extension</p>
+<ul>
+<li><p>mechanism to create PyTorch* operators with custom DPC++ kernels running on the XPU device</p></li>
+</ul>
+</li>
+<li><p>Optimized Fusion</p>
+<ul>
+<li><p>support of SGD/AdamW fusion for both FP32 and BF16 precision</p></li>
+</ul>
+</li>
+</ul>
+<p>This release supports the following fusion patterns in PyTorch* JIT mode:</p>
+<ul class="simple">
+<li><p>Conv2D + ReLU</p></li>
+<li><p>Conv2D + Sum</p></li>
+<li><p>Conv2D + Sum + ReLU</p></li>
+<li><p>Pad + Conv2d</p></li>
+<li><p>Conv2D + SiLu</p></li>
+<li><p>Permute + Contiguous</p></li>
+<li><p>Conv3D + ReLU</p></li>
+<li><p>Conv3D + Sum</p></li>
+<li><p>Conv3D + Sum + ReLU</p></li>
+<li><p>Linear + ReLU</p></li>
+<li><p>Linear + Sigmoid</p></li>
+<li><p>Linear + Div(scalar)</p></li>
+<li><p>Linear + GeLu</p></li>
+<li><p>Linear + GeLu_</p></li>
+<li><p>T + Addmm</p></li>
+<li><p>T + Addmm + ReLu</p></li>
+<li><p>T + Addmm + Sigmoid</p></li>
+<li><p>T + Addmm + Dropout</p></li>
+<li><p>T + Matmul</p></li>
+<li><p>T + Matmul + Add</p></li>
+<li><p>T + Matmul + Add + GeLu</p></li>
+<li><p>T + Matmul + Add + Dropout</p></li>
+<li><p>Transpose + Matmul</p></li>
+<li><p>Transpose + Matmul + Div</p></li>
+<li><p>Transpose + Matmul + Div + Add</p></li>
+<li><p>MatMul + Add</p></li>
+<li><p>MatMul + Div</p></li>
+<li><p>Dequantize + PixelShuffle</p></li>
+<li><p>Dequantize + PixelShuffle + Quantize</p></li>
+<li><p>Mul + Add</p></li>
+<li><p>Add + ReLU</p></li>
+<li><p>Conv2D + Leaky_relu</p></li>
+<li><p>Conv2D + Leaky_relu_</p></li>
+<li><p>Conv2D + Sigmoid</p></li>
+<li><p>Conv2D + Dequantize</p></li>
+<li><p>Softplus + Tanh</p></li>
+<li><p>Softplus + Tanh + Mul</p></li>
+<li><p>Conv2D + Dequantize + Softplus + Tanh + Mul</p></li>
+<li><p>Conv2D + Dequantize + Softplus + Tanh + Mul + Quantize</p></li>
+<li><p>Conv2D + Dequantize + Softplus + Tanh + Mul + Quantize + Add</p></li>
+</ul>
+</section>
+<section id="id17">
+<h3>Known Issues<a class="headerlink" href="#id17" title="Permalink to this heading"></a></h3>
+<ul>
+<li><p>[CRITICAL ERROR] Kernel ‘XXX’ removed due to usage of FP64 instructions unsupported by the targeted hardware</p>
+<p>FP64 is not natively supported by the <a class="reference external" href="https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html">Intel® Data Center GPU Flex Series</a> platform. If you run any AI workload on that platform and receive this error message, it means a kernel requiring FP64 instructions is removed and not executed, hence the accuracy of the whole workload is wrong.</p>
+</li>
+<li><p>symbol undefined caused by _GLIBCXX_USE_CXX11_ABI</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ImportError:<span class="w"> </span>undefined<span class="w"> </span>symbol:<span class="w"> </span>_ZNK5torch8autograd4Node4nameB5cxx11Ev
+</pre></div>
+</div>
+<p>DPC++ does not support _GLIBCXX_USE_CXX11_ABI=0, Intel® Extension for PyTorch* is always compiled with _GLIBCXX_USE_CXX11_ABI=1. This symbol undefined issue appears when PyTorch* is compiled with _GLIBCXX_USE_CXX11_ABI=0. Update PyTorch* CMAKE file to set _GLIBCXX_USE_CXX11_ABI=1 and compile PyTorch* with particular compiler which supports _GLIBCXX_USE_CXX11_ABI=1. We recommend to use gcc version 9.4.0 on ubuntu 20.04.</p>
+</li>
+<li><p>Can’t find oneMKL library when build Intel® Extension for PyTorch* without oneMKL</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>/usr/bin/ld:<span class="w"> </span>cannot<span class="w"> </span>find<span class="w"> </span>-lmkl_sycl
+/usr/bin/ld:<span class="w"> </span>cannot<span class="w"> </span>find<span class="w"> </span>-lmkl_intel_ilp64
+/usr/bin/ld:<span class="w"> </span>cannot<span class="w"> </span>find<span class="w"> </span>-lmkl_core
+/usr/bin/ld:<span class="w"> </span>cannot<span class="w"> </span>find<span class="w"> </span>-lmkl_tbb_thread
+dpcpp:<span class="w"> </span>error:<span class="w"> </span>linker<span class="w"> </span><span class="nb">command</span><span class="w"> </span>failed<span class="w"> </span>with<span class="w"> </span><span class="nb">exit</span><span class="w"> </span>code<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="o">(</span>use<span class="w"> </span>-v<span class="w"> </span>to<span class="w"> </span>see<span class="w"> </span>invocation<span class="o">)</span>
+</pre></div>
+</div>
+<p>When PyTorch* is built with oneMKL library and Intel® Extension for PyTorch* is built without oneMKL library, this linker issue may occur. Resolve it by setting:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">USE_ONEMKL</span><span class="o">=</span>OFF
+<span class="nb">export</span><span class="w"> </span><span class="nv">MKL_DPCPP_ROOT</span><span class="o">=</span><span class="si">${</span><span class="nv">PATH_To_Your_oneMKL</span><span class="si">}</span>/__release_lnx/mkl
+</pre></div>
+</div>
+<p>Then clean build Intel® Extension for PyTorch*.</p>
+</li>
+<li><p>undefined symbol: mkl_lapack_dspevd. Intel MKL FATAL ERROR: cannot load libmkl_vml_avx512.so.2 or libmkl_vml_def.so.2</p>
+<p>This issue may occur when Intel® Extension for PyTorch* is built with oneMKL library and PyTorch* is not build with any MKL library. The oneMKL kernel may run into CPU backend incorrectly and trigger this issue. Resolve it by installing MKL library from conda:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>install<span class="w"> </span>mkl
+conda<span class="w"> </span>install<span class="w"> </span>mkl-include
+</pre></div>
+</div>
+<p>then clean build PyTorch*.</p>
+</li>
+<li><p>OSError: libmkl_intel_lp64.so.1: cannot open shared object file: No such file or directory</p>
+<p>Wrong MKL library is used when multiple MKL libraries exist in system. Preload oneMKL by:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">LD_PRELOAD</span><span class="o">=</span><span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_intel_lp64.so.1:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_intel_ilp64.so.1:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_sequential.so.1:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_core.so.1:<span class="si">${</span><span class="nv">MKL_DPCPP_ROOT</span><span class="si">}</span>/lib/intel64/libmkl_sycl.so.1
+</pre></div>
+</div>
+<p>If you continue seeing similar issues for other shared object files, add the corresponding files under ${MKL_DPCPP_ROOT}/lib/intel64/ by <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code>. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.</p>
+</li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="technical_details/ipex_optimize.html" class="btn btn-neutral float-left" title="ipex.optimize Frontend API" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="known_issues.html" class="btn btn-neutral float-right" title="Troubleshooting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f5a250ad580> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intel® Extension for PyTorch* Optimizations for Quantization [GPU] &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.30+xpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Float8 Data Type Support (Prototype)" href="float8.html" />
+    <link rel="prev" title="Auto Mixed Precision (AMP) on GPU" href="amp_gpu.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.1.30+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#quantization">Quantization</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Intel® Extension for PyTorch* Optimizations for Quantization [GPU]</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#imperative-mode">Imperative Mode</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#torchscript-mode">TorchScript Mode</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="float8.html">Float8 Data Type Support (Prototype)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#simple-trace-tool-prototype">Simple Trace Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ipex-logging-prototype-feature-for-debug"><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> (Prototype feature for debug)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">Intel® Extension for PyTorch* Optimizations for Quantization [GPU]</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/int8_overview_xpu.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="intel-extension-for-pytorch-optimizations-for-quantization-gpu">
+<h1>Intel® Extension for PyTorch* Optimizations for Quantization [GPU]<a class="headerlink" href="#intel-extension-for-pytorch-optimizations-for-quantization-gpu" title="Permalink to this heading"></a></h1>
+<p>Intel® Extension for PyTorch* currently supports imperative mode and TorchScript mode for post-training static quantization on GPU. This section illustrates the quantization workflow on Intel GPUs.</p>
+<p>The overall view is that our usage follows the API defined in official PyTorch. Therefore, only small modification like moving model and data to GPU with <code class="docutils literal notranslate"><span class="pre">to('xpu')</span></code> is required. We highly recommend using the TorchScript for quantizing models. With graph model created via TorchScript, optimization like operator fusion (e.g. <code class="docutils literal notranslate"><span class="pre">conv_relu</span></code>) is enabled automatically. This delivers the best performance for int8 workloads.</p>
+<section id="imperative-mode">
+<h2>Imperative Mode<a class="headerlink" href="#imperative-mode" title="Permalink to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+
+<span class="c1"># Define model</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">modelImpe</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">QuantWrapper</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="c1"># Define QConfig</span>
+<span class="n">qconfig</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">QConfig</span><span class="p">(</span><span class="n">activation</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">observer</span><span class="o">.</span><span class="n">MinMaxObserver</span> <span class="o">.</span><span class="n">with_args</span><span class="p">(</span><span class="n">qscheme</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">per_tensor_symmetric</span><span class="p">),</span>
+    <span class="n">weight</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">default_weight_observer</span><span class="p">)</span>  <span class="c1"># weight could also be perchannel</span>
+
+<span class="n">modelImpe</span><span class="o">.</span><span class="n">qconfig</span> <span class="o">=</span> <span class="n">qconfig</span>
+
+<span class="c1"># Prepare model for inserting observer</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">modelImpe</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Calibration to obtain statistics for Observer</span>
+<span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">calib_dataset</span><span class="p">:</span>
+    <span class="n">modelImpe</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+<span class="c1"># Convert model to create a quantized module</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">modelImpe</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Inference</span>
+<span class="n">modelImpe</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Imperative mode usage follows official Pytorch and more details can be found at <a class="reference external" href="https://pytorch.org/docs/1.9.1/quantization.html">PyTorch doc</a>.</p>
+<p>Defining the quantized config (QConfig) for model is the first stage of quantization. Per-tensor quantization is supported for activation quantization, while both per-tensor and per-channel are supported for weight quantization. Weight can be quantized to <code class="docutils literal notranslate"><span class="pre">int8</span></code> data type only. As for activation quantization, both symmetric and asymmetric are supported. Also, both <code class="docutils literal notranslate"><span class="pre">uint8</span></code> and <code class="docutils literal notranslate"><span class="pre">int8</span></code> data types are supported.</p>
+<p>If the best performance is desired, we recommend using the <code class="docutils literal notranslate"><span class="pre">symmetric+int8</span></code> combination. Other configuration may have lower performance due to the existence of <code class="docutils literal notranslate"><span class="pre">zero_point</span></code>.</p>
+<p>After defining a QConfig, the <code class="docutils literal notranslate"><span class="pre">prepare</span></code> function is used to insert observer in models. The observer is responsible for collecting statistics for quantization. A calibration stage is needed for observer to collect info.</p>
+<p>After calibration, function <code class="docutils literal notranslate"><span class="pre">convert</span></code> would quantize weight in module and swap FP32 module to quantized ones. Then, an int8 module is created. Be free to use it for inference.</p>
+</section>
+<section id="torchscript-mode">
+<h2>TorchScript Mode<a class="headerlink" href="#torchscript-mode" title="Permalink to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+<span class="kn">from</span> <span class="nn">torch.quantization.quantize_jit</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">convert_jit</span><span class="p">,</span>
+    <span class="n">prepare_jit</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Define model</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+<span class="c1"># Generate a ScriptModule</span>
+<span class="n">modelJit</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">example_input</span><span class="p">)</span> <span class="c1"># or torch.jit.script(model)</span>
+
+<span class="c1"># Defin QConfig</span>
+<span class="n">qconfig</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">QConfig</span><span class="p">(</span>
+    <span class="n">activation</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">observer</span><span class="o">.</span><span class="n">MinMaxObserver</span><span class="o">.</span><span class="n">with_args</span><span class="p">(</span>
+        <span class="n">qscheme</span><span class="o">=</span><span class="n">qscheme</span><span class="p">,</span>
+        <span class="n">reduce_range</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+    <span class="p">),</span>
+    <span class="n">weight</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">default_weight_observer</span>
+<span class="p">)</span>
+
+<span class="c1"># Prepare model for inserting observer</span>
+<span class="n">modelJit</span> <span class="o">=</span> <span class="n">prepare_jit</span><span class="p">(</span><span class="n">modelJit</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;&#39;</span><span class="p">:</span> <span class="n">qconfig</span><span class="p">},</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Calibration </span>
+<span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">calib_dataset</span><span class="p">:</span>
+    <span class="n">modelJit</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+<span class="c1"># Convert model to quantized one</span>
+<span class="n">modelJit</span> <span class="o">=</span> <span class="n">convert_jit</span><span class="p">(</span><span class="n">modelJit</span><span class="p">)</span>
+
+<span class="c1"># Warmup to fully trigger fusion patterns</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+    <span class="n">modelJit</span><span class="p">(</span><span class="n">warmup_data</span><span class="p">)</span> 
+<span class="c1"># Inference</span>
+<span class="n">modelJit</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
+
+<span class="c1"># Debug</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">modelJit</span><span class="o">.</span><span class="n">graph_for</span><span class="p">(</span><span class="n">inference_dta</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>We need to define <code class="docutils literal notranslate"><span class="pre">QConfig``</span> <span class="pre">for</span> <span class="pre">TorchScript</span> <span class="pre">module,</span> <span class="pre">use</span> </code>prepare_jit<code class="docutils literal notranslate"><span class="pre">for</span> <span class="pre">inserting</span> <span class="pre">observer</span> <span class="pre">and</span> <span class="pre">use</span></code>convert_jit` for replacing FP32 modules.</p>
+<p>Before <code class="docutils literal notranslate"><span class="pre">prepare_jit</span></code>, create a ScriptModule using <code class="docutils literal notranslate"><span class="pre">torch.jit.script</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code>. <code class="docutils literal notranslate"><span class="pre">jit.trace</span></code> is recommended for capable of catching the whole graph in most scenarios.</p>
+<p>Fusion operations like <code class="docutils literal notranslate"><span class="pre">conv_unary</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_binary</span></code>, <code class="docutils literal notranslate"><span class="pre">linear_unary</span></code> (e.g. <code class="docutils literal notranslate"><span class="pre">conv_relu</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_sum_relu</span></code>) are automatically enabled after model conversion (<code class="docutils literal notranslate"><span class="pre">convert_jit</span></code>). A warmup stage is required for bringing the fusion into effect. With the benefit from fusion, ScriptModule can deliver better performance than eager mode. Hence, we recommend using ScriptModule as for performance consideration.</p>
+<p><code class="docutils literal notranslate"><span class="pre">modelJit.graph_for(input)</span></code> is useful to dump the inference graph and other graph related information for performance analysis.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="amp_gpu.html" class="btn btn-neutral float-left" title="Auto Mixed Precision (AMP) on GPU" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="float8.html" class="btn btn-neutral float-right" title="Float8 Data Type Support (Prototype)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f5a22a0e520> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

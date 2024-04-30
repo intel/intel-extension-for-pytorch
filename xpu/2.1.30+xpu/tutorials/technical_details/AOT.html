@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ahead of Time (AOT) Compilation &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.30+xpu documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Memory Management" href="memory_management.html" />
+    <link rel="prev" title="Optimizer Fusion on GPU" href="optimizer_fusion_gpu.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.1.30+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../technical_details.html">Technical Details</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#optimizer-optimization-gpu">Optimizer Optimization [GPU]</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../technical_details.html#ahead-of-time-compilation-aot-gpu">Ahead of Time Compilation (AOT) [GPU]</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Ahead of Time (AOT) Compilation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#use-case">Use case</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#requirement">Requirement</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#memory-management-gpu">Memory Management [GPU]</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#ipex-optimize-gpu"><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> [GPU]</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../technical_details.html">Technical Details</a></li>
+      <li class="breadcrumb-item active">Ahead of Time (AOT) Compilation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/technical_details/AOT.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ahead-of-time-aot-compilation">
+<h1>Ahead of Time (AOT) Compilation<a class="headerlink" href="#ahead-of-time-aot-compilation" title="Permalink to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
+<p><a class="reference external" href="https://www.intel.com/content/www/us/en/develop/documentation/oneapi-dpcpp-cpp-compiler-dev-guide-and-reference/top/compilation/ahead-of-time-compilation.html">AOT Compilation</a> is a helpful feature for development lifecycle or distribution time, when you know beforehand what your target device is going to be at application execution time. When AOT compilation is enabled, no additional compilation time is needed when running application. It also benifits the product quality since no just-in-time (JIT) bugs encountered as JIT is skipped and final code executing on the target device can be tested as-is before delivery to end-users. The disadvantage of this feature is that the final distributed binary size will be increased a lot (e.g. from 500MB to 2.5GB for Intel® Extension for PyTorch*).</p>
+</section>
+<section id="use-case">
+<h2>Use case<a class="headerlink" href="#use-case" title="Permalink to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* provides build option <code class="docutils literal notranslate"><span class="pre">USE_AOT_DEVLIST</span></code> for users who install Intel® Extension for PyTorch* via source compilation to configure device list for AOT compilation. The target device in device list is specified by DEVICE type of the target. Multi-target AOT compilation is supported by using a comma (,) as a delimiter in device list. See below table for the AOT setting targeting <a class="reference external" href="https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html">Intel® Data Center GPU Flex Series</a> &amp; Intel® Arc™ A-Series GPUs.</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>Supported HW</th>
+<th>AOT Setting</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Intel® Data Center GPU Flex Series 170</td>
+<td>USE_AOT_DEVLIST='ats-m150'</td>
+</tr>
+<tr>
+<td>Intel® Data Center GPU Max Series</td>
+<td>USE_AOT_DEVLIST='pvc'</td>
+</tr>
+<tr>
+<td>Intel® Arc™ A-Series</td>
+<td>USE_AOT_DEVLIST='ats-m150'</td>
+</tr>
+</tbody>
+</table><p><strong>Note:</strong> Multiple AOT settings can be used together by seperating setting texts with a comma (,) to make the compiled wheel file have multiple AOT supports. E.g. a wheel file built with <code class="docutils literal notranslate"><span class="pre">USE_AOT_DEVLIST='ats-m150,pvc'</span></code> has both <code class="docutils literal notranslate"><span class="pre">ats-m150</span></code> and <code class="docutils literal notranslate"><span class="pre">pvc</span></code> AOT enabled.</p>
+<p>Intel® Extension for PyTorch* enables AOT compilation for Intel GPU target devices in prebuilt wheel files. Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU Max Series are the enabled target devices in current release, with Intel® Arc™ A-Series GPUs having prototype support. If Intel® Extension for PyTorch* is executed on a device which is not pre-configured in <code class="docutils literal notranslate"><span class="pre">USE_AOT_DEVLIST</span></code>, this application can still run because JIT compilation will be triggered automatically to allow execution on the current device. It causes additional compilation time during execution.</p>
+<p>For more GPU platforms, please refer to <a class="reference external" href="https://www.intel.com/content/www/us/en/develop/documentation/oneapi-dpcpp-cpp-compiler-dev-guide-and-reference/top/compilation/ahead-of-time-compilation.html">Use AOT for Integrated Graphics (Intel GPU)</a>.</p>
+</section>
+<section id="requirement">
+<h2>Requirement<a class="headerlink" href="#requirement" title="Permalink to this heading"></a></h2>
+<p><a class="reference external" href="https://github.com/intel/compute-runtime/releases">Intel® Graphics Compute Runtime for oneAPI Level Zero and OpenCL™ Driver</a> must be installed beforehand to use AOT compilation. Once <code class="docutils literal notranslate"><span class="pre">USE_AOT_DEVLIST</span></code> is configured, Intel® Extension for PyTorch* will provide <code class="docutils literal notranslate"><span class="pre">-fsycl-targets=spir64_gen</span></code> option and <code class="docutils literal notranslate"><span class="pre">-Xs</span> <span class="pre">&quot;-device</span> <span class="pre">${USE_AOT_DEVLIST}&quot;</span></code> option for generating binaries that utilize Intel® oneAPI Level Zero backend.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="optimizer_fusion_gpu.html" class="btn btn-neutral float-left" title="Optimizer Fusion on GPU" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="memory_management.html" class="btn btn-neutral float-right" title="Memory Management" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f5a250bbd30> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
