@@ -35,7 +35,7 @@ Installation for GPU:
 - Clone the `oneccl_bindings_for_pytorch`
 
 ```bash
-git clone https://github.com/intel/torch-ccl.git -b v2.1.100+xpu
+git clone https://github.com/intel/torch-ccl.git -b v2.1.300+xpu
 cd torch-ccl
 git submodule sync 
 git submodule update --init --recursive
