@@ -1,4 +1,4 @@
-Weight-Only Quantization (WOQ)
+Weight-Only Quantization (Prototype)
 =====
 
 ## Introduction

@@ -26,7 +26,7 @@ Intel® Extension for PyTorch* has been released as an open–source project at 
 
 You can find more information about the product at:
 
-- `Features <https://intel.github.io/intel-extension-for-pytorch/gpu/latest/tutorials/features>`_
+- `Features <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/features>`_
 - `Performance <https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/performance>`_ 
 
 Architecture

@@ -21,13 +21,15 @@ Optimized Models
    :header-rows: 1
 
    * - Model Family
-     - LLAMA
+     - LLAMA2
      - GPT-J
+     - Qwen
      - OPT
      - BLOOM
    * - Verified < MODEL ID > (Huggingface hub)
      - "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf"
      - "EleutherAI/gpt-j-6b"
+     - "Qwen/Qwen-7B"
      - "facebook/opt-30b", "facebook/opt-1.3b"
      - "bigscience/bloom-7b1", "bigscience/bloom"
    * - FP16
@@ -35,10 +37,18 @@ Optimized Models
      - ✅
      - ✅
      - ✅
+     - ✅
+   * - INT4 WOQ
+     - ✅
+     - ✅
+     - ✅
+     - ❎
+     - ❎
+
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp16). For other LLMs families, we are working in progress to cover those optimizations, which will expand the model list above.
 
-Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.20%2Bxpu/examples/gpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
+Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.30%2Bxpu/examples/gpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
 
 Optimization Methodologies
 --------------------------
@@ -104,4 +114,23 @@ enhances workload accuracies; however, it also leads to significantly
 heavier computations and places higher requirements to the underlying
 hardware. Given that, quantization becomes a more important methodology
 for inference workloads.
+
+
+Weight Only Quantization INT4
+-----------------------------
+
+Large Language Models (LLMs) have shown remarkable performance in various natural language processing tasks. 
+
+However, deploying them on devices with limited resources is challenging due to their high computational and memory requirements. 
+
+To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike `normal quantization <https://github.com/intel/intel-extension-for-transformers/blob/main/docs/quantization.md>`_, such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WOQ), which only quantizes the weights statically. WOQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WOQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.
+
+For more detailed information, check `WOQ INT4 <llm/int4_weight_only_quantization.html>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   llm/int4_weight_only_quantization
+
 

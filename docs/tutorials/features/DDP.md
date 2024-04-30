@@ -35,7 +35,7 @@ Installation for GPU:
 - Clone the `oneccl_bindings_for_pytorch`
 
 ```bash
-git clone https://github.com/intel/torch-ccl.git -b v2.1.100+xpu
+git clone https://github.com/intel/torch-ccl.git -b v2.1.300+xpu
 cd torch-ccl
 git submodule sync 
 git submodule update --init --recursive
@@ -56,9 +56,9 @@ We recommend to use apt/yum/dnf to install the oneCCL package. Refer to [Base To
 Reference commands:
 
 ```bash
-sudo apt install intel-oneapi-ccl-devel=2021.11.1-6
-sudo yum install intel-oneapi-ccl-devel=2021.11.1-6
-sudo dnf install intel-oneapi-ccl-devel=2021.11.1-6
+sudo apt install intel-oneapi-ccl-devel=2021.12.0-309
+sudo yum install intel-oneapi-ccl-devel=2021.12.0-309
+sudo dnf install intel-oneapi-ccl-devel=2021.12.0-309
 ```
 
 Compile with commands below.
@@ -104,6 +104,7 @@ source $(python -c "import oneccl_bindings_for_pytorch as torch_ccl;print(torch_
 
 ```bash
 source <ONEAPI_ROOT>/ccl/latest/env/vars.sh
+source <ONEAPI_ROOT>/mpi/latest/env/vars.sh
 ```
 
 Note: Make sure you have installed [basekit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit) when using Intel® oneCCL Bindings for Pytorch\* on Intel® GPUs. If the basekit is installed with a package manager, <ONEAPI_ROOT> is `/opt/intel/oneapi`.
@@ -148,6 +149,7 @@ Dynamic link oneCCL and Intel MPI libraries:
 source $(python -c "import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)")/env/setvars.sh
 # Or
 source <ONEAPI_ROOT>/ccl/latest/env/vars.sh
+source <ONEAPI_ROOT>/mpi/latest/env/vars.sh
 ```
 
 `Example_DDP.py`

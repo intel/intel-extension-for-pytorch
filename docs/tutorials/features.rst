@@ -137,19 +137,6 @@ For more detailed information, check `torch.compile for GPU <features/torch_comp
 
    features/torch_compile_gpu
 
-Legacy Profiler Tool (Prototype)
---------------------------------
-
-The legacy profiler tool is an extension of PyTorch* legacy profiler for profiling operators' overhead on XPU devices. With this tool, you can get the information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch* with profiler support as default and enable this tool by adding a `with` statement before the code segment.
-
-For more detailed information, check `Legacy Profiler Tool <features/profiler_legacy.md>`_.
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
-   features/profiler_legacy
-
 Simple Trace Tool (Prototype)
 -----------------------------
 
@@ -178,7 +165,7 @@ For more detailed information, check `Profiler Kineto <features/profiler_kineto.
 
 
 Compute Engine (Prototype feature for debug)
------------------------------------------------
+--------------------------------------------
 
 Compute engine is a prototype feature which provides the capacity to choose specific backend for operators with multiple implementations.
 
@@ -189,5 +176,20 @@ For more detailed information, check `Compute Engine <features/compute_engine.md
    :maxdepth: 1
 
    features/compute_engine
+
+
+``IPEX_LOGGING`` (Prototype feature for debug)
+----------------------------------------------
+
+
+``IPEX_LOGGING`` provides the capability to log verbose information from Intel® Extension for PyTorch\* . Please use ``IPEX_LOGGING`` to get the log information or trace the execution from Intel® Extension for PyTorch\*. Please continue using PyTorch\* macros such as ``TORCH_CHECK``, ``TORCH_ERROR``, etc. to get the log information from PyTorch\*.
+
+For more detailed information, check `IPEX_LOGGING <features/ipex_log.md>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   features/ipex_log
 
 

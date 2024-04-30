@@ -46,3 +46,27 @@ For more detailed information, check `Memory Management <technical_details/memor
    :maxdepth: 1
 
    technical_details/memory_management
+
+
+
+``ipex.optimize`` [GPU]
+-----------------------
+
+The ``ipex.optimize`` API is designed to optimize PyTorch\* modules
+(``nn.modules``) and specific optimizers within Python modules. Its
+optimization options for Intel® GPU device include:
+
+-  Automatic Channels Last
+-  Fusing Convolutional Layers with Batch Normalization
+-  Fusing Linear Layers with Batch Normalization
+-  Replacing Dropout with Identity
+-  Splitting Master Weights
+-  Fusing Optimizer Update Step
+
+For more detailed information, check `ipex.optimize <technical_details/ipex_optimize.html>`_.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   technical_details/ipex_optimize

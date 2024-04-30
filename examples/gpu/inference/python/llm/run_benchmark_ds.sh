@@ -84,35 +84,6 @@ Run_benchmark_llama2-13b() {
 }
 
 
-
-## Llama2-34b
-Run_benchmark_llama2-34b() {
-    model=codellama/CodeLlama-34b-hf
-    sub_model_name=llama2-34b
-    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}_ranknum2
-    mkdir -p ${dir}
-    mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
-    mv log_e2e_ds ${dir}
-    PROFILE=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
-    mv profile*pt ${dir}
-    mv trace.json ${dir}
-}
-
-
-## Falcon-40b
-Run_benchmark_falcon-40b() {
-    model=tiiuae/falcon-40b
-    sub_model_name=falcon-40b
-    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}_ranknum2
-    mkdir -p ${dir}
-    mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
-    mv log_e2e_ds ${dir}
-    PROFILE=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
-    mv profile*pt ${dir}
-    mv trace.json ${dir}
-}
-
-
 ## Llama2-70b
 Run_benchmark_llama2-70b() {
     model=meta-llama/Llama-2-70b-hf
@@ -190,9 +161,7 @@ main() {
     Run_benchmark_llama-13b
     Run_benchmark_llama2-7b
     Run_benchmark_llama2-13b
-    Run_benchmark_llama2-34b
     Run_benchmark_llama2-70b
-    Run_benchmark_falcon-40b
     Run_benchmark_opt-6.7b
     Run_benchmark_opt-30b
     Run_benchmark_bloom-7b
@@ -200,3 +169,4 @@ main() {
 }
 
 main
+

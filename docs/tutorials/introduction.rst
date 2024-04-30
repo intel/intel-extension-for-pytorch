@@ -9,10 +9,11 @@ For the detailed list of supported features and usage instructions, refer to `Fe
 
 Get Started
 -----------
-- `Installation <../../../index.html#installation?platform=gpu&version=v2.1.10%2Bxpu>`_
+- `Installation <../../../index.html#installation?platform=gpu&version=v2.1.30%2Bxpu>`_
 - `Quick Start <getting_started.md>`_
 - `Examples <examples.md>`_
 
 API Documentation
 -----------------
 For detailed description of the Intel® Extension for PyTorch* APIs, refer to the `API Documentation <api_doc.html>`_ section.
+

@@ -1,6 +1,24 @@
 Releases
 =============
 
+## 2.1.30+xpu
+
+Intel® Extension for PyTorch\* v2.1.30+xpu is an update release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.1.0.
+
+### Highlights
+
+- Intel® oneDNN v3.4.1 integration
+- Intel® oneAPI Base Toolkit 2024.1 compatibility
+- Large Language Model (LLM) optimizations for FP16 inference on Intel® Data Center GPU Max Series (Beta): Intel® Extension for PyTorch* provides a lot of specific optimizations for LLM workloads in this release on Intel® Data Center GPU Max Series.  In operator level, we provide highly efficient GEMM kernel to speed up Linear layer and customized fused operators to reduce HBM access/kernel launch overhead. To reduce memory footprint, we define a segment KV Cache policy to save device memory and improve the throughput. Such optimizations are added in this release to enhance existing optimized LLM FP16 models and more Chinese LLM models such as Baichuan2-13B, ChatGLM3-6B and Qwen-7B.
+
+- LLM optimizations for INT4 inference on Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics (Prototype): Intel® Extension for PyTorch* shows remarkable performance when executing LLM models on Intel® GPU. However, deploying such models on GPUs with limited resources is challenging due to their high computational and memory requirements. To achieve a better trade-off, a low-precision solution, e.g., weight-only-quantization for INT4 is enabled to allow Llama 2-7B, GPT-J-6B and Qwen-7B to be executed efficiently on Intel® Arc™ A-Series Graphics. The same optimization makes INT4 models achieve 1.5x speeded up in total latency performance compared with FP16 models with the same configuration and parameters on Intel® Data Center GPU Max Series.
+
+- Opt-in collective performance optimization with oneCCL Bindings for Pytorch*: This opt-in feature can be enabled by setting `TORCH_LLM_ALLREDUCE=1` to provide better scale-up performance by enabling optimized collectives such as `allreduce`, `allgather`, `reducescatter` algorithms in Intel® oneCCL. This feature requires XeLink enabled for cross-cards communication.
+
+### Known Issues
+
+Please refer to [Known Issues webpage](./known_issues.md).
+
 ## 2.1.20+xpu
 
 Intel® Extension for PyTorch\* v2.1.20+xpu is a minor release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.1.0.
