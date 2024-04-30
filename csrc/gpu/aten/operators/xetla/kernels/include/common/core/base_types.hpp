@@ -232,7 +232,8 @@ concept xetla_matrix_ref = __ESIMD_NS::detail::is_simd_view_type_v<Ta> &&
 
 } // namespace gpu::xetla
 
-#if (__LIBSYCL_MAJOR_VERSION >= 7) && (__LIBSYCL_MINOR_VERSION >= 1)
+#if (__LIBSYCL_MAJOR_VERSION > 7) || \
+    ((__LIBSYCL_MAJOR_VERSION == 7) && (__LIBSYCL_MINOR_VERSION >= 1))
 
 namespace sycl::detail {
 template <typename T>
