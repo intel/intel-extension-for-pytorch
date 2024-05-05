@@ -1,9 +1,9 @@
+#ifdef USE_XETLA_XE_HPC
 #include "../../hgemm.h"
 #include <iostream>
 #include "hgemm_impl.h"
 #include "hgemm_policy.h"
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
 // clang-format off
 
@@ -31,9 +31,8 @@ namespace xetla {
 
 #define HGEMM_ENUMERATE_IMPLS(                                                 \
     WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)                         \
-  void HGEMM_ADDMM_IMPL_NAME(                                                  \
+  cgfs_t HGEMM_ADDMM_IMPL_NAME(                                                \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* res,                                                   \
       const sycl::half* a,                                                     \
@@ -45,7 +44,7 @@ namespace xetla {
       const int k,                                                             \
       const float alpha,                                                       \
       const float beta) {                                                      \
-    hgemm_addmm<                                                               \
+    return hgemm_addmm<                                                        \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -56,12 +55,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(                                                          \
-        queue, out, res, a, b, acc_ptr, cnt_ptr, m, n, k, alpha, beta);        \
+        B_ROW_MAJOR>(out, res, a, b, acc_ptr, cnt_ptr, m, n, k, alpha, beta);  \
   }                                                                            \
-  void HGEMM_COMMON_IMPL_NAME(                                                 \
+  cgfs_t HGEMM_COMMON_IMPL_NAME(                                               \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -70,7 +67,7 @@ namespace xetla {
       const int m,                                                             \
       const int n,                                                             \
       const int k) {                                                           \
-    hgemm_common<                                                              \
+    return hgemm_common<                                                       \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -81,10 +78,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(queue, out, a, b, acc_ptr, cnt_ptr, m, n, k);             \
+        B_ROW_MAJOR>(out, a, b, acc_ptr, cnt_ptr, m, n, k);                    \
   }                                                                            \
-  void HGEMM_RES_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)( \
-      sycl::queue & queue,                                                     \
+  cgfs_t HGEMM_RES_IMPL_NAME(                                                  \
+      WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -95,7 +92,7 @@ namespace xetla {
       const int n,                                                             \
       const int k,                                                             \
       const float res_factor) {                                                \
-    hgemm_res<                                                                 \
+    return hgemm_res<                                                          \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -106,12 +103,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(                                                          \
-        queue, out, a, b, res, acc_ptr, cnt_ptr, m, n, k, res_factor);         \
+        B_ROW_MAJOR>(out, a, b, res, acc_ptr, cnt_ptr, m, n, k, res_factor);   \
   }                                                                            \
-  void HGEMM_RES_RES_IMPL_NAME(                                                \
+  cgfs_t HGEMM_RES_RES_IMPL_NAME(                                              \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -124,7 +119,7 @@ namespace xetla {
       const int k,                                                             \
       const float res0_factor,                                                 \
       const float res1_factor) {                                               \
-    hgemm_res_res<                                                             \
+    return hgemm_res_res<                                                      \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -136,7 +131,6 @@ namespace xetla {
         1,                                                                     \
         3,                                                                     \
         B_ROW_MAJOR>(                                                          \
-        queue,                                                                 \
         out,                                                                   \
         a,                                                                     \
         b,                                                                     \
@@ -150,9 +144,8 @@ namespace xetla {
         res0_factor,                                                           \
         res1_factor);                                                          \
   }                                                                            \
-  void HGEMM_BIAS_IMPL_NAME(                                                   \
+  cgfs_t HGEMM_BIAS_IMPL_NAME(                                                 \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -163,7 +156,7 @@ namespace xetla {
       const int n,                                                             \
       const int k,                                                             \
       const float bias_factor) {                                               \
-    hgemm_bias<                                                                \
+    return hgemm_bias<                                                         \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -174,12 +167,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(                                                          \
-        queue, out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor);       \
+        B_ROW_MAJOR>(out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor); \
   }                                                                            \
-  void HGEMM_BIAS_RES_IMPL_NAME(                                               \
+  cgfs_t HGEMM_BIAS_RES_IMPL_NAME(                                             \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -192,7 +183,7 @@ namespace xetla {
       const int k,                                                             \
       const float bias_factor,                                                 \
       const float res_factor) {                                                \
-    hgemm_bias_res<                                                            \
+    return hgemm_bias_res<                                                     \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -204,7 +195,6 @@ namespace xetla {
         1,                                                                     \
         3,                                                                     \
         B_ROW_MAJOR>(                                                          \
-        queue,                                                                 \
         out,                                                                   \
         a,                                                                     \
         b,                                                                     \
@@ -218,9 +208,8 @@ namespace xetla {
         bias_factor,                                                           \
         res_factor);                                                           \
   }                                                                            \
-  void HGEMM_BIAS_RES_RES_IMPL_NAME(                                           \
+  cgfs_t HGEMM_BIAS_RES_RES_IMPL_NAME(                                         \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -235,7 +224,7 @@ namespace xetla {
       const float bias_factor,                                                 \
       const float res0_factor,                                                 \
       const float res1_factor) {                                               \
-    hgemm_bias_res_res<                                                        \
+    return hgemm_bias_res_res<                                                 \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -247,7 +236,6 @@ namespace xetla {
         1,                                                                     \
         3,                                                                     \
         B_ROW_MAJOR>(                                                          \
-        queue,                                                                 \
         out,                                                                   \
         a,                                                                     \
         b,                                                                     \
@@ -263,9 +251,8 @@ namespace xetla {
         res0_factor,                                                           \
         res1_factor);                                                          \
   }                                                                            \
-  void HGEMM_BIAS_RELU_IMPL_NAME(                                              \
+  cgfs_t HGEMM_BIAS_RELU_IMPL_NAME(                                            \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -276,7 +263,7 @@ namespace xetla {
       const int n,                                                             \
       const int k,                                                             \
       const float bias_factor) {                                               \
-    hgemm_bias_relu<                                                           \
+    return hgemm_bias_relu<                                                    \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -287,12 +274,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(                                                          \
-        queue, out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor);       \
+        B_ROW_MAJOR>(out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor); \
   }                                                                            \
-  void HGEMM_BIAS_GELU_IMPL_NAME(                                              \
+  cgfs_t HGEMM_BIAS_GELU_IMPL_NAME(                                            \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -303,7 +288,7 @@ namespace xetla {
       const int n,                                                             \
       const int k,                                                             \
       const float bias_factor) {                                               \
-    hgemm_bias_gelu<                                                           \
+    return hgemm_bias_gelu<                                                    \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -314,12 +299,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(                                                          \
-        queue, out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor);       \
+        B_ROW_MAJOR>(out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor); \
   }                                                                            \
-  void HGEMM_RESMUL_IMPL_NAME(                                                 \
+  cgfs_t HGEMM_RESMUL_IMPL_NAME(                                               \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -329,7 +312,7 @@ namespace xetla {
       const int m,                                                             \
       const int n,                                                             \
       const int k) {                                                           \
-    hgemm_mul<                                                                 \
+    return hgemm_mul<                                                          \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -340,11 +323,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(queue, out, a, b, mul, acc_ptr, cnt_ptr, m, n, k);        \
+        B_ROW_MAJOR>(out, a, b, mul, acc_ptr, cnt_ptr, m, n, k);               \
   }                                                                            \
-  void HGEMM_SILU_IMPL_NAME(                                                   \
+  cgfs_t HGEMM_SILU_IMPL_NAME(                                                 \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out,                                                        \
       const sycl::half* a,                                                     \
       const sycl::half* b,                                                     \
@@ -353,7 +335,7 @@ namespace xetla {
       const int m,                                                             \
       const int n,                                                             \
       const int k) {                                                           \
-    hgemm_silu<                                                                \
+    return hgemm_silu<                                                         \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -364,10 +346,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(queue, out, a, b, acc_ptr, cnt_ptr, m, n, k);             \
+        B_ROW_MAJOR>(out, a, b, acc_ptr, cnt_ptr, m, n, k);                    \
   }                                                                            \
-  void HGEMM_QKV_IMPL_NAME(WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)( \
-      sycl::queue & queue,                                                     \
+  cgfs_t HGEMM_QKV_IMPL_NAME(                                                  \
+      WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
       sycl::half * out0,                                                       \
       sycl::half * out1,                                                       \
       sycl::half * out2,                                                       \
@@ -378,7 +360,7 @@ namespace xetla {
       const int m,                                                             \
       const int n,                                                             \
       const int k) {                                                           \
-    hgemm_qkv<                                                                 \
+    return hgemm_qkv<                                                          \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -389,12 +371,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(                                                          \
-        queue, out0, out1, out2, a, b, acc_ptr, cnt_ptr, m, n, k);             \
+        B_ROW_MAJOR>(out0, out1, out2, a, b, acc_ptr, cnt_ptr, m, n, k);       \
   }                                                                            \
-  void HGEMM_QKV_BIAS_IMPL_NAME(                                               \
+  cgfs_t HGEMM_QKV_BIAS_IMPL_NAME(                                             \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out0,                                                       \
       sycl::half * out1,                                                       \
       sycl::half * out2,                                                       \
@@ -406,7 +386,7 @@ namespace xetla {
       const int m,                                                             \
       const int n,                                                             \
       const int k) {                                                           \
-    hgemm_qkv_bias<                                                            \
+    return hgemm_qkv_bias<                                                     \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -417,12 +397,10 @@ namespace xetla {
         1,                                                                     \
         1,                                                                     \
         3,                                                                     \
-        B_ROW_MAJOR>(                                                          \
-        queue, out0, out1, out2, a, b, bias, acc_ptr, cnt_ptr, m, n, k);       \
+        B_ROW_MAJOR>(out0, out1, out2, a, b, bias, acc_ptr, cnt_ptr, m, n, k); \
   }                                                                            \
-  void HGEMM_QKV_GROUP_IMPL_NAME(                                              \
+  cgfs_t HGEMM_QKV_GROUP_IMPL_NAME(                                            \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out0,                                                       \
       sycl::half * out1,                                                       \
       sycl::half * out2,                                                       \
@@ -436,7 +414,7 @@ namespace xetla {
       const int num_kv_head,                                                   \
       const int group,                                                         \
       const int head_dim) {                                                    \
-    hgemm_qkv_group<                                                           \
+    return hgemm_qkv_group<                                                    \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -448,7 +426,6 @@ namespace xetla {
         1,                                                                     \
         3,                                                                     \
         B_ROW_MAJOR>(                                                          \
-        queue,                                                                 \
         out0,                                                                  \
         out1,                                                                  \
         out2,                                                                  \
@@ -463,9 +440,8 @@ namespace xetla {
         group,                                                                 \
         head_dim);                                                             \
   }                                                                            \
-  void HGEMM_QKV_GROUP_BIAS_IMPL_NAME(                                         \
+  cgfs_t HGEMM_QKV_GROUP_BIAS_IMPL_NAME(                                       \
       WG_M, WG_N, SG_M, SG_N, SG_K, SLM_KS, B_ROW_MAJOR)(                      \
-      sycl::queue & queue,                                                     \
       sycl::half * out0,                                                       \
       sycl::half * out1,                                                       \
       sycl::half * out2,                                                       \
@@ -480,7 +456,7 @@ namespace xetla {
       const int num_kv_head,                                                   \
       const int group,                                                         \
       const int head_dim) {                                                    \
-    hgemm_qkv_group_bias<                                                      \
+    return hgemm_qkv_group_bias<                                               \
         sycl::half,                                                            \
         WG_M,                                                                  \
         WG_N,                                                                  \
@@ -492,7 +468,6 @@ namespace xetla {
         1,                                                                     \
         3,                                                                     \
         B_ROW_MAJOR>(                                                          \
-        queue,                                                                 \
         out0,                                                                  \
         out1,                                                                  \
         out2,                                                                  \
@@ -511,8 +486,7 @@ namespace xetla {
 
 HGEMM_ENUMERATE_POLICIES(HGEMM_ENUMERATE_IMPLS)
 
-void (*hgemm_addmm_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_addmm_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -525,8 +499,7 @@ void (*hgemm_addmm_policies[HGEMM_NUM_POLICIES])(
     const float,
     const float) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_ADDMM_IMPL_NAME)};
 
-void (*hgemm_common_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_common_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -536,8 +509,7 @@ void (*hgemm_common_policies[HGEMM_NUM_POLICIES])(
     const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_COMMON_IMPL_NAME)};
 
-void (*hgemm_res_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_res_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -549,8 +521,7 @@ void (*hgemm_res_policies[HGEMM_NUM_POLICIES])(
     const int,
     const float) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_RES_IMPL_NAME)};
 
-void (*hgemm_res_res_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_res_res_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -564,8 +535,7 @@ void (*hgemm_res_res_policies[HGEMM_NUM_POLICIES])(
     const float,
     const float) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_RES_RES_IMPL_NAME)};
 
-void (*hgemm_bias_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_bias_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -577,8 +547,7 @@ void (*hgemm_bias_policies[HGEMM_NUM_POLICIES])(
     const int,
     const float) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_BIAS_IMPL_NAME)};
 
-void (*hgemm_bias_res_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_bias_res_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -592,8 +561,7 @@ void (*hgemm_bias_res_policies[HGEMM_NUM_POLICIES])(
     const float,
     const float) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_BIAS_RES_IMPL_NAME)};
 
-void (*hgemm_bias_res_res_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_bias_res_res_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -610,8 +578,7 @@ void (*hgemm_bias_res_res_policies[HGEMM_NUM_POLICIES])(
     const float) = {
     HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_BIAS_RES_RES_IMPL_NAME)};
 
-void (*hgemm_bias_relu_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_bias_relu_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -623,8 +590,7 @@ void (*hgemm_bias_relu_policies[HGEMM_NUM_POLICIES])(
     const int,
     const float) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_BIAS_RELU_IMPL_NAME)};
 
-void (*hgemm_bias_gelu_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_bias_gelu_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -636,8 +602,7 @@ void (*hgemm_bias_gelu_policies[HGEMM_NUM_POLICIES])(
     const int,
     const float) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_BIAS_GELU_IMPL_NAME)};
 
-void (*hgemm_resmul_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_resmul_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -648,8 +613,7 @@ void (*hgemm_resmul_policies[HGEMM_NUM_POLICIES])(
     const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_RESMUL_IMPL_NAME)};
 
-void (*hgemm_silu_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_silu_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     const sycl::half*,
     const sycl::half*,
@@ -659,8 +623,7 @@ void (*hgemm_silu_policies[HGEMM_NUM_POLICIES])(
     const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_SILU_IMPL_NAME)};
 
-void (*hgemm_qkv_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_qkv_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     sycl::half*,
     sycl::half*,
@@ -672,8 +635,7 @@ void (*hgemm_qkv_policies[HGEMM_NUM_POLICIES])(
     const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_IMPL_NAME)};
 
-void (*hgemm_qkv_bias_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_qkv_bias_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     sycl::half*,
     sycl::half*,
@@ -686,8 +648,7 @@ void (*hgemm_qkv_bias_policies[HGEMM_NUM_POLICIES])(
     const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_BIAS_IMPL_NAME)};
 
-void (*hgemm_qkv_group_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_qkv_group_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     sycl::half*,
     sycl::half*,
@@ -702,8 +663,7 @@ void (*hgemm_qkv_group_policies[HGEMM_NUM_POLICIES])(
     const int,
     const int) = {HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_GROUP_IMPL_NAME)};
 
-void (*hgemm_qkv_group_bias_policies[HGEMM_NUM_POLICIES])(
-    sycl::queue&,
+cgfs_t (*hgemm_qkv_group_bias_policies[HGEMM_NUM_POLICIES])(
     sycl::half*,
     sycl::half*,
     sycl::half*,
@@ -720,8 +680,8 @@ void (*hgemm_qkv_group_bias_policies[HGEMM_NUM_POLICIES])(
     const int) = {
     HGEMM_ENUMERATE_POLICIES_COMMA(HGEMM_QKV_GROUP_BIAS_IMPL_NAME)};
 
-GemmStatus hgemm_addmm(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_addmm(
+    int policy_id,
     sycl::half* out,
     const sycl::half* res,
     const sycl::half* a,
@@ -734,16 +694,13 @@ GemmStatus hgemm_addmm(
     const float alpha,
     const float beta,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_addmm_policies[policy_id](
-      queue, out, res, a, b, acc_ptr, cnt_ptr, m, n, k, alpha, beta);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_addmm_policies[policy_id](
+      out, res, a, b, acc_ptr, cnt_ptr, m, n, k, alpha, beta);
 }
 
-GemmStatus hgemm_common(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_common(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -753,15 +710,12 @@ GemmStatus hgemm_common(
     const int n,
     const int k,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_common_policies[policy_id](queue, out, a, b, acc_ptr, cnt_ptr, m, n, k);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_common_policies[policy_id](out, a, b, acc_ptr, cnt_ptr, m, n, k);
 }
 
-GemmStatus hgemm_res(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_res(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -773,16 +727,13 @@ GemmStatus hgemm_res(
     const int k,
     const float res_factor,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_res_policies[policy_id](
-      queue, out, a, b, res, acc_ptr, cnt_ptr, m, n, k, res_factor);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_res_policies[policy_id](
+      out, a, b, res, acc_ptr, cnt_ptr, m, n, k, res_factor);
 }
 
-GemmStatus hgemm_res_res(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_res_res(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -796,11 +747,8 @@ GemmStatus hgemm_res_res(
     const float res0_factor,
     const float res1_factor,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_res_res_policies[policy_id](
-      queue,
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_res_res_policies[policy_id](
       out,
       a,
       b,
@@ -813,11 +761,10 @@ GemmStatus hgemm_res_res(
       k,
       res0_factor,
       res1_factor);
-  return GemmStatus::kSuccess;
 }
 
-GemmStatus hgemm_bias(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -829,16 +776,13 @@ GemmStatus hgemm_bias(
     const int k,
     const float bias_factor,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_bias_policies[policy_id](
-      queue, out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_bias_policies[policy_id](
+      out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor);
 }
 
-GemmStatus hgemm_bias_res(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias_res(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -852,28 +796,13 @@ GemmStatus hgemm_bias_res(
     const float bias_factor,
     const float res_factor,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_bias_res_policies[policy_id](
-      queue,
-      out,
-      a,
-      b,
-      bias,
-      res,
-      acc_ptr,
-      cnt_ptr,
-      m,
-      n,
-      k,
-      bias_factor,
-      res_factor);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_bias_res_policies[policy_id](
+      out, a, b, bias, res, acc_ptr, cnt_ptr, m, n, k, bias_factor, res_factor);
 }
 
-GemmStatus hgemm_bias_res_res(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias_res_res(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -889,11 +818,8 @@ GemmStatus hgemm_bias_res_res(
     const float res0_factor,
     const float res1_factor,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_bias_res_res_policies[policy_id](
-      queue,
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_bias_res_res_policies[policy_id](
       out,
       a,
       b,
@@ -908,11 +834,10 @@ GemmStatus hgemm_bias_res_res(
       bias_factor,
       res0_factor,
       res1_factor);
-  return GemmStatus::kSuccess;
 }
 
-GemmStatus hgemm_bias_relu(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias_relu(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -924,16 +849,13 @@ GemmStatus hgemm_bias_relu(
     const int k,
     const float bias_factor,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_bias_relu_policies[policy_id](
-      queue, out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_bias_relu_policies[policy_id](
+      out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor);
 }
 
-GemmStatus hgemm_bias_gelu(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias_gelu(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -945,16 +867,13 @@ GemmStatus hgemm_bias_gelu(
     const int k,
     const float bias_factor,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_bias_gelu_policies[policy_id](
-      queue, out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_bias_gelu_policies[policy_id](
+      out, a, b, bias, acc_ptr, cnt_ptr, m, n, k, bias_factor);
 }
 
-GemmStatus hgemm_resmul(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_resmul(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -965,16 +884,13 @@ GemmStatus hgemm_resmul(
     const int n,
     const int k,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_resmul_policies[policy_id](
-      queue, out, a, b, mul, acc_ptr, cnt_ptr, m, n, k);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_resmul_policies[policy_id](
+      out, a, b, mul, acc_ptr, cnt_ptr, m, n, k);
 }
 
-GemmStatus hgemm_silu(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_silu(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -984,15 +900,12 @@ GemmStatus hgemm_silu(
     const int n,
     const int k,
     const bool is_b_row_major) {
-  int policy_id = hgemm_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_silu_policies[policy_id](queue, out, a, b, acc_ptr, cnt_ptr, m, n, k);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_silu_policies[policy_id](out, a, b, acc_ptr, cnt_ptr, m, n, k);
 }
 
-GemmStatus hgemm_qkv(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_qkv(
+    int policy_id,
     sycl::half* out0,
     sycl::half* out1,
     sycl::half* out2,
@@ -1004,16 +917,13 @@ GemmStatus hgemm_qkv(
     const int n,
     const int k,
     const bool is_b_row_major) {
-  int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_qkv_policies[policy_id](
-      queue, out0, out1, out2, a, b, acc_ptr, cnt_ptr, m, n, k);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_qkv_policies[policy_id](
+      out0, out1, out2, a, b, acc_ptr, cnt_ptr, m, n, k);
 }
 
-GemmStatus hgemm_qkv_bias(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_qkv_bias(
+    int policy_id,
     sycl::half* out0,
     sycl::half* out1,
     sycl::half* out2,
@@ -1026,16 +936,13 @@ GemmStatus hgemm_qkv_bias(
     const int n,
     const int k,
     const bool is_b_row_major) {
-  int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_qkv_bias_policies[policy_id](
-      queue, out0, out1, out2, a, b, bias, acc_ptr, cnt_ptr, m, n, k);
-  return GemmStatus::kSuccess;
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_qkv_bias_policies[policy_id](
+      out0, out1, out2, a, b, bias, acc_ptr, cnt_ptr, m, n, k);
 }
 
-GemmStatus hgemm_qkv_group(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_qkv_group(
+    int policy_id,
     sycl::half* out0,
     sycl::half* out1,
     sycl::half* out2,
@@ -1050,11 +957,8 @@ GemmStatus hgemm_qkv_group(
     const int group,
     const int head_dim,
     const bool is_b_row_major) {
-  int policy_id = hgemm_qkv_find_policy_id(m, head_dim, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_qkv_group_policies[policy_id](
-      queue,
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_qkv_group_policies[policy_id](
       out0,
       out1,
       out2,
@@ -1068,11 +972,10 @@ GemmStatus hgemm_qkv_group(
       num_kv_head,
       group,
       head_dim);
-  return GemmStatus::kSuccess;
 }
 
-GemmStatus hgemm_qkv_group_bias(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_qkv_group_bias(
+    int policy_id,
     sycl::half* out0,
     sycl::half* out1,
     sycl::half* out2,
@@ -1088,11 +991,8 @@ GemmStatus hgemm_qkv_group_bias(
     const int group,
     const int head_dim,
     const bool is_b_row_major) {
-  int policy_id = hgemm_qkv_find_policy_id(m, head_dim, k, is_b_row_major);
-  if (policy_id < 0)
-    return GemmStatus::kError;
-  hgemm_qkv_group_bias_policies[policy_id](
-      queue,
+  assert(policy_id >= 0); // should checked outside
+  return hgemm_qkv_group_bias_policies[policy_id](
       out0,
       out1,
       out2,
@@ -1107,8 +1007,7 @@ GemmStatus hgemm_qkv_group_bias(
       num_kv_head,
       group,
       head_dim);
-  return GemmStatus::kSuccess;
 }
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla
+#endif

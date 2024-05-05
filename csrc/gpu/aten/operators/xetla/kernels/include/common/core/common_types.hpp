@@ -18,32 +18,18 @@
 /// C++ API
 
 #pragma once
+#include <cstdint>
 
 namespace gpu::xetla {
+enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2 };
+inline constexpr bool arch_has_xmx(gpu_arch arch) {
+  return arch >= gpu_arch::XeHpg;
+}
+inline constexpr bool arch_has_2d_load_store(gpu_arch arch) {
+  return arch >= gpu_arch::XeHpc;
+}
 
-/// @brief xetla 4bits data packed as 8bits data type.
-/// 2 4bit data pack to one byte
-struct int4x2 {
-  uint8_t data;
+enum class grf_mode : uint8_t { normal = 0, double_grf = 1 };
 
-  operator uint8_t() const {
-    return data;
-  }
-  int4x2(uint8_t val) {
-    data = val;
-  }
-};
-
-/// @brief Used to check if the type is xetla internal data type
-template <>
-struct is_internal_type<int4x2> {
-  static constexpr bool value = true;
-};
-
-/// @brief Set uint8_t as the native data type of int4x2.
-template <>
-struct native_type<int4x2> {
-  using type = uint8_t;
-};
-
+enum class mem_layout : uint8_t { row_major = 0, col_major = 1 };
 } // namespace gpu::xetla

@@ -439,7 +439,13 @@ def get_xpu_compliers():
     if shutil.which("icx") is None or shutil.which("icpx") is None:
         raise RuntimeError("Failed to find compiler path from OS PATH")
     if IS_WINDOWS:
-        return "icx", "icx"
+        # Windows needs absolute path of compilers, otherwise it will find the
+        # difference of the compiler name and the absolution path in the first
+        # time of incremental build. Reconfiguration will lose all command line
+        # cmake definitions.
+        # https://discourse.cmake.org/t/configure-will-be-re-run-and-you-may-have-to-reset-some-variables/7325
+        win_icx_realpath = shutil.which("icx.exe").replace("\\", "/")
+        return win_icx_realpath, win_icx_realpath
     else:
         return "icx", "icpx"
 

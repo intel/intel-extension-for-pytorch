@@ -126,3 +126,7 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(res_out.cpu().float(), ref_out_cpu, atol=1e-3, rtol=1e-3)
         self.assertEqual(res_out.cpu().float(), ref_out_float, atol=1e-3, rtol=1e-3)
+
+
+if __name__ == "__main__":
+    TestTorchMethod().test_fsdp_index_select()

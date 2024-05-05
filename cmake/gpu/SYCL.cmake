@@ -126,6 +126,7 @@ set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -fsycl-max-parallel-link-jobs=$
 
 if(BUILD_BY_PER_KERNEL)
   set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fsycl-device-code-split=per_kernel)
+  set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -fsycl-device-code-split=per_kernel)
 endif()
 
 # Set AOT targt list in link flags

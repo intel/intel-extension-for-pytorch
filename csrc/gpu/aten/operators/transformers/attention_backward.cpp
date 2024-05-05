@@ -23,7 +23,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
     const c10::optional<at::Tensor>& philox_offset,
     const bool bias_requires_grad,
     const c10::optional<double> scale) {
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (!_grad_out.defined()) {
     return std::make_tuple(Tensor{}, Tensor{}, Tensor{}, Tensor{});
   }
@@ -73,9 +73,8 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   auto dpcpp_queue = dpcppGetCurrentQueue();
 
-  fmha_backward_kernel(
+  auto cgfs = fmha_backward_kernel(
       xeType,
-      dpcpp_queue,
       grad_out.data_ptr(),
       query.data_ptr(),
       key.data_ptr(),
@@ -110,6 +109,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
       philox_offset.has_value()
           ? (uint64_t)*philox_offset.value().data_ptr<int64_t>()
           : -1);
+  DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
   return std::make_tuple(grad_q, grad_k, grad_v, grad_bias);
 #else
   AT_ERROR("SDP backward: xetla library not found in compilation");

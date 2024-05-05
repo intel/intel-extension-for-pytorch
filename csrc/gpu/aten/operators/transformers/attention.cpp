@@ -79,10 +79,9 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
   const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   gpu_arch xeArch = sdp::aten_to_Xetla_arch();
-  fmha_forward_kernel(
+  auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,
       xeType,
-      dpcpp_queue,
       {query.data_ptr(),
        key.data_ptr(),
        value.data_ptr(),
@@ -112,6 +111,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
        seed_t.has_value() ? (uint64_t)*seed_t.value().data_ptr<int64_t>() : -1,
        offset_t.has_value() ? (uint64_t)*offset_t.value().data_ptr<int64_t>()
                             : -1});
+  DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 
   return output;
 #else
@@ -802,10 +802,9 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
 #if defined(USE_XETLA)
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   gpu_arch xeArch = sdp::aten_to_Xetla_arch();
-  gpu::xetla::fmha_forward_kernel(
+  auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,
       xeType,
-      dpcpp_queue,
       {query.data_ptr(),
        key.data_ptr(),
        value.data_ptr(),
@@ -834,6 +833,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
        false, // use_dropout
        (int)0,
        (int)0});
+  DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 #else
   AT_ERROR("SDP: xetla library not found in compilation");
 #endif
@@ -920,12 +920,11 @@ Tensor xetla_fsdp_index_forward(
   auto dpcpp_queue = dpcppGetCurrentQueue();
   RECORD_FUNCTION("xetla_fsdp_index_forward", {});
 
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   TORCH_CHECK(
       dpcppGetDeviceHasXMX(),
       "SDP kernel requires XMX, but the current platform has no XMX ...");
-  gpu::xetla::fmha_forward_index_kernel(
-      dpcpp_queue,
+  auto cgfs = gpu::xetla::fmha_forward_index_kernel(
       query.data_ptr(),
       key.data_ptr(),
       value.data_ptr(),
@@ -951,6 +950,7 @@ Tensor xetla_fsdp_index_forward(
       attn_mask_padding,
       is_causal,
       is_broadcast);
+  DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 #else
   AT_ERROR("SDP: xetla library not found in compilation");
 #endif
@@ -982,9 +982,8 @@ void xetla_paged_attention_impl_v1(
       : nullptr;
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
-#if defined(USE_XETLA)
-  gpu::xetla::paged_attention_v1(
-      dpcpp_queue,
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
+  auto cgfs = gpu::xetla::paged_attention_v1(
       reinterpret_cast<scalar_t*>(out.data_ptr()),
       reinterpret_cast<scalar_t*>(query.data_ptr()),
       reinterpret_cast<scalar_t*>(key_cache.data_ptr()),
@@ -1000,6 +999,8 @@ void xetla_paged_attention_impl_v1(
       block_size,
       max_num_blocks_per_seq,
       max_context_len);
+  DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
+
 #else
   AT_ERROR("PagedAttention: xetla library not found in compilation");
 #endif
@@ -1065,12 +1066,11 @@ void xetla_paged_attention_impl_v2(
       : nullptr;
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
-#if defined(USE_XETLA)
-  gpu::xetla::paged_attention_v2(
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
+  auto cgfs = gpu::xetla::paged_attention_v2(
       max_logits.data_ptr<float>(),
       exp_sums.data_ptr<float>(),
       reinterpret_cast<scalar_t*>(tmp_out.data_ptr()),
-      dpcpp_queue,
       reinterpret_cast<scalar_t*>(out.data_ptr()),
       reinterpret_cast<scalar_t*>(query.data_ptr()),
       reinterpret_cast<scalar_t*>(key_cache.data_ptr()),
@@ -1086,6 +1086,7 @@ void xetla_paged_attention_impl_v2(
       block_size,
       max_num_blocks_per_seq,
       max_context_len);
+  DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 #else
   AT_ERROR("PagedAttention: xetla library not found in compilation");
 #endif

@@ -19,4 +19,5 @@
 
 #pragma once
 
+#include <common/common.hpp>
 #include <experimental/common/base_types.hpp>

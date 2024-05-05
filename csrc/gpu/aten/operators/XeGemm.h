@@ -241,55 +241,76 @@ class HGEMM_XETLA final {
       TORCH_CHECK(alpha_ == 1.0f);
       get_acc_and_cnt_tensor(
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-      status = hgemm_common(
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          acc_tensor_.data_ptr<float>(),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m_,
-          n_,
-          k_,
-          is_b_row_major_);
+      int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+      if (policy_id < 0) {
+        status = xpu::xetla::GemmStatus::kError;
+      } else {
+        auto cgfs = hgemm_common(
+            policy_id,
+            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m_,
+            n_,
+            k_,
+            is_b_row_major_);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+        status = xpu::xetla::GemmStatus::kSuccess;
+      }
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_ADD) {
       if (alpha_ == 1.0f) {
         RECORD_FUNCTION_IMPL(hgemm_res, m_, n_, k_)
         get_acc_and_cnt_tensor(
             m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-        status = hgemm_res(
-            q,
-            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(
-                epilogue_tensors_[0]->data_ptr<scalar_t>()),
-            acc_tensor_.data_ptr<float>(),
-            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-            m_,
-            n_,
-            k_,
-            epilogue_params_[0],
-            is_b_row_major_);
+        int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+        if (policy_id < 0) {
+          status = xpu::xetla::GemmStatus::kError;
+        } else {
+          auto cgfs = hgemm_res(
+              policy_id,
+              reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+              reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+              reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+              reinterpret_cast<sycl::half*>(
+                  epilogue_tensors_[0]->data_ptr<scalar_t>()),
+              acc_tensor_.data_ptr<float>(),
+              reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+              m_,
+              n_,
+              k_,
+              epilogue_params_[0],
+              is_b_row_major_);
+          DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+          status = xpu::xetla::GemmStatus::kSuccess;
+        }
       } else {
         RECORD_FUNCTION_IMPL(hgemm_addmm, m_, n_, k_)
         get_acc_and_cnt_tensor(
             m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-        status = hgemm_addmm(
-            q,
-            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(
-                epilogue_tensors_[0]->data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-            acc_tensor_.data_ptr<float>(),
-            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-            m_,
-            n_,
-            k_,
-            alpha_,
-            epilogue_params_[0],
-            is_b_row_major_);
+        int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+        if (policy_id < 0) {
+          status = xpu::xetla::GemmStatus::kError;
+        } else {
+          auto cgfs = hgemm_addmm(
+              policy_id,
+              reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+              reinterpret_cast<sycl::half*>(
+                  epilogue_tensors_[0]->data_ptr<scalar_t>()),
+              reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+              reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+              acc_tensor_.data_ptr<float>(),
+              reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+              m_,
+              n_,
+              k_,
+              alpha_,
+              epilogue_params_[0],
+              is_b_row_major_);
+          DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+          status = xpu::xetla::GemmStatus::kSuccess;
+        }
       }
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == RES_ADD &&
@@ -298,42 +319,56 @@ class HGEMM_XETLA final {
       get_acc_and_cnt_tensor(
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
       TORCH_CHECK(alpha_ == 1.0f);
-      status = hgemm_res_res(
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[0]->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[1]->data_ptr<scalar_t>()),
-          acc_tensor_.data_ptr<float>(),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m_,
-          n_,
-          k_,
-          epilogue_params_[0],
-          epilogue_params_[1],
-          is_b_row_major_);
+      int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+      if (policy_id < 0) {
+        status = xpu::xetla::GemmStatus::kError;
+      } else {
+        auto cgfs = hgemm_res_res(
+            policy_id,
+            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[0]->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[1]->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m_,
+            n_,
+            k_,
+            epilogue_params_[0],
+            epilogue_params_[1],
+            is_b_row_major_);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+        status = xpu::xetla::GemmStatus::kSuccess;
+      }
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == BIAS) {
       RECORD_FUNCTION_IMPL(hgemm_bias, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
       get_acc_and_cnt_tensor(
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-      status = hgemm_bias(
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[0]->data_ptr<scalar_t>()),
-          acc_tensor_.data_ptr<float>(),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m_,
-          n_,
-          k_,
-          epilogue_params_[0],
-          is_b_row_major_);
+      int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+      if (policy_id < 0) {
+        status = xpu::xetla::GemmStatus::kError;
+      } else {
+        auto cgfs = hgemm_bias(
+            policy_id,
+            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[0]->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m_,
+            n_,
+            k_,
+            epilogue_params_[0],
+            is_b_row_major_);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+        status = xpu::xetla::GemmStatus::kSuccess;
+      }
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == RES_ADD) {
@@ -341,23 +376,30 @@ class HGEMM_XETLA final {
       TORCH_CHECK(alpha_ == 1.0f);
       get_acc_and_cnt_tensor(
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-      status = hgemm_bias_res(
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[0]->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[1]->data_ptr<scalar_t>()),
-          acc_tensor_.data_ptr<float>(),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m_,
-          n_,
-          k_,
-          epilogue_params_[0],
-          epilogue_params_[1],
-          is_b_row_major_);
+      int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+      if (policy_id < 0) {
+        status = xpu::xetla::GemmStatus::kError;
+      } else {
+        auto cgfs = hgemm_bias_res(
+            policy_id,
+            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[0]->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[1]->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m_,
+            n_,
+            k_,
+            epilogue_params_[0],
+            epilogue_params_[1],
+            is_b_row_major_);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+        status = xpu::xetla::GemmStatus::kSuccess;
+      }
     } else if (
         num_epilogues_ == 3 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == RES_ADD && epilogue_types_[2] == RES_ADD) {
@@ -365,26 +407,33 @@ class HGEMM_XETLA final {
       TORCH_CHECK(alpha_ == 1.0f);
       get_acc_and_cnt_tensor(
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-      status = hgemm_bias_res_res(
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[0]->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[1]->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[2]->data_ptr<scalar_t>()),
-          acc_tensor_.data_ptr<float>(),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m_,
-          n_,
-          k_,
-          epilogue_params_[0],
-          epilogue_params_[1],
-          epilogue_params_[2],
-          is_b_row_major_);
+      int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+      if (policy_id < 0) {
+        status = xpu::xetla::GemmStatus::kError;
+      } else {
+        auto cgfs = hgemm_bias_res_res(
+            policy_id,
+            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[0]->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[1]->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[2]->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m_,
+            n_,
+            k_,
+            epilogue_params_[0],
+            epilogue_params_[1],
+            epilogue_params_[2],
+            is_b_row_major_);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+        status = xpu::xetla::GemmStatus::kSuccess;
+      }
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == RELU) {
@@ -392,20 +441,27 @@ class HGEMM_XETLA final {
       TORCH_CHECK(alpha_ == 1.0f);
       get_acc_and_cnt_tensor(
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-      status = hgemm_bias_relu(
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[0]->data_ptr<scalar_t>()),
-          acc_tensor_.data_ptr<float>(),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m_,
-          n_,
-          k_,
-          epilogue_params_[0],
-          is_b_row_major_);
+      int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+      if (policy_id < 0) {
+        status = xpu::xetla::GemmStatus::kError;
+      } else {
+        auto cgfs = hgemm_bias_relu(
+            policy_id,
+            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[0]->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m_,
+            n_,
+            k_,
+            epilogue_params_[0],
+            is_b_row_major_);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+        status = xpu::xetla::GemmStatus::kSuccess;
+      }
     } else if (
         num_epilogues_ == 2 && epilogue_types_[0] == BIAS &&
         epilogue_types_[1] == GELU) {
@@ -413,54 +469,75 @@ class HGEMM_XETLA final {
       TORCH_CHECK(alpha_ == 1.0f);
       get_acc_and_cnt_tensor(
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-      status = hgemm_bias_gelu(
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[0]->data_ptr<scalar_t>()),
-          acc_tensor_.data_ptr<float>(),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m_,
-          n_,
-          k_,
-          epilogue_params_[0],
-          is_b_row_major_);
+      int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+      if (policy_id < 0) {
+        status = xpu::xetla::GemmStatus::kError;
+      } else {
+        auto cgfs = hgemm_bias_gelu(
+            policy_id,
+            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[0]->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m_,
+            n_,
+            k_,
+            epilogue_params_[0],
+            is_b_row_major_);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+        status = xpu::xetla::GemmStatus::kSuccess;
+      }
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == RES_MUL) {
       RECORD_FUNCTION_IMPL(hgemm_resmul, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
       get_acc_and_cnt_tensor(
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-      status = hgemm_resmul(
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(
-              epilogue_tensors_[0]->data_ptr<scalar_t>()),
-          acc_tensor_.data_ptr<float>(),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m_,
-          n_,
-          k_,
-          is_b_row_major_);
+      int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+      if (policy_id < 0) {
+        status = xpu::xetla::GemmStatus::kError;
+      } else {
+        auto cgfs = hgemm_resmul(
+            policy_id,
+            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(
+                epilogue_tensors_[0]->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m_,
+            n_,
+            k_,
+            is_b_row_major_);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+        status = xpu::xetla::GemmStatus::kSuccess;
+      }
     } else if (num_epilogues_ == 1 && epilogue_types_[0] == SILU) {
       RECORD_FUNCTION_IMPL(hgemm_silu, m_, n_, k_)
       TORCH_CHECK(alpha_ == 1.0f);
       get_acc_and_cnt_tensor(
           m_, n_, k_, is_b_row_major_, acc_tensor_, cnt_tensor_);
-      status = hgemm_silu(
-          q,
-          reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
-          acc_tensor_.data_ptr<float>(),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m_,
-          n_,
-          k_,
-          is_b_row_major_);
+      int policy_id = hgemm_find_policy_id(m_, n_, k_, is_b_row_major_);
+      if (policy_id < 0) {
+        status = xpu::xetla::GemmStatus::kError;
+      } else {
+        auto cgfs = hgemm_silu(
+            policy_id,
+            reinterpret_cast<sycl::half*>(c_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(a_->data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(b_->data_ptr<scalar_t>()),
+            acc_tensor_.data_ptr<float>(),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m_,
+            n_,
+            k_,
+            is_b_row_major_);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
+        status = xpu::xetla::GemmStatus::kSuccess;
+      }
     } else {
       TORCH_CHECK(false, "No mateched policy");
     }

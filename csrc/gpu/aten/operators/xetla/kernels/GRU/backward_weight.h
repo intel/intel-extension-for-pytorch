@@ -1,11 +1,9 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include "../xetla.h"
 #include "kernel_attr.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
 template <typename T, typename Act_T>
 struct bpk_config_t {
@@ -687,7 +685,7 @@ struct GruBackwardWeightImplKernelFunctor {
 
 // extern "C"
 template <typename gru_bpk_config_t>
-void gru_backward_weight_impl(
+cgfs_t gru_backward_weight_impl(
     void* err0_ptr,
     void* err1_ptr,
     void* layer_ptr,
@@ -700,8 +698,7 @@ void gru_backward_weight_impl(
     int input_size,
     int hidden_size,
     int sequence_length,
-    int layer_size,
-    cl::sycl::queue& Queue) {
+    int layer_size) {
   size_t wg_tile_n_0 = gru_bpk_config_t::wg_tile_n_0;
   size_t wg_tile_n_1 = gru_bpk_config_t::wg_tile_n_1;
   size_t wg_tile_m = gru_bpk_config_t::wg_tile_m;
@@ -726,25 +723,23 @@ void gru_backward_weight_impl(
       (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0};
   cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    GruBackwardWeightImplKernelFunctor<gru_bpk_config_t, input> kfn(
-        err0_ptr,
-        err1_ptr,
-        layer_ptr,
-        hidden_ptr,
-        w_i_ptr,
-        w_h_ptr,
-        bias0_ptr,
-        bias1_ptr,
-        batch_size,
-        input_size,
-        hidden_size,
-        sequence_length,
-        layer_size);
-    cgh.parallel_for<decltype(kfn)>(Range, kfn);
+  GruBackwardWeightImplKernelFunctor<gru_bpk_config_t, input> kfn(
+      err0_ptr,
+      err1_ptr,
+      layer_ptr,
+      hidden_ptr,
+      w_i_ptr,
+      w_h_ptr,
+      bias0_ptr,
+      bias1_ptr,
+      batch_size,
+      input_size,
+      hidden_size,
+      sequence_length,
+      layer_size);
+  return {
+      [=](sycl::handler& cgh) { cgh.parallel_for<decltype(kfn)>(Range, kfn); },
   };
-  DPCPP_Q_SUBMIT(Queue, cgf);
 }
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla

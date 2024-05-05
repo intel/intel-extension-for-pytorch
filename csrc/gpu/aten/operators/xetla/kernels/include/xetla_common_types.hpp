@@ -15,35 +15,6 @@
  *******************************************************************************/
 
 /// @file
-/// C++ API
+/// C++ API for callers of XeTLA kernels
 
-#pragma once
-
-namespace gpu::xetla {
-
-/// @brief xetla 4bits data packed as 8bits data type.
-/// 2 4bit data pack to one byte
-struct int4x2 {
-  uint8_t data;
-
-  operator uint8_t() const {
-    return data;
-  }
-  int4x2(uint8_t val) {
-    data = val;
-  }
-};
-
-/// @brief Used to check if the type is xetla internal data type
-template <>
-struct is_internal_type<int4x2> {
-  static constexpr bool value = true;
-};
-
-/// @brief Set uint8_t as the native data type of int4x2.
-template <>
-struct native_type<int4x2> {
-  using type = uint8_t;
-};
-
-} // namespace gpu::xetla
+#include <common/core/common_types.hpp>

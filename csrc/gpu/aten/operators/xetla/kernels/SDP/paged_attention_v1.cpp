@@ -14,11 +14,12 @@
  * limitations under the License.
  ******************************************************************************/
 
-#include <utils/DPCPP.h>
+#ifdef USE_XETLA_XE_HPC
+#include <c10/util/Exception.h>
 #include <limits>
+#include "../../mha.h"
 #include "paged_attention_kernel.hpp"
 #include "paged_attention_policy.hpp"
-
 #include "xetla.hpp"
 
 namespace gpu::xetla {
@@ -26,8 +27,7 @@ namespace gpu::xetla {
 namespace attention {
 
 template <typename Policy, typename T, typename U>
-void launch_paged_attention_v1(
-    sycl::queue& q,
+cgfs_t launch_paged_attention_v1(
     T* out,
     T* query,
     T* key_cache,
@@ -44,14 +44,14 @@ void launch_paged_attention_v1(
     uint32_t max_context_len) {
   using kernel = paged_attention_kernel<Policy, T, U>;
 
-  constexpr uint32_t max_comutation =
+  constexpr uint32_t max_computation =
       Policy::block_size * Policy::max_blocks_per_sg * Policy::wg_size;
   TORCH_CHECK(
-      max_context_len <= max_comutation,
+      max_context_len <= max_computation,
       "max_context_len is too large to compute for paged attention V1");
 
   sycl::nd_range<3> nd_range = kernel::get_nd_range(num_seqs, num_heads, 1);
-  auto cgh = DPCPP_Q_CGF(cgh) {
+  return {[=](sycl::handler& cgh) {
     cgh.parallel_for<paged_attention_kernel<Policy, T, U>>(
         nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
           kernel kernel_fn;
@@ -74,8 +74,7 @@ void launch_paged_attention_v1(
 
           kernel_fn(item, args);
         });
-  };
-  DPCPP_Q_SUBMIT(q, cgh);
+  }};
 }
 } // namespace attention
 
@@ -89,7 +88,6 @@ void launch_paged_attention_v1(
           BLOCK_NUM_PER_SG>,                                \
       T,                                                    \
       U>(                                                   \
-      q,                                                    \
       out,                                                  \
       query,                                                \
       key_cache,                                            \
@@ -116,6 +114,7 @@ void launch_paged_attention_v1(
     CALL_V1_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, WG_SIZE, 8)                  \
   else {                                                                       \
     TORCH_CHECK(0, "max_context_len is too large to compute");                 \
+    return {};                                                                 \
   }
 
 #define CALL_V1_LAUNCHER_WG_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE)       \
@@ -139,11 +138,11 @@ void launch_paged_attention_v1(
     }                                                \
     default: {                                       \
       TORCH_CHECK(0, "Unsupported block size: ");    \
+      return {};                                     \
     }                                                \
   }
 
-void paged_attention_v1(
-    sycl::queue& q,
+XETLA_KERNEL_API cgfs_t paged_attention_v1(
     sycl::half* out,
     sycl::half* query,
     sycl::half* key_cache,
@@ -169,6 +168,7 @@ void paged_attention_v1(
     CALL_V1_LAUNCHER_HEAD_SIZE(T, U, 256);
   } else {
     TORCH_CHECK(0, "Unsupported head size");
+    return {};
   }
 }
 
@@ -176,3 +176,4 @@ void paged_attention_v1(
 #undef CALL_V1_LAUNCHER
 
 } // namespace gpu::xetla
+#endif

@@ -9,7 +9,9 @@
 #include "Linear.h"
 #include "comm/ATDispatch.h"
 #include "utils/CustomOperatorRegistration.h"
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC) // XeGemm only supports PVC
 #include "xetla/hgemm.h"
+#endif
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -42,7 +44,7 @@ static Tensor mm_common(const Tensor& a, const Tensor& b) {
                     .add_matrix_b(b)
                     .build();
   GemmStatus status = GemmStatus::kError;
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
@@ -79,7 +81,7 @@ static Tensor mm_resadd(
           .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
@@ -123,7 +125,7 @@ static Tensor mm_resadd_resadd(
           .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
@@ -167,7 +169,7 @@ static Tensor mm_bias(
           .add_epilogue(bias, HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
@@ -211,7 +213,7 @@ static Tensor mm_bias_resadd(
           .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_ADD, res_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
@@ -260,7 +262,7 @@ static Tensor mm_bias_resadd_resadd(
           .add_epilogue(res1, HGEMM_XETLA::EpilogueType::RES_ADD, res1_factor)
           .build();
   GemmStatus status = GemmStatus::kError;
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
@@ -302,7 +304,7 @@ static Tensor mm_resmul(const Tensor& a, const Tensor& b, const Tensor& res) {
                     .add_epilogue(res, HGEMM_XETLA::EpilogueType::RES_MUL)
                     .build();
   GemmStatus status = GemmStatus::kError;
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
@@ -337,7 +339,7 @@ static Tensor mm_silu(const Tensor& a, const Tensor& b) {
                     .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::SILU)
                     .build();
   GemmStatus status = GemmStatus::kError;
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (xetla_valid && policy.valid()) {
     status = policy.run();
   }
@@ -374,7 +376,7 @@ Tensor matmul_relu(
                 bias.value(), HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::RELU)
             .build();
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
     if (xetla_valid && policy.valid()) {
       status = policy.run();
       if (status == GemmStatus::kSuccess) {
@@ -422,7 +424,7 @@ Tensor matmul_gelu(
                 bias.value(), HGEMM_XETLA::EpilogueType::BIAS, bias_factor)
             .add_epilogue(Tensor(), HGEMM_XETLA::EpilogueType::GELU)
             .build();
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
     if (xetla_valid && policy.valid()) {
       auto status = policy.run();
       if (status == GemmStatus::kSuccess)
@@ -509,7 +511,7 @@ static size_t get_cnt_size(
       ks_coop_num_x * counter_size;
 }
 
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
 static void get_acc_and_cnt_tensor(
     const Tensor& input_,
     uint32_t m_,
@@ -607,7 +609,7 @@ static void mm_qkv_out(
   bool xetla_valid = fp64_valid && out0_valid && out1_valid && out2_valid &&
       input_valid && weight_valid && bias_valid && shape_valid;
 
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (dpcppGetDeviceHasXMX() && xetla_valid) {
     char str__[100];
     if (!has_bias) {
@@ -616,43 +618,51 @@ static void mm_qkv_out(
       Tensor acc_tensor_, cnt_tensor_;
       get_acc_and_cnt_tensor(
           input_, m, n, k, is_b_row_major, acc_tensor_, cnt_tensor_);
-      auto status = hgemm_qkv(
-          q,
-          reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
-          reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m,
-          n,
-          k,
-          is_b_row_major);
-      if (status == GemmStatus::kSuccess)
+
+      int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
+      if (policy_id >= 0) {
+        auto cgfs = hgemm_qkv(
+            policy_id,
+            reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+            reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m,
+            n,
+            k,
+            is_b_row_major);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
         return;
+      }
     } else {
       sprintf(str__, "hgemm_qkv_bias(%d, %d, %d)", m, n, k);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
       Tensor acc_tensor_, cnt_tensor_;
       get_acc_and_cnt_tensor(
           input_, m, n, k, is_b_row_major, acc_tensor_, cnt_tensor_);
-      auto status = hgemm_qkv_bias(
-          q,
-          reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
-          reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m,
-          n,
-          k,
-          is_b_row_major);
-      if (status == GemmStatus::kSuccess)
+
+      int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
+      if (policy_id >= 0) {
+        auto cgfs = hgemm_qkv_bias(
+            policy_id,
+            reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
+            reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m,
+            n,
+            k,
+            is_b_row_major);
+        DPCPP_Q_SUBMIT_CGFS(q, cgfs);
         return;
+      }
     }
   }
 #endif
@@ -745,7 +755,7 @@ static void mm_qkv_group_out(
   bool xetla_valid = fp64_valid && out0_valid && out1_valid && out2_valid &&
       input_valid && weight_valid && bias_valid && shape_valid;
 
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (dpcppGetDeviceHasXMX() && xetla_valid) {
     char str__[100];
     Tensor acc_tensor_, cnt_tensor_;
@@ -754,46 +764,54 @@ static void mm_qkv_group_out(
     if (!has_bias) {
       sprintf(str__, "hgemm_qkv_group(%d, %d, %d, g=%d)", m, n, k, group);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-      auto status = hgemm_qkv_group(
-          queue,
-          reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
-          reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m,
-          n,
-          k,
-          num_kv_head,
-          group,
-          head_dim,
-          is_b_row_major);
-      if (status == GemmStatus::kSuccess)
+
+      int policy_id = hgemm_qkv_find_policy_id(m, head_dim, k, is_b_row_major);
+      if (policy_id >= 0) {
+        auto cgfs = hgemm_qkv_group(
+            policy_id,
+            reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+            reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m,
+            n,
+            k,
+            num_kv_head,
+            group,
+            head_dim,
+            is_b_row_major);
+        DPCPP_Q_SUBMIT_CGFS(queue, cgfs);
         return;
+      }
     } else {
       sprintf(str__, "hgemm_qkv_group_bias(%d, %d, %d, g=%d)", m, n, k, group);
       RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-      auto status = hgemm_qkv_group_bias(
-          queue,
-          reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
-          reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
-          reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
-          reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
-          m,
-          n,
-          k,
-          num_kv_head,
-          group,
-          head_dim,
-          is_b_row_major);
-      if (status == GemmStatus::kSuccess)
+
+      int policy_id = hgemm_qkv_find_policy_id(m, head_dim, k, is_b_row_major);
+      if (policy_id >= 0) {
+        auto cgfs = hgemm_qkv_group_bias(
+            policy_id,
+            reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(out1.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(out2.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(input.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(weight.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl::half*>(bias_.value().data_ptr<scalar_t>()),
+            reinterpret_cast<float*>(acc_tensor_.data_ptr<float>()),
+            reinterpret_cast<uint32_t*>(cnt_tensor_.data_ptr()),
+            m,
+            n,
+            k,
+            num_kv_head,
+            group,
+            head_dim,
+            is_b_row_major);
+        DPCPP_Q_SUBMIT_CGFS(queue, cgfs);
         return;
+      }
     }
   }
 #endif

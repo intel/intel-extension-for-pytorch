@@ -7,9 +7,7 @@ This is an implementation of the Flash Attention algorithm
 */
 
 #include "fmha_forward.hpp"
-#include <utils/DPCPP.h>
 #include <limits>
-#include "../../../comm/AccumulateType.h"
 #include "../../mha.h"
 #include "fmha_forward_policy.h"
 #include "fmha_utils.h"
@@ -119,9 +117,7 @@ template <
     bool kSeqLast,
     bool kIsTraining,
     bool kIsDropout>
-void xetla_fmha_forward_kernel(
-    sycl::queue& q,
-    const dispatch_fmha_forward_args_t<T>& args) {
+cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
 #ifdef SDP_DBG
   printf(
       "B, N, Nkv, F, T, H: %u, %u, %u, %u, %u, %u, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d,"
@@ -161,11 +157,8 @@ void xetla_fmha_forward_kernel(
   sycl::nd_range<3> NdRange = fmha_forward_op_t::get_nd_range(
       args.num_batches * args.num_heads, args.num_queries);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    FmhaForwardKernelFunctor<fmha_forward_op_t, T> kfn(args);
-    cgh.parallel_for<decltype(kfn)>(NdRange, kfn);
-  };
-  DPCPP_Q_SUBMIT(q, cgf);
+  FmhaForwardKernelFunctor<fmha_forward_op_t, T> kfn(args);
+  return {[=](sycl::handler& cgh) { cgh.parallel_for(NdRange, kfn); }};
 }
 
 } // namespace fmha
@@ -182,9 +175,9 @@ template <
     bool kIsDropout = false>
 class fmha_forward_kernel_policy {
   template <typename fmha_policy, typename... Args>
-  static void policy(Args&&... args) {
+  static cgfs_t policy(Args&&... args) {
     // check for param pack tricks: https://stackoverflow.com/a/2821244/9817693
-    fmha::xetla_fmha_forward_kernel<
+    return fmha::xetla_fmha_forward_kernel<
         fmha_policy,
         T,
         arch_tag,
@@ -197,10 +190,7 @@ class fmha_forward_kernel_policy {
   }
 
  public:
-  // Use constructor as "static operator()"
-  fmha_forward_kernel_policy(
-      sycl::queue& q,
-      const fmha::dispatch_fmha_forward_args_t<T>& args) {
+  static cgfs_t run(const fmha::dispatch_fmha_forward_args_t<T>& args) {
 #ifdef SDP_DBG
     printf("\n%s\n", __PRETTY_FUNCTION__);
 #endif
@@ -209,28 +199,30 @@ class fmha_forward_kernel_policy {
     if (kIsTraining && kIsDropout && !args.dropout_mask) {
       if constexpr (kIsTraining && kIsDropout && arch_tag == gpu_arch::XeHpc) {
         if (args.head_size <= 64) {
-          policy<fmha_policy_64x64x64>(q, args);
+          return policy<fmha_policy_64x64x64>(args);
         } else if (args.head_size <= 128) {
-          policy<fmha_policy_128x128x128>(q, args);
+          return policy<fmha_policy_128x128x128>(args);
         } else if (args.head_size <= 256) {
-          policy<fmha_policy_128x128x256>(q, args);
+          return policy<fmha_policy_128x128x256>(args);
         } else if (args.head_size <= 512) {
-          policy<fmha_policy_64x128x512>(q, args);
+          return policy<fmha_policy_64x128x512>(args);
         } else {
           assert(false);
+          return {};
         }
       } else {
         std::cout << "BWD only available on PVC\n";
+        return {};
       }
     } else {
       // roughly policy should match (num_queries)x(num_keys)x(head_size)
       if (args.head_size <= 64) {
         if (args.num_queries < 64) {
           // for short query length
-          policy<fmha_policy_8x128x64>(q, args);
+          return policy<fmha_policy_8x128x64>(args);
         } else {
           // for long query length
-          policy<fmha_policy_64x128x64>(q, args);
+          return policy<fmha_policy_64x128x64>(args);
         }
       } else if (args.head_size <= 128) {
         constexpr bool igpu_wo_dropout =
@@ -239,43 +231,50 @@ class fmha_forward_kernel_policy {
           // for extreamly short query length
           if constexpr (igpu_wo_dropout) {
             if (args.num_keys < 512) {
-              policy<stage0<fmha_policy_1x256x128>>(q, args);
+              return policy<stage0<fmha_policy_1x256x128>>(args);
             } else {
-              policy<stage0<fmha_policy_1x512x128>>(q, args);
+              return policy<stage0<fmha_policy_1x512x128>>(args);
             }
           }
+          return {};
         } else if (args.num_queries < 64) {
           // for short query length
           if (args.num_keys < 512) {
-            policy<fmha_policy_8x256x128>(q, args);
+            return policy<fmha_policy_8x256x128>(args);
           } else {
-            policy<fmha_policy_8x512x128>(q, args);
+            return policy<fmha_policy_8x512x128>(args);
           }
         } else {
           // for long query length
           if constexpr (arch_tag == gpu_arch::XeLpg)
-            policy<stage0<fmha_policy_32x128x128>>(q, args);
+            return policy<stage0<fmha_policy_32x128x128>>(args);
           else
-            policy<fmha_policy_64x128x128>(q, args);
+            return policy<fmha_policy_64x128x128>(args);
         }
+      } else if constexpr (arch_tag == gpu_arch::XeLpg) {
+        std::cout << "Larger head_size are experiencing problems on MTL...\n";
+        assert(false);
+        return {};
       } else if (args.head_size <= 256) {
         if (args.num_queries < 64) {
           // for short query length
-          policy<fmha_policy_8x256x256>(q, args);
+          return policy<fmha_policy_8x256x256>(args);
         } else {
           // for long query length
           if (arch_tag != gpu_arch::XeHpc || args.num_keys < 128) {
-            policy<fmha_policy_64x128x256>(q, args);
+            return policy<fmha_policy_64x128x256>(args);
           } else {
             if constexpr (arch_tag == gpu_arch::XeHpc)
-              policy<fmha_policy_64x256x256>(q, args);
+              return policy<fmha_policy_64x256x256>(args);
           }
         }
       } else if (arch_tag == gpu_arch::XeHpc && args.head_size <= 512) {
         if constexpr (arch_tag == gpu_arch::XeHpc)
-          policy<fmha_policy_64x128x512>(q, args);
+          return policy<fmha_policy_64x128x512>(args);
+        return {};
       } else {
         assert(false);
+        return {};
       }
     }
   };
@@ -283,35 +282,31 @@ class fmha_forward_kernel_policy {
 
 template <typename T, gpu_arch arch_tag, bool... Bs>
 
-void dispatch_fmha_forward(
-    sycl::queue& q,
+cgfs_t dispatch_fmha_forward(
     const fmha::dispatch_fmha_forward_args_t<T>& args) {
-  fmha_forward_kernel_policy<T, arch_tag, Bs...>(q, args);
+  return fmha_forward_kernel_policy<T, arch_tag, Bs...>::run(args);
 }
 
 // dispatch different conditions
 template <typename T, gpu_arch arch_tag, bool... Bs, typename... Ts>
-void dispatch_fmha_forward(
-    sycl::queue& q,
+cgfs_t dispatch_fmha_forward(
     const fmha::dispatch_fmha_forward_args_t<T>& args,
     bool b,
     Ts... ts) {
   if (b) {
-    dispatch_fmha_forward<T, arch_tag, Bs..., true>(q, args, ts...);
+    return dispatch_fmha_forward<T, arch_tag, Bs..., true>(args, ts...);
   } else {
-    dispatch_fmha_forward<T, arch_tag, Bs..., false>(q, args, ts...);
+    return dispatch_fmha_forward<T, arch_tag, Bs..., false>(args, ts...);
   }
 }
 
 // dispatch datatype
 template <gpu_arch arch_tag>
-void _fmha_forward_kernel(
+cgfs_t _fmha_forward_kernel(
     XetlaType xeType,
-    sycl::queue& q,
     const fmha_forward_kernel_args_t& args) {
   if (xeType == XetlaType::fp16) {
-    dispatch_fmha_forward<fp16, arch_tag>(
-        q,
+    return dispatch_fmha_forward<fp16, arch_tag>(
         fmha::dispatch_fmha_forward_args_t<fp16>(args),
         args.alibi != nullptr, // is alibi
         args.attn_mask != nullptr, // is is_attn_mask
@@ -320,8 +315,7 @@ void _fmha_forward_kernel(
         args.is_training,
         args.is_dropout);
   } else if constexpr (arch_tag != gpu_arch::XeLpg) {
-    dispatch_fmha_forward<bf16, arch_tag>(
-        q,
+    return dispatch_fmha_forward<bf16, arch_tag>(
         fmha::dispatch_fmha_forward_args_t<bf16>(args),
         args.alibi != nullptr, // is alibi
         args.attn_mask != nullptr, // is is_attn_mask
@@ -331,25 +325,32 @@ void _fmha_forward_kernel(
         args.is_dropout);
   } else {
     printf("No bf16 for igpu!!\n\n");
+    return {};
   }
 }
 
 // dispatch arch
-void fmha_forward_kernel(
+XETLA_KERNEL_API cgfs_t fmha_forward_kernel(
     gpu_arch arch,
     XetlaType xeType,
-    sycl::queue& q,
     const fmha_forward_kernel_args_t& args) {
   switch (arch) {
+#ifdef USE_XETLA_XE_LPG
     case gpu_arch::XeLpg:
-      return _fmha_forward_kernel<gpu_arch::XeLpg>(xeType, q, args);
-    // case gpu_arch::XeHpg:
-    //   return _fmha_forward_kernel<gpu_arch::XeHpg>(xeType, q, args);
+      return _fmha_forward_kernel<gpu_arch::XeLpg>(xeType, args);
+#endif
+#ifdef USE_XETLA_XE_HPG
+    case gpu_arch::XeHpg:
+      // TODO(Yi): fix XeHpg
+      return _fmha_forward_kernel<gpu_arch::XeLpg>(xeType, args);
+#endif
+#ifdef USE_XETLA_XE_HPC
     case gpu_arch::XeHpc:
-      return _fmha_forward_kernel<gpu_arch::XeHpc>(xeType, q, args);
+      return _fmha_forward_kernel<gpu_arch::XeHpc>(xeType, args);
+#endif
     default:
       printf("Unsupported gpu_arch of fmha_forward!!\n\n");
-      return;
+      return {};
   }
 }
 } // namespace gpu::xetla

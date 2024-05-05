@@ -1,6 +1,5 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 // clang-format off
 
 #define HGEMM_COMMA ,

@@ -343,7 +343,7 @@ std::vector<at::Tensor> rnn_layer(
   }
 }
 
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
 std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor>
 xetla_gru_forward(
     const Tensor& input,
@@ -385,7 +385,7 @@ xetla_gru_forward(
   }
 
   auto Queue = dpcppGetCurrentQueue();
-  xpu::xetla::gru_forward(
+  auto cgfs = xpu::xetla::gru_forward(
       input.data_ptr(),
       hx.data_ptr(),
       i_weights.data_ptr(),
@@ -405,9 +405,8 @@ xetla_gru_forward(
       input.size(2),
       hx.size(2),
       input.size(0),
-      num_layers,
-      Queue);
-
+      num_layers);
+  DPCPP_Q_SUBMIT_CGFS(Queue, cgfs);
   return std::make_tuple(
       std::move(y),
       std::move(hy_),
@@ -475,7 +474,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> xetla_gru_backward(
       at::empty(i_biases.sizes(), i_biases.options()).to(at::kFloat);
   auto grad_h_bias =
       at::empty(h_biases.sizes(), h_biases.options()).to(at::kFloat);
-  xpu::xetla::gru_backward_data(
+  auto cgfs_data = xpu::xetla::gru_backward_data(
       grad_hy.data_ptr(),
       grad_y.data_ptr(),
       grad_input.data_ptr(),
@@ -496,10 +495,10 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> xetla_gru_backward(
       hidden_size,
       sequence_size,
       num_layers,
-      drop_prob,
-      Queue);
+      drop_prob);
+  DPCPP_Q_SUBMIT_CGFS(Queue, cgfs_data);
 
-  xpu::xetla::gru_backward_weight(
+  auto cgfs_wei = xpu::xetla::gru_backward_weight(
       bpi0_grad.data_ptr(),
       bpi1_grad.data_ptr(),
       input.data_ptr(),
@@ -512,8 +511,8 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> xetla_gru_backward(
       input_size,
       hidden_size,
       sequence_size,
-      num_layers,
-      Queue);
+      num_layers);
+  DPCPP_Q_SUBMIT_CGFS(Queue, cgfs_wei);
 
   return std::make_tuple(
       std::move(grad_input),
@@ -766,7 +765,7 @@ std::tuple<Tensor, Tensor> gru(
 
     return std::make_tuple(std::move(output), std::move(hy));
   }
-#if defined(USE_XETLA)
+#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   else if (
       dpcppGetDeviceHasXMX() && compute_eng == xpu::COMPUTE_ENG::XETLA &&
       is_xetla_gru_available(

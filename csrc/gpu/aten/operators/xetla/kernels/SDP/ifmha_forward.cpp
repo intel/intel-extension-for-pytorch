@@ -1,4 +1,7 @@
+#if USE_XETLA_XE_HPC
 #include "ifmha_forward.h"
+#include <c10/util/Exception.h>
+#include "../../mha.h"
 
 namespace gpu::xetla {
 namespace fmha {
@@ -115,8 +118,7 @@ template <
     bool kUseBias,
     bool kIsTraining,
     bool kIsBiasBroadcast>
-void ifmha_forward_impl(
-    sycl::queue& q,
+cgfs_t ifmha_forward_impl(
     T* query,
     T* key0,
     T* key1,
@@ -168,28 +170,29 @@ void ifmha_forward_impl(
   sycl::nd_range<2> NdRange =
       ifmha_forward_op_t::get_nd_range(num_batches, beam, num_heads);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    IfmhaForwardImplKernelFunctor<ifmha_forward_op_t, T> kfn(
-        query,
-        key0,
-        key1,
-        value0,
-        value1,
-        index,
-        alibi,
-        bias,
-        dropout,
-        dropout_prob,
-        sm_scale,
-        out,
-        num_batches,
-        beam,
-        num_heads,
-        head_size,
-        kv_len0,
-        kv_len1,
-        alibi_padding,
-        attn_mask_padding);
+  IfmhaForwardImplKernelFunctor<ifmha_forward_op_t, T> kfn(
+      query,
+      key0,
+      key1,
+      value0,
+      value1,
+      index,
+      alibi,
+      bias,
+      dropout,
+      dropout_prob,
+      sm_scale,
+      out,
+      num_batches,
+      beam,
+      num_heads,
+      head_size,
+      kv_len0,
+      kv_len1,
+      alibi_padding,
+      attn_mask_padding);
+
+  return {[=](sycl::handler& cgh) {
     cgh.parallel_for<class IfmhaForwardKernel<
         ifmha_policy,
         T,
@@ -197,8 +200,7 @@ void ifmha_forward_impl(
         kUseBias,
         kIsTraining,
         kIsBiasBroadcast>>(NdRange, kfn);
-  };
-  DPCPP_Q_SUBMIT(q, cgf);
+  }};
 }
 
 } // namespace fmha
@@ -211,7 +213,6 @@ void ifmha_forward_impl(
       kUseBias,             \
       kIsTraining,          \
       kIsBiasBroadcast>(    \
-      q,                    \
       query,                \
       key0,                 \
       key1,                 \
@@ -240,8 +241,7 @@ template <
     bool kUseBias,
     bool kIsTraining,
     bool kIsBiasBroadcast>
-void ifmha_forward(
-    sycl::queue& q,
+cgfs_t ifmha_forward(
     T* query,
     T* key0,
     T* key1,
@@ -265,21 +265,20 @@ void ifmha_forward(
   // occupancy first
   constexpr int hardware_concurrent_wg = 64;
   if (head_size <= 64) {
-    CALL_IMPL_FUNC(ifmha_policy_64x64);
+    return CALL_IMPL_FUNC(ifmha_policy_64x64);
   } else if (head_size <= 128) {
-    CALL_IMPL_FUNC(ifmha_policy_128x64);
+    return CALL_IMPL_FUNC(ifmha_policy_128x64);
   } else if (head_size <= 256) {
-    CALL_IMPL_FUNC(ifmha_policy_256x64);
+    return CALL_IMPL_FUNC(ifmha_policy_256x64);
   } else {
     TORCH_CHECK(0, "SDP Index fusion kernel requires head_dim <= 256 ...");
-    return;
+    return {};
   }
 }
 
 #undef CALL_IMPL_FUNC
 
-void fmha_forward_index_kernel(
-    sycl::queue& q,
+XETLA_KERNEL_API cgfs_t fmha_forward_index_kernel(
     void* query,
     void* key,
     void* value,
@@ -314,8 +313,7 @@ void fmha_forward_index_kernel(
       "SDP Index fusion kernel doesn't support causal so far ...");
 
 #define DISPATCH_TEMPLATE(T, USE_ALIBI, USE_BIAS, IS_TRAINING, IS_BROADCAST) \
-  ifmha_forward<T, USE_ALIBI, USE_BIAS, IS_TRAINING, IS_BROADCAST>(          \
-      q,                                                                     \
+  return ifmha_forward<T, USE_ALIBI, USE_BIAS, IS_TRAINING, IS_BROADCAST>(   \
       (T*)query,                                                             \
       (T*)key,                                                               \
       (T*)key_cache,                                                         \
@@ -368,3 +366,4 @@ void fmha_forward_index_kernel(
   }
 }
 } // namespace gpu::xetla
+#endif

@@ -1,10 +1,10 @@
 #pragma once
-
 #include <sycl/sycl.hpp>
-namespace xpu {
-namespace xetla {
+#include "xetla_kernel_api.h"
 
-void gru_forward(
+namespace xpu::xetla {
+
+XETLA_KERNEL_API cgfs_t gru_forward(
     void* layer_ptr,
     void* hx_ptr,
     void* i_weights,
@@ -24,10 +24,9 @@ void gru_forward(
     const int input_size,
     const int hidden_size,
     const int sequence_size,
-    const int layer_size,
-    sycl::queue& Queue);
+    const int layer_size);
 
-void gru_backward_data(
+XETLA_KERNEL_API cgfs_t gru_backward_data(
     void* layer_err_ptr,
     void* y_err_ptr,
     void* x_grad_ptr,
@@ -48,10 +47,9 @@ void gru_backward_data(
     const int hidden_size,
     const int sequence_length,
     const int layer_size,
-    const float dropout,
-    sycl::queue& Queue);
+    const float dropout);
 
-void gru_backward_weight(
+XETLA_KERNEL_API cgfs_t gru_backward_weight(
     void* err0_ptr,
     void* err1_ptr,
     void* layer_ptr,
@@ -64,8 +62,5 @@ void gru_backward_weight(
     const int input_size,
     const int hidden_size,
     const int sequence_length,
-    const int layer_size,
-    sycl::queue& Queue);
-
-} // namespace xetla
-} // namespace xpu
+    const int layer_size);
+} // namespace xpu::xetla

@@ -1,11 +1,11 @@
+#ifdef USE_XETLA_XE_HPC
 #include "../../GRU.h"
 
 #include "forward.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
-void gru_forward(
+XETLA_KERNEL_API cgfs_t gru_forward(
     void* layer_ptr,
     void* hx_ptr,
     void* i_weights,
@@ -25,10 +25,9 @@ void gru_forward(
     const int input_size,
     const int hidden_size,
     const int sequence_size,
-    const int layer_size,
-    sycl::queue& Queue) {
-  if (hidden_size <= 256)
-    gru_forward_impl<m512k92n256_fwd>(
+    const int layer_size) {
+  if (hidden_size <= 256) {
+    return gru_forward_impl<m512k92n256_fwd>(
         layer_ptr,
         hx_ptr,
         i_weights,
@@ -48,10 +47,9 @@ void gru_forward(
         input_size,
         hidden_size,
         sequence_size,
-        layer_size,
-        Queue);
-  else if (hidden_size <= 1024)
-    gru_forward_impl<m512k379n681_fwd>(
+        layer_size);
+  } else if (hidden_size <= 1024) {
+    return gru_forward_impl<m512k379n681_fwd>(
         layer_ptr,
         hx_ptr,
         i_weights,
@@ -71,11 +69,12 @@ void gru_forward(
         input_size,
         hidden_size,
         sequence_size,
-        layer_size,
-        Queue);
-  else
-    assert(0); // Currently need add shape conig manually
+        layer_size);
+  } else {
+    assert(0); // Currently need add shape config manually
+    return {};
+  }
 }
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla
+#endif

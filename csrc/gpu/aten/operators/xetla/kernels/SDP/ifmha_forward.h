@@ -20,7 +20,6 @@
 
 #pragma once
 
-#include <utils/DPCPP.h>
 #include <limits>
 #include "ifmha_policy.h"
 #include "ifmha_utils.h"

@@ -1,12 +1,12 @@
+#ifdef USE_XETLA_XE_HPC
 #include "../../GRU.h"
 
 #include "backward_input.h"
 #include "backward_weight.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
-void gru_backward_data(
+cgfs_t gru_backward_data(
     void* layer_err_ptr,
     void* y_err_ptr,
     void* x_grad_ptr,
@@ -27,10 +27,9 @@ void gru_backward_data(
     const int hidden_size,
     const int sequence_length,
     const int layer_size,
-    const float dropout,
-    sycl::queue& Queue) {
-  if (hidden_size > 0 && hidden_size <= 256)
-    gru_backward_data_impl<m512k92n256_bpi>(
+    const float dropout) {
+  if (hidden_size > 0 && hidden_size <= 256) {
+    return gru_backward_data_impl<m512k92n256_bpi>(
         layer_err_ptr,
         y_err_ptr,
         x_grad_ptr,
@@ -51,10 +50,9 @@ void gru_backward_data(
         hidden_size,
         sequence_length,
         layer_size,
-        dropout,
-        Queue);
-  else if (hidden_size <= 1024)
-    gru_backward_data_impl<m512k379n681_bpi>(
+        dropout);
+  } else if (hidden_size <= 1024) {
+    return gru_backward_data_impl<m512k379n681_bpi>(
         layer_err_ptr,
         y_err_ptr,
         x_grad_ptr,
@@ -75,13 +73,14 @@ void gru_backward_data(
         hidden_size,
         sequence_length,
         layer_size,
-        dropout,
-        Queue);
-  else
+        dropout);
+  } else {
     assert(0); // Currently a few shapes are supported
+    return {};
+  }
 }
 
-void gru_backward_weight(
+cgfs_t gru_backward_weight(
     void* err0_ptr,
     void* err1_ptr,
     void* layer_ptr,
@@ -94,10 +93,9 @@ void gru_backward_weight(
     const int input_size,
     const int hidden_size,
     const int sequence_length,
-    const int layer_size,
-    sycl::queue& Queue) {
-  if (hidden_size > 0 && hidden_size <= 1024)
-    gru_backward_weight_impl<m512k92n256_bpk>(
+    const int layer_size) {
+  if (hidden_size > 0 && hidden_size <= 1024) {
+    return gru_backward_weight_impl<m512k92n256_bpk>(
         err0_ptr,
         err1_ptr,
         layer_ptr,
@@ -110,11 +108,12 @@ void gru_backward_weight(
         input_size,
         hidden_size,
         sequence_length,
-        layer_size,
-        Queue);
-  else
+        layer_size);
+  } else {
     assert(0); // Currently a few shapes are supported
+    return {};
+  }
 }
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla
+#endif

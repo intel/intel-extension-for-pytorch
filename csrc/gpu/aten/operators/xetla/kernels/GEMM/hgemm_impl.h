@@ -1,11 +1,9 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include "../xetla.h"
 #include "epilogue_impl.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
 template <
     typename scalar_t,
@@ -45,8 +43,7 @@ struct hgemm_caller {
     gemm_op_t::arguments_t arg;
   };
 
-  void operator()(
-      sycl::queue& queue,
+  cgfs_t operator()(
       scalar_t* out,
       const scalar_t* a,
       const scalar_t* b,
@@ -111,11 +108,10 @@ struct hgemm_caller {
         acc_ptr,
         cnt_ptr,
         args);
-    auto cgf = DPCPP_Q_CGF(cgh) {
-      HgemmCallerKernelFunctor<gemm_op_t> kfn(arg);
+    HgemmCallerKernelFunctor<gemm_op_t> kfn(arg);
+    return {[=](sycl::handler& cgh) {
       cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
-    };
-    DPCPP_Q_SUBMIT(queue, cgf);
+    }};
   }
 };
 
@@ -131,8 +127,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_addmm(
-    sycl::queue& queue,
+inline cgfs_t hgemm_addmm(
     scalar_t* out,
     const scalar_t* res,
     const scalar_t* a,
@@ -158,8 +153,7 @@ inline void hgemm_addmm(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(
-      queue,
+  return caller(
       out,
       a,
       b,
@@ -183,8 +177,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_common(
-    sycl::queue& queue,
+inline cgfs_t hgemm_common(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -207,7 +200,7 @@ inline void hgemm_common(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(queue, out, a, b, acc_ptr, cnt_ptr, m, n, k, {{}});
+  return caller(out, a, b, acc_ptr, cnt_ptr, m, n, k, {{}});
 }
 
 template <
@@ -222,8 +215,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_res(
-    sycl::queue& queue,
+inline cgfs_t hgemm_res(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -248,8 +240,7 @@ inline void hgemm_res(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(
-      queue,
+  return caller(
       out,
       a,
       b,
@@ -273,8 +264,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_res_res(
-    sycl::queue& queue,
+inline cgfs_t hgemm_res_res(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -303,8 +293,7 @@ inline void hgemm_res_res(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(
-      queue,
+  return caller(
       out,
       a,
       b,
@@ -329,8 +318,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_bias(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -355,8 +343,7 @@ inline void hgemm_bias(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(
-      queue,
+  return caller(
       out,
       a,
       b,
@@ -380,8 +367,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_bias_res(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias_res(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -410,8 +396,7 @@ inline void hgemm_bias_res(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(
-      queue,
+  return caller(
       out,
       a,
       b,
@@ -436,8 +421,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_bias_res_res(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias_res_res(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -469,8 +453,7 @@ inline void hgemm_bias_res_res(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(
-      queue,
+  return caller(
       out,
       a,
       b,
@@ -496,8 +479,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_bias_relu(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias_relu(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -523,8 +505,7 @@ inline void hgemm_bias_relu(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(
-      queue,
+  return caller(
       out,
       a,
       b,
@@ -548,8 +529,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_bias_gelu(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias_gelu(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -575,8 +555,7 @@ inline void hgemm_bias_gelu(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(
-      queue,
+  return caller(
       out,
       a,
       b,
@@ -600,8 +579,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_mul(
-    sycl::queue& queue,
+inline cgfs_t hgemm_mul(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -626,8 +604,7 @@ inline void hgemm_mul(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(
-      queue,
+  return caller(
       out,
       a,
       b,
@@ -651,8 +628,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_silu(
-    sycl::queue& queue,
+inline cgfs_t hgemm_silu(
     scalar_t* out,
     const scalar_t* a,
     const scalar_t* b,
@@ -675,7 +651,7 @@ inline void hgemm_silu(
       STAGES,
       B_ROW_MAJOR,
       tile_op_t>();
-  caller(queue, out, a, b, acc_ptr, cnt_ptr, m, n, k, {{{}}});
+  return caller(out, a, b, acc_ptr, cnt_ptr, m, n, k, {{{}}});
 }
 
 template <
@@ -814,8 +790,8 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_qkv(
-    sycl::queue& queue,
+inline cgfs_t hgemm_qkv(
+
     scalar_t* out0,
     scalar_t* out1,
     scalar_t* out2,
@@ -844,40 +820,39 @@ inline void hgemm_qkv(
   cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
   cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    HgemmQKVKernelFunctor<
-        scalar_t,
-        WG_M,
-        WG_N,
-        SG_M,
-        SG_N,
-        SG_K,
-        SLM_KS,
-        L3_KS,
-        SYNC_FREQ,
-        STAGES,
-        B_ROW_MAJOR,
-        layout_a,
-        layout_b>
-        kfn(out0,
-            out1,
-            out2,
-            a,
-            b,
-            acc_ptr,
-            cnt_ptr,
-            m,
-            n,
-            k,
-            group,
-            lda,
-            ldb,
-            ldc,
-            size_b,
-            size_o);
+  HgemmQKVKernelFunctor<
+      scalar_t,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      SLM_KS,
+      L3_KS,
+      SYNC_FREQ,
+      STAGES,
+      B_ROW_MAJOR,
+      layout_a,
+      layout_b>
+      kfn(out0,
+          out1,
+          out2,
+          a,
+          b,
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k,
+          group,
+          lda,
+          ldb,
+          ldc,
+          size_b,
+          size_o);
+  return {[=](sycl::handler& cgh) {
     cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
+  }};
 }
 
 template <
@@ -1028,8 +1003,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_qkv_bias(
-    sycl::queue& queue,
+inline cgfs_t hgemm_qkv_bias(
     scalar_t* out0,
     scalar_t* out1,
     scalar_t* out2,
@@ -1060,42 +1034,41 @@ inline void hgemm_qkv_bias(
   cl::sycl::range<3> LocalRange{SLM_KS, thread_range_m, thread_range_n};
   cl::sycl::nd_range<3> NDRange(GroupRange * LocalRange, LocalRange);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    HgemmQKVBiasKernelFunctor<
-        scalar_t,
-        WG_M,
-        WG_N,
-        SG_M,
-        SG_N,
-        SG_K,
-        SLM_KS,
-        L3_KS,
-        SYNC_FREQ,
-        STAGES,
-        B_ROW_MAJOR,
-        layout_a,
-        layout_b>
-        kfn(out0,
-            out1,
-            out2,
-            a,
-            b,
-            bias,
-            acc_ptr,
-            cnt_ptr,
-            m,
-            n,
-            k,
-            group,
-            lda,
-            ldb,
-            ldc,
-            size_b,
-            size_o,
-            size_bias);
+  HgemmQKVBiasKernelFunctor<
+      scalar_t,
+      WG_M,
+      WG_N,
+      SG_M,
+      SG_N,
+      SG_K,
+      SLM_KS,
+      L3_KS,
+      SYNC_FREQ,
+      STAGES,
+      B_ROW_MAJOR,
+      layout_a,
+      layout_b>
+      kfn(out0,
+          out1,
+          out2,
+          a,
+          b,
+          bias,
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k,
+          group,
+          lda,
+          ldb,
+          ldc,
+          size_b,
+          size_o,
+          size_bias);
+  return {[=](sycl::handler& cgh) {
     cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
+  }};
 }
 
 template <
@@ -1110,8 +1083,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_qkv_group(
-    sycl::queue& queue,
+inline cgfs_t hgemm_qkv_group(
     scalar_t* out0,
     scalar_t* out1,
     scalar_t* out2,
@@ -1176,7 +1148,7 @@ inline void hgemm_qkv_group(
       dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
+  return {[=](sycl::handler& cgh) {
     cgh.parallel_for(NDRange, [=](nd_item<3> item) KERNEL_MAIN {
       uint32_t batch_id = item.get_group(0);
       slm_barrier_init<gemm_op_t>();
@@ -1209,8 +1181,7 @@ inline void hgemm_qkv_group(
       gemm_op_t gemm_op;
       gemm_op(item, arg);
     });
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
+  }};
 }
 
 template <
@@ -1225,8 +1196,8 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR>
-inline void hgemm_qkv_group_bias(
-    sycl::queue& queue,
+inline cgfs_t hgemm_qkv_group_bias(
+
     scalar_t* out0,
     scalar_t* out1,
     scalar_t* out2,
@@ -1296,7 +1267,7 @@ inline void hgemm_qkv_group_bias(
       dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
+  return {[=](sycl::handler& cgh) {
     cgh.parallel_for(NDRange, [=](nd_item<3> item) KERNEL_MAIN {
       uint32_t batch_id = item.get_group(0);
       slm_barrier_init<gemm_op_t>();
@@ -1332,9 +1303,7 @@ inline void hgemm_qkv_group_bias(
       gemm_op_t gemm_op;
       gemm_op(item, arg);
     });
-  };
-  DPCPP_Q_SUBMIT(queue, cgf);
+  }};
 }
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla

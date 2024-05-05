@@ -1,6 +1,5 @@
-#include <utils/DPCPP.h>
+#ifdef USE_XETLA_XE_HPC
 #include <limits>
-#include "../../../comm/AccumulateType.h"
 #include "../../mha.h"
 #include "fmha_backward_policy.h"
 #include "fmha_forward_policy.h"
@@ -1158,8 +1157,7 @@ template <
     bool kUseBias,
     bool kIsCausal,
     bool kIsDropout>
-void xetla_fmha_backward_kernel(
-    sycl::queue& q,
+cgfs_t xetla_fmha_backward_kernel(
     T* grad_out,
     T* query,
     T* key,
@@ -1211,43 +1209,41 @@ void xetla_fmha_backward_kernel(
   sycl::nd_range<3> NdRange =
       fmha_backward_op_t::get_nd_range(num_batches * num_heads);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    FmhaBackwardKernelFunctor<fmha_backward_op_t, T> kfn(
-        grad_out,
-        query,
-        key,
-        value,
-        bias,
-        dropout,
-        out,
-        log_sumexp,
-        workspace,
-        grad_q_tmp,
-        dropout_prob,
-        grad_query,
-        grad_key,
-        grad_value,
-        grad_bias,
-        num_batches,
-        num_heads,
-        head_size,
-        num_queries,
-        num_keys,
-        bias_strideB,
-        bias_strideN,
-        bias_strideF,
-        attn_mask_padding,
-        alpha,
-        seed,
-        offset);
+  FmhaBackwardKernelFunctor<fmha_backward_op_t, T> kfn(
+      grad_out,
+      query,
+      key,
+      value,
+      bias,
+      dropout,
+      out,
+      log_sumexp,
+      workspace,
+      grad_q_tmp,
+      dropout_prob,
+      grad_query,
+      grad_key,
+      grad_value,
+      grad_bias,
+      num_batches,
+      num_heads,
+      head_size,
+      num_queries,
+      num_keys,
+      bias_strideB,
+      bias_strideN,
+      bias_strideF,
+      attn_mask_padding,
+      alpha,
+      seed,
+      offset);
+  return {[=](sycl::handler& cgh) {
     cgh.parallel_for<decltype(kfn)>(NdRange, kfn);
-  };
-  DPCPP_Q_SUBMIT(q, cgf);
+  }};
 }
 } // namespace fmha
 #define CALL_IMPL_FUNC(P)                                                  \
   fmha::xetla_fmha_backward_kernel<P, T, kUseBias, kIsCausal, kIsDropout>( \
-      q,                                                                   \
       grad_out,                                                            \
       query,                                                               \
       key,                                                                 \
@@ -1282,8 +1278,7 @@ template <
     bool kUseBias = false,
     bool kIsCausal = false,
     bool kIsDropout = false>
-void fmha_backward_kernel_policy(
-    sycl::queue& q,
+cgfs_t fmha_backward_kernel_policy(
     T* grad_out,
     T* query,
     T* key,
@@ -1312,23 +1307,23 @@ void fmha_backward_kernel_policy(
     uint64_t seed = 0,
     uint64_t offset = 123) {
   if (head_size <= 64) {
-    CALL_IMPL_FUNC(fmha_bwd_policy_128x128x64);
+    return CALL_IMPL_FUNC(fmha_bwd_policy_128x128x64);
   } else if (head_size <= 128) {
-    CALL_IMPL_FUNC(fmha_bwd_policy_128x128x128);
+    return CALL_IMPL_FUNC(fmha_bwd_policy_128x128x128);
   } else if (head_size <= 256) {
-    CALL_IMPL_FUNC(fmha_bwd_policy_128x128x256);
+    return CALL_IMPL_FUNC(fmha_bwd_policy_128x128x256);
   } else if (head_size <= 512) {
-    CALL_IMPL_FUNC(fmha_bwd_policy_64x128x512);
+    return CALL_IMPL_FUNC(fmha_bwd_policy_64x128x512);
   } else {
     assert(false);
+    return {};
   }
 }
 
 #undef CALL_IMPL_FUNC
 
 template <typename T, bool... Bs>
-void dispatch_fmha_backward(
-    sycl::queue& q,
+cgfs_t dispatch_fmha_backward(
     T* grad_out,
     T* query,
     T* key,
@@ -1356,8 +1351,7 @@ void dispatch_fmha_backward(
     uint32_t attn_mask_padding,
     uint64_t seed,
     uint64_t offset) {
-  fmha_backward_kernel_policy<T, Bs...>(
-      q,
+  return fmha_backward_kernel_policy<T, Bs...>(
       grad_out,
       query,
       key,
@@ -1389,8 +1383,7 @@ void dispatch_fmha_backward(
 
 // dispatch different conditions
 template <typename T, bool... Bs, typename... Ts>
-void dispatch_fmha_backward(
-    sycl::queue& q,
+cgfs_t dispatch_fmha_backward(
     T* grad_out,
     T* query,
     T* key,
@@ -1421,8 +1414,7 @@ void dispatch_fmha_backward(
     bool b,
     Ts... ts) {
   if (b) {
-    dispatch_fmha_backward<T, Bs..., true>(
-        q,
+    return dispatch_fmha_backward<T, Bs..., true>(
         grad_out,
         query,
         key,
@@ -1452,8 +1444,7 @@ void dispatch_fmha_backward(
         offset,
         ts...);
   } else {
-    dispatch_fmha_backward<T, Bs..., false>(
-        q,
+    return dispatch_fmha_backward<T, Bs..., false>(
         grad_out,
         query,
         key,
@@ -1486,8 +1477,7 @@ void dispatch_fmha_backward(
 }
 
 template <typename T>
-void fmha_backward_kernel_impl(
-    sycl::queue& q,
+cgfs_t fmha_backward_kernel_impl(
     T* grad_out,
     T* query,
     T* key,
@@ -1519,8 +1509,7 @@ void fmha_backward_kernel_impl(
     uint64_t offset_t) {
   bool is_bias = bias ? true : false;
 
-  dispatch_fmha_backward<T>(
-      q,
+  return dispatch_fmha_backward<T>(
       grad_out,
       query,
       key,
@@ -1554,9 +1543,8 @@ void fmha_backward_kernel_impl(
 }
 
 // dispatch datatype
-void fmha_backward_kernel(
+XETLA_KERNEL_API cgfs_t fmha_backward_kernel(
     XetlaType xeType,
-    sycl::queue& q,
     void* grad_out,
     void* query,
     void* key,
@@ -1587,8 +1575,7 @@ void fmha_backward_kernel(
     uint64_t seed_t = 0,
     uint64_t offset_t = 123) {
   if (xeType == XetlaType::fp16) {
-    fmha_backward_kernel_impl<fp16>(
-        q,
+    return fmha_backward_kernel_impl<fp16>(
         (fp16*)grad_out,
         (fp16*)query,
         (fp16*)key,
@@ -1619,8 +1606,7 @@ void fmha_backward_kernel(
         seed_t,
         offset_t);
   } else {
-    fmha_backward_kernel_impl<bf16>(
-        q,
+    return fmha_backward_kernel_impl<bf16>(
         (bf16*)grad_out,
         (bf16*)query,
         (bf16*)key,
@@ -1653,3 +1639,4 @@ void fmha_backward_kernel(
   }
 }
 } // namespace gpu::xetla
+#endif

@@ -1,11 +1,11 @@
 #pragma once
-
 #include <stddef.h>
-
-#include <common/core/common.hpp>
 #include <sycl/sycl.hpp>
+#include <xetla_common_types.hpp>
+#include "xetla_kernel_api.h"
 
 namespace gpu::xetla {
+using namespace xpu::xetla;
 
 enum class XetlaType {
   fp16,
@@ -47,14 +47,12 @@ struct fmha_forward_kernel_args_t {
 // * causal
 // * permutation t, n, h
 // * alibi
-void fmha_forward_kernel(
+XETLA_KERNEL_API cgfs_t fmha_forward_kernel(
     gpu_arch arch,
     XetlaType xeType,
-    sycl::queue& q,
     const fmha_forward_kernel_args_t& args);
 
-void fmha_forward_index_kernel(
-    sycl::queue& q,
+XETLA_KERNEL_API cgfs_t fmha_forward_index_kernel(
     void* query,
     void* key,
     void* value,
@@ -81,9 +79,8 @@ void fmha_forward_index_kernel(
     bool is_causal,
     bool is_bias_bc);
 
-void fmha_backward_kernel(
+XETLA_KERNEL_API cgfs_t fmha_backward_kernel(
     XetlaType xeType,
-    sycl::queue& q,
     void* grad_out,
     void* query,
     void* key,
@@ -114,8 +111,7 @@ void fmha_backward_kernel(
     uint64_t seed_t,
     uint64_t offset_t);
 
-void paged_attention_v1(
-    sycl::queue& q,
+XETLA_KERNEL_API cgfs_t paged_attention_v1(
     sycl::half* out,
     sycl::half* query,
     sycl::half* key_cache,
@@ -132,11 +128,10 @@ void paged_attention_v1(
     uint32_t max_blocks_per_seq,
     uint32_t max_context_len);
 
-void paged_attention_v2(
+XETLA_KERNEL_API cgfs_t paged_attention_v2(
     float* max_logits,
     float* exp_sums,
     sycl::half* tmp_out,
-    sycl::queue& q,
     sycl::half* out,
     sycl::half* query,
     sycl::half* key_cache,
@@ -152,5 +147,4 @@ void paged_attention_v2(
     uint32_t block_size,
     uint32_t max_blocks_per_seq,
     uint32_t max_context_len);
-
 } // namespace gpu::xetla

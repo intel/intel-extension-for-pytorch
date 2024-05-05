@@ -14,11 +14,12 @@
  * limitations under the License.
  ******************************************************************************/
 
-#include <utils/DPCPP.h>
+#ifdef USE_XETLA_XE_HPC
+#include <c10/util/Exception.h>
 #include <limits>
+#include "../../mha.h"
 #include "paged_attention_kernel.hpp"
 #include "paged_attention_policy.hpp"
-
 #include "xetla.hpp"
 
 namespace gpu::xetla {
@@ -26,11 +27,10 @@ namespace gpu::xetla {
 namespace attention {
 
 template <typename T, typename U, uint32_t HEAD_SIZE, uint32_t BLOCK_SIZE>
-void launch_paged_attention_v2(
+std::vector<std::function<void(sycl::handler&)>> launch_paged_attention_v2(
     float* max_logits,
     float* exp_sums,
     T* tmp_out,
-    sycl::queue& q,
     T* out,
     T* query,
     T* key_cache,
@@ -54,108 +54,102 @@ void launch_paged_attention_v2(
       max_num_partitions > 1,
       "max_context_len must be greater than partition_size when using paged attention v2");
 
-  {
+  std::function<void(sycl::handler&)> cgh0 = [=](sycl::handler& cgh) {
     // first kernel
     using kernel = paged_attention_kernel<policy, T, U>;
 
     sycl::nd_range<3> nd_range =
         kernel::get_nd_range(num_seqs, num_heads, max_num_partitions);
 
-    auto cgh = DPCPP_Q_CGF(cgh) {
-      cgh.parallel_for<paged_attention_kernel<policy, T, U>>(
-          nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
-            kernel kernel_fn;
-            typename kernel::arguments_t args(
-                max_logits,
-                exp_sums,
-                tmp_out,
-                query,
-                key_cache,
-                value_cache,
-                head_mapping,
-                block_tables,
-                context_lens,
-                sm_scale,
-                num_seqs,
-                num_heads,
-                num_kv_heads,
-                head_size,
-                max_blocks_per_seq);
+    cgh.parallel_for<paged_attention_kernel<policy, T, U>>(
+        nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
+          kernel kernel_fn;
+          typename kernel::arguments_t args(
+              max_logits,
+              exp_sums,
+              tmp_out,
+              query,
+              key_cache,
+              value_cache,
+              head_mapping,
+              block_tables,
+              context_lens,
+              sm_scale,
+              num_seqs,
+              num_heads,
+              num_kv_heads,
+              head_size,
+              max_blocks_per_seq);
 
-            kernel_fn(item, args);
-          });
-    };
-    DPCPP_Q_SUBMIT(q, cgh);
-  }
-  {
+          kernel_fn(item, args);
+        });
+  };
+  std::function<void(sycl::handler&)> cgh1 = [=](sycl::handler& cgh) {
     // second reduce kernel
     using reduce_kernel = paged_attention_reduce<policy, T, U>;
     sycl::nd_range<3> nd_range =
         reduce_kernel::get_nd_range(num_seqs, num_heads);
 
-    auto cgh2 = DPCPP_Q_CGF(cgh) {
-      cgh.parallel_for<paged_attention_reduce<policy, T, U>>(
-          nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
-            reduce_kernel reduce_kernel_fn;
-            typename reduce_kernel::arguments_t args(
-                out,
-                tmp_out,
-                max_logits,
-                exp_sums,
-                context_lens,
-                num_seqs,
-                num_heads,
-                head_size,
-                max_num_partitions);
+    cgh.parallel_for<paged_attention_reduce<policy, T, U>>(
+        nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
+          reduce_kernel reduce_kernel_fn;
+          typename reduce_kernel::arguments_t args(
+              out,
+              tmp_out,
+              max_logits,
+              exp_sums,
+              context_lens,
+              num_seqs,
+              num_heads,
+              head_size,
+              max_num_partitions);
 
-            reduce_kernel_fn(item, args);
-          });
-    };
-    DPCPP_Q_SUBMIT(q, cgh2);
-  }
+          reduce_kernel_fn(item, args);
+        });
+  };
+  return {cgh0, cgh1};
 }
 } // namespace attention
 
-#define CALL_V2_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE)                       \
-  return attention::launch_paged_attention_v2<T, U, HEAD_SIZE, BLOCK_SIZE>( \
-      max_logits,                                                           \
-      exp_sums,                                                             \
-      tmp_out,                                                              \
-      q,                                                                    \
-      out,                                                                  \
-      query,                                                                \
-      key_cache,                                                            \
-      value_cache,                                                          \
-      head_mapping,                                                         \
-      block_tables,                                                         \
-      context_lens,                                                         \
-      sm_scale,                                                             \
-      num_seqs,                                                             \
-      num_heads,                                                            \
-      num_kv_heads,                                                         \
-      head_size,                                                            \
-      max_blocks_per_seq,                                                   \
+#define CALL_V2_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE)                \
+  attention::launch_paged_attention_v2<T, U, HEAD_SIZE, BLOCK_SIZE>( \
+      max_logits,                                                    \
+      exp_sums,                                                      \
+      tmp_out,                                                       \
+      out,                                                           \
+      query,                                                         \
+      key_cache,                                                     \
+      value_cache,                                                   \
+      head_mapping,                                                  \
+      block_tables,                                                  \
+      context_lens,                                                  \
+      sm_scale,                                                      \
+      num_seqs,                                                      \
+      num_heads,                                                     \
+      num_kv_heads,                                                  \
+      head_size,                                                     \
+      max_blocks_per_seq,                                            \
       max_context_len);
 
 // Note: only support block_size = 16/32, to reduce compiliation time
 #define CALL_V2_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE) \
   switch (block_size) {                              \
     case 16: {                                       \
-      CALL_V2_LAUNCHER(T, U, HEAD_SIZE, 16);         \
+      return CALL_V2_LAUNCHER(T, U, HEAD_SIZE, 16);  \
     }                                                \
     case 32: {                                       \
-      CALL_V2_LAUNCHER(T, U, HEAD_SIZE, 32);         \
+      return CALL_V2_LAUNCHER(T, U, HEAD_SIZE, 32);  \
     }                                                \
     default: {                                       \
       TORCH_CHECK(0, "Unsupported block size: ");    \
+      return {};                                     \
     }                                                \
   }
 
-void paged_attention_v2(
+XETLA_KERNEL_API cgfs_t paged_attention_v2(
     float* max_logits,
     float* exp_sums,
     sycl::half* tmp_out,
-    sycl::queue& q,
     sycl::half* out,
     sycl::half* query,
     sycl::half* key_cache,
@@ -181,6 +175,7 @@ void paged_attention_v2(
     CALL_V2_LAUNCHER_BLOCK_SIZE(T, U, 256);
   } else {
     TORCH_CHECK(0, "Unsupported head size");
+    return {};
   }
 }
 
@@ -188,3 +183,4 @@ void paged_attention_v2(
 #undef CALL_V2_LAUNCHER
 
 } // namespace gpu::xetla
+#endif

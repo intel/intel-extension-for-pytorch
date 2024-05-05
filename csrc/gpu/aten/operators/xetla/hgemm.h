@@ -1,14 +1,13 @@
 #pragma once
-
 #include <sycl/sycl.hpp>
+#include "xetla_kernel_api.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
 enum class GemmStatus { kSuccess, kError };
 
-GemmStatus hgemm_addmm(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_addmm(
+    int policy_id,
     sycl::half* out,
     const sycl::half* res,
     const sycl::half* a,
@@ -22,8 +21,8 @@ GemmStatus hgemm_addmm(
     const float beta,
     const bool is_b_row_major);
 
-GemmStatus hgemm_common(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_common(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -34,8 +33,8 @@ GemmStatus hgemm_common(
     const int k,
     const bool is_b_row_major);
 
-GemmStatus hgemm_res(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_res(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -48,8 +47,8 @@ GemmStatus hgemm_res(
     const float res_factor,
     const bool is_b_row_major);
 
-GemmStatus hgemm_res_res(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_res_res(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -64,8 +63,8 @@ GemmStatus hgemm_res_res(
     const float res1_factor,
     const bool is_b_row_major);
 
-GemmStatus hgemm_bias(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -78,8 +77,8 @@ GemmStatus hgemm_bias(
     const float bias_factor,
     const bool is_b_row_major);
 
-GemmStatus hgemm_bias_res(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias_res(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -94,8 +93,8 @@ GemmStatus hgemm_bias_res(
     const float res_factor,
     const bool is_b_row_major);
 
-GemmStatus hgemm_bias_res_res(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias_res_res(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -112,8 +111,8 @@ GemmStatus hgemm_bias_res_res(
     const float res1_factor,
     const bool is_b_row_major);
 
-GemmStatus hgemm_bias_relu(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias_relu(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -126,8 +125,8 @@ GemmStatus hgemm_bias_relu(
     const float bias_factor,
     const bool is_b_row_major);
 
-GemmStatus hgemm_bias_gelu(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_bias_gelu(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -140,8 +139,8 @@ GemmStatus hgemm_bias_gelu(
     const float bias_factor,
     const bool is_b_row_major);
 
-GemmStatus hgemm_resmul(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_resmul(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -153,8 +152,8 @@ GemmStatus hgemm_resmul(
     const int k,
     const bool is_b_row_major);
 
-GemmStatus hgemm_silu(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_silu(
+    int policy_id,
     sycl::half* out,
     const sycl::half* a,
     const sycl::half* b,
@@ -165,8 +164,8 @@ GemmStatus hgemm_silu(
     const int k,
     const bool is_b_row_major);
 
-GemmStatus hgemm_qkv(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_qkv(
+    int policy_id,
     sycl::half* out0,
     sycl::half* out1,
     sycl::half* out2,
@@ -179,8 +178,8 @@ GemmStatus hgemm_qkv(
     const int k,
     const bool is_b_row_major);
 
-GemmStatus hgemm_qkv_bias(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_qkv_bias(
+    int policy_id,
     sycl::half* out0,
     sycl::half* out1,
     sycl::half* out2,
@@ -194,8 +193,8 @@ GemmStatus hgemm_qkv_bias(
     const int k,
     const bool is_b_row_major);
 
-GemmStatus hgemm_qkv_group(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_qkv_group(
+    int policy_id,
     sycl::half* out0,
     sycl::half* out1,
     sycl::half* out2,
@@ -211,8 +210,8 @@ GemmStatus hgemm_qkv_group(
     const int head_dim,
     const bool is_b_row_major);
 
-GemmStatus hgemm_qkv_group_bias(
-    sycl::queue& queue,
+XETLA_KERNEL_API cgfs_t hgemm_qkv_group_bias(
+    int policy_id,
     sycl::half* out0,
     sycl::half* out1,
     sycl::half* out2,
@@ -229,5 +228,4 @@ GemmStatus hgemm_qkv_group_bias(
     const int head_dim,
     const bool is_b_row_major);
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla

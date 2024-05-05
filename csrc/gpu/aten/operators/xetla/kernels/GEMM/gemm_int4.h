@@ -1,11 +1,10 @@
 #pragma once
 
-#include <utils/DPCPP.h>
+#include "../../GEMM_INT4.h"
 #include "../xetla.h"
 #include "epilogue_impl.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 using namespace gpu::xetla;
 
 template <
@@ -106,8 +105,7 @@ struct hgemm_wint4_func {
         gemm_arg;
   };
 
-  static inline void run(
-      sycl::queue& queue,
+  static inline cgf_t run(
       dtype_a* A,
       dtype_b* B,
       dtype_c* C,
@@ -138,11 +136,10 @@ struct hgemm_wint4_func {
 
     cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
 
-    auto cgf = DPCPP_Q_CGF(cgh) {
-      RunKernelFunctor<gemm_op_t> kfn(gemm_arg);
+    RunKernelFunctor<gemm_op_t> kfn(gemm_arg);
+    return [=](sycl::handler& cgh) {
       cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
     };
-    DPCPP_Q_SUBMIT(queue, cgf);
   }
 };
 
@@ -159,8 +156,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -200,8 +196,7 @@ inline void hgemm_wint4(
 
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -211,7 +206,7 @@ inline void hgemm_wint4(
       n,
       k,
       const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
+      const_cast<scalar_t*>(b_scale))};
 }
 
 template <
@@ -227,8 +222,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_bias_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -277,8 +271,7 @@ inline void hgemm_bias_wint4(
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -289,7 +282,7 @@ inline void hgemm_bias_wint4(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{const_cast<scalar_t*>(bias), {n, 1, n}}}});
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}}}})};
 }
 
 template <
@@ -305,8 +298,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_bias_gelu_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias_gelu_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -358,8 +350,7 @@ inline void hgemm_bias_gelu_wint4(
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -370,7 +361,7 @@ inline void hgemm_bias_gelu_wint4(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{const_cast<scalar_t*>(bias), {n, 1, n}}, {}}});
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}}, {}}})};
 }
 
 template <
@@ -386,8 +377,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_res_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_res_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -435,8 +425,7 @@ inline void hgemm_res_wint4(
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -447,7 +436,7 @@ inline void hgemm_res_wint4(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{const_cast<scalar_t*>(res), {n, m, n}}}});
+      {{{const_cast<scalar_t*>(res), {n, m, n}}}})};
 }
 
 template <
@@ -463,8 +452,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_mul_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -512,8 +500,7 @@ inline void hgemm_mul_wint4(
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -524,7 +511,7 @@ inline void hgemm_mul_wint4(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{const_cast<scalar_t*>(mul), {n, m, n}}}});
+      {{{const_cast<scalar_t*>(mul), {n, m, n}}}})};
 }
 
 template <
@@ -540,8 +527,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_bias_res_res_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias_res_res_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -603,8 +589,7 @@ inline void hgemm_bias_res_res_wint4(
   const data_type_b* b_alias = reinterpret_cast<const int4x2*>(b);
   const data_type_b* b_zp_alias = reinterpret_cast<const int4x2*>(b_zp);
 
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -617,7 +602,7 @@ inline void hgemm_bias_res_res_wint4(
       const_cast<scalar_t*>(b_scale),
       {{{const_cast<scalar_t*>(bias), {n, 1, n}},
         {const_cast<scalar_t*>(res0), {n, m, n}},
-        {const_cast<scalar_t*>(res1), {n, m, n}}}});
+        {const_cast<scalar_t*>(res1), {n, m, n}}}})};
 }
 
 template <
@@ -633,8 +618,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_qkv_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_qkv_wint4(
     scalar_t* out0,
     scalar_t* out1,
     scalar_t* out2,
@@ -687,43 +671,42 @@ inline void hgemm_qkv_wint4(
   }
   uint32_t zp_offset = group_num * n / 2;
   uint32_t scale_offset = group_num * n;
+  return {
 
-  hgemm_wint4_functor::run(
-      queue,
-      const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias),
-      out0,
-      acc_ptr,
-      cnt_ptr,
-      m,
-      n,
-      k,
-      const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale));
-  hgemm_wint4_functor::run(
-      queue,
-      const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + weight_offset),
-      out1,
-      acc_ptr,
-      cnt_ptr,
-      m,
-      n,
-      k,
-      const_cast<data_type_zp*>(b_zp_alias + zp_offset),
-      const_cast<scalar_t*>(b_scale + scale_offset));
-  hgemm_wint4_functor::run(
-      queue,
-      const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + 2 * weight_offset),
-      out2,
-      acc_ptr,
-      cnt_ptr,
-      m,
-      n,
-      k,
-      const_cast<data_type_zp*>(b_zp_alias + 2 * zp_offset),
-      const_cast<scalar_t*>(b_scale + 2 * scale_offset));
+      hgemm_wint4_functor::run(
+          const_cast<scalar_t*>(a),
+          const_cast<data_type_b*>(b_alias),
+          out0,
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k,
+          const_cast<data_type_zp*>(b_zp_alias),
+          const_cast<scalar_t*>(b_scale)),
+      hgemm_wint4_functor::run(
+          const_cast<scalar_t*>(a),
+          const_cast<data_type_b*>(b_alias + weight_offset),
+          out1,
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k,
+          const_cast<data_type_zp*>(b_zp_alias + zp_offset),
+          const_cast<scalar_t*>(b_scale + scale_offset)),
+      hgemm_wint4_functor::run(
+          const_cast<scalar_t*>(a),
+          const_cast<data_type_b*>(b_alias + 2 * weight_offset),
+          out2,
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k,
+          const_cast<data_type_zp*>(b_zp_alias + 2 * zp_offset),
+          const_cast<scalar_t*>(b_scale + 2 * scale_offset)),
+  };
 }
 
 template <
@@ -739,8 +722,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_qkv_bias_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_qkv_bias_wint4(
     scalar_t* out0,
     scalar_t* out1,
     scalar_t* out2,
@@ -801,46 +783,44 @@ inline void hgemm_qkv_bias_wint4(
   }
   uint32_t zp_offset = group_num * n / 2;
   uint32_t scale_offset = group_num * n;
-
-  hgemm_wint4_functor::run(
-      queue,
-      const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias),
-      out0,
-      acc_ptr,
-      cnt_ptr,
-      m,
-      n,
-      k,
-      const_cast<data_type_zp*>(b_zp_alias),
-      const_cast<scalar_t*>(b_scale),
-      {{{const_cast<scalar_t*>(bias), {n, 1, n}}}});
-  hgemm_wint4_functor::run(
-      queue,
-      const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + weight_offset),
-      out1,
-      acc_ptr,
-      cnt_ptr,
-      m,
-      n,
-      k,
-      const_cast<data_type_zp*>(b_zp_alias + zp_offset),
-      const_cast<scalar_t*>(b_scale + scale_offset),
-      {{{const_cast<scalar_t*>(bias + n), {n, 1, n}}}});
-  hgemm_wint4_functor::run(
-      queue,
-      const_cast<scalar_t*>(a),
-      const_cast<data_type_b*>(b_alias + 2 * weight_offset),
-      out2,
-      acc_ptr,
-      cnt_ptr,
-      m,
-      n,
-      k,
-      const_cast<data_type_zp*>(b_zp_alias + 2 * zp_offset),
-      const_cast<scalar_t*>(b_scale + 2 * scale_offset),
-      {{{const_cast<scalar_t*>(bias + 2 * n), {n, 1, n}}}});
+  return {
+      hgemm_wint4_functor::run(
+          const_cast<scalar_t*>(a),
+          const_cast<data_type_b*>(b_alias),
+          out0,
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k,
+          const_cast<data_type_zp*>(b_zp_alias),
+          const_cast<scalar_t*>(b_scale),
+          {{{const_cast<scalar_t*>(bias), {n, 1, n}}}}),
+      hgemm_wint4_functor::run(
+          const_cast<scalar_t*>(a),
+          const_cast<data_type_b*>(b_alias + weight_offset),
+          out1,
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k,
+          const_cast<data_type_zp*>(b_zp_alias + zp_offset),
+          const_cast<scalar_t*>(b_scale + scale_offset),
+          {{{const_cast<scalar_t*>(bias + n), {n, 1, n}}}}),
+      hgemm_wint4_functor::run(
+          const_cast<scalar_t*>(a),
+          const_cast<data_type_b*>(b_alias + 2 * weight_offset),
+          out2,
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k,
+          const_cast<data_type_zp*>(b_zp_alias + 2 * zp_offset),
+          const_cast<scalar_t*>(b_scale + 2 * scale_offset),
+          {{{const_cast<scalar_t*>(bias + 2 * n), {n, 1, n}}}}),
+  };
 }
 
 template <
@@ -856,8 +836,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_silu_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_silu_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -897,8 +876,7 @@ inline void hgemm_silu_wint4(
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -909,7 +887,7 @@ inline void hgemm_silu_wint4(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{}}});
+      {{{}}})};
 }
 
 template <
@@ -925,8 +903,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_silu_mul_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_silu_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -974,8 +951,7 @@ inline void hgemm_silu_mul_wint4(
 
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -986,7 +962,7 @@ inline void hgemm_silu_mul_wint4(
       k,
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
-      {{{}, {const_cast<scalar_t*>(mul), {n, m, n}}}});
+      {{{}, {const_cast<scalar_t*>(mul), {n, m, n}}}})};
 }
 
 template <
@@ -1002,8 +978,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_bias_silu_mul_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias_silu_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -1060,8 +1035,7 @@ inline void hgemm_bias_silu_mul_wint4(
 
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -1074,7 +1048,7 @@ inline void hgemm_bias_silu_mul_wint4(
       const_cast<scalar_t*>(b_scale),
       {{{const_cast<scalar_t*>(bias), {n, 1, n}},
         {},
-        {const_cast<scalar_t*>(mul), {n, m, n}}}});
+        {const_cast<scalar_t*>(mul), {n, m, n}}}})};
 }
 
 template <
@@ -1090,8 +1064,7 @@ template <
     int SYNC_FREQ,
     int STAGES,
     int ARCH>
-inline void hgemm_bias_add_wint4(
-    sycl::queue& queue,
+inline cgfs_t hgemm_bias_add_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
@@ -1149,8 +1122,7 @@ inline void hgemm_bias_add_wint4(
   const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
-  hgemm_wint4_functor::run(
-      queue,
+  return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
       const_cast<data_type_b*>(b_alias),
       out,
@@ -1162,8 +1134,7 @@ inline void hgemm_bias_add_wint4(
       const_cast<data_type_zp*>(b_zp_alias),
       const_cast<scalar_t*>(b_scale),
       {{{const_cast<scalar_t*>(bias), {n, 1, n}},
-        {const_cast<scalar_t*>(res), {n, m, n}}}});
+        {const_cast<scalar_t*>(res), {n, m, n}}}})};
 }
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla

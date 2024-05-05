@@ -184,6 +184,12 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
     DPCPP_EXCEP_CATCH                                                          \
   }
 
+// utility to submit a list of CGFs
+#define DPCPP_Q_SUBMIT_CGFS(q, cgfs, ...)    \
+  for (auto& cgf : (cgfs)) {                 \
+    DPCPP_Q_SUBMIT((q), cgf, ##__VA_ARGS__); \
+  }
+
 template <typename T>
 using dpcpp_info_t = typename T::return_type;
 

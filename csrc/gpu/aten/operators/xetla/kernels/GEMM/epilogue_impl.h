@@ -1,10 +1,8 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include "../xetla.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
 using namespace cl::sycl;
 using namespace gpu;
@@ -290,5 +288,4 @@ struct silu_op_t {
 
 } // namespace epilogue_impl
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla

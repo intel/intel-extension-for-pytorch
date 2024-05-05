@@ -1,11 +1,9 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include "../xetla.h"
 #include "kernel_attr.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
 template <typename T, typename Act_T>
 struct fwd_config_t {
@@ -724,7 +722,7 @@ hidden*/ (input_T*)i_weights + input_weight_offset, /*weights*/
 /// @param Queue sycl::queue
 /// @return
 template <typename gru_config_t>
-void gru_forward_impl(
+std::vector<std::function<void(sycl::handler&)>> gru_forward_impl(
     void* layer_ptr,
     void* hx_ptr,
     void* i_weights,
@@ -744,8 +742,7 @@ void gru_forward_impl(
     int input_size,
     int hidden_size,
     int sequence_size,
-    int layer_size,
-    cl::sycl::queue& Queue) {
+    int layer_size) {
   size_t M = batch_size;
   size_t N = hidden_size;
   using input_T = gru_config_t::input_T;
@@ -778,8 +775,9 @@ void gru_forward_impl(
   cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
   // launch kernels
+  std::vector<std::function<void(sycl::handler&)>> cgfs;
   for (int seq = 0; seq < sequence_size + layer_size - 1; seq++) {
-    auto cgf = DPCPP_Q_CGF(cgh) {
+    cgfs.push_back([=](sycl::handler& cgh) {
       GruForwardImplKernelFunctor<gru_config_t, input_T, Act_T, gru_op> kfn(
           layer_ptr,
           hx_ptr,
@@ -803,10 +801,9 @@ void gru_forward_impl(
           layer_size,
           seq);
       cgh.parallel_for<decltype(kfn)>(Range, kfn);
-    };
-    DPCPP_Q_SUBMIT(Queue, cgf);
+    });
   }
+  return cgfs;
 }
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla

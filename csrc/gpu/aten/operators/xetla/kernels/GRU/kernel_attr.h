@@ -2,8 +2,7 @@
 
 #include "../xetla.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
 class gru_base_config {
  public:
@@ -90,5 +89,4 @@ class m512k92n256_bpi : public gru_base_config {
   static constexpr uint32_t sg_tile_k = 32;
 };
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla

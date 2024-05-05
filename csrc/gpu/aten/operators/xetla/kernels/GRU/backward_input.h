@@ -1,11 +1,9 @@
 #pragma once
 
-#include <utils/DPCPP.h>
 #include "../xetla.h"
 #include "kernel_attr.h"
 
-namespace xpu {
-namespace xetla {
+namespace xpu::xetla {
 
 template <typename T>
 struct bpi_config_t {
@@ -847,7 +845,7 @@ struct GruBackwardDataImplKernelFunctor {
 
 // extern "C"
 template <typename gru_bpi_config_t>
-void gru_backward_data_impl(
+cgfs_t gru_backward_data_impl(
     void* layer_err_ptr,
     void* y_err_ptr,
     void* x_grad_ptr,
@@ -868,8 +866,7 @@ void gru_backward_data_impl(
     int hidden_size,
     int sequence_length,
     int layer_size,
-    float dropout,
-    cl::sycl::queue& Queue) {
+    float dropout) {
   static size_t wg_tile_m = gru_bpi_config_t::wg_tile_m;
   static size_t wg_tile_n_0 = gru_bpi_config_t::wg_tile_n_0;
   static size_t wg_tile_n_1 = gru_bpi_config_t::wg_tile_n_1;
@@ -894,33 +891,31 @@ void gru_backward_data_impl(
       (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0};
   cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    GruBackwardDataImplKernelFunctor<gru_bpi_config_t, input> kfn(
-        layer_err_ptr,
-        y_err_ptr,
-        x_grad_ptr,
-        bpi0_ptr,
-        bpi1_ptr,
-        partial_grad_ptr,
-        x0_grad_ptr,
-        reset_gate_ptr,
-        input_gate_ptr,
-        new_gate_ptr,
-        hgate_2_ptr,
-        hidden_ptr,
-        i_weights,
-        h_weights,
-        mask_ptr,
-        batch_size,
-        input_size,
-        hidden_size,
-        sequence_length,
-        layer_size,
-        dropout);
-    cgh.parallel_for<decltype(kfn)>(Range, kfn);
+  GruBackwardDataImplKernelFunctor<gru_bpi_config_t, input> kfn(
+      layer_err_ptr,
+      y_err_ptr,
+      x_grad_ptr,
+      bpi0_ptr,
+      bpi1_ptr,
+      partial_grad_ptr,
+      x0_grad_ptr,
+      reset_gate_ptr,
+      input_gate_ptr,
+      new_gate_ptr,
+      hgate_2_ptr,
+      hidden_ptr,
+      i_weights,
+      h_weights,
+      mask_ptr,
+      batch_size,
+      input_size,
+      hidden_size,
+      sequence_length,
+      layer_size,
+      dropout);
+  return {
+      [=](sycl::handler& cgh) { cgh.parallel_for<decltype(kfn)>(Range, kfn); },
   };
-  DPCPP_Q_SUBMIT(Queue, cgf);
 }
 
-} // namespace xetla
-} // namespace xpu
+} // namespace xpu::xetla

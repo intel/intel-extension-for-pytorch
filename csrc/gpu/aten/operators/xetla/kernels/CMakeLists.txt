@@ -1,10 +1,13 @@
 set(TARGET xetla_kernels)
-set(IPEX_INCLUDE_DIRS
-        ${SYCL_INCLUDE_DIR}
-        ${IPEX_GPU_ROOT_DIR}
-        ${IPEX_GPU_ATEN_SRC_DIR}
-        ${IPEX_CSRC_ROOT_DIR}
-        ${BUILD_IPEX_GPU_ATEN_GENERATED})
+
+set(XETLA_AVAILABLE_ARCHS xe_hpc xe_hpg xe_lpg)
+string(REPLACE "," ";" USE_XETLA ${USE_XETLA})
+# set true value to all available archs ; set false value to empty list
+if("${USE_XETLA}")  # A quoted string always evaluates to false unless: The string's value is one of the true constants
+  set(USE_XETLA ${XETLA_AVAILABLE_ARCHS})
+elseif(NOT USE_XETLA) # if(<variable>): True if given a variable that is defined to a value that is not a false constant
+  set(USE_XETLA "")
+endif()
 
 # link openblas
 set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS}
@@ -30,8 +33,39 @@ set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -DPASTokenReduct
 
 set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs )
 
+foreach(used_arch IN LISTS USE_XETLA)
+  foreach(available_arch IN LISTS XETLA_AVAILABLE_ARCHS)
+    if (used_arch STREQUAL available_arch)
+      string(TOUPPER "${used_arch}" arch_upper)
+      set(USE_XETLA_${arch_upper} ON)
+      message(STATUS "XeTLA: Found arch from list: ${arch_upper}")
+      break()
+    endif()
+  endforeach()
+  if (NOT USE_XETLA_${arch_upper})
+    message(FATAL_ERROR "Unexpected XeTLA architecture: ${used_arch}")
+  endif()
+endforeach()
+
 if (USE_AOT_DEVLIST)
-  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-device pvc -options '${XETLA_OFFLINE_OPTIONS}'")
+  # Disable implementations for architectures not in USE_AOT_DEVLIST
+  function (disable_architecture_by_aot ARCH REGULAR_EXPRESSION)
+    string(REGEX MATCHALL ${REGULAR_EXPRESSION} USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST}")
+    message(STATUS "XeTLA: USE_AOT_DEVLIST_${ARCH}: ${USE_AOT_DEVLIST_${ARCH}}")
+    if("${USE_AOT_DEVLIST_${ARCH}}" STRLESS_EQUAL "")
+      set(USE_XETLA_${ARCH} OFF PARENT_SCOPE)
+    endif()
+  endfunction()
+  disable_architecture_by_aot(XE_HPC "(pvc|xe-hpc)")
+  disable_architecture_by_aot(XE_HPG "(ats-m150|acm-g10|acm-g11|acm-g12|xe-hpg)")
+  disable_architecture_by_aot(XE_LPG "(mtl-m|mtl-s|mtl-p|xe-lpg|0x7d55|0x7dd5|0x7d57|0x7dd7)")
+
+  set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST}")
+  if (USE_XETLA_XE_HPC)  # Temporary fix as AOT fails of try to compile XE_HPC kernels for ats-m150 etc
+    set(XETLA_USE_AOT_DEVLIST "pvc")
+  endif()
+  message(STATUS "XeTLA: XETLA_USE_AOT_DEVLIST: ${XETLA_USE_AOT_DEVLIST}")
+  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-device ${XETLA_USE_AOT_DEVLIST} -options '${XETLA_OFFLINE_OPTIONS}'")
 else()
   set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "${XETLA_OFFLINE_OPTIONS}")
 endif()
@@ -52,14 +86,28 @@ endif()
 FILE(GLOB_RECURSE kernels_src *.cpp)
 add_library(${TARGET} SHARED ${kernels_src})
 
-target_include_directories(${TARGET} PUBLIC ${XETLA_INCLUDE_DIR} )
-# suppress warnings inside aten by setting it as a system include directory
-target_include_directories(${TARGET} SYSTEM PUBLIC ${TORCH_INCLUDE_DIRS})
-target_include_directories(${TARGET} PUBLIC ${IPEX_INCLUDE_DIRS} )
+target_include_directories(${TARGET} PUBLIC ${XETLA_INCLUDE_DIR})
+target_include_directories(${TARGET} PUBLIC ${TORCH_INCLUDE_DIRS})
+target_link_libraries(${TARGET} PUBLIC ${GPU_TORCH_LIBS})
+
+# Set visibility to hidden to close the differences of Windows & Linux
+set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+target_compile_definitions(${TARGET} PRIVATE BUILD_XETLA_KERNEL_LIB)
+
+# Feature flag macros should be public for uses in its dependent libraries
+target_compile_definitions(${TARGET} PUBLIC USE_XETLA)
+foreach(available_arch IN LISTS XETLA_AVAILABLE_ARCHS)
+  string(TOUPPER ${available_arch} ARCH)
+  if(USE_XETLA_${ARCH})
+    message(STATUS "XeTLA: USE_XETLA_${ARCH} enabled.")
+    target_compile_definitions(${TARGET} PUBLIC "USE_XETLA_${ARCH}")
+  else()
+    message(STATUS "XeTLA: USE_XETLA_${ARCH} disabled.")
+  endif()
+endforeach()
 
 target_link_options(${TARGET} PRIVATE ${XETLA_KERNEL_FLAGS})
+target_compile_options(${TARGET} PRIVATE -fsycl)
 if (USE_AOT_DEVLIST)
-  target_compile_options(${TARGET} PRIVATE -fsycl -fsycl-targets=spir64_gen)
-else()
-  target_compile_options(${TARGET} PRIVATE -fsycl)
+  target_compile_options(${TARGET} PRIVATE -fsycl-targets=spir64_gen)
 endif()
