@@ -188,7 +188,7 @@ class TestNNMethod(TestCase):
         self.assertEqual(v.grad, v_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
         self.assertEqual(g.grad, g_xpu.grad.cpu(), atol=1e-3, rtol=1e-5)
 
-    def test_weight_norm_differnt_type(self):
+    def test_weight_norm_different_type(self):
         v = torch.randn(8193, 8193).requires_grad_(True)
         g = torch.randn(8193).to(torch.float).requires_grad_(True)
         gw = torch.randn(8193, 8193)
