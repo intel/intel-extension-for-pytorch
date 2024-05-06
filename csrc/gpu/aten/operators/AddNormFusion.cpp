@@ -12,6 +12,14 @@ using namespace at::AtenIpexTypeXPU::normalization;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+// Decalre the rms_norm_fwd from RMSNorm.cpp for naive implementation fallback
+std::tuple<Tensor, Tensor> rms_norm_fw(
+    const Tensor& input,
+    at::IntArrayRef normalized_shape,
+    const Tensor& weight,
+    double epsilon);
+
 namespace impl {
 
 constexpr int float4_size = sizeof(float) * 4;
@@ -59,13 +67,11 @@ struct FusedNormKernel1Functor {
     vec_t X_val[Num];
     accscalar_t sum1 = 0;
     accscalar_t sum2 = 0;
-
     for (int i = 0; i < Num; ++i) {
       index_t plane_offset = (i * workgroup_size + local_id) * vec_size;
       if (plane_offset < Plane) {
         X_val[i] =
             *(reinterpret_cast<vec_t*>(X_data + group_offset + plane_offset));
-
         if (add1_data != nullptr && add2_data != nullptr) {
           vec_t add1_val = *(reinterpret_cast<vec_t*>(
               add1_data + group_offset + plane_offset));
@@ -356,7 +362,6 @@ void launch_vectorized_fused_norm_kernel1(
       }                                                                        \
     }                                                                          \
   }
-
   switch (vec_size) {
     case 8: {
       vectorized_fused_norm_kernel1(8);
@@ -406,6 +411,10 @@ bool LayerNormKernelImplInternal(
   int vec_size = max_vec_size;
   while ((vec_size >> 1) * workgroup_size >= N) {
     vec_size = vec_size >> 1;
+  }
+  // fallback if N is not divisible for vec_size
+  if (N % vec_size != 0) {
+    return false;
   }
   scalar_t* X_data = X.data_ptr<scalar_t>();
   scalar_t* Y_data = Y.data_ptr<scalar_t>();
@@ -514,10 +523,22 @@ Tensor add_add_layer_norm(
       }
     }
     if (!(can_be_fused && fast_path_success)) {
-      Tensor mean, rstd;
-      std::tuple<Tensor, Tensor, Tensor>(output, mean, rstd) =
-          at::AtenIpexTypeXPU::native_layer_norm(
-              input_, normalized_shape, weight_opt, bias_opt, epsilon);
+      if (add1.defined() && add2.defined()) {
+        if (add_back) {
+          add1.add_(input_).add_(add2);
+          input_ = add1;
+        } else {
+          input_ = input_ + add1 + add2;
+        }
+      } else if (add1.defined()) {
+        if (add_back) {
+          add1.add_(input_);
+          input_ = add1;
+        } else
+          input_ = add1 + input_;
+      }
+      output = std::get<0>(at::AtenIpexTypeXPU::native_layer_norm(
+          input_, normalized_shape, weight_opt, bias_opt, epsilon));
     }
   }
   return output.reshape(input.sizes());
@@ -580,7 +601,6 @@ Tensor add_add_rms_norm(
       impl::fast_check_layer_norm_inputs(input, normalized_shape, weight, bias);
   auto M = M_N.first;
   auto N = M_N.second;
-
   int numel = input.numel();
   Tensor output = at::empty(input.sizes(), input.options());
   if (input.numel()) {
@@ -599,12 +619,23 @@ Tensor add_add_rms_norm(
         fast_path_success = impl::LayerNormKernelImpl<true, false>(
             add1, add2, input_, weight_, bias_, M, N, epsilon, output);
     }
-
     if (!(can_be_fused && fast_path_success)) {
-      Tensor mean, rstd;
-      std::tuple<Tensor, Tensor, Tensor>(output, mean, rstd) =
-          at::AtenIpexTypeXPU::native_layer_norm(
-              input_, normalized_shape, weight_opt, bias_opt, epsilon);
+      if (add1.defined() && add2.defined()) {
+        if (add_back) {
+          add1.add_(input_).add_(add2);
+          input_ = add1;
+        } else {
+          input_ = input_ + add1 + add2;
+        }
+      } else if (add1.defined()) {
+        if (add_back) {
+          add1.add_(input_);
+          input_ = add1;
+        } else
+          input_ = add1 + input_;
+      }
+      output =
+          std::get<0>(rms_norm_fw(input_, normalized_shape, weight_, epsilon));
     }
   }
   return output.reshape(input.sizes());

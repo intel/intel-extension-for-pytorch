@@ -3150,9 +3150,13 @@ class TestNNMethod(TestCase):
         x_xpu = x.to("xpu").to(torch.float16)
         a_xpu = a.to("xpu").to(torch.float16)
         out = x_xpu.clone()
+        out_tanh = x_xpu.clone()
         ref = torch.nn.functional.gelu(x) * a
         torch.ops.torch_ipex.gelu_mul(x_xpu, a_xpu, out, "none")
+        ref_tanh = torch.nn.functional.gelu(x, approximate="tanh") * a
+        torch.ops.torch_ipex.gelu_mul(x_xpu, a_xpu, out_tanh, "tanh")
         self.assertEqual(ref, out.to("cpu").float(), atol=1e-3, rtol=1e-3)
+        self.assertEqual(ref_tanh, out_tanh.to("cpu").float(), atol=1e-3, rtol=1e-3)
 
     def test_linear_binary_min_fusion(self, dtype=torch.float):
         x = torch.randn([2, 4], device=cpu_device)

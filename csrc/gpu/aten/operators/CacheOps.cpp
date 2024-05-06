@@ -42,8 +42,8 @@ void swap_blocks(
   } else {
     TORCH_CHECK(false, "Invalid device combination");
   }
-  void* src_ptr = src.data_ptr();
-  void* dst_ptr = dst.data_ptr();
+  char* src_ptr = static_cast<char*>(src.data_ptr());
+  char* dst_ptr = static_cast<char*>(dst.data_ptr());
   const int64_t block_size = src.element_size() * src[0].numel();
   int64_t* block_map_data = block_map.data_ptr<int64_t>();
   int pair_number = block_map.size(0);
@@ -52,7 +52,7 @@ void swap_blocks(
     int64_t dst_block_number = block_map_data[i * 2 + 1];
     int64_t src_offset = src_block_number * block_size;
     int64_t dst_offset = dst_block_number * block_size;
-    dpcppMemcpy(dst_ptr, src_ptr, block_size, cpy_kind);
+    dpcppMemcpy(dst_ptr + dst_offset, src_ptr + src_offset, block_size, cpy_kind);
   }
   return;
 }

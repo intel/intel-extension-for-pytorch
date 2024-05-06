@@ -74,8 +74,9 @@ struct gelu_tanh_mul_dpcpp_funcor {
     constexpr accscalar_t kKappa = 0.044715;
     auto x_cube = accscalar_t(a) * accscalar_t(a) * accscalar_t(a);
     auto inner = kBeta * (accscalar_t(a) + kKappa * x_cube);
-    return accscalar_t(0.5) * accscalar_t(a) *
-        (accscalar_t(1) + Numerics<accscalar_t>::tanh(inner));
+    return (accscalar_t(0.5) * accscalar_t(a) *
+            (accscalar_t(1) + Numerics<accscalar_t>::tanh(inner))) *
+        accscalar_t(b);
   }
 };
 
