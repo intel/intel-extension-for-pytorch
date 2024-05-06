@@ -58,6 +58,10 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16).
 We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
+In addition, Intel® Extension for PyTorch* introduces module level optimization APIs (prototype feature) since release 2.3.0.
+The feature provides optimized alternatives for several commonly used LLM modules and functionalities for the optimizations of the niche or customized LLMs.
+Please read [**LLM module level optimization practice**](./examples/cpu/inference/python/llm-modeling) to better understand how to optimize your own LLM and achieve better performance.
+
 ## Support
 
 The team tracks bugs and enhancement requests using [GitHub issues](https://github.com/intel/intel-extension-for-pytorch/issues/). Before submitting a suggestion or bug report, search the existing GitHub issues to see if your issue has already been reported.

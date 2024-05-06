@@ -2,7 +2,7 @@
 
 * Notes
 
-  If you use linux kernerl under version 5.4 in host, upgrade it.
+  If you use linux kernel under version 5.4 in host, upgrade it.
 
 * How to build an image
 

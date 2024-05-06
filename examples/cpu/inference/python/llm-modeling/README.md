@@ -1,15 +1,15 @@
-# 1. LLM Optimization Overview
+﻿# 1. LLM Module Level Optimizations Overview
 
-ipex.llm provides dedicated optimization for running Large Language Models (LLM) faster, including technical points like paged attention, ROPE fusion, etc. 
-To further provide optimized modules or functions to help build modelings, ipex supports the following module/function level APIs:
+Intel® Extension for PyTorch* provides dedicated optimization for running Large Language Models (LLMs) faster, including technical points like paged attention, ROPE fusion, etc. 
+To further provide optimized modules or functions to help build modelings, `ipex.llm` supports the following module/function level APIs:
 
-```
+```python
 import intel_extension_for_pytorch as ipex
 ```
 
-### linear post-op fusions
-```
-#using module init and forward
+## Linear post-op fusions
+```python
+# using module init and forward
 ipex.llm.modules.linearMul
 ipex.llm.modules.linearGelu
 ipex.llm.modules.linearNewGelu
@@ -21,9 +21,9 @@ ipex.llm.modules.linear2SiluMul
 ipex.llm.modules.linearRelu
 ```
 
-###  Attention related fusions 
-```
-#using module init and forward
+##  Attention related fusions 
+```python
+# using module init and forward
 ipex.llm.modules.RotaryEmbedding
 ipex.llm.modules.RMSNorm
 ipex.llm.modules.FastLayerNorm
@@ -31,17 +31,18 @@ ipex.llm.modules.VarlenAttention
 ipex.llm.modules.PagedAttention
 ipex.llm.modules.IndirectAccessKVCacheAttention
 
-#using as functions
+# using as functions
 ipex.llm.functional.rotary_embedding
 ipex.llm.functional.rms_norm
 ipex.llm.functional.fast_layer_norm
 ipex.llm.functional.indirect_access_kv_cache_attention
 ipex.llm.functional.varlen_attention
-
 ```
 
-### Generation related fusions 
-```
+## Generation related fusions
+```python
+# using for optimizing huggingface generation APIs with prompt sharing
+ipex.llm.generation.hf_beam_sample
 ipex.llm.generation.hf_beam_search
 ipex.llm.generation.hf_greedy_search
 ipex.llm.generation.hf_sample
@@ -49,39 +50,21 @@ ipex.llm.generation.hf_sample
 
 <br>
 
-# 2. Show cases of ipex.llm optimized modules and functions based modeling
-We provide LLAMA, GPTJ and OPT modeling as show cases that apply the optimized modules or functions from ipex.llm layers.
+# 2. Showcases of ipex.llm optimized modules and functions based modeling
 
-| MODEL FAMILY | MODEL NAME (Huggingface hub) |
-|:---:|:---:|
-|LLAMA| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", etc. |
-|GPT-J| "EleutherAI/gpt-j-6b", etc. |
-|OPT| "facebook/opt-30b", "facebook/opt-1.3b", etc. |
+We provide optimized LLAMA, GPT-J and OPT modeling files on the basis of [huggingface modeling APIs](https://huggingface.co/docs/transformers/en/main_classes/model) and a entry script `run.py` as showcases that apply the optimized modules or functions from `ipex.llm`.
 
-## How To Run LLM with ipex.llm
+## Running example script
 
-**ipex.llm provides a single script to facilitate running generation tasks as below:**
-Note that please setup ENV according to the ../llm/README.md
+Please refer to the [instructions](../llm/README.md#3-environment-setup) for environment setup.
 
-```
-python run.py --help # for more detailed usages
+The detail usage of `run.py` can be obtained by running
+
+```bash
+python run.py --help
 ```
 
-| Key args of run.py | Notes |
-|---|---|
-| model name | use "-m MODEL_NAME" to choose models to run |
-| generation | default: beam search (beam size = 4), "--greedy" for greedy search |
-| input tokens | default: 32, provide fixed sizes for input prompt size, use "--input-tokens" for [32, 64, 128, 256, 512, 1024, 2016, 2017, 2048, 4096, 8192]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
-| output tokens | default: 32, use "--max-new-tokens" to choose any other size |
-| batch size |  default: 1, use "--batch-size" to choose any other size |
-| generation iterations |  use "--num-iter" and "--num-warmup" to control the repeated iterations of generation, default: 100-iter/10-warmup |
-| ipex prepack | apply ipex weight prepack optimization by "--use-ipex-optimize"|
-| profiling | enable pytorch profiling by " --profile"|
-
-*Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
-
-
-## Run commands
+Example commands are listed below:
 
 ```bash
 # The following "OMP_NUM_THREADS" and "numactl" settings are based on the assumption that
@@ -89,9 +72,118 @@ python run.py --help # for more detailed usages
 # Please adjust the settings per your hardware.
 
 # Running FP32 model
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  -m meta-llama/Llama-2-7b-hf --dtype float32  --use-ipex-optimize
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  -m meta-llama/Llama-2-7b-hf --dtype float32
 
 # Running BF16 model
-OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  -m meta-llama/Llama-2-7b-hf --dtype bfloat16 --use-ipex-optimize
-
+OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  -m meta-llama/Llama-2-7b-hf --dtype bfloat16
 ```
+
+*Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
+
+<br>
+
+# 3. Optimize your own LLM with ipex.llm
+
+## Changes required in the modeling file
+
+The changes required for applying `ipex.llm` optimizations for the customized LLMs are highly diverse based on their respective model architectures and implementations.
+Generally speaking, the key steps would be:
+
+1. Analyze the model to find out the parts that are suitable for utilizing the optimizations.
+
+2. Re-write these parts, applying the optimized `ipex.llm` operators.
+
+3. Some refactor of model architecture definition may be required to connect the original and optimized modules.
+
+## Changes required in the inference entry script
+
+Some key updates are required in the LLM inference entry script:
+
+1. Optimization for linear modules and their fusions: realized by weight prepacking with `ipex.optimize()`.
+
+```python
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+    _enable_tpp,
+    _disable_tpp,
+)
+
+_disable_tpp()
+if args.dtype == "bfloat16":
+    _enable_tpp()
+    model = ipex.optimize(model.eval(), dtype=torch.bfloat16, inplace=True)
+else:
+    model = ipex.optimize(
+        model.eval(),
+        dtype=torch.float32,
+        inplace=True,
+        auto_kernel_selection=True,
+    )
+```
+
+*Note:* The example is for FP32/BF16 optimization.
+Please refer to [Advanced Usage](#4-advanced-usage) part for weight only quantization enabling.
+
+2. Optimizations for [the huggingface text generation API](https://huggingface.co/docs/transformers/en/main_classes/text_generation):
+
+- Using `ipex.llm.generation` functions to get prompt sharing for first token acceleration when `num_beams > 1`.
+
+```python
+# Taking beam search as example here, please check complete code updates in run.py
+hf_beam_search = ipex.llm.generation.hf_beam_search.__get__(model, model.__class__)
+setattr(model, "beam_search", hf_beam_search)
+```
+
+- Using PyTorch jit to further reduce dispatch overhead for first token and next tokens acceleration.
+
+```python
+# Please create a dummy `sample_inputs` in advance 
+# as the example input for jit.trace()
+with torch.no_grad(), torch.cpu.amp.autocast(enabled=amp_enabled):
+    trace_model = torch.jit.trace(
+        model,
+        example_kwarg_inputs=sample_inputs,
+        strict=False,
+        check_trace=False,
+    )
+    trace_model = torch.jit.freeze(trace_model)
+    model = ipex._set_optimized_model_for_generation(
+        model, optimized_model=trace_model
+    )
+```
+
+Please read `run.py` and the example modeling files for detail of the changes.
+The key parts are highlighted with comments.
+
+<br>
+
+# 4. Advanced usage
+
+## How to apply weight only quantization int8
+
+Intel® Extension for PyTorch* also provides weight only quantization for int8 precision optimization
+(replace the part using `ipex.optimize()`, which is for fp32/bf16 optimization in above showcases).
+
+```python
+from intel_extension_for_pytorch.quantization import WoqWeightDtype
+from intel_extension_for_pytorch.quantization import prepare, convert
+weight_dtype = WoqWeightDtype.INT8 # weight dtype is int8
+lowp_mode = ipex.quantization.WoqLowpMode.BF16 # lowest precision for computation
+qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+    weight_dtype=weight_dtype,
+    lowp_mode=lowp_mode,
+    group_size= -1, # default is -1, can be further tuned in [32, 64, 128, 256, 512] (recommend) for better accuracy if needed
+)
+prepared_model = prepare(model, qconfig)
+with torch.no_grad(), torch.cpu.amp.autocast(enabled=True): # we recommend to use quantization with AMP for better perf
+    converted_model = convert(prepared_model).to(torch.bfloat16)
+```
+
+<br>
+
+# 5. Miscellaneous Tips
+
+- For LLMs, usually the query, key and value linear operations in Attention layer can be fused into one linear as kind of concat linear optimization. (e.g., [modeling_gpt_neox](https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt_neox/modeling_gpt_neox.py#L175) from transformers)
+ 
+- LLM generation tasks are based on the [assumption](https://huggingface.co/blog/how-to-generate) that the probability distribution of a word sequence can be decomposed into the product of conditional next word distributions.
+Thus the model's computation of `lm_head` layer during the first token's generation can be reduced with using last token as its inputs (instead of using the full tokens from input prompt).
+The showcases we provide contain such optimization (set with `lm_head_generation` flag). This is also optimized in LLM serving [text-generation-inference](https://github.com/huggingface/text-generation-inference/blob/main/server/text_generation_server/models/custom_modeling/flash_llama_modeling.py#L419).

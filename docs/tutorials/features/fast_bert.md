@@ -9,7 +9,7 @@ Currently `ipex.fast_bert` API is only well optimized for training. For inferenc
 
 ### Prerequisite
 
-- Transformers 4.6.0 ~ 4.31.0
+- Transformers 4.6.0 ~ 4.38.1
 
 ### Usage Example
 
