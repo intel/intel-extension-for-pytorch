@@ -119,7 +119,10 @@ void launch_vec_kernel_Lamb(
 
   auto param_norm_sum = at::sum(param_norm_tensor).item().to<float>();
   auto rtw_norm_sum = at::sum(rtw_norm_tensor).item().to<float>();
-  float true_ratio = std::sqrt(param_norm_sum) / std::sqrt(rtw_norm_sum);
+  float true_ratio = 1;
+  if (param_norm_sum != 0 && rtw_norm_sum != 0) {
+    true_ratio = std::sqrt(param_norm_sum) / std::sqrt(rtw_norm_sum);
+  }
 
   at::TensorIterator update_iter = TensorIteratorConfig()
                                        .add_output(weight)
