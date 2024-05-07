@@ -65,8 +65,8 @@
 <li class="toctree-l4"><a class="reference internal" href="#installation-of-intel-oneccl-bindings-for-pytorch">Installation of Intel® oneCCL Bindings for Pytorch*</a><ul>
 <li class="toctree-l5"><a class="reference internal" href="#install-pytorch-and-intel-extension-for-pytorch">Install PyTorch and Intel® Extension for PyTorch*</a></li>
 <li class="toctree-l5"><a class="reference internal" href="#install-intel-oneccl-bindings-for-pytorch">Install Intel® oneCCL Bindings for Pytorch*</a><ul>
-<li class="toctree-l6"><a class="reference internal" href="#install-from-source">Install from source:</a></li>
-<li class="toctree-l6"><a class="reference internal" href="#install-from-prebuilt-wheel">Install from prebuilt wheel:</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#recommended-install-from-prebuilt-wheels">[Recommended] Install from prebuilt wheels</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#install-from-source">Install from source</a></li>
 </ul>
 </li>
 <li class="toctree-l5"><a class="reference internal" href="#runtime-dynamic-linking">Runtime Dynamic Linking</a></li>
@@ -146,7 +146,7 @@
 <h1>DistributedDataParallel (DDP)<a class="headerlink" href="#distributeddataparallel-ddp" title="Permalink to this heading"></a></h1>
 <section id="introduction">
 <h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">DistributedDataParallel</span> <span class="pre">(DDP)</span></code> is a PyTorch* module that implements multi-process data parallelism across multiple GPUs and machines. With DDP, the model is replicated on every process, and each model replica is fed a different set of input data samples. DDP enables overlapping between gradient communication and gradient computations to speed up training. Please refer to <a class="reference external" href="https://pytorch.org/tutorials/intermediate/ddp_tutorial.html">DDP Tutorial</a> for an introduction to DDP.</p>
+<p><code class="docutils literal notranslate"><span class="pre">DistributedDataParallel</span> <span class="pre">(DDP)</span></code> is a PyTorch* module that implements multi-process data parallelism across multiple GPUs and machines. With DDP, the model is replicated on every process, and each model replica is fed a different set of input data samples. Please refer to <a class="reference external" href="https://pytorch.org/tutorials/intermediate/ddp_tutorial.html">DDP Tutorial</a> for an introduction to DDP.</p>
 <p>The PyTorch <code class="docutils literal notranslate"><span class="pre">Collective</span> <span class="pre">Communication</span> <span class="pre">(c10d)</span></code> library supports communication across processes. To run DDP on GPU, we use Intel® oneCCL Bindings for Pytorch* (formerly known as torch-ccl) to implement the PyTorch c10d ProcessGroup API (https://github.com/intel/torch-ccl). It holds PyTorch bindings maintained by Intel for the Intel® oneAPI Collective Communications Library* (oneCCL), a library for efficient distributed deep learning training implementing such collectives as <code class="docutils literal notranslate"><span class="pre">allreduce</span></code>, <code class="docutils literal notranslate"><span class="pre">allgather</span></code>, and <code class="docutils literal notranslate"><span class="pre">alltoall</span></code>. Refer to <a class="reference external" href="https://github.com/oneapi-src/oneCCL">oneCCL Github page</a> for more information about oneCCL.</p>
 </section>
 <section id="installation-of-intel-oneccl-bindings-for-pytorch">
@@ -155,54 +155,25 @@
 <section id="install-pytorch-and-intel-extension-for-pytorch">
 <h3>Install PyTorch and Intel® Extension for PyTorch*<a class="headerlink" href="#install-pytorch-and-intel-extension-for-pytorch" title="Permalink to this heading"></a></h3>
 <p>Make sure you have installed PyTorch and Intel® Extension for PyTorch* successfully.
-For more detailed information, check <a class="reference external" href="../../../../index.html#installation">installation guide</a>.</p>
+For more detailed information, check <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu">Installation Guide</a>.</p>
 </section>
 <section id="install-intel-oneccl-bindings-for-pytorch">
 <h3>Install Intel® oneCCL Bindings for Pytorch*<a class="headerlink" href="#install-intel-oneccl-bindings-for-pytorch" title="Permalink to this heading"></a></h3>
-<section id="install-from-source">
-<h4>Install from source:<a class="headerlink" href="#install-from-source" title="Permalink to this heading"></a></h4>
-<p>Installation for CPU:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/intel/torch-ccl.git<span class="w"> </span>-b<span class="w"> </span>v2.1.0+cpu
-<span class="nb">cd</span><span class="w"> </span>torch-ccl
-git<span class="w"> </span>submodule<span class="w"> </span>sync
-git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>--recursive
-python<span class="w"> </span>setup.py<span class="w"> </span>install
-</pre></div>
-</div>
-<p>Installation for GPU:</p>
-<ul class="simple">
-<li><p>Clone the <code class="docutils literal notranslate"><span class="pre">oneccl_bindings_for_pytorch</span></code></p></li>
-</ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/intel/torch-ccl.git<span class="w"> </span>-b<span class="w"> </span>v2.1.300+xpu
-<span class="nb">cd</span><span class="w"> </span>torch-ccl
-git<span class="w"> </span>submodule<span class="w"> </span>sync<span class="w"> </span>
-git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>--recursive
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>Install <code class="docutils literal notranslate"><span class="pre">oneccl_bindings_for_pytorch</span></code></p></li>
-</ul>
-<p>Option 1: build with oneCCL from third party</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">COMPUTE_BACKEND</span><span class="o">=</span>dpcpp<span class="w"> </span>python<span class="w"> </span>setup.py<span class="w"> </span>install
-</pre></div>
-</div>
-<p>Option 2: build without oneCCL and use oneCCL in system (Recommend)</p>
-<p>We recommend to use apt/yum/dnf to install the oneCCL package. Refer to <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html">Base Toolkit Installation</a> for adding the APT/YUM/DNF key and sources for first-time users.</p>
+<section id="recommended-install-from-prebuilt-wheels">
+<h4>[Recommended] Install from prebuilt wheels<a class="headerlink" href="#recommended-install-from-prebuilt-wheels" title="Permalink to this heading"></a></h4>
+<ol class="simple">
+<li><p>Install oneCCL package:</p></li>
+</ol>
+<p>We recommend using apt/yum/dnf to install the oneCCL package. Refer to <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html">Base Toolkit Installation</a> for adding the APT/YUM/DNF key and sources for first-time users.</p>
 <p>Reference commands:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>intel-oneapi-ccl-devel<span class="o">=</span><span class="m">2021</span>.11.1-6
-sudo<span class="w"> </span>yum<span class="w"> </span>install<span class="w"> </span>intel-oneapi-ccl-devel<span class="o">=</span><span class="m">2021</span>.11.1-6
-sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>intel-oneapi-ccl-devel<span class="o">=</span><span class="m">2021</span>.11.1-6
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>intel-oneapi-ccl-devel<span class="o">=</span><span class="m">2021</span>.12.0-309
+sudo<span class="w"> </span>yum<span class="w"> </span>install<span class="w"> </span>intel-oneapi-ccl-devel<span class="o">=</span><span class="m">2021</span>.12.0-309
+sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>intel-oneapi-ccl-devel<span class="o">=</span><span class="m">2021</span>.12.0-309
 </pre></div>
 </div>
-<p>Compile with commands below.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">INTELONEAPIROOT</span><span class="o">=</span>/opt/intel/oneapi
-<span class="nv">USE_SYSTEM_ONECCL</span><span class="o">=</span>ON<span class="w"> </span><span class="nv">COMPUTE_BACKEND</span><span class="o">=</span>dpcpp<span class="w"> </span>python<span class="w"> </span>setup.py<span class="w"> </span>install
-</pre></div>
-</div>
-</section>
-<section id="install-from-prebuilt-wheel">
-<h4>Install from prebuilt wheel:<a class="headerlink" href="#install-from-prebuilt-wheel" title="Permalink to this heading"></a></h4>
-<p>Prebuilt wheel files for CPU, GPU with generic Python* and GPU with Intel® Distribution for Python* are released in separate repositories.</p>
+<ol class="simple">
+<li><p>Install <code class="docutils literal notranslate"><span class="pre">oneccl_bindings_for_pytorch</span></code></p></li>
+</ol>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Generic Python* for CPU</span>
 <span class="n">REPO_URL</span><span class="p">:</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">pytorch</span><span class="o">-</span><span class="n">extension</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">release</span><span class="o">-</span><span class="n">whl</span><span class="o">/</span><span class="n">stable</span><span class="o">/</span><span class="n">cpu</span><span class="o">/</span><span class="n">us</span><span class="o">/</span>
 <span class="c1"># Generic Python* for GPU</span>
@@ -214,24 +185,18 @@ sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> <
 </pre></div>
 </div>
 </section>
+<section id="install-from-source">
+<h4>Install from source<a class="headerlink" href="#install-from-source" title="Permalink to this heading"></a></h4>
+<p>Refer to <a class="reference external" href="https://github.com/intel/torch-ccl/tree/ccl_torch2.1.300+xpu?tab=readme-ov-file#install-from-source">Installation Guide</a> to install Intel® oneCCL Bindings for Pytorch* from source.</p>
+</section>
 </section>
 <section id="runtime-dynamic-linking">
 <h3>Runtime Dynamic Linking<a class="headerlink" href="#runtime-dynamic-linking" title="Permalink to this heading"></a></h3>
 <ul class="simple">
-<li><p>If torch-ccl is built with oneCCL from third party or installed from prebuilt wheel:
-Dynamic link oneCCL and Intel MPI libraries:</p></li>
-</ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)&quot;</span><span class="k">)</span>/env/setvars.sh
-</pre></div>
-</div>
-<p>Dynamic link oneCCL only (not including Intel MPI):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)&quot;</span><span class="k">)</span>/env/vars.sh<span class="w"> </span>
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>If torch-ccl is built without oneCCL and use oneCCL in system, dynamic link oneCCl from oneAPI basekit:</p></li>
+<li><p>dynamic link oneCCl from oneAPI basekit:</p></li>
 </ul>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span>&lt;ONEAPI_ROOT&gt;/ccl/latest/env/vars.sh
+<span class="nb">source</span><span class="w"> </span>&lt;ONEAPI_ROOT&gt;/mpi/latest/env/vars.sh
 </pre></div>
 </div>
 <p>Note: Make sure you have installed <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit">basekit</a> when using Intel® oneCCL Bindings for Pytorch* on Intel® GPUs. If the basekit is installed with a package manager, &lt;ONEAPI_ROOT&gt; is <code class="docutils literal notranslate"><span class="pre">/opt/intel/oneapi</span></code>.</p>
@@ -278,6 +243,7 @@ Dynamic link oneCCL and Intel MPI libraries:</p></li>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)&quot;</span><span class="k">)</span>/env/setvars.sh
 <span class="c1"># Or</span>
 <span class="nb">source</span><span class="w"> </span>&lt;ONEAPI_ROOT&gt;/ccl/latest/env/vars.sh
+<span class="nb">source</span><span class="w"> </span>&lt;ONEAPI_ROOT&gt;/mpi/latest/env/vars.sh
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">Example_DDP.py</span></code></p>
@@ -434,7 +400,7 @@ Dynamic link oneCCL and Intel MPI libraries:</p></li>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f5a22cd28e0> 
+   <jinja2.runtime.BlockReference object at 0x7f644ce4d130> 
 <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 

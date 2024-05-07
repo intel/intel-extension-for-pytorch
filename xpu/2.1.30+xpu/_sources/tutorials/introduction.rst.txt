@@ -9,7 +9,7 @@ For the detailed list of supported features and usage instructions, refer to `Fe
 
 Get Started
 -----------
-- `Installation <../../../index.html#installation?platform=gpu&version=v2.1.30%2Bxpu>`_
+- `Installation <https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.30%2bxpu>`_
 - `Quick Start <getting_started.md>`_
 - `Examples <examples.md>`_
 
