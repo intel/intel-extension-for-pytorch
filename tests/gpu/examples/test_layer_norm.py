@@ -290,3 +290,17 @@ class TestNNMethod(TestCase):
         z_cpu = y_cpu.mean().backward()
         z_dpcpp = y_dpcpp.mean().backward()
         self.assertEqual(z_cpu, z_dpcpp, atol=1e-5, rtol=1e-5)
+
+    def test_layer_norm_no_bias(self, dtype=torch.float):
+        x_i = torch.randn(64, requires_grad=True, dtype=dtype, device=cpu_device)
+        x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
+
+        layernorm = torch.nn.LayerNorm(
+            64, elementwise_affine=True, bias=False, eps=1e-6
+        )
+        y_cpu = layernorm(x_i)
+        z_cpu = y_cpu.mean().backward()
+        layernorm.to(dpcpp_device).to(dtype)
+        y_dpcpp = layernorm(x_dpcpp_i)
+        z_dpcpp = y_dpcpp.mean().backward()
+        self.assertEqual(z_cpu, z_dpcpp, atol=1e-5, rtol=1e-5)
