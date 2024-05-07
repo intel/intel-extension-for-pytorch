@@ -2,8 +2,8 @@
 
 Here you can find the inference benchmarking scripts for large language models (LLM) text generation. These scripts:
 
-- Support Llama 2, GPT-J, Qwen, OPT, and Bloom model families
-- Include both single instance and distributed (DeepSpeed) use cases
+- Support Llama 2, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as ChatGLMv3-6B and Baichuan2-13B. 
+- Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
 
@@ -18,6 +18,9 @@ Currently, only support Transformers 4.31.0. Support for newer versions of Trans
 |Qwen|"Qwen/Qwen-7B"| ✅ | ✅ |✅ | ✅|
 |OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ | ❎ |✅ | ❎ |
 |Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ | ❎ |✅ | ❎ |
+|ChatGLM3-6B|"THUDM/chatglm3-6b"| ✅ | ❎ |✅ | ❎ |
+|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| ✅ | ❎ |✅ | ❎ |
+
 
 
 **Note**: The verified models mentioned above (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well-supported with all optimizations like indirect access KV cache and fused ROPE. For other LLM families, we are actively working to implement these optimizations, which will be reflected in the expanded model list above. 

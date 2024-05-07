@@ -14,8 +14,6 @@ Intel® Extension for PyTorch\* provides optimizations for both eager mode and g
 
 The extension can be loaded as a Python module for Python programs or linked as a C++ library for C++ programs. In Python scripts users can enable it dynamically by importing `intel_extension_for_pytorch`.
 
-In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLMs are introduced in the Intel® Extension for PyTorch\*.
-
 * Check [CPU tutorial](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® CPUs. Source code is available at the [main branch](https://github.com/intel/intel-extension-for-pytorch/tree/main).
 * Check [GPU tutorial](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) for detailed information of Intel® Extension for PyTorch\* for Intel® GPUs. Source code is available at the [xpu-main branch](https://github.com/intel/intel-extension-for-pytorch/tree/xpu-main).
 
@@ -114,5 +112,6 @@ See Intel's [Security Center](https://www.intel.com/content/www/us/en/security-c
 for information on how to report a potential security issue or vulnerability.
 
 See also: [Security Policy](SECURITY.md)
+
 
 
