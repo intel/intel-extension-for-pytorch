@@ -569,6 +569,16 @@ def get_default_recipe(nodes):
                     node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[
                         0
                     ].inf_dtype
+            elif node.type == str(
+                torch.Tensor.flatten
+            ) and not _check_has_quantizable_node_after_node(node):
+                # If the post op of flatten is not a quantizable node, force reset input's inf_dtype to orig_dtype
+                node.input_tensor_infos[0].inf_dtype = node.input_tensor_infos[
+                    0
+                ].orig_dtype
+                node.input_tensor_force_inf_dtype[0] = node.input_tensor_infos[
+                    0
+                ].inf_dtype
             else:
                 # For other quantizable node, we don't need add fake quant before it if it's pre node is one none-quantizable op.
                 # Now all other quantizable node only have one input info, so we can check the one pre input node info to check

@@ -73,6 +73,8 @@ class TestDefaultRecipe(JitLlgaTestCase):
             def forward(self, x):
                 x = self.quantized_module(x)
                 x = x.flatten(1)
+                # add a quantifiable op after flatten
+                x = x.flatten(1)
                 return x
 
         class conv_swish(nn.Module):

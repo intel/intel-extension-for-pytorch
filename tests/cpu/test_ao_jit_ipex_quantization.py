@@ -164,6 +164,22 @@ class TestIpexOps(JitLlgaTestCase):
                 x = self.flatten(x)
                 return x
 
+        class M2(nn.Module):
+            def __init__(
+                self,
+            ):
+                super(M2, self).__init__()
+                self.projection = torch.nn.Conv2d(
+                    3, 768, kernel_size=(16, 16), stride=(16, 16)
+                )
+                self.cls_token = torch.rand(1, 1, 768)
+
+            def forward(self, pixel_values):
+                embeddings = self.projection(pixel_values).flatten(2).transpose(1, 2)
+                cls_tokens = self.cls_token.expand(224, -1, -1)
+                embeddings = torch.cat((cls_tokens, embeddings), dim=1)
+                return embeddings
+
         m = M()
         x = torch.rand(1, 3, 14, 14)
         for qconfig in static_qconfig:
@@ -172,6 +188,12 @@ class TestIpexOps(JitLlgaTestCase):
             FileCheck().check_not("aten::quantize_per_tensor").check_not(
                 "at::dequantize"
             ).check("aten::flatten").run(graph)
+        m2 = M2()
+        x = torch.rand(224, 3, 224, 224)
+        for qconfig in static_qconfig:
+            graph = self.checkQuantizeTrace(m2, [x], atol=2e-1, qconfig=qconfig)
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+            self.assertGraphContainsExactly(graph, "aten::dequantize", 0)
 
     def test_embeddingbag_int8(self):
         class M(nn.Module):
