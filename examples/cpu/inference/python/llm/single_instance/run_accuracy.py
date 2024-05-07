@@ -162,7 +162,7 @@ class HuggingFaceModel(BaseLM):
             model_id if config is None else config, torchscript=with_jit, trust_remote_code=True
         )
 
-        if self._dtype in ("int8", "int4", "nf4"):
+        if self._dtype in ("int8", "int4", "nf4") and not re.search("yuan", self.config.architectures[0], re.IGNORECASE):
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
                     self.model = model_class[0].from_config(self.config, trust_remote_code=True)
@@ -253,6 +253,19 @@ class HuggingFaceModel(BaseLM):
                 for i in range(num_hidden_layers)
             ]
         )
+        if re.search("yuan", self.config.architectures[0], re.IGNORECASE):
+            past_key_values = tuple(
+                [
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                        torch.zeros(1, 1, 2, hidden_size),
+                    )
+                    for i in range(num_hidden_layers)
+                ]
+            )
         return past_key_values
 
     def _model_call(
@@ -439,9 +452,57 @@ class HuggingFaceModel(BaseLM):
             max_gen_tokens = min(
                 self.max_gen_toks, request_args.get("max_length", self.max_gen_toks)
             )
-            cont = self._model_generate(
-                context_enc, context_enc.shape[1] + max_gen_tokens, primary_until
-            )
+            with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True
+                if args.quant_with_amp or self._dtype == "bfloat16"
+                else False,
+            ):
+                if self._with_jit and self.iter == 0:
+                    if self._dtype not in ["int8", "int4", "nf4"]:
+                        if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
+                            input_bs = context_enc.shape[0] * self.num_beams
+                            attention_mask = torch.ones(len(context_enc[0]))
+                            position_ids = torch.arange(len(context_enc[0]))
+                            example_dict = {
+                                "input_ids": context_enc[:, -1:],
+                                "attention_mask": attention_mask.unsqueeze(0)[:, -1:],
+                                "position_ids": position_ids.unsqueeze(0)[:, -1:],
+                                "past_key_values": self._get_past_key_values(input_bs),
+                            }
+                            model = torch.jit.trace(
+                                self.model.eval(),
+                                example_kwarg_inputs=example_dict,
+                                strict=False,
+                                check_trace=False,
+                            )
+                            model = torch.jit.freeze(model.eval())
+                            example_dict = {
+                                "input_ids": example_dict["input_ids"].repeat(input_bs, 1),
+                                "attention_mask": example_dict["attention_mask"].repeat(input_bs, 1),
+                                "position_ids": example_dict["position_ids"].repeat(input_bs, 1)
+                            }
+                            first_token_model = torch.jit.trace(
+                                self.model.eval(),
+                                example_kwarg_inputs=example_dict,
+                                strict=False,
+                                check_trace=False,
+                            )
+                            first_token_model = torch.jit.freeze(first_token_model.eval())
+                    else:
+                        model = torch.jit.load(args.quantized_model_path)
+                        model = torch.jit.freeze(model.eval())
+                        if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
+                            first_token_model = torch.jit.load(args.quantized_model_path+"2")
+                            first_token_model = torch.jit.freeze(first_token_model.eval())
+                    if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
+                        ipex._set_optimized_model_for_generation(self.model, optimized_model=model, first_token_optimized_model=first_token_model)
+                    else:
+                        ipex._set_optimized_model_for_generation(self.model, optimized_model=model)
+                    
+                    self.iter = self.iter + 1
+                cont = self._model_generate(
+                    context_enc, context_enc.shape[1] + max_gen_tokens, primary_until
+                )
 
             s = self.tok_decode(cont[0].tolist()[context_enc.shape[1] :])
             if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
