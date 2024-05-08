@@ -37,8 +37,8 @@ All the usage are defined in `utils/LogUtils.h`. Currently Intel® Extension for
 You can use `IPEX_XXX_LOG`, XXX represents the log level as mentioned above. There are four parameters defined for simple log:
 - Log component, representing which part of Intel® Extension for PyTorch\* does this log belong to.
 - Log sub component, input an empty string("") for general usages. For `SYNGRAPH` you can add any log sub componment.
-- Log message template format string.
-- Log name.
+- Log message template format string, same as fmt_string in lib fmt, `{}` is used as a place holder for format args .
+- Log args for template format string, args numbers should be aligned with size of `{}`s.
 
 Below is an example for using simple log inside abs kernel:
 
@@ -48,14 +48,14 @@ IPEX_INFO_LOG("OPS", "", "Add a log for inside ops {}", "abs");
 
 ```
 ### Event Log
-Event log is used for recording a whole event, such as an operator calculation. The whole event is identified by an unique `event_id`. You can also mark each step by using `step_id`. Use `IPEX_XXX_EVENT_END()` to complete the logging of the whole event.
+Event log is used for recording a whole event, such as an operator calculation. The whole event is identified by an unique `event_id`. You can also mark each step by using `step_id`. Use `IPEX_XXX_EVENT_END()` to complete the logging of the whole event. `XXX` represents the log level mentioned above. It will be used as the log level for all logs within one single log event.
 
 Below is an example for using event log:
 
 ```c++
-IPEX_EVENT_END("OPS", "", "record_avg_pool", "start", "Here record the time start with arg:{}", arg);
+IPEX_EVENT_LOG("OPS", "", "record_avg_pool", "start", "Here record the time start with arg:{}", arg);
 prepare_data();
-IPEX_EVENT_END("OPS", "", "record_avg_pool", "data_prepare_finish", "Here record the data_prepare_finish with arg:{}", arg);
+IPEX_EVENT_LOG("OPS", "", "record_avg_pool", "data_prepare_finish", "Here record the data_prepare_finish with arg:{}", arg);
 avg_pool();
 IPEX_INFO_EVENT_END("OPS", "", "record_avg_pool", "finish conv", "Here record the end");
 ```

@@ -14,25 +14,14 @@ To use PyTorch DDP on GPU, install Intel® oneCCL Bindings for Pytorch\* as desc
 ### Install PyTorch and Intel® Extension for PyTorch\*
 
 Make sure you have installed PyTorch and Intel® Extension for PyTorch\* successfully.
-For more detailed information, check [installation guide](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu).
+For more detailed information, check [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu).
 
 ### Install Intel® oneCCL Bindings for Pytorch\*
 
 #### [Recommended] Install from prebuilt wheels
 
-1. Install oneCCL package:
 
-We recommend using apt/yum/dnf to install the oneCCL package. Refer to [Base Toolkit Installation](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html) for adding the APT/YUM/DNF key and sources for first-time users.
-
-Reference commands:
-
-```bash
-sudo apt install intel-oneapi-ccl-devel=2021.12.0-309
-sudo yum install intel-oneapi-ccl-devel=2021.12.0-309
-sudo dnf install intel-oneapi-ccl-devel=2021.12.0-309
-```
-
-2. Install `oneccl_bindings_for_pytorch`
+1. Install `oneccl_bindings_for_pytorch`
 
 ```
 # Generic Python* for CPU
@@ -50,8 +39,7 @@ python -m pip install oneccl_bind_pt --extra-index-url <REPO_URL>
 
 #### Install from source
 
-If you want to install torch-ccl from source, you can refer to [torch-ccl Installation guide](https://github.com/intel/torch-ccl/tree/ccl_torch2.1.300+xpu?tab=readme-ov-file#install-from-source).
-
+Refer to [Installation Guide](https://github.com/intel/torch-ccl/tree/ccl_torch2.1.300+xpu?tab=readme-ov-file#install-from-source) to install Intel® oneCCL Bindings for Pytorch\* from source.
 
 ### Runtime Dynamic Linking
 
@@ -247,3 +235,4 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_
     num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 ```
 Then you can start your model training on multiple GPU devices of one card.
+
