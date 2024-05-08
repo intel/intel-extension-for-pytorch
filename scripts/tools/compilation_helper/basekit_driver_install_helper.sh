@@ -11,13 +11,11 @@ fi
 MODE=$1
 if [ "${MODE}" != "driver" ] &&
    [ "${MODE}" != "dev" ] &&
-   [ "${MODE}" != "runtime" ] &&
-   [ "${MODE}" != "runtime-dev" ]; then
+   [ "${MODE}" != "runtime" ]; then
     echo "MODE \"${MODE}\" not supported."
     echo "MODE: \"driver\" for installing required driver packages."
     echo "      \"dev\" for installing required packages for compilation."
     echo "      \"runtime\" for installing required packages for runtime."
-    echo "      \"runtime-dev\" for installing required packages for runtime and ccl-dev "
     exit 2
 fi
 
@@ -162,28 +160,6 @@ function install-runtime() {
         ${SUDO} apt update
         ${SUDO} apt install -y intel-oneapi-runtime-dpcpp-cpp=2024.1.0-963 \
         intel-oneapi-runtime-mkl=2024.1.0-691 \
-        intel-oneapi-runtime-ccl=2021.12.0-309
-    fi
-    if [ "${OS_ID}" = "rhel" ] || [ "${OS_ID}" = "centos" ]; then
-        ${SUDO} dnf install -y intel-oneapi-runtime-dpcpp-cpp-2024.1.0-963 \
-        intel-oneapi-runtime-mkl-2024.1.0-691 \
-        intel-oneapi-runtime-ccl-2021.12.0-309
-    fi
-}
-
-function install-runtime-withdev() {
-    SUDO=$1
-    OS_ID=$2
-    OS_VERSION=$3
-    add-repo-basekit ${SUDO} ${OS_ID} ${OS_VERSION}
-    if [ "${SUDO}" = "null" ]; then
-        SUDO=""
-    fi
-
-    if [ "${OS_ID}" = "ubuntu" ]; then
-        ${SUDO} apt update
-        ${SUDO} apt install -y intel-oneapi-runtime-dpcpp-cpp=2024.1.0-963 \
-        intel-oneapi-runtime-mkl=2024.1.0-691 \
         intel-oneapi-ccl-devel=2021.12.0-309
     fi
     if [ "${OS_ID}" = "rhel" ] || [ "${OS_ID}" = "centos" ]; then
@@ -207,7 +183,6 @@ fi
 if [ "${MODE}" = "runtime" ]; then
     install-runtime ${SUDO} ${OS_ID} ${OS_VERSION}
 fi
-if [ "${MODE}" = "runtime-dev" ]; then
-    install-runtime-withdev ${SUDO} ${OS_ID} ${OS_VERSION}
-fi
+
+
 

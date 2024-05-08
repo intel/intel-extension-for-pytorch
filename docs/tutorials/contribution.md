@@ -16,7 +16,7 @@ Once you implement and test your feature or bug-fix, submit a Pull Request to ht
 
 ## Developing Intel® Extension for PyTorch\* on XPU
 
-A full set of instructions on installing Intel® Extension for PyTorch\* from source is in the [Installation document](../../../index.html#installation?platform=gpu&version=v2.1.30%2Bxpu).
+A full set of instructions on installing Intel® Extension for PyTorch\* from source is in the [Installation document](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.30%2bxpu).
 
 To develop on your machine, here are some tips:
 

@@ -86,14 +86,14 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         exit 3
     fi
     python -m pip install pyyaml
-    VER_DS=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k version)
-    VER_IDEX=$(python tools/yaml_utils.py -f dependency_version.yml -d intel-extension-for-deepspeed -k version)
-    VER_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k version)
-    VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
-    VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
-    COMMIT_TRANSFORMERS=$(python tools/yaml_utils.py -f dependency_version.yml -d transformers -k commit)
-    VER_PROTOBUF=$(python tools/yaml_utils.py -f dependency_version.yml -d protobuf -k version)
-    VER_LM_EVAL=$(python tools/yaml_utils.py -f dependency_version.yml -d lm_eval -k version)
+    VER_DS=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d deepspeed -k version)
+    VER_IDEX=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d intel-extension-for-deepspeed -k version)
+    VER_TORCHCCL=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torch-ccl -k version)
+    VER_GCC=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
+    VER_TORCH=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
+    COMMIT_TRANSFORMERS=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d transformers -k commit)
+    VER_PROTOBUF=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d protobuf -k version)
+    VER_LM_EVAL=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d lm_eval -k version)
     VER_IPEX_MAJOR=$(grep "VERSION_MAJOR" version.txt | cut -d " " -f 2)
     VER_IPEX_MINOR=$(grep "VERSION_MINOR" version.txt | cut -d " " -f 2)
     VER_IPEX_PATCH=$(grep "VERSION_PATCH" version.txt | cut -d " " -f 2)
@@ -140,7 +140,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         cp intel-extension-for-pytorch/ecological_libs/deepspeed/dist/*.whl ${WHEELFOLDER}
         cp torch-ccl/dist/*.whl ${WHEELFOLDER}
         rm -rf compile_bundle.sh llvm-project llvm-release pytorch torch-ccl
-        export LD_PRELOAD=$(bash intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh)
+        export LD_PRELOAD=$(bash intel-extension-for-pytorch/scripts/tools/compilation_helper/get_libstdcpp_lib.sh)
     fi
 
     #echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
@@ -168,3 +168,4 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     bash ${AUX_INSTALL_SCRIPT}
     rm -rf ${WHEELFOLDER}
 fi
+

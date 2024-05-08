@@ -130,13 +130,13 @@ git submodule sync
 git submodule update --init --recursive
 
 python -m pip install pyyaml
-COMMIT_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k commit)
-VERSION_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
-COMMIT_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k commit)
-COMMIT_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k commit)
-REPO_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
-COMMIT_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k commit)
-#VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
+COMMIT_TORCH=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d pytorch -k commit)
+VERSION_TORCH=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
+COMMIT_TORCHVISION=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torchvision -k commit)
+COMMIT_TORCHAUDIO=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torchaudio -k commit)
+REPO_TORCHCCL=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
+COMMIT_TORCHCCL=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torch-ccl -k commit)
+#VER_GCC=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
 python -m pip uninstall -y pyyaml
 cd ..
 
@@ -324,7 +324,7 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
 fi
 
 # Sanity Test
-LIBSTDCPP=$(bash ./intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh)
+LIBSTDCPP=$(bash ./intel-extension-for-pytorch/scripts/tools/compilation_helper/get_libstdcpp_lib.sh)
 if [[ ! "${LIBSTDCPP}" =~ "/usr/lib/" ]]; then
     export LD_PRELOAD=${LIBSTDCPP}
     echo "======================================================"
@@ -343,3 +343,4 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     CMD="${CMD} import oneccl_bindings_for_pytorch as torch_ccl; print(f'torchccl_version:    {torch_ccl.__version__}');"
 fi
 python -c "${CMD}"
+

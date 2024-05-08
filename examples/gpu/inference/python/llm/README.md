@@ -2,8 +2,8 @@
 
 Here you can find the inference benchmarking scripts for large language models (LLM) text generation. These scripts:
 
-- Support Llama 2, GPT-J, Qwen, OPT, and Bloom model families
-- Include both single instance and distributed (DeepSpeed) use cases
+- Support Llama 2, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as ChatGLMv3-6B and Baichuan2-13B. 
+- Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
 
@@ -18,6 +18,8 @@ Currently, only support Transformers 4.31.0. Support for newer versions of Trans
 |Qwen|"Qwen/Qwen-7B"| ✅ | ✅ |✅ | ✅|
 |OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ | ❎ |✅ | ❎ |
 |Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ | ❎ |✅ | ❎ |
+|ChatGLM3-6B|"THUDM/chatglm3-6b"| ✅ | ❎ |✅ | ❎ |
+|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| ✅ | ❎ |✅ | ❎ |
 
 
 **Note**: The verified models mentioned above (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well-supported with all optimizations like indirect access KV cache and fused ROPE. For other LLM families, we are actively working to implement these optimizations, which will be reflected in the expanded model list above. 
@@ -85,7 +87,7 @@ conda install pkg-config
 cd examples/gpu/inference/python/llm
 # If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
 bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <AOT>
-export LD_PRELOAD=$(bash ../../../../../tools/get_libstdcpp_lib.sh)
+export LD_PRELOAD=$(bash ../../../../../scripts/tools/compilation_helper/get_libstdcpp_lib.sh)
 export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
 source ./tools/env_activate.sh
 
@@ -193,4 +195,5 @@ bash run_benchmark_woq.sh
 >Note:
 > * Saving quantized model should be executed before the optimize_transformers function is called.
 > * The optimize_transformers function is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. The detail of `optimize_transformers`, please refer to [Transformers Optimization Frontend API](../../../../../docs/tutorials/llm/llm_optimize_transformers.md).
+
 

@@ -1,5 +1,5 @@
-# read:  python tools/yaml_utils.py -f dependency_version.yml -d DEPENDENCY -k KEY -v VALUE
-# write: python tools/yaml_utils.py -w -f dependency_version.yml -d DEPENDENCY -k KEY -v VALUE
+# read:  python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d DEPENDENCY -k KEY -v VALUE
+# write: python scripts/tools/compilation_helper/yaml_utils.py -w -f dependency_version.yml -d DEPENDENCY -k KEY -v VALUE
 
 import argparse
 import yaml
@@ -33,3 +33,4 @@ def main():
 
 if __name__ == '__main__':
     print(main())
+

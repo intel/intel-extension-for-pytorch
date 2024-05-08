@@ -21,7 +21,7 @@ RUN apt update && \
     software-properties-common \
     gnupg \
     gpg-agent
-COPY ./tools/basekit_driver_install_helper.sh .
+COPY ./scripts/tools/compilation_helper/basekit_driver_install_helper.sh .
 RUN bash ./basekit_driver_install_helper.sh driver
 
 ARG GID_RENDER=109
@@ -51,9 +51,9 @@ RUN . ./miniconda3/bin/activate && \
 FROM base AS deploy
 
 COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/gpu/inference/python/llm ./llm
-COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh .
-COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/tools/basekit_driver_install_helper.sh .
-RUN bash ./basekit_driver_install_helper.sh runtime-dev
+COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/scripts/tools/compilation_helper/get_libstdcpp_lib.sh .
+COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/scripts/tools/compilation_helper/basekit_driver_install_helper.sh .
+RUN bash ./basekit_driver_install_helper.sh runtime
 RUN . ./miniconda3/bin/activate && \
     conda create -y -n py310 python=3.10 && conda activate py310 && \
     echo "conda activate py310" >> ./.bashrc && \
@@ -66,4 +66,6 @@ RUN sudo apt clean && \
     sudo rm -rf /var/lib/apt/lists/* && \
     if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then sudo rm /etc/apt/apt.conf.d/proxy.conf; fi && \
     sudo rm /basekit_driver_install_helper.sh
+
+
 
