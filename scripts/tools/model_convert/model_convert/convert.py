@@ -6,12 +6,6 @@ from ruamel.yaml import YAML
 from .wrap_api import WrapAPI
 
 yaml = YAML(typ="safe", pure=True)
-lazy_init_list = ["_is_in_bad_fork",
-                  "_lazy_call",
-                  "_lazy_init",
-                  "is_initialized",
-                  "DeferredCudaCallError",
-                  "_LazySeedTracker"]
 not_callable_list = ["is_bf16_supported",
                      "has_half",
                      "_initialization_lock",
@@ -82,8 +76,6 @@ def get_api_info():
     for item in dir(torch.xpu):
         tmp_list.append("torch.cuda." + item)
 
-    for item in lazy_init_list:
-        tmp_list.append("torch.cuda." + item)
     tmp_list.append("torch.cuda._CudaBase")
     cuda_xpu_common_list = list(set(cuda_list).intersection(set(tmp_list)))
     cuda_support_xpu_not_list = list(
@@ -198,12 +190,7 @@ class WrapHelper:
 
             full_api_name = "torch.cuda." + item.api_name
             if full_api_name in cuda_xpu_common_list:
-                if item.api_name in lazy_init_list:
-                    if item.api_name == "DeferredCudaCallError":
-                        api = get_attr(torch.xpu.lazy_init, "DeferredXPUCallError")
-                    else:
-                        api = get_attr(torch.xpu.lazy_init, item.api_name)
-                elif item.api_name == "_CudaBase":
+                if item.api_name == "_CudaBase":
                     api = get_attr(torch.xpu, "_XPUBase")
                 else:
                     api = get_attr(torch.xpu, item.api_name)
@@ -214,18 +201,11 @@ class WrapHelper:
         torch.has_cuda = True
         torch.version.cuda = "11.7"
         torch.cuda.has_half = True
-        torch.cuda._initialization_lock = torch.xpu.lazy_init._initialization_lock
-        torch.cuda._initialized = torch.xpu.lazy_init._initialized
-        torch.cuda._lazy_seed_tracker = torch.xpu.lazy_init._lazy_seed_tracker
-        torch.cuda._queued_calls = torch.xpu.lazy_init._queued_calls
-        torch.cuda._tls = torch.xpu.lazy_init._tls
-        torch.cuda.threading = torch.xpu.lazy_init.threading
-        torch.cuda.traceback = torch.xpu.lazy_init.traceback
 
         # set device property
         device_property=torch.xpu.get_device_properties(torch.device('xpu'))
-        setattr(intel_extension_for_pytorch._C._DeviceProperties, 'multi_processor_count',
-                device_property.gpu_subslice_count)
+        # setattr(intel_extension_for_pytorch._C._DeviceProperties, 'multi_processor_count',
+        #        device_property.gpu_subslice_count)
         # TODO: major, minor. Major means the arch, minor means the incremental imporvement
 
 def convert():

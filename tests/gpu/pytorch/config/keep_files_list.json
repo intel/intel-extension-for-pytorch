@@ -1,6 +1,7 @@
 [
   "run_test.py",
   "run_tests.py",
+  "rebase_compare.py",
   "requirements.txt",
   "config/*.json",
   "config/*.yaml",

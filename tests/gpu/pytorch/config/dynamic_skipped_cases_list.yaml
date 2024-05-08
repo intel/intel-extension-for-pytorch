@@ -73,6 +73,8 @@
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_all_strides_pca_lowrank_xpu_float32
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_all_strides_svd_lowrank_xpu_float32
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_diff_xpu_int16
+  - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_linalg_cholesky_xpu_float32
+  - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_linalg_cholesky_xpu_float64
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_nn_functional_conv2d_xpu_bfloat16
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_nn_functional_conv2d_xpu_float16
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_nn_functional_conv2d_xpu_float64
@@ -143,11 +145,12 @@
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_4_xpu
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_512_xpu
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_513_xpu
+  - test_nestedtensor.py::TestNestedTensorDeviceTypeXPU::test_layer_norm_xpu_float16
   - test_nestedtensor.py::TestNestedTensorDeviceTypeXPU::test_layer_norm_xpu_float32
+  - test_nn.py::TestNN::test_RNN_input_size_zero
   - test_nn.py::TestNN::test_pdist
   - test_nn.py::TestNN::test_pdist_cuda_gradgrad_unimplemented
   - test_nn.py::TestNN::test_pdist_large
-  - test_nn.py::TestNN::test_RNN_input_size_zero
   - test_nn.py::TestNN::test_pdist_zeros
   - test_ops.py::TestCommonXPU::test_dtypes___rmatmul___xpu
   - test_ops.py::TestCommonXPU::test_dtypes__refs_nn_functional_pdist_xpu
@@ -250,9 +253,11 @@
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_nn_functional_pdist_xpu_float32
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_ormqr_xpu_float32
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_tensordot_xpu_float32
-- reason: Skipped due to no implemented for now. Associated ops will be implemented in future.
+- reason: Skipped due to no implemented for now. Associated ops will be implemented
+    in future.
   cases:
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_abs_backward_xpu
+  - test_nestedtensor.py::TestNestedTensorSubclassXPU::test_sdpa_with_constant_sequence_length_xpu_float64
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_accumulate_grad_different_strides_xpu
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_backward_for_add_op_xpu
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_backward_for_sub_op_xpu
@@ -6167,7 +6172,6 @@
   - test_sparse.py::TestSparseMaskedReductionsXPU::test_future_empty_dim_masked_sum_xpu_uint8
   - test_sparse.py::TestSparseXPU::test_basic_xpu_float64
   - test_sparse.py::TestSparseXPU::test_change_tensor_metadata_xpu_float64
-  - test_sparse.py::TestSparseXPU::test_new_xpu_float64
   - test_sparse.py::TestSparseXPU::test_to_dense_hybrid_sparse_xpu_float64
   - test_sparse.py::TestSparseXPU::test_to_dense_with_gradcheck_sparse_xpu_bfloat16
   - test_sparse.py::TestSparseXPU::test_to_dense_with_gradcheck_sparse_xpu_float16
@@ -6209,40 +6213,23 @@
   - test_ops.py::TestCommonXPU::test_dtypes_bernoulli_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_bmm_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_cdist_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_digamma_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_div_trunc_rounding_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_einsum_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_erfinv_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_frexp_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_grid_sampler_2d_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_i0_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_igamma_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_igammac_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_inner_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_kthvalue_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_lgamma_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_linalg_cross_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_linalg_multi_dot_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_masked_median_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_median_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_msort_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_multinomial_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_mvlgamma_mvlgamma_p_1_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_mvlgamma_mvlgamma_p_3_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_mvlgamma_mvlgamma_p_5_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_nanmedian_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_bilinear_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_embedding_bag_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_fractional_max_pool2d_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_grid_sample_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_max_unpool1d_grad_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_max_unpool1d_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_max_unpool2d_grad_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_max_unpool2d_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_max_unpool3d_grad_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_max_unpool3d_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_nn_functional_smooth_l1_loss_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_polygamma_polygamma_n_0_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_round_decimals_0_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_sort_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_special_bessel_j0_xpu
@@ -6264,7 +6251,6 @@
   - test_ops.py::TestCommonXPU::test_dtypes_special_modified_bessel_k0_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_special_modified_bessel_k1_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_special_ndtri_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_special_polygamma_special_polygamma_n_0_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_special_scaled_modified_bessel_k0_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_special_scaled_modified_bessel_k1_xpu
   - test_ops.py::TestCommonXPU::test_dtypes_special_spherical_bessel_j0_xpu
@@ -6339,9 +6325,6 @@
   - test_sparse.py::TestSparseXPU::test_div_by_sparse_error_xpu
   - test_sparse.py::TestSparseXPU::test_floor_divide_by_sparse_error_xpu
   - test_tensor_creation_ops.py::TestTensorCreationXPU::test_new_empty_strided_xpu
-  - test_nestedtensor.py::TestNestedTensorDeviceTypeXPU::test_bmm_cuda_xpu_float16
-  - test_nestedtensor.py::TestNestedTensorDeviceTypeXPU::test_bmm_cuda_xpu_float32
-  - test_nestedtensor.py::TestNestedTensorDeviceTypeXPU::test_bmm_cuda_xpu_float64
   - test_ops.py::TestCommonXPU::test_errors_linalg_lstsq_grad_oriented_xpu
   - test_ops.py::TestCommonXPU::test_errors_linalg_lstsq_xpu
   - test_linalg.py::TestLinalgXPU::test__int_mm_errors_xpu
@@ -6418,7 +6401,7 @@
   - test_sparse_csr.py::TestSparseCompressedXPU::test_validate_SparseCSR_xpu_int64
   - test_sparse_csr.py::TestSparseCompressedXPU::test_validate_SparseCSR_xpu_int8
   - test_sparse_csr.py::TestSparseCompressedXPU::test_validate_SparseCSR_xpu_uint8
-- reason: Auto skipped due to porting of p2_other_Failed_ no_non-deterministic 
+- reason: Auto skipped due to porting of p2_other_Failed_ no_non-deterministic
   cases:
   - test_torch.py::TestTorchDeviceTypeXPU::test_nondeterministic_alert_AdaptiveAvgPool2d_xpu
   - test_torch.py::TestTorchDeviceTypeXPU::test_nondeterministic_alert_AdaptiveAvgPool3d_xpu
@@ -6722,12 +6705,6 @@
   - test_torch.py::TestTorchDeviceTypeXPU::test_multinomial_deterministic_xpu_float32
   - test_torch.py::TestTorchDeviceTypeXPU::test_multinomial_deterministic_xpu_float64
   - test_tensor_creation_ops.py::TestRandomTensorCreationXPU::test_randperm_device_compatibility_xpu
-- reason: Auto skipped due to porting of p1_5_Failed
-  cases:
-  - test_ops.py::TestCommonXPU::test_dtypes_diagflat_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_linalg_eigh_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_linalg_eigvalsh_xpu
-  - test_ops.py::TestCommonXPU::test_dtypes_lu_solve_xpu
 - reason: Auto skipped due to porting of other_failed_zhy_cuda_dismatch_xpu
   cases:
   - test_tensor_creation_ops.py::TestAsArrayXPU::test_unsupported_alias_mult_devices_xpu_float32
@@ -8978,7 +8955,6 @@
 - reason: Auto skipped due to feature of _nested_tensor_storage_offsets_p3_1_Error
   cases:
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_to_buffer_series_ops_grad_with_broadcast_xpu
-  - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_unbind_flow_through_xpu
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_values_grad_with_broadcast_xpu
 - reason: Auto skipped due to feature of _sparse_mask_projection_p3_1_Error
   cases:

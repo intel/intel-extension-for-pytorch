@@ -10,11 +10,13 @@
   - nn/test_dropout
   - nn/test_embedding
   - nn/test_pooling
+  - nn/test_convolution
   - test_autograd
   - test_binary_ufuncs
   - test_complex
   - test_decomp
   - test_dlpack
+  - test_dataloader
   - test_expanded_weights
   - test_fake_tensor
   - test_foreach
@@ -24,15 +26,16 @@
   - test_linalg
   - test_masked
   - test_meta
-  - test_module_init
   - test_modules
   - test_nestedtensor
   - test_nn
   - test_numpy_interop
+  - test_native_mha
   - test_ops
   - test_ops_gradients
   - test_ops_jit
   - test_prims
+  - test_python_dispatch
   - test_reductions
   - test_scatter_gather_ops
   - test_segment_reductions
@@ -50,6 +53,11 @@
   - test_view_ops
   - test_vmap
 - CI_TESTS:
+  - test_ops
+  - test_ops_gradients
+  - test_linalg
+  - test_ops_jit
+  - test_modules
   - nn/test_dropout
   - nn/test_embedding
   - nn/test_pooling
@@ -57,14 +65,9 @@
   - test_dlpack
   - test_foreach
   - test_indexing
-  - test_linalg
   - test_masked
-  - test_modules
   - test_nestedtensor
   - test_nn
-  - test_ops
-  - test_ops_gradients
-  - test_ops_jit
   - test_reductions
   - test_scatter_gather_ops
   - test_segment_reductions
