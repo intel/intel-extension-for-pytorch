@@ -1,5 +1,6 @@
 import collections
 import functools
+import warnings
 
 import torch
 
@@ -18,6 +19,9 @@ class autocast(torch.amp.autocast_mode.autocast):
     """
 
     def __init__(self, enabled=True, dtype=torch.bfloat16, cache_enabled=True):
+        warnings.warn(
+            "torch.xpu.amp.autocast is deprecated. Please use torch.amp.autocast('xpu') instead."
+        )
         super().__init__(
             "xpu", enabled=enabled, dtype=dtype, cache_enabled=cache_enabled
         )

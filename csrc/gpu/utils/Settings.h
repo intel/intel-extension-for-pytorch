@@ -140,7 +140,6 @@ class IPEX_API Settings final {
   FP32_MATH_MODE fp32_math_mode;
 
   ENV_VAL sync_mode_enabled;
-  ENV_VAL tile_as_device_enabled;
   ENV_VAL onednn_layout_enabled;
   ENV_VAL onednn_deterministic;
 
