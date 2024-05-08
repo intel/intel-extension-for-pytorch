@@ -2012,6 +2012,7 @@ def _Phi3Attention_forward(
         None,
         attention_mask,
         add_casual_mask=False,
+        sliding_window = self.config.sliding_window,
     )
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
@@ -2193,9 +2194,9 @@ class _IPEXAttentionRef(nn.Module):
                     if "type" in config.rope_scaling:
                         extra_inputs["type"] = config.rope_scaling["type"]
                 if hasattr(config, "original_max_position_embeddings"):
-                    extra_inputs["original_max_position_embeddings"] = (
-                        config.original_max_position_embeddings
-                    )
+                    extra_inputs[
+                        "original_max_position_embeddings"
+                    ] = config.original_max_position_embeddings
                 self._IPEXROPE = _IPEXRopeRef(
                     self.max_position_embeddings,
                     self.pos_embd_dim,

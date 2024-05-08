@@ -158,6 +158,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
         text_max_length: Optional[int] = 0,
         cutoff: Optional[torch.Tensor] = None,
         vision: Optional[torch.Tensor] = False,
+        sliding_window: Optional[int] = 128000,
     ):
         if cutoff is not None:
             if layer_past is None:
@@ -248,6 +249,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
             head_mask,
             attention_mask,
             add_casual_mask,
+            sliding_window,
         )
 
         present = (
@@ -278,6 +280,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
         seq_info: Optional[torch.Tensor] = None,
         cutoff: Optional[torch.Tensor] = None,
         vision: Optional[torch.Tensor] = False,
+        sliding_window: Optional[int] = 128000,
     ):
         return self.apply_function(
             query,
@@ -293,6 +296,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
             self.text_max_length,
             cutoff,
             vision,
+            sliding_window,
         )
 
 

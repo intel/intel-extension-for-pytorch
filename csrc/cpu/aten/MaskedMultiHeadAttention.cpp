@@ -38,7 +38,8 @@ masked_multihead_self_attention_forward_cpu(
     int64_t max_positions,
     const c10::optional<at::Tensor>& head_mask /* optional */,
     const c10::optional<at::Tensor>& attention_mask /* optional */,
-    c10::optional<bool> add_casual_mask /* optional */) {
+    c10::optional<bool> add_casual_mask /* optional */,
+    c10::optional<int64_t> sliding_window_size /* optional */) {
   return masked_multihead_self_attention_kernel_stub(
       kCPU,
       query,
@@ -52,7 +53,8 @@ masked_multihead_self_attention_forward_cpu(
       max_positions,
       head_mask,
       attention_mask,
-      add_casual_mask);
+      add_casual_mask,
+      sliding_window_size);
 }
 
 at::Tensor prepare_4d_causal_attention_mask_forward_cpu(
@@ -79,7 +81,7 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
       "masked_multihead_self_attention(Tensor query, Tensor key, Tensor value, Tensor key_cache, \
        Tensor value_cache, Tensor beam_idx, Tensor seq_info, float scale_attn, int max_positions, \
-       Tensor? head_mask, Tensor? attention_mask, bool? add_casual_mask=None)-> (Tensor, Tensor, Tensor, Tensor, Tensor)");
+       Tensor? head_mask, Tensor? attention_mask, bool? add_casual_mask=None, int? sliding_window_size=128000)-> (Tensor, Tensor, Tensor, Tensor, Tensor)");
   m.impl(
       "masked_multihead_self_attention",
       c10::DispatchKey::CPU,

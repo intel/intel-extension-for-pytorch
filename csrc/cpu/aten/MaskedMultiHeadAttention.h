@@ -21,7 +21,8 @@ masked_multihead_self_attention(
     int64_t max_positions,
     const c10::optional<at::Tensor>& head_mask /* optional */,
     const c10::optional<at::Tensor>& attention_mask /* optional */,
-    c10::optional<bool> add_casual_mask /* optional */);
+    c10::optional<bool> add_casual_mask /* optional */,
+    c10::optional<int64_t> sliding_window_size /* optional */);
 
 at::Tensor prepare_4d_causal_attention_mask_forward_cpu(
     at::Tensor& attention_mask,
@@ -44,7 +45,8 @@ using masked_multihead_self_attention_kernel_fn =
         int64_t max_positions,
         const c10::optional<at::Tensor>& head_mask /* optional */,
         const c10::optional<at::Tensor>& attention_mask /* optional */,
-        c10::optional<bool> add_casual_mask /* optional */);
+        c10::optional<bool> add_casual_mask /* optional */,
+        c10::optional<int64_t> sliding_window_size /* optional */);
 
 IPEX_DECLARE_DISPATCH(
     masked_multihead_self_attention_kernel_fn,

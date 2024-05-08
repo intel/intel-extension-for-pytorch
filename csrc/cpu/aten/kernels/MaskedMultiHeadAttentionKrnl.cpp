@@ -521,7 +521,8 @@ scale_dot_product_for_indirect_access_kv_cache(
     at::Tensor& beam_idx,
     const int64_t offset,
     const double scale_factor,
-    at::Tensor& attention_mask) {
+    at::Tensor& attention_mask,
+    const int64_t swa_size) {
   RECORD_FUNCTION(
       "ipex::scale_dot_product_for_indirect_access_kv_cache",
       c10::ArrayRef<c10::IValue>({}));
@@ -558,12 +559,18 @@ scale_dot_product_for_indirect_access_kv_cache(
 
   auto thread_numbers = omp_get_max_threads();
   auto max_parallel_parts = thread_numbers * 4;
-
+  auto swa_start = offset <= swa_size ? 0 : offset - swa_size + 1;
   auto kv_block_size = bs * head_num >= max_parallel_parts
-      ? seq_len
-      : std::max(seq_len / max_parallel_parts, 1L);
+      ? seq_len - swa_start
+      : std::max((seq_len - swa_start) / max_parallel_parts, 1L);
+  printf(
+      "swa_start:%d, kv_block_size:%d, swa_size: %d\n",
+      swa_start,
+      kv_block_size,
+      swa_size);
   kv_block_size = std::min(kv_block_size, 32L);
-  auto kv_block_count = (seq_len + kv_block_size - 1) / kv_block_size;
+  auto kv_block_count =
+      ((seq_len - swa_start) + kv_block_size - 1) / kv_block_size;
   if (offset > 0) {
     // according to the last decoded token to get the target beam for the past
     // token
@@ -582,7 +589,7 @@ scale_dot_product_for_indirect_access_kv_cache(
     for (auto block_id = 0; block_id < kv_block_count; block_id++) {
       for (auto bi = 0; bi < bs; bi++) {
         for (auto hi = 0; hi < head_num; hi++) {
-          auto k_start = block_id * kv_block_size;
+          auto k_start = block_id * kv_block_size + swa_start;
           auto block_size = std::min(kv_block_size, seq_len - k_start);
           for (auto ti = k_start; ti < k_start + block_size; ti++) {
             for (auto query_ti = 0; query_ti < cur_len; query_ti++) {
@@ -738,7 +745,7 @@ scale_dot_product_for_indirect_access_kv_cache(
           auto thread_id = 0;
           if (kv_block_size < seq_len)
             thread_id = omp_get_thread_num();
-          auto v_start = block_id * kv_block_size;
+          auto v_start = block_id * kv_block_size + swa_start;
           auto block_size = std::min(kv_block_size, seq_len - v_start);
           for (auto vi = v_start; vi < v_start + block_size; vi++) {
             for (auto query_ti = 0; query_ti < cur_len; query_ti++) {
@@ -1172,7 +1179,8 @@ zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
     at::Tensor& beam_idx,
     const int64_t offset,
     const double scale_attn,
-    at::Tensor& attention_mask) {
+    at::Tensor& attention_mask,
+    const int64_t swa_size) {
   assert(
       key.scalar_type() == at::kBFloat16 || key.scalar_type() == at::kFloat ||
       key.scalar_type() == at::kHalf);
@@ -1186,7 +1194,8 @@ zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
         beam_idx,
         offset,
         scale_attn,
-        attention_mask);
+        attention_mask,
+        swa_size);
   } else if (
       query.scalar_type() == at::kFloat &&
       value.scalar_type() == at::kBFloat16) {
@@ -1199,7 +1208,8 @@ zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
         beam_idx,
         offset,
         scale_attn,
-        attention_mask);
+        attention_mask,
+        swa_size);
   } else if (
       key.scalar_type() == at::kBFloat16 && value.scalar_type() == at::kFloat) {
     return scale_dot_product_for_indirect_access_kv_cache<at::BFloat16, float>(
@@ -1211,7 +1221,8 @@ zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
         beam_idx,
         offset,
         scale_attn,
-        attention_mask);
+        attention_mask,
+        swa_size);
   } else if (
       query.scalar_type() == at::kHalf && value.scalar_type() == at::kHalf) {
 #if defined(CPU_CAPABILITY_AVX512_FP16)
@@ -1235,7 +1246,8 @@ zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
         beam_idx,
         offset,
         scale_attn,
-        attention_mask);
+        attention_mask,
+        swa_size);
 #endif
   } else if (
       query.scalar_type() == at::kFloat && value.scalar_type() == at::kHalf) {
@@ -1248,7 +1260,8 @@ zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
         beam_idx,
         offset,
         scale_attn,
-        attention_mask);
+        attention_mask,
+        swa_size);
   } else if (
       query.scalar_type() == at::kHalf && value.scalar_type() == at::kFloat) {
     return scale_dot_product_for_indirect_access_kv_cache<at::Half, float>(
@@ -1260,7 +1273,8 @@ zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
         beam_idx,
         offset,
         scale_attn,
-        attention_mask);
+        attention_mask,
+        swa_size);
   }
   return scale_dot_product_for_indirect_access_kv_cache<
       at::BFloat16,
@@ -1273,7 +1287,8 @@ zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
       beam_idx,
       offset,
       scale_attn,
-      attention_mask);
+      attention_mask,
+      swa_size);
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
@@ -1377,7 +1392,8 @@ masked_multihead_self_attention_kernel_impl(
     int64_t max_positions,
     const c10::optional<at::Tensor>& head_mask /* optional */,
     const c10::optional<at::Tensor>& attention_mask /* optional */,
-    c10::optional<bool> add_casual_mask /* optional */) {
+    c10::optional<bool> add_casual_mask /* optional */,
+    c10::optional<int64_t> sliding_window_size /* optional */) {
   TORCH_CHECK(
       attention_mask.has_value(),
       "Attention mask is necessary for ipex::masked_multihead_self_attention_kernel_impl");
@@ -1402,6 +1418,10 @@ masked_multihead_self_attention_kernel_impl(
   auto offset = seq_info.data_ptr<long>()[0];
   auto cache_size = key_cache.size(0);
   auto cur_len = query.size(1);
+  auto swa_size = offset + cur_len;
+  if (sliding_window_size.has_value()) {
+    swa_size = sliding_window_size.value();
+  }
   if (offset == 0) {
     max_positions =
         max_positions > cur_len ? max_positions : max_positions + cur_len;
@@ -1456,7 +1476,8 @@ masked_multihead_self_attention_kernel_impl(
         beam_idx,
         offset,
         scale_attn,
-        attention_mask_v);
+        attention_mask_v,
+        swa_size);
   } else {
     return first_token_masked_mha(
         query,
