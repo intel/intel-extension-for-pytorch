@@ -483,8 +483,13 @@ void _mkl_dft(
   auto ostrides = output.strides();
   int64_t idist = istrides[0];
   int64_t odist = ostrides[0];
-  desc_config->set_value(config_param::FWD_DISTANCE, idist);
-  desc_config->set_value(config_param::BWD_DISTANCE, odist);
+  if (!inverse) {
+    desc_config->set_value(config_param::FWD_DISTANCE, idist);
+    desc_config->set_value(config_param::BWD_DISTANCE, odist);
+  } else {
+    desc_config->set_value(config_param::FWD_DISTANCE, odist);
+    desc_config->set_value(config_param::BWD_DISTANCE, idist);
+  }
   std::vector<int64_t> mkl_istrides(1 + signal_ndim, 0),
       mkl_ostrides(1 + signal_ndim, 0);
   for (int64_t i = 1; i <= signal_ndim; i++) {

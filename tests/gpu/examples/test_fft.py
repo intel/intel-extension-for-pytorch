@@ -64,17 +64,21 @@ class TestNNMethod(TestCase):
                 self.assertEqual(y2, y2_dpcpp.cpu())
 
     def test_irfft(self, dtype=torch.float):
-        x1 = torch.randn(5, 5)
-        x2 = torch.randn(4, 3, 2)
-        x1_dpcpp = x1.to("xpu")
-        x2_dpcpp = x2.to("xpu")
-        y1 = torch.fft.rfft(x1, 2)
-        y2 = torch.fft.irfft(y1, 2)
+        shapes = [[5, 5], [4, 3, 2], [2, 32, 6], [65, 80, 115]]
 
-        y1_dpcpp = torch.fft.rfft(x1_dpcpp, 2)
-        y2_dpcpp = torch.fft.irfft(y1_dpcpp, 2)
+        for shape in shapes:
+            fft_input = torch.randn(*shape, dtype=dtype)
+            fft_input = torch.fft.rfft(fft_input)
 
-        self.assertEqual(y2, y2_dpcpp.cpu())
+            x1 = fft_input
+            y1 = torch.fft.irfft(x1, n=shape[-1])
+            y2 = torch.fft.rfft(y1)
+
+            x1_dpcpp = fft_input.to(device="xpu")
+            y1_dpcpp = torch.fft.irfft(x1_dpcpp, n=shape[-1])
+            y2_dpcpp = torch.fft.rfft(y1_dpcpp)
+
+            self.assertEqual(y2, y2_dpcpp.cpu())
 
     def test_ifft2(self, dtype=torch.float):
         f_real = torch.randn(2, 72, 72)
