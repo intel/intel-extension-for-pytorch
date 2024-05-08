@@ -22,6 +22,7 @@
 
 #include <dpct/blas_utils.h>
 #include <dpct/dpct.h>
+#include <c10/xpu/XPUStream.h>
 #include <ipex.h>
 #include <sycl/sycl.hpp>
 #include <cassert>
@@ -37,10 +38,7 @@
 namespace at {
 namespace sycl {
 inline dpct::queue_ptr getCurrentSYCLStream() {
-  auto device_type = c10::DeviceType::XPU;
-  c10::impl::VirtualGuardImpl impl(device_type);
-  c10::Stream c10_stream = impl.getStream(c10::Device(device_type));
-  auto& queue = xpu::get_queue_from_stream(c10_stream);
+  auto& queue = c10::xpu::getCurrentXPUStream().queue();
   return &queue;
 }
 

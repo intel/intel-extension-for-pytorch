@@ -33,6 +33,7 @@
 #include "gemm_test.h"
 
 #include <torch/torch.h>
+#include <c10/xpu/XPUStream.h>
 #include <ipex.h>
 
 #ifndef SYCL_CUDA_STREAM
