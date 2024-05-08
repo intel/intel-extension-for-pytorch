@@ -563,11 +563,6 @@ scale_dot_product_for_indirect_access_kv_cache(
   auto kv_block_size = bs * head_num >= max_parallel_parts
       ? seq_len - swa_start
       : std::max((seq_len - swa_start) / max_parallel_parts, 1L);
-  printf(
-      "swa_start:%d, kv_block_size:%d, swa_size: %d\n",
-      swa_start,
-      kv_block_size,
-      swa_size);
   kv_block_size = std::min(kv_block_size, 32L);
   auto kv_block_count =
       ((seq_len - swa_start) + kv_block_size - 1) / kv_block_size;
