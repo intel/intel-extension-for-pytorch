@@ -43,3 +43,13 @@ set(IPEX_ATEN_CORE_SRCS
   ${aten_quant_src}
   ${aten_tensor_src}
   PARENT_SCOPE)
+
+# OPs that use XeTLA kernels when USE_XETLA
+FILE(GLOB xetla_ops_src
+  "operators/transformers/*.cpp"
+  "operators/Blas.cpp"
+  "operators/GRU.cpp"
+  "operators/XEGEMM_INT4.cpp"
+  "operators/XeGemm.cpp"
+)
+set(IPEX_ATEN_XETLA_OPS_SRCS "${xetla_ops_src}" PARENT_SCOPE)

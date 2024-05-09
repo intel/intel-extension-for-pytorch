@@ -4,6 +4,8 @@ set(XETLA_AVAILABLE_ARCHS xe_hpc xe_hpg xe_lpg)
 string(REPLACE "," ";" USE_XETLA ${USE_XETLA})
 # set true value to all available archs ; set false value to empty list
 if("${USE_XETLA}")  # A quoted string always evaluates to false unless: The string's value is one of the true constants
+  # Note: CMake < 3.20 will evaluate `("${USE_XETLA}")` to True if USE_XETLA is mtl-p, and then be replaced by the whole
+  # XETLA_AVAILABLE_ARCHS. Therefore cmake >= 3.20 should be used to partially enable xetla kernels for development. 
   set(USE_XETLA ${XETLA_AVAILABLE_ARCHS})
 elseif(NOT USE_XETLA) # if(<variable>): True if given a variable that is defined to a value that is not a false constant
   set(USE_XETLA "")
@@ -51,6 +53,8 @@ if (USE_AOT_DEVLIST)
   # Disable implementations for architectures not in USE_AOT_DEVLIST
   function (disable_architecture_by_aot ARCH REGULAR_EXPRESSION)
     string(REGEX MATCHALL ${REGULAR_EXPRESSION} USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST}")
+    string(REPLACE ";" "," USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST_${ARCH}}")
+    set(USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST_${ARCH}}" PARENT_SCOPE)
     message(STATUS "XeTLA: USE_AOT_DEVLIST_${ARCH}: ${USE_AOT_DEVLIST_${ARCH}}")
     if("${USE_AOT_DEVLIST_${ARCH}}" STRLESS_EQUAL "")
       set(USE_XETLA_${ARCH} OFF PARENT_SCOPE)
@@ -62,7 +66,11 @@ if (USE_AOT_DEVLIST)
 
   set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST}")
   if (USE_XETLA_XE_HPC)  # Temporary fix as AOT fails of try to compile XE_HPC kernels for ats-m150 etc
-    set(XETLA_USE_AOT_DEVLIST "pvc")
+    message(STATUS "XeTLA: XE_HPC suppress other aot targets")
+    set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST_XE_HPC}")
+  elseif(USE_XETLA_XE_HPG) # Temporary fix as AOT fails of try to compile XE_HPG kernels for mtl-p etc
+    message(STATUS "XeTLA: XE_HPG suppress other aot targets")
+    set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST_XE_HPG}")
   endif()
   message(STATUS "XeTLA: XETLA_USE_AOT_DEVLIST: ${XETLA_USE_AOT_DEVLIST}")
   set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-device ${XETLA_USE_AOT_DEVLIST} -options '${XETLA_OFFLINE_OPTIONS}'")
