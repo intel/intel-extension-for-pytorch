@@ -1364,19 +1364,22 @@ class WeightOnlyQuantizationTester(TestCase):
             def forward(self, x):
                 return self.linear(x)
 
-        def test(shape, has_bias, act_quant_mode, group_size):
-            M, N, K = shape
+        def test(shape, has_bias, act_quant_mode, group_size, w_dtype):
             dtype = torch.bfloat16
-            model = Mod(K, N, has_bias)
+            model = Mod(shape[1], shape[2], has_bias)
             m = model.eval()
             m2 = copy.deepcopy(m)
-            data = torch.rand(M, K) * 0.5
+            data = torch.rand(shape[0], shape[1])
+            if w_dtype == WoqWeightDtype.INT4:
+                lowp_mode = WoqLowpMode.INT8
+            else:
+                lowp_mode = WoqLowpMode.BF16
             if group_size == -1 and act_quant_mode != 0:
                 # these cases are covered by another test case for act_quant_mode
                 return
             qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-                weight_dtype=WoqWeightDtype.INT4,
-                lowp_mode=WoqLowpMode.INT8,
+                weight_dtype=w_dtype,
+                lowp_mode=lowp_mode,
                 act_quant_mode=act_quant_mode,
                 group_size=group_size,
             )
@@ -1393,20 +1396,20 @@ class WeightOnlyQuantizationTester(TestCase):
                 w = copy.deepcopy(m.linear.weight.data)
                 if group_size == -1:
                     qw, w_scales, w_zero_points = quantize_per_channel(
-                        w, WoqWeightDtype.INT4, None, None
+                        w, w_dtype, None, None
                     )
                     fake_quant_w = dequantize_per_channel(
-                        qw, w_scales, w_zero_points.int(), WoqWeightDtype.INT4, w.shape
+                        qw, w_scales, w_zero_points.int(), w_dtype, w.shape
                     )
                 else:
                     qw, w_scales, w_zero_points = quantize_per_block(
-                        w, WoqWeightDtype.INT4, group_size, None, None
+                        w, w_dtype, group_size, None, None
                     )
                     fake_quant_w = dequantize_per_block(
                         qw,
                         w_scales,
                         w_zero_points,
-                        WoqWeightDtype.INT4,
+                        w_dtype,
                         group_size,
                         weight_shape=w.shape,
                     )
@@ -1423,15 +1426,16 @@ class WeightOnlyQuantizationTester(TestCase):
                     y_ref = y_ref.to(dtype)
                     torch.testing.assert_close(y, y_ref, atol=1e-2, rtol=1e-1)
 
-        MNK_list = [(4, 64, 128), (4, 32, 127), (9, 31, 256)]
+        MNK_list = [(4, 64, 128), (4, 32, 127), (9, 31, 256), (1024, 4096, 4096)]
         has_bias_list = [False, True]
         quant_mode_list = [0, 1, 2, 3]
         group_size_list = [-1, 32, 64, 128]
+        weight_dtype = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
         cases = itertools.product(
-            MNK_list, has_bias_list, quant_mode_list, group_size_list
+            MNK_list, has_bias_list, quant_mode_list, group_size_list, weight_dtype
         )
-        for shape, has_bias, act_quant_mode, group_size in cases:
-            test(shape, has_bias, act_quant_mode, group_size)
+        for shape, has_bias, act_quant_mode, group_size, w_dtype in cases:
+            test(shape, has_bias, act_quant_mode, group_size, w_dtype)
 
     def test_compute_with_g_idx(self):
         class Mod(nn.Module):
