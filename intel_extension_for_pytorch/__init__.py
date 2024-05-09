@@ -123,6 +123,7 @@ from . import fx
 from . import _dynamo
 from . import _inductor
 from . import llm
+from . import distributed
 
 # frontend
 from .transformers.optimize import optimize_transformers
