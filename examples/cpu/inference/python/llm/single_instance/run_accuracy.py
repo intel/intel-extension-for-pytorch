@@ -158,10 +158,15 @@ class HuggingFaceModel(BaseLM):
         self.tokenizer = model_class[1].from_pretrained(
             model_id, trust_remote_code=True
         )
-        self.config = AutoConfig.from_pretrained(
-            model_id if config is None else config, torchscript=with_jit, trust_remote_code=True
-        )
-
+        if model_type == "chatglm":
+            # chatglm modeling is from remote hub and its torch_dtype in config.json need to be overrided
+            self.config = AutoConfig.from_pretrained(
+                model_id if config is None else config, torchscript=with_jit, trust_remote_code=True, torch_dtype=load_dtype,
+            )
+        else:
+            self.config = AutoConfig.from_pretrained(
+                model_id if config is None else config, torchscript=with_jit, trust_remote_code=True
+            )
         if self._dtype in ("int8", "int4", "nf4") and not re.search("yuan", self.config.architectures[0], re.IGNORECASE):
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):

@@ -204,9 +204,15 @@ else:
 
 
 if args.config_file is None:
-    config = AutoConfig.from_pretrained(
-        args.model_id, torchscript=True, trust_remote_code=True
-    )
+    if "chatglm" in args.model_id.lower():
+        # chatglm modeling is from remote hub and its torch_dtype in config.json need to be overrided
+        config = AutoConfig.from_pretrained(
+            args.model_id, torchscript=True, trust_remote_code=True, torch_dtype=torch.float
+        )
+    else:
+        config = AutoConfig.from_pretrained(
+            args.model_id, torchscript=True, trust_remote_code=True,
+        )
 else:
     config = AutoConfig.from_pretrained(
         args.config_file, torchscript=True, trust_remote_code=True
