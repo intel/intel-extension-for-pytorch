@@ -31,7 +31,10 @@ torch.manual_seed(128)
 
 curpath = os.path.abspath(os.path.dirname(__file__))
 
+has_ccl = ipex_comm.has_ccl()
+world_size = 0 if not has_ccl else ipex_comm.get_world_size()
 
+@unittest.skipIf(not (has_ccl and world_size > 1), "oneccl is not built")
 class TensorParallelTester(TestCase):
     def _shard_model(self, model):
         rank = ipex_comm.get_rank()
