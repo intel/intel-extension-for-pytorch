@@ -26,7 +26,7 @@ class TestTorchXPUMethod(TestCase):
         end_event = torch.xpu.Event(enable_timing=True)
         end_event.record()
         end_event.synchronize()
-        t = start_event.elapsed_time(end_event)
-        self.assertTrue(t > 0)
-        t = end_event.elapsed_time(start_event)
-        self.assertTrue(t < 0)
+        with self.assertRaisesRegex(
+            NotImplementedError, "elapsed_time is not supported by XPUEvent."
+        ):
+            start_event.elapsed_time(end_event)
