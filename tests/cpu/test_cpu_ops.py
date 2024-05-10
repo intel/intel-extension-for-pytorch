@@ -6,7 +6,6 @@ import torch.nn.functional as F
 import random
 import itertools
 import intel_extension_for_pytorch as ipex
-import intel_extension_for_pytorch._C as core
 from common_utils import TestCase
 import torch.autograd.functional as autogradF
 from copy import deepcopy
@@ -1404,9 +1403,7 @@ class CPUOPsTester(TestCase):
             self.assertTrue(y7.dtype == datatype)
 
     def test_flash_attention(self):
-        dtypes = [torch.float, torch.double, torch.bfloat16]
-        if core.isa_has_amx_fp16_support():
-            dtypes.append(torch.float16)
+        dtypes = [torch.float, torch.double, torch.bfloat16, torch.float16]
         for dtype in dtypes:
             for causal, has_attention_mask in [
                 [False, False],

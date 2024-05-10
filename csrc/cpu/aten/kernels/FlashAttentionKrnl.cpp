@@ -659,9 +659,8 @@ cpu_flash_attention(
   const auto dtype = query.scalar_type();
   const auto accumulate_dtype = at::toOpMathType(dtype);
   const bool is_fp16 = dtype == at::kHalf;
-  TORCH_CHECK(
-      !is_fp16 || (is_fp16 && utils::isa_has_amx_fp16_support()),
-      "scaled_dot_product_attention_flash_attention does not support FP16 on the platforms without amx_fp16 support");
+  const int vnni_pack =
+      (!is_fp16 || (is_fp16 && utils::isa_has_amx_fp16_support())) ? 1 : 0;
 
   bool is_bool_mask = attention_mask.has_value() &&
       attention_mask.value().scalar_type() == ScalarType::Bool;
@@ -759,7 +758,8 @@ cpu_flash_attention(
       /*ldc*/ kvSplitSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto qk_gemm_ktail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ kvTail,
@@ -771,7 +771,8 @@ cpu_flash_attention(
       /*ldc*/ kvTail,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto qk_gemm_qtail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qTail,
       /*N*/ kvSplitSize,
@@ -783,7 +784,8 @@ cpu_flash_attention(
       /*ldc*/ kvSplitSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto qk_gemm_qktail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qTail,
       /*N*/ kvTail,
@@ -795,7 +797,8 @@ cpu_flash_attention(
       /*ldc*/ kvTail,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
 
   // Create tpp kernels for Attention @ Value
   bool av_gemm_K_even = kvSplitSize % 2 == 0;
@@ -809,51 +812,55 @@ cpu_flash_attention(
   auto av_gemm = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ av_gemm_K,
+      /*K*/ vnni_pack ? av_gemm_K : kvSplitSize,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K,
-      /*ldb*/ headSize,
+      /*ldb*/ vnni_pack ? headSize : vStrideN,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto av_gemm_tail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ av_gemm_K_tail,
+      /*K*/ vnni_pack ? av_gemm_K_tail : kvTail,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K_tail,
-      /*ldb*/ headSize,
+      /*ldb*/ vnni_pack ? headSize : vStrideN,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto av_gemm_bias = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ av_gemm_K,
+      /*K*/ vnni_pack ? av_gemm_K : kvSplitSize,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K,
-      /*ldb*/ headSize,
+      /*ldb*/ vnni_pack ? headSize : vStrideN,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto av_gemm_bias_tail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ av_gemm_K_tail,
+      /*K*/ vnni_pack ? av_gemm_K_tail : kvTail,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K_tail,
-      /*ldb*/ headSize,
+      /*ldb*/ vnni_pack ? headSize : vStrideN,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
 
   // Buffer to store Key and Value after transforms
   at::Tensor key_t_reorder = at::empty(
@@ -900,7 +907,8 @@ cpu_flash_attention(
           /*out_cols*/ kvSplitSize,
           /*ldi*/ headSize_even ? kStrideN : qk_gemm_K,
           /*ldo*/ kvSplitSize,
-          /*xtype*/ XformTPP::XFORM_XPOSE_N2V_TPP,
+          /*xtype*/
+          vnni_pack ? XformTPP::XFORM_XPOSE_N2V_TPP : XformTPP::XFORM_XPOSE_TPP,
           /*ignore_vnni_for_fp32*/ true),
       XPOSE);
   auto k_xform_tail = SCOPEIT(
@@ -911,7 +919,8 @@ cpu_flash_attention(
           /*out_cols*/ kvTail,
           /*ldi*/ headSize_even ? kStrideN : qk_gemm_K,
           /*ldo*/ kvTail,
-          /*xtype*/ XformTPP::XFORM_XPOSE_N2V_TPP,
+          /*xtype*/
+          vnni_pack ? XformTPP::XFORM_XPOSE_N2V_TPP : XformTPP::XFORM_XPOSE_TPP,
           /*ignore_vnni_for_fp32*/ true),
       XPOSE);
   // Create tpp transforms for Value
@@ -972,24 +981,26 @@ cpu_flash_attention(
                       j * qk_gemm_K * kvSize + n * qk_gemm_K);
             }
             if (!av_gemm_K_even) {
-              // padding
-              // [kvSplitSize, headSize] -> [kvSplitSize + 1, headSize]
-              pad_row_zero(
-                  v_data + i * vStrideB + j * vStrideH + n * vStrideN,
-                  value_padding_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize,
-                  av_gemm_K,
-                  headSize,
-                  vStrideN);
-              v_xform(
-                  value_padding_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize,
-                  value_reorder_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize);
-            } else {
+              if (is_fp16 && vnni_pack) {
+                // padding
+                // [kvSplitSize, headSize] -> [kvSplitSize + 1, headSize]
+                pad_row_zero(
+                    v_data + i * vStrideB + j * vStrideH + n * vStrideN,
+                    value_padding_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    av_gemm_K,
+                    headSize,
+                    vStrideN);
+                v_xform(
+                    value_padding_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    value_reorder_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize);
+              }
+            } else if (vnni_pack) {
               v_xform(
                   v_data + i * vStrideB + j * vStrideH + n * vStrideN,
                   value_reorder_ptr +
@@ -1020,24 +1031,26 @@ cpu_flash_attention(
                       j * qk_gemm_K * kvSize + n * qk_gemm_K);
             }
             if (!av_gemm_K_tail_even) {
-              // padding
-              // [kvtail, headSize] -> [kvtail + 1, headSize]
-              pad_row_zero(
-                  v_data + i * vStrideB + j * vStrideH + n * vStrideN,
-                  value_padding_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize,
-                  av_gemm_K_tail,
-                  headSize,
-                  vStrideN);
-              v_xform_tail(
-                  value_padding_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize,
-                  value_reorder_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize);
-            } else {
+              if (is_fp16 && vnni_pack) {
+                // padding
+                // [kvtail, headSize] -> [kvtail + 1, headSize]
+                pad_row_zero(
+                    v_data + i * vStrideB + j * vStrideH + n * vStrideN,
+                    value_padding_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    av_gemm_K_tail,
+                    headSize,
+                    vStrideN);
+                v_xform_tail(
+                    value_padding_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    value_reorder_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize);
+              }
+            } else if (vnni_pack) {
               v_xform_tail(
                   v_data + i * vStrideB + j * vStrideH + n * vStrideN,
                   value_reorder_ptr +
@@ -1260,18 +1273,24 @@ cpu_flash_attention(
                 if (n == 0) {
                   av_gemm(
                       qk_reduced_data,
-                      value_reorder_ptr +
-                          i * num_head * kv_padding_size * headSize +
-                          j * kv_padding_size * headSize + psize * headSize,
+                      vnni_pack
+                          ? (value_reorder_ptr +
+                             i * num_head * kv_padding_size * headSize +
+                             j * kv_padding_size * headSize + psize * headSize)
+                          : (v_data + i * vStrideB + j * vStrideH +
+                             n * vStrideN),
                       dst_data,
                       1);
                 } else {
                   // bias
                   av_gemm_bias(
                       qk_reduced_data,
-                      value_reorder_ptr +
-                          i * num_head * kv_padding_size * headSize +
-                          j * kv_padding_size * headSize + psize * headSize,
+                      vnni_pack
+                          ? (value_reorder_ptr +
+                             i * num_head * kv_padding_size * headSize +
+                             j * kv_padding_size * headSize + psize * headSize)
+                          : (v_data + i * vStrideB + j * vStrideH +
+                             n * vStrideN),
                       dst_data,
                       1);
                 }
@@ -1280,18 +1299,24 @@ cpu_flash_attention(
                 if (n == 0) {
                   av_gemm_tail(
                       qk_reduced_data,
-                      value_reorder_ptr +
-                          i * num_head * kv_padding_size * headSize +
-                          j * kv_padding_size * headSize + psize * headSize,
+                      vnni_pack
+                          ? (value_reorder_ptr +
+                             i * num_head * kv_padding_size * headSize +
+                             j * kv_padding_size * headSize + psize * headSize)
+                          : (v_data + i * vStrideB + j * vStrideH +
+                             n * vStrideN),
                       dst_data,
                       1);
                 } else {
                   // bias
                   av_gemm_bias_tail(
                       qk_reduced_data,
-                      value_reorder_ptr +
-                          i * num_head * kv_padding_size * headSize +
-                          j * kv_padding_size * headSize + psize * headSize,
+                      vnni_pack
+                          ? (value_reorder_ptr +
+                             i * num_head * kv_padding_size * headSize +
+                             j * kv_padding_size * headSize + psize * headSize)
+                          : (v_data + i * vStrideB + j * vStrideH +
+                             n * vStrideN),
                       dst_data,
                       1);
                 }
