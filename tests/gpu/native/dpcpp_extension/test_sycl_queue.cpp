@@ -36,9 +36,18 @@ extern "C" bool isSYCLQueue(void* q_ptr) {
   return false;
 }
 
+bool is_sycl_queue(py::object obj) {
+  TORCH_CHECK(PyLong_Check(obj.ptr()), "invalid SYCL queue pointer");
+  auto q_ptr = PyLong_AsVoidPtr(obj.ptr());
+  if (q_ptr == nullptr && PyErr_Occurred()) {
+    throw python_error();
+  }
+  return isSYCLQueue(q_ptr);
+}
+
 PYBIND11_MODULE(mod_test_sycl_queue, m) {
   m.def(
       "is_sycl_queue",
-      &isSYCLQueue,
+      &is_sycl_queue,
       "check sycl queue void pointer in a capsule");
 }

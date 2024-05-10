@@ -1019,6 +1019,7 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
         python_lib_path = os.path.join(python_path, "libs")
 
         extra_ldflags.append("c10.lib")
+        extra_ldflags.append("c10_xpu.lib")
         extra_ldflags.append("torch_cpu.lib")
         extra_ldflags.append("torch.lib")
         if not is_standalone:
@@ -1027,6 +1028,7 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
 
     else:
         extra_ldflags.append("-lc10")
+        extra_ldflags.append("-lc10_xpu")
         extra_ldflags.append("-ltorch_cpu")
         extra_ldflags.append("-ltorch")
         if not is_standalone:
