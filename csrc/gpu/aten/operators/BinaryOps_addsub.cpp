@@ -36,10 +36,11 @@ struct AddKernelDpcppFunctor {
 };
 
 void add_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
+      at::ScalarType::ComplexHalf,
       iter.dtype(),
       "add",
       [&]() {

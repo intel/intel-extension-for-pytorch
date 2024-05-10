@@ -27,10 +27,11 @@ struct mul_kernel_dpcpp_functor {
 };
 
 static void mul_kernel_dpcpp(TensorIteratorBase& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       at::ScalarType::Bool,
+      at::ScalarType::ComplexHalf,
       iter.dtype(),
       "mul",
       [&]() {

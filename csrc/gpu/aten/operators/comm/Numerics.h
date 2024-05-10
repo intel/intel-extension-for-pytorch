@@ -1626,6 +1626,9 @@ struct Numerics<c10::complex<at::Half>> {
   static inline bool eq(c10::complex<at::Half> a, c10::complex<at::Half> b) {
     return a == b;
   }
+  static inline bool ne(c10::complex<at::Half> a, c10::complex<at::Half> b) {
+    return a != b;
+  }
 };
 template <typename In, typename Out>
 struct ScalarConvert {

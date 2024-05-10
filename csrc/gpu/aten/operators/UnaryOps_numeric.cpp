@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/OpMathType.h>
 #include <ATen/native/TensorIterator.h>
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
@@ -78,16 +79,25 @@ struct abs_kernel_functor {
 };
 
 void abs_kernel(TensorIteratorBase& iter) {
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      ScalarType::Half,
-      ScalarType::BFloat16,
-      ScalarType::Bool,
-      iter.common_dtype(),
-      "abs",
-      [&]() {
-        abs_kernel_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
+  auto dtype = iter.dtype();
+  if (at::isComplexType(dtype)) {
+    IPEX_DISPATCH_COMPLEX_TYPES_AND(kComplexHalf, dtype, "abs", [&]() {
+      using opmath_t = at::opmath_type<scalar_t>;
+      abs_kernel_functor<opmath_t> f;
+      dpcpp_kernel_for_tensor_iter(iter, f);
+    });
+  } else {
+    IPEX_DISPATCH_ALL_TYPES_AND3(
+        ScalarType::Half,
+        ScalarType::BFloat16,
+        ScalarType::Bool,
+        iter.dtype(),
+        "abs",
+        [&]() {
+          abs_kernel_functor<scalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
+        });
+  }
 }
 
 template <typename scalar_t>
