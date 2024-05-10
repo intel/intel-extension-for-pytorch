@@ -1,6 +1,75 @@
 Releases
 =============
 
+## 2.3.0
+
+We are excited to announce the release of Intel® Extension for PyTorch* 2.3.0+cpu which accompanies PyTorch 2.3. This release mainly brings you the new feature on Large Language Model (LLM) called module level LLM optimization API, which provides module level optimizations for commonly used LLM modules and functionalities, and targets to optimize customized LLM modeling for scenarios like private models, self-customized models, LLM serving frameworks, etc. This release also extends the list of optimized LLM models to a broader level and includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
+
+### Highlights
+
+- Large Language Model (LLM) optimization
+
+  [Intel® Extension for PyTorch*](https://github.com/intel/intel-extension-for-pytorch) provides a new feature called module level LLM optimization API, which provides module level optimizations for commonly used LLM modules and functionalities. LLM creators can then use this new API set to replace related parts in models by themselves, with which to reach peak performance.
+
+  There are 3 categories of module level LLM optimization APIs in general:
+
+  - Linear post-op APIs
+
+  ```python
+  # using module init and forward
+  ipex.llm.modules.linearMul
+  ipex.llm.modules.linearGelu
+  ipex.llm.modules.linearNewGelu
+  ipex.llm.modules.linearAdd
+  ipex.llm.modules.linearAddAdd
+  ipex.llm.modules.linearSilu
+  ipex.llm.modules.linearSiluMul
+  ipex.llm.modules.linear2SiluMul
+  ipex.llm.modules.linearRelu
+  ```
+
+  - Attention related APIs
+
+  ```python
+  # using module init and forward
+  ipex.llm.modules.RotaryEmbedding
+  ipex.llm.modules.RMSNorm
+  ipex.llm.modules.FastLayerNorm
+  ipex.llm.modules.VarlenAttention
+  ipex.llm.modules.PagedAttention
+  ipex.llm.modules.IndirectAccessKVCacheAttention
+
+  # using as functions
+  ipex.llm.functional.rotary_embedding
+  ipex.llm.functional.rms_norm
+  ipex.llm.functional.fast_layer_norm
+  ipex.llm.functional.indirect_access_kv_cache_attention
+  ipex.llm.functional.varlen_attention
+  ```
+
+  - Generation related APIs
+
+  ```python
+  # using for optimizing huggingface generation APIs with prompt sharing
+  ipex.llm.generation.hf_beam_sample
+  ipex.llm.generation.hf_beam_search
+  ipex.llm.generation.hf_greedy_search
+  ipex.llm.generation.hf_sample
+  ```
+
+  More detailed introduction on how to apply this API set and example code walking you through can be found [here](https://github.com/intel/intel-extension-for-pytorch/tree/release/2.3/examples/cpu/inference/python/llm-modeling).
+
+- Bug fixing and other optimization
+
+    - Optimized the performance of LLM [#2561](https://github.com/intel/intel-extension-for-pytorch/commit/ade45387ecc4e707754de9db6fc2be0af186e2ba) [#2584](https://github.com/intel/intel-extension-for-pytorch/commit/05d07645e1ae5eeeff15abda31a6ba5806dd2bb2) [#2617](https://github.com/intel/intel-extension-for-pytorch/commit/adb563834a4f6bd327d7307c493c8fe1648e6211) [#2663](https://github.com/intel/intel-extension-for-pytorch/commit/214dea0c8e7b2864a0c2d1a1c32fb7815ca68070) [#2733](https://github.com/intel/intel-extension-for-pytorch/commit/f5b941c3b7ea8fe1a387617a9329467d1e1b544a) 
+    - Supported Act Order of GPTQ [#2550](https://github.com/intel/intel-extension-for-pytorch/commit/be636289eef628b995e79a475c58f8a4d93e4890) [#2568](https://github.com/intel/intel-extension-for-pytorch/commit/9fcc4897492333330fb6bd156b1178d55347d292)
+    - Improved the warning and the logging information for better user experience [#2641](https://github.com/intel/intel-extension-for-pytorch/commit/e0bf673cf3ea4063a7e168ec221f421fbd378fb3) [#2675](https://github.com/intel/intel-extension-for-pytorch/commit/770275a755ea0445675720a3f6f14e77c491fceb)
+    - Added TorchServe CPU Example [#2613](https://github.com/intel/intel-extension-for-pytorch/commit/1f6fe6423dde7ccecc1565e73dc81d9cb281bc1f)    
+    - Upgraded oneDNN to v3.4.1 [#2747](https://github.com/intel/intel-extension-for-pytorch/commit/e2a9af49874fcf39097036c08848cd37cadc0084)
+    - Misc fix and enhancement [#2468](https://github.com/intel/intel-extension-for-pytorch/commit/f88a7d127a6a3017db508454c7d332d7b2ad83f6) [#2627](https://github.com/intel/intel-extension-for-pytorch/commit/bc32ea463084d711e4a9aae85e38dd5d7d427849) [#2631](https://github.com/intel/intel-extension-for-pytorch/commit/f55a2bfa5d505fb7c7a6225c1c6206b5926777ab) [#2704](https://github.com/intel/intel-extension-for-pytorch/commit/eae477f76356b5a83640941787a168f680334775)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.2.0+cpu...v2.3.0+cpu
+
 ## 2.2.0
 
 We are excited to announce the release of Intel® Extension for PyTorch\* 2.2.0+cpu which accompanies PyTorch 2.2. This release mainly brings in our latest optimization on Large Language Model (LLM) including new dedicated API set (`ipex.llm`), new capability for auto-tuning accuracy recipe for LLM, and a broader list of optimized LLM models, together with a set of bug fixing and small optimization. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
