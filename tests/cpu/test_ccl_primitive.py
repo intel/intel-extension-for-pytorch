@@ -3,8 +3,11 @@ import os
 import torch
 import intel_extension_for_pytorch as ipex
 
+has_ccl = ipex.cpu.comm.has_ccl()
+world_size = 0 if not has_ccl else ipex.cpu.comm.get_world_size()
 
-@unittest.skip("oneccl can't works in docker")
+
+@unittest.skipIf(not (has_ccl and world_size > 1), "oneccl is not built")
 class CCLTester(unittest.TestCase):
     def test_all_reduce_add(self):
         mpi_world_size = int(os.environ.get("PMI_SIZE", -1))
