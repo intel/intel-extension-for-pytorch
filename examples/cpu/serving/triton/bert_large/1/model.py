@@ -34,34 +34,48 @@ import triton_python_backend_utils as pb_utils
 import intel_extension_for_pytorch as ipex
 import json
 
+
 def make_model(model_name, input_shape, device, bfloat16):
-    print(f"{{ origin: '{model_name}', input shape: {input_shape}, enabled bfloat16: {bfloat16}}}")
+    print(
+        f"{{ origin: '{model_name}', input shape: {input_shape}, enabled bfloat16: {bfloat16}}}"
+    )
     # Download PyTorch model
     config = AutoConfig.from_pretrained(
-        model_name, return_dict=False, torchscript=True, num_labels=2)
+        model_name, return_dict=False, torchscript=True, num_labels=2
+    )
     model = BertModel.from_pretrained(model_name, config=config)
     model = model.eval()
     vocab_size = model.config.vocab_size
     data = torch.randint(vocab_size, size=input_shape)
 
-    print('Optimizing model in IPEX:')
+    print("Optimizing model in IPEX:")
     try:
-      model = ipex.optimize(model, level="O1",auto_kernel_selection=True, conv_bn_folding=False, dtype=torch.bfloat16 if bfloat16 else torch.float32)
-      with torch.no_grad(), torch.cpu.amp.autocast(enabled=bfloat16):
-          model = torch.jit.trace(model, data, check_trace=False, strict=False)
-          model = torch.jit.freeze(model)
-    except Exception as e: print(e)
-   
-    print('Trigger Init Model Execution')
+        model = ipex.optimize(
+            model,
+            level="O1",
+            auto_kernel_selection=True,
+            conv_bn_folding=False,
+            dtype=torch.bfloat16 if bfloat16 else torch.float32,
+        )
+        with torch.no_grad(), torch.cpu.amp.autocast(enabled=bfloat16):
+            model = torch.jit.trace(model, data, check_trace=False, strict=False)
+            model = torch.jit.freeze(model)
+    except Exception as e:
+        print(e)
+
+    print("Trigger Init Model Execution")
     # Enable fusion path (need to run forward propagation twice)
     with torch.no_grad(), torch.cpu.amp.autocast(enabled=bfloat16):
         model(data)
         model(data)
     return model.to(device)
 
+
 def compute_batch_set(full_batch, batches):
     if batches is None or len(batches) == 0:
-        return [full_batch,]
+        return [
+            full_batch,
+        ]
 
     batches = sorted(batches, reverse=True)
     batch_set = []
@@ -73,6 +87,7 @@ def compute_batch_set(full_batch, batches):
             break
 
     return batch_set
+
 
 def execute_model(models, inputs, batches, dynamic_shape, bfloat16):
     input_batches = [x.shape[0] for x in inputs]
@@ -92,10 +107,10 @@ def execute_model(models, inputs, batches, dynamic_shape, bfloat16):
     # Execute the model
     model_outputs = []
     with torch.no_grad(), torch.cpu.amp.autocast(enabled=bfloat16):
-      for i in range(len(splits)):
-          inp = splitted_inputs[i]
-          out = models[0 if dynamic_shape else splits[i]](inp)[1]
-          model_outputs.append(out)
+        for i in range(len(splits)):
+            inp = splitted_inputs[i]
+            out = models[0 if dynamic_shape else splits[i]](inp)[1]
+            model_outputs.append(out)
 
     # Re-combine results
     full_output = torch.concat(model_outputs, 0)
@@ -127,57 +142,64 @@ class TritonPythonModel:
         """
 
         # You must parse model_config. JSON string is not parsed here
-        self.model_config = json.loads(args['model_config'])
-        self.device = torch.device('cpu')
+        self.model_config = json.loads(args["model_config"])
+        self.device = torch.device("cpu")
 
         # Get INPUT0 configuration
-        input0_config = pb_utils.get_input_config_by_name(
-            self.model_config, "INPUT0")
-        seq_length = input0_config['dims'][0]
+        input0_config = pb_utils.get_input_config_by_name(self.model_config, "INPUT0")
+        seq_length = input0_config["dims"][0]
 
         # Get OUTPUT0 configuration
         output0_config = pb_utils.get_output_config_by_name(
-            self.model_config, "OUTPUT0")
+            self.model_config, "OUTPUT0"
+        )
 
         # Convert Triton types to numpy types
         self.output0_dtype = pb_utils.triton_string_to_numpy(
-            output0_config['data_type'])
+            output0_config["data_type"]
+        )
 
         self.batches = []
         self.dynamic_shape = True
         self.bfloat16 = False
-        parameters = self.model_config['parameters']
+        parameters = self.model_config["parameters"]
 
-        if 'origin' in parameters:
-          origin = parameters['origin']['string_value']
+        if "origin" in parameters:
+            origin = parameters["origin"]["string_value"]
         else:
-          raise pb_utils.TritonModelException("Origin model name should be defined")
+            raise pb_utils.TritonModelException("Origin model name should be defined")
 
-        if 'batches' in parameters:
-          self.batches = json.loads(parameters['batches']['string_value'])
+        if "batches" in parameters:
+            self.batches = json.loads(parameters["batches"]["string_value"])
 
-        if 'dynamic_shape' in parameters:
-          self.dynamic_shape = json.loads(parameters['dynamic_shape']['string_value'])
+        if "dynamic_shape" in parameters:
+            self.dynamic_shape = json.loads(parameters["dynamic_shape"]["string_value"])
 
-        if 'bfloat16' in parameters:
-          self.bfloat16 = json.loads(parameters['bfloat16']['string_value'])
+        if "bfloat16" in parameters:
+            self.bfloat16 = json.loads(parameters["bfloat16"]["string_value"])
 
         self.models_cpu = dict()
         # Dynamic shapes supported in fp32/bf6 mode for PyTorch+IPEX
         if self.dynamic_shape:
-          input_shape = [1, seq_length if seq_length > 0 else 128]
-          self.models_cpu[0] = make_model(origin, input_shape, self.device, self.bfloat16)
+            input_shape = [1, seq_length if seq_length > 0 else 128]
+            self.models_cpu[0] = make_model(
+                origin, input_shape, self.device, self.bfloat16
+            )
 
         else:
-          if seq_length <= 0:
-            raise pb_utils.TritonModelException("Dynamic shapes switched off but input size is not defined")
+            if seq_length <= 0:
+                raise pb_utils.TritonModelException(
+                    "Dynamic shapes switched off but input size is not defined"
+                )
 
-          if self.batches is None or len(self.batches) == 0:
-            self.batches = [1]
+            if self.batches is None or len(self.batches) == 0:
+                self.batches = [1]
 
-          for batch in self.batches:
-            input_shape = [batch, seq_length]
-            self.models_cpu[batch] = make_model(origin, input_shape, self.device, self.bfloat16)
+            for batch in self.batches:
+                input_shape = [batch, seq_length]
+                self.models_cpu[batch] = make_model(
+                    origin, input_shape, self.device, self.bfloat16
+                )
 
     def execute(self, requests):
         """`execute` must be implemented in every Python model. `execute`
@@ -208,16 +230,21 @@ class TritonPythonModel:
             in_0_cpu = dlpack.from_dlpack(in_0).to(self.device)
             inputs.append(in_0_cpu)
 
-        outputs = execute_model(self.models_cpu, inputs, self.batches, self.dynamic_shape, self.bfloat16)
+        outputs = execute_model(
+            self.models_cpu, inputs, self.batches, self.dynamic_shape, self.bfloat16
+        )
 
         # Convert model outputs to triton responses
         responses = []
         for cur_bert_output in outputs:
             pooler_output = cur_bert_output.cpu().detach().numpy()
-            out_tensor_0 = pb_utils.Tensor("OUTPUT0", pooler_output.astype(self.output0_dtype))
+            out_tensor_0 = pb_utils.Tensor(
+                "OUTPUT0", pooler_output.astype(self.output0_dtype)
+            )
 
             inference_response = pb_utils.InferenceResponse(
-                output_tensors=[out_tensor_0])
+                output_tensors=[out_tensor_0]
+            )
             responses.append(inference_response)
 
         return responses
@@ -227,4 +254,4 @@ class TritonPythonModel:
         Implementing `finalize` function is optional. This function allows
         the model to perform any necessary clean ups before exit.
         """
-        print('Cleaning up...')
+        print("Cleaning up...")

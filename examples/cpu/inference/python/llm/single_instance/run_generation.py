@@ -17,7 +17,7 @@ from transformers import TextStreamer
 
 import sys
 
-sys.path.append(sys.path[0] + '/../../')
+sys.path.append(sys.path[0] + "/../../")
 
 import logging
 
@@ -54,7 +54,13 @@ try:
     from llava.model.builder import load_pretrained_model
     from llava.conversation import conv_templates
     from llava.mm_utils import get_model_name_from_path, tokenizer_image_token
-    from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+    from llava.constants import (
+        IMAGE_TOKEN_INDEX,
+        DEFAULT_IMAGE_TOKEN,
+        DEFAULT_IM_START_TOKEN,
+        DEFAULT_IM_END_TOKEN,
+    )
+
     MODEL_CLASSES["llava"] = (LlavaLlamaForCausalLM, AutoTokenizer)
 except ImportError:
     pass
@@ -88,10 +94,15 @@ parser.add_argument(
     "--prompt", default=None, type=str, help="input prompt for self-defined if needed"
 )
 parser.add_argument(
-    "--streaming", action="store_true", help="enable streaming mode for generation output (greedy search only)"
+    "--streaming",
+    action="store_true",
+    help="enable streaming mode for generation output (greedy search only)",
 )
 parser.add_argument(
-    "--image-url", default="http://images.cocodataset.org/val2017/000000039769.jpg", type=str, help="image url for image-to-text task"
+    "--image-url",
+    default="http://images.cocodataset.org/val2017/000000039769.jpg",
+    type=str,
+    help="image url for image-to-text task",
 )
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
@@ -100,7 +111,9 @@ parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--ipex", action="store_true")
 parser.add_argument("--deployment-mode", action="store_true")
 parser.add_argument("--torch-compile", action="store_true")
-parser.add_argument("--backend", default="ipex", type=str, help="backend of torch.compile")
+parser.add_argument(
+    "--backend", default="ipex", type=str, help="backend of torch.compile"
+)
 parser.add_argument("--profile", action="store_true")
 parser.add_argument("--benchmark", action="store_true")
 parser.add_argument("--num-iter", default=100, type=int, help="num iter")
@@ -135,15 +148,23 @@ if args.config_file is None:
     if model_type == "chatglm":
         # chatglm modeling is from remote hub and its torch_dtype in config.json need to be overrided
         config = AutoConfig.from_pretrained(
-            args.model_id, torchscript=args.deployment_mode, trust_remote_code=True, torch_dtype=amp_dtype,
+            args.model_id,
+            torchscript=args.deployment_mode,
+            trust_remote_code=True,
+            torch_dtype=amp_dtype,
         )
     else:
         config = AutoConfig.from_pretrained(
-            args.model_id, torchscript=args.deployment_mode, trust_remote_code=True,
+            args.model_id,
+            torchscript=args.deployment_mode,
+            trust_remote_code=True,
         )
 else:
     config = AutoConfig.from_pretrained(
-        args.config_file, torchscript=args.deployment_mode, trust_remote_code=True, torch_dtype=amp_dtype,
+        args.config_file,
+        torchscript=args.deployment_mode,
+        trust_remote_code=True,
+        torch_dtype=amp_dtype,
     )
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
@@ -159,11 +180,13 @@ if model_type != "llava":
         torch_dtype=amp_dtype,
         config=config,
         low_cpu_mem_usage=True,
-        trust_remote_code=True
+        trust_remote_code=True,
     )
     tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 else:
-    tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_id)
+    tokenizer, model, image_processor, context_len = load_pretrained_model(
+        args.model_id
+    )
 model = model.eval()
 model = model.to(memory_format=torch.channels_last)
 num_beams = 1 if args.greedy else 4
@@ -172,7 +195,14 @@ if args.streaming:
     streamer = TextStreamer(tokenizer)
 else:
     streamer = None
-generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens, streamer=streamer)
+generate_kwargs = dict(
+    do_sample=False,
+    temperature=0.9,
+    num_beams=num_beams,
+    max_new_tokens=args.max_new_tokens,
+    min_new_tokens=args.max_new_tokens,
+    streamer=streamer,
+)
 
 if re.search("gptbigcode", model.config.architectures[0], re.IGNORECASE):
     model_type = "gptbigcode"
@@ -181,22 +211,27 @@ if re.search("gptneox", model.config.architectures[0], re.IGNORECASE):
 elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
     generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
     generate_kwargs.pop("max_new_tokens")
-elif re.search("git", model.config.architectures[0], re.IGNORECASE) or re.search("llava", model.config.architectures[0], re.IGNORECASE):
+elif re.search("git", model.config.architectures[0], re.IGNORECASE) or re.search(
+    "llava", model.config.architectures[0], re.IGNORECASE
+):
     from PIL import Image
     import requests
     from io import BytesIO
+
     model.config.batch_size = int(args.batch_size) * num_beams
 
     def load_image(image_file):
-        if image_file.startswith('http://') or image_file.startswith('https://'):
+        if image_file.startswith("http://") or image_file.startswith("https://"):
             response = requests.get(image_file)
-            image = Image.open(BytesIO(response.content)).convert('RGB')
+            image = Image.open(BytesIO(response.content)).convert("RGB")
         else:
-            image = Image.open(image_file).convert('RGB')
+            image = Image.open(image_file).convert("RGB")
         return image
+
+
 if re.search("llava", model.config.architectures[0], re.IGNORECASE):
     model_name = get_model_name_from_path(args.model_id)
-    if 'llama-2' in model_name.lower():
+    if "llama-2" in model_name.lower():
         conv_mode = "llava_llama_2"
     elif "v1" in model_name.lower():
         conv_mode = "llava_v1"
@@ -206,13 +241,17 @@ if re.search("llava", model.config.architectures[0], re.IGNORECASE):
         conv_mode = "llava_v0"
     conv = conv_templates[conv_mode].copy()
     if "mpt" in model_name.lower():
-        roles = ('user', 'assistant')
+        roles = ("user", "assistant")
     else:
         roles = conv.roles
 if re.search("yuan", model.config.architectures[0], re.IGNORECASE):
     model.config.batch_size = int(args.batch_size) * num_beams
+
+
 def trace_handler(prof):
     print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1))
+
+
 # to ipex
 if args.ipex:
     model = ipex.llm.optimize(
@@ -223,7 +262,10 @@ if args.ipex:
     )
 if args.torch_compile:
     if args.deployment_mode:
-        raise SystemExit("[ERROR] deployment_mode cannot co-work with torch.compile, please set deployment_mode to False if want to use torch.compile.")
+        raise SystemExit(
+            "[ERROR] deployment_mode cannot co-work with torch.compile, please set deployment_mode"
+            " to False if want to use torch.compile."
+        )
     model.forward = torch.compile(model.forward, dynamic=True, backend=args.backend)
 
 
@@ -243,9 +285,15 @@ if args.benchmark:
         image = load_image(args.image_url)
         image = [image] * args.batch_size
         if model.config.mm_use_im_start_end:
-            prompt = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + prompt
+            prompt = (
+                DEFAULT_IM_START_TOKEN
+                + DEFAULT_IMAGE_TOKEN
+                + DEFAULT_IM_END_TOKEN
+                + "\n"
+                + prompt
+            )
         else:
-            prompt = DEFAULT_IMAGE_TOKEN + '\n' + prompt
+            prompt = DEFAULT_IMAGE_TOKEN + "\n" + prompt
         conv.append_message(conv.roles[0], prompt)
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
@@ -262,7 +310,9 @@ if args.benchmark:
                 + args.model_id
             )
         elif int(args.input_tokens) > 8192:
-            prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+            prompt = prompt_pool[model_type]["8192"] * int(
+                int(args.input_tokens) / 8192
+            )
         elif args.input_tokens in prompt_pool[model_type]:
             prompt = prompt_pool[model_type][args.input_tokens]
         else:
@@ -283,17 +333,34 @@ if args.benchmark:
         for i in range(num_iter):
             tic = time.time()
             if model_type == "llava":
-                input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in prompt])
-                image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(amp_dtype) for img in image]
-                output = model.generate(input_ids, images=image_tensor, **generate_kwargs)
+                input_ids = torch.stack(
+                    [
+                        tokenizer_image_token(
+                            pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+                        )
+                        for pmt in prompt
+                    ]
+                )
+                image_tensor = [
+                    image_processor.preprocess(img, return_tensors="pt")[
+                        "pixel_values"
+                    ].to(amp_dtype)
+                    for img in image
+                ]
+                output = model.generate(
+                    input_ids, images=image_tensor, **generate_kwargs
+                )
             elif model_type == "git":
-                input_ids=tokenizer(images=prompt, return_tensors="pt").pixel_values
+                input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
                 output = model.generate(pixel_values=input_ids, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = model.generate(input_ids, **generate_kwargs)
             gen_ids = output[0] if args.token_latency else output
-            gen_text = tokenizer.batch_decode(gen_ids[:, input_ids.shape[1]:] if model_type=="llava" else gen_ids, skip_special_tokens=True)
+            gen_text = tokenizer.batch_decode(
+                gen_ids[:, input_ids.shape[1] :] if model_type == "llava" else gen_ids,
+                skip_special_tokens=True,
+            )
 
             toc = time.time()
             input_tokens_lengths = [x.shape[0] for x in input_ids]
@@ -317,12 +384,33 @@ if args.benchmark:
             ) as prof:
                 for i in range(5):
                     if model_type == "llava":
-                        input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in prompt])
-                        image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(amp_dtype) for img in image]
-                        output = model.generate(input_ids, images=image_tensor, **generate_kwargs)
+                        input_ids = torch.stack(
+                            [
+                                tokenizer_image_token(
+                                    pmt,
+                                    tokenizer,
+                                    IMAGE_TOKEN_INDEX,
+                                    return_tensors="pt",
+                                )
+                                for pmt in prompt
+                            ]
+                        )
+                        image_tensor = [
+                            image_processor.preprocess(img, return_tensors="pt")[
+                                "pixel_values"
+                            ].to(amp_dtype)
+                            for img in image
+                        ]
+                        output = model.generate(
+                            input_ids, images=image_tensor, **generate_kwargs
+                        )
                     elif model_type == "git":
-                        input_ids=tokenizer(images=prompt, return_tensors="pt").pixel_values
-                        output = model.generate(pixel_values=input_ids, **generate_kwargs)
+                        input_ids = tokenizer(
+                            images=prompt, return_tensors="pt"
+                        ).pixel_values
+                        output = model.generate(
+                            pixel_values=input_ids, **generate_kwargs
+                        )
                     else:
                         input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                         output = model.generate(input_ids, **generate_kwargs)

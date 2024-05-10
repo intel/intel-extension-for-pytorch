@@ -1,12 +1,15 @@
 import torch
+
 #################### code changes ####################  # noqa F401
 import intel_extension_for_pytorch as ipex
 from intel_extension_for_pytorch.quantization import prepare, convert
+
 ######################################################  # noqa F401
 
 ##### Example Model #####  # noqa F401
 import torchvision.models as models
-model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
+
+model = models.resnet50(weights="ResNet50_Weights.DEFAULT")
 model.eval()
 data = torch.rand(128, 3, 224, 224)
 #########################  # noqa F401
@@ -22,14 +25,17 @@ prepared_model = prepare(model, qconfig_mapping, example_inputs=data, inplace=Fa
 
 ##### Example Dataloader #####  # noqa F401
 import torchvision
-DOWNLOAD = True
-DATA = 'datasets/cifar10/'
 
-transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((224, 224)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
+DOWNLOAD = True
+DATA = "datasets/cifar10/"
+
+transform = torchvision.transforms.Compose(
+    [
+        torchvision.transforms.Resize((224, 224)),
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ]
+)
 train_dataset = torchvision.datasets.CIFAR10(
     root=DATA,
     train=True,
@@ -37,13 +43,12 @@ train_dataset = torchvision.datasets.CIFAR10(
     download=DOWNLOAD,
 )
 calibration_data_loader = torch.utils.data.DataLoader(
-    dataset=train_dataset,
-    batch_size=128
+    dataset=train_dataset, batch_size=128
 )
 
 with torch.no_grad():
     for batch_idx, (d, target) in enumerate(calibration_data_loader):
-        print(f'calibrated on batch {batch_idx} out of {len(calibration_data_loader)}')
+        print(f"calibrated on batch {batch_idx} out of {len(calibration_data_loader)}")
         prepared_model(d)
 ##############################  # noqa F401
 

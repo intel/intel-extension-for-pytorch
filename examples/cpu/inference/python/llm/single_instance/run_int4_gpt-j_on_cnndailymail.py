@@ -45,13 +45,21 @@ parser.add_argument(
     help="the INT4 model file path. If provided, calibration with GPTQ and quantization are skipped.",
 )
 parser.add_argument("--output-dir", nargs="?", default="./saved_results")
-parser.add_argument("--fp32", action="store_true",
-                    help="Run float32 model without quantization. Cannot use this option along with --bf16.")
-parser.add_argument("--bf16", action="store_true",
-                    help="Run bfloat16 model without quantization. Cannot use this option along with --fp32.")
+parser.add_argument(
+    "--fp32",
+    action="store_true",
+    help="Run float32 model without quantization. Cannot use this option along with --bf16.",
+)
+parser.add_argument(
+    "--bf16",
+    action="store_true",
+    help="Run bfloat16 model without quantization. Cannot use this option along with --fp32.",
+)
 args = parser.parse_args()
 
-assert not (args.fp32 and args.bf16), "--fp32 and --bf16 cannot be used at the same time"
+assert not (
+    args.fp32 and args.bf16
+), "--fp32 and --bf16 cannot be used at the same time"
 
 random.seed(9973)
 logger = logging.getLogger("INT4 GPT-J")
@@ -71,7 +79,15 @@ PROMPT_DICT = {
 
 
 class CNNDAILYMAIL(object):
-    def __init__(self, model_path, data_path, device="cpu", is_calib=False, num_samples=20, max_len=1920):
+    def __init__(
+        self,
+        model_path,
+        data_path,
+        device="cpu",
+        is_calib=False,
+        num_samples=20,
+        max_len=1920,
+    ):
         self.model_path = model_path
         self.data_path = data_path
         self.device = device
@@ -87,7 +103,7 @@ class CNNDAILYMAIL(object):
         self.load_dataset()
 
     def load_dataset(self):
-        """ Loads dataset"""
+        """Loads dataset"""
         with open(self.data_path, "r") as fid:
             list_data_dict = json.load(fid)
             self.list_data_dict = copy.deepcopy(list_data_dict)
@@ -96,11 +112,14 @@ class CNNDAILYMAIL(object):
             self.num_samples = min(self.num_samples, len(list_data_dict))
 
             if self.is_calib:
-                list_data_dict = list_data_dict[:self.num_samples]
+                list_data_dict = list_data_dict[: self.num_samples]
             else:
                 list_data_dict = random.choices(list_data_dict, k=self.num_samples)
 
-        prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
+        prompt_input, prompt_no_input = (
+            PROMPT_DICT["prompt_input"],
+            PROMPT_DICT["prompt_no_input"],
+        )
         sources = [prompt_input.format_map(example) for example in list_data_dict]
         targets = [f"{example['output']}" for example in list_data_dict]
 
@@ -116,7 +135,7 @@ class CNNDAILYMAIL(object):
         self.targets = targets
 
     def load_tokenizer(self):
-        """ Returns the tokenizer """
+        """Returns the tokenizer"""
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_path,
             model_max_length=2048,
@@ -127,7 +146,13 @@ class CNNDAILYMAIL(object):
 
     @torch.no_grad()
     def tokenize_function(self, text):
-        example = self.tokenizer(text, truncation=True, max_length=self.max_len, return_tensors="pt", padding=self.padding)
+        example = self.tokenizer(
+            text,
+            truncation=True,
+            max_length=self.max_len,
+            return_tensors="pt",
+            padding=self.padding,
+        )
         return example
 
     def __len__(self):
@@ -158,6 +183,7 @@ metric = evaluate.load("rouge")
 parent_path = Path(__file__).parent.absolute()
 Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
+
 def load_original_model(args):
     logger.info("Loading model {}...".format(args.model))
     config = AutoConfig.from_pretrained(args.model, torchscript=True)
@@ -168,14 +194,15 @@ def load_original_model(args):
     logger.info("model loaded.")
     return user_model, tokenizer
 
-dataset_id = 'cnn_dailymail'
-dataset_version = '3.0.0'
+
+dataset_id = "cnn_dailymail"
+dataset_version = "3.0.0"
 dataset_split = "validation"
 if args.dataset_path == "":
     instruction_template = "Summarize the following news article:"
     logger.info("Loading {} split of {} dataset...".format(dataset_split, args.model))
     dataset = load_dataset(dataset_id, name=dataset_version, split=dataset_split)
-    train = dict((x['id'], x) for x in dataset)
+    train = dict((x["id"], x) for x in dataset)
     inputs = []
     for i in tqdm(range(len(dataset))):
         sample = dataset[i]
@@ -185,8 +212,10 @@ if args.dataset_path == "":
         x["output"] = sample["highlights"]
         inputs.append(x)
 
-    val_data_path = os.path.join(args.output_dir, "cnn_dailymail_{}.json".format(dataset_split))
-    with open(val_data_path, 'w') as write_f:
+    val_data_path = os.path.join(
+        args.output_dir, "cnn_dailymail_{}.json".format(dataset_split)
+    )
+    with open(val_data_path, "w") as write_f:
         json.dump(inputs, write_f, indent=4, ensure_ascii=False)
 
     logger.info("{} data saved at {}".format(dataset_split, val_data_path))
@@ -214,25 +243,32 @@ elif args.int4_model == "":
         logger.info("Calibration with GPTQ will take an hour or so. Please wait.")
         user_model, tokenizer = load_original_model(args)
         calib_iters = 128
-        calib_dataset = CNNDAILYMAIL(args.model, val_data_path, is_calib=True, num_samples=calib_iters)
+        calib_dataset = CNNDAILYMAIL(
+            args.model, val_data_path, is_calib=True, num_samples=calib_iters
+        )
         calib_dataloader = DataLoader(
             calib_dataset,
             batch_size=batch_size,
             shuffle=False,
-            collate_fn=calib_dataset.collate_batch
+            collate_fn=calib_dataset.collate_batch,
         )
 
-        compressed_model = ipex.quantization.gptq(  
+        compressed_model = ipex.quantization.gptq(
             model=user_model,
             dataloader=calib_dataloader,
-            group_size=128, 
+            group_size=128,
             use_max_length=True,
             compression_dtype=torch.int32,
             compression_dim=1,
             scale_dtype=torch.float16,
-            save_dir=args.output_dir)
+            save_dir=args.output_dir,
+        )
 
-        logger.info("Calibration finished. Low-precision checkpoint generated as {}.".format(args.output_dir))
+        logger.info(
+            "Calibration finished. Low-precision checkpoint generated as {}.".format(
+                args.output_dir
+            )
+        )
         # Quit here because we want to use different environment variables to run GPTQ and benchmark.
         # So, run this script twice and specify the GPTQ checkpoint file for the second run.
         quit()
@@ -243,12 +279,12 @@ elif args.int4_model == "":
     logger.info("Loading low_precision_checkpoint...")
     low_precision_checkpoint = torch.load(low_precision_checkpoint_file_path)
     config_dict = {
-            "weight_key": "qweight",
-            "scale_key": "scales",
-            "zero_point_key": "qzeros",
-            "bias_key": "bias",
-            "g_idx_key": "g_idx"
-        }
+        "weight_key": "qweight",
+        "scale_key": "scales",
+        "zero_point_key": "qzeros",
+        "bias_key": "bias",
+        "g_idx_key": "g_idx",
+    }
     state_dict_and_config = (low_precision_checkpoint, config_dict)
     logger.info("low_precision_checkpoint loaded.")
 
@@ -316,7 +352,11 @@ elif args.int4_model == "":
         self_jit = torch.jit.freeze(self_jit.eval())
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         self_jit.save(args.output_dir + "/int4_model.pt")
-    logger.info("Quantization finished. INT4 model saved to {}.".format(args.output_dir + "/int4_model.pt"))
+    logger.info(
+        "Quantization finished. INT4 model saved to {}.".format(
+            args.output_dir + "/int4_model.pt"
+        )
+    )
 else:
     user_model, tokenizer = load_original_model(args)
     logger.info("INT4 model is given. Quantization skipped.")
@@ -338,6 +378,7 @@ preds = []
 predictions = []
 ground_truths = []
 
+
 def postprocess_text(preds, targets):
     preds = [pred.strip() for pred in preds]
     targets = [target.strip() for target in targets]
@@ -347,22 +388,30 @@ def postprocess_text(preds, targets):
 
     return preds, targets
 
+
 # Only run 1000 samples. It saves a lot of time and it's a good approximation of results on the whole dataset
 iters = 1000
-val_dataset = CNNDAILYMAIL(args.model, val_data_path, is_calib=False, max_len=max_len, num_samples=iters)
+val_dataset = CNNDAILYMAIL(
+    args.model, val_data_path, is_calib=False, max_len=max_len, num_samples=iters
+)
 sources = val_dataset.sources
 targets = val_dataset.targets
 logger.info("Start running accuracy task...")
 logger.info("Number of samples to run = {}".format(iters))
 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
     enabled=(False if args.fp32 else True),
-    dtype=(None if args.fp32 else torch.bfloat16)
+    dtype=(None if args.fp32 else torch.bfloat16),
 ):
     for i in tqdm(range(len(sources))):
         input_ids, actual_lens, att_mask = val_dataset[i]
         input_lens = input_ids.shape[-1]
         t0 = time.time()
-        out_tokens = user_model.generate(input_ids, attention_mask=att_mask, **generate_kwargs, pad_token_id=tokenizer.pad_token_id)
+        out_tokens = user_model.generate(
+            input_ids,
+            attention_mask=att_mask,
+            **generate_kwargs,
+            pad_token_id=tokenizer.pad_token_id,
+        )
         t1 = time.time()
         print("Inference time: {}".format(round(t1 - t0, 3)))
         print("Seq len: {}".format(input_ids.shape[-1]))
@@ -379,7 +428,12 @@ with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
         if i == iters - 1:
             break
 
-result = metric.compute(predictions=predictions, references=ground_truths, use_stemmer=True, use_aggregator=False)
+result = metric.compute(
+    predictions=predictions,
+    references=ground_truths,
+    use_stemmer=True,
+    use_aggregator=False,
+)
 result = {k: round(np.mean(v) * 100, 4) for k, v in result.items()}
 logger.info("Accuracy test results:")
 logger.info(result)

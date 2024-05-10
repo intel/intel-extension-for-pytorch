@@ -1,8 +1,9 @@
 import torch
 
 from .llm import LLMConfig, EXAMPLE_INPUTS_MODE
-import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch as ipex  # noqa F401
 import re
+
 
 class BaichuanConfig(LLMConfig):
     def __init__(self, model_id):
@@ -21,7 +22,9 @@ class BaichuanConfig(LLMConfig):
         super().get_user_model(config, benchmark)
         input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
         attention_mask = torch.ones_like(input_ids)
-        example_inputs = self.model.prepare_inputs_for_generation(input_ids, attention_mask=attention_mask)
+        example_inputs = self.model.prepare_inputs_for_generation(
+            input_ids, attention_mask=attention_mask
+        )
         if example_inputs.get("position_ids", None) is not None:
             self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV_POS
         return self.model

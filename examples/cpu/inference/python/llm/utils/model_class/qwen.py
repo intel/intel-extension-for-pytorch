@@ -1,5 +1,6 @@
 from .llm import LLMConfig, EXAMPLE_INPUTS_MODE
 
+
 class QwenConfig(LLMConfig):
     def __init__(self, model_id):
         self.name = "qwen"

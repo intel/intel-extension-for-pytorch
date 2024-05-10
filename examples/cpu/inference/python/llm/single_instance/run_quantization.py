@@ -7,7 +7,6 @@ from datasets import load_dataset
 
 import torch
 from torch.utils.data import DataLoader
-import transformers
 from transformers import AutoConfig
 from transformers import TextStreamer
 import intel_extension_for_pytorch as ipex
@@ -48,7 +47,9 @@ parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
 )
 parser.add_argument(
-    "--streaming", action="store_true", help="enable streaming mode for generation output (greedy search only)"
+    "--streaming",
+    action="store_true",
+    help="enable streaming mode for generation output (greedy search only)",
 )
 parser.add_argument("--dataset", nargs="?", default="")
 parser.add_argument("--split", nargs="?", default="validation", const="validation")
@@ -66,9 +67,14 @@ parser.add_argument(
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
 )
 parser.add_argument(
-    "--image-url", default="http://images.cocodataset.org/val2017/000000039769.jpg", type=str, help="image url for image-to-text task"
+    "--image-url",
+    default="http://images.cocodataset.org/val2017/000000039769.jpg",
+    type=str,
+    help="image url for image-to-text task",
 )
-parser.add_argument("--qconfig-summary-file", default="", help="qconfig for static quantization")
+parser.add_argument(
+    "--qconfig-summary-file", default="", help="qconfig for static quantization"
+)
 parser.add_argument("--quantized-model-path", default="./saved_results/best_model.pt")
 parser.add_argument("--benchmark", action="store_true")
 parser.add_argument("--input-tokens", default="32", type=str)
@@ -77,43 +83,77 @@ parser.add_argument("--num-iter", default=100, type=int, help="num iter")
 parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
 parser.add_argument("--batch-size", default=1, type=int, help="batch size")
 parser.add_argument(
-    "--calib-len", default=512, type=int, help="calibration dataset max or padding max length for SmoothQuant autotuning"
-)
-parser.add_argument("--calib-iters", default=512, type=int, help="calibration iters for SmoothQuant autotuning")
-parser.add_argument(
-    "--calib-shuffle", action="store_true", help="whether to shuffle on calibration dataset for SmoothQuant autotuning"
-)
-parser.add_argument(
-    "--calib-padding", action="store_true", help="whether to pad on calibration dataset for SmoothQuant autotuning"
+    "--calib-len",
+    default=512,
+    type=int,
+    help="calibration dataset max or padding max length for SmoothQuant autotuning",
 )
 parser.add_argument(
-    "--calib-pad-val", default=1, type=int, help="calibration dataset padding value for SmoothQuant autotuning"
+    "--calib-iters",
+    default=512,
+    type=int,
+    help="calibration iters for SmoothQuant autotuning",
 )
 parser.add_argument(
-    "--fallback-add", action="store_true", help="whether to fallback add ops to fp32 for SmoothQuant autotuning"
+    "--calib-shuffle",
+    action="store_true",
+    help="whether to shuffle on calibration dataset for SmoothQuant autotuning",
+)
+parser.add_argument(
+    "--calib-padding",
+    action="store_true",
+    help="whether to pad on calibration dataset for SmoothQuant autotuning",
+)
+parser.add_argument(
+    "--calib-pad-val",
+    default=1,
+    type=int,
+    help="calibration dataset padding value for SmoothQuant autotuning",
+)
+parser.add_argument(
+    "--fallback-add",
+    action="store_true",
+    help="whether to fallback add ops to fp32 for SmoothQuant autotuning",
 )
 parser.add_argument("--alpha", default=0.5, help="alpha value for smoothquant")
 parser.add_argument(
     "--folding", action="store_true", help="whether to fold mul into the previous layer"
 )
 parser.add_argument(
-    "--init-alpha", default=0.5, type=float, help="a value to get baseline quantization error for auto-tuning"
+    "--init-alpha",
+    default=0.5,
+    type=float,
+    help="a value to get baseline quantization error for auto-tuning",
 )
 parser.add_argument(
-    "--alpha-min", default=0.0, type=float, help="min value of auto-tuning alpha search space"
+    "--alpha-min",
+    default=0.0,
+    type=float,
+    help="min value of auto-tuning alpha search space",
 )
 parser.add_argument(
-    "--alpha-max", default=1.0, type=float, help="max value of auto-tuning alpha search space"
+    "--alpha-max",
+    default=1.0,
+    type=float,
+    help="max value of auto-tuning alpha search space",
 )
 parser.add_argument(
-    "--alpha-step", default=0.1, type=float, help="step_size of auto-tuning alpha search space"
+    "--alpha-step",
+    default=0.1,
+    type=float,
+    help="step_size of auto-tuning alpha search space",
 )
 parser.add_argument(
-    "--shared-criterion", choices=["min", "mean", "max"], default="max", type=str
-    , help="criterion for input LayerNorm op of a transformer block"
+    "--shared-criterion",
+    choices=["min", "mean", "max"],
+    default="max",
+    type=str,
+    help="criterion for input LayerNorm op of a transformer block",
 )
 parser.add_argument(
-    "--enable-blockwise-loss", action="store_true", help="whether to enable block-wise auto-tuning"
+    "--enable-blockwise-loss",
+    action="store_true",
+    help="whether to enable block-wise auto-tuning",
 )
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--greedy", action="store_true")
@@ -182,7 +222,7 @@ parser.add_argument(
     action="store_true",
     help="Indicate that the low-precision checkpoint is in the legacy format rather than the"
     " HuggingFace Optimum format for backward compatibility. It must be used with"
-    " --low-precision-checkpoint. Otherwise, it has no effect."
+    " --low-precision-checkpoint. Otherwise, it has no effect.",
 )
 args = parser.parse_args()
 
@@ -207,11 +247,16 @@ if args.config_file is None:
     if "chatglm" in args.model_id.lower():
         # chatglm modeling is from remote hub and its torch_dtype in config.json need to be overrided
         config = AutoConfig.from_pretrained(
-            args.model_id, torchscript=True, trust_remote_code=True, torch_dtype=torch.float
+            args.model_id,
+            torchscript=True,
+            trust_remote_code=True,
+            torch_dtype=torch.float,
         )
     else:
         config = AutoConfig.from_pretrained(
-            args.model_id, torchscript=True, trust_remote_code=True,
+            args.model_id,
+            torchscript=True,
+            trust_remote_code=True,
         )
 else:
     config = AutoConfig.from_pretrained(
@@ -223,7 +268,9 @@ if re.search("falcon", config.architectures[0], re.IGNORECASE) or re.search(
     model = FALCONConfig(args.model_id)
 elif re.search("GPTJ", config.architectures[0], re.IGNORECASE):
     model = GPTJConfig(args.model_id)
-elif re.search("llama", config.architectures[0], re.IGNORECASE) and not re.search("llava", config.architectures[0], re.IGNORECASE):
+elif re.search("llama", config.architectures[0], re.IGNORECASE) and not re.search(
+    "llava", config.architectures[0], re.IGNORECASE
+):
     model = LLAMAConfig(args.model_id)
 elif re.search("gptneox", config.architectures[0], re.IGNORECASE):
     model = GPTNEOXConfig(args.model_id)
@@ -254,27 +301,36 @@ elif re.search("qwen", config.architectures[0], re.IGNORECASE):
 elif re.search("git", config.architectures[0], re.IGNORECASE):
     from PIL import Image
     import requests
+
     model = GitConfig(args.model_id)
 elif re.search("llava", config.architectures[0], re.IGNORECASE):
     from PIL import Image
     import requests
     from io import BytesIO
+
     try:
         from llava.conversation import conv_templates
         from llava.mm_utils import get_model_name_from_path, tokenizer_image_token
-        from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+        from llava.constants import (
+            IMAGE_TOKEN_INDEX,
+            DEFAULT_IMAGE_TOKEN,
+            DEFAULT_IM_START_TOKEN,
+            DEFAULT_IM_END_TOKEN,
+        )
     except ImportError:
         pass
     model = LlavaConfig(args.model_id)
+
     def load_image(image_file):
-        if image_file.startswith('http://') or image_file.startswith('https://'):
+        if image_file.startswith("http://") or image_file.startswith("https://"):
             response = requests.get(image_file)
-            image = Image.open(BytesIO(response.content)).convert('RGB')
+            image = Image.open(BytesIO(response.content)).convert("RGB")
         else:
-            image = Image.open(image_file).convert('RGB')
+            image = Image.open(image_file).convert("RGB")
         return image
+
     model_name = get_model_name_from_path(args.model_id)
-    if 'llama-2' in model_name.lower():
+    if "llama-2" in model_name.lower():
         conv_mode = "llava_llama_2"
     elif "v1" in model_name.lower():
         conv_mode = "llava_v1"
@@ -284,7 +340,7 @@ elif re.search("llava", config.architectures[0], re.IGNORECASE):
         conv_mode = "llava_v0"
     conv = conv_templates[conv_mode].copy()
     if "mpt" in model_name.lower():
-        roles = ('user', 'assistant')
+        roles = ("user", "assistant")
     else:
         roles = conv.roles
 elif re.search("phi3", config.architectures[0], re.IGNORECASE):
@@ -318,7 +374,7 @@ generate_kwargs = dict(
     num_beams=num_beams,
     max_new_tokens=args.max_new_tokens,
     min_new_tokens=args.max_new_tokens,
-    streamer=streamer
+    streamer=streamer,
 )
 if re.search("t5", config.architectures[0], re.IGNORECASE):
     generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
@@ -334,12 +390,16 @@ user_model.eval()
 beam_idx_tmp = torch.zeros(
     (2048, int(args.batch_size * num_beams)), dtype=torch.long
 ).contiguous()
+
+
 def _get_target_nums(names):
     for n in names:
         if hasattr(user_model.config, n):
             return getattr(user_model.config, n)
     print(f"Not found target {names[0]}")
     exit(0)
+
+
 num_heads_names = ["num_attention_heads", "n_head", "num_heads", "n_heads"]
 num_layers_names = ["num_hidden_layers", "n_layer", "num_layers", "n_layers"]
 hidden_size_names = ["hidden_size", "n_embd"]
@@ -369,6 +429,7 @@ if model.name == "yuan":
             for i in range(n_layers)
         ]
     )
+
 
 def get_example_inputs(model):
     if model.use_global_past_key_value:
@@ -446,8 +507,8 @@ def get_example_inputs(model):
         ]
         pixel_inputs = torch.ones(batch_size, 3, 224, 224)
         example_inputs = (
-            input_ids.unsqueeze(0).repeat(batch_size,1),
-            attention_mask.unsqueeze(0).repeat(batch_size,1),
+            input_ids.unsqueeze(0).repeat(batch_size, 1),
+            attention_mask.unsqueeze(0).repeat(batch_size, 1),
             tuple(past_key_value),
             pixel_inputs,
         )
@@ -469,10 +530,13 @@ def get_example_inputs(model):
             tuple(past_key_value),
         )
     else:
-        raise RuntimeError("Your model does not match existing example inputs used in ipex quantization, exiting...")
+        raise RuntimeError(
+            "Your model does not match existing example inputs used in ipex quantization, exiting..."
+        )
     if hasattr(model, "extra_inputs"):
         example_inputs = example_inputs + model.extra_inputs
     return example_inputs
+
 
 if args.ipex_smooth_quant:
     if args.qconfig_summary_file != "":
@@ -486,9 +550,10 @@ if args.ipex_smooth_quant:
             deployment_mode=True,
         )
         pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-        user_model.trace_graph.save(args.output_dir + '/' + args.quant_model_name)
+        user_model.trace_graph.save(args.output_dir + "/" + args.quant_model_name)
         quant_model = user_model.trace_graph
     else:
+
         class Evaluator:
             def __init__(
                 self, dataset, tokenizer, args, batch_size=1, pad_val=1, pad_max=512
@@ -499,11 +564,11 @@ if args.ipex_smooth_quant:
                 self.pad_val = pad_val
                 self.pad_max = pad_max
                 self.args = args
-    
+
                 # tokenize the dataset
                 self.dataset = self.dataset.map(self.tokenize_function, batched=True)
                 self.dataset.set_format(type="torch", columns=["input_ids"])
-    
+
             @torch.no_grad()
             def tokenize_function(self, examples):
                 if "prompt" in examples:
@@ -513,7 +578,7 @@ if args.ipex_smooth_quant:
                 elif "code" in examples:
                     example = self.tokenizer(examples["code"])
                 return example
-    
+
             @torch.no_grad()
             def collate_batch(self, batch):
                 position_ids_padded = []
@@ -530,6 +595,7 @@ if args.ipex_smooth_quant:
                         )
                     else:
                         from torch.nn.functional import pad
+
                         pad_len = int(args.calib_len) - input_ids.shape[0]
                         input_ids = pad(
                             input_ids, (0, pad_len), value=int(args.calib_pad_val)
@@ -574,17 +640,23 @@ if args.ipex_smooth_quant:
                     model_kwargs = {
                         "attention_mask": torch.vstack(attention_mask_padded),
                     }
-                    model_kwargs = user_model._prepare_encoder_decoder_kwargs_for_generation(
-                        torch.vstack(input_ids_padded), model_kwargs, "input_ids"
+                    model_kwargs = (
+                        user_model._prepare_encoder_decoder_kwargs_for_generation(
+                            torch.vstack(input_ids_padded), model_kwargs, "input_ids"
+                        )
                     )
-                    input_ids, example_inputs = user_model._expand_inputs_for_generation(
-                        input_ids=torch.vstack(input_ids_padded),
-                        expand_size=num_beams,
-                        is_encoder_decoder=True,
-                        **model_kwargs,
+                    input_ids, example_inputs = (
+                        user_model._expand_inputs_for_generation(
+                            input_ids=torch.vstack(input_ids_padded),
+                            expand_size=num_beams,
+                            is_encoder_decoder=True,
+                            **model_kwargs,
+                        )
                     )
                     input_bs = int(args.batch_size * num_beams)
-                    last_hidden_state = example_inputs["encoder_outputs"]["last_hidden_state"]
+                    last_hidden_state = example_inputs["encoder_outputs"][
+                        "last_hidden_state"
+                    ]
                     global_past_key_value = tuple(
                         [
                             (
@@ -593,16 +665,24 @@ if args.ipex_smooth_quant:
                                 torch.zeros([1, n_heads, 1, head_dim]).contiguous(),
                                 beam_idx_tmp,
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                user_model.decoder.block[i].layer[1].EncDecAttention.k(last_hidden_state)
-                                .view(input_bs, -1, n_heads, head_dim).transpose(0, 1),
-                                user_model.decoder.block[i].layer[1].EncDecAttention.v(last_hidden_state)
-                                .view(input_bs, -1, n_heads, head_dim).transpose(0, 1),
+                                user_model.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.k(last_hidden_state)
+                                .view(input_bs, -1, n_heads, head_dim)
+                                .transpose(0, 1),
+                                user_model.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.v(last_hidden_state)
+                                .view(input_bs, -1, n_heads, head_dim)
+                                .transpose(0, 1),
                                 beam_idx_tmp,
                             )
                             for i in range(n_layers)
                         ]
                     )
-                    decoder_input_ids = (torch.zeros(input_bs).to(torch.long).unsqueeze(1))
+                    decoder_input_ids = (
+                        torch.zeros(input_bs).to(torch.long).unsqueeze(1)
+                    )
                     model_inputs = (
                         decoder_input_ids,
                         torch.vstack(attention_mask_padded),
@@ -610,13 +690,15 @@ if args.ipex_smooth_quant:
                         (last_hidden_state,),
                     )
                 else:
-                    raise RuntimeError("Your model does not match existing example inputs used in ipex smooth quant, exiting...")
+                    raise RuntimeError(
+                        "Your model does not match existing example inputs used in ipex smooth quant, exiting..."
+                    )
 
                 if hasattr(model, "extra_inputs"):
                     model_inputs = model_inputs + model.extra_inputs
 
                 return (model_inputs, last_ind)
-    
+
         calib_dataset = load_dataset(
             args.dataset if args.dataset else model.default_dataset, split="train"
         )
@@ -624,7 +706,11 @@ if args.ipex_smooth_quant:
             calib_dataset = calib_dataset.shuffle(seed=42)
         user_model.eval()
         calib_evaluator = Evaluator(
-            calib_dataset, tokenizer, args, batch_size=args.batch_size, pad_max=int(args.input_tokens) if model.name=="t5" else 512
+            calib_dataset,
+            tokenizer,
+            args,
+            batch_size=args.batch_size,
+            pad_max=int(args.input_tokens) if model.name == "t5" else 512,
         )
         calib_dataloader = DataLoader(
             calib_evaluator.dataset,
@@ -642,7 +728,7 @@ if args.ipex_smooth_quant:
         example_inputs = get_example_inputs(model)
 
         from intel_extension_for_pytorch.quantization import prepare, convert
-    
+
         if model.use_ipex_autotune:
             qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
             user_model = ipex.llm.optimize(
@@ -658,17 +744,21 @@ if args.ipex_smooth_quant:
                     "weight": {"dtype": ["fp32"]},
                     "activation": {"dtype": ["fp32"]},
                 }
-            
-            smoothquant_args = {"alpha": args.alpha if args.alpha == "auto" \
-                                else literal_eval(args.alpha), "folding": args.folding}
+
+            smoothquant_args = {
+                "alpha": (
+                    args.alpha if args.alpha == "auto" else literal_eval(args.alpha)
+                ),
+                "folding": args.folding,
+            }
             if args.alpha == "auto":
                 smoothquant_args["auto_alpha_args"] = {
-                        "init_alpha": float(args.init_alpha),
-                        "alpha_min": float(args.alpha_min),
-                        "alpha_max": float(args.alpha_max),
-                        "alpha_step": float(args.alpha_step),
-                        "shared_criterion": args.shared_criterion,
-                        "enable_blockwise_loss": args.enable_blockwise_loss
+                    "init_alpha": float(args.init_alpha),
+                    "alpha_min": float(args.alpha_min),
+                    "alpha_max": float(args.alpha_max),
+                    "alpha_step": float(args.alpha_step),
+                    "shared_criterion": args.shared_criterion,
+                    "enable_blockwise_loss": args.enable_blockwise_loss,
                 }
                 # using specified sq recipes for llama2-7b
                 if re.search("llama", config.architectures[0], re.IGNORECASE):
@@ -679,21 +769,23 @@ if args.ipex_smooth_quant:
                         "alpha_max": 0.99,
                         "alpha_step": 0.01,
                         "shared_criterion": "mean",
-                        "enable_blockwise_loss": False
-                }
+                        "enable_blockwise_loss": False,
+                    }
 
             prepared_model = ipex.quantization.autotune(
                 user_model,
                 calib_dataloader,
                 calib_func=calib_func,
                 op_type_dict=op_type_dict,
-                smoothquant_args=smoothquant_args
+                smoothquant_args=smoothquant_args,
             )
             pathlib.Path(args.output_dir).mkdir(parents=True, exist_ok=True)
             prepared_model.save_qconf_summary(args.output_dir + "/best_configure.json")
 
         else:
-            qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(alpha=args.alpha)
+            qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping(
+                alpha=args.alpha
+            )
             user_model = ipex.llm.optimize(
                 user_model.eval(),
                 dtype=amp_dtype,
@@ -723,15 +815,23 @@ if args.ipex_smooth_quant:
             quant_model = self_jit
             if model.name == "yuan":
                 input_bs = int(args.batch_size * num_beams)
-                example_inputs = (example_inputs[0].repeat(input_bs, 1), example_inputs[1].repeat(input_bs, 1), example_inputs[2].repeat(input_bs, 1))
+                example_inputs = (
+                    example_inputs[0].repeat(input_bs, 1),
+                    example_inputs[1].repeat(input_bs, 1),
+                    example_inputs[2].repeat(input_bs, 1),
+                )
                 self_jit_first = torch.jit.trace(
-                    convert_model.eval(), example_inputs, strict=False, check_trace=False
+                    convert_model.eval(),
+                    example_inputs,
+                    strict=False,
+                    check_trace=False,
                 )
                 self_jit_first = torch.jit.freeze(self_jit_first.eval())
                 self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
 
 elif args.ipex_weight_only_quantization:
     from intel_extension_for_pytorch.quantization import WoqWeightDtype
+
     if args.weight_dtype == "INT8":
         weight_dtype = WoqWeightDtype.INT8
     elif args.weight_dtype == "INT4":
@@ -796,7 +896,11 @@ elif args.ipex_weight_only_quantization:
         quant_model = self_jit
         if model.name == "yuan":
             input_bs = int(args.batch_size * num_beams)
-            example_inputs = (example_inputs[0].repeat(input_bs, 1), example_inputs[1].repeat(input_bs, 1), example_inputs[2].repeat(input_bs, 1))
+            example_inputs = (
+                example_inputs[0].repeat(input_bs, 1),
+                example_inputs[1].repeat(input_bs, 1),
+                example_inputs[2].repeat(input_bs, 1),
+            )
             self_jit_first = torch.jit.trace(
                 user_model.eval(), example_inputs, strict=False, check_trace=False
             )
@@ -826,9 +930,15 @@ if args.benchmark:
             print("warning: loading failed.", e)
             self_jit = quant_model
         if model.name == "yuan":
-            ipex._set_optimized_model_for_generation(user_model, optimized_model=self_jit, first_token_optimized_model=self_jit_first)
+            ipex._set_optimized_model_for_generation(
+                user_model,
+                optimized_model=self_jit,
+                first_token_optimized_model=self_jit_first,
+            )
         else:
-            ipex._set_optimized_model_for_generation(user_model, optimized_model=self_jit)
+            ipex._set_optimized_model_for_generation(
+                user_model, optimized_model=self_jit
+            )
 
     if model.name == "git":
         prompt = Image.open(requests.get(args.image_url, stream=True).raw)
@@ -838,9 +948,15 @@ if args.benchmark:
         image = load_image(args.image_url)
         image = [image] * args.batch_size
         if user_model.config.mm_use_im_start_end:
-            prompt = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + prompt
+            prompt = (
+                DEFAULT_IM_START_TOKEN
+                + DEFAULT_IMAGE_TOKEN
+                + DEFAULT_IM_END_TOKEN
+                + "\n"
+                + prompt
+            )
         else:
-            prompt = DEFAULT_IMAGE_TOKEN + '\n' + prompt
+            prompt = DEFAULT_IMAGE_TOKEN + "\n" + prompt
         conv.append_message(conv.roles[0], prompt)
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
@@ -853,7 +969,9 @@ if args.benchmark:
         if args.prompt is not None:
             prompt = args.prompt
         elif int(args.input_tokens) > 8192:
-            prompt = prompt_pool[model.name]["8192"] * int(int(args.input_tokens) / 8192)
+            prompt = prompt_pool[model.name]["8192"] * int(
+                int(args.input_tokens) / 8192
+            )
         elif args.input_tokens in prompt_pool[model.name]:
             prompt = prompt_pool[model.name][args.input_tokens]
         else:
@@ -878,9 +996,23 @@ if args.benchmark:
         for i in range(num_iter):
             tic = time.time()
             if model.name == "llava":
-                input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in prompt])
-                image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(amp_dtype) for img in image]
-                output = user_model.generate(input_ids, images=image_tensor, **generate_kwargs)
+                input_ids = torch.stack(
+                    [
+                        tokenizer_image_token(
+                            pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+                        )
+                        for pmt in prompt
+                    ]
+                )
+                image_tensor = [
+                    image_processor.preprocess(img, return_tensors="pt")[
+                        "pixel_values"
+                    ].to(amp_dtype)
+                    for img in image
+                ]
+                output = user_model.generate(
+                    input_ids, images=image_tensor, **generate_kwargs
+                )
             elif model.name == "git":
                 input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
                 output = user_model.generate(pixel_values=input_ids, **generate_kwargs)
@@ -888,7 +1020,10 @@ if args.benchmark:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = user_model.generate(input_ids, **generate_kwargs)
             gen_ids = output[0] if args.token_latency else output
-            gen_text = tokenizer.batch_decode(gen_ids[:, input_ids.shape[1]:] if model.name=="llava" else gen_ids, skip_special_tokens=True)
+            gen_text = tokenizer.batch_decode(
+                gen_ids[:, input_ids.shape[1] :] if model.name == "llava" else gen_ids,
+                skip_special_tokens=True,
+            )
             toc = time.time()
             input_tokens_lengths = [x.shape[0] for x in input_ids]
             output_tokens_lengths = [x.shape[0] for x in gen_ids]
@@ -917,17 +1052,42 @@ if args.benchmark:
         ) as prof:
             for i in range(5):
                 if model.name == "llava":
-                    input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in prompt])
-                    image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(amp_dtype) for img in image]
-                    output = user_model.generate(input_ids, images=image_tensor, **generate_kwargs)
+                    input_ids = torch.stack(
+                        [
+                            tokenizer_image_token(
+                                pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+                            )
+                            for pmt in prompt
+                        ]
+                    )
+                    image_tensor = [
+                        image_processor.preprocess(img, return_tensors="pt")[
+                            "pixel_values"
+                        ].to(amp_dtype)
+                        for img in image
+                    ]
+                    output = user_model.generate(
+                        input_ids, images=image_tensor, **generate_kwargs
+                    )
                 elif model.name == "git":
-                    input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
-                    output = user_model.generate(pixel_values=input_ids, **generate_kwargs)
+                    input_ids = tokenizer(
+                        images=prompt, return_tensors="pt"
+                    ).pixel_values
+                    output = user_model.generate(
+                        pixel_values=input_ids, **generate_kwargs
+                    )
                 else:
                     input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                     output = user_model.generate(input_ids, **generate_kwargs)
                 gen_ids = output[0] if args.token_latency else output
-                gen_text = tokenizer.batch_decode(gen_ids[:, input_ids.shape[1]:] if model.name=="llava" else gen_ids, skip_special_tokens=True)
+                gen_text = tokenizer.batch_decode(
+                    (
+                        gen_ids[:, input_ids.shape[1] :]
+                        if model.name == "llava"
+                        else gen_ids
+                    ),
+                    skip_special_tokens=True,
+                )
                 prof.step()
 
     print("\n", "-" * 10, "Summary:", "-" * 10)

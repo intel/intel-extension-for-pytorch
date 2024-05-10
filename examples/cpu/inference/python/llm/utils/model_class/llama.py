@@ -5,6 +5,7 @@ from transformers import LlamaForCausalLM, AutoTokenizer
 
 import intel_extension_for_pytorch as ipex
 
+
 class LLAMAConfig(LLMConfig):
     def __init__(self, model_id):
         self.name = "llama"
@@ -16,7 +17,7 @@ class LLAMAConfig(LLMConfig):
         self.default_dataset = "NeelNanda/pile-10k"
         self.use_global_past_key_value = True
         self.use_ipex_autotune = True
-    
+
     def get_user_model(self, config, benchmark):
         if benchmark:
             try:
@@ -24,11 +25,17 @@ class LLAMAConfig(LLMConfig):
                     self.model = LlamaForCausalLM._from_config(config)
             except (RuntimeError, AttributeError):
                 self.model = LlamaForCausalLM.from_pretrained(
-                    self.model_id, config=config, low_cpu_mem_usage=True, torch_dtype=torch.half
+                    self.model_id,
+                    config=config,
+                    low_cpu_mem_usage=True,
+                    torch_dtype=torch.half,
                 )
         else:
             self.model = LlamaForCausalLM.from_pretrained(
-                self.model_id, config=config, low_cpu_mem_usage=True, torch_dtype=torch.float
+                self.model_id,
+                config=config,
+                low_cpu_mem_usage=True,
+                torch_dtype=torch.float,
             )
         return self.model
 

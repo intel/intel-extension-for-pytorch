@@ -1,7 +1,7 @@
 import torch
 import torchvision.models as models
 
-model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
+model = models.resnet50(weights="ResNet50_Weights.DEFAULT")
 model.eval()
 x = torch.randn(4, 3, 224, 224)
 

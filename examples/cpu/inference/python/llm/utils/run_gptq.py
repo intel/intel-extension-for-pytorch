@@ -1,15 +1,15 @@
-'''
+"""
 Ported from Intel(R) Extension for Transformers
-https://github.com/intel/intel-extension-for-transformers/blob/53bed434f16cba1fff6cdb30749d3ea545e56ee5/examples/huggingface/pytorch/language-modeling/quantization/run_clm_no_trainer.py
+https://github.com/intel/intel-extension-for-transformers/blob/53bed434f16cba1fff6cdb30749d3ea545e56ee5/examples/huggingface/pytorch/language-modeling/quantization/run_clm_no_trainer.py  # noqa
 With unused code removed.
-'''
+"""
 
 import argparse
 import sys
-sys.path.append('./')
+
+sys.path.append("./")
 import time
 import re
-from pathlib import Path
 import torch
 from datasets import load_dataset
 from torch.nn.functional import pad
@@ -29,7 +29,9 @@ args = parser.parse_args()
 
 
 class Evaluator:
-    def __init__(self, dataset, tokenizer, batch_size=8, pad_val=1, pad_max=196, is_calib=False):
+    def __init__(
+        self, dataset, tokenizer, batch_size=8, pad_val=1, pad_max=196, is_calib=False
+    ):
         self.dataset = dataset
         self.tokenizer = tokenizer
         self.batch_size = batch_size
@@ -56,7 +58,11 @@ class Evaluator:
             pad_len = self.pad_max - input_ids.shape[0]
             last_ind.append(input_ids.shape[0] - 1)
             if self.is_calib:
-                input_ids = input_ids[:self.pad_max] if len(input_ids) > self.pad_max else input_ids
+                input_ids = (
+                    input_ids[: self.pad_max]
+                    if len(input_ids) > self.pad_max
+                    else input_ids
+                )
             else:
                 input_ids = pad(input_ids, (0, pad_len), value=self.pad_val)
             input_ids_padded.append(input_ids)
@@ -101,9 +107,11 @@ class Evaluator:
 
 def get_user_model():
     from transformers import AutoModelForCausalLM, AutoModel, AutoTokenizer
+
     torchscript = False
     if re.search("llama", args.model.lower()):
-        from transformers import LlamaForCausalLM, AutoTokenizer
+        from transformers import LlamaForCausalLM
+
         user_model = LlamaForCausalLM.from_pretrained(
             args.model,
             torchscript=torchscript,  # torchscript will force `return_dict=False` to avoid jit errors
@@ -111,6 +119,7 @@ def get_user_model():
         tokenizer = AutoTokenizer.from_pretrained(args.model)
     elif re.search("mpt-7b-chat", args.model.lower()):
         from mpt_7b.modeling_mpt import MPTForCausalLM
+
         user_model = MPTForCausalLM.from_pretrained(
             args.model,
             torchscript=torchscript,  # torchscript will force `return_dict=False` to avoid jit errors
@@ -120,6 +129,7 @@ def get_user_model():
         user_model.config.use_cache = True
     elif re.search("falcon-7b-instruct", args.model.lower()):
         from falcon_7b_instruct.modelling_RW import RWForCausalLM
+
         user_model = RWForCausalLM.from_pretrained(
             args.model,
             torchscript=torchscript,  # torchscript will force `return_dict=False` to avoid jit errors
@@ -156,7 +166,9 @@ user_model, tokenizer = get_user_model()
 calib_dataset = load_dataset(args.dataset, split="train")
 # calib_dataset = datasets.load_from_disk('/your/local/dataset/pile-10k/') # use this if trouble with connecting to HF
 calib_dataset = calib_dataset.shuffle(seed=42)
-calib_evaluator = Evaluator(calib_dataset, tokenizer, batch_size=1, pad_max=512, is_calib=True)
+calib_evaluator = Evaluator(
+    calib_dataset, tokenizer, batch_size=1, pad_max=512, is_calib=True
+)
 calib_dataloader = DataLoader(
     calib_evaluator.dataset,
     batch_size=1,
@@ -164,13 +176,13 @@ calib_dataloader = DataLoader(
     collate_fn=calib_evaluator.collate_batch,
 )
 
-compressed_model = ipex.quantization.gptq(  
-                        model=user_model,
-                        dataloader=calib_dataloader,
-                        group_size=args.group_size,
-                        act_order=args.act_order,
-                        nsamples=args.nsamples,
-                        use_max_length=args.use_max_length,
-                        pad_max_length=args.pad_max_length,
-                        save_dir=args.output_dir)
-
+compressed_model = ipex.quantization.gptq(
+    model=user_model,
+    dataloader=calib_dataloader,
+    group_size=args.group_size,
+    act_order=args.act_order,
+    nsamples=args.nsamples,
+    use_max_length=args.use_max_length,
+    pad_max_length=args.pad_max_length,
+    save_dir=args.output_dir,
+)

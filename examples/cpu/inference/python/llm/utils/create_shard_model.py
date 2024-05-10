@@ -1,9 +1,15 @@
 import torch
 import argparse
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, T5ForConditionalGeneration, AutoProcessor
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    T5ForConditionalGeneration,
+    AutoProcessor,
+)
+
 # Here import ipex for Baichuan loading compatibility, for other models we can ignore this import
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch  # noqa F401
 
 # supported models
 MODEL_CLASSES = {
@@ -33,6 +39,7 @@ MODEL_CLASSES = {
 try:
     from llava.model.language_model.llava_llama import LlavaLlamaForCausalLM
     from llava.model.builder import load_pretrained_model
+
     MODEL_CLASSES["llava"] = (LlavaLlamaForCausalLM, AutoTokenizer)
 except ImportError:
     pass
@@ -69,7 +76,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 print(args)
-if args.local_rank == 0 :
+if args.local_rank == 0:
     model_type = next(
         (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
     )
@@ -80,7 +87,9 @@ if args.local_rank == 0 :
     elif args.dtype == "bfloat16":
         load_dtype = torch.bfloat16
     if model_type != "llava":
-        tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
+        tokenizer = model_class[1].from_pretrained(
+            args.model_id, trust_remote_code=True
+        )
         model = model_class[0].from_pretrained(
             args.model_id,
             torch_dtype=load_dtype,
@@ -88,8 +97,14 @@ if args.local_rank == 0 :
             trust_remote_code=True,
         )
     else:
-        tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_id)
-    model.save_pretrained(save_directory=args.save_path, max_shard_size=args.max_shard_size, safe_serialization=False)
+        tokenizer, model, image_processor, context_len = load_pretrained_model(
+            args.model_id
+        )
+    model.save_pretrained(
+        save_directory=args.save_path,
+        max_shard_size=args.max_shard_size,
+        safe_serialization=False,
+    )
     tokenizer.save_pretrained(save_directory=args.save_path)
     if model_type == "llava":
         image_processor.save_pretrained(save_directory=args.save_path)

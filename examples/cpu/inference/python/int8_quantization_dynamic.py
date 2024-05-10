@@ -1,7 +1,9 @@
 import torch
+
 #################### code changes ####################  # noqa F401
 import intel_extension_for_pytorch as ipex
 from intel_extension_for_pytorch.quantization import prepare, convert
+
 ######################################################  # noqa F401
 
 ##### Example Model #####  # noqa F401
@@ -27,7 +29,9 @@ prepared_model = prepare(model, qconfig_mapping, example_inputs=data)
 
 converted_model = convert(prepared_model)
 with torch.no_grad():
-    traced_model = torch.jit.trace(converted_model, (data,), check_trace=False, strict=False)
+    traced_model = torch.jit.trace(
+        converted_model, (data,), check_trace=False, strict=False
+    )
     traced_model = torch.jit.freeze(traced_model)
 
 traced_model.save("dynamic_quantized_model.pt")

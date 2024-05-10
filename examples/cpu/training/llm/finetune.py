@@ -4,7 +4,7 @@ https://github.com/tloen/alpaca-lora/blob/main/finetune.py
 """
 
 import os
-from typing import List
+from typing import tuple
 
 import fire
 import torch
@@ -44,10 +44,10 @@ def train(
     lora_r: int = 8,
     lora_alpha: int = 16,
     lora_dropout: float = 0.05,
-    lora_target_modules: List[str] = [
+    lora_target_modules: tuple[str] = (
         "q_proj",
         "v_proj",
-    ],
+    ),
     # llm hyperparams
     train_on_inputs: bool = True,  # if False, masks out inputs in loss
     group_by_length: bool = False,  # faster, but produces an odd training loss curve
@@ -123,9 +123,7 @@ def train(
             base_model, attn_implementation="eager"
         )
     else:
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model
-        )
+        model = AutoModelForCausalLM.from_pretrained(base_model)
 
     tokenizer = AutoTokenizer.from_pretrained(base_model)
 
@@ -179,7 +177,7 @@ def train(
     config = LoraConfig(
         r=lora_r,
         lora_alpha=lora_alpha,
-        target_modules=lora_target_modules,
+        target_modules=list(lora_target_modules),
         lora_dropout=lora_dropout,
         bias="none",
         task_type="CAUSAL_LM",

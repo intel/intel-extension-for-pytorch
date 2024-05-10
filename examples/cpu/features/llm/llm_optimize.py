@@ -1,6 +1,8 @@
 import torch
+
 #################### code changes ####################  # noqa F401
 import intel_extension_for_pytorch as ipex
+
 ######################################################  # noqa F401
 import argparse
 from transformers import (
@@ -35,9 +37,7 @@ amp_dtype = getattr(torch, args.dtype)
 
 # load model
 model_id = "facebook/opt-125m"
-config = AutoConfig.from_pretrained(
-    model_id, torchscript=True, trust_remote_code=True
-)
+config = AutoConfig.from_pretrained(model_id, torchscript=True, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
     torch_dtype=amp_dtype,
@@ -45,10 +45,7 @@ model = AutoModelForCausalLM.from_pretrained(
     low_cpu_mem_usage=True,
     trust_remote_code=True,
 )
-tokenizer = AutoTokenizer.from_pretrained(
-    model_id,
-    trust_remote_code=True
-)
+tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 model = model.eval()
 model = model.to(memory_format=torch.channels_last)
 
@@ -73,12 +70,12 @@ print("---- Prompt size:", input_size)
 prompt = [prompt] * args.batch_size
 
 # inference
-with torch.no_grad(), torch.inference_mode(), torch.cpu.amp.autocast(enabled=amp_enabled):
+with torch.no_grad(), torch.inference_mode(), torch.cpu.amp.autocast(
+    enabled=amp_enabled
+):
     input_ids = tokenizer(prompt, return_tensors="pt").input_ids
     gen_ids = model.generate(
-        input_ids,
-        max_new_tokens=args.max_new_tokens,
-        **generate_kwargs
+        input_ids, max_new_tokens=args.max_new_tokens, **generate_kwargs
     )
     gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
     input_tokens_lengths = [x.shape[0] for x in input_ids]

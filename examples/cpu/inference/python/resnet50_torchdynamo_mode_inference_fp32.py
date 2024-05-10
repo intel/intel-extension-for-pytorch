@@ -8,6 +8,7 @@ data = torch.rand(128, 3, 224, 224)
 # Beta Feature
 #################### code changes ####################  # noqa F401
 import intel_extension_for_pytorch as ipex
+
 model = ipex.optimize(model, weights_prepack=False)
 model = torch.compile(model, backend="ipex")
 ######################################################  # noqa F401

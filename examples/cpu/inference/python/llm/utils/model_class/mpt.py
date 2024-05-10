@@ -1,6 +1,7 @@
 from .llm import LLMConfig, EXAMPLE_INPUTS_MODE
 from transformers.models.mpt.modeling_mpt import MptForCausalLM
 
+
 class MPTConfig(LLMConfig):
     def __init__(self, model_id):
         self.name = "mpt"

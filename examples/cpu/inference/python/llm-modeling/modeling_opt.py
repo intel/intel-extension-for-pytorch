@@ -56,8 +56,10 @@ class OPTAttention(nn.Module):
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.enable_bias)
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=self.enable_bias)
         # ==================== Changes to apply ipex.llm layers  ====================
-        self._IPEXIndirectAccessKVCacheAttention = ipex.llm.modules.IndirectAccessKVCacheAttention(
-            config.max_position_embeddings
+        self._IPEXIndirectAccessKVCacheAttention = (
+            ipex.llm.modules.IndirectAccessKVCacheAttention(
+                config.max_position_embeddings
+            )
         )
         # ==========================================================================
 
@@ -722,7 +724,7 @@ class IPEXOPTForCausalLM(OPTPreTrainedModel):
         )
         return model_inputs
 
-    # ==================== rewrite to _reorder_cache to work with ipex.llm.modules.IndirectAccessKVCacheAttention  ====================
+    # rewrite to _reorder_cache to work with ipex.llm.modules.IndirectAccessKVCacheAttention
     def _reorder_cache(
         self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
     ) -> Tuple[Tuple[torch.Tensor]]:

@@ -4,7 +4,7 @@ import torchvision.models as models
 # Import the Intel Extension for PyTorch
 import intel_extension_for_pytorch as ipex
 
-model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
+model = models.resnet50(weights="ResNet50_Weights.DEFAULT")
 model.eval()
 
 # Apply some fusions at the front end

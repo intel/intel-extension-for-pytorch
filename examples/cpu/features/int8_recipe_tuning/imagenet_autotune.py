@@ -5,13 +5,17 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import intel_extension_for_pytorch as ipex
 
-model_names = sorted(name for name in models.__dict__
-                     if name.islower() and not name.startswith("__")
-                     and callable(models.__dict__[name]))
+model_names = sorted(
+    name
+    for name in models.__dict__
+    if name.islower() and not name.startswith("__") and callable(models.__dict__[name])
+)
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
-    def __init__(self, name, fmt=':f'):
+
+    def __init__(self, name, fmt=":f"):
         self.name = name
         self.fmt = fmt
         self.reset()
@@ -29,8 +33,9 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
     def __str__(self):
-        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
+        fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"
         return fmtstr.format(**self.__dict__)
+
 
 class ProgressMeter(object):
     def __init__(self, num_batches, meters, prefix=""):
@@ -41,12 +46,13 @@ class ProgressMeter(object):
     def display(self, batch):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
-        print('\t'.join(entries))
+        print("\t".join(entries))
 
     def _get_batch_fmtstr(self, num_batches):
         num_digits = len(str(num_batches // 1))
-        fmt = '{:' + str(num_digits) + 'd}'
-        return '[' + fmt + '/' + fmt.format(num_batches) + ']'
+        fmt = "{:" + str(num_digits) + "d}"
+        return "[" + fmt + "/" + fmt.format(num_batches) + "]"
+
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
@@ -64,23 +70,23 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
+
 def validate(val_loader, model, criterion, args):
 
     # switch to evaluate mode
     model.eval()
 
     def eval_func(model):
-        batch_time = AverageMeter('Time', ':6.3f')
-        losses = AverageMeter('Loss', ':.4e')
-        top1 = AverageMeter('Acc@1', ':6.2f')
-        top5 = AverageMeter('Acc@5', ':6.2f')
+        batch_time = AverageMeter("Time", ":6.3f")
+        losses = AverageMeter("Loss", ":.4e")
+        top1 = AverageMeter("Acc@1", ":6.2f")
+        top5 = AverageMeter("Acc@5", ":6.2f")
         number_iter = len(val_loader)
 
         progress = ProgressMeter(
-            number_iter,
-            [batch_time, losses, top1, top5],
-            prefix='Test: ')
-        print('Evaluating RESNET: total Steps: {}'.format(number_iter))
+            number_iter, [batch_time, losses, top1, top5], prefix="Test: "
+        )
+        print("Evaluating RESNET: total Steps: {}".format(number_iter))
         with torch.no_grad():
             for i, (images, target) in enumerate(val_loader):
                 images = images.contiguous(memory_format=torch.channels_last)
@@ -95,12 +101,16 @@ def validate(val_loader, model, criterion, args):
                     progress.display(i)
 
         # TODO: this should also be done with the ProgressMeter
-        print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'.format(top1=top1, top5=top5))
+        print(
+            " * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}".format(top1=top1, top5=top5)
+        )
 
         return top1.avg.item()
 
     print(".........runing autotuning step.........")
-    tuned_model = ipex.quantization.autotune(model, val_loader, eval_func=eval_func, sampling_sizes=[300])
+    tuned_model = ipex.quantization.autotune(
+        model, val_loader, eval_func=eval_func, sampling_sizes=[300]
+    )
     print(".........autotuning step done.........")
 
     print(".........runing int8 inference.........")
@@ -118,46 +128,86 @@ def validate(val_loader, model, criterion, args):
 
     return
 
+
 def main(args):
     print("=> using pre-trained model '{}'".format(args.arch))
     model = models.__dict__[args.arch](pretrained=True)
 
-    assert args.data is not None, "please set dataset path if you want to using real data"
-    valdir = os.path.join(args.data, 'val')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    assert (
+        args.data is not None
+    ), "please set dataset path if you want to using real data"
+    valdir = os.path.join(args.data, "val")
+    normalize = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+    )
     criterion = torch.nn.CrossEntropyLoss()
 
     val_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ])),
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+        datasets.ImageFolder(
+            valdir,
+            transforms.Compose(
+                [
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    normalize,
+                ]
+            ),
+        ),
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.workers,
+        pin_memory=True,
+    )
 
     validate(val_loader, model, criterion, args)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('-data', metavar='DIR', nargs='?', default='imagenet',
-                        help='path to dataset (default: imagenet)')
-    parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
-                        choices=model_names,
-                        help='model architecture: ' +
-                             ' | '.join(model_names) +
-                             ' (default: resnet18)')
-    parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
-                        help='number of data loading workers (default: 4)')
-    parser.add_argument('-b', '--batch-size', default=256, type=int,
-                        metavar='N',
-                        help='mini-batch size (default: 256), this is the total '
-                        'batch size of all GPUs on the current node when '
-                        'using Data Parallel or Distributed Data Parallel')
-    parser.add_argument('-p', '--print-freq', default=10, type=int,
-                        metavar='N', help='print frequency (default: 10)')
+    parser.add_argument(
+        "-data",
+        metavar="DIR",
+        nargs="?",
+        default="imagenet",
+        help="path to dataset (default: imagenet)",
+    )
+    parser.add_argument(
+        "-a",
+        "--arch",
+        metavar="ARCH",
+        default="resnet18",
+        choices=model_names,
+        help="model architecture: " + " | ".join(model_names) + " (default: resnet18)",
+    )
+    parser.add_argument(
+        "-j",
+        "--workers",
+        default=4,
+        type=int,
+        metavar="N",
+        help="number of data loading workers (default: 4)",
+    )
+    parser.add_argument(
+        "-b",
+        "--batch-size",
+        default=256,
+        type=int,
+        metavar="N",
+        help="mini-batch size (default: 256), this is the total "
+        "batch size of all GPUs on the current node when "
+        "using Data Parallel or Distributed Data Parallel",
+    )
+    parser.add_argument(
+        "-p",
+        "--print-freq",
+        default=10,
+        type=int,
+        metavar="N",
+        help="print frequency (default: 10)",
+    )
     main(parser.parse_args())
 
 print("Execution finished")

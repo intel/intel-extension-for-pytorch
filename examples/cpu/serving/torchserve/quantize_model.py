@@ -22,7 +22,7 @@ model = prepare(model, qconfig, example_inputs=dummy_tensor, inplace=False)
 n_iter = 100
 for i in range(n_iter):
     model(dummy_tensor)
- 
+
 # convert and deploy
 model = convert(model)
 
@@ -30,4 +30,4 @@ with torch.no_grad():
     model = torch.jit.trace(model, dummy_tensor)
     model = torch.jit.freeze(model)
 
-torch.jit.save(model, './rn50_int8_jit.pt')
+torch.jit.save(model, "./rn50_int8_jit.pt")

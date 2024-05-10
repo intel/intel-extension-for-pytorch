@@ -1,7 +1,8 @@
 from .llm import LLMConfig, EXAMPLE_INPUTS_MODE
 from transformers import AutoModelForCausalLM, AutoProcessor
 import torch
-import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch as ipex  # noqa F401
+
 
 class GitConfig(LLMConfig):
     def __init__(self, model_id):

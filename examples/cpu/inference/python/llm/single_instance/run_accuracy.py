@@ -1,3 +1,4 @@
+# encoding: UTF-8
 import argparse
 import torch
 import intel_extension_for_pytorch as ipex
@@ -6,7 +7,8 @@ import sys
 import math
 import torch.nn.functional as F
 import re
-sys.path.append(sys.path[0] + '/../../')
+
+sys.path.append(sys.path[0] + "/../../")
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -45,7 +47,10 @@ parser.add_argument("--output_dir", nargs="?", default="./saved_results")
 parser.add_argument("--output_path", nargs="?", default="./logs")
 parser.add_argument("--device", default="cpu", type=str, help="cpu")
 parser.add_argument(
-    "--dtype", default="bfloat16", type=str, help="float32 or bfloat16 or int8 or int4 or nf4"
+    "--dtype",
+    default="bfloat16",
+    type=str,
+    help="float32 or bfloat16 or int8 or int4 or nf4",
 )
 parser.add_argument(
     "--batch-size", default=1, type=int, help="For accuracy measurement only."
@@ -57,11 +62,19 @@ parser.add_argument(
     "--ipex", action="store_true", help="use intel extension for pytorch."
 )
 parser.add_argument(
-    "--disable-jit", action="store_true", help="disable converting model to torchscript mode."
+    "--disable-jit",
+    action="store_true",
+    help="disable converting model to torchscript mode.",
 )
 parser.add_argument("--torch-compile", action="store_true")
-parser.add_argument("--backend", default="ipex", type=str, help="backend of torch.compile")
-parser.add_argument("--quant-with-amp", action="store_true", help="by default static quant is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)")
+parser.add_argument(
+    "--backend", default="ipex", type=str, help="backend of torch.compile"
+)
+parser.add_argument(
+    "--quant-with-amp",
+    action="store_true",
+    help="by default static quant is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
+)
 parser.add_argument("--quantized-model-path", default="./saved_results/best_model.pt")
 parser.add_argument(
     "--tasks",
@@ -79,19 +92,30 @@ parser.add_argument(
 args = parser.parse_args()
 
 
-
 import lm_eval
 from lm_eval import evaluator, utils
 from lm_eval.base import BaseLM
 from typing import Union, List, Optional, Tuple
 from transformers import BatchEncoding
 import transformers
+
 try:
-    from llava.model.language_model.llava_llama import LlavaLlamaForCausalLM
+    from llava.model.language_model.llava_llama import (  # noqa F401
+        LlavaLlamaForCausalLM,
+    )
     from llava.model.builder import load_pretrained_model
     from llava.conversation import conv_templates
-    from llava.mm_utils import get_model_name_from_path, process_images, tokenizer_image_token
-    from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+    from llava.mm_utils import (
+        get_model_name_from_path,
+        process_images,
+        tokenizer_image_token,
+    )
+    from llava.constants import (  # noqa F401
+        IMAGE_TOKEN_INDEX,
+        DEFAULT_IMAGE_TOKEN,
+        DEFAULT_IM_START_TOKEN,
+        DEFAULT_IM_END_TOKEN,
+    )
     import lmms_eval
     from lmms_eval.api.instance import Instance
     from lmms_eval.api.model import lmms
@@ -101,15 +125,20 @@ try:
     from lmms_eval.api.registry import ALL_TASKS
     from lmms_eval.tasks import initialize_tasks
 except ImportError:
+
     def register_model(name):
         def decorator(func):
             return func
+
         return decorator
+
     from abc import ABC as lmms
+
     Instance = None
     pass
 
 TokenSequence = Union[List[int], torch.LongTensor, torch.Tensor, BatchEncoding]
+
 
 class HuggingFaceModel(BaseLM):
     _DEFAULT_MAX_LENGTH = 2048
@@ -125,7 +154,7 @@ class HuggingFaceModel(BaseLM):
         max_length=None,
         dtype: Optional[Union[str, torch.dtype]] = "auto",
         config=None,
-        add_special_tokens = True,
+        add_special_tokens=True,
     ):
         super().__init__()
 
@@ -161,18 +190,27 @@ class HuggingFaceModel(BaseLM):
         if model_type == "chatglm":
             # chatglm modeling is from remote hub and its torch_dtype in config.json need to be overrided
             self.config = AutoConfig.from_pretrained(
-                model_id if config is None else config, torchscript=with_jit, trust_remote_code=True, torch_dtype=load_dtype,
+                model_id if config is None else config,
+                torchscript=with_jit,
+                trust_remote_code=True,
+                torch_dtype=load_dtype,
             )
         else:
             self.config = AutoConfig.from_pretrained(
-                model_id if config is None else config, torchscript=with_jit, trust_remote_code=True
+                model_id if config is None else config,
+                torchscript=with_jit,
+                trust_remote_code=True,
             )
-        if self._dtype in ("int8", "int4", "nf4") and not re.search("yuan", self.config.architectures[0], re.IGNORECASE):
+        if self._dtype in ("int8", "int4", "nf4") and not re.search(
+            "yuan", self.config.architectures[0], re.IGNORECASE
+        ):
             try:
                 with ipex.OnDevice(dtype=torch.float, device="meta"):
-                    self.model = model_class[0].from_config(self.config, trust_remote_code=True)
+                    self.model = model_class[0].from_config(
+                        self.config, trust_remote_code=True
+                    )
             except (RuntimeError, AttributeError) as e:
-                print('Warning: Loading model to meta device failed:', e)
+                print("Warning: Loading model to meta device failed:", e)
                 self.model = model_class[0].from_pretrained(
                     model_id,
                     low_cpu_mem_usage=True,
@@ -201,17 +239,27 @@ class HuggingFaceModel(BaseLM):
 
         if args.torch_compile:
             if dtype in ["int8", "int4", "nf4"]:
-                raise SystemExit("[ERROR] Currently this script does not support torch.compile with int8/int4/nf4 datatype, please set dtype to float32 or bfloat16 if want to use torch.compile.")
+                raise SystemExit(
+                    "[ERROR] Currently this script does not support torch.compile with int8/int4/nf4 datatype,"
+                    " please set dtype to float32 or bfloat16 if want to use torch.compile."
+                )
             if with_jit:
-                raise SystemExit("[ERROR] JIT cannot co-work with torch.compile, please set jit to False if want to use torch.compile.")
-            self.model.forward = torch.compile(self.model.forward, dynamic=True, backend=args.backend)
+                raise SystemExit(
+                    "[ERROR] JIT cannot co-work with torch.compile, please set jit to False if want to use"
+                    " torch.compile."
+                )
+            self.model.forward = torch.compile(
+                self.model.forward, dynamic=True, backend=args.backend
+            )
 
         self.base_model = self.model
 
         self.iter = 0
         self.num_beams = 1 if with_greedy else 4
         self.tp_number = 1
-        self.is_t5 = re.search("t5", self.base_model.config.architectures[0], re.IGNORECASE)
+        self.is_t5 = re.search(
+            "t5", self.base_model.config.architectures[0], re.IGNORECASE
+        )
 
     def _get_target_nums(self, names):
         for n in names:
@@ -234,26 +282,33 @@ class HuggingFaceModel(BaseLM):
         past_key_values = tuple(
             [
                 (
-                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                    torch.zeros([1, num_heads, 1, head_dim]).contiguous(),
-                    torch.zeros([1, num_heads, 1, head_dim]).contiguous(),
-                    beam_idx_tmp,
-                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                    self.base_model.decoder.block[i].layer[1]
-                    .EncDecAttention.k(last_hidden_state)
-                    .view(int(input_bs), -1, num_heads, head_dim).transpose(0, 1)
-                    .contiguous(),
-                    self.base_model.decoder.block[i].layer[1]
-                    .EncDecAttention.v(last_hidden_state)
-                    .view(int(input_bs), -1, num_heads, head_dim).transpose(0, 1)
-                    .contiguous(),
-                    beam_idx_tmp,
-                ) if self.is_t5 else
-                (
-                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                    torch.zeros([1, num_heads, 1, head_dim]).contiguous(),
-                    torch.zeros([1, num_heads, 1, head_dim]).contiguous(),
-                    beam_idx_tmp,
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, num_heads, 1, head_dim]).contiguous(),
+                        torch.zeros([1, num_heads, 1, head_dim]).contiguous(),
+                        beam_idx_tmp,
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        self.base_model.decoder.block[i]
+                        .layer[1]
+                        .EncDecAttention.k(last_hidden_state)
+                        .view(int(input_bs), -1, num_heads, head_dim)
+                        .transpose(0, 1)
+                        .contiguous(),
+                        self.base_model.decoder.block[i]
+                        .layer[1]
+                        .EncDecAttention.v(last_hidden_state)
+                        .view(int(input_bs), -1, num_heads, head_dim)
+                        .transpose(0, 1)
+                        .contiguous(),
+                        beam_idx_tmp,
+                    )
+                    if self.is_t5
+                    else (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, num_heads, 1, head_dim]).contiguous(),
+                        torch.zeros([1, num_heads, 1, head_dim]).contiguous(),
+                        beam_idx_tmp,
+                    )
                 )
                 for i in range(num_hidden_layers)
             ]
@@ -283,8 +338,11 @@ class HuggingFaceModel(BaseLM):
         _attention_mask = []
         _position_ids = []
         if self.is_t5:
-            inputs = inputs['input_ids']
-        elif hasattr(self.config, "_name_or_path") and self.config._name_or_path == "THUDM/chatglm2-6b":
+            inputs = inputs["input_ids"]
+        elif (
+            hasattr(self.config, "_name_or_path")
+            and self.config._name_or_path == "THUDM/chatglm2-6b"
+        ):
             input_bs, input_len = inputs.shape
             bos = torch.tensor([64790, 64792]).repeat(input_bs, 1)
             inputs = torch.cat((bos, inputs), 1)
@@ -300,8 +358,10 @@ class HuggingFaceModel(BaseLM):
         position_ids_batched = torch.stack(_position_ids)
         if self.is_t5:
             model_kwargs = {"attention_mask": attention_mask_batched}
-            model_kwargs = self.base_model._prepare_encoder_decoder_kwargs_for_generation(
-                inputs, model_kwargs, "input_ids"
+            model_kwargs = (
+                self.base_model._prepare_encoder_decoder_kwargs_for_generation(
+                    inputs, model_kwargs, "input_ids"
+                )
             )
             (
                 inputs,
@@ -312,33 +372,39 @@ class HuggingFaceModel(BaseLM):
                 is_encoder_decoder=True,
                 **model_kwargs,
             )
-            past_key_values = self._get_past_key_values(input_bs, example_inputs["encoder_outputs"]["last_hidden_state"])
+            past_key_values = self._get_past_key_values(
+                input_bs, example_inputs["encoder_outputs"]["last_hidden_state"]
+            )
             if self.num_beams == 1:
-                decoder_input_ids = self.base_model._shift_right(labels['input_ids'])
+                decoder_input_ids = self.base_model._shift_right(labels["input_ids"])
             else:
-                decoder_input_ids = self.base_model._shift_right(labels['input_ids'].repeat_interleave(self.num_beams, dim=0))
+                decoder_input_ids = self.base_model._shift_right(
+                    labels["input_ids"].repeat_interleave(self.num_beams, dim=0)
+                )
             example_dict = {
                 "decoder_input_ids": decoder_input_ids,
-                "encoder_outputs": (example_inputs["encoder_outputs"]["last_hidden_state"],),
+                "encoder_outputs": (
+                    example_inputs["encoder_outputs"]["last_hidden_state"],
+                ),
             }
         else:
             past_key_values = self._get_past_key_values(input_bs)
             example_dict = {"input_ids": inputs}
 
-        model_inputs = self.base_model.prepare_inputs_for_generation(inputs, attention_mask=attention_mask_batched)
+        model_inputs = self.base_model.prepare_inputs_for_generation(
+            inputs, attention_mask=attention_mask_batched
+        )
         has_position_ids = model_inputs.get("position_ids", None) is not None
         if self._with_jit:
-            example_dict["attention_mask"]= attention_mask_batched
-            example_dict["past_key_values"]= past_key_values
+            example_dict["attention_mask"] = attention_mask_batched
+            example_dict["past_key_values"] = past_key_values
             if has_position_ids:
                 example_dict["position_ids"] = position_ids_batched
         if "return_last_logit" in model_inputs:
             example_dict["return_last_logit"] = torch.tensor(True)
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
-            enabled=True
-            if args.quant_with_amp or self._dtype == "bfloat16"
-            else False,
+            enabled=True if args.quant_with_amp or self._dtype == "bfloat16" else False,
         ):
             if self._with_jit and self.iter == 0:
                 if self._dtype not in ["int8", "int4", "nf4"]:
@@ -442,14 +508,20 @@ class HuggingFaceModel(BaseLM):
                 except ValueError:
                     if not warn_stop_seq:
                         print(
-                            "Warning: a primary stop sequence is multi-token! Will default to EOS token for this tokenizer. Consider using `hf-causal-experimental` for multi-token stop sequence support for the time being."
+                            "Warning: a primary stop sequence is multi-token! Will default to EOS token for"
+                            " this tokenizer. Consider using `hf-causal-experimental` for multi-token stop"
+                            " sequence support for the time being."
                         )
                         warn_stop_seq = True
                     primary_until = self.eot_token_id
             else:
                 primary_until = None
-            if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
-                context = "详细分析并求解以下数学问题。\n" + context.replace("问题: ", "").replace("\n逐步解答:", "<sep>")
+            if re.search(
+                "yuan", self.base_model.config.architectures[0], re.IGNORECASE
+            ):
+                context = "详细分析并求解以下数学问题。\n" + context.replace(
+                    "问题: ", ""
+                ).replace("\n逐步解答:", "<sep>")
             context_enc = torch.tensor(
                 [self.tok_encode(context)[self.max_gen_toks - self.max_length :]]
             ).to(self.device)
@@ -458,13 +530,17 @@ class HuggingFaceModel(BaseLM):
                 self.max_gen_toks, request_args.get("max_length", self.max_gen_toks)
             )
             with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
-                enabled=True
-                if args.quant_with_amp or self._dtype == "bfloat16"
-                else False,
+                enabled=(
+                    True if args.quant_with_amp or self._dtype == "bfloat16" else False
+                ),
             ):
                 if self._with_jit and self.iter == 0:
                     if self._dtype not in ["int8", "int4", "nf4"]:
-                        if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
+                        if re.search(
+                            "yuan",
+                            self.base_model.config.architectures[0],
+                            re.IGNORECASE,
+                        ):
                             input_bs = context_enc.shape[0] * self.num_beams
                             attention_mask = torch.ones(len(context_enc[0]))
                             position_ids = torch.arange(len(context_enc[0]))
@@ -482,9 +558,15 @@ class HuggingFaceModel(BaseLM):
                             )
                             model = torch.jit.freeze(model.eval())
                             example_dict = {
-                                "input_ids": example_dict["input_ids"].repeat(input_bs, 1),
-                                "attention_mask": example_dict["attention_mask"].repeat(input_bs, 1),
-                                "position_ids": example_dict["position_ids"].repeat(input_bs, 1)
+                                "input_ids": example_dict["input_ids"].repeat(
+                                    input_bs, 1
+                                ),
+                                "attention_mask": example_dict["attention_mask"].repeat(
+                                    input_bs, 1
+                                ),
+                                "position_ids": example_dict["position_ids"].repeat(
+                                    input_bs, 1
+                                ),
                             }
                             first_token_model = torch.jit.trace(
                                 self.model.eval(),
@@ -492,25 +574,45 @@ class HuggingFaceModel(BaseLM):
                                 strict=False,
                                 check_trace=False,
                             )
-                            first_token_model = torch.jit.freeze(first_token_model.eval())
+                            first_token_model = torch.jit.freeze(
+                                first_token_model.eval()
+                            )
                     else:
                         model = torch.jit.load(args.quantized_model_path)
                         model = torch.jit.freeze(model.eval())
-                        if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
-                            first_token_model = torch.jit.load(args.quantized_model_path+"2")
-                            first_token_model = torch.jit.freeze(first_token_model.eval())
-                    if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
-                        ipex._set_optimized_model_for_generation(self.model, optimized_model=model, first_token_optimized_model=first_token_model)
+                        if re.search(
+                            "yuan",
+                            self.base_model.config.architectures[0],
+                            re.IGNORECASE,
+                        ):
+                            first_token_model = torch.jit.load(
+                                args.quantized_model_path + "2"
+                            )
+                            first_token_model = torch.jit.freeze(
+                                first_token_model.eval()
+                            )
+                    if re.search(
+                        "yuan", self.base_model.config.architectures[0], re.IGNORECASE
+                    ):
+                        ipex._set_optimized_model_for_generation(
+                            self.model,
+                            optimized_model=model,
+                            first_token_optimized_model=first_token_model,
+                        )
                     else:
-                        ipex._set_optimized_model_for_generation(self.model, optimized_model=model)
-                    
+                        ipex._set_optimized_model_for_generation(
+                            self.model, optimized_model=model
+                        )
+
                     self.iter = self.iter + 1
                 cont = self._model_generate(
                     context_enc, context_enc.shape[1] + max_gen_tokens, primary_until
                 )
 
             s = self.tok_decode(cont[0].tolist()[context_enc.shape[1] :])
-            if re.search("yuan", self.base_model.config.architectures[0], re.IGNORECASE):
+            if re.search(
+                "yuan", self.base_model.config.architectures[0], re.IGNORECASE
+            ):
                 s = s.replace("\n", "").split("<eod>")[0]
 
             for term in until:
@@ -522,6 +624,7 @@ class HuggingFaceModel(BaseLM):
             res.append(s)
 
         return re_ord.get_original(res)
+
 
 class HuggingFaceSeq2SeqModel(HuggingFaceModel):
     """Seq2Seq language modeling.
@@ -650,6 +753,7 @@ class HuggingFaceSeq2SeqModel(HuggingFaceModel):
                     self.cache_hook.add_partial("loglikelihood", cache_key, answer)
         return results
 
+
 class T5ModelLambada(HuggingFaceSeq2SeqModel):
     def _loglikelihood_tokens(
         self,
@@ -677,16 +781,26 @@ class T5ModelLambada(HuggingFaceSeq2SeqModel):
 
             for cache_key, log_softmax, target_tokens, target_mask in output_iterator:
                 length = target_mask.sum()
-                if length >= 1 and target_tokens[length-1].item() == self.tokenizer.encode(self.tokenizer.eos_token, add_special_tokens = False)[0]:
+                if (
+                    length >= 1
+                    and target_tokens[length - 1].item()
+                    == self.tokenizer.encode(
+                        self.tokenizer.eos_token, add_special_tokens=False
+                    )[0]
+                ):
                     length = length - 1
 
                 log_softmax = log_softmax[:length]
                 target_tokens = target_tokens[:length]
                 greedy_tokens = log_softmax.argmax(dim=-1)
                 max_equal = (greedy_tokens == target_tokens).all()
-                target_text = self.tokenizer.decode(target_tokens, skip_special_tokens = True)
-                greedy_text = self.tokenizer.decode(greedy_tokens, skip_special_tokens = True)
-                max_text_equal = (greedy_text == target_text)
+                target_text = self.tokenizer.decode(
+                    target_tokens, skip_special_tokens=True
+                )
+                greedy_text = self.tokenizer.decode(
+                    greedy_tokens, skip_special_tokens=True
+                )
+                max_text_equal = greedy_text == target_text
                 target_logits = torch.gather(
                     log_softmax, 1, target_tokens.unsqueeze(-1)
                 ).squeeze(-1)
@@ -709,7 +823,7 @@ class LMMS(lmms):
         batch_size=1,
         dtype: Optional[Union[str, torch.dtype]] = "auto",
         config=None,
-        add_special_tokens = True,
+        add_special_tokens=True,
     ) -> None:
         super().__init__()
         self._device = torch.device(device)
@@ -730,11 +844,19 @@ class LMMS(lmms):
         elif dtype in ["int8", "int4", "nf4"]:
             load_dtype = torch.float32
             infer_dtype = torch.int8
-        self.amp_dtype = torch.bfloat16 if args.quant_with_amp or self._dtype == "bfloat16" else torch.float32
+        self.amp_dtype = (
+            torch.bfloat16
+            if args.quant_with_amp or self._dtype == "bfloat16"
+            else torch.float32
+        )
         if re.search("llava", pretrained, re.IGNORECASE):
-            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, get_model_name_from_path(pretrained))
+            self._tokenizer, self._model, self._image_processor, self._max_length = (
+                load_pretrained_model(
+                    pretrained, None, get_model_name_from_path(pretrained)
+                )
+            )
             model_name = get_model_name_from_path(pretrained)
-            if 'llama-2' in model_name.lower():
+            if "llama-2" in model_name.lower():
                 conv_mode = "llava_llama_2"
             elif "v1" in model_name.lower():
                 conv_mode = "llava_v1"
@@ -750,7 +872,9 @@ class LMMS(lmms):
             )
             self._tokenizer = self._image_processor.tokenizer
             self._config = AutoConfig.from_pretrained(
-                pretrained if config is None else config, torchscript=with_jit, trust_remote_code=True
+                pretrained if config is None else config,
+                torchscript=with_jit,
+                trust_remote_code=True,
             )
             self._model = model_class[0].from_pretrained(
                 pretrained,
@@ -772,10 +896,18 @@ class LMMS(lmms):
 
         if args.torch_compile:
             if dtype in ["int8", "int4", "nf4"]:
-                raise SystemExit("[ERROR] Currently this script does not support torch.compile with int8/int4/nf4 datatype, please set dtype to float32 or bfloat16 if want to use torch.compile.")
+                raise SystemExit(
+                    "[ERROR] Currently this script does not support torch.compile with int8/int4/nf4 datatype,"
+                    " please set dtype to float32 or bfloat16 if want to use torch.compile."
+                )
             if with_jit:
-                raise SystemExit("[ERROR] JIT cannot co-work with torch.compile, please set jit to False if want to use torch.compile.")
-            self._model.forward = torch.compile(self._model.forward, dynamic=True, backend=args.backend)
+                raise SystemExit(
+                    "[ERROR] JIT cannot co-work with torch.compile, please set jit to False if want to use"
+                    " torch.compile."
+                )
+            self._model.forward = torch.compile(
+                self._model.forward, dynamic=True, backend=args.backend
+            )
 
         self._base_model = self._model
 
@@ -803,10 +935,14 @@ class LMMS(lmms):
                 "past_key_values": past_key_values,
             }
             if re.search("llava", pretrained, re.IGNORECASE):
-                sample_inputs["inputs_embeds"] = torch.zeros(batch_size, 1, 4096).to(self.amp_dtype)
+                sample_inputs["inputs_embeds"] = torch.zeros(batch_size, 1, 4096).to(
+                    self.amp_dtype
+                )
             elif re.search("git", pretrained, re.IGNORECASE):
                 sample_inputs["input_ids"] = input_ids.repeat(self.batch_size, 1)
-                sample_inputs["attention_mask"] = attention_mask.repeat(self.batch_size, 1)
+                sample_inputs["attention_mask"] = attention_mask.repeat(
+                    self.batch_size, 1
+                )
                 sample_inputs["pixel_values"] = torch.zeros(batch_size, 3, 224, 224)
                 num_head = self.model.config.num_attention_heads
                 head_dim = int(self.model.config.hidden_size / num_head)
@@ -814,8 +950,12 @@ class LMMS(lmms):
                     [
                         (
                             torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                            torch.zeros([batch_size, num_head, 1, head_dim]).contiguous(),
-                            torch.zeros([batch_size, num_head, 1, head_dim]).contiguous(),
+                            torch.zeros(
+                                [batch_size, num_head, 1, head_dim]
+                            ).contiguous(),
+                            torch.zeros(
+                                [batch_size, num_head, 1, head_dim]
+                            ).contiguous(),
                             torch.zeros(1, 4, dtype=torch.long),
                         )
                         for i in range(self.model.config.num_hidden_layers)
@@ -823,7 +963,8 @@ class LMMS(lmms):
                 )
                 sample_inputs["past_key_values"] = past_key_values
             with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
-                enabled=True if self.amp_dtype == torch.bfloat16 else False,):
+                enabled=True if self.amp_dtype == torch.bfloat16 else False,
+            ):
                 if self._dtype != "int8":
                     traced_model = torch.jit.trace(
                         self._model.eval(),
@@ -838,8 +979,9 @@ class LMMS(lmms):
 
                 traced_model(**sample_inputs)
                 traced_model(**sample_inputs)
-            ipex._set_optimized_model_for_generation(self._model, optimized_model=traced_model)
-
+            ipex._set_optimized_model_for_generation(
+                self._model, optimized_model=traced_model
+            )
 
     @property
     def config(self):
@@ -866,7 +1008,9 @@ class LMMS(lmms):
     def pad_sequence(self, input_ids, batch_first, padding_value):
         if self.tokenizer.padding_side == "left":
             input_ids = [torch.flip(_input_ids, [0]) for _input_ids in input_ids]
-        input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=batch_first, padding_value=padding_value)
+        input_ids = torch.nn.utils.rnn.pad_sequence(
+            input_ids, batch_first=batch_first, padding_value=padding_value
+        )
         if self.tokenizer.padding_side == "left":
             input_ids = torch.flip(input_ids, [1])
         return input_ids
@@ -887,7 +1031,9 @@ class LMMS(lmms):
     def world_size(self):
         return self._world_size
 
-    def tok_encode(self, string: str, left_truncate_len=None, add_special_tokens=None) -> List[int]:
+    def tok_encode(
+        self, string: str, left_truncate_len=None, add_special_tokens=None
+    ) -> List[int]:
         """ """
         add_special_tokens = False if add_special_tokens is None else add_special_tokens
         encoding = self.tokenizer.encode(string, add_special_tokens=add_special_tokens)
@@ -902,9 +1048,13 @@ class LMMS(lmms):
     def loglikelihood(self, requests: List[Instance]) -> List[Tuple[float, bool]]:
         # TODO
         res = []
-        pbar = tqdm(total=len(requests), disable=(self.rank != 0), desc="Model Responding")
+        pbar = tqdm(
+            total=len(requests), disable=(self.rank != 0), desc="Model Responding"
+        )
 
-        for contexts, doc_to_target, doc_to_visual, doc_id, task, split in [reg.args for reg in requests]:
+        for contexts, doc_to_target, doc_to_visual, doc_id, task, split in [
+            reg.args for reg in requests
+        ]:
             # encode, pad, and truncate contexts for this batch
             if type(doc_to_target) == str:
                 continuation = doc_to_target
@@ -915,7 +1065,10 @@ class LMMS(lmms):
             if visuals:
                 image = process_images(visuals, self._image_processor, self._config)
                 if type(image) is list:
-                    image = [_image.to(dtype=torch.float16, device=self.device) for _image in image]
+                    image = [
+                        _image.to(dtype=torch.float16, device=self.device)
+                        for _image in image
+                    ]
                 else:
                     image = image.to(dtype=torch.float16, device=self.device)
             else:
@@ -923,12 +1076,17 @@ class LMMS(lmms):
 
             prompts_input = contexts[0]
 
-            if image is not None and len(image) != 0 and DEFAULT_IMAGE_TOKEN not in prompts_input:
+            if (
+                image is not None
+                and len(image) != 0
+                and DEFAULT_IMAGE_TOKEN not in prompts_input
+            ):
                 """
                 Three senarios:
                 1. No image, and there for, no image token should be added.
                 2. image token is already specified in the context, so we don't need to add it.
-                3. image token is not specified in the context and there is image inputs, so we need to add it. In this case, we add the image token at the beginning of the context and add a new line.
+                3. image token is not specified in the context and there is image inputs, so we need to add it.
+                  In this case, we add the image token at the beginning of the context and add a new line.
                 """
                 image_tokens = [DEFAULT_IMAGE_TOKEN] * len(visuals)
                 image_tokens = " ".join(image_tokens)
@@ -938,24 +1096,44 @@ class LMMS(lmms):
             conv.append_message(conv.roles[0], prompts_input)
             conv.append_message(conv.roles[1], None)
             prompt = conv.get_prompt()
-            pad_token_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
-            contxt_id = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
+            pad_token_id = (
+                self.tokenizer.pad_token_id
+                if self.tokenizer.pad_token_id is not None
+                else self.tokenizer.eos_token_id
+            )
+            contxt_id = (
+                tokenizer_image_token(
+                    prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+                )
+                .unsqueeze(0)
+                .to(self.device)
+            )
             # Add the answer of the second role
             conv.messages[1][1] = continuation
 
             prompt = conv.get_prompt()
-            input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
+            input_ids = (
+                tokenizer_image_token(
+                    prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+                )
+                .unsqueeze(0)
+                .to(self.device)
+            )
             labels = input_ids.clone()
             # Context part no need to calculate for loss
             labels[0, : contxt_id.shape[1]] = -100
             with torch.inference_mode():
-                outputs = self.model(input_ids=input_ids, labels=labels, images=image, use_cache=True)
+                outputs = self.model(
+                    input_ids=input_ids, labels=labels, images=image, use_cache=True
+                )
             loss = outputs["loss"]
             # loss = torch.exp(loss)
             logits = outputs["logits"]
             greedy_tokens = logits.argmax(dim=-1)
             cont_toks = input_ids[:, contxt_id.shape[1] :]  # [1, seq]
-            greedy_tokens = greedy_tokens[:, contxt_id.shape[1] : input_ids.shape[1]]  # [1, seq]
+            greedy_tokens = greedy_tokens[
+                :, contxt_id.shape[1] : input_ids.shape[1]
+            ]  # [1, seq]
             max_equal = (greedy_tokens == cont_toks).all()
             res.append((float(loss.item()), bool(max_equal)))
             pbar.update(1)
@@ -985,15 +1163,23 @@ class LMMS(lmms):
         # we group requests by their generation_kwargs,
         # so that we don't try to execute e.g. greedy sampling and temp=0.8 sampling
         # in the same batch.
-        re_ords = lmms_utils.Collator([reg.args for reg in requests], _collate, grouping=True)
+        re_ords = lmms_utils.Collator(
+            [reg.args for reg in requests], _collate, grouping=True
+        )
         chunks = re_ords.get_batched(n=self.batch_size, batch_fn=None)
-        num_iters = len(requests) // self.batch_size if len(requests) % self.batch_size == 0 else len(requests) // self.batch_size + 1
+        num_iters = (
+            len(requests) // self.batch_size
+            if len(requests) % self.batch_size == 0
+            else len(requests) // self.batch_size + 1
+        )
         pbar = tqdm(total=num_iters, disable=(self.rank != 0), desc="Model Responding")
         for chunk in chunks:
             contexts, all_gen_kwargs, doc_to_visual, doc_id, task, split = zip(*chunk)
             task = task[0]
             split = split[0]
-            visuals = [doc_to_visual[0](self.task_dict[task][split][ids]) for ids in doc_id]
+            visuals = [
+                doc_to_visual[0](self.task_dict[task][split][ids]) for ids in doc_id
+            ]
             visuals = self.flatten(visuals)
             # we assume all gen kwargs in the batch are the same
             # this is safe to assume because the `grouper` object ensures it.
@@ -1008,14 +1194,24 @@ class LMMS(lmms):
                     if isinstance(until, str):
                         until = [until]
                     elif not isinstance(until, list):
-                        raise ValueError(f"Expected `gen_kwargs['until']` to be of type Union[str,list] but got {type(until)}")
+                        raise ValueError(
+                            f"Expected `gen_kwargs['until']` to be of type Union[str,list] but got {type(until)}"
+                        )
 
-                if "image_aspect_ratio" in gen_kwargs.keys() and "image_aspect_ratio" not in self._config.__dict__:
-                    # here we should pop it out of gen_kwargs so that it doesn't get passed to the model for next step of generation
-                    self._config.image_aspect_ratio = gen_kwargs.pop("image_aspect_ratio")
+                if (
+                    "image_aspect_ratio" in gen_kwargs.keys()
+                    and "image_aspect_ratio" not in self._config.__dict__
+                ):
+                    # here we should pop it out of gen_kwargs so that it doesn't get passed to the model for
+                    # next step of generation
+                    self._config.image_aspect_ratio = gen_kwargs.pop(
+                        "image_aspect_ratio"
+                    )
                 # encode, pad, and truncate contexts for this batch
                 if visuals:
-                    image_tensor = process_images(visuals, self._image_processor, self._config)
+                    image_tensor = process_images(
+                        visuals, self._image_processor, self._config
+                    )
                 else:
                     image_tensor = None
 
@@ -1024,14 +1220,23 @@ class LMMS(lmms):
                 question_input = []
 
                 for visual, context in zip(visuals, contexts):
-                    if image_tensor is not None and len(image_tensor) != 0 and DEFAULT_IMAGE_TOKEN not in context:
+                    if (
+                        image_tensor is not None
+                        and len(image_tensor) != 0
+                        and DEFAULT_IMAGE_TOKEN not in context
+                    ):
                         """
                         Three senarios:
                         1. No image, and there for, no image token should be added.
                         2. image token is already specified in the context, so we don't need to add it.
-                        3. image token is not specified in the context and there is image inputs, so we need to add it. In this case, we add the image token at the beginning of the context and add a new line.
+                        3. image token is not specified in the context and there is image inputs, so we need to add it.
+                          In this case, we add the image token at the beginning of the context and add a new line.
                         """
-                        image_tokens = [DEFAULT_IMAGE_TOKEN] * len(visual) if isinstance(visual, list) else [DEFAULT_IMAGE_TOKEN]
+                        image_tokens = (
+                            [DEFAULT_IMAGE_TOKEN] * len(visual)
+                            if isinstance(visual, list)
+                            else [DEFAULT_IMAGE_TOKEN]
+                        )
                         image_tokens = " ".join(image_tokens)
                         question = image_tokens + "\n" + context
                     else:
@@ -1055,9 +1260,10 @@ class LMMS(lmms):
                         prompt_question = conv.get_prompt()
                         question_input.append(prompt_question)
 
-                # input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
                 # preconfigure gen_kwargs with defaults
-                gen_kwargs["image_sizes"] = [visuals[idx].size for idx in range(len(visuals))]
+                gen_kwargs["image_sizes"] = [
+                    visuals[idx].size for idx in range(len(visuals))
+                ]
                 if "max_new_tokens" not in gen_kwargs:
                     gen_kwargs["max_new_tokens"] = 1024
                 if "temperature" not in gen_kwargs:
@@ -1067,12 +1273,23 @@ class LMMS(lmms):
                 if "num_beams" not in gen_kwargs:
                     gen_kwargs["num_beams"] = 1
 
-                input_ids_list = [tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt") for prompt in question_input]
-                pad_token_ids = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
-                input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device)
+                input_ids_list = [
+                    tokenizer_image_token(
+                        prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+                    )
+                    for prompt in question_input
+                ]
+                pad_token_ids = (
+                    self.tokenizer.pad_token_id
+                    if self.tokenizer.pad_token_id is not None
+                    else self.tokenizer.eos_token_id
+                )
+                input_ids = self.pad_sequence(
+                    input_ids_list, batch_first=True, padding_value=pad_token_ids
+                ).to(self.device)
                 attention_masks = input_ids.ne(pad_token_ids).to(self.device)
                 input_dict = {
-                    "input_ids":input_ids,
+                    "input_ids": input_ids,
                     "attention_mask": attention_masks,
                     "pad_token_id": pad_token_ids,
                     "images": image_tensor.to(self.amp_dtype),
@@ -1083,7 +1300,9 @@ class LMMS(lmms):
                     "max_new_tokens": gen_kwargs["max_new_tokens"],
                 }
             elif re.search("git", self.model.config.architectures[0], re.IGNORECASE):
-                input_ids=self._image_processor(images=visuals, return_tensors="pt").pixel_values
+                input_ids = self._image_processor(
+                    images=visuals, return_tensors="pt"
+                ).pixel_values
                 gen_kwargs.pop("until", None)
                 input_dict = {
                     "pixel_values": input_ids.to(self.amp_dtype),
@@ -1091,11 +1310,21 @@ class LMMS(lmms):
                 }
             try:
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
-                    enabled=True if self.amp_dtype == torch.bfloat16 else False,):
+                    enabled=True if self.amp_dtype == torch.bfloat16 else False,
+                ):
                     cont = self.model.generate(**input_dict)
                     text_outputs = self.tokenizer.batch_decode(
-                        cont[:, input_ids.shape[1]:] if re.search("llava", self.model.config.architectures[0], re.IGNORECASE) else cont,
-                        skip_special_tokens=True)
+                        (
+                            cont[:, input_ids.shape[1] :]
+                            if re.search(
+                                "llava",
+                                self.model.config.architectures[0],
+                                re.IGNORECASE,
+                            )
+                            else cont
+                        ),
+                        skip_special_tokens=True,
+                    )
             except Exception as e:
                 print(f"Error {e} in generating")
                 cont = ""
@@ -1107,7 +1336,8 @@ class LMMS(lmms):
 
         pbar.close()
         return res
-    
+
+
 lm_tasks = []
 lmms_tasks = []
 lm_all_tasks = lm_eval.tasks.ALL_TASKS
@@ -1148,7 +1378,7 @@ if len(lm_tasks) != 0:
             with_jit=not args.disable_jit,
             dtype=args.dtype,
             config=args.config_file,
-            add_special_tokens=False
+            add_special_tokens=False,
         )
 
     results = evaluator.evaluate(
@@ -1160,14 +1390,16 @@ if len(lm_tasks) != 0:
     print(evaluator.make_table(results))
 elif len(lmms_tasks) != 0:
     task_names = lmms_utils.pattern_match(lmms_tasks, ALL_TASKS)
-    lm = LMMS(pretrained=args.model, device="cpu", 
-            batch_size=args.batch_size,
-            with_ipex=args.ipex,
-            with_jit=not args.disable_jit,
-            dtype=args.dtype,
-            config=args.config_file,
-            add_special_tokens=False
-        )
+    lm = LMMS(
+        pretrained=args.model,
+        device="cpu",
+        batch_size=args.batch_size,
+        with_ipex=args.ipex,
+        with_jit=not args.disable_jit,
+        dtype=args.dtype,
+        config=args.config_file,
+        add_special_tokens=False,
+    )
 
     task_dict = lmms_eval.tasks.get_task_dict(task_names, model_name="test")
     for task_name in task_dict.keys():
@@ -1185,6 +1417,6 @@ elif len(lmms_tasks) != 0:
         task_dict=task_dict,
         # limit=10,
         # bootstrap_iters=100,
-        cli_args=args
+        cli_args=args,
     )
     print(lmms_evaluator.make_table(results))

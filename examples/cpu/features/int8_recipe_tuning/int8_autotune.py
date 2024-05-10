@@ -36,6 +36,7 @@ for X, y in test_dataloader:
     print(f"Shape of y: {y.shape} {y.dtype}")
     break
 
+
 # Define model
 class NeuralNetwork(nn.Module):
     def __init__(self):
@@ -46,7 +47,7 @@ class NeuralNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(512, 512),
             nn.ReLU(),
-            nn.Linear(512, 10)
+            nn.Linear(512, 10),
         )
 
     def forward(self, x):
@@ -54,9 +55,11 @@ class NeuralNetwork(nn.Module):
         logits = self.linear_relu_stack(x)
         return logits
 
+
 model = NeuralNetwork()
 loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+
 
 def train(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
@@ -88,6 +91,7 @@ print("Done!")
 ################################ QUANTIZE ##############################  # noqa F401
 model.eval()
 
+
 def evaluate(dataloader, model):
     size = len(dataloader.dataset)
     model.eval()
@@ -100,13 +104,21 @@ def evaluate(dataloader, model):
     accuracy /= size
     return accuracy
 
+
 ######################## recipe tuning with INC ########################  # noqa F401
 def eval(prepared_model):
     accu = evaluate(test_dataloader, prepared_model)
     return float(accu)
 
-tuned_model = ipex.quantization.autotune(model, test_dataloader, eval_func=eval, sampling_sizes=[100],
-                                         accuracy_criterion={'relative': .01}, tuning_time=0)
+
+tuned_model = ipex.quantization.autotune(
+    model,
+    test_dataloader,
+    eval_func=eval,
+    sampling_sizes=[100],
+    accuracy_criterion={"relative": 0.01},
+    tuning_time=0,
+)
 ########################################################################  # noqa F401
 
 # run tuned model
