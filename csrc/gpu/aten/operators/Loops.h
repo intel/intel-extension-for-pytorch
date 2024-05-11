@@ -1006,7 +1006,8 @@ void opmath_gpu_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
     dpcpp_kernel_for_tensor_iter<decltype(binf), false, fast_mode>(iter, binf);
   }
 }
-
+// Legacy variant that assumes that func_t has the correct types
+// that we expect to load from memory
 template <typename func_t, bool fast_mode = false>
 void dpcpp_kernel_with_scalars(TensorIteratorBase& iter, const func_t& f) {
   using traits = function_traits<func_t>;

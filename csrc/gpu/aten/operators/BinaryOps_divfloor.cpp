@@ -44,7 +44,7 @@ struct MulFunctor<bool> {
 };
 
 const char div_name[] = "div_kernel";
-void div_true_kernel(TensorIteratorBase& iter) {
+void div_true_kernel_dpcpp(TensorIteratorBase& iter) {
   auto common_dtype = iter.common_dtype();
   if (iter.common_dtype() == kComplexHalf) {
     using scalar_t = c10::complex<at::Half>;
@@ -61,7 +61,7 @@ void div_true_kernel(TensorIteratorBase& iter) {
           using opmath_t = at::opmath_type<scalar_t>;
           auto inv_b = opmath_t(1.0) / iter.scalar_value<opmath_t>(2);
           iter.remove_operand(2);
-          dpcpp_kernel_for_tensor_iter(
+          dpcpp_fast_mode_kernel_for_tensor_iter(
               iter,
               BUnaryFunctor<scalar_t, scalar_t, scalar_t, MulFunctor<opmath_t>>(
                   MulFunctor<opmath_t>(), inv_b));
@@ -70,7 +70,7 @@ void div_true_kernel(TensorIteratorBase& iter) {
     IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
         kHalf, kBFloat16, common_dtype, "div_true_dpcpp", [&]() {
           DivFunctor<scalar_t> f;
-          dpcpp_kernel_with_scalars(iter, f);
+          dpcpp_fast_mode_kernel_with_scalars(iter, f);
         });
   }
 }
@@ -171,7 +171,7 @@ static void div_floor_kernel_dpcpp(TensorIterator& iter) {
           using accscalar_t = acc_type<scalar_t>;
           auto b = iter.scalar_value<accscalar_t>(2);
           if (DPCPP_UNLIKELY(b == 0)) {
-            return div_true_kernel(iter);
+            return div_true_kernel_dpcpp(iter);
           }
 
           auto inv_b = accscalar_t(1.0) / b;
@@ -221,5 +221,8 @@ void div_floor_kernel(TensorIterator& iter) {
   impl::div_floor_kernel_dpcpp(iter);
 }
 
+void div_true_kernel(TensorIteratorBase& iter) {
+  impl::div_true_kernel_dpcpp(iter);
+}
 } // namespace AtenIpexTypeXPU
 } // namespace at

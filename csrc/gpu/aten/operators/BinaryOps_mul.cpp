@@ -20,8 +20,7 @@ namespace impl {
 
 template <typename scalar_t>
 struct mul_kernel_dpcpp_functor {
-  using opmath_t = at::opmath_type<scalar_t>;
-  scalar_t operator()(opmath_t a, opmath_t b) const {
+  scalar_t operator()(scalar_t a, scalar_t b) const {
     return a * b;
   }
 };
@@ -35,8 +34,9 @@ static void mul_kernel_dpcpp(TensorIteratorBase& iter) {
       iter.dtype(),
       "mul",
       [&]() {
-        mul_kernel_dpcpp_functor<scalar_t> f;
-        opmath_gpu_kernel_with_scalars<scalar_t>(iter, f);
+        using opmath_t = at::opmath_type<scalar_t>;
+        mul_kernel_dpcpp_functor<opmath_t> f;
+        fast_mode_opmath_symmetric_gpu_kernel_with_scalars<scalar_t>(iter, f);
       });
 }
 } // namespace impl

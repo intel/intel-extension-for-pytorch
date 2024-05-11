@@ -47,7 +47,12 @@ void add_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
         using opmath_t = at::opmath_type<scalar_t>;
         auto alpha = alpha_scalar.to<opmath_t>();
         AddKernelDpcppFunctor<scalar_t, opmath_t> kfn(alpha);
-        opmath_gpu_kernel_with_scalars<scalar_t>(iter, kfn);
+        opmath_gpu_kernel_with_scalars<
+            scalar_t,
+            scalar_t,
+            scalar_t,
+            decltype(kfn),
+            true>(iter, kfn);
       });
 }
 

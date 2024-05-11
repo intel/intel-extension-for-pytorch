@@ -16,32 +16,11 @@ using namespace xpu::dpcpp;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-namespace impl {
-
-template <typename scalar_t>
-struct DivKernelDpcppFunctor {
-  using opmath_t = at::opmath_type<scalar_t>;
-  scalar_t operator()(opmath_t a, opmath_t b) const {
-    return a / b;
-  }
-};
-
-static void div_kernel_dpcpp(TensorIteratorBase& iter) {
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      iter.dtype(),
-      "div",
-      [&]() {
-        DivKernelDpcppFunctor<scalar_t> kfn;
-        dpcpp_fast_mode_kernel_with_scalars(iter, kfn);
-      });
-}
-
-} // namespace impl
+namespace impl {} // namespace impl
 
 void div_floor_kernel(TensorIterator& iter);
 void div_trunc_kernel(TensorIterator& iter);
+void div_true_kernel(TensorIteratorBase& iter);
 
 Tensor& div_out(const Tensor& self, const Tensor& other, Tensor& result) {
   return binary_out_template<dnnl::algorithm::binary_div>(
@@ -49,7 +28,9 @@ Tensor& div_out(const Tensor& self, const Tensor& other, Tensor& result) {
       result,
       self,
       other,
-      [=](TensorIteratorBase& iter) { impl::div_kernel_dpcpp(iter); });
+      [=](TensorIteratorBase& iter) {
+        at::AtenIpexTypeXPU::div_true_kernel(iter);
+      });
 }
 
 Tensor& div_out(
@@ -82,7 +63,9 @@ Tensor div(const Tensor& self, const Tensor& other) {
       result,
       self,
       other,
-      [=](TensorIteratorBase& iter) { impl::div_kernel_dpcpp(iter); });
+      [=](TensorIteratorBase& iter) {
+        at::AtenIpexTypeXPU::div_true_kernel(iter);
+      });
 }
 
 Tensor& div_(Tensor& self, const Tensor& other) {
@@ -91,7 +74,9 @@ Tensor& div_(Tensor& self, const Tensor& other) {
       self,
       self,
       other,
-      [=](TensorIteratorBase& iter) { impl::div_kernel_dpcpp(iter); });
+      [=](TensorIteratorBase& iter) {
+        at::AtenIpexTypeXPU::div_true_kernel(iter);
+      });
 }
 
 } // namespace AtenIpexTypeXPU
