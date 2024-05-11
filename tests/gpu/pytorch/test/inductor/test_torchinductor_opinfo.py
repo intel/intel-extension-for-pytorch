@@ -200,6 +200,10 @@ inductor_skips["xpu"] = {
     "nn.functional.cosine_embedding_loss": {b8},
     "native_batch_norm": {f16, f32, f64},
     "_native_batch_norm_legit": {f16, f32, f64},
+
+    # Long is not supported in oneDNN
+    # Only skip errors which cause segmentfault.
+    "nn.functional.linear": {i64},
 }
 
 if not SM80OrLater:
