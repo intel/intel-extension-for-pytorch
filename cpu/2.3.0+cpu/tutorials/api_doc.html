@@ -421,13 +421,15 @@ will be dumped out for the second inference only.</p>
 <dt class="sig sig-object py" id="ipex.llm.modules.LinearSilu">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearSilu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearSilu" title="Permalink to this definition"></a></dt>
 <dd><p>Applies a linear transformation to the <cite>input</cite> data, and then apply PyTorch SILU
-(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html</a>) on the result:</p>
-<blockquote>
-<div><p>result = torch.nn.functional.silu(linear(input))</p>
-</div></blockquote>
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html</a>)
+on the result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">silu</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to be fused with silu.</p>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with silu.</p>
 </dd>
 </dl>
 <dl class="simple">
@@ -451,9 +453,9 @@ will be dumped out for the second inference only.</p>
 <dd><p>Applies a linear transformation to the <cite>input</cite> data, then apply PyTorch SILU
 (see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html</a>)
 on the result, and multiplies the result by <cite>other</cite>:</p>
-<blockquote>
-<div><p>result = torch.nn.functional.silu(linear(input)) * other</p>
-</div></blockquote>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">silu</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span> <span class="o">*</span> <span class="n">other</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to
@@ -479,17 +481,20 @@ be fused with silu and mul.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.llm.modules.Linear2SiluMul">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">Linear2SiluMul</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear_s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linear_m</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.Linear2SiluMul" title="Permalink to this definition"></a></dt>
-<dd><p>Applies two linear transformation to the <cite>input</cite> data (<cite>linear_s</cite> and <cite>linear_m</cite>), then apply PyTorch SILU
-(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html</a>) on the result from <cite>linear_s</cite>
-, and multiplies the result from <cite>linear_m</cite>:</p>
-<blockquote>
-<div><p>result = torch.nn.functional.silu(linear_s(input)) * linear_m(input)</p>
-</div></blockquote>
+<dd><p>Applies two linear transformation to the <cite>input</cite> data (<cite>linear_s</cite> and
+<cite>linear_m</cite>), then apply PyTorch SILU
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html</a>)
+on the result from <cite>linear_s</cite>, and multiplies the result from <cite>linear_m</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">silu</span><span class="p">(</span><span class="n">linear_s</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span> <span class="o">*</span> <span class="n">linear_m</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>linear_s</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to be fused with silu.</p></li>
-<li><p><strong>linear_m</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to be fused with mul.</p></li>
+<li><p><strong>linear_s</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with silu.</p></li>
+<li><p><strong>linear_m</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with mul.</p></li>
 </ul>
 </dd>
 </dl>
@@ -513,13 +518,15 @@ be fused with silu and mul.</p>
 <dt class="sig sig-object py" id="ipex.llm.modules.LinearRelu">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearRelu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearRelu" title="Permalink to this definition"></a></dt>
 <dd><p>Applies a linear transformation to the <cite>input</cite> data, and then apply PyTorch RELU
-(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.relu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.relu.html</a>) on the result:</p>
-<blockquote>
-<div><p>result = torch.nn.functional.relu(linear(input))</p>
-</div></blockquote>
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.relu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.relu.html</a>)
+on the result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to be fused with relu.</p>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module
+to be fused with relu.</p>
 </dd>
 </dl>
 <dl class="simple">
@@ -543,12 +550,13 @@ be fused with silu and mul.</p>
 <dd><p>Applies a linear transformation to the <cite>input</cite> data, and then apply NewGELUActivation
 (see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/activations.py#L50">https://github.com/huggingface/transformers/blob/main/src/transformers/activations.py#L50</a>)
 on the result:</p>
-<blockquote>
-<div><p>result = NewGELUActivation(linear(input))</p>
-</div></blockquote>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">NewGELUActivation</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to be fused with new_gelu.</p>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module
+to be fused with new_gelu.</p>
 </dd>
 </dl>
 <dl class="simple">
@@ -570,13 +578,15 @@ on the result:</p>
 <dt class="sig sig-object py" id="ipex.llm.modules.LinearGelu">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearGelu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearGelu" title="Permalink to this definition"></a></dt>
 <dd><p>Applies a linear transformation to the <cite>input</cite> data, and then apply PyTorch GELU
-(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.gelu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.gelu.html</a>) on the result:</p>
-<blockquote>
-<div><p>result = torch.nn.functional.gelu(linear(input))</p>
-</div></blockquote>
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.gelu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.gelu.html</a>)
+on the result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">gelu</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to be fused with gelu.</p>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with gelu.</p>
 </dd>
 </dl>
 <dl class="simple">
@@ -597,13 +607,15 @@ on the result:</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.llm.modules.LinearMul">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearMul</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearMul" title="Permalink to this definition"></a></dt>
-<dd><dl class="simple">
-<dt>Applies a linear transformation to the <cite>input</cite> data, and then multiplies the result by <cite>other</cite>:</dt><dd><p>result = linear(input) * other</p>
-</dd>
-</dl>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data, and then multiplies
+the result by <cite>other</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span> <span class="o">*</span> <span class="n">other</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to be fused with mul.</p>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module
+to be fused with mul.</p>
 </dd>
 </dl>
 <dl class="simple">
@@ -625,13 +637,15 @@ on the result:</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.llm.modules.LinearAdd">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearAdd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearAdd" title="Permalink to this definition"></a></dt>
-<dd><dl class="simple">
-<dt>Applies a linear transformation to the <cite>input</cite> data, and then add the result by <cite>other</cite>:</dt><dd><p>result = linear(input) + other</p>
-</dd>
-</dl>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data,
+and then add the result by <cite>other</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span> <span class="o">+</span> <span class="n">other</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to be fused with add.</p>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with add.</p>
 </dd>
 </dl>
 <dl class="simple">
@@ -653,13 +667,15 @@ on the result:</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.llm.modules.LinearAddAdd">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearAddAdd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearAddAdd" title="Permalink to this definition"></a></dt>
-<dd><dl class="simple">
-<dt>Applies a linear transformation to the <cite>input</cite> data, and then add the result by <cite>other_1</cite> and <cite>other_2</cite>:</dt><dd><p>result = linear(input) + other_1 + other_2</p>
-</dd>
-</dl>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data,
+and then add the result by <cite>other_1</cite> and <cite>other_2</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span> <span class="o">+</span> <span class="n">other_1</span> <span class="o">+</span> <span class="n">other_2</span>
+</pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to be fused with add and add.</p>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with add and add.</p>
 </dd>
 </dl>
 <dl class="simple">
@@ -682,34 +698,38 @@ on the result:</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.llm.modules.RotaryEmbedding">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">RotaryEmbedding</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_position_embeddings</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos_embd_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backbone</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.RotaryEmbedding" title="Permalink to this definition"></a></dt>
-<dd><dl class="simple">
-<dt>[module init and forward] Applies RotaryEmbedding (see <a class="reference external" href="https://huggingface.co/papers/2104.09864">https://huggingface.co/papers/2104.09864</a>)</dt><dd><p>on the <cite>query ` or `key</cite> before their multi-head attention computation.</p>
-</dd>
-</dl>
+<dd><p>[module init and forward] Applies RotaryEmbedding (see <a class="reference external" href="https://huggingface.co/papers/2104.09864">https://huggingface.co/papers/2104.09864</a>)
+on the <code class="docutils literal notranslate"><span class="pre">query</span></code> or <code class="docutils literal notranslate"><span class="pre">key</span></code> before their multi-head attention computation.</p>
+<p><cite>module init</cite></p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>init</strong> (<em>module</em>) – </p></li>
-<li><p><strong>max_position_embeddings</strong> (<em>-</em>) – size (max) of the position embeddings.</p></li>
-<li><p><strong>pos_embd_dim</strong> (<em>-</em>) – dimension of the position embeddings.</p></li>
-<li><p><strong>base</strong> (<em>-</em>) – Default: 10000. Base to generate the frequency of position embeddings.</p></li>
-<li><p><strong>backbone</strong> (<em>-</em>) – Default: None. The exact transformers model backbone
+<li><p><strong>max_position_embeddings</strong> (<em>int</em>) – size (max) of the position embeddings.</p></li>
+<li><p><strong>pos_embd_dim</strong> (<em>int</em>) – dimension of the position embeddings.</p></li>
+<li><p><strong>base</strong> (<em>int</em>) – Default: 10000. Base to generate the frequency of position embeddings.</p></li>
+<li><p><strong>backbone</strong> (<em>str</em>) – Default: None. The exact transformers model backbone
 (e.g., “GPTJForCausalLM”, get from model.config.architectures[0],
 see <a class="reference external" href="https://huggingface.co/EleutherAI/gpt-j-6b/blob/main/config.json#L4">https://huggingface.co/EleutherAI/gpt-j-6b/blob/main/config.json#L4</a>).</p></li>
-<li><p><strong>forward</strong> – </p></li>
-<li><p><strong>input</strong> (<em>-</em>) – input to be applied with position embeddings,
+</ul>
+</dd>
+</dl>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input</strong> (<em>torch.Tensor</em>) – input to be applied with position embeddings,
 taking shape of [batch size, sequence length, num_head/num_kv_head, head_dim]
 (as well as the output shape).</p></li>
-<li><p><strong>position_ids</strong> (<em>-</em>) – the according position_ids for the input.
+<li><p><strong>position_ids</strong> (<em>torch.Tensor</em>) – the according position_ids for the input.
 The shape should be [batch size, sequence length. In some cases,
 there is only one element which the past_kv_length, and position id
 can be constructed by past_kv_length + current_position.</p></li>
-<li><p><strong>num_head</strong> (<em>-</em>) – head num from the input shape.</p></li>
-<li><p><strong>head_dim</strong> (<em>-</em>) – head dim from the input shape.</p></li>
-<li><p><strong>offset</strong> (<em>-</em>) – the offset value. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,
+<li><p><strong>num_head</strong> (<em>int</em>) – head num from the input shape.</p></li>
+<li><p><strong>head_dim</strong> (<em>int</em>) – head dim from the input shape.</p></li>
+<li><p><strong>offset</strong> (<em>int</em>) – the offset value. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,
 so the offset is 1. For llama, cos/sin is applied to the neighboring rotary_dim elements,
 so the offset is rotary_dim/2.</p></li>
-<li><p><strong>rotary_ndims</strong> (<em>-</em>) – the rotary dimension. e.g., 64 for GPTJ. head size for LLama.</p></li>
+<li><p><strong>rotary_ndims</strong> (<em>int</em>) – the rotary dimension. e.g., 64 for GPTJ. head size for LLama.</p></li>
 </ul>
 </dd>
 </dl>
@@ -722,60 +742,62 @@ so the offset is rotary_dim/2.</p></li>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">query_rotery</span> <span class="o">=</span> <span class="n">rope_module</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">position_ids</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">256</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span>
 </pre></div>
 </div>
-<dl class="simple">
-<dt>[Direct function call] This module also provides a <cite>.apply_function</cite> function call to be used on query and key</dt><dd><p>at the same time without initializing the module (assume rotary embedding
-sin/cos values are provided).</p>
-</dd>
-</dl>
-<p>Args:
-- query, key (torch.Tensor) : inputs to be applied with position embeddings, taking shape of</p>
-<blockquote>
-<div><p>[batch size, sequence length, num_head/num_kv_head, head_dim]
-or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p>
-</div></blockquote>
-<ul class="simple">
-<li><p>sin/cos (torch.Tensor): [num_tokens, rotary_dim] the sin/cos value tensor generated to be applied on query/key.</p></li>
-<li><p>rotary_ndims (int): the rotary dimension. e.g., 64 for GPTJ. head size for LLama.</p></li>
-<li><p>head_dim (int) : head dim from the input shape.</p></li>
-<li><dl class="simple">
-<dt>rotary_half (bool)<span class="classifier">if False. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,</span></dt><dd><p>so the offset is 1.
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite> function call
+to be used on query and key at the same time without initializing the module
+(assume rotary embedding sin/cos values are provided).</p>
+<p><cite>apply_function()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – inputs to be applied with position embeddings, taking shape of
+[batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – inputs to be applied with position embeddings, taking shape of
+[batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p></li>
+<li><p><strong>sin/cos</strong> (<em>torch.Tensor</em>) – [num_tokens, rotary_dim] the sin/cos value tensor generated to be applied on query/key.</p></li>
+<li><p><strong>rotary_ndims</strong> (<em>int</em>) – the rotary dimension. e.g., 64 for GPTJ. head size for LLama.</p></li>
+<li><p><strong>head_dim</strong> (<em>int</em>) – head dim from the input shape.</p></li>
+<li><p><strong>rotary_half</strong> (<em>bool</em>) – if False. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,
+so the offset is 1.
 if True, e.g., for llama, cos/sin is applied to the neighboring rotary_dim elements,
-so the offset is rotary_dim/2.</p>
-</dd>
-</dl>
-</li>
-<li><dl class="simple">
-<dt>position_ids (torch.Tensor): Default is None and optional if sin/cos is provided. the according position_ids</dt><dd><p>for the input. The shape should be [batch size, sequence length].</p>
-</dd>
-</dl>
-</li>
+so the offset is rotary_dim/2.</p></li>
+<li><p><strong>position_ids</strong> (<em>torch.Tensor</em>) – Default is None and optional if sin/cos is provided. the according position_ids
+for the input. The shape should be [batch size, sequence length].</p></li>
 </ul>
-<p>Return
-- query, key (torch.Tensor): [batch size, sequence length, num_head/num_kv_head, head_dim]</p>
-<blockquote>
-<div><p>or [num_tokens, num_head/num_kv_head, head_dim].</p>
-</div></blockquote>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>[batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim].</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>query, key (torch.Tensor)</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.llm.modules.RMSNorm">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">RMSNorm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hidden_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.RMSNorm" title="Permalink to this definition"></a></dt>
 <dd><p>[module init and forward] Applies RMSnorm on the input (hidden states).
-(see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76</a>)
-:param module init:
-:param - hidden_size: the size of the hidden states.
-:type - hidden_size: int
-:param - eps: the variance_epsilon to apply RMSnorm, default using 1e-6.
-:type - eps: float
-:param - weight: the weight to apply RMSnorm, default None and will use <cite>torch.ones(hidden_size)</cite>.
-:type - weight: torch.Tensor
-:param forward:
-:param - hidden_states: input to be applied RMSnorm, usually taking shape of</p>
-<blockquote>
-<div><p>[batch size, sequence length, hidden_size]
-(as well as the output shape).</p>
-</div></blockquote>
+(see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76</a>)</p>
+<p><cite>module init</cite></p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_size</strong> (<em>int</em>) – the size of the hidden states.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – the variance_epsilon to apply RMSnorm, default using 1e-6.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply RMSnorm, default None
+and will use <cite>torch.ones(hidden_size)</cite>.</p></li>
+</ul>
+</dd>
+</dl>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – input to be applied RMSnorm, usually taking shape of
+[batch size, sequence length, hidden_size] (as well as the output shape).</p>
+</dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
@@ -785,36 +807,42 @@ so the offset is rotary_dim/2.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">rmsnorm_module</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
 </pre></div>
 </div>
-<dl class="simple">
-<dt>[Direct function call] This module also provides a <cite>.apply_function</cite> function call to apply RMSNorm without</dt><dd><p>initializing the module.</p>
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite> function
+call to apply RMSNorm without initializing the module.</p>
+<p><cite>apply_function()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – the input tensor to apply RMSNorm.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply RMSnorm.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – the variance_epsilon to apply RMSnorm.</p></li>
+</ul>
 </dd>
 </dl>
-<p>Args:
-- hidden_states(torch.Tensor) : the input tensor to apply RMSNorm.
-- weight (torch.Tensor): the weight to apply RMSnorm.
-- eps (float) : the variance_epsilon to apply RMSnorm.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.llm.modules.FastLayerNorm">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">FastLayerNorm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">normalized_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.FastLayerNorm" title="Permalink to this definition"></a></dt>
 <dd><p>[module init and forward] Applies PyTorch Layernorm (see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html">https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html</a>)
-on the input (hidden states).
-:param module init:
-:param - normalized_shape:
-:type - normalized_shape: (int or list) or torch.Size
-:param - eps: a value added to the denominator for numerical stability.
-:type - eps: float
-:param - weight: the weight of Layernorm to apply normalization.
-:type - weight: torch.Tensor
-:param - bias: an additive bias for normalization.
-:type - bias: torch.Tensor
-:param forward:
-:param - hidden_states: input to be applied Layernorm, usually taking shape of</p>
-<blockquote>
-<div><p>[batch size, sequence length, hidden_size] (as well as the output shape).</p>
-</div></blockquote>
+on the input (hidden states).</p>
+<p><cite>module init</cite></p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>normalized_shape</strong> (<em>(</em><em>int</em><em> or </em><em>list</em><em>) or </em><em>torch.Size</em>) – </p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – a value added to the denominator for numerical stability.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight of Layernorm to apply normalization.</p></li>
+<li><p><strong>bias</strong> (<em>torch.Tensor</em>) – an additive bias for normalization.</p></li>
+</ul>
+</dd>
+</dl>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – input to be applied Layernorm, usually taking shape of
+[batch size, sequence length, hidden_size] (as well as the output shape).</p>
+</dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
@@ -825,16 +853,20 @@ on the input (hidden states).
 <span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">layernorm_module</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
 </pre></div>
 </div>
-<dl class="simple">
-<dt>[Direct function call] This module also provides a <cite>.apply_function</cite> function call to apply fast layernorm</dt><dd><p>without initializing the module.</p>
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite> function call to apply fast layernorm
+without initializing the module.</p>
+<p><cite>apply_function()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – the input tensor to apply normalization.</p></li>
+<li><p><strong>normalized_shape</strong> (<em>int</em><em> or </em><em>list</em><em>) or </em><em>torch.Size</em>) – </p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply normalization.</p></li>
+<li><p><strong>bias</strong> (<em>torch.Tensor</em>) – an additive bias for normalization.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – a value added to the denominator for numerical stability.</p></li>
+</ul>
 </dd>
 </dl>
-<p>Args:
-- hidden_states(torch.Tensor) : the input tensor to apply normalization.
-- normalized_shape (int or list) or torch.Size) input shape from an expected input of size.
-- weight (torch.Tensor): the weight to apply normalization.
-- bias (torch.Tensor): an additive bias for normalization.
-- eps (float): a value added to the denominator for numerical stability.</p>
 </dd></dl>
 
 <dl class="py class">
@@ -847,65 +879,67 @@ context to do scale dot product. When the sequence is very long, the memory over
 performance bottleneck. This module provides an Indirect Access KV_cache(IAKV), Firstly, IAKV pre-allocates
 buffers(key and value use different buffers) to store all key/value hidden states and beam index information.
 It can use beam index history to decide which beam should be used by a timestamp and this information will
-generate an offset to access the kv_cache buffer.
-Data Format:
-- The shape of the pre-allocated key(value) buffer is [max_seq, beam*batch, head_num, head_size],</p>
-<blockquote>
-<div><p>the hidden state of key/value which is the shape of [beam*batch, head_num, head_size] is stored token by token.
+generate an offset to access the kv_cache buffer.</p>
+<p>Data Format:</p>
+<p>The shape of the pre-allocated key(value) buffer is [max_seq, beam*batch, head_num, head_size],
+the hidden state of key/value which is the shape of [beam*batch, head_num, head_size] is stored token by token.
 All beam idx information of every timestamp is also stored in a Tensor with the shape of [max_seq, beam*batch].</p>
-</div></blockquote>
-<p>[Module init and forward]
-Args:
-module init
-- text_max_length (int) : the max length of kv cache to be used for generation (allocate the pre-cache buffer).</p>
-<p>forward
-- query (torch.Tensor): Query tensor; shape: (beam*batch, seq_len, head_num, head_dim).
-- key (torch.Tensor): Key tensor; shape: (beam*batch, seq_len, head_num, head_dim).
-- value (torch.Tensor): Value tensor; shape: (beam*batch, seq_len, head_num, head_dim).
-- scale_attn (float):scale used by the attention layer. should be the  sqrt(head_size).
-- layer_past (tuple(torch.Tensor)): tuple(seq_info, key_cache, value_cache, beam-idx).</p>
-<blockquote>
-<div><p>key_cache: key cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);
-value_cache: value cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);
-beam-idx:  history beam idx, shape:(max_seq, beam*batch);
-seq_info: Sequence info tensor, shape:(1, 1, max_seq, max_seq).</p>
-</div></blockquote>
-<ul class="simple">
-<li><p>head_mask (torch.Tensor): Head mask tensor which is not supported by kernel yet.</p></li>
-<li><p>attention_mask(torch.Tensor): Attention mask information.</p></li>
+<p><cite>module init</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>text_max_length</strong> (<em>int</em>) – the max length of kv cache to be used
+for generation (allocate the pre-cache buffer).</p>
+</dd>
+</dl>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – Query tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – Key tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – Value tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>scale_attn</strong> (<em>float</em>) – scale used by the attention layer. should be <code class="docutils literal notranslate"><span class="pre">sqrt(head_size)</span></code>.</p></li>
+<li><p><strong>layer_past</strong> (<em>tuple</em><em>(</em><em>torch.Tensor</em><em>)</em>) – <p>tuple(seq_info, key_cache, value_cache, beam-idx).</p>
+<ul>
+<li><p>key_cache: key cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);</p></li>
+<li><p>value_cache: value cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);</p></li>
+<li><p>beam-idx:  history beam idx, shape:(max_seq, beam*batch);</p></li>
+<li><p>seq_info: Sequence info tensor, shape:(1, 1, max_seq, max_seq).</p></li>
 </ul>
-<p>Return:
-- attn_output:  weighted value which is the output of scale dot product. shape (beam*batch, seq_len, head_num, head_size).
-- attn_weights:  The output tensor of the first matmul in scale dot product which is not supported by kernel now.
-- new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).</p>
-<p>Notes:
-- How to reorder KV cache when using the format of IndirectAccessKVCacheAttention (e.g., on llama model</p>
-<blockquote>
-<div><dl>
-<dt>see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318</a>)</dt><dd><dl>
-<dt>def _reorder_cache(</dt><dd><p>self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor</p>
+</p></li>
+<li><p><strong>head_mask</strong> (<em>torch.Tensor</em>) – Head mask tensor which is not supported by kernel yet.</p></li>
+<li><p><strong>attention_mask</strong> (<em>torch.Tensor</em>) – Attention mask information.</p></li>
+</ul>
 </dd>
-<dt>) -&gt; Tuple[Tuple[torch.Tensor]]:</dt><dd><dl>
-<dt>if (</dt><dd><p>len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>Weighted value which is the output of scale dot product.
+shape (beam*batch, seq_len, head_num, head_size).</p>
+<p>attn_weights: The output tensor of the first matmul in scale dot product
+which is not supported by kernel now.</p>
+<p>new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).</p>
+</p>
 </dd>
-<dt>):</dt><dd><dl class="simple">
-<dt>for layer_past in past_key_values:</dt><dd><p>layer_past[3][layer_past[0].size(-2) - 1] = beam_idx</p>
-</dd>
-</dl>
-<p>return past_key_values</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>attn_output</p>
 </dd>
 </dl>
-</dd>
-</dl>
-</dd>
-</dl>
-</div></blockquote>
-<dl class="simple">
-<dt>[Direct function call] This module also provides a <cite>.apply_function</cite> function call to apply IndirectAccessKVCacheAttention</dt><dd><p>without initializing the module.</p>
-</dd>
-</dl>
-<p>Args:
-- The parameters are the same as the forward call.</p>
+<p class="rubric">Notes</p>
+<p>How to reorder KV cache when using the format of IndirectAccessKVCacheAttention (e.g., on llama model
+see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318</a>)</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">_reorder_cache</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">past_key_values</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]],</span> <span class="n">beam_idx</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">past_key_values</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">past_key_values</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+    <span class="p">):</span>
+        <span class="k">for</span> <span class="n">layer_past</span> <span class="ow">in</span> <span class="n">past_key_values</span><span class="p">:</span>
+            <span class="n">layer_past</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="n">layer_past</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">beam_idx</span>
+        <span class="k">return</span> <span class="n">past_key_values</span>
+</pre></div>
+</div>
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite> function call
+to apply IndirectAccessKVCacheAttention without initializing the module.</p>
+<p>The parameters of <cite>apply_function()</cite> are the same as the <cite>forward()</cite> call.</p>
 </dd></dl>
 
 <dl class="py class">
@@ -916,109 +950,98 @@ to enable the paged attention kernel in and use the layout of (num_blocks, self.
 for key/value cache. The basic logic as following figure. Firstly, The DRAM buffer which includes num_blocks
 are pre-allocated to store key or value cache. For every block, block_size tokens can be stored. In the forward
 pass, the cache manager will firstly allocate some slots from this buffer and use reshape_and_cache API to store
-the key/value and then use  single_query_cached_kv_attention API to do the scale-dot-product of MHA.
+the key/value and then use single_query_cached_kv_attention API to do the scale-dot-product of MHA.
 The block is basic allocation unit of paged attention and the token intra-block are stored one-by-one.
 The block tables are used to map the logical block of sequence into the physical block.</p>
 <p>[class method]: reshape_and_cache
-ipex.llm.modules.PagedAttention.reshape_and_cache(key,  value,  key_cache, value_cache, slot_mapping)
-This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.
-Args:
-- key (torch.Tensor):  The keytensor. The shape should be [num_seqs, num_heads, head_size].
-- value (torch.Tensor):  The value tensor. The shape should be [num_seqs, num_heads, head_size].
-- key_cache (torch.Tensor):  The pre-allocated buffer to store the key cache. The shape should be</p>
-<blockquote>
-<div><p>[num_blocks,  block_size, num_heads, head_size].</p>
-</div></blockquote>
-<ul class="simple">
-<li><dl class="simple">
-<dt>value_cache (torch.Tensor): The pre-allocated buffer to store the value cache. The shape should be</dt><dd><p>[num_blocks,  block_size, num_heads, head_size].</p>
-</dd>
-</dl>
-</li>
-<li><dl class="simple">
-<dt>slot_mapping (torch.Tensor):  It stores the position to store the key/value in the pre-allocated buffers.</dt><dd><p>The shape should be the number of sequences. For sequence _i_, the slot_mapping[i]//block_number
-can get the block index, and the slot_mapping%block_size can get the offset of this block.</p>
-</dd>
-</dl>
-</li>
+ipex.llm.modules.PagedAttention.reshape_and_cache(key, value, key_cache, value_cache, slot_mapping)
+This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – The keytensor. The shape should be [num_seqs, num_heads, head_size].</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – The value tensor. The shape should be [num_seqs, num_heads, head_size].</p></li>
+<li><p><strong>key_cache</strong> (<em>torch.Tensor</em>) – The pre-allocated buffer to store the key cache.
+The shape should be [num_blocks, block_size, num_heads, head_size].</p></li>
+<li><p><strong>value_cache</strong> (<em>torch.Tensor</em>) – The pre-allocated buffer to store the value cache.
+The shape should be [num_blocks, block_size, num_heads, head_size].</p></li>
+<li><p><strong>slot_mapping</strong> (<em>torch.Tensor</em>) – It stores the position to store the key/value in the pre-allocated buffers.
+The shape should be the number of sequences. For sequence <code class="docutils literal notranslate"><span class="pre">i</span></code>, the <code class="docutils literal notranslate"><span class="pre">slot_mapping[i]</span> <span class="pre">//</span> <span class="pre">block_number</span></code>
+can get the block index, and the <code class="docutils literal notranslate"><span class="pre">slot_mapping</span> <span class="pre">%</span> <span class="pre">block_size</span></code> can get the offset of this block.</p></li>
 </ul>
-<p>[class method]: single_query_cached_kv_attention
-ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(</p>
-<blockquote>
-<div><p>out,
-query,
-key_cache,
-value_cache,
-head_mapping,
-scale,
-block_tables,
-context_lens,
-block_size,
-max_context_len,
-alibi_slopes
-)</p>
-</div></blockquote>
-<p>This operator is used to be calculated the scale-dot-product based on the paged attention.
-Args:
-- out (torch.Tensor): The output tensor with shape of [num_seqs, num_heads, head_size]. where the num_seqs</p>
-<blockquote>
-<div><p>is the number of the sequence in this batch. The num_heads means the number of query
-head. head_size means the head dimension.</p>
-</div></blockquote>
-<ul class="simple">
-<li><p>query (torch.Tensor): The query tensor. The shape should be [num_seqs, num_heads, head_size].</p></li>
-<li><dl class="simple">
-<dt>key_cache (torch.Tensor): The pre-allocated buffer to store the key cache. The shape should be</dt><dd><p>[num_blocks,  block_size, num_heads, head_size].</p>
 </dd>
 </dl>
-</li>
-<li><dl class="simple">
-<dt>value_cache(torch.Tensor): The pre-allocated buffer to store the value cache. The shape should be</dt><dd><p>[num_blocks,  block_size, num_heads, head_size].</p>
-</dd>
-</dl>
-</li>
-<li><dl class="simple">
-<dt>head_mapping(torch.Tensor): The mapping from the query head to the kv head. The shape should be</dt><dd><p>the number of query heads.</p>
-</dd>
-</dl>
-</li>
-<li><p>scale (float): The scale used by the scale-dot-product. In general, it is: float(1.0 / (head_size ** 0.5)).</p></li>
-<li><dl class="simple">
-<dt>block_tables:(torch.Tensor): The mapping table used to mapping the logical sequence to the physical sequence.</dt><dd><p>The shape should be [num_seqs, max_num_blocks_per_seq].</p>
-</dd>
-</dl>
-</li>
-<li><p>context_lens (torch.Tensor):  The sequence length for every sequence. The size is [num_seqs].</p></li>
-<li><p>block_size (int): The block size which means the number of token in every block.</p></li>
-<li><p>max_context_len (int): The max sequence length.</p></li>
-<li><p>alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).</p></li>
+<p>[class method]: single_query_cached_kv_attention</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">PagedAttention</span><span class="o">.</span><span class="n">single_query_cached_kv_attention</span><span class="p">(</span>
+                                                    <span class="n">out</span><span class="p">,</span>
+                                                    <span class="n">query</span><span class="p">,</span>
+                                                    <span class="n">key_cache</span><span class="p">,</span>
+                                                    <span class="n">value_cache</span><span class="p">,</span>
+                                                    <span class="n">head_mapping</span><span class="p">,</span>
+                                                    <span class="n">scale</span><span class="p">,</span>
+                                                    <span class="n">block_tables</span><span class="p">,</span>
+                                                    <span class="n">context_lens</span><span class="p">,</span>
+                                                    <span class="n">block_size</span><span class="p">,</span>
+                                                    <span class="n">max_context_len</span><span class="p">,</span>
+                                                    <span class="n">alibi_slopes</span>
+                                                    <span class="p">)</span>
+</pre></div>
+</div>
+<p>This operator is used to be calculated the scale-dot-product based on the paged attention.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>out</strong> (<em>torch.Tensor</em>) – The output tensor with shape of [num_seqs, num_heads, head_size],
+where the num_seqs is the number of the sequence in this batch. The num_heads
+means the number of query head. head_size means the head dimension.</p></li>
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – The query tensor. The shape should be [num_seqs, num_heads, head_size].</p></li>
+<li><p><strong>key_cache</strong> (<em>torch.Tensor</em>) – The pre-allocated buffer to store the key cache.
+The shape should be [num_blocks,  block_size, num_heads, head_size].</p></li>
+<li><p><strong>value_cache</strong> (<em>torch.Tensor</em>) – The pre-allocated buffer to store the value cache.
+The shape should be [num_blocks,  block_size, num_heads, head_size].</p></li>
+<li><p><strong>head_mapping</strong> (<em>torch.Tensor</em>) – The mapping from the query head to the kv head.
+The shape should be the number of query heads.</p></li>
+<li><p><strong>scale</strong> (<em>float</em>) – The scale used by the scale-dot-product.
+In general, it is: <code class="docutils literal notranslate"><span class="pre">float(1.0</span> <span class="pre">/</span> <span class="pre">(head_size</span> <span class="pre">**</span> <span class="pre">0.5))</span></code>.</p></li>
+<li><p><strong>block_tables</strong> – (torch.Tensor): The mapping table used to mapping the logical sequence
+to the physical sequence. The shape should be [num_seqs, max_num_blocks_per_seq].</p></li>
+<li><p><strong>context_lens</strong> (<em>torch.Tensor</em>) – The sequence length for every sequence. The size is [num_seqs].</p></li>
+<li><p><strong>block_size</strong> (<em>int</em>) – The block size which means the number of token in every block.</p></li>
+<li><p><strong>max_context_len</strong> (<em>int</em>) – The max sequence length.</p></li>
+<li><p><strong>alibi_slopes</strong> (<em>torch.Tensor</em><em>, </em><em>optinal</em>) – which is the alibi slope with the shape of (num_heads).</p></li>
 </ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.llm.modules.VarlenAttention">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">VarlenAttention</span></span><a class="headerlink" href="#ipex.llm.modules.VarlenAttention" title="Permalink to this definition"></a></dt>
-<dd><dl class="simple">
-<dt>[module init and forward] Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value</dt><dd><p>(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html</a>),
+<dd><p>[module init and forward] Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html</a>),
 and accept the variant (different) sequence length among the query, key and value.</p>
-</dd>
-</dl>
+<p>This module does not have args for <cite>module init</cite>.</p>
+<p><cite>forward()</cite></p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>init</strong> (<em>module</em>) – this module does not have args for module init</p></li>
-<li><p><strong>forward</strong> – </p></li>
-<li><p><strong>query</strong> (<em>-</em>) – shape [query_tokens, num_head, head_size], where tokens is total sequence length among batch size.</p></li>
-<li><p><strong>key</strong> (<em>-</em>) – shape [key_tokens, num_head, head_size], where tokens is total sequence length among batch size.</p></li>
-<li><p><strong>value</strong> (<em>-</em>) – shape [value_tokens, num_head, head_size], where tokens is total sequence length among batch size.</p></li>
-<li><p><strong>out</strong> (<em>-</em>) – buffer to get the results, the shape is the same as query.</p></li>
-<li><p><strong>seqlen_q</strong> (<em>-</em>) – shape [batch_size + 1], points the current query_tokens among total sequence length.</p></li>
-<li><p><strong>seqlen_k</strong> (<em>-</em>) – shape [batch_size + 1], points the current key_tokens among total sequence length.</p></li>
-<li><p><strong>max_seqlen_q</strong> (<em>-</em>) – max/total sequence length of query.</p></li>
-<li><p><strong>max_seqlen_k</strong> (<em>-</em>) – max/total sequence length of key.</p></li>
-<li><p><strong>pdropout</strong> (<em>-</em>) – dropout probability; if greater than 0.0, dropout is applied, default is 0.0.</p></li>
-<li><p><strong>softmax_scale</strong> (<em>-</em>) – scaling factor applied is prior to softmax.</p></li>
-<li><p><strong>is_causal</strong> (<em>-</em>) – whether to apply causal attention masking, default is True.</p></li>
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – shape [query_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – shape [key_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – shape [value_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>out</strong> (<em>torch.Tensor</em>) – buffer to get the results, the shape is the same as query.</p></li>
+<li><p><strong>seqlen_q</strong> (<em>torch.Tensor</em>) – shape [batch_size + 1], points the
+current query_tokens among total sequence length.</p></li>
+<li><p><strong>seqlen_k</strong> (<em>torch.Tensor</em>) – shape [batch_size + 1], points the
+current key_tokens among total sequence length.</p></li>
+<li><p><strong>max_seqlen_q</strong> (<em>int</em>) – max/total sequence length of query.</p></li>
+<li><p><strong>max_seqlen_k</strong> (<em>int</em>) – max/total sequence length of key.</p></li>
+<li><p><strong>pdropout</strong> (<em>float</em>) – dropout probability; if greater than 0.0,
+dropout is applied, default is 0.0.</p></li>
+<li><p><strong>softmax_scale</strong> (<em>float</em>) – scaling factor applied is prior to softmax.</p></li>
+<li><p><strong>is_causal</strong> (<em>bool</em>) – whether to apply causal attention masking, default is True.</p></li>
 </ul>
 </dd>
 </dl>
@@ -1039,73 +1062,78 @@ and accept the variant (different) sequence length among the query, key and valu
 <span class="gp">&gt;&gt;&gt; </span><span class="n">varlenAttention_module</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">seqlen_q</span><span class="p">,</span> <span class="n">seqlen_k</span><span class="p">,</span> <span class="n">max_seqlen_q</span><span class="p">,</span> <span class="n">max_seqlen_k</span><span class="p">,</span> <span class="n">pdropout</span><span class="p">,</span> <span class="n">softmax_scale</span><span class="p">)</span>
 </pre></div>
 </div>
-<dl class="simple">
-<dt>[Direct function call] This module also provides a <cite>.apply_function</cite> function call to apply VarlenAttention without</dt><dd><p>initializing the module.</p>
-</dd>
-</dl>
-<p>Args:
-- The parameters are the same as the forward call.</p>
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite>
+function call to apply VarlenAttention without initializing the module.</p>
+<p>The parameters of <cite>apply_function()</cite> are the same as the <cite>forward()</cite> call.</p>
 </dd></dl>
 
 <span class="target" id="module-ipex.llm.functional"></span><dl class="py function">
 <dt class="sig sig-object py" id="ipex.llm.functional.rotary_embedding">
 <span class="sig-prename descclassname"><span class="pre">ipex.llm.functional.</span></span><span class="sig-name descname"><span class="pre">rotary_embedding</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cos</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotary_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotary_half</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position_ids</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.functional.rotary_embedding" title="Permalink to this definition"></a></dt>
-<dd><dl class="simple">
-<dt>Applies RotaryEmbedding (see <a class="reference external" href="https://huggingface.co/papers/2104.09864">https://huggingface.co/papers/2104.09864</a>)</dt><dd><p>on the <cite>query ` or `key</cite> before their multi-head attention computation.</p>
-</dd>
-</dl>
-<p>Args:
-- query, key (torch.Tensor) : inputs to be applied with position embeddings, taking shape of</p>
-<blockquote>
-<div><p>[batch size, sequence length, num_head/num_kv_head, head_dim]
-or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p>
-</div></blockquote>
-<ul class="simple">
-<li><p>sin/cos (torch.Tensor): [num_tokens, rotary_dim] the sin/cos value tensor generated to be applied on query/key.</p></li>
-<li><p>rotary_ndims (int): the rotary dimension. e.g., 64 for GPTJ. head size for LLama.</p></li>
-<li><p>head_dim (int) : head dim from the input shape.</p></li>
-<li><dl class="simple">
-<dt>rotary_half (bool)<span class="classifier">if False. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,</span></dt><dd><p>so the offset is 1.
-if True, e.g., for llama, cos/sin is applied to the neighboring rotary_dim elements,
+<dd><p>Applies RotaryEmbedding (see <a class="reference external" href="https://huggingface.co/papers/2104.09864">https://huggingface.co/papers/2104.09864</a>)
+on the <cite>query ` or `key</cite> before their multi-head attention computation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – inputs to be applied with position embeddings,
+taking shape of [batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – inputs to be applied with position embeddings,
+taking shape of [batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p></li>
+<li><p><strong>sin/cos</strong> (<em>torch.Tensor</em>) – [num_tokens, rotary_dim] the sin/cos value tensor
+generated to be applied on query/key.</p></li>
+<li><p><strong>rotary_ndims</strong> (<em>int</em>) – the rotary dimension. e.g., 64 for GPTJ. head size for LLama.</p></li>
+<li><p><strong>head_dim</strong> (<em>int</em>) – head dim from the input shape.</p></li>
+<li><p><strong>rotary_half</strong> (<em>bool</em>) – <p>if False. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,
+so the offset is 1.</p>
+<p>if True, e.g., for llama, cos/sin is applied to the neighboring rotary_dim elements,
 so the offset is rotary_dim/2.</p>
-</dd>
-</dl>
-</li>
-<li><dl class="simple">
-<dt>position_ids (torch.Tensor): Default is None and optional if sin/cos is provided. the according position_ids</dt><dd><p>for the input. The shape should be [batch size, sequence length].</p>
-</dd>
-</dl>
-</li>
+</p></li>
+<li><p><strong>position_ids</strong> (<em>torch.Tensor</em>) – Default is None and optional if sin/cos is provided.
+The according position_ids for the input. The shape should be [batch size, sequence length].</p></li>
 </ul>
-<p>Return
-- query, key (torch.Tensor): [batch size, sequence length, num_head/num_kv_head, head_dim]</p>
-<blockquote>
-<div><p>or [num_tokens, num_head/num_kv_head, head_dim].</p>
-</div></blockquote>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Return</dt><dd><p>query, key (torch.Tensor): [batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim].</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="ipex.llm.functional.rms_norm">
 <span class="sig-prename descclassname"><span class="pre">ipex.llm.functional.</span></span><span class="sig-name descname"><span class="pre">rms_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hidden_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.functional.rms_norm" title="Permalink to this definition"></a></dt>
 <dd><p>Applies RMSnorm on the input (hidden states).
-(see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76</a>)
-Args:
-- hidden_states(torch.Tensor) : the input tensor to apply RMSNorm.
-- weight (torch.Tensor): the weight to apply RMSnorm.
-- eps (float) : the variance_epsilon to apply RMSnorm.</p>
+(see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76</a>)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – the input tensor to apply RMSNorm.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply RMSnorm.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – the variance_epsilon to apply RMSnorm.</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="ipex.llm.functional.fast_layer_norm">
 <span class="sig-prename descclassname"><span class="pre">ipex.llm.functional.</span></span><span class="sig-name descname"><span class="pre">fast_layer_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hidden_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalized_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.functional.fast_layer_norm" title="Permalink to this definition"></a></dt>
 <dd><p>Applies PyTorch Layernorm (see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html">https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html</a>)
-on the input (hidden states).
-Args:
-- hidden_states(torch.Tensor) : the input tensor to apply normalization.
-- normalized_shape (int or list) or torch.Size) input shape from an expected input of size.
-- weight (torch.Tensor): the weight to apply normalization.
-- bias (torch.Tensor): an additive bias for normalization.
-- eps (float): a value added to the denominator for numerical stability.</p>
+on the input (hidden states).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – the input tensor to apply normalization.</p></li>
+<li><p><strong>normalized_shape</strong> (<em>int</em><em> or </em><em>list</em><em>) or </em><em>torch.Size</em>) – expected input of size.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply normalization.</p></li>
+<li><p><strong>bias</strong> (<em>torch.Tensor</em>) – an additive bias for normalization.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – a value added to the denominator for numerical stability.</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
@@ -1118,82 +1146,87 @@ context to do scale dot product. When the sequence is very long, the memory over
 performance bottleneck. This module provides an Indirect Access KV_cache(IAKV), Firstly, IAKV pre-allocates
 buffers(key and value use different buffers) to store all key/value hidden states and beam index information.
 It can use beam index history to decide which beam should be used by a timestamp and this information will
-generate an offset to access the kv_cache buffer.
-Data Format:
-- The shape of the pre-allocated key(value) buffer is [max_seq, beam*batch, head_num, head_size],</p>
-<blockquote>
-<div><p>the hidden state of key/value which is the shape of [beam*batch, head_num, head_size] is stored token by token.
+generate an offset to access the kv_cache buffer.</p>
+<p>Data Format:</p>
+<p>The shape of the pre-allocated key(value) buffer is [max_seq, beam*batch, head_num, head_size],
+the hidden state of key/value which is the shape of [beam*batch, head_num, head_size] is stored token by token.
 All beam idx information of every timestamp is also stored in a Tensor with the shape of [max_seq, beam*batch].</p>
-</div></blockquote>
-<p>forward
-- query (torch.Tensor): Query tensor; shape: (beam*batch, seq_len, head_num, head_dim).
-- key (torch.Tensor): Key tensor; shape: (beam*batch, seq_len, head_num, head_dim).
-- value (torch.Tensor): Value tensor; shape: (beam*batch, seq_len, head_num, head_dim).
-- scale_attn (float):scale used by the attention layer. should be the  sqrt(head_size).
-- layer_past (tuple(torch.Tensor)): tuple(seq_info, key_cache, value_cache, beam-idx).</p>
-<blockquote>
-<div><p>key_cache: key cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);
-value_cache: value cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);
-beam-idx:  history beam idx, shape:(max_seq, beam*batch);
-seq_info: Sequence info tensor, shape:(1, 1, max_seq, max_seq).</p>
-</div></blockquote>
-<ul class="simple">
-<li><p>head_mask (torch.Tensor): Head mask tensor which is not supported by kernel yet.</p></li>
-<li><p>attention_mask(torch.Tensor): Attention mask information.</p></li>
-<li><p>text_max_length (int) : the max length of kv cache to be used for generation (allocate the pre-cache buffer).</p></li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – Query tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – Key tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – Value tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>scale_attn</strong> (<em>float</em>) – scale used by the attention layer. should be the  sqrt(head_size).</p></li>
+<li><p><strong>layer_past</strong> (<em>tuple</em><em>(</em><em>torch.Tensor</em><em>)</em>) – <p>tuple(seq_info, key_cache, value_cache, beam-idx).</p>
+<ul>
+<li><p>key_cache: key cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);</p></li>
+<li><p>value_cache: value cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);</p></li>
+<li><p>beam-idx:  history beam idx, shape:(max_seq, beam*batch);</p></li>
+<li><p>seq_info: Sequence info tensor, shape:(1, 1, max_seq, max_seq).</p></li>
 </ul>
-<p>Return:
-- attn_output:  weighted value which is the output of scale dot product. shape (beam*batch, seq_len, head_num, head_size).
-- attn_weights:  The output tensor of the first matmul in scale dot product which is not supported by kernel now.
-- new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).</p>
-<p>Notes:
-- How to reorder KV cache when using the format of IndirectAccessKVCacheAttention (e.g., on llama model</p>
-<blockquote>
-<div><dl>
-<dt>see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318</a>)</dt><dd><dl>
-<dt>def _reorder_cache(</dt><dd><p>self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor</p>
+</p></li>
+<li><p><strong>head_mask</strong> (<em>torch.Tensor</em>) – Head mask tensor which is not supported by kernel yet.</p></li>
+<li><p><strong>attention_mask</strong> (<em>torch.Tensor</em>) – Attention mask information.</p></li>
+<li><p><strong>text_max_length</strong> (<em>int</em>) – the max length of kv cache to be used for generation
+(allocate the pre-cache buffer).</p></li>
+</ul>
 </dd>
-<dt>) -&gt; Tuple[Tuple[torch.Tensor]]:</dt><dd><dl>
-<dt>if (</dt><dd><p>len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>weighted value which is the output of scale dot product.
+shape (beam*batch, seq_len, head_num, head_size).</p>
+<p>attn_weights: the output tensor of the first matmul in scale dot product
+which is not supported by kernel now.</p>
+<p>new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).</p>
+</p>
 </dd>
-<dt>):</dt><dd><dl class="simple">
-<dt>for layer_past in past_key_values:</dt><dd><p>layer_past[3][layer_past[0].size(-2) - 1] = beam_idx</p>
-</dd>
-</dl>
-<p>return past_key_values</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>attn_output</p>
 </dd>
 </dl>
-</dd>
-</dl>
-</dd>
-</dl>
-</div></blockquote>
+<p class="rubric">Notes</p>
+<p>How to reorder KV cache when using the format of IndirectAccessKVCacheAttention (e.g., on llama model
+see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318</a>)</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">_reorder_cache</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">past_key_values</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]],</span> <span class="n">beam_idx</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">past_key_values</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">past_key_values</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+    <span class="p">):</span>
+        <span class="k">for</span> <span class="n">layer_past</span> <span class="ow">in</span> <span class="n">past_key_values</span><span class="p">:</span>
+            <span class="n">layer_past</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="n">layer_past</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">beam_idx</span>
+        <span class="k">return</span> <span class="n">past_key_values</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="ipex.llm.functional.varlen_attention">
 <span class="sig-prename descclassname"><span class="pre">ipex.llm.functional.</span></span><span class="sig-name descname"><span class="pre">varlen_attention</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seqlen_q</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seqlen_k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_seqlen_q</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_seqlen_k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pdropout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">softmax_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_tensors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_causal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_softmax</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gen_</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Generator</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.functional.varlen_attention" title="Permalink to this definition"></a></dt>
-<dd><dl class="simple">
-<dt>Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value</dt><dd><p>(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html</a>),
+<dd><p>Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html</a>),
 and accept the variant (different) sequence length among the query, key and value.</p>
-</dd>
-</dl>
+<p>This module does not have args for <cite>module init</cite>.</p>
+<p><cite>forward()</cite></p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>init</strong> (<em>module</em>) – this module does not have args for module init</p></li>
-<li><p><strong>forward</strong> – </p></li>
-<li><p><strong>query</strong> (<em>-</em>) – shape [query_tokens, num_head, head_size], where tokens is total sequence length among batch size.</p></li>
-<li><p><strong>key</strong> (<em>-</em>) – shape [key_tokens, num_head, head_size], where tokens is total sequence length among batch size.</p></li>
-<li><p><strong>value</strong> (<em>-</em>) – shape [value_tokens, num_head, head_size], where tokens is total sequence length among batch size.</p></li>
-<li><p><strong>out</strong> (<em>-</em>) – buffer to get the results, the shape is the same as query.</p></li>
-<li><p><strong>seqlen_q</strong> (<em>-</em>) – shape [batch_size + 1], points the current query_tokens among total sequence length.</p></li>
-<li><p><strong>seqlen_k</strong> (<em>-</em>) – shape [batch_size + 1], points the current key_tokens among total sequence length.</p></li>
-<li><p><strong>max_seqlen_q</strong> (<em>-</em>) – max/total sequence length of query.</p></li>
-<li><p><strong>max_seqlen_k</strong> (<em>-</em>) – max/total sequence length of key.</p></li>
-<li><p><strong>pdropout</strong> (<em>-</em>) – dropout probability; if greater than 0.0, dropout is applied, default is 0.0.</p></li>
-<li><p><strong>softmax_scale</strong> (<em>-</em>) – scaling factor applied is prior to softmax.</p></li>
-<li><p><strong>is_causal</strong> (<em>-</em>) – whether to apply causal attention masking, default is True.</p></li>
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – shape [query_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – shape [key_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – shape [value_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>out</strong> (<em>torch.Tensor</em>) – buffer to get the results, the shape is the same as query.</p></li>
+<li><p><strong>seqlen_q</strong> (<em>torch.Tensor</em>) – shape [batch_size + 1],
+points the current query_tokens among total sequence length.</p></li>
+<li><p><strong>seqlen_k</strong> (<em>torch.Tensor</em>) – shape [batch_size + 1],
+points the current key_tokens among total sequence length.</p></li>
+<li><p><strong>max_seqlen_q</strong> (<em>int</em>) – max/total sequence length of query.</p></li>
+<li><p><strong>max_seqlen_k</strong> (<em>int</em>) – max/total sequence length of key.</p></li>
+<li><p><strong>pdropout</strong> (<em>float</em>) – dropout probability; if greater than 0.0, dropout is applied, default is 0.0.</p></li>
+<li><p><strong>softmax_scale</strong> (<em>float</em>) – scaling factor applied is prior to softmax.</p></li>
+<li><p><strong>is_causal</strong> (<em>bool</em>) – whether to apply causal attention masking, default is True.</p></li>
 </ul>
 </dd>
 </dl>
@@ -1607,7 +1640,7 @@ ipex.cpu.runtime.Task object.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f4de2dc47f0> 
+   <jinja2.runtime.BlockReference object at 0x7f705c2dca60> 
   <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
