@@ -1294,30 +1294,28 @@ first_token_masked_mha(
   auto key_lenght = key.size(1);
   auto kv_head_num = key.size(2);
   auto head_size = key.size(3);
-  if (origin_type == at::kHalf) {
-    key = key.to(at::kFloat);
-    query = query.to(at::kFloat);
-    value = value.to(at::kFloat);
-    key_cache = key_cache.to(at::kFloat);
-    value_cache = value_cache.to(at::kFloat);
-  }
   if (add_casual_mask) {
-    auto casual_mask =
-        at::full({query_length, key_lenght}, -1e6, query.options());
+    auto casual_mask = at::full(
+        {query_length, key_lenght},
+        origin_type == at::kHalf ? -6e4 : -1e6,
+        query.options());
     casual_mask = at::triu(casual_mask, 1);
     casual_mask = casual_mask.unsqueeze(0).unsqueeze(0);
     attention_mask = attention_mask + casual_mask;
   }
-  if (key.scalar_type() != at::kBFloat16 && key.scalar_type() != at::kFloat) {
+  if (key.scalar_type() != at::kBFloat16 && key.scalar_type() != at::kFloat &&
+      key.scalar_type() != at::kHalf) {
     TORCH_CHECK(
         false,
-        "key and value must be float or bfloat16 to use ipex::masked_multihead_self_attention_kernel_impl");
+        "key and value must be float, float16 or bfloat16 to use ipex::masked_multihead_self_attention_kernel_impl");
   }
   if (key.scalar_type() == at::kFloat) {
     copy_key_value<float>(key_cache, key, value_cache, value, beam_batch);
-  } else {
+  } else if (key.scalar_type() == at::kBFloat16) {
     copy_key_value<at::BFloat16>(
         key_cache, key, value_cache, value, beam_batch);
+  } else {
+    copy_key_value<at::Half>(key_cache, key, value_cache, value, beam_batch);
   }
   // support MGQ/MQA
   // expand the head dimensiopn of key/value to be same to the query
@@ -1344,6 +1342,11 @@ first_token_masked_mha(
         attention_mask,
         1. / scale_attn));
   } else {
+    if (origin_type == at::kHalf) {
+      key = key.to(at::kFloat);
+      query = query.to(at::kFloat);
+      value = value.to(at::kFloat);
+    }
     key = key.permute({0, 2, 1, 3});
     query = query.permute({0, 2, 1, 3});
     value = value.permute({0, 2, 1, 3});
@@ -1355,12 +1358,8 @@ first_token_masked_mha(
     attn_outputs = attn_weights.matmul(value);
     if (origin_type == at::kHalf) {
       attn_weights = attn_weights.to(origin_type);
+      attn_outputs = attn_outputs.to(origin_type);
     }
-  }
-  if (origin_type == at::kHalf) {
-    attn_outputs = attn_outputs.to(origin_type);
-    key_cache = key_cache.to(origin_type);
-    value_cache = value_cache.to(origin_type);
   }
   return std::make_tuple(
       attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
