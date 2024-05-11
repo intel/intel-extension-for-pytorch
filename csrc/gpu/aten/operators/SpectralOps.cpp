@@ -277,15 +277,15 @@ class dft_config_t {
     val_int64_.clear();
     val_float_.clear();
     val_double_.clear();
-    mkl_istrides_.clear();
-    mkl_ostrides_.clear();
+    fwd_strides_.clear();
+    bwd_strides_.clear();
   }
 
   void set_strides(
-      std::vector<int64_t>& istrides,
-      std::vector<int64_t>& ostrides) {
-    mkl_istrides_ = istrides;
-    mkl_ostrides_ = ostrides;
+      std::vector<int64_t>& fwd_strides,
+      std::vector<int64_t>& bwd_strides) {
+    fwd_strides_ = fwd_strides;
+    bwd_strides_ = bwd_strides;
   }
 
   template <typename T>
@@ -313,11 +313,11 @@ class dft_config_t {
     COMMIT_VAL(val_float_);
     COMMIT_VAL(val_double_);
 
-    if (!mkl_istrides_.empty()) {
-      desc.set_value(config_param::INPUT_STRIDES, mkl_istrides_.data());
+    if (!fwd_strides_.empty()) {
+      desc.set_value(config_param::FWD_STRIDES, fwd_strides_.data());
     }
-    if (!mkl_ostrides_.empty()) {
-      desc.set_value(config_param::OUTPUT_STRIDES, mkl_ostrides_.data());
+    if (!bwd_strides_.empty()) {
+      desc.set_value(config_param::BWD_STRIDES, bwd_strides_.data());
     }
   }
 
@@ -332,16 +332,16 @@ class dft_config_t {
     MAP_TO_BYTES(val_float_);
     MAP_TO_BYTES(val_double_);
 
-    xpu::dpcpp::to_bytes(bytes, mkl_istrides_);
-    xpu::dpcpp::to_bytes(bytes, mkl_ostrides_);
+    xpu::dpcpp::to_bytes(bytes, fwd_strides_);
+    xpu::dpcpp::to_bytes(bytes, bwd_strides_);
   }
 
  private:
   config_int64_t val_int64_;
   config_float_t val_float_;
   config_double_t val_double_;
-  std::vector<int64_t> mkl_istrides_;
-  std::vector<int64_t> mkl_ostrides_;
+  std::vector<int64_t> fwd_strides_;
+  std::vector<int64_t> bwd_strides_;
 };
 
 template <precision prec, domain dom>
@@ -483,6 +483,7 @@ void _mkl_dft(
   auto ostrides = output.strides();
   int64_t idist = istrides[0];
   int64_t odist = ostrides[0];
+
   if (!inverse) {
     desc_config->set_value(config_param::FWD_DISTANCE, idist);
     desc_config->set_value(config_param::BWD_DISTANCE, odist);
@@ -490,13 +491,22 @@ void _mkl_dft(
     desc_config->set_value(config_param::FWD_DISTANCE, odist);
     desc_config->set_value(config_param::BWD_DISTANCE, idist);
   }
-  std::vector<int64_t> mkl_istrides(1 + signal_ndim, 0),
-      mkl_ostrides(1 + signal_ndim, 0);
+
+  std::vector<int64_t> fwd_strides(1 + signal_ndim, 0),
+      bwd_strides(1 + signal_ndim, 0);
+
   for (int64_t i = 1; i <= signal_ndim; i++) {
-    mkl_istrides[i] = istrides[i];
-    mkl_ostrides[i] = ostrides[i];
+    if (!inverse) {
+      fwd_strides[i] = istrides[i];
+      bwd_strides[i] = ostrides[i];
+    } else {
+      fwd_strides[i] = ostrides[i];
+      bwd_strides[i] = istrides[i];
+    }
   }
-  desc_config->set_strides(mkl_istrides, mkl_ostrides);
+
+  desc_config->set_strides(fwd_strides, bwd_strides);
+
   if (!complex_input || !complex_output) {
     desc_config->set_value(
         config_param::CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX);
