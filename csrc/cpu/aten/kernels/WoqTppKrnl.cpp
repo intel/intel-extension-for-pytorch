@@ -5,6 +5,7 @@
 #include <ATen/cpu/vec/functional.h>
 #include <ATen/cpu/vec/vec.h>
 #include <aten/Linear.h>
+#include "csrc/cpu/tpp/kernels/TPPGEMMKrnl.h"
 #include "csrc/cpu/tpp/woq/tla.h"
 
 #ifdef __GNUC__
@@ -117,6 +118,7 @@ at::Tensor map_nf4_tensor_to_float(const at::Tensor& t) {
 
 #define QUANT_A_THRESHOLD 30720
 #define SMALL_BATCH_THRESHOLD 32
+#define DEQUANT_UPFRONT_THRESHOLD 1024
 #define PARALLEL_M_THRESHOLD 128
 constexpr long PREFETCH_K_DIST = 64; // TODO(jgong5): do not hard-code
 constexpr long LOOP_K_UNROLL = 4; // TODO(jgong5): do not hard-code
@@ -1675,6 +1677,297 @@ class DequantGemmTPP<
   long ldc;
 };
 
+// Compared to qlinear_woq_affine_impl,
+// this function dequantize weight upfront before gemm to improve the
+// performance for the first token.
+template <
+    typename T,
+    typename TComp,
+    typename TGemmOut,
+    typename Tout,
+    typename TScale,
+    typename TZero,
+    int quant_a_mode = -1,
+    int quant_w_mode = 0>
+void qlinear_woq_affine_dequant_upfront_impl(
+    const at::Tensor& x,
+    const at::Tensor& qw_packed,
+    const at::Tensor& scales, // dtype is TComp
+    const at::Tensor& b, // dtype is TGemmOut
+    at::Tensor y,
+    const int qw_type,
+    int fusion_type,
+    const TensorList& others_list,
+    int64_t quant_block_k,
+    const std::optional<at::Tensor>& zps = std::nullopt) { // dtype is TComp
+  const bool sym_quant = is_sym_quant(qw_type);
+  auto x_sizes = x.sizes();
+  auto w_sizes = qw_packed.sizes();
+  auto Nc = w_sizes[0];
+  auto Nb = w_sizes[3];
+  auto Kc = w_sizes[1];
+  auto Kb = w_sizes[2];
+  auto N = Nc * Nb;
+  auto K = Kc * Kb;
+  TLA_ASSERT(
+      !(std::is_same<T, uint8_t>() || std::is_same<TComp, uint8_t>()),
+      "WOQ dequant upfront does not support uint8_t computation");
+
+  auto quant_block_multiple = quant_block_k == 0 ? 1 : quant_block_k / Kb;
+  auto quant_k_blocks =
+      quant_block_k == 0 ? 1 : (K + quant_block_k - 1) / quant_block_k;
+  int scales_kc = quant_w_mode == QUANT_W_PER_CHANNEL ? QUANT_W_PER_K_BLOCK
+                                                      : quant_k_blocks;
+
+  auto pw = GetVLAPtr<uint8_t>((uint8_t*)qw_packed.data_ptr(), {Kc, Kb * Nb});
+  auto ldy = N;
+
+  torch::Tensor dqw =
+      torch::empty({Nc, Kc, Kb, Nb}, c10::CppTypeToScalarType<TComp>::value);
+  if (std::is_same<TComp, bfloat16>()) {
+    // reshape to VNNI format
+    dqw = dqw.view({Nc, Kc, Kb / 2, Nb, 2});
+  }
+  auto dqw_ptr = GetVLAPtr<TComp>(dqw, {Kc, Kb, Nb});
+  auto tin0 = others_list.size() > 0
+      ? others_list[0].to(c10::CppTypeToScalarType<T>::value)
+      : at::Tensor{};
+  auto tin1 = others_list.size() > 1
+      ? others_list[1].to(c10::CppTypeToScalarType<T>::value)
+      : at::Tensor{};
+  auto pscales = GetVLAPtr<TComp>(scales, {scales_kc, Nb});
+  auto pzps = sym_quant ? GetVLAPtr<TComp>(nullptr, {1, 1})
+                        : GetVLAPtr<TComp>(zps.value(), {scales_kc, Nb});
+  product_dispatcher<
+      std::tuple</*qw_type*/ int, /*BLOCK_N*/ long>,
+      std::tuple<
+          enumerate_dispatcher<int, QINT8, QINT4, NF4>,
+          enumerate_dispatcher<long, 16, 32, 64, 128>>>::
+      call(
+          std::make_tuple(qw_type, Nb),
+          [&](auto tuple) {
+            auto qw_type_ = std::get<0>(tuple);
+            auto block_n = std::get<1>(tuple);
+            auto loop_scheme = "bA";
+            auto dequant_loop =
+                ThreadedLoop<2>({{Nc}, {0, Kc, Kc}}, loop_scheme);
+            constexpr const int N_GROUP_SIZE = get_n_group_size(block_n);
+            dequant_loop(
+                [&](int* idx) {
+                  int nc = idx[0];
+                  int kc_start = idx[1];
+                  int kc_end = kc_start + Kc;
+                  for (int kc = kc_start; kc < kc_end; kc++) {
+                    int32_t k_groups = -1;
+                    int32_t quant_offset = kc / quant_block_multiple;
+                    TScale* scale_w = nullptr;
+                    TZero* zp_w = nullptr;
+                    if constexpr (quant_w_mode == QUANT_W_PER_CHANNEL) {
+                      scale_w = pscales[nc][0];
+                      if (!sym_quant) {
+                        zp_w = pzps[nc][0];
+                      }
+                    } else {
+                      scale_w = pscales[nc][quant_offset];
+                      if (!sym_quant) {
+                        zp_w = pzps[nc][quant_offset];
+                      }
+                    }
+                    Dequantize<TComp, block_n, N_GROUP_SIZE, qw_type_>::call(
+                        pw[nc][kc],
+                        Kb,
+                        block_n,
+                        scale_w,
+                        zp_w,
+                        dqw_ptr[nc][kc][0]);
+                  }
+                },
+                [&]() {},
+                [&]() {});
+
+            auto x_reshaped = x.dim() == 3 ? x : x.view({x_sizes[0], 1, K});
+            auto M = y.numel() / y.size(-1);
+            auto block_m = 64L;
+            auto rem = M % block_m;
+            auto ldy = N;
+            if (Nc % 4 == 0) {
+              Nc /= 4;
+              Nb *= 4;
+            } else if (Nc % 2 == 0) {
+              Nc /= 2;
+              Nb *= 2;
+            }
+            auto gelu_fwd_tpp_ptr = fusion_type == FUSE_GELU_ERF
+                ? std::make_shared<GeluFwdTPP<T>>(
+                      GeluFwdTPP<T>(block_m, Nb, ldy, ldy))
+                : nullptr;
+            auto gelu_fwd_tpp_rem_ptr = fusion_type == FUSE_GELU_ERF
+                ? std::make_shared<GeluFwdTPP<T>>(
+                      GeluFwdTPP<T>(rem, Nb, ldy, ldy))
+                : nullptr;
+            bool has_add_post_op =
+                fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD;
+            auto add_tpp_ptr = has_add_post_op
+                ? std::make_shared<AddTPP<T, T>>(
+                      AddTPP<T, T>(block_m, Nb, ldy, ldy))
+                : nullptr;
+            auto add_tpp_rem_ptr = has_add_post_op
+                ? std::make_shared<AddTPP<T, T>>(
+                      AddTPP<T, T>(rem, Nb, ldy, ldy))
+                : nullptr;
+            auto gelu_tanh_fwd_tpp_ptr = fusion_type == FUSE_GELU_TANH
+                ? std::make_shared<GeluTanhFwdTPP<T>>(
+                      GeluTanhFwdTPP<T>(block_m, Nb, ldy, ldy))
+                : nullptr;
+            auto gelu_tanh_fwd_tpp_rem_ptr = fusion_type == FUSE_GELU_TANH
+                ? std::make_shared<GeluTanhFwdTPP<T>>(
+                      GeluTanhFwdTPP<T>(rem, Nb, ldy, ldy))
+                : nullptr;
+            auto in0_ptr = GetVLAPtr<T>(tin0, {Nc, Nb});
+            auto in1_ptr = GetVLAPtr<T>(tin1, {Nc, Nb});
+
+            // For add/add_add, using aten add is faster than TPP fused kernel
+            auto tpp_linear_with_post_op = [&](at::Tensor& in,
+                                               at::Tensor& out,
+                                               int fuse_type = 0) {
+              if (fuse_type == FUSE_GELU_ERF) {
+                tpp_linear_gelu<TComp, Tout>(in, dqw, b, out);
+              } else if (fuse_type == FUSE_ADD || fuse_type == FUSE_ADD_ADD) {
+                TLA_ASSERT(
+                    false,
+                    "fuse_type should not be ADD or ADD_ADD since it's slower than aten add");
+              } else if (fuse_type == FUSE_GELU_TANH) {
+                tpp_linear_gelu_tanh<TComp, Tout>(in, dqw, b, out);
+              } else {
+                tpp_linear_bias<TComp, TGemmOut>(in, dqw, b, out);
+              }
+            };
+
+            // Maybe convert x to TComp and then call tpp_linear
+            // We can only call tpp linear with post op when Tout == TGemmOut
+            // Otherwise, we need to convert the output to Tout then apply post
+            // op ourselves
+            auto maybe_cvt_x_and_compute = [&](at::Tensor& y,
+                                               int fuse_type = 0) {
+              if constexpr (!std::is_same<T, TComp>()) {
+                auto x_comp = at::empty(
+                    x_reshaped.sizes(),
+                    x_reshaped.options().dtype(
+                        c10::CppTypeToScalarType<TComp>::value));
+                auto cvt_x_tpp = ConvertTPP<T, TComp>(block_m, Kb, K, K);
+                auto cvt_x_rem_tpp = ConvertTPP<T, TComp>(rem, Kb, K, K);
+                auto cvt_loop = torch_ipex::tpp::ThreadedLoop<2>(
+                    {{0, M, block_m}, {Kc}}, "AB");
+                auto in_ptr = GetVLAPtr<T>(x, {Kc, Kb});
+                auto out_ptr = GetVLAPtr<TComp>(x_comp, {Kc, Kb});
+                cvt_loop([&](int* ind) {
+                  int m = ind[0], kc = ind[1];
+                  if (m + block_m <= M) {
+                    cvt_x_tpp(in_ptr[m][kc], out_ptr[m][kc]);
+                  } else {
+                    cvt_x_rem_tpp(in_ptr[m][kc], out_ptr[m][kc]);
+                  }
+                });
+                tpp_linear_with_post_op(x_comp, y, fuse_type);
+              } else {
+                tpp_linear_with_post_op(x_reshaped, y, fuse_type);
+              }
+            };
+
+            // If Tout != TGemmOut, such as the lowp-mode=bf16 case, we need a
+            // buffer for output
+            if constexpr (!std::is_same<Tout, TGemmOut>()) {
+              auto y_gemm = at::empty(
+                  {M, y.size(-1)},
+                  y.options().dtype(c10::CppTypeToScalarType<TGemmOut>::value));
+              maybe_cvt_x_and_compute(y_gemm);
+              auto cvt_y_tpp =
+                  ConvertTPP<TGemmOut, Tout>(block_m, Nb, ldy, ldy);
+              auto cvt_y_rem_tpp =
+                  ConvertTPP<TGemmOut, Tout>(rem, Nb, ldy, ldy);
+              auto post_loop = torch_ipex::tpp::ThreadedLoop<2>(
+                  {{0, M, block_m}, {Nc}}, "AB");
+              auto in_ptr = GetVLAPtr<TGemmOut>(y_gemm, {Nc, Nb});
+              auto out_ptr = GetVLAPtr<Tout>(y, {Nc, Nb});
+              // Convert y to T and handle post ops
+              if (fusion_type == 0) {
+                post_loop([&](int* ind) {
+                  int m = ind[0], nc = ind[1];
+                  if (m + block_m <= M) {
+                    cvt_y_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                  } else {
+                    cvt_y_rem_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                  }
+                });
+              } else if (fusion_type == FUSE_GELU_ERF) {
+                post_loop([&](int* ind) {
+                  int m = ind[0], nc = ind[1];
+                  if (m + block_m <= M) {
+                    cvt_y_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*gelu_fwd_tpp_ptr)(out_ptr[m][nc], out_ptr[m][nc]);
+                  } else {
+                    cvt_y_rem_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*gelu_fwd_tpp_rem_ptr)(out_ptr[m][nc], out_ptr[m][nc]);
+                  }
+                });
+              } else if (fusion_type == FUSE_GELU_TANH) {
+                post_loop([&](int* ind) {
+                  int m = ind[0], nc = ind[1];
+                  if (m + block_m <= M) {
+                    cvt_y_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*gelu_tanh_fwd_tpp_ptr)(out_ptr[m][nc], out_ptr[m][nc]);
+                  } else {
+                    cvt_y_rem_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*gelu_tanh_fwd_tpp_rem_ptr)(
+                        out_ptr[m][nc], out_ptr[m][nc]);
+                  }
+                });
+              } else if (fusion_type == FUSE_ADD) {
+                post_loop([&](int* ind) {
+                  int m = ind[0], nc = ind[1];
+                  if (m + block_m <= M) {
+                    cvt_y_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*add_tpp_ptr)(
+                        out_ptr[m][nc], in0_ptr[m][nc], out_ptr[m][nc]);
+                  } else {
+                    cvt_y_rem_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*add_tpp_rem_ptr)(
+                        out_ptr[m][nc], in0_ptr[m][nc], out_ptr[m][nc]);
+                  }
+                });
+              } else if (fusion_type == FUSE_ADD_ADD) {
+                post_loop([&](int* ind) {
+                  int m = ind[0], nc = ind[1];
+                  if (m + block_m <= M) {
+                    cvt_y_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*add_tpp_ptr)(
+                        out_ptr[m][nc], in0_ptr[m][nc], out_ptr[m][nc]);
+                    (*add_tpp_ptr)(
+                        out_ptr[m][nc], in1_ptr[m][nc], out_ptr[m][nc]);
+                  } else {
+                    cvt_y_rem_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*add_tpp_rem_ptr)(
+                        out_ptr[m][nc], in0_ptr[m][nc], out_ptr[m][nc]);
+                    (*add_tpp_rem_ptr)(
+                        out_ptr[m][nc], in1_ptr[m][nc], out_ptr[m][nc]);
+                  }
+                });
+              }
+            } else { // Tout == TGemmOut
+              // For add/add_add, using aten add is faster than TPP fused kernel
+              if (fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD) {
+                maybe_cvt_x_and_compute(y, 0);
+                for (auto& tin : others_list) {
+                  y.add_(tin.view(y.sizes()));
+                }
+              } else {
+                maybe_cvt_x_and_compute(y, fusion_type);
+              }
+            }
+          },
+          [](auto tuple) { failing_fallback(); });
+}
+
 // If T != TComp
 //   T -> TComp -> GEMM -> TComp -> bias/PostOp -> Tout
 // If T == TComp (we can save intermediate output buffer and schedule M/N/K
@@ -1719,6 +2012,33 @@ void qlinear_woq_affine_impl(
       quant_block_k == 0 ? 1 : (K + quant_block_k - 1) / quant_block_k;
 
   TLA_ASSERT(Nb % 16 == 0, "Nb must be a multiple of 16");
+
+  // For first token with large M, go to the dequant upfront path
+  // Now it only supports INT8 weight
+  if constexpr (!std::is_same<TComp, uint8_t>()) {
+    if (M >= DEQUANT_UPFRONT_THRESHOLD && !is_4bit_flag) {
+      qlinear_woq_affine_dequant_upfront_impl<
+          T,
+          TComp,
+          TGemmOut,
+          Tout,
+          TScale,
+          TZero,
+          quant_a_mode,
+          quant_w_mode>(
+          x,
+          qw_packed,
+          scales,
+          b,
+          y,
+          qw_type,
+          fusion_type,
+          others_list,
+          quant_block_k,
+          zps);
+      return;
+    }
+  }
 
   // select BLOCK_M according to M
   // TODO(jgong5): improve the heuristic
@@ -2324,7 +2644,10 @@ at::Tensor qlinear_woq_pack(
   auto K = is_4bit_flag ? sizes[1] * 2 : sizes[1];
   TLA_ASSERT(N % block_n == 0, "N must be multiple of block_n");
   TLA_ASSERT(K % block_k == 0, "K must be multiple of block_k");
-  TLA_ASSERT(block_n % 16 == 0, "block_n must be multiple of 16 for int4");
+  if (is_4bit_flag) {
+    TLA_ASSERT(
+        block_n % 16 == 0, "block_n must be multiple of 16 for 4bit weight");
+  }
   if (lowp_mode == LOWP_MODE_INT8) {
     TLA_ASSERT(
         block_k % 4 == 0,

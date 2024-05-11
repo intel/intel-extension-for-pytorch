@@ -31,7 +31,9 @@ REGISTER_LOCAL_SCOPE(
 REGISTER_LOCAL_SCOPE(
     tpp_linear_gelu_krnl,
     "tpp_linear_gelu_krnl"); // linear bias + gelu
-
+REGISTER_LOCAL_SCOPE(
+    tpp_linear_gelu_tanh_krnl,
+    "tpp_linear_gelu_tanh_krnl"); // linear bias + gelu_tanh
 REGISTER_LOCAL_SCOPE(
     tpp_linear_mul_krnl,
     "tpp_linear_mul_krnl"); // linear bias + mul
@@ -65,7 +67,7 @@ inline at::Tensor wt_tensor_for_first_token(at::Tensor& t) {
   auto C2 = sizes[2];
   auto K2 = sizes[3];
   auto C3 = sizes[4];
-  if (K2 >= 32)
+  if (K2 > 32)
     return t;
   auto t_new = t.new_empty({K1 / RBS, C1, C2, RBS * K2, C3});
   auto in = GetVLAPtr<T>(t, {RBS, C1, C2, K2 * C3});
@@ -86,7 +88,7 @@ inline at::Tensor wt_tensor_for_first_token(at::Tensor& t) {
   return t_new;
 }
 
-template <typename T>
+template <typename T, typename Tout = T>
 inline void tpp_linear_bias(
     const at::Tensor& t_in,
     const at::Tensor& t_wt,
@@ -119,9 +121,9 @@ inline void tpp_linear_bias(
 
   auto wt_V = GetVLAPtr<T>(t_wt_V, {Nc, Hc * Hk});
 
-  auto bias = GetVLAPtr<T>(t_bias, {Hk});
+  auto bias = GetVLAPtr<Tout>(t_bias, {Hk});
 
-  auto out = GetVLAPtr<T>(t_out, {Nk, Hk});
+  auto out = GetVLAPtr<Tout>(t_out, {Nk, Hk});
 
   auto Ncb = Nc;
   auto BSb = 64L;
@@ -130,14 +132,15 @@ inline void tpp_linear_bias(
     Ncb = NCB_BLOCK_SIZE;
 
   bool with_bias = (t_bias.numel() > 0);
-  auto copy_bias_tpp = SCOPEIT(CpyBiasTPP<T>(BSb, Hk, K), BIAS);
-  auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<T>(rem, Hk, K), BIAS);
-  auto zero_tpp = SCOPEIT(SetZeroTPP<T>(BSb, Hk, K), EW_ZERO);
-  auto zero_tpp_rem = SCOPEIT(SetZeroTPP<T>(rem, Hk, K), EW_ZERO);
-  auto brgemm_tpp = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto brgemm_tpp_rem = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto copy_bias_tpp = SCOPEIT(CpyBiasTPP<Tout>(BSb, Hk, K), BIAS);
+  auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
+  auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
+  auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
+  constexpr int b_vnni = std::is_same<T, bfloat16>();
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
 
   {
     RECORD_SCOPE(tpp_linear_krnl, {t_in, t_wt_V});
@@ -441,7 +444,7 @@ inline void tpp_linear_add_add(
   }
 }
 
-template <typename T>
+template <typename T, typename Tout = T>
 inline void tpp_linear_gelu(
     const at::Tensor& t_in,
     const at::Tensor& t_wt,
@@ -469,8 +472,8 @@ inline void tpp_linear_gelu(
 
   auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
   auto wt_V = GetVLAPtr<T>(t_wt_V, {Nc, Hc * Hk});
-  auto bias = GetVLAPtr<T>(t_bias, {Hk});
-  auto out = GetVLAPtr<T>(t_out, {Nk, Hk});
+  auto bias = GetVLAPtr<Tout>(t_bias, {Hk});
+  auto out = GetVLAPtr<Tout>(t_out, {Nk, Hk});
 
   auto Ncb = Nc;
   auto BSb = 64L;
@@ -478,16 +481,109 @@ inline void tpp_linear_gelu(
   if (large_cache_opt)
     Ncb = NCB_BLOCK_SIZE;
   bool with_bias = (t_bias.numel() > 0);
-  auto copy_bias_tpp = SCOPEIT(CpyBiasTPP<T>(BSb, Hk, K), BIAS);
-  auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<T>(rem, Hk, K), BIAS);
-  auto zero_tpp = SCOPEIT(SetZeroTPP<T>(BSb, Hk, K), EW_ZERO);
-  auto zero_tpp_rem = SCOPEIT(SetZeroTPP<T>(rem, Hk, K), EW_ZERO);
-  auto brgemm_tpp = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto brgemm_tpp_rem = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto gelu_fwd_tpp = SCOPEIT(GeluFwdTPP<T>(BSb, Hk, K, K), ACT);
-  auto gelu_fwd_tpp_rem = SCOPEIT(GeluFwdTPP<T>(rem, Hk, K, K), ACT);
+  auto copy_bias_tpp = SCOPEIT(CpyBiasTPP<Tout>(BSb, Hk, K), BIAS);
+  auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
+  auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
+  auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
+  constexpr int b_vnni = std::is_same<T, bfloat16>();
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto gelu_fwd_tpp = SCOPEIT(GeluFwdTPP<Tout>(BSb, Hk, K, K), ACT);
+  auto gelu_fwd_tpp_rem = SCOPEIT(GeluFwdTPP<Tout>(rem, Hk, K, K), ACT);
+
+  {
+    RECORD_SCOPE(tpp_linear_gelu_krnl, {t_in, t_wt_V});
+
+    auto loop_scheme = large_cache_opt ? GEMM_LOOP_SCHEME : "aCb";
+    auto igemm_loop = torch_ipex::tpp::ThreadedLoop<3>(
+        {{0, Nc, Ncb, false}, {0, BS, BSb}, {Nk}}, loop_scheme);
+    igemm_loop(
+        [&](int* ind) {
+          int nc = ind[0], s1 = ind[1], nk = ind[2];
+          auto count = nc + Ncb < Nc ? Ncb : Nc - nc;
+          bool is_rem = (s1 + BSb > BS);
+          if (!is_rem) {
+            if (nc == 0) {
+              if (with_bias) {
+                copy_bias_tpp(bias[nk], out[s1][nk]);
+              } else {
+                zero_tpp(out[s1][nk]);
+              }
+            }
+            brgemm_tpp(in[s1][nc], wt_V[nk][nc], out[s1][nk], count, true);
+            if (!(nc + Ncb < Nc)) { // last nc iter
+              gelu_fwd_tpp(out[s1][nk], out[s1][nk]);
+            }
+          } else {
+            if (nc == 0) {
+              if (with_bias) {
+                copy_bias_tpp_rem(bias[nk], out[s1][nk]);
+              } else {
+                zero_tpp_rem(out[s1][nk]);
+              }
+            }
+            brgemm_tpp_rem(in[s1][nc], wt_V[nk][nc], out[s1][nk], count, false);
+            brgemm_tpp.config();
+            if (!(nc + Ncb < Nc)) { // last nc iter
+              gelu_fwd_tpp_rem(out[s1][nk], out[s1][nk]);
+            }
+          }
+        },
+        [&]() { brgemm_tpp.config(); },
+        [&]() { brgemm_tpp.release(); });
+  }
+}
+
+template <typename T, typename Tout = T>
+inline void tpp_linear_gelu_tanh(
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
+    at::Tensor& t_out) {
+  auto t_wt_ = t_wt;
+  auto in_sizes = t_in.sizes();
+  auto BS = in_sizes[0] * in_sizes[1];
+  bool large_cache_opt = false;
+  if (BS > FT_OPT_SIZE) { // first token compute
+    t_wt_ = wt_tensor_for_first_token<T>(t_wt_);
+    large_cache_opt = true;
+  }
+
+  auto wt_sizes = t_wt_.sizes();
+  auto C = in_sizes[2];
+
+  auto Nc = wt_sizes[1];
+  auto Hc = C / Nc;
+  auto Nk = wt_sizes[0];
+  auto Hk = wt_sizes[3];
+  auto K = Nk * Hk;
+
+  auto t_wt_V = torch_ipex::tpp::wt_tensor_for_fwd(Nk, Hk, Nc, Hc, t_wt_);
+
+  auto in = GetVLAPtr<T>(t_in, {Nc, Hc});
+  auto wt_V = GetVLAPtr<T>(t_wt_V, {Nc, Hc * Hk});
+  auto bias = GetVLAPtr<Tout>(t_bias, {Hk});
+  auto out = GetVLAPtr<Tout>(t_out, {Nk, Hk});
+
+  auto Ncb = Nc;
+  auto BSb = 64L;
+  auto rem = BS % 64;
+  if (large_cache_opt)
+    Ncb = NCB_BLOCK_SIZE;
+  bool with_bias = (t_bias.numel() > 0);
+  auto copy_bias_tpp = SCOPEIT(CpyBiasTPP<Tout>(BSb, Hk, K), BIAS);
+  auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
+  auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
+  auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
+  constexpr int b_vnni = std::is_same<T, bfloat16>();
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto gelu_fwd_tpp = SCOPEIT(GeluTanhFwdTPP<Tout>(BSb, Hk, K, K), ACT);
+  auto gelu_fwd_tpp_rem = SCOPEIT(GeluTanhFwdTPP<Tout>(rem, Hk, K, K), ACT);
 
   {
     RECORD_SCOPE(tpp_linear_gelu_krnl, {t_in, t_wt_V});
