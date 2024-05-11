@@ -282,6 +282,80 @@ inline Vectorized<float> exp_u20(Vectorized<float> data) {
 }
 #endif
 
+// out = val * a + b
+template <typename T1, typename T2>
+inline void _scale_attn_mask_fusion_kernel(
+    T1* a,
+    T2* b,
+    const int& size,
+    T1* out,
+    T1& val) {
+  auto vec_size = at::vec::Vectorized<T1>::size();
+  auto vec_scale = at::vec::Vectorized<T1>(val);
+  for (long i = 0; i < vec_size * (size / vec_size); i += vec_size) {
+    auto tmp0 = at::vec::Vectorized<T1>::loadu(a + i);
+    auto tmp1 = at::vec::Vectorized<T2>::loadu(b + i);
+    auto tmp2 = at::vec::convert<T1>(tmp1);
+    auto tmp3 = tmp0 * vec_scale + tmp2;
+    _store(out + i, tmp3);
+  }
+  for (long i = vec_size * (size / vec_size); i < size; i++) {
+    auto tmp0 = a[i];
+    auto tmp1 = (T1)b[i];
+    out[i] = tmp0 * val + tmp1;
+  }
+}
+
+// out = val * a + b
+template <typename T1>
+inline void _scale_attn_mask_fusion_kernel(
+    T1* a,
+    T1* b,
+    const int& size,
+    T1* out,
+    T1& val) {
+  auto vec_size = at::vec::Vectorized<T1>::size();
+  auto vec_scale = at::vec::Vectorized<T1>(val);
+  for (long i = 0; i < vec_size * (size / vec_size); i += vec_size) {
+    auto tmp0 = at::vec::Vectorized<T1>::loadu(a + i);
+    auto tmp1 = at::vec::Vectorized<T1>::loadu(b + i);
+    auto tmp2 = tmp0 * vec_scale + tmp1;
+    _store(out + i, tmp2);
+  }
+  for (long i = vec_size * (size / vec_size); i < size; i++) {
+    auto tmp0 = a[i];
+    auto tmp1 = b[i];
+    out[i] = tmp0 * val + tmp1;
+  }
+}
+
+// out = b ? val * a : -inf
+template <typename T1>
+inline void _scale_attn_mask_fusion_kernel(
+    T1* a,
+    bool* b,
+    const int& size,
+    T1* out,
+    T1& val) {
+  auto vec_size = at::vec::Vectorized<T1>::size();
+  auto vec_scale = at::vec::Vectorized<T1>(val);
+  auto neg_inf = -std::numeric_limits<T1>::infinity();
+  auto vec_neg_inf = at::vec::Vectorized<T1>(neg_inf);
+  for (long i = 0; i < vec_size * (size / vec_size); i += vec_size) {
+    auto tmp0 = at::vec::Vectorized<T1>::loadu(a + i);
+    auto tmp1 = at::vec::Vectorized<bool>::loadu(b + i);
+    auto tmp2 = at::vec::convert<T1>(tmp1);
+    auto tmp3 =
+        at::vec::Vectorized<T1>::blendv(vec_neg_inf, tmp0 * vec_scale, tmp2);
+    _store(out + i, tmp3);
+  }
+  for (long i = vec_size * (size / vec_size); i < size; i++) {
+    auto tmp0 = a[i];
+    auto tmp1 = b[i];
+    out[i] = tmp1 ? tmp0 * val : neg_inf;
+  }
+}
+
 // 1) out = exp(a - val)
 // 2) val = sum(out)
 template <typename T1, typename T2>
@@ -366,7 +440,11 @@ inline void _mul_reduce_max_fusion_kernel(
  *@param attention_mask: attention mask
  *@param scale: scaling factor applied prior to softmax
  */
-template <typename scalar_t, int64_t q_split_size, int64_t kv_split_size>
+template <
+    typename scalar_t,
+    typename mask_t,
+    int64_t q_split_size,
+    int64_t kv_split_size>
 inline typename std::enable_if_t<!is_reduced_floating_point_v<scalar_t>, void>
 cpu_flash_attention(
     const at::Tensor& output,
@@ -388,14 +466,9 @@ cpu_flash_attention(
   at::Tensor key = k.transpose(1, 2);
   at::Tensor value = v.transpose(1, 2);
 
-  bool is_bool_mask = attention_mask.has_value() &&
-      attention_mask.value().scalar_type() == ScalarType::Bool;
   using accum_t = at::opmath_type<scalar_t>;
   using Vec = at::vec::Vectorized<accum_t>;
   accum_t scaling_factor = calculate_scale(query, scale).as_float_unchecked();
-  if (attention_mask.has_value() && is_bool_mask) {
-    attention_mask.value() = attention_mask.value().to(at::kFloat);
-  }
 
   // Sizes
   TORCH_CHECK(
@@ -458,8 +531,8 @@ cpu_flash_attention(
   scalar_t* q_data = query.data_ptr<scalar_t>();
   scalar_t* k_data = key.data_ptr<scalar_t>();
   scalar_t* v_data = value.data_ptr<scalar_t>();
-  accum_t* mask_data = attention_mask.has_value()
-      ? attention_mask.value().data_ptr<accum_t>()
+  mask_t* mask_data = attention_mask.has_value()
+      ? attention_mask.value().data_ptr<mask_t>()
       : nullptr;
   scalar_t* out_data = output.data_ptr<scalar_t>();
   accum_t* lse_data = logsumexp.data_ptr<accum_t>();
@@ -523,31 +596,15 @@ cpu_flash_attention(
             // And apply scaling factor
             if (attention_mask.has_value()) {
               for (int64_t row = 0; row < qBlockSize; ++row) {
-                if (is_bool_mask) {
-                  // qk <- attn_mask ? qk : -inf
-                  auto neg_inf = -std::numeric_limits<accum_t>::infinity();
-                  at::vec::map2<accum_t>(
-                      [neg_inf, scaling_factor](Vec x, Vec m) {
-                        return Vec::blendv(
-                            Vec(neg_inf), x * Vec(scaling_factor), m);
-                      },
-                      qk_data + row * kvBlockSize,
-                      qk_data + row * kvBlockSize,
-                      mask_data + i * mStrideB + j * mStrideH +
-                          (m + row) * mStrideM + n,
-                      kvBlockSize);
-                } else {
-                  // qk <- qk + attn_mask
-                  at::vec::map2<accum_t>(
-                      [scaling_factor](Vec x, Vec y) {
-                        return x * Vec(scaling_factor) + y;
-                      },
-                      qk_data + row * kvBlockSize,
-                      qk_data + row * kvBlockSize,
-                      mask_data + i * mStrideB + j * mStrideH +
-                          (m + row) * mStrideM + n,
-                      kvBlockSize);
-                }
+                // qk <- attn_mask ? qk : -inf, if attn_mask is bool
+                // qk <- qk + attn_mask, else
+                _scale_attn_mask_fusion_kernel(
+                    qk_data + row * kvBlockSize,
+                    mask_data + i * mStrideB + j * mStrideH +
+                        (m + row) * mStrideM + n,
+                    kvBlockSize,
+                    qk_data + row * kvBlockSize,
+                    scaling_factor);
               }
             }
             // Update coefficients with Softmax
@@ -634,7 +691,11 @@ cpu_flash_attention(
 }
 
 // Half/BFloat16
-template <typename scalar_t, int64_t q_split_size, int64_t kv_split_size>
+template <
+    typename scalar_t,
+    typename mask_t,
+    int64_t q_split_size,
+    int64_t kv_split_size>
 inline typename std::enable_if_t<is_reduced_floating_point_v<scalar_t>, void>
 cpu_flash_attention(
     const at::Tensor& output,
@@ -662,14 +723,9 @@ cpu_flash_attention(
   const int vnni_pack =
       (!is_fp16 || (is_fp16 && utils::isa_has_amx_fp16_support())) ? 1 : 0;
 
-  bool is_bool_mask = attention_mask.has_value() &&
-      attention_mask.value().scalar_type() == ScalarType::Bool;
   using accum_t = at::opmath_type<scalar_t>;
   using Vec = at::vec::Vectorized<accum_t>;
   accum_t scaling_factor = calculate_scale(query, scale).as_float_unchecked();
-  if (attention_mask.has_value()) {
-    attention_mask.value() = attention_mask.value().to(at::kFloat);
-  }
 
   // Sizes
   TORCH_CHECK(
@@ -734,8 +790,8 @@ cpu_flash_attention(
   scalar_t* q_data = query.data_ptr<scalar_t>();
   scalar_t* k_data = key.data_ptr<scalar_t>();
   scalar_t* v_data = value.data_ptr<scalar_t>();
-  accum_t* mask_data = attention_mask.has_value()
-      ? attention_mask.value().data_ptr<accum_t>()
+  mask_t* mask_data = attention_mask.has_value()
+      ? attention_mask.value().data_ptr<mask_t>()
       : nullptr;
   scalar_t* out_data = output.data_ptr<scalar_t>();
   accum_t* lse_data = logsumexp.data_ptr<accum_t>();
@@ -1185,31 +1241,15 @@ cpu_flash_attention(
             // And apply scaling factor
             if (attention_mask.has_value()) {
               for (int64_t row = 0; row < qBlockSize; ++row) {
-                if (is_bool_mask) {
-                  // qk <- attn_mask ? qk : -inf
-                  auto neg_inf = -std::numeric_limits<accum_t>::infinity();
-                  at::vec::map2<accum_t>(
-                      [neg_inf, scaling_factor](Vec x, Vec m) {
-                        return Vec::blendv(
-                            Vec(neg_inf), x * Vec(scaling_factor), m);
-                      },
-                      qk_data + row * kvBlockSize,
-                      qk_data + row * kvBlockSize,
-                      mask_data + i * mStrideB + j * mStrideH +
-                          (m + row) * mStrideM + n,
-                      kvBlockSize);
-                } else {
-                  // qk <- qk + attn_mask
-                  at::vec::map2<accum_t>(
-                      [scaling_factor](Vec x, Vec y) {
-                        return x * Vec(scaling_factor) + y;
-                      },
-                      qk_data + row * kvBlockSize,
-                      qk_data + row * kvBlockSize,
-                      mask_data + i * mStrideB + j * mStrideH +
-                          (m + row) * mStrideM + n,
-                      kvBlockSize);
-                }
+                // qk <- attn_mask ? qk : -inf, if attn_mask is bool
+                // qk <- qk + attn_mask, else
+                _scale_attn_mask_fusion_kernel(
+                    qk_data + row * kvBlockSize,
+                    mask_data + i * mStrideB + j * mStrideH +
+                        (m + row) * mStrideM + n,
+                    kvBlockSize,
+                    qk_data + row * kvBlockSize,
+                    scaling_factor);
               }
             }
             // Update coefficients with Softmax
@@ -1363,6 +1403,21 @@ cpu_flash_attention(
       });
 }
 
+#define AT_DISPATCH_MASK_TYPES(TYPE, NAME, ...)                      \
+  AT_DISPATCH_SWITCH(                                                \
+      TYPE,                                                          \
+      NAME,                                                          \
+      AT_PRIVATE_CASE_TYPE_USING_HINT(                               \
+          at::ScalarType::Bool, mask_t, __VA_ARGS__)                 \
+          AT_PRIVATE_CASE_TYPE_USING_HINT(                           \
+              at::ScalarType::Float, mask_t, __VA_ARGS__)            \
+              AT_PRIVATE_CASE_TYPE_USING_HINT(                       \
+                  at::ScalarType::Double, mask_t, __VA_ARGS__)       \
+                  AT_PRIVATE_CASE_TYPE_USING_HINT(                   \
+                      at::ScalarType::BFloat16, mask_t, __VA_ARGS__) \
+                      AT_PRIVATE_CASE_TYPE_USING_HINT(               \
+                          at::ScalarType::Half, mask_t, __VA_ARGS__))
+
 void flash_attention_kernel_impl(
     const at::Tensor& output,
     const at::Tensor& logsumexp,
@@ -1377,39 +1432,81 @@ void flash_attention_kernel_impl(
 
   AT_DISPATCH_FLOATING_TYPES_AND2(
       kBFloat16, kHalf, query.scalar_type(), "flash_attention", [&] {
-        if (q_seq_len >= 768) {
-          cpu_flash_attention<scalar_t, 256, 512>(
-              output,
-              logsumexp,
-              query,
-              key,
-              value,
-              dropout_p,
-              is_causal,
-              attention_mask,
-              scale);
-        } else if (q_seq_len >= 192) {
-          cpu_flash_attention<scalar_t, 64, 512>(
-              output,
-              logsumexp,
-              query,
-              key,
-              value,
-              dropout_p,
-              is_causal,
-              attention_mask,
-              scale);
+        if (!attention_mask.has_value()) {
+          if (q_seq_len >= 768) {
+            cpu_flash_attention<scalar_t, scalar_t, 256, 512>(
+                output,
+                logsumexp,
+                query,
+                key,
+                value,
+                dropout_p,
+                is_causal,
+                attention_mask,
+                scale);
+          } else if (q_seq_len >= 192) {
+            cpu_flash_attention<scalar_t, scalar_t, 64, 512>(
+                output,
+                logsumexp,
+                query,
+                key,
+                value,
+                dropout_p,
+                is_causal,
+                attention_mask,
+                scale);
+          } else {
+            cpu_flash_attention<scalar_t, scalar_t, 32, 512>(
+                output,
+                logsumexp,
+                query,
+                key,
+                value,
+                dropout_p,
+                is_causal,
+                attention_mask,
+                scale);
+          }
         } else {
-          cpu_flash_attention<scalar_t, 32, 512>(
-              output,
-              logsumexp,
-              query,
-              key,
-              value,
-              dropout_p,
-              is_causal,
-              attention_mask,
-              scale);
+          AT_DISPATCH_MASK_TYPES(
+              attention_mask.value().scalar_type(),
+              "flash_attention_mask",
+              [&]() {
+                if (q_seq_len >= 768) {
+                  cpu_flash_attention<scalar_t, mask_t, 256, 512>(
+                      output,
+                      logsumexp,
+                      query,
+                      key,
+                      value,
+                      dropout_p,
+                      is_causal,
+                      attention_mask,
+                      scale);
+                } else if (q_seq_len >= 192) {
+                  cpu_flash_attention<scalar_t, mask_t, 64, 512>(
+                      output,
+                      logsumexp,
+                      query,
+                      key,
+                      value,
+                      dropout_p,
+                      is_causal,
+                      attention_mask,
+                      scale);
+                } else {
+                  cpu_flash_attention<scalar_t, mask_t, 32, 512>(
+                      output,
+                      logsumexp,
+                      query,
+                      key,
+                      value,
+                      dropout_p,
+                      is_causal,
+                      attention_mask,
+                      scale);
+                }
+              });
         }
       });
 }
@@ -1442,6 +1539,7 @@ std::tuple<at::Tensor, at::Tensor> flash_attention_kernel(
   TORCH_CHECK(
       !attention_mask.has_value() ||
           dtype == attention_mask.value().scalar_type() ||
+          attention_mask.value().scalar_type() == ScalarType::Float ||
           attention_mask.value().scalar_type() == ScalarType::Bool,
       "IPEX flash_attention: Mask should have the same data type as Q/K/V or Bool");
   TORCH_CHECK(

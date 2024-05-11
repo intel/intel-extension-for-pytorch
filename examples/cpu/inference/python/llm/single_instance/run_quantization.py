@@ -968,10 +968,8 @@ if args.benchmark:
             prompt_pool = json.load(f)
         if args.prompt is not None:
             prompt = args.prompt
-        elif int(args.input_tokens) > 8192:
-            prompt = prompt_pool[model.name]["8192"] * int(
-                int(args.input_tokens) / 8192
-            )
+        # elif int(args.input_tokens) > 8192:
+        #     prompt = prompt_pool[model.name]["8192"] * int(int(args.input_tokens) / 8192)
         elif args.input_tokens in prompt_pool[model.name]:
             prompt = prompt_pool[model.name][args.input_tokens]
         else:
