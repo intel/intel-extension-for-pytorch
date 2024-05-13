@@ -560,8 +560,6 @@ scale_dot_product_for_indirect_access_kv_cache(
   auto attn_out_ptr = attn_outs.data_ptr<VT>();
   // torch_ipex::cpu::kernel::zero_ker(attn_out_ptr, attn_outs.numel());
   auto attn_w_ptr = attn_weights.data_ptr<float>();
-  long new_beam_idx[beam_batch][offset + query.size(1) + 1];
-  auto b_ptr = beam_idx.data_ptr<long>();
 
   auto thread_numbers = omp_get_max_threads();
   auto max_parallel_parts = thread_numbers * 4;
@@ -571,7 +569,10 @@ scale_dot_product_for_indirect_access_kv_cache(
   kv_block_size = std::min(kv_block_size, 32L);
   auto kv_block_count =
       ((seq_len - swa_start) + kv_block_size - 1) / kv_block_size;
-  if (offset > 0) {
+  auto need_update_beam_idx = offset > 0 and bs > 1;
+  auto b_ptr = beam_idx.data_ptr<long>();
+  long new_beam_idx[beam_batch][offset + query.size(1) + 1];
+  if (need_update_beam_idx) {
     // according to the last decoded token to get the target beam for the past
     // token
     for (int i = 0; i < bs; i++) {
@@ -604,6 +605,7 @@ scale_dot_product_for_indirect_access_kv_cache(
               attn_w_pos[0] = 0.0f;
               auto kc_token_start = ti * kc_token_stride;
               auto kc_t_beam_start = kc_token_start;
+              auto beam = need_update_beam_idx ? new_beam_idx[bi][ti] : 0;
               if (ti >
                   query_ti + offset) { // only caculate the innerproduct for
                                        // the past token and current token
@@ -644,8 +646,8 @@ scale_dot_product_for_indirect_access_kv_cache(
                       false,
                       nullptr);
                 } else {
-                  kc_t_beam_start = kc_t_beam_start +
-                      new_beam_idx[bi][ti] * kv_head * head_size;
+                  kc_t_beam_start =
+                      kc_t_beam_start + beam * kv_head * head_size;
                   if (cur_len > 1) {
                     auto beam_size = beam_batch / bs;
                     kc_t_beam_start =
@@ -762,6 +764,7 @@ scale_dot_product_for_indirect_access_kv_cache(
                   attn_out_head_stride + query_ti * head_size;
 
               auto vc_token_start = vi * kc_token_stride;
+              auto beam = need_update_beam_idx ? new_beam_idx[bi][vi] : 0;
               if (vi == query_ti + offset) { // caculate the attention values
                                              // for the current token
                 auto vc_t_beam_start = vc_token_start;
@@ -803,8 +806,8 @@ scale_dot_product_for_indirect_access_kv_cache(
                       nullptr,
                       flag_access[thread_id][bi][hi]);
                 } else {
-                  auto vc_t_beam_start = vc_token_start +
-                      new_beam_idx[bi][vi] * kv_head * head_size;
+                  auto vc_t_beam_start =
+                      vc_token_start + beam * kv_head * head_size;
                   if (cur_len > 1) {
                     auto beam_size = beam_batch / bs;
                     vc_t_beam_start =
@@ -916,7 +919,8 @@ scale_dot_product_for_indirect_access_kv_cache_half(
   auto attn_w_ptr = attn_weights.data_ptr<at::Half>();
   long new_beam_idx[beam_batch][offset + query.size(1) + 1];
   auto b_ptr = beam_idx.data_ptr<long>();
-  if (offset > 0) {
+  auto need_update_beam_idx = offset > 0 && bs > 1;
+  if (need_update_beam_idx) {
     // according to the last decoded token to get the target beam for the past
     // token
     for (int i = 0; i < bs; i++) {
@@ -946,6 +950,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
             attn_w_pos[0] = 0.0f;
             auto kc_token_start = ti * kc_token_stride;
             auto kc_t_beam_start = kc_token_start;
+            auto beam = need_update_beam_idx ? new_beam_idx[bi][ti] : 0;
             if (ti > query_ti + offset) { // only caculate the innerproduct for
                                           // the past token and current token
               attn_w_pos[0] = -10000.0f;
@@ -985,8 +990,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                     false,
                     nullptr);
               } else {
-                kc_t_beam_start = kc_t_beam_start +
-                    new_beam_idx[bi][ti] * kv_head * head_size;
+                kc_t_beam_start = kc_t_beam_start + beam * kv_head * head_size;
                 if (cur_len > 1) {
                   auto beam_size = beam_batch / bs;
                   kc_t_beam_start =
@@ -1072,6 +1076,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                 query_ti * head_size;
 
             auto vc_token_start = vi * kc_token_stride;
+            auto beam = need_update_beam_idx ? new_beam_idx[bi][vi] : 0;
             if (vi == query_ti + offset) { // caculate the attention values
                                            // for the current token
               auto vc_t_beam_start = vc_token_start;
@@ -1114,7 +1119,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                     flag_access[thread_id][bi][hi]);
               } else {
                 auto vc_t_beam_start =
-                    vc_token_start + new_beam_idx[bi][vi] * kv_head * head_size;
+                    vc_token_start + beam * kv_head * head_size;
                 if (cur_len > 1) {
                   auto beam_size = beam_batch / bs;
                   vc_t_beam_start =
@@ -1505,7 +1510,7 @@ void attention_mask_2d_to_4d(
     int64_t length,
     int64_t diagonal) {
   T finfo_min_val = finfo_min.item<T>();
-#pragma omp parallel for collapse(2)
+
   for (int64_t b = 0; b < batch_size; ++b) {
     for (int64_t l = 0; l < seq_length; ++l) {
       for (int64_t c = 0; c < length; ++c) {
