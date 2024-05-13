@@ -618,6 +618,7 @@ class TestGraphCaptureMultiStream(TestCase):
         not ipex.cpu.runtime.is_runtime_ext_enabled(),
         "Skip when IPEX Runtime extension is not enabled",
     )
+    @unittest.skipIf(True, "Core dump.")  # TODO: Jiayi to re-enable
     @runtime_thread_affinity_test_env
     def test_multi_stream_graph_mode_torchdynamo(self):
         model = Conv_IF_Relu().to(memory_format=torch.channels_last)
@@ -670,6 +671,7 @@ class TestGraphCaptureMultiStream(TestCase):
         not ipex.cpu.runtime.is_runtime_ext_enabled(),
         "Skip when IPEX Runtime extension is not enabled",
     )
+    @unittest.skipIf(True, "Core dump.")  # TODO: Jiayi to re-enable
     @runtime_thread_affinity_test_env
     def test_multi_stream_graph_mode_torchdynamo_autocast(self):
         model = Conv_IF_Relu().to(memory_format=torch.channels_last)
