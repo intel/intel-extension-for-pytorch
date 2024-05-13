@@ -410,8 +410,8 @@ def iterate_and_apply_convert(
                 ]:
                     ch_axis = 1
                 if (
-                    torch.is_autocast_cpu_enabled()
-                    and torch.get_autocast_cpu_dtype() == torch.bfloat16
+                    torch.is_autocast_enabled("cpu")
+                    and torch.get_autocast_dtype("cpu") == torch.bfloat16
                 ):
                     # do autocast in Python side
                     if args.dtype == torch.float32:
@@ -437,8 +437,8 @@ def iterate_and_apply_convert(
                     or str(type(op)) in conv_linear_modules
                 ):
                     if (
-                        torch.is_autocast_cpu_enabled()
-                        and torch.get_autocast_cpu_dtype() == torch.bfloat16
+                        torch.is_autocast_enabled("cpu")
+                        and torch.get_autocast_dtype("cpu") == torch.bfloat16
                     ):
                         if args.dtype == torch.bfloat16:
                             args = args.to(dtype=torch.float32)

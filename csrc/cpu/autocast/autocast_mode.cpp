@@ -6,7 +6,7 @@ namespace torch_ipex {
 namespace autocast {
 
 at::ScalarType get_autocast_dtype() {
-  return at::autocast::get_autocast_cpu_dtype();
+  return at::autocast::get_autocast_dtype(at::kCPU);
 }
 
 Tensor cpu_cached_cast(at::ScalarType to_type, const Tensor& arg) {

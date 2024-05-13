@@ -56,7 +56,7 @@ def jit_trace_wrapper(f):
     def wrapper(*args, **kwargs):
         prev = torch.is_autocast_cache_enabled()
         # For running CPU workload, disable autocast cache
-        if torch.is_autocast_cpu_enabled():
+        if torch.is_autocast_enabled("cpu"):
             torch.set_autocast_cache_enabled(False)
 
         # For running XPU workload and the platform unsupports 2d block,

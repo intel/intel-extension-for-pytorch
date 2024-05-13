@@ -473,8 +473,8 @@ def convert(model, inplace=False):
     # which will reduce the dtype conversion.
     # TODO: check whether can be removed or not?
     if (
-        torch.is_autocast_cpu_enabled()
-        and torch.get_autocast_cpu_dtype() == torch.bfloat16
+        torch.torch.is_autocast_enabled("cpu")
+        and torch.get_autocast_dtype("cpu") == torch.bfloat16
     ):
         convert_model = nn.utils._model_convert.convert_model_data_type(
             convert_model, torch.bfloat16

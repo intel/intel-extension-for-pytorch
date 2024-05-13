@@ -472,8 +472,8 @@ class AutoQuantizationState(torch.nn.Module):
                         if w_dtype != torch.float32:
                             weight = weight.to(w_dtype)
                 if (
-                    torch.is_autocast_cpu_enabled()
-                    and torch.get_autocast_cpu_dtype() == torch.bfloat16
+                    torch.is_autocast_enabled("cpu")
+                    and torch.get_autocast_dtype("cpu") == torch.bfloat16
                 ):
                     if weight.dtype == torch.bfloat16:
                         weight = weight.to(dtype=torch.float32)
@@ -510,8 +510,8 @@ class AutoQuantizationState(torch.nn.Module):
                 scale, zp, dtype = quant_info
                 weight = op.weight
                 if (
-                    torch.is_autocast_cpu_enabled()
-                    and torch.get_autocast_cpu_dtype() == torch.bfloat16
+                    torch.torch.is_autocast_enabled("cpu")
+                    and torch.get_autocast_dtype("cpu") == torch.bfloat16
                 ):
                     if weight.dtype == torch.bfloat16:
                         weight = weight.to(dtype=torch.float32)
@@ -538,8 +538,8 @@ class AutoQuantizationState(torch.nn.Module):
                 ):
                     scale, zp, dtype = quant_info
                     if (
-                        torch.is_autocast_cpu_enabled()
-                        and torch.get_autocast_cpu_dtype() == torch.bfloat16
+                        torch.torch.is_autocast_enabled("cpu")
+                        and torch.get_autocast_dtype("cpu") == torch.bfloat16
                     ):
                         if weights[tensor_arg_idx].dtype == torch.bfloat16:
                             weights[tensor_arg_idx] = weights[tensor_arg_idx].to(
@@ -574,8 +574,8 @@ class AutoQuantizationState(torch.nn.Module):
                         tensor_arg_idx + 1
                     ]
                     if (
-                        torch.is_autocast_cpu_enabled()
-                        and torch.get_autocast_cpu_dtype() == torch.bfloat16
+                        torch.torch.is_autocast_enabled("cpu")
+                        and torch.get_autocast_dtype("cpu") == torch.bfloat16
                     ):
                         weight_if_bf16 = w_ih.dtype == torch.bfloat16
                         if weight_if_bf16:

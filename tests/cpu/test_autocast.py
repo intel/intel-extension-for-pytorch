@@ -60,9 +60,9 @@ class TestFunction(TestCase):
 
     def test_set_autocast_dtype(self):
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
-            self.assertEqual(torch.get_autocast_cpu_dtype(), torch.bfloat16)
+            self.assertEqual(torch.get_autocast_dtype("cpu"), torch.bfloat16)
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.float16):
-            self.assertEqual(torch.get_autocast_cpu_dtype(), torch.float16)
+            self.assertEqual(torch.get_autocast_dtype("cpu"), torch.float16)
 
     def test_forward_dtype(self):
         rand_seed = int(get_rand_seed())
@@ -803,9 +803,9 @@ class TestAutocastOperations(TestCase):
         if add_kwargs is None:
             add_kwargs = {}
 
-        self.assertFalse(torch.is_autocast_cpu_enabled())
+        self.assertFalse(torch.torch.is_autocast_enabled("cpu"))
         with torch.cpu.amp.autocast(enabled=True, dtype=autocast_type):
-            self.assertTrue(torch.is_autocast_cpu_enabled())
+            self.assertTrue(torch.torch.is_autocast_enabled("cpu"))
             out_type = out_type if out_type is not None else run_as_type
             output = output_method = None
 
@@ -860,7 +860,7 @@ class TestAutocastOperations(TestCase):
             # as the C++-side autocasting, and should be bitwise accurate.
             output_to_compare = output if output is not None else output_method
             with torch.cpu.amp.autocast(enabled=False, dtype=autocast_type):
-                self.assertFalse(torch.is_autocast_cpu_enabled())
+                self.assertFalse(torch.torch.is_autocast_enabled("cpu"))
 
                 if module is not None and hasattr(module, op):
                     control = getattr(module, op)(
@@ -875,8 +875,8 @@ class TestAutocastOperations(TestCase):
                 self.assertTrue(
                     comparison, "torch.{} result did not match control".format(op)
                 )
-            self.assertTrue(torch.is_autocast_cpu_enabled())
-        self.assertFalse(torch.is_autocast_cpu_enabled())
+            self.assertTrue(torch.torch.is_autocast_enabled("cpu"))
+        self.assertFalse(torch.torch.is_autocast_enabled("cpu"))
 
     def _run_autocast_pass_test(
         self,
@@ -900,9 +900,9 @@ class TestAutocastOperations(TestCase):
         if add_kwargs is None:
             add_kwargs = {}
 
-        self.assertFalse(torch.is_autocast_cpu_enabled())
+        self.assertFalse(torch.torch.is_autocast_enabled("cpu"))
         with torch.cpu.amp.autocast(enabled=True, dtype=autocast_type):
-            self.assertTrue(torch.is_autocast_cpu_enabled())
+            self.assertTrue(torch.torch.is_autocast_enabled("cpu"))
             out_type = out_type if out_type is not None else run_as_type
 
             # Try module.* variant, if requested:
