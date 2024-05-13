@@ -1412,6 +1412,7 @@ masked_multihead_self_attention_kernel_impl(
         value.options());
     beam_idx = at::empty({max_positions, beam_batch}, beam_idx.options());
     auto beam_idx_access = beam_idx.accessor<long, 2>();
+    #pragma omp parallel for collapse(2)
     for (auto i = 0; i < max_positions; i++) {
       for (auto j = 0; j < beam_batch; j++) {
         if (key.size(0) == beam_batch) {
