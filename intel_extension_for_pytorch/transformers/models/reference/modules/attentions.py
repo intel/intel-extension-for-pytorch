@@ -2012,7 +2012,7 @@ def _Phi3Attention_forward(
         None,
         attention_mask,
         add_casual_mask=False,
-        sliding_window=self.config.sliding_window,
+        # sliding_window=self.config.sliding_window,
     )
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
