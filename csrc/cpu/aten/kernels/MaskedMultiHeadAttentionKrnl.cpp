@@ -535,7 +535,13 @@ scale_dot_product_for_indirect_access_kv_cache(
   auto head_size = query.size(3);
   auto seq_len = offset + cur_len;
   auto kc_token_stride = beam_batch * kv_head * head_size;
-  auto attn_weights = at::empty({bs, head_num, cur_len, seq_len}, at::kFloat);
+  auto swa_start = offset <= swa_size ? 0 : offset - swa_size + 1;
+  at::Tensor attn_weights;
+  if (swa_start == 0) {
+    attn_weights = at::empty({bs, head_num, cur_len, seq_len}, at::kFloat);
+  } else {
+    attn_weights = at::zeros({bs, head_num, cur_len, seq_len}, at::kFloat);
+  }
   query = query.contiguous();
   key = key.contiguous();
   auto q_ptr = query.data_ptr<QT>();
@@ -559,7 +565,6 @@ scale_dot_product_for_indirect_access_kv_cache(
 
   auto thread_numbers = omp_get_max_threads();
   auto max_parallel_parts = thread_numbers * 4;
-  auto swa_start = offset <= swa_size ? 0 : offset - swa_size + 1;
   auto kv_block_size = bs * head_num >= max_parallel_parts
       ? seq_len - swa_start
       : std::max((seq_len - swa_start) / max_parallel_parts, 1L);

@@ -5,6 +5,8 @@ import unittest
 from typing import Tuple
 import intel_extension_for_pytorch as ipex
 import itertools
+
+
 class MaskedMHA(torch.nn.Module):
     def __init__(self, hidden_size=4096, n_head=16, n_head_kv=16, head_dim=256):
         super().__init__()
@@ -93,7 +95,7 @@ class MaskedMHA(torch.nn.Module):
                 None,
                 attention_mask,
                 add_casual_mask,
-                sliding_window
+                sliding_window,
             )
         else:
             # Get the concatenated key and value
@@ -139,7 +141,9 @@ class MaskedMHATest(TestCase):
         max_seq_len = 64
         first_seq_len = 32
         sliding_window = [10, 40, None]
-        options = itertools.product(batch_size_list, beam_size_list, head_num_kv_list, sliding_window)
+        options = itertools.product(
+            batch_size_list, beam_size_list, head_num_kv_list, sliding_window
+        )
         for batch_size, beam_size, head_num_kv, sw in options:
             key_cache = None
             value_cache = None
@@ -190,7 +194,9 @@ class MaskedMHATest(TestCase):
                 )  # combine the attention mask and causal mask
             else:
                 attention_mask = torch.ones(batch_size, first_seq_len, dtype=torch.long)
-                inputs_embeds = torch.rand(batch_size, first_seq_len, head_num * head_size, dtype=torch.float32)
+                inputs_embeds = torch.rand(
+                    batch_size, first_seq_len, head_num * head_size, dtype=torch.float32
+                )
                 attention_mask = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
                     attention_mask,
                     inputs_embeds,
@@ -314,8 +320,12 @@ class MaskedMHATest(TestCase):
                     beam_size * batch_size, 1, 1, offset + 1, dtype=torch.float32
                 )
             else:
-                attention_mask = torch.ones(beam_size * batch_size, offset, dtype=torch.long)
-                inputs_embeds = torch.rand(beam_size * batch_size, 1, head_num * head_size, dtype=torch.float32)
+                attention_mask = torch.ones(
+                    beam_size * batch_size, offset, dtype=torch.long
+                )
+                inputs_embeds = torch.rand(
+                    beam_size * batch_size, 1, head_num * head_size, dtype=torch.float32
+                )
                 attention_mask = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
                     attention_mask,
                     inputs_embeds,
@@ -364,14 +374,23 @@ class MaskedMHATest(TestCase):
             if sw is None:
                 attention_mask_bf16 = attention_mask.bfloat16()
             else:
-                attention_mask_bf16 = torch.ones(beam_size * batch_size, offset, dtype=torch.long)
-                inputs_embeds = torch.rand(beam_size * batch_size, 1, head_num * head_size, dtype=torch.bfloat16)
-                attention_mask_bf16 = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
-                    attention_mask_bf16,
-                    inputs_embeds,
-                    torch.tensor(offset).contiguous(),
-                    torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
-                    sw,
+                attention_mask_bf16 = torch.ones(
+                    beam_size * batch_size, offset, dtype=torch.long
+                )
+                inputs_embeds = torch.rand(
+                    beam_size * batch_size,
+                    1,
+                    head_num * head_size,
+                    dtype=torch.bfloat16,
+                )
+                attention_mask_bf16 = (
+                    torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
+                        attention_mask_bf16,
+                        inputs_embeds,
+                        torch.tensor(offset).contiguous(),
+                        torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
+                        sw,
+                    )
                 )
             with torch.inference_mode(), torch.no_grad(), torch.autocast(
                 device_type="cpu",
@@ -445,8 +464,12 @@ class MaskedMHATest(TestCase):
                     beam_size * batch_size, 1, 1, offset + 1, dtype=torch.float32
                 )
             else:
-                attention_mask = torch.ones(beam_size * batch_size, offset, dtype=torch.long)
-                inputs_embeds = torch.rand(beam_size * batch_size, 1, head_num * head_size, dtype=torch.float32)
+                attention_mask = torch.ones(
+                    beam_size * batch_size, offset, dtype=torch.long
+                )
+                inputs_embeds = torch.rand(
+                    beam_size * batch_size, 1, head_num * head_size, dtype=torch.float32
+                )
                 attention_mask = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
                     attention_mask,
                     inputs_embeds,
@@ -495,14 +518,23 @@ class MaskedMHATest(TestCase):
             if sw is None:
                 attention_mask_bf16 = attention_mask.bfloat16()
             else:
-                attention_mask_bf16 = torch.ones(beam_size * batch_size, offset, dtype=torch.long)
-                inputs_embeds = torch.rand(beam_size * batch_size, 1, head_num * head_size, dtype=torch.bfloat16)
-                attention_mask_bf16 = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
-                    attention_mask_bf16,
-                    inputs_embeds,
-                    torch.tensor(offset).contiguous(),
-                    torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
-                    sw,
+                attention_mask_bf16 = torch.ones(
+                    beam_size * batch_size, offset, dtype=torch.long
+                )
+                inputs_embeds = torch.rand(
+                    beam_size * batch_size,
+                    1,
+                    head_num * head_size,
+                    dtype=torch.bfloat16,
+                )
+                attention_mask_bf16 = (
+                    torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
+                        attention_mask_bf16,
+                        inputs_embeds,
+                        torch.tensor(offset).contiguous(),
+                        torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
+                        sw,
+                    )
                 )
             with torch.inference_mode(), torch.no_grad(), torch.autocast(
                 device_type="cpu",

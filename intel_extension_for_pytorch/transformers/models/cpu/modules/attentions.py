@@ -42,9 +42,9 @@ class _IPEXAttentionCPU(nn.Module):
                     if "type" in config.rope_scaling:
                         extra_inputs["type"] = config.rope_scaling["type"]
                 if hasattr(config, "original_max_position_embeddings"):
-                    extra_inputs[
-                        "original_max_position_embeddings"
-                    ] = config.original_max_position_embeddings
+                    extra_inputs["original_max_position_embeddings"] = (
+                        config.original_max_position_embeddings
+                    )
                 self._IPEXROPE = _IPEXRopeCPU(
                     self.max_position_embeddings,
                     self.pos_embd_dim,
