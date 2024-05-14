@@ -1,10 +1,11 @@
 import torch
 import intel_extension_for_pytorch  # noqa
 
-from torch.testing._internal.common_utils import TestCase
+from torch.testing._internal.common_utils import TestCase, set_default_dtype
 import contextlib
 from torch import nn
 import numpy as np
+import pytest
 
 
 class TestTorchMethod(TestCase):
@@ -232,6 +233,10 @@ class TestTorchMethod(TestCase):
                         batch_first=batch_first, training=training, atol=atol, rtol=rtol
                     )
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    @set_default_dtype(torch.double)
     def test_transformerdecoderlayer(self):
         d_model = 4
         nhead = 2
