@@ -2011,6 +2011,7 @@ def _Phi3Attention_forward(
         past_key_value,
         None,
         attention_mask,
+        add_casual_mask=False,
     )
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
