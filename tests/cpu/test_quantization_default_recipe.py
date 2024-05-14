@@ -723,7 +723,7 @@ class WeightOnlyQuantizationTester(TestCase):
             [9, 4095, 4095],
             [9, 4096, 4096],
             [196, 4095, 16383],
-            [1024, 512, 512],
+            [192, 4096, 16384],
         ]
         use_bias_list = [True, False]
         cases = itertools.product(shape_list, use_bias_list)
@@ -738,6 +738,15 @@ class WeightOnlyQuantizationTester(TestCase):
 
             def forward(self, x):
                 return self.linear(x)
+
+        def tpp_is_used(N, K):
+            num_threads = torch.get_num_threads()
+            block_n = 32 if N // 64 // num_threads < 4 else 64
+            block_k = 64
+            while K % block_k != 0:
+                block_k //= 2
+                assert block_k > 0
+            return N % block_n == 0 and K % block_k == 0
 
         def test(feature, has_bias, w_dtype):
             model = M(feature[1], feature[2], has_bias)
@@ -754,51 +763,33 @@ class WeightOnlyQuantizationTester(TestCase):
                 weight_int8, w_scales, w_zero_points = quantize_per_channel(
                     weight, w_dtype
                 )
+                weight_fp32 = dequantize_per_channel(
+                    weight_int8, w_scales, w_zero_points.int(), w_dtype, weight.shape
+                )
+                weight_bf16 = weight_fp32.bfloat16()
+                weight_fp16 = weight_fp32.half()
                 data_bf16 = data.bfloat16()
                 data_fp16 = data_bf16.half()
                 bias_fp32 = m.linear.bias
                 # if M >= 32, compute in bf16
                 # if M < 32, compute in fp32 or fp16. Depends on fp16 support.
                 if feature[0] >= 32:
-                    weight_bf16 = dequantize_per_channel(
-                        weight_int8,
-                        w_scales.bfloat16(),
-                        w_zero_points.bfloat16(),
-                        w_dtype,
-                        weight.shape,
-                    ).bfloat16()
                     output1 = torch.matmul(
                         data_bf16.float(), weight_bf16.float().T
-                    ).float()
-                    if has_bias:
-                        output1 = output1 + bias_fp32
-                    output1 = output1.bfloat16()
-                    # For reference kernel
-                    weight_bf16_ref = dequantize_per_channel(
-                        weight_int8,
-                        w_scales.float(),
-                        w_zero_points.float(),
-                        w_dtype,
-                        weight.shape,
                     ).bfloat16()
-                    output1_ref = torch.matmul(data_bf16, weight_bf16_ref.T)
                     if has_bias:
-                        output1_ref = output1_ref + bias_fp32.bfloat16()
-                    output1_ref = output1_ref.bfloat16()
+                        output1 = output1 + bias_fp32.bfloat16()
                 else:
-                    weight_fp16 = dequantize_per_channel(
-                        weight_int8,
-                        w_scales.half(),
-                        w_zero_points.half(),
-                        w_dtype,
-                        weight.shape,
+                    output1_fp32 = torch.matmul(
+                        data_bf16.float(), weight_bf16.float().T
                     )
+                    if has_bias:
+                        output1_fp32 = output1_fp32 + bias_fp32
                     output1_fp16 = torch.matmul(
                         data_fp16.float(), weight_fp16.float().T
                     ).half()
                     if has_bias:
                         output1_fp16 = output1_fp16 + bias_fp32.half()
-                    output1_fp16 = output1_fp16.bfloat16()
                 with torch.autocast(
                     device_type="cpu", enabled=True, dtype=torch.bfloat16
                 ):
@@ -813,22 +804,22 @@ class WeightOnlyQuantizationTester(TestCase):
                     output2 = woq_model(data)
                     output2 = output2.bfloat16()
                 if feature[0] < 32:
-                    torch.testing.assert_close(
-                        output1_fp16, output2, atol=0.01, rtol=0.1
-                    )
-                else:
-                    # Use try...except to handle numeric differences between optimized and ref kernels
                     try:
-                        torch.testing.assert_close(output1, output2)
-                    except Exception:
-                        torch.testing.assert_close(output1_ref, output2)
+                        torch.testing.assert_close(
+                            output1_fp32.bfloat16(), output2, atol=0.01, rtol=0.1
+                        )
+                    except Exception as e:
+                        torch.testing.assert_close(
+                            output1_fp16.bfloat16(), output2, atol=0.01, rtol=0.1
+                        )
+                else:
+                    torch.testing.assert_close(output1, output2)
 
         shape_list = [
             [3, 31, 31],
             [4, 64, 64],
             [9, 128, 128],
             [196, 63, 255],
-            [1024, 512, 512],
         ]
         use_bias_list = [True, False]
         w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
@@ -848,7 +839,6 @@ class WeightOnlyQuantizationTester(TestCase):
         shape_list = [
             [2, 24, 24],
             [8, 64, 64],
-            [1024, 512, 512],
         ]
         use_bias_list = [True, False]
         w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
@@ -911,7 +901,6 @@ class WeightOnlyQuantizationTester(TestCase):
             [4, 4096, 4096],
             [9, 4095, 4095],
             [196, 4095, 16383],
-            [1024, 512, 512],
         ]
         use_bias_list = [True, False]
         w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
@@ -969,7 +958,6 @@ class WeightOnlyQuantizationTester(TestCase):
             [4, 4096, 4095],
             [9, 4095, 4095],
             [196, 4095, 16383],
-            [1024, 512, 512],
         ]
         use_bias_list = [True, False]
         cases = itertools.product(shape_list, use_bias_list)
@@ -1026,7 +1014,6 @@ class WeightOnlyQuantizationTester(TestCase):
             [4, 4096, 4095],
             [9, 4095, 4095],
             [196, 4095, 4095],
-            [1024, 512, 512],
         ]
         use_bias_list = [True, False]
         cases = itertools.product(shape_list, use_bias_list)
@@ -1045,14 +1032,13 @@ class WeightOnlyQuantizationTester(TestCase):
 
         bias_list = [False, True]
         bf16_list = [False, True]
-        batch_size_list = [4, 1024]
-        cases = itertools.product(bias_list, bf16_list, batch_size_list)
-        for bias, bf16, bs in cases:
+        cases = itertools.product(bias_list, bf16_list)
+        for bias, bf16 in cases:
             with torch.cpu.amp.autocast(
                 enabled=bf16, dtype=torch.bfloat16 if bf16 else None
             ):
                 model = Mod(bias).eval()
-                data = torch.rand(bs, 64)
+                data = torch.rand(4, 64)
                 qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                     lowp_mode=2
                 )
@@ -1081,14 +1067,13 @@ class WeightOnlyQuantizationTester(TestCase):
 
         bias_list = [False, True]
         bf16_list = [False, True]
-        batch_size_list = [4, 1024]
-        cases = itertools.product(bias_list, bf16_list, batch_size_list)
-        for bias, bf16, bs in cases:
+        cases = itertools.product(bias_list, bf16_list)
+        for bias, bf16 in cases:
             with torch.cpu.amp.autocast(
                 enabled=bf16, dtype=torch.bfloat16 if bf16 else None
             ):
                 model = Mod(bias).eval()
-                data = torch.rand(bs, 64)
+                data = torch.rand(4, 64)
                 qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                     lowp_mode=2
                 )
@@ -1120,17 +1105,14 @@ class WeightOnlyQuantizationTester(TestCase):
         bias_list = [False, True]
         bf16_list = [False, True]
         others_len_list = [1, 2]
-        batch_size_list = [4, 1024]
-        cases = itertools.product(
-            bias_list, bf16_list, others_len_list, batch_size_list
-        )
-        for bias, bf16, others_len, bs in cases:
+        cases = itertools.product(bias_list, bf16_list, others_len_list)
+        for bias, bf16, others_len in cases:
             with torch.cpu.amp.autocast(
                 enabled=bf16, dtype=torch.bfloat16 if bf16 else None
             ):
                 model = Mod(bias).eval()
-                data = torch.rand(bs, 64)
-                others = [torch.rand(bs, 64)] * others_len
+                data = torch.rand(4, 64)
+                others = [torch.rand(4, 64)] * others_len
                 fused_op = (
                     torch.ops.torch_ipex.woq_linear_add
                     if others_len == 1
@@ -1195,13 +1177,14 @@ class WeightOnlyQuantizationTester(TestCase):
             def forward(self, x):
                 return self.linear(x)
 
+        # When lowp_mode=BF16, only case of batch size >= 32 uses BF16.
+        data = torch.rand(32, 64)
         m = M()
 
         lowp_mode_list = [WoqLowpMode.NONE, WoqLowpMode.FP16, WoqLowpMode.BF16]
         act_dtype_list = [torch.bfloat16, torch.half]
         compute_dtype_list = [None, torch.half, torch.bfloat16]
-        batch_size_list = [4, 1024]
-        cases = itertools.product(lowp_mode_list, act_dtype_list, batch_size_list)
+        cases = itertools.product(lowp_mode_list, act_dtype_list)
         # lowp_mode does not affect weight observer for int8
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping()
         weight = copy.deepcopy(m.linear.weight)
@@ -1209,11 +1192,7 @@ class WeightOnlyQuantizationTester(TestCase):
         weight_int8, w_scales, w_zps = quantize_per_channel(weight, w_dtype)
         weight_fp32 = dequantize_per_channel(weight_int8, w_scales, w_zps, w_dtype)
         bias_fp32 = copy.deepcopy(m.linear.bias)
-        for lowp_mode, act_dtype, bs in cases:
-            # When lowp_mode=BF16, only case of batch size >= 32 uses BF16.
-            if lowp_mode == WoqLowpMode.BF16 and bs < 32:
-                continue
-            data = torch.rand(bs, 64)
+        for lowp_mode, act_dtype in cases:
             if lowp_mode == WoqLowpMode.NONE:
                 compute_dtype_list[0] = act_dtype
             compute_dtype = compute_dtype_list[int(lowp_mode)]
@@ -1313,6 +1292,8 @@ class WeightOnlyQuantizationTester(TestCase):
             return out
 
     def test_weight_only_quantization_act_quant_mode(self):
+        M, N, K = 4, 64, 128
+        groupsize = 64
 
         class Mod(nn.Module):
             def __init__(self, has_bias):
@@ -1322,7 +1303,7 @@ class WeightOnlyQuantizationTester(TestCase):
             def forward(self, x):
                 return self.linear(x)
 
-        def test(has_bias, act_quant_mode, M):
+        def test(has_bias, act_quant_mode):
             dtype = torch.bfloat16
             model = Mod(has_bias)
             m = model.eval()
@@ -1368,14 +1349,11 @@ class WeightOnlyQuantizationTester(TestCase):
                     y_ref = y_ref.to(dtype)
                     torch.testing.assert_close(y, y_ref, atol=1e-2, rtol=1e-1)
 
-        N, K = 64, 512
-        groupsize = 64
         has_bias_list = [False, True]
         quant_mode_list = [0, 1, 2, 3]
-        batch_size_list = [4, 1024]
-        cases = itertools.product(has_bias_list, quant_mode_list, batch_size_list)
-        for has_bias, quant_mode, M in cases:
-            test(has_bias, quant_mode, M)
+        cases = itertools.product(has_bias_list, quant_mode_list)
+        for has_bias, quant_mode in cases:
+            test(has_bias, quant_mode)
 
     def test_weight_only_quantization_group_size(self):
         class Mod(nn.Module):

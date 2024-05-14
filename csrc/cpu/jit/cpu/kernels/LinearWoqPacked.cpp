@@ -275,7 +275,7 @@ static at::Tensor _shuffle_input_channels_if_needed(
     auto& g_idx = context.g_idx_.value();
     auto K = input.size(-1);
     std::vector<int64_t> input_shape = {input.numel() / K, K};
-    return woq_shuffle_tensor_by_group_idx</* is_4bit */ false>(
+    return woq_shuffle_tensor_by_group_idx(
         input, input_shape, g_idx, context.group_size_);
   }
   return input;
