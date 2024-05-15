@@ -553,9 +553,19 @@ scale_dot_product_for_indirect_access_kv_cache(
   auto attn_out_ptr = attn_outs.data_ptr<VT>();
   // torch_ipex::cpu::kernel::zero_ker(attn_out_ptr, attn_outs.numel());
   auto attn_w_ptr = attn_weights.data_ptr<float>();
-  long new_beam_idx[beam_batch][offset + query.size(1) + 1];
+
+  auto thread_numbers = omp_get_max_threads();
+  auto max_parallel_parts = thread_numbers * 4;
+
+  auto kv_block_size = bs * head_num >= max_parallel_parts
+      ? seq_len
+      : std::max(seq_len / max_parallel_parts, 1L);
+  kv_block_size = std::min(kv_block_size, 32L);
+  auto kv_block_count = (seq_len + kv_block_size - 1) / kv_block_size;
+  auto need_update_beam_idx = offset > 0 and bs > 1;
   auto b_ptr = beam_idx.data_ptr<long>();
-  if (offset > 0) {
+  long new_beam_idx[beam_batch][offset + query.size(1) + 1];
+  if (need_update_beam_idx) {
     // according to the last decoded token to get the target beam for the past
     // token
     for (int i = 0; i < bs; i++) {
@@ -570,49 +580,42 @@ scale_dot_product_for_indirect_access_kv_cache(
     RECORD_FUNCTION(
         "ipex::iakv_sdp::matmul(query, key)", c10::ArrayRef<c10::IValue>({}));
 #pragma omp parallel for collapse(3)
-    for (auto ti = 0; ti < seq_len; ti++) {
+    for (auto block_id = 0; block_id < kv_block_count; block_id++) {
       for (auto bi = 0; bi < bs; bi++) {
         for (auto hi = 0; hi < head_num; hi++) {
-          for (auto query_ti = 0; query_ti < cur_len; query_ti++) {
-            auto kv_hi = hi / group_size; // maping the query head to key/value
-                                          // head to support MGA/MQA
-            auto q_ptr_start = q_ptr +
-                (bi * cur_len + query_ti) * head_num * head_size +
-                hi * head_size;
-            auto attn_w_stride = (bi * head_num + hi) * cur_len * seq_len;
-            auto attn_w_pos =
-                attn_w_ptr + attn_w_stride + query_ti * seq_len + ti;
-            attn_w_pos[0] = 0.0f;
-            auto kc_token_start = ti * kc_token_stride;
-            auto kc_t_beam_start = kc_token_start;
-            if (ti > query_ti + offset) { // only caculate the innerproduct for
-                                          // the past token and current token
-              attn_w_pos[0] = -10000.0f;
-            } else if (ti == query_ti + offset) { // caculate the innerproduct
-                                                  // for the current token and
-                                                  // store the key
-              if (cur_len > 1) { // this may occur for processing the promt
-                auto beam_size = beam_batch / bs;
-                // need to store key accross beam
-                kc_t_beam_start =
-                    kc_t_beam_start + bi * beam_size * kv_head * head_size;
-              } else {
-                kc_t_beam_start = kc_t_beam_start + bi * kv_head * head_size;
-              }
-              auto kc_head_start =
-                  k_cache_ptr + kc_t_beam_start + kv_hi * head_size;
-              auto k_ptr_start = k_ptr +
-                  (bi * cur_len + ti - offset) * kv_head * head_size +
-                  kv_hi * head_size;
-              reduce_head<QT>(
-                  q_ptr_start,
-                  k_ptr_start,
-                  attn_w_pos,
-                  head_size,
-                  true,
-                  kc_head_start);
-            } else { // caculate the innerproduct for the past token
-              if (ti >= offset) {
+          auto k_start = block_id * kv_block_size;
+          auto block_size = std::min(kv_block_size, seq_len - k_start);
+          for (auto ti = k_start; ti < k_start + block_size; ti++) {
+            for (auto query_ti = 0; query_ti < cur_len; query_ti++) {
+              auto kv_hi = hi / group_size; // maping the query head to
+                                            // key/value head to support MGA/MQA
+              auto q_ptr_start = q_ptr +
+                  (bi * cur_len + query_ti) * head_num * head_size +
+                  hi * head_size;
+              auto attn_w_stride = (bi * head_num + hi) * cur_len * seq_len;
+              auto attn_w_pos =
+                  attn_w_ptr + attn_w_stride + query_ti * seq_len + ti;
+              attn_w_pos[0] = 0.0f;
+              auto kc_token_start = ti * kc_token_stride;
+              auto kc_t_beam_start = kc_token_start;
+              auto beam = need_update_beam_idx ? new_beam_idx[bi][ti] : 0;
+              if (ti >
+                  query_ti + offset) { // only caculate the innerproduct for
+                                       // the past token and current token
+                attn_w_pos[0] = -10000.0f;
+              } else if (ti == query_ti + offset) { // caculate the innerproduct
+                                                    // for the current token and
+                                                    // store the key
+                if (cur_len > 1) { // this may occur for processing the promt
+                  auto beam_size = beam_batch / bs;
+                  // need to store key accross beam
+                  kc_t_beam_start =
+                      kc_t_beam_start + bi * beam_size * kv_head * head_size;
+                } else {
+                  kc_t_beam_start = kc_t_beam_start + bi * kv_head * head_size;
+                }
+                auto kc_head_start =
+                    k_cache_ptr + kc_t_beam_start + kv_hi * head_size;
                 auto k_ptr_start = k_ptr +
                     (bi * cur_len + ti - offset) * kv_head * head_size +
                     kv_hi * head_size;
@@ -621,25 +624,38 @@ scale_dot_product_for_indirect_access_kv_cache(
                     k_ptr_start,
                     attn_w_pos,
                     head_size,
-                    false,
-                    nullptr);
-              } else {
-                kc_t_beam_start = kc_t_beam_start +
-                    new_beam_idx[bi][ti] * kv_head * head_size;
-                if (cur_len > 1) {
-                  auto beam_size = beam_batch / bs;
+                    true,
+                    kc_head_start);
+              } else { // caculate the innerproduct for the past token
+                if (ti >= offset) {
+                  auto k_ptr_start = k_ptr +
+                      (bi * cur_len + ti - offset) * kv_head * head_size +
+                      kv_hi * head_size;
+                  reduce_head<QT>(
+                      q_ptr_start,
+                      k_ptr_start,
+                      attn_w_pos,
+                      head_size,
+                      false,
+                      nullptr);
+                } else {
                   kc_t_beam_start =
-                      kc_t_beam_start + bi * beam_size * kv_head * head_size;
+                      kc_t_beam_start + beam * kv_head * head_size;
+                  if (cur_len > 1) {
+                    auto beam_size = beam_batch / bs;
+                    kc_t_beam_start =
+                        kc_t_beam_start + bi * beam_size * kv_head * head_size;
+                  }
+                  auto kc_head_start =
+                      k_cache_ptr + kc_t_beam_start + kv_hi * head_size;
+                  reduce_head<QT>(
+                      q_ptr_start,
+                      kc_head_start,
+                      attn_w_pos,
+                      head_size,
+                      false,
+                      nullptr);
                 }
-                auto kc_head_start =
-                    k_cache_ptr + kc_t_beam_start + kv_hi * head_size;
-                reduce_head<QT>(
-                    q_ptr_start,
-                    kc_head_start,
-                    attn_w_pos,
-                    head_size,
-                    false,
-                    nullptr);
               }
             }
           }
@@ -705,7 +721,6 @@ scale_dot_product_for_indirect_access_kv_cache(
       }
     }
   }
-  auto thread_numbers = omp_get_max_threads();
   auto private_attn_outs =
       at::empty({thread_numbers, bs, head_num, cur_len, head_size}, at::kFloat);
   auto private_attn_out_flag =
@@ -719,53 +734,44 @@ scale_dot_product_for_indirect_access_kv_cache(
         "ipex::iakv_sdp::matmul(attn_w, value)",
         c10::ArrayRef<c10::IValue>({}));
 #pragma omp parallel for collapse(3)
-    for (auto vi = 0; vi < seq_len; vi++) {
+    for (auto block_id = 0; block_id < kv_block_count; block_id++) {
       for (auto bi = 0; bi < bs; bi++) {
         for (auto hi = 0; hi < head_num; hi++) {
-          auto thread_id = omp_get_thread_num();
-          for (auto query_ti = 0; query_ti < cur_len; query_ti++) {
-            auto kv_hi = hi / group_size; // maping the query head to key/value
-                                          // head to support MGA/MQA
-            auto attn_w_stride = (bi * head_num + hi) * cur_len * seq_len;
-            auto attn_w_query_start =
-                attn_w_ptr + attn_w_stride + query_ti * seq_len;
-            // calculate weighted value and store the result to attn_outs[bs,
-            // head_num, cur_len, head_size]
-            auto attn_out_head_stride = thread_id * attn_outs_stride_priv +
-                (bi * head_num + hi) * cur_len * head_size;
-            auto attn_out_start = private_attn_out_ptr + attn_out_head_stride +
-                query_ti * head_size;
+          auto thread_id = 0;
+          if (kv_block_size < seq_len)
+            thread_id = omp_get_thread_num();
+          auto v_start = block_id * kv_block_size;
+          auto block_size = std::min(kv_block_size, seq_len - v_start);
+          for (auto vi = v_start; vi < v_start + block_size; vi++) {
+            for (auto query_ti = 0; query_ti < cur_len; query_ti++) {
+              auto kv_hi = hi / group_size; // maping the query head to
+                                            // key/value head to support MGA/MQA
+              auto attn_w_stride = (bi * head_num + hi) * cur_len * seq_len;
+              auto attn_w_query_start =
+                  attn_w_ptr + attn_w_stride + query_ti * seq_len;
+              // calculate weighted value and store the result to attn_outs[bs,
+              // head_num, cur_len, head_size]
+              auto attn_out_head_stride = thread_id * attn_outs_stride_priv +
+                  (bi * head_num + hi) * cur_len * head_size;
+              auto attn_out_start = private_attn_out_ptr +
+                  attn_out_head_stride + query_ti * head_size;
 
-            auto vc_token_start = vi * kc_token_stride;
-            if (vi == query_ti + offset) { // caculate the attention values
-                                           // for the current token
-              auto vc_t_beam_start = vc_token_start;
-              if (cur_len > 1) { // this may occur for processing the promt
-                auto beam_size = beam_batch / bs;
-                // removed the redundant computation, need to store key accross
-                // beam
-                vc_t_beam_start =
-                    vc_t_beam_start + bi * beam_size * kv_head * head_size;
-              } else {
-                vc_t_beam_start = vc_t_beam_start + bi * kv_head * head_size;
-              }
-              auto v_cache_head_start =
-                  v_cache_ptr + vc_t_beam_start + kv_hi * head_size;
-              auto v_ptr_start = v_ptr +
-                  (bi * cur_len + vi - offset) * kv_head * head_size +
-                  kv_hi * head_size;
-              mul_attenion_weights_and_value_of_head<VT, float>(
-                  attn_w_query_start[vi],
-                  v_ptr_start,
-                  attn_out_start,
-                  head_size,
-                  true,
-                  v_cache_head_start,
-                  flag_access[thread_id][bi][hi]);
-            } else if (vi < query_ti + offset) { // caculate attention
-                                                 // values for the past
-                                                 // token
-              if (vi >= offset) {
+              auto vc_token_start = vi * kc_token_stride;
+              auto beam = need_update_beam_idx ? new_beam_idx[bi][vi] : 0;
+              if (vi == query_ti + offset) { // caculate the attention values
+                                             // for the current token
+                auto vc_t_beam_start = vc_token_start;
+                if (cur_len > 1) { // this may occur for processing the promt
+                  auto beam_size = beam_batch / bs;
+                  // removed the redundant computation, need to store key
+                  // accross beam
+                  vc_t_beam_start =
+                      vc_t_beam_start + bi * beam_size * kv_head * head_size;
+                } else {
+                  vc_t_beam_start = vc_t_beam_start + bi * kv_head * head_size;
+                }
+                auto v_cache_head_start =
+                    v_cache_ptr + vc_t_beam_start + kv_hi * head_size;
                 auto v_ptr_start = v_ptr +
                     (bi * cur_len + vi - offset) * kv_head * head_size +
                     kv_hi * head_size;
@@ -774,32 +780,48 @@ scale_dot_product_for_indirect_access_kv_cache(
                     v_ptr_start,
                     attn_out_start,
                     head_size,
-                    false,
-                    nullptr,
-                    flag_access[thread_id][bi][hi]);
-              } else {
-                auto vc_t_beam_start =
-                    vc_token_start + new_beam_idx[bi][vi] * kv_head * head_size;
-                if (cur_len > 1) {
-                  auto beam_size = beam_batch / bs;
-                  vc_t_beam_start =
-                      vc_t_beam_start + bi * beam_size * kv_head * head_size;
-                }
-                auto v_cache_head_start =
-                    v_cache_ptr + vc_t_beam_start + kv_hi * head_size;
-                mul_attenion_weights_and_value_of_head<VT, float>(
-                    attn_w_query_start[vi],
+                    true,
                     v_cache_head_start,
-                    attn_out_start,
-                    head_size,
-                    false,
-                    nullptr,
                     flag_access[thread_id][bi][hi]);
+              } else if (vi < query_ti + offset) { // caculate attention
+                                                   // values for the past
+                                                   // token
+                if (vi >= offset) {
+                  auto v_ptr_start = v_ptr +
+                      (bi * cur_len + vi - offset) * kv_head * head_size +
+                      kv_hi * head_size;
+                  mul_attenion_weights_and_value_of_head<VT, float>(
+                      attn_w_query_start[vi],
+                      v_ptr_start,
+                      attn_out_start,
+                      head_size,
+                      false,
+                      nullptr,
+                      flag_access[thread_id][bi][hi]);
+                } else {
+                  auto vc_t_beam_start =
+                      vc_token_start + beam * kv_head * head_size;
+                  if (cur_len > 1) {
+                    auto beam_size = beam_batch / bs;
+                    vc_t_beam_start =
+                        vc_t_beam_start + bi * beam_size * kv_head * head_size;
+                  }
+                  auto v_cache_head_start =
+                      v_cache_ptr + vc_t_beam_start + kv_hi * head_size;
+                  mul_attenion_weights_and_value_of_head<VT, float>(
+                      attn_w_query_start[vi],
+                      v_cache_head_start,
+                      attn_out_start,
+                      head_size,
+                      false,
+                      nullptr,
+                      flag_access[thread_id][bi][hi]);
+                }
               }
+              if (flag_access[thread_id][bi][hi] == 0)
+                flag_access[thread_id][bi][hi] = 1;
             }
           }
-          if (flag_access[thread_id][bi][hi] == 0)
-            flag_access[thread_id][bi][hi] = 1;
         }
       }
     }
@@ -817,17 +839,20 @@ scale_dot_product_for_indirect_access_kv_cache(
           if (flag_access[0][bi][hi] == 0) {
             torch_ipex::cpu::kernel::zero_ker(thr0_head_start, head_size);
           }
-          for (auto thread_id = 1; thread_id < thread_numbers; thread_id++) {
-            if (flag_access[thread_id][bi][hi] == 0) {
-              continue;
+          if (kv_block_size < seq_len) {
+            for (auto thread_id = 1; thread_id < thread_numbers; thread_id++) {
+              if (flag_access[thread_id][bi][hi] == 0) {
+                continue;
+              }
+              auto attn_out_head_stride = thread_id * attn_outs_stride_priv +
+                  (bi * head_num + hi) * cur_len * head_size;
+              auto private_attn_out_start =
+                  private_attn_out_ptr + attn_out_head_stride + qi * head_size;
+              torch_ipex::cpu::kernel::add_ker<float, float>(
+                  thr0_head_start, private_attn_out_start, head_size);
             }
-            auto attn_out_head_stride = thread_id * attn_outs_stride_priv +
-                (bi * head_num + hi) * cur_len * head_size;
-            auto private_attn_out_start =
-                private_attn_out_ptr + attn_out_head_stride + qi * head_size;
-            torch_ipex::cpu::kernel::add_ker<float, float>(
-                thr0_head_start, private_attn_out_start, head_size);
           }
+
           auto attn_outs_start = attn_out_ptr +
               (bi * head_num + hi) * cur_len * head_size + qi * head_size;
           torch_ipex::cpu::kernel::move_ker<VT, float>(
@@ -887,7 +912,8 @@ scale_dot_product_for_indirect_access_kv_cache_half(
   auto attn_w_ptr = attn_weights.data_ptr<at::Half>();
   long new_beam_idx[beam_batch][offset + query.size(1) + 1];
   auto b_ptr = beam_idx.data_ptr<long>();
-  if (offset > 0) {
+  auto need_update_beam_idx = offset > 0 && bs > 1;
+  if (need_update_beam_idx) {
     // according to the last decoded token to get the target beam for the past
     // token
     for (int i = 0; i < bs; i++) {
@@ -917,6 +943,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
             attn_w_pos[0] = 0.0f;
             auto kc_token_start = ti * kc_token_stride;
             auto kc_t_beam_start = kc_token_start;
+            auto beam = need_update_beam_idx ? new_beam_idx[bi][ti] : 0;
             if (ti > query_ti + offset) { // only caculate the innerproduct for
                                           // the past token and current token
               attn_w_pos[0] = -10000.0f;
@@ -956,8 +983,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                     false,
                     nullptr);
               } else {
-                kc_t_beam_start = kc_t_beam_start +
-                    new_beam_idx[bi][ti] * kv_head * head_size;
+                kc_t_beam_start = kc_t_beam_start + beam * kv_head * head_size;
                 if (cur_len > 1) {
                   auto beam_size = beam_batch / bs;
                   kc_t_beam_start =
@@ -1043,6 +1069,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                 query_ti * head_size;
 
             auto vc_token_start = vi * kc_token_stride;
+            auto beam = need_update_beam_idx ? new_beam_idx[bi][vi] : 0;
             if (vi == query_ti + offset) { // caculate the attention values
                                            // for the current token
               auto vc_t_beam_start = vc_token_start;
@@ -1085,7 +1112,7 @@ scale_dot_product_for_indirect_access_kv_cache_half(
                     flag_access[thread_id][bi][hi]);
               } else {
                 auto vc_t_beam_start =
-                    vc_token_start + new_beam_idx[bi][vi] * kv_head * head_size;
+                    vc_token_start + beam * kv_head * head_size;
                 if (cur_len > 1) {
                   auto beam_size = beam_batch / bs;
                   vc_t_beam_start =
@@ -1391,6 +1418,7 @@ masked_multihead_self_attention_kernel_impl(
         value.options());
     beam_idx = at::empty({max_positions, beam_batch}, beam_idx.options());
     auto beam_idx_access = beam_idx.accessor<long, 2>();
+#pragma omp parallel for collapse(2)
     for (auto i = 0; i < max_positions; i++) {
       for (auto j = 0; j < beam_batch; j++) {
         if (key.size(0) == beam_batch) {
@@ -1449,11 +1477,98 @@ masked_multihead_self_attention_kernel_impl(
         add_casual_mask.value_or(true));
   }
 }
+
+template <typename T>
+void attention_mask_2d_to_4d(
+    const T* attention_mask_ptr,
+    T* causal_4d_mask_ptr,
+    at::Tensor& finfo_min,
+    int64_t batch_size,
+    int64_t seq_length,
+    int64_t src_length,
+    int64_t past_key_value_length,
+    int64_t length,
+    int64_t diagonal) {
+  T finfo_min_val = finfo_min.item<T>();
+
+  for (int64_t b = 0; b < batch_size; ++b) {
+    for (int64_t l = 0; l < seq_length; ++l) {
+      for (int64_t c = 0; c < length; ++c) {
+        int64_t idx = b * seq_length * length + l * length + c;
+        int64_t mask_idx = l * length + c;
+        T value = finfo_min_val;
+        if (l + diagonal <= c && l + past_key_value_length >= c) {
+          value = 0;
+        }
+        if (c < src_length) {
+          T inverted_mask_value = 1.0 - attention_mask_ptr[b * src_length + c];
+          if (inverted_mask_value != 0) {
+            value = finfo_min_val;
+          }
+        }
+        causal_4d_mask_ptr[idx] = value;
+      }
+    }
+  }
+}
+
+at::Tensor prepare_4d_causal_attention_mask_kernel_impl(
+    at::Tensor& attention_mask,
+    at::Tensor& inputs_embeds,
+    at::Tensor& past_kv_len,
+    at::Tensor& finfo_min,
+    int64_t sliding_window) {
+  auto dtype = inputs_embeds.scalar_type();
+  int64_t batch_size = inputs_embeds.size(0);
+  int64_t seq_length = inputs_embeds.size(1);
+  int64_t src_length = attention_mask.size(-1);
+  int64_t past_key_value_length = past_kv_len.item<int64_t>();
+  int64_t length = seq_length + past_key_value_length;
+  int64_t diagonal = past_key_value_length - sliding_window + 1;
+
+  at::Tensor causal_4d_mask = torch::empty(
+      {batch_size, 1, seq_length, length}, inputs_embeds.options());
+  attention_mask = attention_mask.to(inputs_embeds.dtype());
+
+  if (dtype == at::kFloat) {
+    float* attention_mask_ptr = attention_mask.data_ptr<float>();
+    float* causal_4d_mask_ptr = causal_4d_mask.data_ptr<float>();
+    attention_mask_2d_to_4d<float>(
+        attention_mask_ptr,
+        causal_4d_mask_ptr,
+        finfo_min,
+        batch_size,
+        seq_length,
+        src_length,
+        past_key_value_length,
+        length,
+        diagonal);
+  } else if (dtype == at::kBFloat16) {
+    at::BFloat16* attention_mask_ptr = attention_mask.data_ptr<at::BFloat16>();
+    at::BFloat16* causal_4d_mask_ptr = causal_4d_mask.data_ptr<at::BFloat16>();
+    attention_mask_2d_to_4d<at::BFloat16>(
+        attention_mask_ptr,
+        causal_4d_mask_ptr,
+        finfo_min,
+        batch_size,
+        seq_length,
+        src_length,
+        past_key_value_length,
+        length,
+        diagonal);
+  }
+
+  return causal_4d_mask;
+}
 } // anonymous namespace
 
 IPEX_REGISTER_DISPATCH(
     masked_multihead_self_attention_kernel_stub,
     &masked_multihead_self_attention_kernel_impl);
+
+IPEX_REGISTER_DISPATCH(
+    prepare_4d_causal_attention_mask_kernel_stub,
+    &prepare_4d_causal_attention_mask_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

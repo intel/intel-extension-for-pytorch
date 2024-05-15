@@ -1966,6 +1966,16 @@ def _PhiAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
+    batch, slen, num_key_value_heads, head_dim = hidden_states.shape
+    if n_rep == 1:
+        return hidden_states
+    hidden_states = hidden_states[:, :, :, None, :].expand(
+        batch, slen, num_key_value_heads, n_rep, head_dim
+    )
+    return hidden_states.reshape(batch, slen, num_key_value_heads * n_rep, head_dim)
+
+
 def _Phi3Attention_forward(
     self,
     hidden_states: torch.Tensor,
@@ -1993,8 +2003,6 @@ def _Phi3Attention_forward(
     value_states = value_states.view(
         bsz, q_len, self.num_key_value_heads, self.head_dim
     )
-    key_states = _repeat_kv(key_states, self.num_key_value_groups)
-    value_states = _repeat_kv(value_states, self.num_key_value_groups)
     (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
         query_states,
         key_states,
@@ -2003,6 +2011,7 @@ def _Phi3Attention_forward(
         past_key_value,
         None,
         attention_mask,
+        add_casual_mask=False,
     )
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
@@ -2181,6 +2190,8 @@ class _IPEXAttentionRef(nn.Module):
                         ]
                     if "long_factor" in config.rope_scaling:
                         extra_inputs["long_factor"] = config.rope_scaling["long_factor"]
+                    if "type" in config.rope_scaling:
+                        extra_inputs["type"] = config.rope_scaling["type"]
                 if hasattr(config, "original_max_position_embeddings"):
                     extra_inputs["original_max_position_embeddings"] = (
                         config.original_max_position_embeddings

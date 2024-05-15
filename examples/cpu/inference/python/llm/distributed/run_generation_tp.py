@@ -382,8 +382,8 @@ if args.benchmark:
                 "[ERROR] model prompt is not supported, please use --prompt for this model: "
                 + args.model_id
             )
-        elif int(args.input_tokens) > 8192:
-            prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+        # elif int(args.input_tokens) > 8192:
+        #     prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
         elif args.input_tokens in prompt_pool[model_type]:
             prompt = prompt_pool[model_type][args.input_tokens]
         else:

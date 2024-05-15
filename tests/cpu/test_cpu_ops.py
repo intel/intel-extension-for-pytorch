@@ -1514,6 +1514,41 @@ class CPUOPsTester(TestCase):
         math_ref = torch._scaled_dot_product_attention_math(q2, k2, v2)[0]
         torch.testing.assert_close(actual, math_ref, atol=1e-5, rtol=5e-6)
 
+    def test_prepare_4d_causal_attention_mask(self):
+        for dtype in [torch.float32, torch.bfloat16]:
+            for sliding_window in [10, 40]:
+                for seq_len in [1, 32]:
+                    inputs_embeds = torch.rand((1, seq_len, 768), dtype=dtype)
+                    finfo_min = torch.finfo(dtype).min
+                    past_key_values_length = 0
+                    if seq_len == 1:
+                        past_key_values_length = 32
+                    attention_mask = torch.ones(
+                        (1, past_key_values_length + seq_len), dtype=torch.long
+                    )
+                    output = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
+                        attention_mask,
+                        inputs_embeds,
+                        torch.tensor(past_key_values_length).contiguous(),
+                        torch.tensor(finfo_min).contiguous(),
+                        sliding_window,
+                    )
+                    try:
+                        from transformers.modeling_attn_mask_utils import (
+                            _prepare_4d_causal_attention_mask,
+                        )
+
+                        output_ref = _prepare_4d_causal_attention_mask(
+                            attention_mask,
+                            (inputs_embeds.shape[0], inputs_embeds.shape[1]),
+                            inputs_embeds,
+                            past_key_values_length,
+                            sliding_window,
+                        )
+                        self.assertEqual(output, output_ref)
+                    except ImportError:
+                        pass
+
 
 if __name__ == "__main__":
     test = unittest.main()

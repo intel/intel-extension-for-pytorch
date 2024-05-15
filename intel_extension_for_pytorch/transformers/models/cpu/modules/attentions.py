@@ -39,6 +39,8 @@ class _IPEXAttentionCPU(nn.Module):
                         ]
                     if "long_factor" in config.rope_scaling:
                         extra_inputs["long_factor"] = config.rope_scaling["long_factor"]
+                    if "type" in config.rope_scaling:
+                        extra_inputs["type"] = config.rope_scaling["type"]
                 if hasattr(config, "original_max_position_embeddings"):
                     extra_inputs["original_max_position_embeddings"] = (
                         config.original_max_position_embeddings
