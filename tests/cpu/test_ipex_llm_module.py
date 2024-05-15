@@ -148,6 +148,44 @@ def apply(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor):
     return torch.cat([c, d], dim=-1)
 
 
+def add_rmsnorm(residual, x, weight, bias, eps, add_back):
+    orig_dtype = x.dtype
+    x = x.to(torch.float32)
+    x = residual + x
+    variance = x.pow(2).mean(dim=-1, keepdim=True)
+    out = x * torch.rsqrt(variance + eps)
+    out = out.to(orig_dtype) * weight
+    if add_back:
+        residual.copy_(x.to(orig_dtype))
+    return out
+
+
+def add_layernorm(residual, x, weight, bias, eps, add_back):
+    x = residual + x
+    out = torch.nn.functional.layer_norm(
+        x, [x.size(-1)], weight=weight, bias=bias, eps=eps
+    )
+    if add_back:
+        residual.copy_(x)
+    return out
+
+
+def silu_mul(x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None):
+    if out is None:
+        out = torch.empty_like(x)
+    out = torch.nn.functional.silu(x) * y
+    return out
+
+
+def gelu_mul(
+    x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None, approximate="none"
+):
+    if out is None:
+        out = torch.empty_like(x)
+    out = torch.nn.functional.gelu(x, approximate=approximate) * y
+    return out
+
+
 class TestLLMModules(TestCase):
     def test_linearfusion_args0(self):
         x1 = torch.rand(1, 4, 4096)
@@ -313,6 +351,69 @@ class TestLLMModules(TestCase):
 
             self.assertEqual(ipex_q, ref_q)
             self.assertEqual(ref_k, ipex_k)
+
+    def test_add_layernorm(self):
+        for add_back in [True, False]:
+            for dtype in [torch.float, torch.bfloat16]:
+                weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
+                eps = 1e-6
+                x = torch.rand(1, 32, 4096).to(dtype)
+                if add_back:
+                    target_residual = x + x
+                residual = x
+                x_ = copy.deepcopy(x)
+                residual_ = x_
+                ref_out = add_layernorm(residual_, x_, weight, None, eps, add_back)
+                ipex_out = ipex.llm.functional.add_layer_norm(
+                    residual, x, weight, None, eps, add_back
+                )
+                if add_back:
+                    self.assertEqual(residual, target_residual)
+                    self.assertEqual(residual_, target_residual)
+                else:
+                    self.assertEqual(residual, x)
+                    self.assertEqual(residual_, x)
+                self.assertEqual(ref_out, ipex_out)
+
+    def test_add_rmsnorm(self):
+        for add_back in [True, False]:
+            for dtype in [torch.float, torch.bfloat16]:
+                weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
+                eps = 1e-6
+                x = torch.rand(1, 32, 4096).to(dtype)
+                if add_back:
+                    target_residual = x + x
+                residual = x
+                x_ = copy.deepcopy(x)
+                residual_ = x_
+                ref_out = add_rmsnorm(residual_, x_, weight, None, eps, add_back)
+                ipex_out = ipex.llm.functional.add_rms_norm(
+                    residual, x, weight, None, eps, add_back
+                )
+                if add_back:
+                    self.assertEqual(residual, target_residual)
+                    self.assertEqual(residual_, target_residual)
+                else:
+                    self.assertEqual(residual, x)
+                    self.assertEqual(residual_, x)
+                self.assertEqual(ref_out, ipex_out)
+
+    def test_gelu_mul(self):
+        for dtype in [torch.float, torch.bfloat16]:
+            for approximate in ["tanh", "none"]:
+                x = torch.rand(1, 32, 4096).to(dtype)
+                x_ = copy.deepcopy(x)
+                ref_out = gelu_mul(x_, x_, approximate=approximate)
+                ipex_out = ipex.llm.functional.gelu_mul(x_, x_, approximate=approximate)
+                self.assertEqual(ref_out, ipex_out)
+
+    def test_silu_mul(self):
+        for dtype in [torch.float, torch.bfloat16]:
+            x = torch.rand(1, 32, 4096).to(dtype)
+            x_ = copy.deepcopy(x)
+            ref_out = silu_mul(x_, x_)
+            ipex_out = ipex.llm.functional.silu_mul(x_, x_)
+            self.assertEqual(ref_out, ipex_out)
 
 
 if __name__ == "__main__":

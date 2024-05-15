@@ -81,6 +81,16 @@ at::Tensor dil_add_layernorm(
     float eps,
     bool cuda_enable);
 
+// register as a python op
+at::Tensor add_layernorm(
+    const at::Tensor& a,
+    const at::Tensor& b,
+    int64_t alpha,
+    at::IntArrayRef normalized_shape,
+    const c10::optional<at::Tensor>& weight_opt,
+    const c10::optional<at::Tensor>& bias_opt,
+    double eps);
+
 namespace {
 
 at::Tensor add_layer_norm_kernel_impl(

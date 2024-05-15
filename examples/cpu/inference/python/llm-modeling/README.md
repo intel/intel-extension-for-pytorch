@@ -37,6 +37,10 @@ ipex.llm.functional.rms_norm
 ipex.llm.functional.fast_layer_norm
 ipex.llm.functional.indirect_access_kv_cache_attention
 ipex.llm.functional.varlen_attention
+ipex.llm.functional.add_layer_norm
+ipex.llm.functional.add_rms_norm
+ipex.llm.functional.silu_mul
+ipex.llm.functional.gelu_mul
 ```
 
 ## Generation related fusions
