@@ -376,7 +376,7 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         super().__init__()
 
     @classmethod
-    def apply_functions(
+    def apply_function(
         cls,
         query,  # [total_q, num_head, head_size]
         key,  # [total_k, num_head_k, head_size]
@@ -451,8 +451,8 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
             attn_mask=attn_mask if not is_causal else None,
             is_causal=is_causal,
         )
-        out.copy_(out_.transpose(1, 2).reshape(-1, out.shape[-2], out.shape[-1]))
-
+        out_ = out_.permute(0, 2, 1, 3)
+        out.copy_(out_[q_mask])
         return out
 
     def forward(
@@ -472,7 +472,7 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         return_softmax,
         gen_,
     ):
-        self.apply_function(
+        return self.apply_function(
             query,
             key,
             value,

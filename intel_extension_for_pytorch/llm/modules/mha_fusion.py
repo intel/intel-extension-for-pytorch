@@ -147,9 +147,14 @@ class RotaryEmbedding(nn.Module):
         runtime_module = cls.runtime_ops.get_module_from_device(
             query.device.type, IPEXCustomOpType.ROPE, False
         )
-        query, key = runtime_module.rotary_embedding(
+
+        query_, key_ = runtime_module.rotary_embedding(
             query, key, sin, cos, rotary_dim, rotary_half, position_ids
         )
+
+        # keep the inplace context as used in TGI
+        query.copy_(query_)
+        key.copy_(key_)
         return query, key
 
 
@@ -504,7 +509,13 @@ class PagedAttention:
     ):
         return cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
-        ).reshape_and_cache(key, value, key_cache, value_cache, slot_mapping)
+        ).reshape_and_cache(
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping.int() if slot_mapping.dtype is torch.long else slot_mapping,
+        )
 
     @classmethod
     def single_query_cached_kv_attention(

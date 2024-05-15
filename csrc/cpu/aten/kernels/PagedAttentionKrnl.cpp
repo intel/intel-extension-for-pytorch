@@ -117,9 +117,14 @@ void single_query_cached_kv_attention_kernel(
       {num_seqs, num_heads, max_context_len},
       query.options().dtype(at::ScalarType::Float));
   auto attn_weights_ptr = attn_weights.data_ptr<float>();
-  auto kv_block_stride = key_cache.stride(0);
-  auto q_stride = query.stride(0);
-  auto attn_weights_stride = attn_weights.stride(0);
+  auto kv_block_strideN = key_cache.stride(0);
+  auto kv_block_strideP = key_cache.stride(1);
+  auto kv_block_strideH = key_cache.stride(2);
+
+  auto q_strideN = query.stride(0);
+  auto q_strideH = query.stride(1);
+  auto attn_weights_strideN = attn_weights.stride(0);
+  auto attn_weights_strideH = attn_weights.stride(1);
 
   if (alibi_slopes.has_value()) {
     auto alibi_slopes_size = alibi_slopes.value().size(0);
@@ -135,15 +140,15 @@ void single_query_cached_kv_attention_kernel(
         auto context_len = context_lens_ptr[seq_id];
         if (token_id >= context_len)
           continue;
-        auto attn_w_pos = attn_weights_ptr + seq_id * attn_weights_stride +
-            head_id * max_context_len + token_id;
-        auto q_ptr_start = query_ptr + seq_id * q_stride + head_id * head_size;
+        auto attn_w_pos = attn_weights_ptr + seq_id * attn_weights_strideN +
+            head_id * attn_weights_strideH + token_id;
+        auto q_ptr_start = query_ptr + seq_id * q_strideN + head_id * q_strideH;
         auto block_id = block_tables_ptr
             [seq_id * max_num_blocks_per_seq + token_id / block_size];
         auto block_offset = token_id % block_size;
-        auto k_cache_start = key_cache_ptr + block_id * kv_block_stride +
-            block_offset * num_kv_heads * head_size +
-            head_mapping_ptr[head_id] * head_size;
+        auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
+            block_offset * kv_block_strideP +
+            head_mapping_ptr[head_id] * kv_block_strideH;
         reduce_head<scalar_t, scalar_t>(
             q_ptr_start, k_cache_start, attn_w_pos, head_size);
       }
@@ -157,8 +162,8 @@ void single_query_cached_kv_attention_kernel(
       auto max_val = -10000.0f;
       float sum = 0.0f;
       auto context_len = context_lens_ptr[seq_id];
-      auto attn_w_start = attn_weights_ptr + seq_id * attn_weights_stride +
-          head_id * max_context_len;
+      auto attn_w_start = attn_weights_ptr + seq_id * attn_weights_strideN +
+          head_id * attn_weights_strideH;
 #if defined(CPU_CAPABILITY_AVX512)
       if (alibi_slopes_ptr != nullptr) {
         auto alibi_slope = alibi_slopes_ptr[head_id];
@@ -221,7 +226,12 @@ void single_query_cached_kv_attention_kernel(
       at::zeros({thread_numbers, num_seqs, num_heads}, at::kByte);
   auto flag_access = private_attn_out_flag.accessor<uint8_t, 3>();
   auto private_attn_out_ptr = private_attn_outs.data_ptr<float>();
-  auto private_attn_out_stride = private_attn_outs.stride(0);
+  auto private_attn_out_strideT = private_attn_outs.stride(0);
+  auto private_attn_out_strideN = private_attn_outs.stride(1);
+  auto private_attn_out_strideH = private_attn_outs.stride(2);
+  auto attn_out_strideN = out.stride(0);
+  auto attn_out_strideH = out.stride(1);
+
 // mul and accumulate
 #pragma omp parallel for collapse(3)
   for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
@@ -232,17 +242,17 @@ void single_query_cached_kv_attention_kernel(
         if (token_id >= context_len)
           continue;
         auto attn_w = attn_weights_ptr
-            [seq_id * attn_weights_stride + head_id * max_context_len +
+            [seq_id * attn_weights_strideN + head_id * attn_weights_strideH +
              token_id];
         auto block_id = block_tables_ptr
             [seq_id * max_num_blocks_per_seq + token_id / block_size];
         auto block_offset = token_id % block_size;
-        auto v_cache_start = value_cache_ptr + block_id * kv_block_stride +
-            block_offset * num_kv_heads * head_size +
-            head_mapping_ptr[head_id] * head_size;
+        auto v_cache_start = value_cache_ptr + block_id * kv_block_strideN +
+            block_offset * kv_block_strideP +
+            head_mapping_ptr[head_id] * kv_block_strideH;
         auto attn_out_start = private_attn_out_ptr +
-            thread_id * private_attn_out_stride + seq_id * q_stride +
-            head_id * head_size;
+            thread_id * private_attn_out_strideT + seq_id * attn_out_strideN +
+            head_id * attn_out_strideH;
         mul_attenion_weights_and_value_of_head<float, scalar_t>(
             attn_w,
             v_cache_start,
@@ -262,8 +272,8 @@ void single_query_cached_kv_attention_kernel(
 #pragma omp parallel for collapse(2)
     for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
       for (auto hi = 0; hi < num_heads; hi++) {
-        auto thr0_head_start =
-            private_attn_out_ptr + (seq_id * num_heads + hi) * head_size;
+        auto thr0_head_start = private_attn_out_ptr +
+            seq_id * private_attn_out_strideN + hi * private_attn_out_strideH;
         if (flag_access[0][seq_id][hi] == 0) {
           torch_ipex::cpu::kernel::zero_ker(thr0_head_start, head_size);
         }
@@ -271,10 +281,10 @@ void single_query_cached_kv_attention_kernel(
           if (flag_access[thread_id][seq_id][hi] == 0) {
             continue;
           }
-          auto attn_out_head_stride = thread_id * private_attn_out_stride +
-              (seq_id * num_heads + hi) * head_size;
+          auto attn_out_head_offset = thread_id * private_attn_out_strideT +
+              seq_id * private_attn_out_strideN + hi * private_attn_out_strideH;
           auto private_attn_out_start =
-              private_attn_out_ptr + attn_out_head_stride;
+              private_attn_out_ptr + attn_out_head_offset;
           torch_ipex::cpu::kernel::add_ker<float, float>(
               thr0_head_start, private_attn_out_start, head_size);
         }
@@ -327,16 +337,19 @@ void reshape_and_cache_kernel(
   auto value_cache_ptr = value_cache.data_ptr<DST_T>();
   auto value_ptr = value.data_ptr<SRC_T>();
   auto slot_mapping_ptr = slot_mapping.data_ptr<int>();
-  auto cache_stride = key_cache.stride(0);
-  auto state_stride = key.stride(0);
+  auto cache_strideN = key_cache.stride(0);
+  auto cache_strideP = key_cache.stride(1);
+  auto cache_strideH = key_cache.stride(2);
+  auto state_strideN = key.stride(0);
+  auto state_strideH = key.stride(1);
 #pragma omp parallel for collapse(2)
   for (auto ti = 0; ti < num_tokens; ti++) {
     for (auto hi = 0; hi < head_num; hi++) {
       auto block_id = slot_mapping_ptr[ti] / block_size;
       auto block_offset = slot_mapping_ptr[ti] % block_size;
-      auto cache_offset = block_id * cache_stride +
-          block_offset * key_cache.stride(1) + hi * head_size;
-      auto state_offset = ti * state_stride + hi * head_size;
+      auto cache_offset = block_id * cache_strideN +
+          block_offset * cache_strideP + hi * cache_strideH;
+      auto state_offset = ti * state_strideN + hi * state_strideH;
       auto key_cache_start = key_cache_ptr + cache_offset;
       auto key_ptr_start = key_ptr + state_offset;
       auto value_cache_start = value_cache_ptr + cache_offset;
@@ -410,8 +423,6 @@ void reshape_and_cache_cpu_kernel_impl(
   TORCH_CHECK(
       key_cache.scalar_type() == value_cache.scalar_type(),
       "key_cache and value_cache should have the same data type");
-  TORCH_CHECK(key_cache.is_contiguous(), "key_cache should be contiguous");
-  TORCH_CHECK(value_cache.is_contiguous(), "value_cache should be contiguous");
   TORCH_CHECK(
       slot_mapping.is_contiguous(), "slot_mapping should be contiguous");
   RECORD_FUNCTION(

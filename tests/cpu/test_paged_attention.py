@@ -122,9 +122,25 @@ class PagedAttentionTest(TestCase):
         max_seq_len = 1024
         scale = float(1.0 / (head_size**0.5))
         num_query_heads, num_kv_head = num_head
-        query = torch.empty(
-            num_seqs, num_query_heads, head_size, dtype=dtype, device="cpu"
+        qkv = torch.empty(
+            num_seqs,
+            (num_query_heads + num_kv_head * 2) * head_size,
+            dtype=dtype,
+            device="cpu",
         )
+        query, _, _ = qkv.split(
+            [
+                num_query_heads * head_size,
+                num_kv_head * head_size,
+                num_kv_head * head_size,
+            ],
+            dim=1,
+        )
+        query = query.view(num_seqs, num_query_heads, head_size)
+        # import pdb
+
+        # pdb.set_trace()
+        print(query.shape, query.stride())
         query.uniform_(-scale, scale)
         assert num_query_heads % num_kv_head == 0
         num_queries_per_kv = num_query_heads // num_kv_head
