@@ -8,9 +8,9 @@
 #   branch:      Branch name of the Github repository. For human understanding only.
 
 deepspeed:
-  commit: v0.14.2
+  commit: 6bef2f21a8a41880f831713d5c42926ef43ff4d5
   repo: https://github.com/microsoft/DeepSpeed.git
-  version: 0.14.2
+  version: 
 gcc:
   max-version: null
   min-version: 12.3.0
