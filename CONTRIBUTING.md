@@ -180,7 +180,9 @@ For example, if you wanted to run the test `MayContainAlias`, which is part of t
 ### Python Code
 We can find python code style utils in `scripts/tools/setup` folder. Please install the related dependency python modules:
 ```bash
-pip install -r scripts/tools/setup/requirements-flake8.txt
+pip install lintrunner
+pip install lintrunner-adapters
+lintrunner init
 ```
 Please run flake8.py to auto-format python code and check the python code style. The script will return results, please manual modify code follow the output information, and until it shows pass:
 ```bash
