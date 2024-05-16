@@ -499,13 +499,16 @@ def add_rms_norm_cpu(
     add_back: bool,
 ):
     assert bias is None, "bias is not supported in add_rmsnorm yet"
-
-    if add_back:
-        add.add_(x)
+    if add is not None:
+        if add_back:
+            add.add_(x)
+            input = add
+        else:
+            input = add + x
     else:
-        add = add + x
+        input = x
 
-    return torch.ops.torch_ipex.rmsnorm(add, weight, eps)
+    return torch.ops.torch_ipex.rmsnorm(input, weight, eps)
 
 
 def add_layer_norm_cpu(
@@ -516,10 +519,17 @@ def add_layer_norm_cpu(
     eps: float,
     add_back: bool,
 ):
-    out = torch.ops.torch_ipex.add_layernorm(x, add, 1, [x.size(-1)], weight, bias, eps)
-    if add_back:
-        add.add_(x)
-    return out
+    if add is not None:
+        out = torch.ops.torch_ipex.add_layernorm(
+            x, add, 1, [x.size(-1)], weight, bias, eps
+        )
+        if add_back:
+            add.add_(x)
+        return out
+    else:
+        return torch.nn.functional.layer_norm(
+            x, [x.size(-1)], weight=weight, bias=bias, eps=eps
+        )
 
 
 @torch.compile(dynamic=True, options={"fx_graph_cache": True})

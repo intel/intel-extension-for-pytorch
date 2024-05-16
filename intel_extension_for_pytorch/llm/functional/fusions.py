@@ -286,19 +286,20 @@ def add_rms_norm(
     weight: torch.Tensor,
     bias: torch.Tensor,
     eps: float,
-    add_back: bool,
+    add_back: bool = False,
 ):
     r"""
     Add residual on input x and apply RMSnorm on the result.
 
     Args:
-        residual (torch.Tensor): residual to add with x.
+        residual (torch.Tensor): residual to add with x. If residual is None,
+            it means only apply rmsnorm on x.
         x (torch.Tensor) : the input tensor to add residual and apply RMSNorm.
         weight (torch.Tensor): the weight to apply RMSnorm.
         bias (torch.Tensor): the bias to apply RMSnorm.
         eps (float) : the variance_epsilon to apply RMSnorm.
         add_back (bool) : whether to store the result of (x + residual) back
-            to the residual buffer.
+            to the residual buffer (if residual is not None). Default is False.
 
     """
     f = _get_function_from_device(x.device.type, add_rms_norm)
@@ -311,19 +312,20 @@ def add_layer_norm(
     weight: torch.Tensor,
     bias: torch.Tensor,
     eps: float,
-    add_back: bool,
+    add_back: bool = False,
 ):
     r"""
     Add residual on input x and apply layernorm on the result.
 
     Args:
-        residual (torch.Tensor): residual to add with x.
+        residual (torch.Tensor): residual to add with x. If residual is None,
+            it means only apply layernorm on x.
         x (torch.Tensor) : the input tensor to add residual and apply layernorm.
         weight (torch.Tensor): the weight to apply layernorm.
         bias (torch.Tensor): the bias to apply layernorm.
         eps (float) : the variance_epsilon to apply layernorm.
         add_back (bool) : whether to store the result of (x + residual) back
-            to the residual buffer.
+            to the residual buffer (if residual is not None). Default is False.
 
     """
     f = _get_function_from_device(x.device.type, add_layer_norm)

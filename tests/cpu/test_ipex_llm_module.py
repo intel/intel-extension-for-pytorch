@@ -151,16 +151,21 @@ def apply(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor):
 def add_rmsnorm(residual, x, weight, bias, eps, add_back):
     orig_dtype = x.dtype
     x = x.to(torch.float32)
-    x = residual + x
+    if residual is not None:
+        x = residual + x
     variance = x.pow(2).mean(dim=-1, keepdim=True)
     out = x * torch.rsqrt(variance + eps)
     out = out.to(orig_dtype) * weight
-    if add_back:
+    if add_back and residual is not None:
         residual.copy_(x.to(orig_dtype))
     return out
 
 
 def add_layernorm(residual, x, weight, bias, eps, add_back):
+    if residual is None:
+        return torch.nn.functional.layer_norm(
+            x, [x.size(-1)], weight=weight, bias=bias, eps=eps
+        )
     x = residual + x
     out = torch.nn.functional.layer_norm(
         x, [x.size(-1)], weight=weight, bias=bias, eps=eps
@@ -355,48 +360,58 @@ class TestLLMModules(TestCase):
     def test_add_layernorm(self):
         for add_back in [True, False]:
             for dtype in [torch.float, torch.bfloat16]:
-                weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
-                eps = 1e-6
-                x = torch.rand(1, 32, 4096).to(dtype)
-                if add_back:
-                    target_residual = x + x
-                residual = x
-                x_ = copy.deepcopy(x)
-                residual_ = x_
-                ref_out = add_layernorm(residual_, x_, weight, None, eps, add_back)
-                ipex_out = ipex.llm.functional.add_layer_norm(
-                    residual, x, weight, None, eps, add_back
-                )
-                if add_back:
-                    self.assertEqual(residual, target_residual)
-                    self.assertEqual(residual_, target_residual)
-                else:
-                    self.assertEqual(residual, x)
-                    self.assertEqual(residual_, x)
-                self.assertEqual(ref_out, ipex_out)
+                for residual_is_none in [True, False]:
+                    weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
+                    eps = 1e-6
+                    x = torch.rand(1, 32, 4096).to(dtype)
+                    if residual_is_none:
+                        residual = None
+                    else:
+                        if add_back:
+                            target_residual = x + x
+                        residual = x
+                    x_ = copy.deepcopy(x)
+                    residual_ = x_ if not residual_is_none else None
+                    ref_out = add_layernorm(residual_, x_, weight, None, eps, add_back)
+                    ipex_out = ipex.llm.functional.add_layer_norm(
+                        residual, x, weight, None, eps, add_back
+                    )
+                    if not residual_is_none:
+                        if add_back:
+                            self.assertEqual(residual, target_residual)
+                            self.assertEqual(residual_, target_residual)
+                        else:
+                            self.assertEqual(residual, x)
+                            self.assertEqual(residual_, x)
+                    self.assertEqual(ref_out, ipex_out)
 
     def test_add_rmsnorm(self):
         for add_back in [True, False]:
             for dtype in [torch.float, torch.bfloat16]:
-                weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
-                eps = 1e-6
-                x = torch.rand(1, 32, 4096).to(dtype)
-                if add_back:
-                    target_residual = x + x
-                residual = x
-                x_ = copy.deepcopy(x)
-                residual_ = x_
-                ref_out = add_rmsnorm(residual_, x_, weight, None, eps, add_back)
-                ipex_out = ipex.llm.functional.add_rms_norm(
-                    residual, x, weight, None, eps, add_back
-                )
-                if add_back:
-                    self.assertEqual(residual, target_residual)
-                    self.assertEqual(residual_, target_residual)
-                else:
-                    self.assertEqual(residual, x)
-                    self.assertEqual(residual_, x)
-                self.assertEqual(ref_out, ipex_out)
+                for residual_is_none in [True, False]:
+                    weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
+                    eps = 1e-6
+                    x = torch.rand(1, 32, 4096).to(dtype)
+                    if residual_is_none:
+                        residual = None
+                    else:
+                        if add_back:
+                            target_residual = x + x
+                        residual = x
+                    x_ = copy.deepcopy(x)
+                    residual_ = x_ if not residual_is_none else None
+                    ref_out = add_rmsnorm(residual_, x_, weight, None, eps, add_back)
+                    ipex_out = ipex.llm.functional.add_rms_norm(
+                        residual, x, weight, None, eps, add_back
+                    )
+                    if not residual_is_none:
+                        if add_back:
+                            self.assertEqual(residual, target_residual)
+                            self.assertEqual(residual_, target_residual)
+                        else:
+                            self.assertEqual(residual, x)
+                            self.assertEqual(residual_, x)
+                    self.assertEqual(ref_out, ipex_out)
 
     def test_gelu_mul(self):
         for dtype in [torch.float, torch.bfloat16]:
