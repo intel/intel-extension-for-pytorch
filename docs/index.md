@@ -12,15 +12,15 @@ There are several environment setup methodologies provided. You can choose eithe
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout 2.3-rc1-sp
+git checkout 2.3-phi-3
 git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.0 .
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:phi3 .
 
 # Run the container with command below
-docker run --rm -it --privileged ipex-llm:2.3.0 bash
+docker run --rm -it --privileged ipex-llm:phi3 bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -35,7 +35,7 @@ source ./tools/env_activate.sh
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout 2.3-rc1-sp
+git checkout 2.3-phi-3
 git submodule sync
 git submodule update --init --recursive
 
@@ -96,7 +96,6 @@ By default, for weight-only quantization, we use quantization with [Automatic Mi
 - Command:
 ```bash
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <PHI3_MODEL_ID_OR_LOCAL_PATH> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results"  --greedy --input-tokens <INPUT_LENGTH>
-# Note: you can add "--group-size" to tune good accuracy, suggested range as one of [32, 64, 128, 256, 512].
 ```
 
 #### 2.1.1.3 Notes:
@@ -135,7 +134,6 @@ For weight-only quantization with deepspeed, we quantize the model then run the 
 - Command:
 ```bash
 deepspeed --bind_cores_to_rank run.py  --benchmark -m <PHI3_MODEL_ID_OR_LOCAL_PATH> --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --greedy --input-tokens <INPUT_LENGTH>  --autotp --shard-model --output-dir "saved_results"
-# Note: you can add "--group-size" to tune good accuracy, suggested range as one of [32, 64, 128, 256, 512].
 ```
 
 #### 2.1.2.4 How to Shard Model weight files for Distributed Inference with DeepSpeed
