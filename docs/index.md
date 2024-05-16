@@ -67,7 +67,7 @@ python run.py --help # for more detailed usages
 |---|---|
 | model id | "--model-name-or-path" or "-m" to specify the <PHI3_MODEL_ID_OR_LOCAL_PATH>, it is model id from Huggingface or downloaded local path |
 | generation | default: beam search (beam size = 4), "--greedy" for greedy search |
-| input tokens | provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [1024, 2048, 4096, 8192]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
+| input tokens | provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [1024, 2048, 4096, 8192, 130944]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
 | output tokens | default: 32, use "--max-new-tokens" to choose any other size |
 | batch size |  default: 1, use "--batch-size" to choose any other size |
 | token latency |  enable "--token-latency" to print out the first or next token latency |
