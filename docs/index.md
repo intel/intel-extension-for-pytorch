@@ -81,32 +81,9 @@ python run.py --help # for more detailed usages
 
 The _\<PHI3_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Phi 3 model you will run, which can be found from [HuggingFace Models](https://huggingface.co/models).
 
-### 2.1.1 Run generation with one socket inference
-#### 2.1.1.1 BF16:
+### 2.1.1 Run generation with multiple instances on multiple CPU numa nodes
 
-- Command:
-```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py --benchmark -m <PHI3_MODEL_ID_OR_LOCAL_PATH> --dtype bfloat16 --ipex --greedy --input-tokens <INPUT_LENGTH> 
-```
-
-#### 2.1.1.2 Weight-only quantization (INT8):
-
-By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
-
-- Command:
-```bash
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <PHI3_MODEL_ID_OR_LOCAL_PATH> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results"  --greedy --input-tokens <INPUT_LENGTH>
-```
-
-#### 2.1.1.3 Notes:
-
-(1) [_numactl_](https://linux.die.net/man/8/numactl) is used to specify memory and cores of your hardware to get better performance. _\<node N\>_ specifies the [numa](https://en.wikipedia.org/wiki/Non-uniform_memory_access) node id (e.g., 0 to use the memory from the first numa node). _\<physical cores list\>_ specifies phsysical cores which you are using from the _\<node N\>_ numa node (e.g., 0-47 from the first numa node of AWS m7i.metal-48xl instance). You can use [_lscpu_](https://man7.org/linux/man-pages/man1/lscpu.1.html) command in Linux to check the numa node information.
-
-(2) For all quantization benchmarks, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" .
-
-### 2.1.2 Run generation with two sockets inference (DeepSpeed autotp)
-
-#### 2.1.2.1 Prepare:
+#### 2.1.1.1 Prepare:
 
 ```bash
 unset KMP_AFFINITY
@@ -117,16 +94,16 @@ In the DeepSpeed cases below, we recommend "--shard-model" to shard model weight
 If using "--shard-model", it will save a copy of the shard model weights file in the path of "--output-dir" (default path is "./saved_results" if not provided).
 If you have used "--shard-model" and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove "--shard-model", and replace "-m <PHI3_MODEL_ID_OR_LOCAL_PATH>" with "-m <shard model path>" to skip the repeated shard steps.
 
-Besides, the standalone shard model function/scripts are also provided in section 2.1.2.4, in case you would like to generate the shard model weights files in advance before running distributed inference.
+Besides, the standalone shard model function/scripts are also provided in section 2.1.1.4, in case you would like to generate the shard model weights files in advance before running distributed inference.
 
-#### 2.1.2.2 BF16:
+#### 2.1.1.2 BF16:
 
 - Command:
 ```bash
 deepspeed --bind_cores_to_rank  run.py --benchmark -m <PHI3_MODEL_ID_OR_LOCAL_PATH> --dtype bfloat16 --ipex  --greedy --input-tokens <INPUT_LENGTH> --autotp --shard-model
 ```
 
-#### 2.1.2.3 Weight-only quantization (INT8):
+#### 2.1.1.3 Weight-only quantization (INT8):
 
 By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
 For weight-only quantization with deepspeed, we quantize the model then run the benchmark. The quantized model won't be saved.
@@ -136,7 +113,7 @@ For weight-only quantization with deepspeed, we quantize the model then run the 
 deepspeed --bind_cores_to_rank run.py  --benchmark -m <PHI3_MODEL_ID_OR_LOCAL_PATH> --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --greedy --input-tokens <INPUT_LENGTH>  --autotp --shard-model --output-dir "saved_results"
 ```
 
-#### 2.1.2.4 How to Shard Model weight files for Distributed Inference with DeepSpeed
+#### 2.1.1.4 How to Shard Model weight files for Distributed Inference with DeepSpeed
 
 To save memory usage, we could shard the model weights files under the local path before we launch distributed tests with DeepSpeed.
 
@@ -146,6 +123,29 @@ cd ./utils
 python create_shard_model.py -m <PHI3_MODEL_ID_OR_LOCAL_PATH>  --save-path ./local_phi3_model_shard
 # After sharding the model, using "-m ./local_phi3_model_shard" in later tests
 ```
+
+### 2.1.2 Run generation with single instance on a single numa node
+#### 2.1.2.1 BF16:
+
+- Command:
+```bash
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py --benchmark -m <PHI3_MODEL_ID_OR_LOCAL_PATH> --dtype bfloat16 --ipex --greedy --input-tokens <INPUT_LENGTH> 
+```
+
+#### 2.1.2.2 Weight-only quantization (INT8):
+
+By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
+
+- Command:
+```bash
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <PHI3_MODEL_ID_OR_LOCAL_PATH> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results"  --greedy --input-tokens <INPUT_LENGTH>
+```
+
+#### 2.1.2.3 Notes:
+
+(1) [_numactl_](https://linux.die.net/man/8/numactl) is used to specify memory and cores of your hardware to get better performance. _\<node N\>_ specifies the [numa](https://en.wikipedia.org/wiki/Non-uniform_memory_access) node id (e.g., 0 to use the memory from the first numa node). _\<physical cores list\>_ specifies phsysical cores which you are using from the _\<node N\>_ numa node (e.g., 0-47 from the first numa node of AWS m7i.metal-48xl instance). You can use [_lscpu_](https://man7.org/linux/man-pages/man1/lscpu.1.html) command in Linux to check the numa node information.
+
+(2) For all quantization benchmarks, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" .
 
 ## Miscellaneous Tips
 Intel® Extension for PyTorch* also provides dedicated optimization for many other Large Language Models (LLM), which cover a set of data types that are supported for various scenarios. For more details, please check this [Intel® Extension for PyTorch* doc](https://github.com/intel/intel-extension-for-pytorch/blob/release/2.3/README.md).
