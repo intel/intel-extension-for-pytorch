@@ -213,7 +213,7 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     if [ -f prompt.json ]; then
         rm -f prompt.json
     fi
-    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+    wget -O prompt.json https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt-phi3.json
     cd single_instance
     if [ -f prompt.json ]; then
         rm -f prompt.json

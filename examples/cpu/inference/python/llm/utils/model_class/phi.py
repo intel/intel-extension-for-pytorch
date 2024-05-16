@@ -18,6 +18,8 @@ class Phi3Config(LLMConfig):
     def __init__(self, model_id):
         self.name = "phi-3"
         self.model_id = model_id
+        if "medium" in model_id:
+            self.name = "phi-3-medium"
         self.to_channels_last = True
         self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV_POS
 
