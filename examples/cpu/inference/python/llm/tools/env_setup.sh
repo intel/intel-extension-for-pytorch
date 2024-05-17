@@ -93,10 +93,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             echo ""
             echo "Install prebuilt wheels for phi3"
             echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/nightly/cpu" >> ${AUX_INSTALL_SCRIPT}
-            echo "python -m pip install
-https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.4.0%2Bgit8d1a157-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
-            echo "python -m pip install
-https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/oneccl_bind_pt-2.3.0%2Bgit999b1b0-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
+            echo "python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.4.0%2Bgit8d1a157-cp310-cp310-linux_x86_64.whl https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/oneccl_bind_pt-2.3.0%2Bgit999b1b0-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
             python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/nightly/cpu
             python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.4.0%2Bgit8d1a157-cp310-cp310-linux_x86_64.whl https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/oneccl_bind_pt-2.3.0%2Bgit999b1b0-cp310-cp310-linux_x86_64.whl
         fi
