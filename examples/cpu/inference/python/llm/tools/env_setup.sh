@@ -91,15 +91,13 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         set -e
         if [ ${TORCH_DEV} -eq 0 ]; then
             echo ""
-            echo "Error: Detected dependent PyTorch is a nightly built version. Installation from prebuilt wheel files is not supported. Run again to compile from source."
-            exit 4
-        else
-            echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
+            echo "Install prebuilt wheels for phi3"
+            echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/nightly/cpu" >> ${AUX_INSTALL_SCRIPT}
             echo "python -m pip install
 https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.4.0%2Bgit8d1a157-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
             echo "python -m pip install
 https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/oneccl_bind_pt-2.3.0%2Bgit999b1b0-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
-            python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
+            python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/nightly/cpu
             python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.4.0%2Bgit8d1a157-cp310-cp310-linux_x86_64.whl https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/oneccl_bind_pt-2.3.0%2Bgit999b1b0-cp310-cp310-linux_x86_64.whl
         fi
     else
@@ -176,21 +174,19 @@ https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/oneccl_bind_pt
     rm -rf lm-evaluation-harness
 
     # Install DeepSpeed
-    if [ $((${MODE} & 0x08)) -ne 0 ]; then
-        if [ -d DeepSpeed ]; then
-            rm -rf DeepSpeed
-        fi
-        git clone ${REPO_DS_SYCL} DeepSpeed
-        cd DeepSpeed
-        git checkout ${COMMIT_DS_SYCL}
-        python -m pip install -r requirements/requirements.txt
-        python setup.py bdist_wheel
-        cp dist/*.whl ${WHEELFOLDER}
-        cd ..
+
+    if [ -d DeepSpeed ]; then
         rm -rf DeepSpeed
-    else
-        echo "python -m pip install deepspeed==${VER_DS_SYCL}" >> ${AUX_INSTALL_SCRIPT}
     fi
+    git clone ${REPO_DS_SYCL} DeepSpeed
+    cd DeepSpeed
+    git checkout ${COMMIT_DS_SYCL}
+    python -m pip install -r requirements/requirements.txt
+    python setup.py bdist_wheel
+    cp dist/*.whl ${WHEELFOLDER}
+    cd ..
+    rm -rf DeepSpeed
+
 
     # Install OneCCL
     if [ -d oneCCL ]; then

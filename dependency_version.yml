@@ -9,7 +9,7 @@
 
 deepspeed:
   commit: 6bef2f21a8a41880f831713d5c42926ef43ff4d5
-  repo: https://github.com/microsoft/DeepSpeed.git
+  repo: https://github.com/Yejing-Lai/DeepSpeed.git
   version: 
 gcc:
   max-version: null
