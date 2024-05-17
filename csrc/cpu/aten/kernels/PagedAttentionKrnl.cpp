@@ -126,35 +126,54 @@ void single_query_cached_kv_attention_kernel(
   auto attn_weights_strideN = attn_weights.stride(0);
   auto attn_weights_strideH = attn_weights.stride(1);
 
+  auto max_logic_blocks = (max_context_len + block_size - 1) / block_size;
+
+  auto thread_numbers = omp_get_max_threads();
+  auto max_parallel_parts = thread_numbers * 4;
   if (alibi_slopes.has_value()) {
     auto alibi_slopes_size = alibi_slopes.value().size(0);
     TORCH_CHECK(
         alibi_slopes_size == num_heads,
         "alibi_slopes size is not equal to num_heads");
   }
-
-#pragma omp parallel for collapse(3)
-  for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
-    for (auto head_id = 0; head_id < num_heads; head_id++) {
-      for (auto token_id = 0; token_id < max_context_len; token_id++) {
-        auto context_len = context_lens_ptr[seq_id];
-        if (token_id >= context_len)
-          continue;
-        auto attn_w_pos = attn_weights_ptr + seq_id * attn_weights_strideN +
-            head_id * attn_weights_strideH + token_id;
-        auto q_ptr_start = query_ptr + seq_id * q_strideN + head_id * q_strideH;
-        auto block_id = block_tables_ptr
-            [seq_id * max_num_blocks_per_seq + token_id / block_size];
-        auto block_offset = token_id % block_size;
-        auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
-            block_offset * kv_block_strideP +
-            head_mapping_ptr[head_id] * kv_block_strideH;
-        reduce_head<scalar_t, scalar_t>(
-            q_ptr_start, k_cache_start, attn_w_pos, head_size);
+  {
+    RECORD_FUNCTION(
+        "ipex::paged_attention_sdp::matmul(query, key)",
+        c10::ArrayRef<c10::IValue>({}));
+#pragma omp parallel for collapse(3) schedule(static, 1)
+    for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
+      for (auto logical_block_id = 0; logical_block_id < max_logic_blocks;
+           logical_block_id++) {
+        for (auto head_id = 0; head_id < num_heads; head_id++) {
+          auto context_len = context_lens_ptr[seq_id];
+          auto token_start = logical_block_id * block_size;
+          auto token_end =
+              std::min((int)(token_start + block_size), context_len);
+          if (token_start >= context_len)
+            continue;
+          for (auto token_id = token_start; token_id < token_end; token_id++) {
+            auto attn_w_pos = attn_weights_ptr + seq_id * attn_weights_strideN +
+                head_id * attn_weights_strideH + token_id;
+            auto q_ptr_start =
+                query_ptr + seq_id * q_strideN + head_id * q_strideH;
+            auto physical_block_id = block_tables_ptr
+                [seq_id * max_num_blocks_per_seq + logical_block_id];
+            auto block_offset = token_id - token_start;
+            auto k_cache_start = key_cache_ptr +
+                physical_block_id * kv_block_strideN +
+                block_offset * kv_block_strideP +
+                head_mapping_ptr[head_id] * kv_block_strideH;
+            reduce_head<scalar_t, scalar_t>(
+                q_ptr_start, k_cache_start, attn_w_pos, head_size);
+          }
+        }
       }
     }
   }
-
+  {
+    RECORD_FUNCTION(
+        "ipex::paged_attention_sdp::div+add+softmax",
+        c10::ArrayRef<c10::IValue>({}));
 // div+add+softmax
 #pragma omp parallel for collapse(2)
   for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
@@ -218,8 +237,7 @@ void single_query_cached_kv_attention_kernel(
 #endif
     }
   }
-
-  auto thread_numbers = omp_get_max_threads();
+  }
   auto private_attn_outs =
       at::empty({thread_numbers, num_seqs, num_heads, head_size}, at::kFloat);
   auto private_attn_out_flag =
@@ -231,40 +249,51 @@ void single_query_cached_kv_attention_kernel(
   auto private_attn_out_strideH = private_attn_outs.stride(2);
   auto attn_out_strideN = out.stride(0);
   auto attn_out_strideH = out.stride(1);
-
+  {
+    RECORD_FUNCTION(
+        "ipex::paged_attention_sdp::matmul(attn_w, value)",
+        c10::ArrayRef<c10::IValue>({}));
 // mul and accumulate
-#pragma omp parallel for collapse(3)
-  for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
-    for (auto head_id = 0; head_id < num_heads; head_id++) {
-      for (auto token_id = 0; token_id < max_context_len; token_id++) {
-        auto context_len = context_lens_ptr[seq_id];
-        auto thread_id = omp_get_thread_num();
-        if (token_id >= context_len)
-          continue;
-        auto attn_w = attn_weights_ptr
-            [seq_id * attn_weights_strideN + head_id * attn_weights_strideH +
-             token_id];
-        auto block_id = block_tables_ptr
-            [seq_id * max_num_blocks_per_seq + token_id / block_size];
-        auto block_offset = token_id % block_size;
-        auto v_cache_start = value_cache_ptr + block_id * kv_block_strideN +
-            block_offset * kv_block_strideP +
-            head_mapping_ptr[head_id] * kv_block_strideH;
-        auto attn_out_start = private_attn_out_ptr +
-            thread_id * private_attn_out_strideT + seq_id * attn_out_strideN +
-            head_id * attn_out_strideH;
-        mul_attenion_weights_and_value_of_head<float, scalar_t>(
-            attn_w,
-            v_cache_start,
-            attn_out_start,
-            head_size,
-            flag_access[thread_id][seq_id][head_id]);
-        if (flag_access[thread_id][seq_id][head_id] == 0) {
-          flag_access[thread_id][seq_id][head_id] = 1;
-        }
-      } // for token_id
-    } // for head_id
-  } // for seq_id
+#pragma omp parallel for collapse(3) schedule(static, 1)
+    for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
+      for (auto logical_block_id = 0; logical_block_id < max_logic_blocks;
+           logical_block_id++) {
+        for (auto head_id = 0; head_id < num_heads; head_id++) {
+          auto context_len = context_lens_ptr[seq_id];
+          auto token_start = logical_block_id * block_size;
+          if (token_start >= context_len)
+            continue;
+          auto token_end =
+              std::min((int)(token_start + block_size), context_len);
+          auto thread_id = omp_get_thread_num();
+          for (auto token_id = token_start; token_id < token_end; token_id++) {
+            auto attn_w = attn_weights_ptr
+                [seq_id * attn_weights_strideN +
+                 head_id * attn_weights_strideH + token_id];
+            auto physical_block_id = block_tables_ptr
+                [seq_id * max_num_blocks_per_seq + logical_block_id];
+            auto block_offset = token_id - token_start;
+            auto v_cache_start = value_cache_ptr +
+                physical_block_id * kv_block_strideN +
+                block_offset * kv_block_strideP +
+                head_mapping_ptr[head_id] * kv_block_strideH;
+            auto attn_out_start = private_attn_out_ptr +
+                thread_id * private_attn_out_strideT +
+                seq_id * attn_out_strideN + head_id * attn_out_strideH;
+            mul_attenion_weights_and_value_of_head<float, scalar_t>(
+                attn_w,
+                v_cache_start,
+                attn_out_start,
+                head_size,
+                flag_access[thread_id][seq_id][head_id]);
+            if (flag_access[thread_id][seq_id][head_id] == 0) {
+              flag_access[thread_id][seq_id][head_id] = 1;
+            }
+          } // for token_id
+        } // for head_id
+      } // for block id
+    } // for seq_id
+  }
   {
     RECORD_FUNCTION(
         "ipex::single_query_cached_kv_attention::reduction_private_result",
@@ -345,9 +374,9 @@ void reshape_and_cache_kernel(
 #pragma omp parallel for collapse(2)
   for (auto ti = 0; ti < num_tokens; ti++) {
     for (auto hi = 0; hi < head_num; hi++) {
-      auto block_id = slot_mapping_ptr[ti] / block_size;
+      auto physical_block_id = slot_mapping_ptr[ti] / block_size;
       auto block_offset = slot_mapping_ptr[ti] % block_size;
-      auto cache_offset = block_id * cache_strideN +
+      auto cache_offset = physical_block_id * cache_strideN +
           block_offset * cache_strideP + hi * cache_strideH;
       auto state_offset = ti * state_strideN + hi * state_strideH;
       auto key_cache_start = key_cache_ptr + cache_offset;
