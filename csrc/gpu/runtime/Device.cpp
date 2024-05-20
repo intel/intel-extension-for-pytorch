@@ -13,6 +13,10 @@
 #include <mutex>
 #include <vector>
 
+#ifdef USE_PTI
+#include <profiler/XPUActivityApi.h>
+#endif
+
 namespace xpu {
 namespace dpcpp {
 
@@ -121,6 +125,19 @@ static void enumDevices(std::vector<std::unique_ptr<sycl::device>>& devices) {
 // It should be call only once. (std::call_once)
 static void initGlobalDevicePoolState() {
   enumDevices(gDevPool.devices);
+#ifdef USE_PTI
+  // enum and save device uuids for PTI mapping
+  std::vector<std::array<unsigned char, 16>> uuids;
+  for (const auto& device_ptr : gDevPool.devices) {
+    if (device_ptr->is_gpu() &&
+        device_ptr->has(sycl::aspect::ext_intel_device_info_uuid))
+      uuids.push_back(
+          device_ptr->get_info<sycl::ext::intel::info::device::uuid>());
+    else
+      uuids.push_back(std::array<unsigned char, 16>{});
+  }
+  libkineto::XPUActivityApi::singleton().setDeviceUuidMap(uuids);
+#endif
 
   auto device_count = gDevPool.devices.size();
   if (device_count <= 0) {

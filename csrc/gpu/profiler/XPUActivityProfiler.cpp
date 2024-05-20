@@ -19,8 +19,6 @@
 #include <profiler/xpu_output_base.h>
 #include <profiler/XPUActivity.cpp>
 
-#include "onepti_activity_api.h"
-
 using namespace std::chrono;
 using std::string;
 
@@ -123,7 +121,6 @@ void XPUActivityProfiler::processTraceInternal(ActivityLogger& logger) {
   VLOG(0) << "Profile time range: " << captureWindowStartTime_ << " - "
           << captureWindowEndTime_;
   logger.handleTraceStart(metadata_);
-  onepti_.stopCollecting();
   for (auto& cpu_trace : traceBuffers_->cpu) {
     string trace_name = cpu_trace->span.name;
     VLOG(0) << "Processing CPU buffer for " << trace_name << " ("
@@ -145,7 +142,7 @@ void XPUActivityProfiler::processTraceInternal(ActivityLogger& logger) {
       const auto count_and_size = onepti_.processActivities(
           *traceBuffers_->gpu,
           std::bind(
-              &XPUActivityProfiler::handleOneptiActivity,
+              &XPUActivityProfiler::handlePtiActivity,
               this,
               std::placeholders::_1,
               &logger));
@@ -211,15 +208,16 @@ void XPUActivityProfiler::processCpuTrace(
 }
 
 inline void XPUActivityProfiler::handleCorrelationActivity(
-    const Onepti_ActivityExternalCorrelation* correlation) {
-  if (correlation->externalKind == ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0) {
-    cpuCorrelationMap_[correlation->correlationId] = correlation->externalId;
-  } else if (
-      correlation->externalKind == ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1) {
-    userCorrelationMap_[correlation->correlationId] = correlation->externalId;
+    const pti_view_record_external_correlation* correlation) {
+  if (correlation->_external_kind == PTI_VIEW_EXTERNAL_KIND_CUSTOM_0) {
+    cpuCorrelationMap_[correlation->_correlation_id] =
+        correlation->_external_id;
+  } else if (correlation->_external_kind == PTI_VIEW_EXTERNAL_KIND_CUSTOM_1) {
+    userCorrelationMap_[correlation->_correlation_id] =
+        correlation->_external_id;
   } else {
     LOG(WARNING)
-        << "Invalid Onepti_ActivityExternalCorrelation sent to handleOneptiActivity";
+        << "Invalid PTI External Correaltion activity sent to handlePtiActivity";
   }
 }
 
@@ -306,7 +304,7 @@ inline bool XPUActivityProfiler::outOfRange(const ITraceActivity& act) {
 // }
 
 void XPUActivityProfiler::handleRuntimeActivity(
-    const Onepti_ActivityAPI* activity,
+    const pti_view_record_sycl_runtime* activity,
     ActivityLogger* logger) {
   // if (isBlockListedRuntimeCbid(activity->cbid)) {
   //   return;
@@ -314,13 +312,13 @@ void XPUActivityProfiler::handleRuntimeActivity(
   // VLOG(2) << activity->correlationId
   //         << ": ONEPTI_ACTIVITY_KIND_RUNTIME, cbid=" << activity->cbid
   //         << " tid=" << activity->threadId;
-  int32_t tid = activity->threadId;
+  int32_t tid = activity->_thread_id;
   const auto& it = resourceInfo_.find({processId(), tid});
   if (it != resourceInfo_.end()) {
     tid = it->second.id;
   }
   const ITraceActivity* linked =
-      linkedActivity(activity->correlationId, cpuCorrelationMap_);
+      linkedActivity(activity->_correlation_id, cpuCorrelationMap_);
   const auto& runtime_activity =
       traceBuffers_->addActivityWrapper(RuntimeActivity(activity, linked, tid));
   checkTimestampOrder(&runtime_activity);
@@ -330,23 +328,24 @@ void XPUActivityProfiler::handleRuntimeActivity(
   runtime_activity.log(*logger);
 }
 
-// void XPUActivityProfiler::handleOverheadActivity(
-//     const Onepti_ActivityOverhead* activity,
-//     ActivityLogger* logger) {
-//   VLOG(2) << ": ONEPTI_ACTIVITY_KIND_OVERHEAD"
-//           << " overheadKind=" << activity->overheadKind;
-//   const auto& overhead_activity =
-//       traceBuffers_->addActivityWrapper(OverheadActivity(activity, nullptr));
-//   // Monitor memory overhead
-//   if (activity->overheadKind == ONEPTI_ACTIVITY_OVERHEAD_ONEPTI_RESOURCE) {
-//     resourceOverheadCount_++;
-//   }
-//
-//   if (outOfRange(overhead_activity)) {
-//     return;
-//   }
-//   overhead_activity.log(*logger);
-// }
+void XPUActivityProfiler::handleOverheadActivity(
+    const pti_view_record_overhead* activity,
+    ActivityLogger* logger) {
+  std::cout << "HANDLING OVERHEAD ACTIVITY" << std::endl;
+  VLOG(2) << ": PTI_VIEW_OVERHEAD_KIND"
+          << " overheadKind=" << activity->_overhead_kind;
+  const auto& overhead_activity =
+      traceBuffers_->addActivityWrapper(OverheadActivity(activity, nullptr));
+  // Monitor memory overhead
+  if (activity->_overhead_kind == PTI_VIEW_OVERHEAD_KIND_RESOURCE) {
+    resourceOverheadCount_++;
+  }
+
+  if (outOfRange(overhead_activity)) {
+    return;
+  }
+  overhead_activity.log(*logger);
+}
 
 inline void XPUActivityProfiler::updateGpuNetSpan(const ITraceActivity& gpuOp) {
   if (!gpuOp.linkedActivity()) {
@@ -439,46 +438,48 @@ inline void XPUActivityProfiler::handleGpuActivity(
     const T* act,
     ActivityLogger* logger) {
   const ITraceActivity* linked =
-      linkedActivity(act->correlationId, cpuCorrelationMap_);
+      linkedActivity(act->_correlation_id, cpuCorrelationMap_);
   const auto& gpu_activity =
       traceBuffers_->addActivityWrapper(GpuActivity<T>(act, linked));
   handleGpuActivity(gpu_activity, logger);
 }
 
-void XPUActivityProfiler::handleOneptiActivity(
-    const Onepti_Activity* record,
+void XPUActivityProfiler::handlePtiActivity(
+    const pti_view_record_base* record,
     ActivityLogger* logger) {
-  switch (record->kind) {
-    case ONEPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION:
+  switch (record->_view_kind) {
+    case PTI_VIEW_EXTERNAL_CORRELATION:
       handleCorrelationActivity(
-          reinterpret_cast<const Onepti_ActivityExternalCorrelation*>(record));
+          reinterpret_cast<const pti_view_record_external_correlation*>(
+              record));
       break;
-    case ONEPTI_ACTIVITY_KIND_RUNTIME:
+    case PTI_VIEW_SYCL_RUNTIME_CALLS:
       handleRuntimeActivity(
-          reinterpret_cast<const Onepti_ActivityAPI*>(record), logger);
+          reinterpret_cast<const pti_view_record_sycl_runtime*>(record),
+          logger);
       break;
-    case ONEPTI_ACTIVITY_KIND_CONCURRENT_KERNEL:
+    case PTI_VIEW_DEVICE_GPU_KERNEL:
       handleGpuActivity(
-          reinterpret_cast<const Onepti_ActivityKernel*>(record), logger);
+          reinterpret_cast<const pti_view_record_kernel*>(record), logger);
       break;
-    // case ONEPTI_ACTIVITY_KIND_MEMCPY:
-    //   handleGpuActivity(
-    //       reinterpret_cast<const Onepti_ActivityMemcpy*>(record), logger);
-    //   break;
+    case PTI_VIEW_DEVICE_GPU_MEM_COPY:
+      handleGpuActivity(
+          reinterpret_cast<const pti_view_record_memory_copy*>(record), logger);
+      break;
     // case ONEPTI_ACTIVITY_KIND_MEMCPY2:
     //   handleGpuActivity(
     //       reinterpret_cast<const Onepti_ActivityMemcpy2*>(record), logger);
     //   break;
-    // case ONEPTI_ACTIVITY_KIND_MEMSET:
-    //   handleGpuActivity(
-    //       reinterpret_cast<const Onepti_ActivityMemset*>(record), logger);
-    //   break;
-    // case ONEPTI_ACTIVITY_KIND_OVERHEAD:
-    //   handleOverheadActivity(
-    //       reinterpret_cast<const Onepti_ActivityOverhead*>(record), logger);
-    //   break;
+    case PTI_VIEW_DEVICE_GPU_MEM_FILL:
+      handleGpuActivity(
+          reinterpret_cast<const pti_view_record_memory_fill*>(record), logger);
+      break;
+    case PTI_VIEW_COLLECTION_OVERHEAD:
+      handleOverheadActivity(
+          reinterpret_cast<const pti_view_record_overhead*>(record), logger);
+      break;
     default:
-      LOG(WARNING) << "Unexpected activity type: " << record->kind;
+      LOG(WARNING) << "Unexpected activity type: " << record->_view_kind;
       break;
   }
 }
@@ -568,7 +569,7 @@ void XPUActivityProfiler::configure(
     if (VLOG_IS_ON(1)) {
       timestamp = system_clock::now();
     }
-    onepti_.enableOneptiActivities(config_->selectedActivityTypes());
+    onepti_.enablePtiActivities(config_->selectedActivityTypes());
     if (VLOG_IS_ON(1)) {
       auto t2 = system_clock::now();
       addOverheadSample(
@@ -614,7 +615,6 @@ void XPUActivityProfiler::configure(
 void XPUActivityProfiler::startTraceInternal(
     const time_point<system_clock>& now) {
   captureWindowStartTime_ = libkineto::timeSinceEpoch(now);
-  onepti_.startCollecting();
   VLOG(0) << "Warmup -> CollectTrace";
   for (auto& session : sessions_) {
     LOG(INFO) << "Starting child profiler session";
@@ -631,7 +631,7 @@ void XPUActivityProfiler::stopTraceInternal(
     if (VLOG_IS_ON(1)) {
       timestamp = system_clock::now();
     }
-    onepti_.disableOneptiActivities(derivedConfig_->profileActivityTypes());
+    onepti_.disablePtiActivities(derivedConfig_->profileActivityTypes());
     if (VLOG_IS_ON(1)) {
       auto t2 = system_clock::now();
       addOverheadSample(

@@ -38,10 +38,6 @@ add_subdirectory(${IPEX_GPU_ROOT_DIR}/utils)
 set(IPEX_DISTRIBUTED_SRCS)
 add_subdirectory(${IPEX_GPU_ROOT_DIR}/distributed)
 
-set(IPEX_PROFILER_INCLUDES)
-set(IPEX_PROFILER_SRCS)
-add_subdirectory(${IPEX_GPU_PROFILER_SRC_DIR})
-
 if(USE_XETLA)
   set(IPEX_GPU_XETLA_DIR "${IPEX_GPU_ROOT_DIR}/aten/operators/xetla")
   add_subdirectory(${IPEX_GPU_XETLA_DIR})
@@ -50,6 +46,24 @@ endif()
 if(NOT DEFINED SYCL_INCLUDE_DIR)
   message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
+
+# Kineto + PTI-sdk dependency part
+if(USE_PTI)
+  find_package(Pti 0.7.0 QUIET)
+  if(NOT TARGET Pti::pti_view)
+    message(WARNING "PTI-sdk library not found. Will continue building without profiler.\n")
+    set(USE_PTI OFF CACHE BOOL "Disable PTI support." FORCE)
+  else()
+    get_target_property(PTI_INCLUDE_DIR Pti::pti_view INTERFACE_INCLUDE_DIRECTORIES)
+    find_library(PTI_VIEW_LIBRARY NAMES pti_view PATHS "${PTI_INCLUDE_DIR}/../lib")
+    set(PTI_LIBRARY ${PTI_VIEW_LIBRARY} CACHE STRING "Imported PTI library.")
+    set(PTI_INCLUDE_DIR ${PTI_INCLUDE_DIR} CACHE STRING "PTI include directory.")
+  endif()
+endif(USE_PTI)
+
+set(IPEX_PROFILER_INCLUDES)
+set(IPEX_PROFILER_SRCS)
+add_subdirectory(${IPEX_GPU_PROFILER_SRC_DIR})
 
 set(IPEX_INCLUDE_DIRS
         ${TORCH_INCLUDE_DIRS}
@@ -161,42 +175,6 @@ if (USE_MULTI_CONTEXT)
   list(APPEND IPEX_COMPILE_DEFINITIONS "USE_MULTI_CONTEXT")
 endif()
 
-if (USE_PROFILER)
-  # Enable Profiler
-  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_PROFILER")
-endif()
-
-if (USE_KINETO)
-  if (USE_ONETRACE)
-    find_package(oneTrace QUIET)
-    if (ONETRACE_FOUND)
-      target_link_libraries(intel-ext-pt-gpu PUBLIC ${ONETRACE_LIBRARY})
-      target_include_directories(intel-ext-pt-gpu PUBLIC ${ONETRACE_INCLUDE_DIRS})
-      list(APPEND IPEX_COMPILE_DEFINITIONS "USE_ONETRACE")
-      set_target_properties(intel-ext-pt-gpu PROPERTIES USE_ONETRACE ON)
-      set_target_properties(intel-ext-pt-gpu PROPERTIES ONETRACE_INCLUDE_DIRS "${ONETRACE_INCLUDE_DIRS}")
-    else()
-      message(WARNING "WARNING: Cannot find onetrace! Continue to build without onetrace!")
-      set_target_properties(intel-ext-pt-gpu PROPERTIES USE_ONETRACE OFF)
-    endif()
-  endif()
-  if (USE_PTI)
-    message(WARNING "WARNING: PTI library has not been ready! Continue to build without PTI!")
-    set_target_properties(intel-ext-pt-gpu PROPERTIES USE_PTI OFF)
-  endif()
-  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_KINETO")
-
-  find_package(fmt QUIET)
-  if (FMT_FOUND)
-    target_link_libraries(intel-ext-pt-gpu PRIVATE fmt::fmt-header-only)
-    target_include_directories(intel-ext-pt-gpu PRIVATE ${FMT_INCLUDE_DIR})
-    set_target_properties(intel-ext-pt-gpu PROPERTIES FMT_INCLUDE_DIR "${FMT_INCLUDE_DIR}")
-  else()
-    message(FATAL_ERROR "ERROR: Cannot build fmt::fmt-header-only! Cannot build USE_KINETO without FMT!")
-  endif()
-  target_compile_options(intel-ext-pt-gpu PRIVATE "-DKINETO_NAMESPACE=libkineto")
-endif()
-
 if (BUILD_JIT_QUANTIZATION_SAVE)
   list(APPEND IPEX_COMPILE_DEFINITIONS "BUILD_JIT_QUANTIZATION_SAVE")
 endif()
@@ -243,6 +221,25 @@ endif()
   endif()
 else()
   message(FATAL_ERROR "Error: Cannot find spdlog")
+endif()
+
+if (USE_PTI)
+  # Temp fmt part dependency for copied Kineto code
+  if (NOT TARGET fmt::fmt-header-only)
+    find_package(fmt QUIET)
+    if (FMT_FOUND)
+      target_link_libraries(intel-ext-pt-gpu PRIVATE fmt::fmt-header-only)
+      target_include_directories(intel-ext-pt-gpu PRIVATE ${FMT_INCLUDE_DIR})
+      set_target_properties(intel-ext-pt-gpu PROPERTIES FMT_INCLUDE_DIR "${FMT_INCLUDE_DIR}")
+    else()
+      message(FATAL_ERROR "ERROR: Cannot build fmt::fmt-header-only! Cannot build USE_PTI without FMT!")
+    endif()
+  endif()
+  # Temp fmt part end.
+  target_link_libraries(intel-ext-pt-gpu PUBLIC Pti::pti_view)
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_PTI")
+  set_target_properties(intel-ext-pt-gpu PROPERTIES USE_PTI ON)
+  target_compile_options(intel-ext-pt-gpu PRIVATE "-DKINETO_NAMESPACE=libkineto")
 endif()
 
 # XXX: Please make sure to find oneMKL before oneDNN
@@ -325,18 +322,6 @@ if(USE_XETLA)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
   list(APPEND LIBRARIES_INSTALL xetla_kernels)
-endif()
-
-if(USE_KINETO)
-  if(USE_ONETRACE)
-    # static library
-    install(TARGETS ${ONETRACE_LIBRARY}
-      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  elseif(USE_PTI)
-    message(WARNING "WARNING: PTI library has not been ready! Continue to build without PTI!")
-  endif()
 endif()
 
 install(TARGETS intel-ext-pt-gpu

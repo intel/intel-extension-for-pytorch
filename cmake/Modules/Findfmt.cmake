@@ -30,10 +30,17 @@ set(FMT_INCLUDE_DIR)
 set(THIRD_PARTY_DIR "${PROJECT_SOURCE_DIR}/third_party")
 set(FMT_ROOT "${THIRD_PARTY_DIR}/fmt")
 
+set(TEMP_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libs" FORCE)
 add_subdirectory(${FMT_ROOT} fmt EXCLUDE_FROM_ALL)
-if (NOT TARGET fmt)
-  message(FATAL_ERROR "Failed to include fmt target")
+set_target_properties(fmt-header-only PROPERTIES INTERFACE_COMPILE_FEATURES "")
+
+if (NOT TARGET fmt::fmt-header-only)
+  message(FATAL_ERROR "Failed to include fmt::fmt-header-only target")
 endif()
+
+set(BUILD_SHARED_LIBS ${TEMP_BUILD_SHARED_LIBS} CACHE BOOL "Build shared libs" FORCE)
+
 list(APPEND FMT_INCLUDE_DIR "${FMT_ROOT}/include")
 
 set(FMT_FOUND ON)

@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef USE_KINETO
-
 #include <memory>
 #include <set>
 #include <vector>
@@ -69,5 +67,3 @@ class XPUActivityProfilerProxy : public ActivityProfilerInterface {
 };
 
 } // namespace KINETO_NAMESPACE
-
-#endif

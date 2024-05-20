@@ -22,7 +22,6 @@
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
 #include <utils/Macros.h>
-#include <utils/Profiler.h>
 #include <utils/Settings.h>
 
 using namespace dnnl;

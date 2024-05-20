@@ -1,7 +1,6 @@
 #include <runtime/CachingHostAllocator.h>
 #include <runtime/Memory.h>
 #include <runtime/Utils.h>
-#include <utils/Profiler.h>
 
 namespace xpu {
 namespace dpcpp {

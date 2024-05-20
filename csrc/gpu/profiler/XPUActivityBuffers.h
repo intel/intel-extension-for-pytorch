@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef USE_KINETO
-
 #include <list>
 #include <memory>
 
@@ -25,5 +23,3 @@ struct XPUActivityBuffers {
 };
 
 } // namespace KINETO_NAMESPACE
-
-#endif

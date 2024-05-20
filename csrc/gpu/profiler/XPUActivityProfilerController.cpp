@@ -1,5 +1,3 @@
-#ifdef USE_KINETO
-
 #include <profiler/XPUActivityProfilerController.h>
 
 #include <chrono>
@@ -301,5 +299,3 @@ void XPUActivityProfilerController::logInvariantViolation(
 }
 
 } // namespace KINETO_NAMESPACE
-
-#endif

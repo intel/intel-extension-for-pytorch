@@ -155,10 +155,6 @@ static PyObject* THPModule_initExtension(PyObject* self, PyObject* noargs) {
   // Put set_run_yet_variable_to_true() here instead of in C++ API's lazy_init()
   // to avoid circular calls when directly call Python API's _lazy_init().
   set_run_yet_variable_to_true();
-  // initialize oneTrace due to it need to be the first one to call zeInit()
-  if (Settings::I().is_kineto_enabled())
-    if (Settings::I().is_onetrace_enabled())
-      xpu::dpcpp::profiler::enableTracingLayer();
   // call device_count() for getting gpu amounts
   auto num_gpus = xpu::dpcpp::device_count();
   auto default_dpcpp_generators =
@@ -820,15 +816,9 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().is_simple_trace_enabled();
   });
 
-  m.def(
-      "_is_kineto_enabled", []() { return Settings::I().is_kineto_enabled(); });
-
-  m.def("_is_onetrace_enabled", []() {
-    return Settings::I().is_onetrace_enabled();
-  });
+  m.def("_is_pti_enabled", []() { return Settings::I().is_pti_enabled(); });
 
   m.def("_prepare_profiler", xpu::dpcpp::profiler::prepareProfiler);
-  m.def("_enable_tracing_layer", xpu::dpcpp::profiler::enableTracingLayer);
 
   auto module = m.ptr();
   THDPStream_init(module);

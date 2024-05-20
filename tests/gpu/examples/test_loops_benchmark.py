@@ -80,7 +80,11 @@ def run_binary_fn(info, fn, dtype, dynamiccast=False, runs=10):
         ret_cpu = eval("tensor1.cpu() " + fn + " tensor2.cpu()")
         if intel_extension_for_pytorch:
             tensor1_, tensor2_ = tensor1.xpu(), tensor2.xpu()
-            with torch.autograd.profiler_legacy.profile(True, use_xpu=True) as prof:
+            with torch.profiler.profile(
+                activities=[
+                    torch.profiler.ProfilerActivity.XPU,
+                ]
+            ) as prof:
                 if i == 0 and mb:
                     mb.enable_verbose()
                 ret_gpu = eval("tensor1_ " + fn + " tensor2_")
@@ -451,7 +455,11 @@ def run_tests():
 class TestTensorMethod(TestCase):
     @pytest.mark.skipif(
         platform.system() == "Windows",
-        reason="torch.autograd.profiler_legacy not available on Windows.",
+        reason="Profiler test of XPU not available on Windows.",
+    )
+    @pytest.mark.skipif(
+        not intel_extension_for_pytorch._C._is_pti_enabled(),
+        reason="Profiler test of XPU not available without Kineto + PTI support.",
     )
     def test_loops_backbone(self):
         run_tests()

@@ -1,6 +1,5 @@
 set(utils_src
     ${IPEX_GPU_ROOT_DIR}/utils/oneMKLUtils.cpp
-    ${IPEX_GPU_ROOT_DIR}/utils/Profiler.cpp
     ${IPEX_GPU_ROOT_DIR}/utils/Settings.cpp
     ${IPEX_GPU_ROOT_DIR}/utils/SimpleTrace.cpp
     ${IPEX_GPU_ROOT_DIR}/utils/LogImpl.cpp)

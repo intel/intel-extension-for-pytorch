@@ -10,9 +10,6 @@
 [submodule "third_party/fmt"]
 	path = third_party/fmt
 	url = https://github.com/fmtlib/fmt.git
-[submodule "third_party/pti-gpu"]
-	path = third_party/pti-gpu
-	url = https://github.com/intel/pti-gpu.git
 [submodule "third_party/oneDNN"]
 	path = third_party/oneDNN
 	url = https://github.com/oneapi-src/oneDNN.git

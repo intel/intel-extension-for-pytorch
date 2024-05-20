@@ -2,7 +2,7 @@
 
 #include <torch/csrc/profiler/api.h>
 
-#ifdef USE_KINETO
+#ifdef USE_PTI
 #include <profiler/XPUActivityProfilerProxy.h>
 #include <profiler/include/kineto/libkineto.h>
 
@@ -17,7 +17,7 @@ namespace profiler {
 namespace impl {
 namespace kineto {
 
-#ifdef USE_KINETO
+#ifdef USE_PTI
 namespace {
 const std::set<libkineto::ActivityType> cpuTypes = {
     libkineto::ActivityType::CPU_OP,
@@ -38,10 +38,6 @@ const std::set<libkineto::ActivityType> xpuTypes = {
 } // namespace
 
 void libkineto_init_xpu(bool cpuOnly, bool logOnError) {
-#ifdef HAS_ONEPTI
-  // Now onePTI was not ready yet.
-#endif
-
   // libkineto::ConfigLoader& config_loader = libkineto::api().configLoader();
   libkineto::api().registerProfiler(
       std::make_unique<KINETO_NAMESPACE::XPUActivityProfilerProxy>(cpuOnly));
@@ -52,7 +48,7 @@ void prepareTrace(
     const bool cpuOnly,
     const ActivitySet& activities,
     const torch::profiler::impl::ExperimentalConfig& config) {
-#ifdef USE_KINETO
+#ifdef USE_PTI
   if (!libkineto::api().isProfilerRegistered()) {
     libkineto_init_xpu(/*cpuOnly=*/cpuOnly, /*logOnError=*/true);
     libkineto::api().suppressLogMessages();
@@ -71,6 +67,10 @@ void prepareTrace(
   }
 
   libkineto::api().activityProfiler().prepareTrace(k_activities);
+#else
+  TORCH_CHECK(
+      false,
+      "PTI support is not built. Cannot profile on XPU without PTI support");
 #endif
 }
 

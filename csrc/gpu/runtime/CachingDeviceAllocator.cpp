@@ -4,7 +4,6 @@
 #include <runtime/Exception.h>
 #include <runtime/Utils.h>
 #include <utils/Helpers.h>
-#include <utils/Profiler.h>
 
 namespace xpu {
 namespace dpcpp {
@@ -324,8 +323,6 @@ void CachingDeviceAllocator::malloc(
 
   *devPtr = block->m_buffer;
 
-  reportMemoryUsage(block, block->m_size, curDevID);
-
   update_stat_array(stats.allocation, 1, stat_types);
   update_stat_array(stats.allocated_bytes, block->m_size, stat_types);
   update_stat_array(stats.active, 1, stat_types);
@@ -446,8 +443,6 @@ void CachingDeviceAllocator::free_block(Block* block) {
   AT_ASSERT(!block->m_allocated && block->m_event_cnt == 0);
 
   size_t original_block_size = block->m_size;
-
-  reportMemoryUsage(block, -block->m_size, block->m_device);
 
   BlockPool* pool = nullptr;
   if (block->m_pool_type == PoolType::LARGE_POOL) {

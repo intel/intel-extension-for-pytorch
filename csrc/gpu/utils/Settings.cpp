@@ -50,8 +50,6 @@ namespace dpcpp {
  * ==========EXP==========
  *   IPEX_SIMPLE_TRACE:
  *      Default = 0 | Set 1 to enable simple trace for all operators*
- *   IPEX_ZE_TRACING:
- *      Default = 0 | Set 1 to enable kineto profiling based-on level zero tracing
  * ==========EXP==========
  *
  * Internal options:
@@ -200,11 +198,6 @@ Settings::Settings() {
   simple_trace_enabled = ENV_VAL::OFF;
   DPCPP_INIT_ENV_VAL(
       "IPEX_SIMPLE_TRACE", simple_trace_enabled, ENV_VAL, show_opt);
-#endif
-
-#ifdef USE_KINETO
-  onetrace_enabled = ENV_VAL::OFF;
-  DPCPP_INIT_ENV_VAL("IPEX_ZE_TRACING", onetrace_enabled, ENV_VAL, show_opt);
 #endif
 
   if (show_opt) {
@@ -575,18 +568,9 @@ void Settings::disable_simple_trace() {
 #endif
 }
 
-bool Settings::is_kineto_enabled() const {
-#ifdef USE_KINETO
+bool Settings::is_pti_enabled() const {
+#ifdef USE_PTI
   return true;
-#else
-  return false;
-#endif
-}
-
-bool Settings::is_onetrace_enabled() const {
-#ifdef USE_KINETO
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return onetrace_enabled == ENV_VAL::ON;
 #else
   return false;
 #endif

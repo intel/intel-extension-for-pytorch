@@ -738,10 +738,27 @@ if _is_compiled():
                 override_assert_equal()
 
 
+# XXX: this is a temporary work-around to replace torch's _prepare_profiler method
+#     inside IPEX because the extension need to prepare its profiler as a path.
+#     When IPEX's PTI based profiler is successfully upstream to PyTorch as the
+#     Kineto's plugin, these part should be removed as well as all profiler code
+#     inside IPEX.
+
+torch_prepare_profiler_method = torch.autograd.profiler._prepare_profiler
+
+
 def _prepare_profiler(config, activities):
-    # global profiler need to trigger lazy init
-    _lazy_init()
-    return intel_extension_for_pytorch._C._prepare_profiler(config, activities)
+    if torch.profiler.ProfilerActivity.XPU not in activities:
+        return torch_prepare_profiler_method(config, activities)
+    else:
+        if intel_extension_for_pytorch._C._is_pti_enabled():
+            return intel_extension_for_pytorch._C._prepare_profiler(config, activities)
+        else:
+            raise RuntimeError(
+                "intel_extension_for_pytorch ot build with PTI support. "
+                "Cannot profile on XPU activities, but has set ProfilerActivity.XPU"
+            )
+            return None
 
 
 if "torch.autograd.profiler" in sys.modules:

@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef USE_KINETO
-
 #include <atomic>
 #include <cstdint>
 #include <functional>
@@ -94,5 +92,3 @@ class XPUActivityProfilerController {
 };
 
 } // namespace KINETO_NAMESPACE
-
-#endif

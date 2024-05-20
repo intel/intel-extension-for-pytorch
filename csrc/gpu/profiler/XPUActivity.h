@@ -1,10 +1,12 @@
 #pragma once
 
+#include <profiler/XPUActivityApi.h>
 #include <profiler/XPUActivityPlatform.h>
 #include <profiler/include/kineto/GenericTraceActivity.h>
 #include <profiler/include/kineto/ITraceActivity.h>
 #include <profiler/include/kineto/ThreadUtil.h>
-#include "onepti_activity_api.h"
+
+#include <pti/pti_view.h>
 
 #include <string>
 
@@ -21,12 +23,8 @@ template <class T>
 struct XPUActivity : public ITraceActivity {
   explicit XPUActivity(const T* activity, const ITraceActivity* linked)
       : activity_(*activity), linked_(linked) {}
-  int64_t timestamp() const override {
-    return nsToUs(unixEpochTimestamp(activity_.start));
-  }
-  int64_t duration() const override {
-    return nsToUs(activity_.end - activity_.start);
-  }
+  int64_t timestamp() const override;
+  int64_t duration() const override;
   int64_t correlationId() const override {
     return 0;
   }
@@ -55,14 +53,14 @@ struct XPUActivity : public ITraceActivity {
 };
 
 // Onepti_ActivityAPI - ONEPTI runtime activities
-struct RuntimeActivity : public XPUActivity<Onepti_ActivityAPI> {
+struct RuntimeActivity : public XPUActivity<pti_view_record_sycl_runtime> {
   explicit RuntimeActivity(
-      const Onepti_ActivityAPI* activity,
+      const pti_view_record_sycl_runtime* activity,
       const ITraceActivity* linked,
       int32_t threadId)
       : XPUActivity(activity, linked), threadId_(threadId) {}
   int64_t correlationId() const override {
-    return activity_.correlationId;
+    return activity_._correlation_id;
   }
   int64_t deviceId() const override {
     return processId();
@@ -75,7 +73,7 @@ struct RuntimeActivity : public XPUActivity<Onepti_ActivityAPI> {
   }
   bool flowStart() const override;
   const std::string name() const override {
-    return activity_.name;
+    return activity_._name;
   }
   void log(ActivityLogger& logger) const override;
   const std::string metadataJson() const override;
@@ -84,32 +82,31 @@ struct RuntimeActivity : public XPUActivity<Onepti_ActivityAPI> {
   const int32_t threadId_;
 };
 
-// // Onepti_ActivityAPI - ONEPTI overhead activities
-// struct OverheadActivity : public XPUActivity<Onepti_ActivityOverhead> {
-//   explicit OverheadActivity(
-//       const Onepti_ActivityOverhead* activity,
-//       const ITraceActivity* linked,
-//       int32_t threadId=0)
-//       : XPUActivity(activity, linked), threadId_(threadId) {}
-//
-//   int64_t timestamp() const override {
-//     return nsToUs(unixEpochTimestamp(activity_.start));
-//   }
-//   int64_t duration() const override {
-//     return nsToUs(activity_.end - activity_.start);
-//   }
-//   // TODO: Update this with PID ordering
-//   int64_t deviceId() const override {return -1;}
-//   int64_t resourceId() const override {return threadId_;}
-//   ActivityType type() const override {return ActivityType::OVERHEAD;}
-//   bool flowStart() const override;
-//   const std::string name() const override {return
-//   overheadKindString(activity_.overheadKind);} void log(ActivityLogger&
-//   logger) const override; const std::string metadataJson() const override;
-//
-//  private:
-//   const int32_t threadId_;
-// };
+// Onepti_ActivityAPI - ONEPTI overhead activities
+struct OverheadActivity : public XPUActivity<pti_view_record_overhead> {
+  explicit OverheadActivity(
+      const pti_view_record_overhead* activity,
+      const ITraceActivity* linked,
+      int32_t threadId = 0)
+      : XPUActivity(activity, linked), threadId_(threadId) {}
+  // TODO: Update this with PID ordering
+  int64_t deviceId() const override {
+    return -1;
+  }
+  int64_t resourceId() const override {
+    return threadId_;
+  }
+  ActivityType type() const override {
+    return ActivityType::OVERHEAD;
+  }
+  bool flowStart() const override;
+  const std::string name() const override;
+  void log(ActivityLogger& logger) const override;
+  const std::string metadataJson() const override;
+
+ private:
+  const int32_t threadId_;
+};
 
 // Base class for GPU activities.
 // Can also be instantiated directly.
@@ -118,13 +115,14 @@ struct GpuActivity : public XPUActivity<T> {
   explicit GpuActivity(const T* activity, const ITraceActivity* linked)
       : XPUActivity<T>(activity, linked) {}
   int64_t correlationId() const override {
-    return raw().correlationId;
+    return raw()._correlation_id;
   }
   int64_t deviceId() const override {
-    return raw().deviceId;
+    return XPUActivityApi::singleton().get_device_idx_from_uuid(
+        raw()._device_uuid);
   }
   int64_t resourceId() const override {
-    return raw().queueId;
+    return (int64_t)raw()._queue_handle;
   }
   ActivityType type() const override;
   bool flowStart() const override {

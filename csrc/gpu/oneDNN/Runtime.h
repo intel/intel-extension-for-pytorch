@@ -6,7 +6,6 @@
 #include <core/Memory.h>
 #include <core/Stream.h>
 #include <runtime/Utils.h>
-#include <utils/Profiler.h>
 
 #include <oneapi/dnnl/dnnl.hpp>
 #include <oneapi/dnnl/dnnl_sycl.hpp>

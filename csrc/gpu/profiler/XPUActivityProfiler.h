@@ -24,7 +24,7 @@
 #include <profiler/include/kineto/libkineto.h>
 #include <profiler/xpu_output_base.h>
 
-#include "onepti_activity_api.h"
+#include <pti/pti_view.h>
 
 namespace KINETO_NAMESPACE {
 
@@ -246,19 +246,20 @@ class XPUActivityProfiler {
 
   const ITraceActivity* cpuActivity(int32_t correlationId);
 
-  void handleOneptiActivity(
-      const Onepti_Activity* record,
+  void handlePtiActivity(
+      const pti_view_record_base* record,
       ActivityLogger* logger);
 
   void updateGpuNetSpan(const ITraceActivity& gpuOp);
   bool outOfRange(const ITraceActivity& act);
   void handleCorrelationActivity(
-      const Onepti_ActivityExternalCorrelation* correlation);
+      const pti_view_record_external_correlation* correlation);
   void handleRuntimeActivity(
-      const Onepti_ActivityAPI* activity,
+      const pti_view_record_sycl_runtime* activity,
       ActivityLogger* logger);
-  // void handleOverheadActivity(
-  //     const Onepti_ActivityOverhead* activity, ActivityLogger* logger);
+  void handleOverheadActivity(
+      const pti_view_record_overhead* activity,
+      ActivityLogger* logger);
   void handleGpuActivity(const ITraceActivity& act, ActivityLogger* logger);
   template <class T>
   void handleGpuActivity(const T* act, ActivityLogger* logger);

@@ -1,23 +1,13 @@
-#ifdef USE_KINETO
-
 #include <profiler/XPUActivityApi.h>
 
 #include <assert.h>
 #include <chrono>
-#include <iostream>
+#include <cstring>
 #include <mutex>
 #include <thread>
 
 #include <profiler/Logger.h>
 #include <profiler/include/kineto/Config.h>
-
-#include "onepti_activity_api.h"
-
-#if defined(USE_ONETRACE)
-#include "trace_options.h"
-#include "unified_tracer.h"
-#elif defined(USE_PTI)
-#endif
 
 using namespace std::chrono;
 
@@ -25,125 +15,124 @@ namespace KINETO_NAMESPACE {
 
 constexpr size_t kBufSize(4 * 1024 * 1024);
 
-#if defined(USE_ONETRACE)
-static TraceOptions SetFlags() {
-  std::string value;
-  uint32_t flags = 0;
-  std::string log_file;
-
-  flags |= (1 << TRACE_DEMANGLE);
-  flags |= (1 << TRACE_IPEX_CALL_LOGGING);
-  flags |= (1 << TRACE_IPEX_DEVICE_STAGES);
-
-  return TraceOptions(flags, log_file);
-}
-
-UnifiedTracer* XPUActivityApi::tracer = nullptr;
-
-XPUActivityApi::XPUActivityApi() {
-  tracer = UnifiedTracer::Create(SetFlags());
-}
-#endif
-
 XPUActivityApi& XPUActivityApi::singleton() {
   static XPUActivityApi instance;
   return instance;
 }
 
 void XPUActivityApi::pushCorrelationID(int id, CorrelationFlowType type) {
-#ifdef USE_ONETRACE
   if (!singleton().externalCorrelationEnabled_) {
     return;
   }
+  VLOG(2) << "pushCorrelationID(" << id << ")";
   switch (type) {
     case Default:
-      tracer->push_external_correlation_id(
-          ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0, id);
+      ptiViewPushExternalCorrelationId(
+          pti_view_external_kind::PTI_VIEW_EXTERNAL_KIND_CUSTOM_0, id);
       break;
     case User:
-      tracer->push_external_correlation_id(
-          ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1, id);
-      break;
+      ptiViewPushExternalCorrelationId(
+          pti_view_external_kind::PTI_VIEW_EXTERNAL_KIND_CUSTOM_1, id);
   }
-#endif
 }
 
 void XPUActivityApi::popCorrelationID(CorrelationFlowType type) {
-#ifdef USE_ONETRACE
   if (!singleton().externalCorrelationEnabled_) {
     return;
   }
   switch (type) {
     case Default:
-      tracer->pop_external_correlation_id(
-          ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0);
+      ptiViewPopExternalCorrelationId(
+          pti_view_external_kind::PTI_VIEW_EXTERNAL_KIND_CUSTOM_0, nullptr);
       break;
     case User:
-      tracer->pop_external_correlation_id(
-          ONEPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1);
-      break;
+      ptiViewPopExternalCorrelationId(
+          pti_view_external_kind::PTI_VIEW_EXTERNAL_KIND_CUSTOM_1, nullptr);
   }
-#endif
 }
 
-void XPUActivityApi::enableOneptiActivities(
-    const std::set<ActivityType>& selected_activities) {
-#ifdef USE_ONETRACE
-  externalCorrelationEnabled_ = false;
-  for (const auto& activity : selected_activities) {
-    if (activity == ActivityType::GPU_MEMCPY) {
-      // onepti_enable_view(GPU_MEMCPY)
-    }
-    if (activity == ActivityType::GPU_MEMSET) {
-      // onepti_enable_view(GPU_MEMSET)
-    }
-    if (activity == ActivityType::CONCURRENT_KERNEL) {
-      // onepti_enable_view(CONCURRENT_KERNEL)
-    }
-    if (activity == ActivityType::EXTERNAL_CORRELATION) {
-      // onepti_enable_view(EXTERNAL_CORRELATION)
-      externalCorrelationEnabled_ = true;
-    }
-    if (activity == ActivityType::XPU_RUNTIME) {
-      // onepti_enable_view(XPU_RUNTIME)
-    }
-    if (activity == ActivityType::OVERHEAD) {
-      // onepti_enable_view(OVERHEAD)
-    }
+static bool nextActivityRecord(
+    uint8_t* buffer,
+    size_t valid_size,
+    Onepti_Activity*& record) {
+  pti_result status = ptiViewGetNextRecord(buffer, valid_size, &record);
+  if (status != pti_result::PTI_SUCCESS) {
+    record = nullptr;
   }
-
-  tracingEnabled_ = 1;
-#endif
-
-  stopCollection = false;
+  return record != nullptr;
 }
 
-void XPUActivityApi::disableOneptiActivities(
-    const std::set<ActivityType>& selected_activities) {
-#ifdef USE_ONETRACE
-  for (const auto& activity : selected_activities) {
-    if (activity == ActivityType::GPU_MEMCPY) {
-      // onepti_disable_view(GPU_MEMCPY)
-    }
-    if (activity == ActivityType::GPU_MEMSET) {
-      // onepti_disable_view(GPU_MEMSET)
-    }
-    if (activity == ActivityType::CONCURRENT_KERNEL) {
-      // onepti_disable_view(CONCURRENT_KERNEL)
-    }
-    if (activity == ActivityType::EXTERNAL_CORRELATION) {
-      // onepti_disable_view(EXTERNAL_CORRELATION)
-      externalCorrelationEnabled_ = true;
-    }
-    if (activity == ActivityType::XPU_RUNTIME) {
-      // onepti_disable_view(XPU_RUNTIME)
-    }
-    if (activity == ActivityType::OVERHEAD) {
-      // onepti_disable_view(OVERHEAD)
+void XPUActivityApi::setMaxBufferSize(int size) {
+  maxGpuBufferCount_ = 1 + size / kBufSize;
+}
+
+void XPUActivityApi::bufferRequestedTrampoline(uint8_t** buffer, size_t* size) {
+  singleton().bufferRequested(buffer, size);
+}
+
+void XPUActivityApi::bufferRequested(uint8_t** buffer, size_t* size) {
+  std::lock_guard<std::mutex> guard(mutex_);
+  if (allocatedGpuTraceBuffers_.size() >= maxGpuBufferCount_) {
+    stopCollection = true;
+    LOG(WARNING) << "Exceeded max GPU buffer count ("
+                 << allocatedGpuTraceBuffers_.size() << " > "
+                 << maxGpuBufferCount_ << ") - terminating tracing";
+  }
+
+  auto buf = std::make_unique<XPUActivityBuffer>(kBufSize);
+  *buffer = buf->data();
+  *size = kBufSize;
+
+  allocatedGpuTraceBuffers_[*buffer] = std::move(buf);
+}
+
+std::unique_ptr<XPUActivityBufferMap> XPUActivityApi::activityBuffers() {
+  {
+    std::lock_guard<std::mutex> guard(mutex_);
+    if (allocatedGpuTraceBuffers_.empty()) {
+      return nullptr;
     }
   }
-  externalCorrelationEnabled_ = false;
-#endif
+
+  VLOG(1) << "Flushing GPU activity buffers";
+  time_point<system_clock> t1;
+  if (VLOG_IS_ON(1)) {
+    t1 = system_clock::now();
+  }
+  ptiFlushAllViews();
+  if (VLOG_IS_ON(1)) {
+    flushOverhead =
+        duration_cast<microseconds>(system_clock::now() - t1).count();
+  }
+  std::lock_guard<std::mutex> guard(mutex_);
+  return std::move(readyGpuTraceBuffers_);
+}
+
+int XPUActivityApi::processActivitiesForBuffer(
+    uint8_t* buf,
+    size_t validSize,
+    std::function<void(const Onepti_Activity*)> handler) {
+  int count = 0;
+  if (buf && validSize) {
+    Onepti_Activity* record{nullptr};
+    while (nextActivityRecord(buf, validSize, record)) {
+      handler(record);
+      ++count;
+    }
+  }
+  return count;
+}
+
+const std::pair<int, int> XPUActivityApi::processActivities(
+    XPUActivityBufferMap& buffers,
+    std::function<void(const Onepti_Activity*)> handler) {
+  std::pair<int, int> res{0, 0};
+  for (auto& pair : buffers) {
+    auto& buf = pair.second;
+    res.first += processActivitiesForBuffer(buf->data(), buf->size(), handler);
+    res.second += buf->size();
+  }
+  return res;
 }
 
 void XPUActivityApi::clearActivities() {
@@ -153,79 +142,109 @@ void XPUActivityApi::clearActivities() {
       return;
     }
   }
+  ptiFlushAllViews();
   std::lock_guard<std::mutex> guard(mutex_);
   readyGpuTraceBuffers_ = nullptr;
 }
 
-std::unique_ptr<XPUActivityBufferMap> XPUActivityApi::activityBuffers() {
-  // {
-  //   std::lock_guard<std::mutex> guard(mutex_);
-  //   if (allocatedGpuTraceBuffers_.empty()) {
-  //     return nullptr;
-  //   }
-  // }
+void XPUActivityApi::bufferCompletedTrampoline(
+    uint8_t* buffer,
+    size_t size,
+    size_t validSize) {
+  singleton().bufferCompleted(buffer, size, validSize);
+}
 
-#ifdef USE_ONETRACE
+void XPUActivityApi::bufferCompleted(
+    uint8_t* buffer,
+    size_t size,
+    size_t validSize) {
+  std::lock_guard<std::mutex> guard(mutex_);
+  auto it = allocatedGpuTraceBuffers_.find(buffer);
+  if (it == allocatedGpuTraceBuffers_.end()) {
+    LOG(ERROR) << "bufferCompleted called with unknown buffer: "
+               << (void*)buffer;
+    return;
+  }
+
   if (!readyGpuTraceBuffers_) {
     readyGpuTraceBuffers_ = std::make_unique<XPUActivityBufferMap>();
-    auto buf = std::make_unique<XPUActivityBuffer>(tracer->get_buffer());
-    (*readyGpuTraceBuffers_)[buf->data()] = std::move(buf);
   }
-  time_point<system_clock> t1 = system_clock::now();
-  flushOverhead = duration_cast<microseconds>(system_clock::now() - t1).count();
-#endif
-  std::lock_guard<std::mutex> guard(mutex_);
-  return std::move(readyGpuTraceBuffers_);
+  it->second->setSize(validSize);
+  (*readyGpuTraceBuffers_)[it->first] = std::move(it->second);
+  allocatedGpuTraceBuffers_.erase(it);
 }
 
-#ifdef USE_ONETRACE
-int XPUActivityApi::processActivitiesForBuffer(
-    uint8_t* buf,
-    size_t validSize,
-    std::function<void(const Onepti_Activity*)> handler) {
-  int count = 0;
-  if (buf && validSize) {
-    Onepti_Activity* record{nullptr};
-    while (getNextRecord(buf, validSize, record)) {
-      handler(record);
-      ++count;
+void XPUActivityApi::enablePtiActivities(
+    const std::set<ActivityType>& selected_activities) {
+  ptiViewSetCallbacks(bufferRequestedTrampoline, bufferCompletedTrampoline);
+
+  externalCorrelationEnabled_ = false;
+  for (const auto& activity : selected_activities) {
+    if (activity == ActivityType::GPU_MEMCPY) {
+      ptiViewEnable(PTI_VIEW_DEVICE_GPU_MEM_COPY);
+    }
+    if (activity == ActivityType::GPU_MEMSET) {
+      ptiViewEnable(PTI_VIEW_DEVICE_GPU_MEM_FILL);
+    }
+    if (activity == ActivityType::CONCURRENT_KERNEL) {
+      ptiViewEnable(PTI_VIEW_DEVICE_GPU_KERNEL);
+    }
+    if (activity == ActivityType::EXTERNAL_CORRELATION) {
+      ptiViewEnable(PTI_VIEW_EXTERNAL_CORRELATION);
+      externalCorrelationEnabled_ = true;
+    }
+    if (activity == ActivityType::XPU_RUNTIME) {
+      ptiViewEnable(PTI_VIEW_SYCL_RUNTIME_CALLS);
+    }
+    if (activity == ActivityType::OVERHEAD) {
+      // ptiViewEnable(PTI_VIEW_COLLECTION_OVERHEAD);
     }
   }
-  return count;
+
+  tracingEnabled_ = 1;
+
+  stopCollection = false;
 }
 
-void XPUActivityApi::startCollecting() {
-  tracer->set_active_flag(true);
-}
-
-void XPUActivityApi::stopCollecting() {
-  tracer->set_active_flag(false);
-}
-#endif
-
-const std::pair<int, int> XPUActivityApi::processActivities(
-    XPUActivityBufferMap& buffers,
-    std::function<void(const Onepti_Activity*)> handler) {
-  std::pair<int, int> res{0, 0};
-#ifdef USE_ONETRACE
-  for (auto& pair : buffers) {
-    auto& buf = pair.second;
-    res.first += processActivitiesForBuffer(buf->data(), buf->size(), handler);
-    res.second += buf->size();
+void XPUActivityApi::disablePtiActivities(
+    const std::set<ActivityType>& selected_activities) {
+  for (const auto& activity : selected_activities) {
+    if (activity == ActivityType::GPU_MEMCPY) {
+      ptiViewDisable(PTI_VIEW_DEVICE_GPU_MEM_COPY);
+    }
+    if (activity == ActivityType::GPU_MEMSET) {
+      ptiViewDisable(PTI_VIEW_DEVICE_GPU_MEM_FILL);
+    }
+    if (activity == ActivityType::CONCURRENT_KERNEL) {
+      ptiViewDisable(PTI_VIEW_DEVICE_GPU_KERNEL);
+    }
+    if (activity == ActivityType::EXTERNAL_CORRELATION) {
+      ptiViewDisable(PTI_VIEW_EXTERNAL_CORRELATION);
+    }
+    if (activity == ActivityType::XPU_RUNTIME) {
+      ptiViewDisable(PTI_VIEW_SYCL_RUNTIME_CALLS);
+    }
+    if (activity == ActivityType::OVERHEAD) {
+      // ptiViewDisable(PTI_VIEW_COLLECTION_OVERHEAD);
+    }
   }
-#endif
-  return res;
+  externalCorrelationEnabled_ = false;
 }
 
-void XPUActivityApi::setMaxBufferSize(int size) {
-  /* actually useless for XPU */
-  maxGpuBufferCount_ = 1 + size / kBufSize;
+void XPUActivityApi::setDeviceUuidMap(
+    std::vector<std::array<unsigned char, 16>>& uuids) {
+  _uuids.assign(uuids.begin(), uuids.end());
 }
 
-void XPUActivityApi::setDeviceIdMap(const std::vector<std::string>& devices) {
-  tracer->set_device_id_map(devices);
+int64_t XPUActivityApi::get_device_idx_from_uuid(
+    const uint8_t device_uuid[16]) {
+  std::array<unsigned char, 16> key;
+  memcpy(key.data(), device_uuid, 16);
+  auto it = std::find(_uuids.begin(), _uuids.end(), key);
+  if (it == _uuids.end())
+    return static_cast<int64_t>(-1);
+  else
+    return static_cast<int64_t>(std::distance(_uuids.begin(), it));
 }
 
 } // namespace KINETO_NAMESPACE
-
-#endif
