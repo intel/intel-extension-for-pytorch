@@ -245,23 +245,56 @@ def remove_empty_tensor(out):
     return out
 
 
+def found_wrapper(parameter, params_attr):
+    for _, v in params_attr.items():
+        if parameter is v.parameter:
+            return v
+    return None
+
+
 def patch_state_dict(model, params_attr, mode):
-    def cast_back_state_dict(self, *args, destination=None, prefix="", keep_vars=False):
-        with torch.no_grad(), contextlib.ExitStack() as stack:
-            for v in params_attr.values():
-                if mode == "inference":
-                    stack.enter_context(v.inference_cast_save())
+    def get_parammeter_from_model(model, name_list):
+        if name_list[0] == "module" and not hasattr(model, "module"):
+            # for DDP model, there is an extra module
+            name_list = name_list[1:]
+        model_or_param = model
+        for attr in name_list:
+            model_or_param = getattr(model_or_param, attr)
+        return model_or_param
+
+    def to_public_fp32(model, state_dict, params_attr):
+        data_ptr_dict = {}
+        for k, v in state_dict.items():
+            v_ptr = v.data_ptr()
+            if v_ptr in data_ptr_dict:
+                # use cached tensor for multiple parameters share same tensor data
+                state_dict[k] = data_ptr_dict[v_ptr]
+                continue
+            # k = "submodule_name.submodule_name.attr_name"
+            # for example, "attn.linear.weight"
+            name_list = k.split(".")
+            param = get_parammeter_from_model(model, name_list)
+            param_wrapper = found_wrapper(param, params_attr)
+            if param_wrapper:
+                if mode == "inference" and param_wrapper.original_dtype is not None:
+                    state_dict[k] = v.to(param_wrapper.original_dtype)
                 elif mode == "training":
-                    stack.enter_context(v.training_cast_save())
+                    state_dict[k] = param_wrapper._training_cast_to_fp32()
                 else:
                     assert mode == "prepack"
-                    stack.enter_context(v.prepack_cast_save())
-            out = self._original_state_dict(
+                    state_dict[k] = param_wrapper._unpack_cast_to_fp32()
+                data_ptr_dict[v_ptr] = state_dict[k]
+        return state_dict
+
+    def cast_back_state_dict(self, *args, destination=None, prefix="", keep_vars=False):
+        with torch.no_grad(), contextlib.ExitStack() as stack:
+            state_dict = self._original_state_dict(
                 *args, destination=destination, prefix=prefix, keep_vars=keep_vars
             )
             # We don't save the _ipex_module_empty_weight_tensor or _ipex_module_empty_bias_tensor Parameter in the state dict
-            out = remove_empty_tensor(out)
-        return out
+            state_dict = remove_empty_tensor(state_dict)
+            state_dict = to_public_fp32(self, state_dict, params_attr)
+        return state_dict
 
     if not hasattr(model, "_original_state_dict"):
         setattr(model, "_original_state_dict", model.state_dict)  # noqa: B010
@@ -362,52 +395,9 @@ class ParameterWrapper(object):
                 requires_grad=self.master_parameter.requires_grad,
             )
 
-    def inference_cast_save(self):
-        @contextlib.contextmanager
-        def ctx():
-            if self.original_dtype is not None:
-                self.parameter.data = self.parameter.to(self.original_dtype)
-            try:
-                yield
-            finally:
-                if self.original_dtype is not None:
-                    self.parameter.data = self.parameter.to(self.casted_dtype)
-
-        return ctx()
-
-    def training_cast_save(self):
-        @contextlib.contextmanager
-        def ctx():
-            self._training_cast_before_save()
-            try:
-                yield
-            finally:
-                self._training_cast_after_save()
-
-        return ctx()
-
-    def prepack_cast_save(self):
-        @contextlib.contextmanager
-        def ctx():
-            self._cast_unpack_before_save()
-            try:
-                yield
-            finally:
-                self._cast_unpack_after_save()
-
-        return ctx()
-
-    def _inference_cast_before_save(self):
-        if self.original_dtype is not None:
-            self.parameter.data = self.parameter.to(self.original_dtype)
-
-    def _inference_cast_after_save(self):
-        if self.original_dtype is not None:
-            self.parameter.data = self.parameter.to(self.casted_dtype)
-
-    def _training_cast_before_save(self):
+    def _training_cast_to_fp32(self):
         if self.original_dtype is None:
-            return
+            return self.parameter.data.detach()
         assert self.original_dtype in (
             torch.float,
             torch.float32,
@@ -417,51 +407,20 @@ class ParameterWrapper(object):
             fp32_param = torch.ops.torch_ipex.cat_bfloat16_float(
                 self.parameter.data, self.parameter_trail
             )
-            with torch.no_grad():
-                self.parameter.data = fp32_param
+            return fp32_param.detach()
         else:
-            # will save parameter for non-split case
-            with torch.no_grad():
-                self.parameter.data = self.master_parameter.data
+            return self.master_parameter.data.detach()
 
-    def _training_cast_after_save(self):
-        if self.original_dtype is None:
-            return
-        if self.split:
-            assert self.casted_dtype == torch.bfloat16
-            top, self.parameter_trail = torch.ops.torch_ipex.split_float_bfloat16(
-                self.parameter.data
-            )
-            with torch.no_grad():
-                self.parameter.data = top
+    def _unpack_cast_to_fp32(self):
+        fp32_param = self.parameter.data
+        if self.split is not None:
+            fp32_param = self._training_cast_to_fp32()
+        elif self.original_dtype is not None:
+            fp32_param = self.parameter.to(self.original_dtype)
+        if self.op_ctx is None:
+            return fp32_param
         else:
-            self.parameter.data = self.master_parameter.data.to(self.casted_dtype)
-
-    def _cast_unpack_before_save(self):
-        if self.split is not None:
-            self._training_cast_before_save()
-        elif self.original_dtype is not None:
-            self.parameter.data = self.parameter.to(self.original_dtype)
-        if self.op_ctx is None:
-            return
-        with torch.no_grad():
-            if self.master_parameter is not None:
-                self.parameter.data = self.op_ctx.to_public(self.master_parameter)
-            else:
-                self.parameter.data = self.op_ctx.to_public(self.parameter)
-
-    def _cast_unpack_after_save(self):
-        if self.split is not None:
-            self._training_cast_after_save()
-        elif self.original_dtype is not None:
-            self.parameter.data = self.parameter.to(self.casted_dtype)
-        if self.op_ctx is None:
-            return
-        with torch.no_grad():
-            if self.master_parameter is None:
-                self.parameter.data = self.op_ctx.pack(self.parameter)
-            if self.parameter_trail is not None:
-                self.parameter_trail = self.op_ctx.pack(self.parameter_trail)
+            return self.op_ctx.to_public(fp32_param)
 
     def can_prepack(self, module, is_training):
         if self.num_modules != 1:
