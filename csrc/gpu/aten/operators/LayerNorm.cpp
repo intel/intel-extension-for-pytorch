@@ -428,8 +428,10 @@ struct GammaBetaBackwardSimpleDPCPPKernelFunctor {
             db_val[v] = static_cast<weight_t>(db_sum1[v]);
           }
         }
-        *(reinterpret_cast<weight_vec_t*>(dg_data + plane_offset)) = dg_val;
-        *(reinterpret_cast<weight_vec_t*>(db_data + plane_offset)) = db_val;
+        if (dg_data)
+          *(reinterpret_cast<weight_vec_t*>(dg_data + plane_offset)) = dg_val;
+        if (db_data)
+          *(reinterpret_cast<weight_vec_t*>(db_data + plane_offset)) = db_val;
       }
     }
   }
@@ -481,8 +483,8 @@ void GammaBetaBackwardSimpleDPCPPKernel(
     NormConfig& cfg) {
   scalar_t* dY_data = dY.data_ptr<scalar_t>();
   scalar_t* X_data = X.data_ptr<scalar_t>();
-  weight_t* dg_data = dgamma.data_ptr<weight_t>();
-  weight_t* db_data = dbeta.data_ptr<weight_t>();
+  weight_t* dg_data = dgamma.defined() ? dgamma.data_ptr<weight_t>() : nullptr;
+  weight_t* db_data = dbeta.defined() ? dbeta.data_ptr<weight_t>() : nullptr;
 
   using vec_t = at::native::Memory::aligned_vector_loop<scalar_t, vec_size>;
   using weight_vec_t =
@@ -849,8 +851,8 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
   }
   return std::make_tuple(
       grad_input.reshape(input.sizes()),
-      weight.defined() ? grad_weight.reshape(weight.sizes()) : grad_weight,
-      bias.defined() ? grad_bias.reshape(bias.sizes()) : grad_bias);
+      grad_input_mask[1] ? grad_weight.reshape(weight.sizes()) : grad_weight,
+      grad_input_mask[2] ? grad_bias.reshape(bias.sizes()) : grad_bias);
 }
 
 } // namespace AtenIpexTypeXPU
