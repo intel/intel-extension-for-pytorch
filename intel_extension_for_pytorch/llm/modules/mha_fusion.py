@@ -9,13 +9,15 @@ class RotaryEmbedding(nn.Module):
     [module init and forward] Applies RotaryEmbedding (see https://huggingface.co/papers/2104.09864)
                               on the `query ` or `key` before their multi-head attention computation.
     Args:
-        module init:
-        - max_position_embeddings (int): size (max) of the position embeddings.
-        - pos_embd_dim  (int):  dimension of the position embeddings.
-        - base (int) : Default: 10000. Base to generate the frequency of position embeddings.
-        - backbone (str): Default: None. The exact transformers model backbone
-                          (e.g., "GPTJForCausalLM", get from model.config.architectures[0],
-                          see https://huggingface.co/EleutherAI/gpt-j-6b/blob/main/config.json#L4).
+        max_position_embeddings (int): size (max) of the position embeddings.
+        pos_embd_dim  (int):  dimension of the position embeddings.
+        base (int) : Default: 10000. Base to generate the frequency of position embeddings.
+        backbone (str): Default: None. The exact transformers model backbone
+            (e.g., "GPTJForCausalLM", get from model.config.architectures[0],
+            see https://huggingface.co/EleutherAI/gpt-j-6b/blob/main/config.json#L4).
+        extra_rope_config (dict): like phi-3 model, it uses original_max_position_embeddings,
+            long_factor and short_factor, see details:
+            https://huggingface.co/microsoft/Phi-3-mini-128k-instruct/blob/main/config.json#L23.
 
         forward:
         - input (torch.Tensor) : input to be applied with position embeddings,
@@ -70,12 +72,14 @@ class RotaryEmbedding(nn.Module):
         pos_embd_dim: int,
         base=10000,
         backbone: str = None,
+        extra_rope_config: dict = None,
     ):
         super().__init__()
         self.model_backbone = backbone
         self.max_position_embeddings = max_position_embeddings
         self.pos_embd_dim = pos_embd_dim
         self.base = base
+        self.extra_rope_config = extra_rope_config
 
     def forward(
         self,
@@ -107,6 +111,7 @@ class RotaryEmbedding(nn.Module):
             self.pos_embd_dim,
             self.base,
             self.model_backbone,
+            self.extra_rope_config,
         )
         return runtime_module(
             x,

@@ -8,6 +8,8 @@ from intel_extension_for_pytorch.llm.modules import (
     VarlenAttention,
 )
 
+from .utils import _get_function_from_device
+
 
 def rotary_embedding(
     query: torch.Tensor,
@@ -209,3 +211,88 @@ def varlen_attention(
         return_softmax,
         gen_,
     )
+
+
+def silu_mul(x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None):
+    r"""
+    Applies PyTorch silu on input x, and them mul input y:
+    out = silu(x)*y
+
+    Args:
+        x (torch.Tensor): input to apply silu.
+        y (torch.Tensor): input for mul to apply on silu(x).
+        out (torch.Tensor): buffer to get the results.
+
+    """
+    f = _get_function_from_device(x.device.type, silu_mul)
+    return f(x, y, out)
+
+
+def gelu_mul(
+    x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None, approximate="none"
+):
+    r"""
+    Applies PyTorch gelu on input x, and them mul input y:
+    out = gelu(x)*y
+
+    Args:
+        x (torch.Tensor): input to apply gelu.
+        y (torch.Tensor): input for mul to apply on gelu(x).
+        out (torch.Tensor): buffer to get the results.
+        approximate (str): approximate config for gelu.
+
+    """
+    f = _get_function_from_device(x.device.type, gelu_mul)
+    return f(x, y, out, approximate)
+
+
+def add_rms_norm(
+    residual: torch.Tensor,
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+    eps: float,
+    add_back: bool = False,
+):
+    r"""
+    Add residual on input x and apply RMSnorm on the result.
+
+    Args:
+        residual (torch.Tensor): residual to add with x. If residual is None,
+            it means only apply rmsnorm on x.
+        x (torch.Tensor) : the input tensor to add residual and apply RMSNorm.
+        weight (torch.Tensor): the weight to apply RMSnorm.
+        bias (torch.Tensor): the bias to apply RMSnorm.
+        eps (float) : the variance_epsilon to apply RMSnorm.
+        add_back (bool) : whether to store the result of (x + residual) back
+            to the residual buffer (if residual is not None). Default is False.
+
+    """
+    f = _get_function_from_device(x.device.type, add_rms_norm)
+    return f(residual, x, weight, bias, eps, add_back)
+
+
+def add_layer_norm(
+    residual: torch.Tensor,
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+    eps: float,
+    add_back: bool = False,
+):
+    r"""
+    Add residual on input x and apply layernorm on the result.
+
+    Args:
+        residual (torch.Tensor): residual to add with x. If residual is None,
+            it means only apply layernorm on x.
+        x (torch.Tensor) : the input tensor to add residual and apply layernorm.
+        weight (torch.Tensor): the weight to apply layernorm.
+        bias (torch.Tensor): the bias to apply layernorm.
+        eps (float) : the variance_epsilon to apply layernorm.
+        add_back (bool) : whether to store the result of (x + residual) back
+            to the residual buffer (if residual is not None). Default is False.
+
+    """
+    f = _get_function_from_device(x.device.type, add_layer_norm)
+    return f(residual, x, weight, bias, eps, add_back)

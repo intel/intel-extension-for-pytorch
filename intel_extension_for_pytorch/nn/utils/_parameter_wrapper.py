@@ -546,6 +546,7 @@ class ParameterWrapper(object):
         if not hasattr(module, "out_features"):
             setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
 
+        module.tpp_fallback = False
         if module.use_tpp:
             from intel_extension_for_pytorch.nn.utils import (
                 Apply_TPPLinear_weight_prepack,

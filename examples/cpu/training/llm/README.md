@@ -29,8 +29,13 @@ export HOSTFILE=hostfile
 # Quick Start Scripts  
 ## Run the model
 ```
-# Get the dataset here https://github.com/tloen/alpaca-lora/blob/main/alpaca_data.json
+# Get the dataset here: https://github.com/tloen/alpaca-lora/blob/main/alpaca_data.json
 export DATASET="./alpaca_data.json"
+
+# Get the dataset template here: https://github.com/tloen/alpaca-lora/blob/main/templates/alpaca.json
+mkdir ./templates
+mv alpaca.json ./templates
+
 # Env vars
 export LOCAL_BATCH_SIZE=32 #32 is default one, you can choose per need
 export MODEL_NAME_OR_PATH="YOUR LOCAL PATH or MODEL_ID (HF)"

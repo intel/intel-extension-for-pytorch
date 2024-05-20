@@ -488,3 +488,61 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
             return_softmax,
             gen_,
         )
+
+
+def add_rms_norm_cpu(
+    add: torch.Tensor,
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+    eps: float,
+    add_back: bool,
+):
+    assert bias is None, "bias is not supported in add_rmsnorm yet"
+    if add is not None:
+        if add_back:
+            add.add_(x)
+            input = add
+        else:
+            input = add + x
+    else:
+        input = x
+
+    return torch.ops.torch_ipex.rmsnorm(input, weight, eps)
+
+
+def add_layer_norm_cpu(
+    add: torch.Tensor,
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+    eps: float,
+    add_back: bool,
+):
+    if add is not None:
+        out = torch.ops.torch_ipex.add_layernorm(
+            x, add, 1, [x.size(-1)], weight, bias, eps
+        )
+        if add_back:
+            add.add_(x)
+        return out
+    else:
+        return torch.nn.functional.layer_norm(
+            x, [x.size(-1)], weight=weight, bias=bias, eps=eps
+        )
+
+
+@torch.compile(dynamic=True, options={"fx_graph_cache": True})
+def silu_mul_cpu(x, y, out=None):
+    res = torch.nn.functional.silu(x) * y
+    if out is not None:
+        out.copy_(res)
+    return res
+
+
+@torch.compile(dynamic=True, options={"fx_graph_cache": True})
+def gelu_mul_cpu(x, y, out=None, approximate="none"):
+    res = torch.nn.functional.gelu(x, approximate=approximate) * y
+    if out is not None:
+        out.copy_(res)
+    return res
