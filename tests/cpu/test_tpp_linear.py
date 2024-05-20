@@ -102,6 +102,26 @@ class Linear_tpp_fallback_dnnl(torch.nn.Module):
 
 
 class TestTPPlinear(TestCase):
+    def test_tpp_linear_fallback_flag(self):
+        x1 = torch.rand(1, 1, 4097)
+        x2 = copy.deepcopy(x1)
+        for dtype in [torch.float, torch.bfloat16]:
+            model = Linear_tpp_fallback_dnnl().eval()
+
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if dtype is torch.bfloat16 else False
+            ):
+                ref_out = model(x1)
+
+            model = ipex.optimize(model, dtype=dtype)
+            with torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if dtype is torch.bfloat16 else False
+            ):
+                model = torch.jit.script(model)
+                model = torch.jit.freeze(model)
+                out = model(x2)
+            self.assertEqual(out, ref_out)
+
     def test_tpp_linear_fallback(self):
         x1 = torch.rand(1, 1, 4097)
         x2 = copy.deepcopy(x1)
