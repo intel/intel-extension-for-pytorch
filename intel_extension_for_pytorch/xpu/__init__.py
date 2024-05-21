@@ -167,6 +167,10 @@ if has_xpu():
     if len(exec_path) > 0 and "pytest" in exec_path:
         override_assert_equal()
 
+    from torch.utils.checkpoint import DefaultDeviceType
+
+    DefaultDeviceType.set_device_type("xpu")
+
 
 # XXX: this is a temporary work-around to replace torch's _prepare_profiler method
 #     inside IPEX because the extension need to prepare its profiler as a path.
