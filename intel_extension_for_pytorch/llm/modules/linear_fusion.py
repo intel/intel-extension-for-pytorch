@@ -53,12 +53,21 @@ class IPEXLinear2Fusion(nn.Module):
 class LinearSilu(IPEXLinearFusion):
     r"""
     Applies a linear transformation to the `input` data, and then apply PyTorch SILU
-    (see https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html) on the result:
+    (see https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html)
+    on the result:
+
+    .. highlight:: python
+    .. code-block:: python
+
         result = torch.nn.functional.silu(linear(input))
+
     Args:
-        linear (torch.nn.Linear module) : the original torch.nn.Linear module to be fused with silu.
+        linear (torch.nn.Linear module) : the original torch.nn.Linear
+            module to be fused with silu.
+
     Shape:
         Input and output shapes are the same as torch.nn.Linear.
+
     Examples:
         >>> # module init:
         >>> linear_module = torch.nn.Linear(4096, 4096)
@@ -66,6 +75,7 @@ class LinearSilu(IPEXLinearFusion):
         >>> # module forward:
         >>> input = torch.randn(4096, 4096)
         >>> result = ipex_fusion(input)
+
     """
 
     def __init__(self, linear):
@@ -80,15 +90,25 @@ class LinearSilu(IPEXLinearFusion):
 
 class Linear2SiluMul(IPEXLinear2Fusion):
     r"""
-    Applies two linear transformation to the `input` data (`linear_s` and `linear_m`), then apply PyTorch SILU
-    (see https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html) on the result from `linear_s`
-    , and multiplies the result from `linear_m`:
+    Applies two linear transformation to the `input` data (`linear_s` and
+    `linear_m`), then apply PyTorch SILU
+    (see https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html)
+    on the result from `linear_s`, and multiplies the result from `linear_m`:
+
+    .. highlight:: python
+    .. code-block:: python
+
         result = torch.nn.functional.silu(linear_s(input)) * linear_m(input)
+
     Args:
-        linear_s (torch.nn.Linear module) : the original torch.nn.Linear module to be fused with silu.
-        linear_m (torch.nn.Linear module) : the original torch.nn.Linear module to be fused with mul.
+        linear_s (torch.nn.Linear module) : the original torch.nn.Linear
+            module to be fused with silu.
+        linear_m (torch.nn.Linear module) : the original torch.nn.Linear
+            module to be fused with mul.
+
     Shape:
         Input and output shapes are the same as torch.nn.Linear.
+
     Examples:
         >>> # module init:
         >>> linear_s_module = torch.nn.Linear(4096, 4096)
@@ -97,6 +117,7 @@ class Linear2SiluMul(IPEXLinear2Fusion):
         >>> # module forward:
         >>> input = torch.randn(4096, 4096)
         >>> result = ipex_fusion(input)
+
     """
 
     def __init__(self, linear_s, linear_m):
@@ -112,12 +133,21 @@ class Linear2SiluMul(IPEXLinear2Fusion):
 class LinearRelu(IPEXLinearFusion):
     r"""
     Applies a linear transformation to the `input` data, and then apply PyTorch RELU
-    (see https://pytorch.org/docs/stable/generated/torch.nn.functional.relu.html) on the result:
+    (see https://pytorch.org/docs/stable/generated/torch.nn.functional.relu.html)
+    on the result:
+
+    .. highlight:: python
+    .. code-block:: python
+
         result = torch.nn.functional.relu(linear(input))
+
     Args:
-        linear (torch.nn.Linear module) : the original torch.nn.Linear module to be fused with relu.
+        linear (torch.nn.Linear module) : the original torch.nn.Linear module
+            to be fused with relu.
+
     Shape:
         Input and output shapes are the same as torch.nn.Linear.
+
     Examples:
         >>> # module init:
         >>> linear_module = torch.nn.Linear(4096, 4096)
@@ -125,6 +155,7 @@ class LinearRelu(IPEXLinearFusion):
         >>> # module forward:
         >>> input = torch.randn(4096, 4096)
         >>> result = ipex_fusion(input)
+
     """
 
     def __init__(self, linear):
@@ -142,11 +173,19 @@ class LinearNewGelu(IPEXLinearFusion):
     Applies a linear transformation to the `input` data, and then apply NewGELUActivation
     (see https://github.com/huggingface/transformers/blob/main/src/transformers/activations.py#L50)
     on the result:
+
+    .. highlight:: python
+    .. code-block:: python
+
         result = NewGELUActivation(linear(input))
+
     Args:
-        linear (torch.nn.Linear module) : the original torch.nn.Linear module to be fused with new_gelu.
+        linear (torch.nn.Linear module) : the original torch.nn.Linear module
+            to be fused with new_gelu.
+
     Shape:
         Input and output shapes are the same as torch.nn.Linear.
+
     Examples:
         >>> # module init:
         >>> linear_module = torch.nn.Linear(4096, 4096)
@@ -154,6 +193,7 @@ class LinearNewGelu(IPEXLinearFusion):
         >>> # module forward:
         >>> input = torch.randn(4096, 4096)
         >>> result = ipex_fusion(input)
+
     """
 
     def __init__(self, linear):
@@ -169,12 +209,21 @@ class LinearNewGelu(IPEXLinearFusion):
 class LinearGelu(IPEXLinearFusion):
     r"""
     Applies a linear transformation to the `input` data, and then apply PyTorch GELU
-    (see https://pytorch.org/docs/stable/generated/torch.nn.functional.gelu.html) on the result:
+    (see https://pytorch.org/docs/stable/generated/torch.nn.functional.gelu.html)
+    on the result:
+
+    .. highlight:: python
+    .. code-block:: python
+
         result = torch.nn.functional.gelu(linear(input))
+
     Args:
-        linear (torch.nn.Linear module) : the original torch.nn.Linear module to be fused with gelu.
+        linear (torch.nn.Linear module) : the original torch.nn.Linear
+            module to be fused with gelu.
+
     Shape:
         Input and output shapes are the same as torch.nn.Linear.
+
     Examples:
         >>> # module init:
         >>> linear_module = torch.nn.Linear(4096, 4096)
@@ -182,6 +231,7 @@ class LinearGelu(IPEXLinearFusion):
         >>> # module forward:
         >>> input = torch.randn(4096, 4096)
         >>> result = ipex_fusion(input)
+
     """
 
     def __init__(self, linear):
@@ -199,12 +249,19 @@ class LinearSiluMul(IPEXLinearFusion):
     Applies a linear transformation to the `input` data, then apply PyTorch SILU
     (see https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html)
     on the result, and multiplies the result by `other`:
+
+    .. highlight:: python
+    .. code-block:: python
+
         result = torch.nn.functional.silu(linear(input)) * other
+
     Args:
         linear (torch.nn.Linear module) : the original torch.nn.Linear module to
-                                          be fused with silu and mul.
+            be fused with silu and mul.
+
     Shape:
         Input and output shapes are the same as torch.nn.Linear.
+
     Examples:
         >>> # module init:
         >>> linear_module = torch.nn.Linear(4096, 4096)
@@ -213,6 +270,7 @@ class LinearSiluMul(IPEXLinearFusion):
         >>> input = torch.randn(4096, 4096)
         >>> other = torch.randn(4096, 4096)
         >>> result = ipex_fusion(input, other)
+
     """
 
     def __init__(self, linear):
@@ -227,12 +285,21 @@ class LinearSiluMul(IPEXLinearFusion):
 
 class LinearMul(IPEXLinearFusion):
     r"""
-    Applies a linear transformation to the `input` data, and then multiplies the result by `other`:
+    Applies a linear transformation to the `input` data, and then multiplies
+    the result by `other`:
+
+    .. highlight:: python
+    .. code-block:: python
+
         result = linear(input) * other
+
     Args:
-        linear (torch.nn.Linear module) : the original torch.nn.Linear module to be fused with mul.
+        linear (torch.nn.Linear module) : the original torch.nn.Linear module
+            to be fused with mul.
+
     Shape:
         Input and output shapes are the same as torch.nn.Linear.
+
     Examples:
         >>> # module init:
         >>> linear_module = torch.nn.Linear(4096, 4096)
@@ -241,6 +308,7 @@ class LinearMul(IPEXLinearFusion):
         >>> input = torch.randn(4096, 4096)
         >>> other = torch.randn(4096, 4096)
         >>> result = ipex_fusion(input, other)
+
     """
 
     def __init__(self, linear):
@@ -255,12 +323,21 @@ class LinearMul(IPEXLinearFusion):
 
 class LinearAdd(IPEXLinearFusion):
     r"""
-    Applies a linear transformation to the `input` data, and then add the result by `other`:
+    Applies a linear transformation to the `input` data,
+    and then add the result by `other`:
+
+    .. highlight:: python
+    .. code-block:: python
+
         result = linear(input) + other
+
     Args:
-        linear (torch.nn.Linear module) : the original torch.nn.Linear module to be fused with add.
+        linear (torch.nn.Linear module) : the original torch.nn.Linear
+            module to be fused with add.
+
     Shape:
         Input and output shapes are the same as torch.nn.Linear.
+
     Examples:
         >>> # module init:
         >>> linear_module = torch.nn.Linear(4096, 4096)
@@ -269,6 +346,7 @@ class LinearAdd(IPEXLinearFusion):
         >>> input = torch.randn(4096, 4096)
         >>> other = torch.randn(4096, 4096)
         >>> result = ipex_fusion(input, other)
+
     """
 
     def __init__(self, linear):
@@ -283,12 +361,21 @@ class LinearAdd(IPEXLinearFusion):
 
 class LinearAddAdd(IPEXLinearFusion):
     r"""
-    Applies a linear transformation to the `input` data, and then add the result by `other_1` and `other_2`:
+    Applies a linear transformation to the `input` data,
+    and then add the result by `other_1` and `other_2`:
+
+    .. highlight:: python
+    .. code-block:: python
+
         result = linear(input) + other_1 + other_2
+
     Args:
-        linear (torch.nn.Linear module) : the original torch.nn.Linear module to be fused with add and add.
+        linear (torch.nn.Linear module) : the original torch.nn.Linear
+            module to be fused with add and add.
+
     Shape:
         Input and output shapes are the same as torch.nn.Linear.
+
     Examples:
         >>> # module init:
         >>> linear_module = torch.nn.Linear(4096, 4096)
@@ -298,6 +385,7 @@ class LinearAddAdd(IPEXLinearFusion):
         >>> other_1 = torch.randn(4096, 4096)
         >>> other_2 = torch.randn(4096, 4096)
         >>> result = ipex_fusion(input, other_1, other_2)
+
     """
 
     def __init__(self, linear):

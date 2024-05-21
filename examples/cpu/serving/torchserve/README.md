@@ -14,7 +14,7 @@ docker run \
     --rm -it -u root \
     --entrypoint='' \
     -v $PWD:/home/model-server \
-    intel/intel-optimized-pytorch:2.2.0-serving-cpu \
+    intel/intel-optimized-pytorch:2.3.0-serving-cpu \
     python quantize_model.py
 ```
 
@@ -31,7 +31,7 @@ docker run \
     --rm -it -u root \
     --entrypoint='' \
     -v $PWD:/home/model-server \
-    intel/intel-optimized-pytorch:2.2.0-serving-cpu \
+    intel/intel-optimized-pytorch:2.3.0-serving-cpu \
     torch-model-archiver \
         --model-name ipex-resnet50 \
         --version 1.0 \
@@ -43,7 +43,7 @@ docker run \
 > [!NOTE]
 > If you are working under a corporate proxy you will need to include the following parameters in your `docker run` command: `-e http_proxy=${http_proxy} -e https_proxy=${https_proxy}`.
 
-#### Advanced Model Archival
+### Advanced Model Archival
 The `--handler` argument is an important component of serving as it controls the inference pipeline. Torchserve provides several default handlers [built into the application](https://pytorch.org/serve/default_handlers.html#torchserve-default-inference-handlers). that are often enough for most inference cases, but you may need to create a custom handler if your application's inference needs additional preprocessing, postprocessing or using other variables to derive a final output. 
 
 To create a custom handler, first inherit `BaseHandler` or another built-in handler and override any necessary functionality. Usually, you only need to override the preprocessing and postprocessing methods to achieve an application's inference needs.
@@ -88,7 +88,7 @@ docker run \
     -v $PWD/model-store:/home/model-server/model-store \
     -v $PWD/wf-store:/home/model-server/wf-store \
     --net=host \
-    intel/intel-optimized-pytorch:2.2.0-serving-cpu
+    intel/intel-optimized-pytorch:2.3.0-serving-cpu
 ```
 
 > [!TIP]

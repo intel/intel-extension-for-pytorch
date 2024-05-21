@@ -1,6 +1,7 @@
 # 1. LLM Optimization Overview
 
-ipex.llm provides dedicated optimization for running Large Language Models (LLM) faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (prototype).
+`ipex.llm` provides dedicated optimization for running Large Language Models (LLM) faster, including technical points like paged attention, ROPE fusion, etc.
+And a set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (prototype).
 
 <br>
 
@@ -10,29 +11,36 @@ ipex.llm provides dedicated optimization for running Large Language Models (LLM)
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
-|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
-|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
-|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 | 
-|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 | 
-|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 | 
-|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 |  🟩 | 🟩 | 
-|OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 | 
-|OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 |  🟩 | 🟨 | 
+|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
+|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
+|FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 |   |
+|FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Bloom| bigscience/bloom-1b7 | 🟩 | 🟨 | 🟩 | 🟩  | 🟨 |
-|CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟨 |  🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩  |    |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟩 |  🟩 |    |
+|CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |    |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |    |
 |Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 |    |
-|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 |  🟩 |    |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 |  🟩 |    |
-|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 |  🟩 | 🟨 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 |  🟩 |    |
-|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 |  🟩 | 🟨 |
-|MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟨 |  🟩 | 🟩 |
-|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  |  🟩 |  |
-|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |  |  🟨 |  |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |  |  🟩 |  |
+|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|T5| google/flan-t5-xl | 🟩 | 🟩 |   | 🟩 |    |
+|MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  |  🟩 | 🟨 |
+|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 |  🟩 |  |
+|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 |    |
+|GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |    |
+|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |    |
+|Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 
 ## 2.2 Verified for distributed inference mode via DeepSpeed
 
@@ -41,6 +49,8 @@ ipex.llm provides dedicated optimization for running Large Language Models (LLM)
 |LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 |
 |LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 |
 |LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 |
 |GPT-J| EleutherAI/gpt-j-6b | 🟨 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟨 | 🟩 |
 |DOLLY| databricks/dolly-v2-12b | 🟨 | 🟩 |
@@ -50,12 +60,15 @@ ipex.llm provides dedicated optimization for running Large Language Models (LLM)
 |Bloom| bigscience/bloom-1b7 | 🟨 | 🟩 |
 |CodeGen| Salesforce/codegen-2B-multi |  🟩 | 🟩 |
 |Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟨 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 |
 |Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟨 | 🟩 |
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 |
 |T5| google/flan-t5-xl | 🟩 | 🟩 |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 |
+|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |
+|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |
+|GIT| microsoft/git-base | 🟩 | 🟩 |
 
 - 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
 
@@ -69,8 +82,7 @@ We are working in progress to better support the models in the tables with vario
 # 3. Environment Setup
 
 *Note*: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. 
-If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.2.0%2Bcpu/examples/cpu/inference/python/llm/README.md#3-environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
-
+If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.3.0%2Bcpu/examples/cpu/inference/python/llm/README.md#3-environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
 
 ## 3.1 [Recommended] Docker-based environment setup with compilation from source
 
@@ -119,6 +131,21 @@ source ./tools/env_activate.sh
 
 <br>
 
+*Note*: In `env_setup.sh` script a `prompt.json` file is downloaded, which provides prompt samples with pre-defined input token lengths for benchmarking.
+For **Llama-3 models** benchmarking, the users need to download a specific `prompt.json` file, overwriting the original one.
+
+```bash
+wget -O prompt.json https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt-3.json
+```
+
+The original `prompt.json` file can be restored from the repository if needed.
+
+```bash
+wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+```
+
+<br>
+
 # 4. How To Run LLM with ipex.llm
 
 **ipex.llm provides a single script to facilitate running generation tasks as below:**
@@ -126,7 +153,6 @@ source ./tools/env_activate.sh
 ```
 python run.py --help # for more detailed usages
 ```
-
 
 | Key args of run.py | Notes |
 |---|---|
@@ -229,15 +255,14 @@ cd distributed
 unset KMP_AFFINITY
 
 # Distributed inference in FP32
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype float32 --ipex --tasks lambada_openai 
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype float32 --ipex --tasks lambada_openai 
 
 # Distributed inference in BF16
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --tasks lambada_openai 
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --tasks lambada_openai 
 
 # Distributed inference with Weight-Only Quantization
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --tasks lambada_openai  
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --tasks lambada_openai  
 ```
-
 
 ## 4.2 Detail usage of running LLM models
 
@@ -622,28 +647,28 @@ unset KMP_AFFINITY
 
 - Command:
 ```bash
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --dtype float32 --ipex --tasks <TASK_NAME> 
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --dtype float32 --ipex --tasks <TASK_NAME> 
 ```
 - An example of llama2 7b model:
 ```bash
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype float32 --ipex --tasks lambada_openai 
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype float32 --ipex --tasks lambada_openai 
 ```
 
 #### 5.2.2.3 BF16:
 - Command:
 ```bash
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --dtype  bfloat16 -ipex --tasks <TASK_NAME> 
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --dtype  bfloat16 -ipex --tasks <TASK_NAME> 
 ```
 - An example of llama2 7b model:
 ```bash
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --tasks lambada_openai 
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --dtype bfloat16 --ipex --tasks lambada_openai 
 ```
 
 #### 5.2.2.4 Weight-only quantization (INT8):
 
 - Command:
 ```bash
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>  
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model <MODEL_ID> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>  
 ```
 
 Similar to script usage for performance benchmarking, we need to update some arguments of the running command specifically for some models to achieve better accuracy.
@@ -661,7 +686,7 @@ Similar to script usage for performance benchmarking, we need to update some arg
 
 - An example of llama2 7b model:
 ```bash
-deepspeed  --num_gpus 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>  
+deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --ipex --tasks <TASK_NAME>  
 ```
 
 ## 5.3 How to Shard model for Distributed tests with DeepSpeed (autoTP)

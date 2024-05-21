@@ -117,7 +117,6 @@ parser.add_argument(
 )
 parser.add_argument("--greedy", action="store_true")
 parser.add_argument("--profile", action="store_true")
-parser.add_argument("--use-ipex-optimize", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--num-iter", default=100, type=int, help="num iter")
 parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
@@ -138,7 +137,6 @@ model = model_class[0].from_pretrained(
     torch_dtype=amp_dtype,
     low_cpu_mem_usage=True,
     attn_implementation="eager",
-    # torchscript=True if args.use_ipex_optimize else False,
 )
 tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 
@@ -153,56 +151,55 @@ generate_kwargs = dict(
 
 model = model.eval()
 
-if args.use_ipex_optimize:
-    if not hasattr(model.config, "use_ipex_optimize"):
-        model.config.use_ipex_optimize = True
-    # 1) using ipex weight prepack to work with IPEX linear module and their fusions
-    from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
-        _enable_tpp,
-        _disable_tpp,
+# Adding this attribute in model.config
+#  as it will be used in the modeling file.
+if not hasattr(model.config, "use_ipex_optimize"):
+    model.config.use_ipex_optimize = True
+# 1) Applying IPEX weight prepacking with `ipex.optimize()`
+#    to accelerate linear modules and their fusions.
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+    _enable_tpp,
+    _disable_tpp,
+)
+
+_disable_tpp()
+if args.dtype == "bfloat16":
+    _enable_tpp()
+    model = ipex.optimize(model.eval(), dtype=torch.bfloat16, inplace=True)
+else:
+    model = ipex.optimize(
+        model.eval(),
+        dtype=torch.float32,
+        inplace=True,
+        auto_kernel_selection=True,
     )
 
-    _disable_tpp()
-    if args.dtype == "bfloat16":
-        _enable_tpp()
-        model = ipex.optimize(model.eval(), dtype=torch.bfloat16, inplace=True)
-    else:
-        model = ipex.optimize(
-            model.eval(),
-            dtype=torch.float32,
-            inplace=True,
-            auto_kernel_selection=True,
-        )
+# 2) using `ipex.llm.generation` functions
+#    to get prompt sharing for first token optimization
+hf_beam_search = ipex.llm.generation.hf_beam_search.__get__(model, model.__class__)
+hf_greedy_search = ipex.llm.generation.hf_greedy_search.__get__(model, model.__class__)
+hf_sample = ipex.llm.generation.hf_sample.__get__(model, model.__class__)
+hf_beam_sample = ipex.llm.generation.hf_beam_sample.__get__(model, model.__class__)
 
-    # 2) using ipex geneartion function to get prompt sharing and first token optimizations
-    hf_beam_search = ipex.llm.generation.hf_beam_search.__get__(model, model.__class__)
-    hf_greedy_search = ipex.llm.generation.hf_greedy_search.__get__(
-        model, model.__class__
+setattr(model, "beam_search", hf_beam_search)  # noqa: B010
+setattr(model, "greedy_search", hf_greedy_search)  # noqa: B010
+setattr(model, "sample", hf_sample)  # noqa: B010
+setattr(model, "beam_sample", hf_beam_sample)  # noqa: B010
+
+if not hasattr(model.config, "lm_head_generation"):
+    model.config.lm_head_generation = True
+
+# 3) using PyTorch jit to further reduce dispatch overhead
+sample_inputs = get_dummy_input(model, return_dict=True)
+with torch.no_grad(), torch.cpu.amp.autocast(enabled=amp_enabled):
+    trace_model = torch.jit.trace(
+        model,
+        example_kwarg_inputs=sample_inputs,
+        strict=False,
+        check_trace=False,
     )
-    hf_sample = ipex.llm.generation.hf_sample.__get__(model, model.__class__)
-    hf_beam_sample = ipex.llm.generation.hf_beam_sample.__get__(model, model.__class__)
-
-    setattr(model, "beam_search", hf_beam_search)  # noqa: B010
-    setattr(model, "greedy_search", hf_greedy_search)  # noqa: B010
-    setattr(model, "sample", hf_sample)  # noqa: B010
-    setattr(model, "beam_sample", hf_beam_sample)  # noqa: B010
-
-    if not hasattr(model.config, "lm_head_generation"):
-        model.config.lm_head_generation = True
-
-    # 3) using PyTorch jit to further reduce dispatch overhead
-    sample_inputs = get_dummy_input(model, return_dict=True)
-    with torch.no_grad(), torch.cpu.amp.autocast(enabled=amp_enabled):
-        trace_model = torch.jit.trace(
-            model,
-            example_kwarg_inputs=sample_inputs,
-            strict=False,
-            check_trace=False,
-        )
-        trace_model = torch.jit.freeze(trace_model)
-        model = ipex._set_optimized_model_for_generation(
-            model, optimized_model=trace_model
-        )
+    trace_model = torch.jit.freeze(trace_model)
+    model = ipex._set_optimized_model_for_generation(model, optimized_model=trace_model)
 
 
 if (

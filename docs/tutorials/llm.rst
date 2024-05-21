@@ -30,8 +30,14 @@ Verified for distributed inference mode via DeepSpeed
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
-Please check `LLM best known practice <../../examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts.
+Please check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts.
 
+Module Level Optimization API for customized LLM (Prototype)
+------------------------------------------------------------
+
+In the past year, LLM has been flourishing with many open-sourced models contributed to the community, while researchers are building their own LLMs from transformer blocks with variants in implementation details. To help LLM researchers and developers improve their productivity, Intel® Extension for PyTorch* provides module level optimizations for commonly used LLM modules and functionalities, which are operators or certain operator combinations in nature.
+
+Please check `LLM module level optimization practice <https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/inference/python/llm-modeling>`_ to better understand how to use `module level APIs <api_doc.html#llm-module-level-optimizations-prototype>`_ to optimize your LLM and achieve better performance.
 
 Demos
 -----
@@ -143,4 +149,4 @@ Operators fusion is generally used to enable sub-graph fusion to reduce the memo
 Distributed Inference
 ~~~~~~~~~~~~~~~~~~~~~
 
-All above optimizations already help you to get very good performance with single instance. To furthly reduce the inference latency and improve throughput, tensor parallel is also enabled in our soluction. You can firstly use DeepSpeed to auto shard the model and then apply above optimizations with the frontend API function provided by Intel® Extension for PyTorch.
+All above optimizations already help you to get very good performance with single instance. To further reduce the inference latency and improve throughput, tensor parallel is also enabled in our solution. You can firstly use DeepSpeed to auto shard the model and then apply above optimizations with the frontend API function provided by Intel® Extension for PyTorch.

@@ -15,11 +15,11 @@ ARG TORCHAUDIO_VERSION
 ARG IPEX_VERSION
 
 RUN python3 -m pip install --no-cache-dir \
-    torch==${PYTORCH_VERSION:-2.1.0+cpu} \
-    torchaudio==${TORCHAUDIO_VERSION:-2.1.0+cpu} \
-    torchvision==${TORCHVISION_VERSION:-0.16.0+cpu} \
+    torch==${PYTORCH_VERSION:-2.3.0+cpu} \
+    torchaudio==${TORCHAUDIO_VERSION:-2.3.0+cpu} \
+    torchvision==${TORCHVISION_VERSION:-0.18.0+cpu} \
     -f https://download.pytorch.org/whl/cpu/torch_stable.html \
-    intel_extension_for_pytorch==${IPEX_VERSION:-2.1.0}+cpu \
+    intel_extension_for_pytorch==${IPEX_VERSION:-2.3.0}+cpu \
     -f https://developer.intel.com/ipex-whl-stable-cpu \
     configargparse \
     intel-openmp \
