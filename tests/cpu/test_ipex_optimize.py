@@ -24,6 +24,7 @@ import copy
 from common_utils import TestModule, _empty_weight_bias_parameter_names
 from intel_extension_for_pytorch.optim._lamb import Lamb
 import os
+import subprocess
 
 try:
     import transformers
@@ -913,6 +914,49 @@ class TestOptimizeCases(TestCase):
                 fuse_update_step,
                 graph_mode,
             )
+
+    def test_ddp_strict_graph(self):
+        # check if the model can be trained with DDP in strict graph mode
+        # with calling "statce_dict" during training, and also check there
+        # is no difference for final lose between two training.
+        def get_loss(line):
+            loss = line.split(" = ")[-1]
+            if loss.endswith("]"):
+                loss = loss[:-3]
+            return float(loss)
+
+        num = 0
+        loc = os.path.dirname(os.path.abspath(__file__))
+        loss = -1
+        with subprocess.Popen(
+            "python -m intel_extension_for_pytorch.cpu.launch --ccl_worker_count=1"
+            + f" --nproc_per_node=2 --distributed --nnodes 1 {loc}/ipex-optimize-ddp-static-graph.py --get-state-dict",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        ) as p:
+            for line in p.stdout.readlines():
+                line = str(line, "utf-8").strip()
+                if "Resume training successfully" in line:
+                    loss = get_loss(line)
+                    num = num + 1
+        assert num == 2, "training not finished."
+
+        num = 0
+        with subprocess.Popen(
+            "python -m intel_extension_for_pytorch.cpu.launch --ccl_worker_count=1"
+            + f" --nproc_per_node=2 --distributed --nnodes 1 {loc}/ipex-optimize-ddp-static-graph.py",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        ) as p:
+            for line in p.stdout.readlines():
+                line = str(line, "utf-8").strip()
+                if "Resume training successfully" in line:
+                    loss_ = get_loss(line)
+                    self.assertEqual(loss_, loss)
+                    num = num + 1
+        assert num == 2, "training not finished."
 
 
 if __name__ == "__main__":
