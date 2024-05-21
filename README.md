@@ -23,6 +23,18 @@ The extension can be loaded as a Python module for Python programs or linked as 
 
 In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are introduced in the Intel® Extension for PyTorch\*. Check [LLM optimizations CPU](./examples/cpu/inference/python/llm) and [LLM optimizations GPU](./examples/gpu/inference/python/llm) for details.
 
+### Optimized Model List 
+
+| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Arc™ A-Series Graphics (A770) |
+|---|:---:|:---:|:---:|:---:|:---:|
+|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅|✅ | ✅|
+|GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ |✅ | ✅|
+|Qwen|"Qwen/Qwen-7B"| ✅ | ✅ |✅ | ✅|
+|OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ | ❎ |✅ | ❎ |
+|Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ | ❎ |✅ | ❎ |
+|ChatGLM3-6B|"THUDM/chatglm3-6b"| ✅ | ❎ |✅ | ❎ |
+|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| ✅ | ❎ |✅ | ❎ |
+
 
 ## Installation
 
