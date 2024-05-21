@@ -113,14 +113,14 @@
 <p>There are several environment setup methodologies provided. You can choose either of them according to your usage scenario. The Docker-based ones are recommended.</p>
 <section id="recommended-docker-based-environment-setup-with-pre-built-wheels">
 <h2>1.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels<a class="headerlink" href="#recommended-docker-based-environment-setup-with-pre-built-wheels" title="Link to this heading"></a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the Intel® Extension for PyTorch\* source code</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the Intel® Extension for PyTorch* source code</span>
 git<span class="w"> </span>clone<span class="w"> </span>https://github.com/intel/intel-extension-for-pytorch.git
 <span class="nb">cd</span><span class="w"> </span>intel-extension-for-pytorch
 git<span class="w"> </span>checkout<span class="w"> </span><span class="m">2</span>.3-rc1-sp
 git<span class="w"> </span>submodule<span class="w"> </span>sync
 git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>--recursive
 
-<span class="c1"># Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files</span>
+<span class="c1"># Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch* prebuilt wheel files</span>
 <span class="nv">DOCKER_BUILDKIT</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>examples/cpu/inference/python/llm/Dockerfile<span class="w"> </span>-t<span class="w"> </span>ipex-llm:2.3.0<span class="w"> </span>.
 
 <span class="c1"># Run the container with command below</span>
@@ -136,7 +136,7 @@ docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </
 </section>
 <section id="conda-based-environment-setup-with-pre-built-wheels">
 <h2>1.2 Conda-based environment setup with pre-built wheels<a class="headerlink" href="#conda-based-environment-setup-with-pre-built-wheels" title="Link to this heading"></a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the Intel® Extension for PyTorch\* source code</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the Intel® Extension for PyTorch* source code</span>
 git<span class="w"> </span>clone<span class="w"> </span>https://github.com/intel/intel-extension-for-pytorch.git
 <span class="nb">cd</span><span class="w"> </span>intel-extension-for-pytorch
 git<span class="w"> </span>checkout<span class="w"> </span><span class="m">2</span>.3-rc1-sp
