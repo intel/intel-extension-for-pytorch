@@ -346,15 +346,16 @@ def model_convert_reference(_model):
     if _model.device.type == "cpu":
         from ..cpu import comm as ipex_comm
 
-        world_size = ipex_comm.get_world_size()
-        rank = ipex_comm.get_rank()
-        if world_size > 1:
-            global distributed
-            if distributed:
-                need_ipex_tp = False
-            else:
-                need_ipex_tp = True
-                distributed = True
+        if ipex_comm.has_ccl():
+            world_size = ipex_comm.get_world_size()
+            rank = ipex_comm.get_rank()
+            if world_size > 1:
+                global distributed
+                if distributed:
+                    need_ipex_tp = False
+                else:
+                    need_ipex_tp = True
+                    distributed = True
 
     # model-wise optimizations - MHA module
     for supported_mha_class in [
