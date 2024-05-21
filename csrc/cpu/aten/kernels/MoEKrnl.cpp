@@ -7,7 +7,6 @@
 #include <c10/util/Exception.h>
 #include <immintrin.h>
 #include <torch/csrc/autograd/function.h>
-#include <torch/csrc/utils/python_symnode.h>
 #include <algorithm>
 #include "tpp/kernels/TPPGEMMKrnl.h"
 
@@ -15,6 +14,15 @@ namespace torch_ipex {
 namespace cpu {
 
 namespace {
+
+at::Tensor call_AllReduce(const at::Tensor& self) {
+  static auto op_allreduce =
+      c10::Dispatcher::singleton()
+          .findSchemaOrThrow("deepspeed_comm::all_reduce", "")
+          .typed<at::Tensor(const at::Tensor& self)>();
+  auto ret = op_allreduce.call(self);
+  return ret;
+}
 
 at::Tensor mixtral_moe_tpp_kernl_impl(
     const at::Tensor& hidden_states,
@@ -46,13 +54,7 @@ at::Tensor mixtral_moe_tpp_kernl_impl(
         tpp_linear_nobias_forward_cpu(curr_state, down_wei, c10::nullopt);
   }
   if (is_distributed) {
-    py::gil_scoped_acquire acquire;
-    py::function allreduce = py::module_::import("torch")
-                                 .attr("ops")
-                                 .attr("deepspeed_comm")
-                                 .attr("all_reduce");
-    allreduce(curr_state);
-    py::gil_scoped_release release;
+    call_AllReduce(curr_state);
   }
   curr_state = curr_state * routing_w;
   output.index_add_(0, top_x, curr_state.squeeze(0).to(hidden_states.dtype()));
@@ -98,13 +100,7 @@ at::Tensor mixtral_moe_kernl_impl(
         c10::nullopt);
   }
   if (is_distributed) {
-    py::gil_scoped_acquire acquire;
-    py::function allreduce = py::module_::import("torch")
-                                 .attr("ops")
-                                 .attr("deepspeed_comm")
-                                 .attr("all_reduce");
-    allreduce(curr_state);
-    py::gil_scoped_release release;
+    call_AllReduce(curr_state);
   }
   curr_state = curr_state * routing_w;
   output.index_add_(0, top_x, curr_state.squeeze(0).to(hidden_states.dtype()));
@@ -130,13 +126,7 @@ at::Tensor mixtral_moe_woq_kernl_impl(
       down_wei);
 
   if (is_distributed) {
-    py::gil_scoped_acquire acquire;
-    py::function allreduce = py::module_::import("torch")
-                                 .attr("ops")
-                                 .attr("deepspeed_comm")
-                                 .attr("all_reduce");
-    allreduce(curr_state);
-    py::gil_scoped_release release;
+    call_AllReduce(curr_state);
   }
   curr_state = curr_state * routing_w;
   output.index_add_(0, top_x, curr_state.squeeze(0).to(hidden_states.dtype()));
