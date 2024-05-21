@@ -21,34 +21,42 @@ Optimized Models
    :header-rows: 1
 
    * - Model Family
-     - LLAMA2
-     - GPT-J
-     - Qwen
-     - OPT
-     - BLOOM
-   * - Verified < MODEL ID > (Huggingface hub)
+     - Verified < MODEL ID > (Huggingface hub)
+     - FP16
+     - INT4 WOQ
+   * - Llama2
      - "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf"
+     - ✅
+     - ✅
+   * - GPT-J
      - "EleutherAI/gpt-j-6b"
+     - ✅
+     - ✅
+   * - Qwen 
      - "Qwen/Qwen-7B"
+     - ✅
+     - ✅
+   * - OPT 
      - "facebook/opt-30b", "facebook/opt-1.3b"
-     - "bigscience/bloom-7b1", "bigscience/bloom"
-   * - FP16
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-     - ✅
-   * - INT4 WOQ
-     - ✅
-     - ✅
      - ✅
      - ❎
+   * - Bloom 
+     - "bigscience/bloom-7b1", "bigscience/bloom"
+     - ✅
+     - ❎
+   * - ChatGLM3-6B
+     - "THUDM/chatglm3-6b"
+     - ✅
+     - ❎
+   * - Baichuan2-13B
+     - "baichuan-inc/Baichuan2-13B-Chat"
+     - ✅
      - ❎
 
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp16). For other LLMs families, we are working in progress to cover those optimizations, which will expand the model list above.
 
-Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/v2.1.30%2Bxpu/examples/gpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
+Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.1.30/examples/gpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
 
 Optimization Methodologies
 --------------------------
