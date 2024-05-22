@@ -867,7 +867,21 @@ elif args.ipex_weight_only_quantization:
         group_size=args.group_size,
     )
     if args.low_precision_checkpoint != "":
-        low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
+        if args.low_precision_checkpoint.endswith(
+            ".pt"
+        ) or args.low_precision_checkpoint.endswith(".pth"):
+            low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
+        elif args.low_precision_checkpoint.endswith(".safetensors"):
+            try:
+                import safetensors
+            except ImportError:
+                print(
+                    "Please install safetensors package to load safetensors checkpoint."
+                )
+                exit(1)
+            low_precision_checkpoint = safetensors.torch.load_file(
+                args.low_precision_checkpoint
+            )
         if args.gptq_legacy_format:
             config_dict = (
                 ipex.utils.weight_only_quantization._legacy_lowp_checkpoint_config()

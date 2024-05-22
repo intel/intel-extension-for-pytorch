@@ -470,6 +470,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
                             )
                             if args.gptq_legacy_format:
                                 quant_cmd.extend(["--gptq-legacy-format"])
+                    elif args.low_precision_checkpoint != "":
+                        quant_cmd.extend(
+                            [
+                                "--low-precision-checkpoint",
+                                str(args.low_precision_checkpoint),
+                            ]
+                        )
+                        if args.gptq_legacy_format:
+                            quant_cmd.extend(["--gptq-legacy-format"])
                     else:
                         # No need to set group size if args.gptq is true
                         # Group size is read from the checkpoint
