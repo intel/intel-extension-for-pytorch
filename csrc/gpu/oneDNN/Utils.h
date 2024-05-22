@@ -161,8 +161,18 @@ static inline memory::data_type get_onednn_dtype(
 static inline memory::data_type get_onednn_dtype_include_double(
     const at::Tensor& tensor,
     bool allow_undef = false) {
-  if (tensor.scalar_type() == at::ScalarType::Double)
-    return memory::data_type::f64;
+  DeviceId curDevID = at::xpu::current_device();
+  bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
+
+  if (tensor.scalar_type() == at::ScalarType::Double) {
+    if (fp64_valid)
+      return memory::data_type::f64;
+    else if (allow_undef)
+      return memory::data_type::undef;
+    else
+      TORCH_CHECK(false, "Double is not supported on this device!");
+  }
+
   return get_onednn_dtype(tensor, allow_undef);
 }
 
@@ -248,8 +258,10 @@ inline bool onednn_strides_check(const Tensor& src) {
   auto adims = torch_ipex::xpu::oneDNN::get_onednn_dims(src);
   int ndims = (int)adims.size();
   auto dims = adims.data();
+
   auto data_type = static_cast<dnnl_data_type_t>(
-      torch_ipex::xpu::oneDNN::get_onednn_dtype(src, /*allow_undef*/ true));
+      torch_ipex::xpu::oneDNN::get_onednn_dtype_include_double(
+          src, /*allow_undef*/ false));
   auto strides_info = torch_ipex::xpu::oneDNN::get_onednn_strides(src);
   auto strides = strides_info.empty() ? nullptr : &strides_info[0];
 
