@@ -23,5 +23,6 @@ Tensor share_storage_and_set_strided_as(
 void unsafe_get_and_set_data_ptr(const Tensor& src, const Tensor& dst);
 
 void unsafe_release_and_set_data_ptr(const Tensor& src, const Tensor& dst);
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

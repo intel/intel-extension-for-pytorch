@@ -20,10 +20,11 @@
 #pragma once
 
 #include <experimental/group/gemm/common.hpp>
+#include "../../../../../xetla_kernel_api.h"
 
 namespace gpu::xetla::group {
 
-enum quant_mode : uint8_t { S4_ASYM, S4_FULLRANGE_NO_ZP };
+using quant_mode = xpu::xetla::quant_mode;
 
 /// @brief Compute policy for unaligned shape and xmx engine.
 /// @tparam compute_attr_ Is compute-related attributes.

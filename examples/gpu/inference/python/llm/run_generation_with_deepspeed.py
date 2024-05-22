@@ -1,3 +1,4 @@
+import contextlib
 import sys
 import gc
 import json
@@ -509,7 +510,14 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
             # latency
             for i in range(cycles):
                 enable_profile = do_profiling and i == cycles - 1
-                with torch.autograd.profiler_legacy.profile(enabled=enable_profile, use_xpu=True, record_shapes=True) as prof:
+                with (
+                    contextlib.nullcontext(None) if not enable_profile else
+                    torch.profiler.profile(
+                        activities=[torch.profiler.ProfilerActivity.CPU,
+                                    torch.profiler.ProfilerActivity.XPU],
+                        record_shapes=True,
+                    )
+                ) as prof:
                     t0 = time.time()
                     gen_ids, outputs = generate()
                     if args.cuda:
@@ -519,6 +527,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
                 if enable_profile:
                     with open("./profile_{}_{}.log".format(num_beams, local_rank), "w") as f:
                         f.write(prof.key_averages().table(sort_by="self_xpu_time_total"))
+                    # Cannot sort by id when using kineto
                     #with open('./profile_{}_{}_id.log'.format(num_beams, local_rank), "w") as f:
                     #    f.write(prof.table(sort_by="id", row_limit=-1))
                     with open("./profile_{}_{}_detail.log".format(num_beams, local_rank), "w") as f:

@@ -509,6 +509,101 @@ static Tensor mm_bias_add_int4(
   return resize_as_mat1(input, output);
 }
 
+bool is_match_total_mem(
+    Tensor tensor,
+    IntArrayRef new_sizes,
+    c10::ScalarType new_type) {
+  auto old_element = tensor.numel() * c10::elementSize(tensor.scalar_type());
+  auto new_element = std::accumulate(
+      new_sizes.begin(),
+      new_sizes.end(),
+      static_cast<int64_t>(1),
+      std::multiplies<>());
+  return old_element == new_element;
+}
+
+template <class NewType>
+Tensor recast(
+    const Tensor& tensor,
+    IntArrayRef sizes,
+    IntArrayRef strides,
+    std::string info = "") {
+  auto new_dtype = c10::CppTypeToScalarType<NewType>::value;
+  auto device = tensor.device();
+  TORCH_CHECK(
+      is_match_total_mem(tensor, sizes, new_dtype),
+      info,
+      "recast failed : The new type must have the same total number of elements as the old type.");
+  return at::from_blob(
+      (void*)tensor.data_ptr(),
+      sizes,
+      strides,
+      nullptr,
+      at::device(device).dtype(new_dtype),
+      {device});
+}
+
+Tensor _weight_int4pack_mm_xpu(
+    const Tensor& A,
+    const Tensor& B,
+    int64_t qGroupSize,
+    const Tensor& qScaleAndZeros) {
+  constexpr int64_t kNTileSize = 8;
+
+  auto M = A.size(0);
+  auto N = B.size(0) * kNTileSize;
+  auto K = A.size(1);
+
+  TORCH_CHECK(
+      A.dtype() == kBFloat16, __func__, " : expect A to be bfloat16 tensor.");
+  TORCH_CHECK(A.is_contiguous(), __func__, " : expect A to be contiguous.");
+  TORCH_CHECK(A.dim() == 2, __func__, " : expect A to be 2D tensor.");
+
+  TORCH_CHECK(B.dtype() == kInt, __func__, " : expect B to be int32 tensor.");
+  TORCH_CHECK(B.is_contiguous(), __func__, " : expect B to be contiguous.");
+  TORCH_CHECK(B.dim() == 4, __func__, " : expect B to 4d tensor.");
+
+  TORCH_CHECK(
+      qGroupSize == 32 || qGroupSize == 64 || qGroupSize == 128 ||
+          qGroupSize == 256,
+      __func__,
+      ": expect qGroupSize to be 32, 64, 128 or 256, got ",
+      qGroupSize);
+
+  TORCH_CHECK(
+      qScaleAndZeros.dim() == 3 && qScaleAndZeros.size(1) == N &&
+          qScaleAndZeros.size(2) == 2,
+      __func__,
+      ": expect qScaleAndZeros to be 3d tensor with sizes [:, ",
+      N,
+      ", 2]");
+  auto C = at::empty({M, N}, A.options());
+  auto q_scale_and_zeros_vec = at::split(qScaleAndZeros, 1, -1);
+  auto b_recast = recast<uint8_t>(
+      B, {K, N / 2}, {N / 2, 1}, "_weight_int4pack_mm_xpu tensor B");
+  auto q_scale = q_scale_and_zeros_vec[0].reshape({-1, N}).contiguous();
+  auto q_zeros = q_scale_and_zeros_vec[1].reshape({-1, N}).contiguous();
+  TORCH_CHECK(A.dim() == 2 && b_recast.dim() == 2);
+
+  DeviceId curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
+  int8_t is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
+  auto policy =
+      HGEMMXetla_INT4()
+          .add_matrix_out(C)
+          .add_matrix_inp(A)
+          .add_matrix_wei(b_recast)
+          .add_matrix_scl(q_scale)
+          .add_matrix_zp(q_zeros)
+          .add_calib_gz(qGroupSize)
+          .add_arch(GetGpuArchId())
+          .add_quant_mode(xpu::xetla::quant_mode::S4_ASYM_ZERO_NO_DEGRAD)
+          .build();
+  TORCH_CHECK(policy.fallback() == false, "mm int4: invalid gemm shape");
+  policy.run();
+  return resize_as_mat1(A, C);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -534,6 +629,15 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_add_int4.xpu", at::AtenIpexTypeXPU::mm_add_int4);
   IPEX_OP_REGISTER(
       "mm_bias_add_int4.xpu", at::AtenIpexTypeXPU::mm_bias_add_int4);
+}
+
+TORCH_LIBRARY_FRAGMENT(aten, m) {
+  m.def(
+      "_weight_int4pack_mm(Tensor self, Tensor mat2, int qGroupSize, Tensor qScaleAndZeros) -> Tensor");
+  m.impl(
+      "_weight_int4pack_mm",
+      c10::DispatchKey::XPU,
+      at::AtenIpexTypeXPU::_weight_int4pack_mm_xpu);
 }
 } // namespace
 #endif

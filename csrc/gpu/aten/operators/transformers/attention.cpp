@@ -77,7 +77,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
       scale.has_value() ? scale.value() : (1.0 / std::sqrt(query.size(-1)));
 
   const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
-  XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  xpu::xetla::XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   gpu_arch xeArch = sdp::aten_to_Xetla_arch();
   auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,
@@ -800,7 +800,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
 
 #if defined(USE_XETLA)
-  XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  xpu::xetla::XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   gpu_arch xeArch = sdp::aten_to_Xetla_arch();
   auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,

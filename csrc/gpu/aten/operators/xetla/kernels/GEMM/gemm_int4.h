@@ -2,6 +2,7 @@
 
 #include "../../GEMM_INT4.h"
 #include "../xetla.h"
+#include "../xetlaDispatch.h"
 #include "epilogue_impl.h"
 
 namespace xpu::xetla {
@@ -22,6 +23,7 @@ template <
     uint32_t l3_kslicing,
     uint32_t slm_kslicing,
     uint32_t arch,
+    uint32_t q_mode,
     uint32_t dequant_s,
     uint32_t periodic_sync_interval,
     uint32_t prefetch_distance,
@@ -50,7 +52,8 @@ struct hgemm_wint4_func {
       mem_space::global,
       DEVICE_MEM_ALIGNMENT / sizeof(dtype_scale)>;
 
-  using compute_attr = gpu::xetla::group::compute_attr_t<fp16, fp16, dtype_acc>;
+  using compute_attr =
+      gpu::xetla::group::compute_attr_t<dtype_a, dtype_a, dtype_acc>;
   using perf_tuning_knob = gpu::xetla::group::
       perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;
 
@@ -62,7 +65,7 @@ struct hgemm_wint4_func {
       perf_tuning_knob,
       dtype_scale,
       dtype_zero_pt,
-      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+      static_cast<gpu::xetla::group::quant_mode>(q_mode),
       dequant_s == 0 ? 131072 : dequant_s,
       mma_eng,
       static_cast<gpu_arch>(arch)>;
@@ -117,29 +120,59 @@ struct hgemm_wint4_func {
       dtype_zero_pt* zero_pt_ptr,
       dtype_scale* scale_ptr,
       typename epilogue_t::arguments_t epilogue_args = {}) {
-    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
-        gemm_arg(
-            mat_m,
-            mat_k,
-            mat_n,
-            A,
-            mat_k,
-            B,
-            mat_n,
-            C,
-            mat_n,
-            scale_ptr,
-            mat_n,
-            acc_ptr,
-            cnt_ptr,
-            epilogue_args);
+    if constexpr (
+        static_cast<gpu::xetla::group::quant_mode>(q_mode) ==
+        gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP) {
+      typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+          gemm_arg(
+              mat_m,
+              mat_k,
+              mat_n,
+              A,
+              mat_k,
+              B,
+              mat_n,
+              C,
+              mat_n,
+              scale_ptr,
+              mat_n,
+              acc_ptr,
+              cnt_ptr,
+              epilogue_args);
 
-    cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
+      cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
 
-    RunKernelFunctor<gemm_op_t> kfn(gemm_arg);
-    return [=](sycl::handler& cgh) {
-      cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
-    };
+      RunKernelFunctor<gemm_op_t> kfn(gemm_arg);
+      return [=](sycl::handler& cgh) {
+        cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
+      };
+    } else {
+      typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+          gemm_arg(
+              mat_m,
+              mat_k,
+              mat_n,
+              A,
+              mat_k,
+              B,
+              mat_n,
+              C,
+              mat_n,
+              scale_ptr,
+              mat_n,
+              zero_pt_ptr,
+              mat_n,
+              acc_ptr,
+              cnt_ptr,
+              epilogue_args);
+
+      cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
+
+      RunKernelFunctor<gemm_op_t> kfn(gemm_arg);
+      return [=](sycl::handler& cgh) {
+        cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
+      };
+    }
   }
 };
 
@@ -155,12 +188,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     float* acc_ptr,
     uint32_t* cnt_ptr,
@@ -171,7 +205,10 @@ inline cgfs_t hgemm_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using hgemm_wint4_functor = hgemm_wint4_func<
@@ -189,6 +226,7 @@ inline cgfs_t hgemm_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
@@ -221,12 +259,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_bias_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     const scalar_t* bias,
     float* acc_ptr,
@@ -237,7 +276,10 @@ inline cgfs_t hgemm_bias_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
@@ -264,6 +306,7 @@ inline cgfs_t hgemm_bias_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
@@ -297,12 +340,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_bias_gelu_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     const scalar_t* bias,
     float* acc_ptr,
@@ -314,7 +358,10 @@ inline cgfs_t hgemm_bias_gelu_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
@@ -342,6 +389,7 @@ inline cgfs_t hgemm_bias_gelu_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
@@ -376,12 +424,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_res_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     const scalar_t* res,
     float* acc_ptr,
@@ -394,7 +443,10 @@ inline cgfs_t hgemm_res_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_res = scalar_t;
@@ -417,6 +469,7 @@ inline cgfs_t hgemm_res_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
@@ -451,12 +504,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     const scalar_t* mul,
     float* acc_ptr,
@@ -469,7 +523,10 @@ inline cgfs_t hgemm_mul_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_mul = scalar_t;
@@ -492,6 +549,7 @@ inline cgfs_t hgemm_mul_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
@@ -526,12 +584,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_bias_res_res_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     const scalar_t* bias,
     const scalar_t* res0,
@@ -545,7 +604,10 @@ inline cgfs_t hgemm_bias_res_res_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
@@ -581,13 +643,14 @@ inline cgfs_t hgemm_bias_res_res_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const int4x2*>(b);
-  const data_type_b* b_zp_alias = reinterpret_cast<const int4x2*>(b_zp);
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
@@ -617,14 +680,15 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_qkv_wint4(
     scalar_t* out0,
     scalar_t* out1,
     scalar_t* out2,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     float* acc_ptr,
     uint32_t* cnt_ptr,
@@ -636,7 +700,10 @@ inline cgfs_t hgemm_qkv_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using post_op = subgroup::chained_tile_op_t<>;
@@ -655,13 +722,14 @@ inline cgfs_t hgemm_qkv_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const int4x2*>(b);
-  const data_type_b* b_zp_alias = reinterpret_cast<const int4x2*>(b_zp);
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   uint32_t weight_offset = k * n / 2;
 
@@ -721,14 +789,15 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_qkv_bias_wint4(
     scalar_t* out0,
     scalar_t* out1,
     scalar_t* out2,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     const scalar_t* bias,
     float* acc_ptr,
@@ -740,7 +809,10 @@ inline cgfs_t hgemm_qkv_bias_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
@@ -766,13 +838,14 @@ inline cgfs_t hgemm_qkv_bias_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const int4x2*>(b);
-  const data_type_b* b_zp_alias = reinterpret_cast<const int4x2*>(b_zp);
+  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   uint32_t weight_offset = k * n / 2;
   uint32_t bias_offset = k * n / 2;
@@ -835,12 +908,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_silu_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     float* acc_ptr,
     uint32_t* cnt_ptr,
@@ -850,7 +924,10 @@ inline cgfs_t hgemm_silu_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using post_op = subgroup::chained_tile_op_t<epilogue_impl::silu_op_t>;
@@ -869,6 +946,7 @@ inline cgfs_t hgemm_silu_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
@@ -902,12 +980,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_silu_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     const scalar_t* mul,
     float* acc_ptr,
@@ -919,7 +998,10 @@ inline cgfs_t hgemm_silu_mul_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_mul = scalar_t;
@@ -944,6 +1026,7 @@ inline cgfs_t hgemm_silu_mul_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
@@ -977,12 +1060,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_bias_silu_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     const scalar_t* bias,
     const scalar_t* mul,
@@ -995,7 +1079,10 @@ inline cgfs_t hgemm_bias_silu_mul_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_mul = scalar_t;
@@ -1028,6 +1115,7 @@ inline cgfs_t hgemm_bias_silu_mul_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
@@ -1063,12 +1151,13 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    int ARCH>
+    int ARCH,
+    int QUANT_MODE>
 inline cgfs_t hgemm_bias_add_wint4(
     scalar_t* out,
     const scalar_t* a,
     const uint8_t* b,
-    const uint8_t* b_zp,
+    void* b_zp,
     const scalar_t* b_scale,
     const scalar_t* bias,
     const scalar_t* res,
@@ -1082,7 +1171,10 @@ inline cgfs_t hgemm_bias_add_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x2;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x2;
+  using data_type_zp = std::conditional_t<
+      QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD),
+      scalar_t,
+      int4x2>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_res = scalar_t;
@@ -1114,6 +1206,7 @@ inline cgfs_t hgemm_bias_add_wint4(
       L3_KS,
       SLM_KS,
       ARCH,
+      QUANT_MODE,
       DQUANT_S,
       SYNC_FREQ,
       STAGES,
@@ -1137,4 +1230,1101 @@ inline cgfs_t hgemm_bias_add_wint4(
         {const_cast<scalar_t*>(res), {n, m, n}}}})};
 }
 
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_bias_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    void* bias,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_bias_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          reinterpret_cast<scalar_t*>(bias),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_bias_gelu_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    void* bias,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_bias_gelu_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          reinterpret_cast<scalar_t*>(bias),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_mul_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    void* mul,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_mul_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          reinterpret_cast<scalar_t*>(mul),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_silu_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_silu_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_bias_res_res_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    void* bias,
+    void* res0,
+    void* res1,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_bias_res_res_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          reinterpret_cast<scalar_t*>(bias),
+          reinterpret_cast<scalar_t*>(res0),
+          reinterpret_cast<scalar_t*>(res1),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_qkv_wint4(
+    XetlaType xe_type,
+    void* out0,
+    void* out1,
+    void* out2,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_qkv_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out0),
+          reinterpret_cast<scalar_t*>(out1),
+          reinterpret_cast<scalar_t*>(out2),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_qkv_bias_wint4(
+    XetlaType xe_type,
+    void* out0,
+    void* out1,
+    void* out2,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    void* bias,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_qkv_bias_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out0),
+          reinterpret_cast<scalar_t*>(out1),
+          reinterpret_cast<scalar_t*>(out2),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          reinterpret_cast<scalar_t*>(bias),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_silu_mul_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    void* mul,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_silu_mul_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          reinterpret_cast<scalar_t*>(mul),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_bias_silu_mul_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    void* bias,
+    void* mul,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_bias_silu_mul_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          reinterpret_cast<scalar_t*>(bias),
+          reinterpret_cast<scalar_t*>(mul),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_bias_add_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    void* bias,
+    void* res,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_bias_add_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          reinterpret_cast<scalar_t*>(bias),
+          reinterpret_cast<scalar_t*>(res),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+template <
+    int WG_M,
+    int WG_N,
+    int SG_M,
+    int SG_N,
+    int SG_K,
+    int DQUANT_S,
+    int SLM_KS,
+    int L3_KS,
+    int SYNC_FREQ,
+    int STAGES,
+    int ARCH,
+    int QUANT_MODE>
+inline cgfs_t hgemm_res_wint4(
+    XetlaType xe_type,
+    void* out,
+    void* a,
+    const uint8_t* b,
+    void* b_zp,
+    void* b_scale,
+    void* res,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k) {
+  return XETLA_ALL_KERNEL_TYPES(xe_type, [&] {
+    if constexpr (
+        ARCH == static_cast<int>(gpu_arch::XeLpg) &&
+        (std::is_same<scalar_t, gpu::xetla::bf16>::value ||
+         QUANT_MODE == static_cast<int>(quant_mode::S4_ASYM_ZERO_NO_DEGRAD))) {
+      std::cerr
+          << "XeLpg not support bf16 type with S4_ASYM_ZERO_NO_DEGRAD mode!"
+          << std::endl;
+      return cgfs_t();
+    } else {
+      return hgemm_res_wint4<
+          scalar_t,
+          WG_M,
+          WG_N,
+          SG_M,
+          SG_N,
+          SG_K,
+          DQUANT_S,
+          SLM_KS,
+          L3_KS,
+          SYNC_FREQ,
+          STAGES,
+          ARCH,
+          QUANT_MODE>(
+          reinterpret_cast<scalar_t*>(out),
+          reinterpret_cast<scalar_t*>(a),
+          b,
+          b_zp,
+          reinterpret_cast<scalar_t*>(b_scale),
+          reinterpret_cast<scalar_t*>(res),
+          acc_ptr,
+          cnt_ptr,
+          m,
+          n,
+          k);
+    }
+  });
+}
+
+#define HGEMM_WINT4_INTERFACE_IMPL(          \
+    WG_M,                                    \
+    WG_N,                                    \
+    SG_M,                                    \
+    SG_N,                                    \
+    SG_K,                                    \
+    DQUANT_S,                                \
+    SLM_KS,                                  \
+    L3_KS,                                   \
+    SYNC_FREQ,                               \
+    STAGES,                                  \
+    ARCH,                                    \
+    QUANT_MODE)                              \
+  template cgfs_t hgemm_wint4<               \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_bias_wint4<          \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      void* bias,                            \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_bias_gelu_wint4<     \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      void* bias,                            \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_mul_wint4<           \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      void* mul,                             \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_silu_wint4<          \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_bias_res_res_wint4<  \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      void* bias,                            \
+      void* res0,                            \
+      void* res1,                            \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_qkv_wint4<           \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out0,                            \
+      void* out1,                            \
+      void* out2,                            \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_qkv_bias_wint4<      \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out0,                            \
+      void* out1,                            \
+      void* out2,                            \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      void* bias,                            \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_silu_mul_wint4<      \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      void* mul,                             \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_bias_silu_mul_wint4< \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      void* bias,                            \
+      void* mul,                             \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_bias_add_wint4<      \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      void* bias,                            \
+      void* res,                             \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);                     \
+  template cgfs_t hgemm_res_wint4<           \
+      WG_M,                                  \
+      WG_N,                                  \
+      SG_M,                                  \
+      SG_N,                                  \
+      SG_K,                                  \
+      DQUANT_S,                              \
+      SLM_KS,                                \
+      L3_KS,                                 \
+      SYNC_FREQ,                             \
+      STAGES,                                \
+      ARCH,                                  \
+      QUANT_MODE>(                           \
+      XetlaType xe_type,                     \
+      void* out,                             \
+      void* a,                               \
+      const uint8_t* b,                      \
+      void* b_zp,                            \
+      void* b_scale,                         \
+      void* res,                             \
+      float* acc_ptr,                        \
+      uint32_t* cnt_ptr,                     \
+      const uint32_t m,                      \
+      const uint32_t n,                      \
+      const uint32_t k);
 } // namespace xpu::xetla

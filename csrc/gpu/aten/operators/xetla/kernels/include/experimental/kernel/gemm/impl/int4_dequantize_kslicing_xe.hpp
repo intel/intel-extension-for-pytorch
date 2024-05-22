@@ -159,7 +159,8 @@ class gemm_universal_t<
   /// @brief GEMM arguments.
   /// This is the interface for users to pass the application-related runtime
   /// variables.
-  template <group::quant_mode quant_mode = group::S4_FULLRANGE_NO_ZP>
+  template <
+      group::quant_mode quant_mode = group::quant_mode::S4_FULLRANGE_NO_ZP>
   struct arguments_t {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
@@ -296,7 +297,7 @@ class gemm_universal_t<
   };
 
   template <>
-  struct arguments_t<group::S4_FULLRANGE_NO_ZP> {
+  struct arguments_t<group::quant_mode::S4_FULLRANGE_NO_ZP> {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
     uint32_t matrix_m;
@@ -562,8 +563,10 @@ class gemm_universal_t<
     implementable &=
         ((args.matB_ld % pack_ratio == 0) && (args.matrix_n % pack_ratio == 0));
     if constexpr (
-        gemm_t::compute_policy::quant_type !=
-        group::quant_mode::S4_FULLRANGE_NO_ZP) {
+        (gemm_t::compute_policy::quant_type !=
+         group::quant_mode::S4_FULLRANGE_NO_ZP) &&
+        (gemm_t::compute_policy::quant_type !=
+         gpu::xetla::group::quant_mode::S4_ASYM_ZERO_NO_DEGRAD)) {
       implementable &= (args.zero_pt_ld % pack_ratio == 0);
     }
 
@@ -619,6 +622,11 @@ class gemm_universal_t<
     int start_y_scale = start_k / dequant_s;
 
     int start_x_zero_pt = start_n / pack_ratio;
+    if constexpr (
+        gemm_t::compute_policy::quant_type ==
+        group::quant_mode::S4_ASYM_ZERO_NO_DEGRAD) {
+      start_x_zero_pt = start_n;
+    }
     int start_y_zero_pt = start_k / dequant_s;
 
     // set up arguments
@@ -661,6 +669,19 @@ class gemm_universal_t<
         group::quant_mode::S4_FULLRANGE_NO_ZP) {
       gemm_args =
           gemm_args_t(mem_desc_a, mem_desc_b, inner_loop_count, mem_desc_scale);
+    } else if constexpr (
+        gemm_t::compute_policy::quant_type ==
+        group::quant_mode::S4_ASYM_ZERO_NO_DEGRAD) {
+      mem_desc_zero_pt_t mem_desc_zero_pt(
+          args.zero_pt_base,
+          {args.matrix_n, scale_size_y, args.zero_pt_ld},
+          {start_x_zero_pt, start_y_zero_pt});
+      gemm_args = gemm_args_t(
+          mem_desc_a,
+          mem_desc_b,
+          inner_loop_count,
+          mem_desc_scale,
+          mem_desc_zero_pt);
     } else {
       mem_desc_zero_pt_t mem_desc_zero_pt(
           args.zero_pt_base,

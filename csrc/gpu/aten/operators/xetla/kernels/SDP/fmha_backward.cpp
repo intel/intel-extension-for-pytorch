@@ -6,6 +6,7 @@
 #include "fmha_utils.h"
 
 namespace gpu::xetla {
+using namespace xpu::xetla;
 
 namespace fmha {
 

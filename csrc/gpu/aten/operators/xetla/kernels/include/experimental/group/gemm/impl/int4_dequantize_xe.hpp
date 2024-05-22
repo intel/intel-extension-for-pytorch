@@ -23,7 +23,6 @@
 #include <experimental/group/gemm/compute_policy.hpp>
 
 namespace gpu::xetla::group {
-
 /// @addtogroup xetla_gemm
 /// @{
 
@@ -102,7 +101,9 @@ class gemm_t<
       "this is for 4bit matB ");
   static_assert(
       std::is_same<remove_const_t<dtype_zero_pt>, remove_const_t<int4x2>>::
-          value,
+              value ||
+          std::is_same<remove_const_t<dtype_zero_pt>, remove_const_t<dtype_a>>::
+              value,
       "this is for 4bit zero_pt ");
 
   /******** set memory attribute **********/
@@ -246,12 +247,20 @@ class gemm_t<
       scale_tile_desc_t,
       subgroup::msg_type_v<scale_tile_desc_t, mem_space::global>,
       arch_tag>;
-  using zero_pt_tile_desc_t = subgroup::tile_desc_t<
-      tile_size_x_b / pack_ratio,
-      tile_size_y_zero_pt,
-      block_size_x_b / pack_ratio,
-      block_size_y_zero_pt,
-      reg_layout::tiled>;
+  using zero_pt_tile_desc_t = std::conditional_t<
+      compute_policy::quant_type == quant_mode::S4_ASYM_ZERO_NO_DEGRAD,
+      subgroup::tile_desc_t<
+          tile_size_x_b,
+          tile_size_y_zero_pt,
+          block_size_x_b,
+          block_size_y_zero_pt,
+          reg_layout::tiled>,
+      subgroup::tile_desc_t<
+          tile_size_x_b / pack_ratio,
+          tile_size_y_zero_pt,
+          block_size_x_b / pack_ratio,
+          block_size_y_zero_pt,
+          reg_layout::tiled>>;
   using zero_pt_t = subgroup::tile_t<dtype_zero_pt, zero_pt_tile_desc_t>;
   using zero_pt_payload_t = subgroup::mem_payload_t<
       mem_desc_zero_pt_t,
@@ -539,7 +548,7 @@ class gemm_t<
         subgroup::vnni_reverse(matA);
       }
       subgroup::elemwise_cvt(matA_acc, matA);
-      dequantize(matB_acc, matB, scale, zero_pt);
+      dequantize<compute_policy::quant_type>(matB_acc, matB, scale, zero_pt);
       SW_BARRIER();
       tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
       SW_BARRIER();
@@ -566,14 +575,37 @@ class gemm_t<
     for (size_t row = 0; row < tile_x; row++) {
 #pragma unroll
       for (size_t col = 0; col < tile_y; col++) {
-        sycl::ext::oneapi::experimental::printf(
-            "%0.1f ", (float)(sycl::half)mat.reg[row * tile_y + col]);
+        if constexpr (std::is_same<sycl::half, typename T::element_type>::
+                          value) {
+          sycl::ext::oneapi::experimental::printf(
+              "row:%ld, col:%ld, value:%f\n",
+              row,
+              col,
+              (float)(sycl::half)mat.reg[row * tile_y + col]);
+        } else if constexpr (std::is_same<
+                                 sycl::ext::oneapi::bfloat16,
+                                 typename T::element_type>::value) {
+          sycl::ext::oneapi::experimental::printf(
+              "row:%ld, col:%ld, value:%f\n",
+              row,
+              col,
+              (float)(sycl::ext::oneapi::bfloat16)mat[row * tile_x + col]);
+        } else if constexpr (
+            std::is_same<int8_t, typename T::element_type>::value ||
+            std::is_same<uint8_t, typename T::element_type>::value) {
+          sycl::ext::oneapi::experimental::printf(
+              "row:%ld, col:%ld, value:%d\n",
+              row,
+              col,
+              (int8_t)mat[row * tile_x + col]);
+        }
       }
       sycl::ext::oneapi::experimental::printf("\n ");
     }
     sycl::ext::oneapi::experimental::printf("\n ");
   }
 
+  template <quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP>
   inline void dequantize(
       matB_acc_t& matB_acc,
       matB_t& matB,
@@ -682,6 +714,99 @@ class gemm_t<
       }
     }
   }
+
+  template <>
+  inline void dequantize<quant_mode::S4_ASYM_ZERO_NO_DEGRAD>(
+      matB_acc_t& matB_acc,
+      matB_t& matB,
+      scale_t& scale,
+      zero_pt_t& zero_pt) {
+    // no tail, because this is matB
+    constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
+    constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
+
+    constexpr uint32_t block_b_y_per_scale = dequant_s / block_size_y_b;
+    constexpr uint32_t vnni_rows = sizeof(uint32_t) / sizeof(dtype_mma_b);
+    constexpr uint32_t min_val_size =
+        (compute_policy::mma_engine == mma_engine::xmx)
+        ? block_size_x_b * vnni_rows
+        : scale_t::block_size_x;
+    xetla_vector<dtype_scale, min_val_size> min_val_vec(-8);
+
+#pragma unroll
+    for (uint32_t i = 0; i < num_block_y; ++i) {
+#pragma unroll
+      for (uint32_t j = 0; j < num_block_x; ++j) {
+        int block_id = (i * num_block_x + j);
+        auto matB_blk = matB.reg
+                            .xetla_select<matB_t::block_elems, 1>(
+                                block_id * matB_t::block_elems)
+                            .xetla_format<uint8_t>();
+        int scale_block_id = (i / block_b_y_per_scale * num_block_x + j);
+        auto scale_vec = scale.reg.xetla_select<scale_t::block_size_x, 1>(
+            scale_block_id * scale_t::block_size_x);
+        auto zero_pt_vec = zero_pt.reg.xetla_select<zero_pt_t::block_size_x, 1>(
+            scale_block_id * zero_pt_t::block_size_x);
+
+        auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
+            block_id * matB_acc_t::block_elems);
+
+        // 2: int8 includes 2 4bits data.
+        xetla_vector<uint8_t, block_size_x_b * block_size_y_b> cvt_blk;
+
+        xetla_vector<int32_t, block_size_x_b * block_size_y_b> cvt_blk_i32;
+        cvt_blk.xetla_select<matB_t::block_elems, 2>(0) = matB_blk & 0x0f;
+        cvt_blk.xetla_select<matB_t::block_elems, 2>(1) = matB_blk >> 4;
+        cvt_blk_i32 = (cvt_blk.xetla_format<int8_t>());
+
+        if constexpr (compute_policy::mma_engine == mma_engine::xmx) {
+          xetla_vector<dtype_mma_b, matB_acc_t::block_elems * vnni_rows>
+              temp_blk;
+          temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0) =
+              cvt_blk_i32;
+
+#pragma unroll
+          for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
+#pragma unroll
+            for (uint32_t row = 0; row < vnni_rows; row++) {
+              temp_blk.xetla_select<block_size_x_b, vnni_rows>(
+                  row + block_size_x_b * k * vnni_rows) =
+                  temp_blk.xetla_select<block_size_x_b, vnni_rows>(
+                      (k + row) * block_size_x_b * vnni_rows);
+            }
+          }
+          xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
+          xetla_vector<dtype_zero_pt, block_size_x_b * vnni_rows> zero_pt_blk;
+#pragma unroll
+          for (uint32_t row = 0; row < vnni_rows; row++) {
+            scale_blk.xetla_select<block_size_x_b, vnni_rows>(row) = scale_vec;
+            zero_pt_blk.xetla_select<block_size_x_b, vnni_rows>(row) =
+                zero_pt_vec;
+          }
+
+#pragma unroll
+          for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
+            dst_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
+                k * block_size_x_b) =
+                temp_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
+                    k * block_size_x_b * vnni_rows) *
+                    scale_blk +
+                zero_pt_blk + (min_val_vec * scale_blk);
+          }
+        } else {
+#pragma unroll
+          for (uint32_t k = 0; k < block_size_y_b; k++) {
+            dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b) =
+                cvt_blk_i32.xetla_select<block_size_x_b, 1>(
+                    k * block_size_x_b) *
+                    scale_vec +
+                zero_pt_vec + (min_val_vec * scale_vec);
+          }
+        }
+      }
+    }
+  }
+
   /// @brief Updates tile base descriptor based on the tid.
   __XETLA_API static void update_sg_tile_tdesc(
       arguments_t& args,
@@ -693,9 +818,12 @@ class gemm_t<
     args.matA_base_desc.update_coord_y(tile_offset_m);
     args.matB_base_desc.update_coord_x(tile_offset_n / pack_ratio);
     args.scale_base_desc.update_coord_x(tile_offset_n);
-    args.zero_pt_base_desc.update_coord_x(tile_offset_n / pack_ratio);
+    if constexpr (
+        compute_policy::quant_type == quant_mode::S4_ASYM_ZERO_NO_DEGRAD) {
+      args.zero_pt_base_desc.update_coord_x(tile_offset_n);
+    } else {
+      args.zero_pt_base_desc.update_coord_x(tile_offset_n / pack_ratio);
+    }
   }
 };
-/// @} xetla_gemm
-
 } // namespace gpu::xetla::group
