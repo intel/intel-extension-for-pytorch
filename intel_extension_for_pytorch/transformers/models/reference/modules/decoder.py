@@ -1273,6 +1273,128 @@ def Phi3DecoderLayer_forward(
     return outputs
 
 
+def WhisperEncoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: torch.Tensor,
+    layer_head_mask: torch.Tensor,
+    output_attentions: bool = False,
+) -> torch.Tensor:
+    residual = hidden_states
+    hidden_states = self.self_attn_layer_norm(hidden_states)
+    hidden_states, attn_weights, _ = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        layer_head_mask=layer_head_mask,
+        output_attentions=output_attentions,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.out_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    residual = hidden_states
+    hidden_states = self.final_layer_norm(hidden_states)
+    hidden_states = self.linear_gelu(hidden_states)
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.fc2(hidden_states)
+        hidden_states = residual + hidden_states
+
+    if hidden_states.dtype == torch.float16 and (
+        torch.isinf(hidden_states).any() or torch.isnan(hidden_states).any()
+    ):
+        clamp_value = torch.finfo(hidden_states.dtype).max - 1000
+        hidden_states = torch.clamp(hidden_states, min=-clamp_value, max=clamp_value)
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    return outputs
+
+
+def WhisperDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    encoder_hidden_states: Optional[torch.Tensor] = None,
+    encoder_attention_mask: Optional[torch.Tensor] = None,
+    layer_head_mask: Optional[torch.Tensor] = None,
+    cross_attn_layer_head_mask: Optional[torch.Tensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = True,
+) -> torch.Tensor:
+    residual = hidden_states
+    hidden_states = self.self_attn_layer_norm(hidden_states)
+    self_attn_past_key_value = (
+        past_key_value[:4] if past_key_value is not None else None
+    )
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        past_key_value=self_attn_past_key_value,
+        attention_mask=attention_mask,
+        layer_head_mask=layer_head_mask,
+        output_attentions=output_attentions,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.out_proj(hidden_states)
+        hidden_states = residual + hidden_states
+    cross_attn_present_key_value = None
+    cross_attn_weights = None
+    if encoder_hidden_states is not None:
+        residual = hidden_states
+        hidden_states = self.encoder_attn_layer_norm(hidden_states)
+        cross_attn_past_key_value = (
+            past_key_value[4:] if past_key_value is not None else None
+        )
+        (
+            hidden_states,
+            cross_attn_weights,
+            cross_attn_present_key_value,
+        ) = self.encoder_attn(
+            hidden_states=hidden_states,
+            key_value_states=encoder_hidden_states,
+            attention_mask=encoder_attention_mask,
+            layer_head_mask=cross_attn_layer_head_mask,
+            past_key_value=cross_attn_past_key_value,
+            output_attentions=output_attentions,
+        )
+        if not self.distributed:
+            hidden_states = self.encoder_mha_linear_add(hidden_states, residual)
+        else:
+            hidden_states = self.encoder_attn.out_proj(hidden_states)
+            hidden_states = residual + hidden_states
+        present_key_value = present_key_value + cross_attn_present_key_value
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.final_layer_norm(hidden_states)
+
+    hidden_states = self.linear_gelu(hidden_states)
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.fc2(hidden_states)
+        hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights, cross_attn_weights)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1470,6 +1592,19 @@ class _IPEXDecoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["mlp"].down_proj
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
                 del self.__dict__["_modules"]["self_attn"].o_proj
+        elif self.model_backbone == "WhisperForConditionalGeneration":
+            if not self.distributed:
+                self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)
+                del self.__dict__["_modules"]["self_attn"].out_proj
+                self.mlp_linear_add = _IPEXlinearAddRef(module.fc2)
+                del self.__dict__["_modules"]["fc2"]
+                if hasattr(module, "encoder_attn"):
+                    self.encoder_mha_linear_add = _IPEXlinearAddRef(
+                        module.encoder_attn.out_proj
+                    )
+                    del self.__dict__["_modules"]["encoder_attn"].out_proj
+            self.linear_gelu = _IPEXlinearGeluRef(module.fc1)
+            del self.__dict__["_modules"]["fc1"]
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -1709,6 +1844,23 @@ class _IPEXDecoderLayerRef(nn.Module):
                 output_attentions,
                 use_cache,
                 past_key_value,
+            )
+        elif self.model_backbone == "WhisperForConditionalGeneration":
+            if encoder_hidden_states is not None:
+                return WhisperDecoderLayer_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    encoder_hidden_states,
+                    encoder_attention_mask,
+                    layer_head_mask,
+                    cross_attn_layer_head_mask,
+                    past_key_value,
+                    output_attentions,
+                    use_cache,
+                )
+            return WhisperEncoderLayer_forward(
+                self, hidden_states, attention_mask, layer_head_mask, output_attentions
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

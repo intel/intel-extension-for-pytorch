@@ -15,6 +15,7 @@ class EXAMPLE_INPUTS_MODE(IntEnum):
     MASK_KV_ENC = 5
     MASK_KV_PIXEL = 6
     EMBEDS_MASK_KV = 7
+    KV_ENC = 8
 
 
 class LLMConfig(ABC):

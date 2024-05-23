@@ -180,6 +180,7 @@ def _sample(
             "YuanForCausalLM",
             "PhiForCausalLM",
             "Phi3ForCausalLM",
+            "WhisperForConditionalGeneration",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -235,6 +236,47 @@ def _sample(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
+                if self.model_backbone == "WhisperForConditionalGeneration":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                self.model.decoder.layers[i]
+                                .encoder_attn.k_proj(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.model.decoder.layers[i].encoder_attn.num_heads,
+                                    self.model.decoder.layers[i].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                self.model.decoder.layers[i]
+                                .encoder_attn.v_proj(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.model.decoder.layers[i].encoder_attn.num_heads,
+                                    self.model.decoder.layers[i].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+
             if first_token:
                 if hasattr(self.config, "n_layer"):
                     num_hidden_layers = self.config.n_layer
@@ -287,6 +329,12 @@ def _sample(
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            if self.model_backbone == "WhisperForConditionalGeneration":
+                model_inputs["encoder_outputs"] = (
+                    model_inputs["encoder_outputs"]["last_hidden_state"],
+                )
+                model_inputs.pop("decoder_position_ids", None)
+                model_inputs.pop("decoder_attention_mask", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)

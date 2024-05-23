@@ -19,14 +19,24 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     T5ForConditionalGeneration,
+    WhisperForConditionalGeneration,
     AutoProcessor,
 )
-
+from datasets import load_dataset
+from torch.utils.data import DataLoader
 import sys
 
 sys.path.append(sys.path[0] + "/../../")
 
 try:
+    import lmms_eval
+    from lmms_eval.api.instance import Instance
+    from lmms_eval.api.model import lmms
+    from lmms_eval.api.registry import register_model
+    from lmms_eval import evaluator as lmms_evaluator
+    from lmms_eval import utils as lmms_utils
+    from lmms_eval.api.registry import ALL_TASKS
+    from lmms_eval.tasks import initialize_tasks
     from llava.model.language_model.llava_llama import (  # noqa F401
         LlavaLlamaForCausalLM,
     )
@@ -43,14 +53,6 @@ try:
         DEFAULT_IM_START_TOKEN,
         DEFAULT_IM_END_TOKEN,
     )
-    import lmms_eval
-    from lmms_eval.api.instance import Instance
-    from lmms_eval.api.model import lmms
-    from lmms_eval.api.registry import register_model
-    from lmms_eval import evaluator as lmms_evaluator
-    from lmms_eval import utils as lmms_utils
-    from lmms_eval.api.registry import ALL_TASKS
-    from lmms_eval.tasks import initialize_tasks
 except ImportError:
 
     def register_model(name):
@@ -85,6 +87,7 @@ MODEL_CLASSES = {
     "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "phi": (AutoModelForCausalLM, AutoTokenizer),
+    "whisper": (WhisperForConditionalGeneration, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -1645,8 +1648,377 @@ class LMMS(lmms):
         return res
 
 
+class LibriSpeech:
+    _DEFAULT_MAX_LENGTH = 2048
+
+    def __init__(
+        self,
+        pretrained: str,
+        device="cpu",
+        with_ipex=True,
+        with_jit=True,
+        with_greedy=False,
+        batch_size=1,
+        max_length=None,
+        dtype: Optional[Union[str, torch.dtype]] = "auto",
+        tp_number=1,
+        config=None,
+        add_special_tokens=True,
+    ):
+        model_id = pretrained
+        self._device = device
+        self._batch_size = batch_size
+        self._with_jit = with_jit
+        self._with_ipex = with_ipex
+        self._with_greedy = with_greedy
+        self._max_length = max_length
+        self._dtype = dtype
+        self._tp_number = tp_number
+        self.add_special_tokens = add_special_tokens
+
+        load_dtype = torch.float32
+        infer_dtype = torch.float32
+        if args.quant_with_amp or dtype == "bfloat16":
+            load_dtype = torch.bfloat16
+            infer_dtype = torch.bfloat16
+        else:
+            if dtype == "float16":
+                load_dtype = torch.half
+                infer_dtype = torch.half
+            elif dtype == "int8":
+                load_dtype = torch.float32
+                infer_dtype = torch.int8
+        self.amp_dtype = (
+            torch.bfloat16
+            if args.quant_with_amp or self._dtype == "bfloat16"
+            else torch.float32
+        )
+        model_type = next(
+            (x for x in MODEL_CLASSES.keys() if x in model_id.lower()), "auto"
+        )
+        model_class = MODEL_CLASSES[model_type]
+
+        self.tokenizer = model_class[1].from_pretrained(
+            model_id, trust_remote_code=True
+        )
+        self.config = AutoConfig.from_pretrained(
+            model_id if config is None else config,
+            torchscript=with_jit,
+            trust_remote_code=True,
+        )
+
+        # For now, Falcon, baichuan and gptbigcode have accuracy issue with from_config with deepspeed meta device load.
+        # TODO: we will change the scope once deepspeed providing the support
+        if world_size == 1 or model_type in [
+            "whisper",
+        ]:
+            self.model = model_class[0].from_pretrained(
+                model_id,
+                config=self.config,
+                low_cpu_mem_usage=True,
+                torch_dtype=load_dtype,
+                trust_remote_code=True,
+            )
+        else:
+            with deepspeed.OnDevice(dtype=load_dtype, device="meta"):
+                if model_class[0] == AutoModelForCausalLM:
+                    self.model = (
+                        model_class[0]
+                        .from_config(self.config, trust_remote_code=True)
+                        .to(load_dtype)
+                    )
+                else:
+                    self.model = model_class[0].from_pretrained(
+                        model_id,
+                        low_cpu_mem_usage=True,
+                        config=self.config,
+                        torch_dtype=load_dtype,
+                        trust_remote_code=True,
+                    )
+
+        self.model = self.model.eval()
+
+        checkpoints_json = "checkpoints.json"
+
+        def print_rank0(*msg):
+            if local_rank != 0:
+                return
+            print(*msg)
+
+        def get_repo_root(model_name_or_path):
+            if os.path.exists(model_name_or_path):
+                # local path
+                # use absolute path here to avoid path error in deepspeed
+                model_name_or_path = os.path.abspath(model_name_or_path)
+                return model_name_or_path
+            # checks if online or not
+            if is_offline_mode():
+                print_rank0("Offline mode: forcing local_files_only=True")
+            # download only on first process
+            allow_patterns = ["*.bin", "*.model", "*.json", "*.txt", "*.py", "*LICENSE"]
+            if local_rank == 0:
+                snapshot_download(
+                    model_name_or_path,
+                    local_files_only=is_offline_mode(),
+                    cache_dir=os.getenv("TRANSFORMERS_CACHE", None),
+                    allow_patterns=allow_patterns,
+                    # ignore_patterns=["*.safetensors"],
+                )
+
+            dist.barrier()
+
+            return snapshot_download(
+                model_name_or_path,
+                local_files_only=is_offline_mode(),
+                cache_dir=os.getenv("TRANSFORMERS_CACHE", None),
+                allow_patterns=allow_patterns,
+                # ignore_patterns=["*.safetensors"],
+            )
+
+        def get_checkpoint_files(model_name_or_path):
+            cached_repo_dir = get_repo_root(model_name_or_path)
+
+            # extensions: .bin | .pt
+            # creates a list of paths from all downloaded files in cache dir
+            file_list = [
+                str(entry)
+                for entry in Path(cached_repo_dir).rglob("*.[bp][it][n]")
+                if entry.is_file()
+            ]
+            return file_list
+
+        def write_checkpoints_json():
+            checkpoint_files = get_checkpoint_files(model_id)
+            if local_rank == 0:
+                # model.config.model_type.upper()
+                data = {
+                    "type": "BLOOM",
+                    "checkpoints": checkpoint_files,
+                    "version": 1.0,
+                }
+                json.dump(data, open(checkpoints_json, "w"))
+
+        repo_root = get_repo_root(model_id)
+        write_checkpoints_json()
+        dist.barrier()
+        self.model = deepspeed.init_inference(
+            self.model,
+            mp_size=tp_number,
+            base_dir=repo_root,
+            dtype=infer_dtype,
+            checkpoint=checkpoints_json,
+        )
+
+        self.model = self.model.module
+
+        if self._with_ipex:
+            ipex_woq_enabled = args.ipex_weight_only_quantization
+            if ipex_woq_enabled:
+                from intel_extension_for_pytorch.quantization import WoqWeightDtype
+
+                if args.weight_dtype == "INT8":
+                    weight_dtype = WoqWeightDtype.INT8
+                elif args.weight_dtype == "INT4":
+                    weight_dtype = WoqWeightDtype.INT4
+                else:
+                    assert args.weight_dtype == "NF4"
+                    weight_dtype = WoqWeightDtype.NF4
+
+                if args.lowp_mode == "INT8":
+                    lowp_mode = ipex.quantization.WoqLowpMode.INT8
+                elif args.lowp_mode == "FP32":
+                    lowp_mode = ipex.quantization.WoqLowpMode.NONE
+                elif args.lowp_mode == "FP16":
+                    lowp_mode = ipex.quantization.WoqLowpMode.FP16
+                elif args.lowp_mode == "BF16":
+                    lowp_mode = ipex.quantization.WoqLowpMode.BF16
+                else:  # AUTO
+                    if weight_dtype == WoqWeightDtype.INT4:
+                        lowp_mode = ipex.quantization.WoqLowpMode.INT8
+                    else:
+                        lowp_mode = ipex.quantization.WoqLowpMode.BF16
+
+                act_quant_mode_dict = {
+                    "PER_TENSOR": ipex.quantization.WoqActQuantMode.PER_TENSOR,
+                    "PER_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
+                    "PER_BATCH": ipex.quantization.WoqActQuantMode.PER_BATCH,
+                    "PER_BATCH_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK,
+                }
+                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                    weight_dtype=weight_dtype,
+                    lowp_mode=lowp_mode,
+                    act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
+                    group_size=args.group_size,
+                )
+            self.model = ipex.llm.optimize(
+                self.model.eval(),
+                dtype=infer_dtype,
+                quantization_config=qconfig if ipex_woq_enabled else None,
+                inplace=True,
+                deployment_mode=False,
+            )
+
+        self.base_model = self.model
+
+        self.num_beams = 1 if with_greedy else 4
+        self.iter = 0
+
+        if self._with_jit:
+            past_key_values = tuple(
+                [
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros(
+                            [
+                                1,
+                                32,
+                                self.model.model.decoder.layers[
+                                    i
+                                ].encoder_attn.num_heads,
+                                self.model.model.decoder.layers[
+                                    i
+                                ].encoder_attn.head_dim,
+                            ],
+                            dtype=self.amp_dtype,
+                        ).contiguous(),
+                        torch.zeros(
+                            [
+                                1,
+                                32,
+                                self.model.model.decoder.layers[
+                                    i
+                                ].encoder_attn.num_heads,
+                                self.model.model.decoder.layers[
+                                    i
+                                ].encoder_attn.head_dim,
+                            ],
+                            dtype=self.amp_dtype,
+                        ).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
+                    for i in range(self.config.num_hidden_layers)
+                ]
+            )
+            last_hidden_state = torch.rand([1, 32, 1280]).to(self.amp_dtype)
+            sample_inputs = {
+                "decoder_input_ids": torch.ones(4).to(torch.long).unsqueeze(0),
+                "past_key_values": past_key_values,
+                "encoder_outputs": (last_hidden_state,),
+            }
+            with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if self.amp_dtype == torch.bfloat16 else False,
+            ):
+                if self._dtype != "int8":
+                    traced_model = torch.jit.trace(
+                        self.model.eval(),
+                        example_kwarg_inputs=sample_inputs,
+                        strict=False,
+                        check_trace=False,
+                    )
+                    traced_model = torch.jit.freeze(traced_model.eval())
+                else:
+                    traced_model = torch.jit.load(args.quantized_model_path)
+                    traced_model = torch.jit.freeze(traced_model.eval())
+
+                traced_model(**sample_inputs)
+                traced_model(**sample_inputs)
+            ipex._set_optimized_model_for_generation(
+                self.model, optimized_model=traced_model
+            )
+        self.dataset = load_dataset("librispeech_asr", split="test.clean")
+        self.dataloader = DataLoader(
+            self.dataset,
+            batch_size=1,
+            shuffle=False,
+        )
+
+    def _levenshtein(self, a: List, b: List) -> int:
+        """Calculates the Levenshtein distance between a and b."""
+        n, m = len(a), len(b)
+        if n > m:
+            # Make sure n <= m, to use O(min(n,m)) space
+            a, b = b, a
+            n, m = m, n
+
+        current = list(range(n + 1))
+        for i in range(1, m + 1):
+            previous, current = current, [i] + [0] * n
+            for j in range(1, n + 1):
+                add, delete = previous[j] + 1, current[j - 1] + 1
+                change = previous[j - 1]
+                if a[j - 1] != b[i - 1]:
+                    change = change + 1
+                current[j] = min(add, delete, change)
+
+        return current[n]
+
+    def word_error_rate(self, hypotheses: List[str], references: List[str]) -> float:
+        """
+        Computes Average Word Error rate between two texts represented as
+        corresponding lists of string. Hypotheses and references must have same length.
+
+        Args:
+            hypotheses: list of hypotheses
+            references: list of references
+
+        Returns:
+            (float) average word error rate
+        """
+        scores = 0
+        words = 0
+        if len(hypotheses) != len(references):
+            raise ValueError(
+                "In word error rate calculation, hypotheses and reference"
+                " lists must have the same number of elements. But I got:"
+                "{0} and {1} correspondingly".format(len(hypotheses), len(references))
+            )
+        for h, r in zip(hypotheses, references):
+            h_list = h.split()
+            r_list = r.split()
+            words += len(r_list)
+            scores += self._levenshtein(h_list, r_list)
+        if words != 0:
+            wer = 1.0 * scores / words
+        else:
+            wer = float("inf")
+        return wer, scores, words
+
+    def evaluate(self):
+        results = []
+        references = []
+        for batch_ndx, sample in enumerate(self.dataloader):
+            inputs = sample["audio"]["array"].squeeze(0)
+            model_inputs = self.tokenizer(
+                inputs, sampling_rate=16000, return_tensors="pt"
+            ).input_features
+            with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if self.amp_dtype == torch.bfloat16 else False,
+            ):
+                output = self.model.generate(
+                    model_inputs,
+                    do_sample=False,
+                    temperature=0.9,
+                    num_beams=self.num_beams,
+                )
+                gen_text = self.tokenizer.batch_decode(output, skip_special_tokens=True)
+                if len(results) == 0:
+                    results = gen_text
+                    references = sample["text"]
+                else:
+                    results += gen_text
+                    references += sample["text"]
+        references = [r.capitalize() for r in references]
+        wer, scores, words = self.word_error_rate(results, references)
+        return wer, scores, words
+
+
 lm_tasks = []
 lmms_tasks = []
+other_tasks = []
 lm_all_tasks = lm_eval.tasks.ALL_TASKS
 try:
     initialize_tasks()
@@ -1657,6 +2029,8 @@ for task in args.tasks:
         lm_tasks.append(task)
     elif task in ALL_TASKS:
         lmms_tasks.append(task)
+    elif task in ["librispeech_asr"]:
+        other_tasks.append(task)
     else:
         print(f"Task {task} in not supported by lm_eval and lmms_eval")
         exit(0)
@@ -1730,3 +2104,19 @@ elif len(lmms_tasks) != 0:
         cli_args=args,
     )
     print(lmms_evaluator.make_table(results))
+elif len(other_tasks) != 0:
+    if "librispeech_asr" in other_tasks:
+        evaluator = LibriSpeech(
+            pretrained=args.model,
+            device="cpu",
+            batch_size=args.batch_size,
+            with_ipex=args.ipex,
+            with_jit=not args.disable_jit,
+            dtype=args.dtype,
+            config=args.config_file,
+            add_special_tokens=True,
+            with_greedy=False,
+        )
+    wer, scores, num_words = evaluator.evaluate()
+    print("Evaluation WER: {0}".format(wer))
+    print("Accuracy: {:.15f} ".format(1 - wer))

@@ -5,6 +5,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     T5ForConditionalGeneration,
+    WhisperForConditionalGeneration,
     AutoProcessor,
 )
 
@@ -33,6 +34,7 @@ MODEL_CLASSES = {
     "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "phi": (AutoModelForCausalLM, AutoTokenizer),
+    "whisper": (WhisperForConditionalGeneration, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

@@ -172,6 +172,13 @@ supported_models = [
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
     ),
+    model_info(
+        "whisper",
+        transformers.models.whisper.modeling_whisper.WhisperForConditionalGeneration,
+        False,
+        lambda m: m.model.decoder.layers[0].self_attn.__class__,
+        lambda m: m.model.decoder.layers[0].__class__,
+    ),
 ]
 
 
@@ -247,6 +254,12 @@ class OptimizeTransformersNightlyTester(TestCase):
             input_dict["decoder_input_ids"] = decoder_input_ids.unsqueeze(0)
         if m.name == "git":
             input_dict["pixel_values"] = torch.zeros(1, 3, 224, 224)
+        if m.name == "whisper":
+            last_hidden_state = torch.rand([1, 32, 1280])
+            input_dict = {
+                "decoder_input_ids": torch.ones(4).to(torch.long).unsqueeze(0),
+                "encoder_outputs": (last_hidden_state,),
+            }
 
         with torch.no_grad():
             key_hf = ref_m(**input_dict)

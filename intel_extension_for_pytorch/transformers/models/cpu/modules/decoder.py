@@ -214,5 +214,23 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 self.mha_linear_add = _IPEXlinearAddCPU(
                     module.mha_linear_add.linear, tpp=tpp, woq=woq
                 )
+        elif self.model_backbone == "WhisperForConditionalGeneration":
+            if not self.distributed:
+                if hasattr(module, "mha_linear_add"):
+                    self.mha_linear_add = _IPEXlinearAddCPU(
+                        module.mha_linear_add.linear, tpp=tpp, woq=woq
+                    )
+                if hasattr(module, "mlp_linear_add"):
+                    self.mlp_linear_add = _IPEXlinearAddCPU(
+                        module.mlp_linear_add.linear, tpp=tpp, woq=woq
+                    )
+                if hasattr(module, "encoder_mha_linear_add"):
+                    self.encoder_mha_linear_add = _IPEXlinearAddCPU(
+                        module.encoder_mha_linear_add.linear, tpp=tpp, woq=woq
+                    )
+            if hasattr(module, "linear_gelu"):
+                self.linear_gelu = _IPEXlinearGeluCPU(
+                    module.linear_gelu.linear, tpp=tpp, woq=woq
+                )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

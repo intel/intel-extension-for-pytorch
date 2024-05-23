@@ -7,6 +7,8 @@ import sys
 import math
 import torch.nn.functional as F
 import re
+from datasets import load_dataset
+from torch.utils.data import DataLoader
 
 sys.path.append(sys.path[0] + "/../../")
 from transformers import (
@@ -14,6 +16,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     T5ForConditionalGeneration,
+    WhisperForConditionalGeneration,
     AutoProcessor,
 )
 
@@ -38,6 +41,7 @@ MODEL_CLASSES = {
     "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "phi": (AutoModelForCausalLM, AutoTokenizer),
+    "whisper": (WhisperForConditionalGeneration, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -100,6 +104,14 @@ from transformers import BatchEncoding
 import transformers
 
 try:
+    import lmms_eval
+    from lmms_eval.api.instance import Instance
+    from lmms_eval.api.model import lmms
+    from lmms_eval.api.registry import register_model
+    from lmms_eval import evaluator as lmms_evaluator
+    from lmms_eval import utils as lmms_utils
+    from lmms_eval.api.registry import ALL_TASKS
+    from lmms_eval.tasks import initialize_tasks
     from llava.model.language_model.llava_llama import (  # noqa F401
         LlavaLlamaForCausalLM,
     )
@@ -116,14 +128,6 @@ try:
         DEFAULT_IM_START_TOKEN,
         DEFAULT_IM_END_TOKEN,
     )
-    import lmms_eval
-    from lmms_eval.api.instance import Instance
-    from lmms_eval.api.model import lmms
-    from lmms_eval.api.registry import register_model
-    from lmms_eval import evaluator as lmms_evaluator
-    from lmms_eval import utils as lmms_utils
-    from lmms_eval.api.registry import ALL_TASKS
-    from lmms_eval.tasks import initialize_tasks
 except ImportError:
 
     def register_model(name):
@@ -1338,8 +1342,266 @@ class LMMS(lmms):
         return res
 
 
+class LibriSpeech:
+    def __init__(
+        self,
+        pretrained: str,
+        device: Optional[str] = "cpu",
+        with_ipex=True,
+        with_jit=True,
+        with_greedy=False,
+        batch_size=1,
+        dtype: Optional[Union[str, torch.dtype]] = "auto",
+        config=None,
+        add_special_tokens=True,
+    ) -> None:
+        model_id = pretrained
+        self.device = torch.device(device)
+        self.batch_size = int(batch_size)
+        self.with_jit = with_jit
+        self.with_ipex = with_ipex
+        self.with_greedy = with_greedy
+        self.dtype = dtype
+        self.add_special_tokens = add_special_tokens
+        load_dtype = torch.float32
+        infer_dtype = torch.float32
+        if dtype == "float16":
+            load_dtype = torch.half
+            infer_dtype = torch.half
+        elif dtype == "bfloat16":
+            load_dtype = torch.bfloat16
+            infer_dtype = torch.bfloat16
+        elif dtype in ["int8", "int4", "nf4"]:
+            load_dtype = torch.float32
+            infer_dtype = torch.int8
+        self.amp_dtype = (
+            torch.bfloat16
+            if args.quant_with_amp or self.dtype == "bfloat16"
+            else torch.float32
+        )
+
+        model_type = next(
+            (x for x in MODEL_CLASSES.keys() if x in model_id.lower()), "auto"
+        )
+        model_class = MODEL_CLASSES[model_type]
+        self.tokenizer = model_class[1].from_pretrained(
+            model_id, trust_remote_code=True
+        )
+        self.config = AutoConfig.from_pretrained(
+            model_id if config is None else config,
+            torchscript=with_jit,
+            trust_remote_code=True,
+        )
+        self.config.torchscript = self.with_jit
+        if self.dtype in ("int8", "int4", "nf4"):
+            try:
+                with ipex.OnDevice(dtype=torch.float, device="meta"):
+                    self.model = model_class[0].from_config(
+                        self.config, trust_remote_code=True
+                    )
+            except (RuntimeError, AttributeError) as e:
+                print("Warning: Loading model to meta device failed:", e)
+                self.model = model_class[0].from_pretrained(
+                    model_id,
+                    low_cpu_mem_usage=True,
+                    config=self.config,
+                    torch_dtype=load_dtype,
+                    trust_remote_code=True,
+                )
+        else:
+            self.model = model_class[0].from_pretrained(
+                model_id,
+                low_cpu_mem_usage=True,
+                config=self.config,
+                torch_dtype=load_dtype,
+                trust_remote_code=True,
+            )
+
+        self.model = self.model.eval()
+        if with_ipex and dtype not in ["int8", "int4", "nf4"]:
+            self.model = ipex.llm.optimize(
+                self.model.eval(),
+                dtype=infer_dtype,
+                inplace=True,
+                deployment_mode=False,
+            )
+
+        if args.torch_compile:
+            if dtype in ["int8", "int4", "nf4"]:
+                raise SystemExit(
+                    "[ERROR] Currently this script does not support torch.compile with int8/int4/nf4 datatype,"
+                    " please set dtype to float32 or bfloat16 if want to use torch.compile."
+                )
+            if with_jit:
+                raise SystemExit(
+                    "[ERROR] JIT cannot co-work with torch.compile, please set jit to False if want to use"
+                    " torch.compile."
+                )
+            self.model.forward = torch.compile(
+                self.model.forward, dynamic=True, backend=args.backend
+            )
+
+        self.base_model = self.model
+
+        self.iter = 0
+        self.num_beams = 1 if with_greedy else 4
+        self.tp_number = 1
+        if self.with_jit:
+            past_key_values = tuple(
+                [
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros(
+                            [
+                                1,
+                                32,
+                                self.model.model.decoder.layers[
+                                    i
+                                ].encoder_attn.num_heads,
+                                self.model.model.decoder.layers[
+                                    i
+                                ].encoder_attn.head_dim,
+                            ],
+                            dtype=self.amp_dtype,
+                        ).contiguous(),
+                        torch.zeros(
+                            [
+                                1,
+                                32,
+                                self.model.model.decoder.layers[
+                                    i
+                                ].encoder_attn.num_heads,
+                                self.model.model.decoder.layers[
+                                    i
+                                ].encoder_attn.head_dim,
+                            ],
+                            dtype=self.amp_dtype,
+                        ).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
+                    for i in range(self.config.num_hidden_layers)
+                ]
+            )
+            last_hidden_state = torch.rand([1, 32, 1280]).to(self.amp_dtype)
+            sample_inputs = {
+                "decoder_input_ids": torch.ones(4).to(torch.long).unsqueeze(0),
+                "past_key_values": past_key_values,
+                "encoder_outputs": (last_hidden_state,),
+            }
+            with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if self.amp_dtype == torch.bfloat16 else False,
+            ):
+                if self.dtype != "int8":
+                    traced_model = torch.jit.trace(
+                        self.model.eval(),
+                        example_kwarg_inputs=sample_inputs,
+                        strict=False,
+                        check_trace=False,
+                    )
+                    traced_model = torch.jit.freeze(traced_model.eval())
+                else:
+                    traced_model = torch.jit.load(args.quantized_model_path)
+                    traced_model = torch.jit.freeze(traced_model.eval())
+
+                traced_model(**sample_inputs)
+                traced_model(**sample_inputs)
+            ipex._set_optimized_model_for_generation(
+                self.model, optimized_model=traced_model
+            )
+        self.dataset = load_dataset("librispeech_asr", split="test.clean")
+        self.dataloader = DataLoader(
+            self.dataset,
+            batch_size=1,
+            shuffle=False,
+        )
+
+    def _levenshtein(self, a: List, b: List) -> int:
+        """Calculates the Levenshtein distance between a and b."""
+        n, m = len(a), len(b)
+        if n > m:
+            # Make sure n <= m, to use O(min(n,m)) space
+            a, b = b, a
+            n, m = m, n
+
+        current = list(range(n + 1))
+        for i in range(1, m + 1):
+            previous, current = current, [i] + [0] * n
+            for j in range(1, n + 1):
+                add, delete = previous[j] + 1, current[j - 1] + 1
+                change = previous[j - 1]
+                if a[j - 1] != b[i - 1]:
+                    change = change + 1
+                current[j] = min(add, delete, change)
+
+        return current[n]
+
+    def word_error_rate(self, hypotheses: List[str], references: List[str]) -> float:
+        """
+        Computes Average Word Error rate between two texts represented as
+        corresponding lists of string. Hypotheses and references must have same length.
+
+        Args:
+            hypotheses: list of hypotheses
+            references: list of references
+
+        Returns:
+            (float) average word error rate
+        """
+        scores = 0
+        words = 0
+        if len(hypotheses) != len(references):
+            raise ValueError(
+                "In word error rate calculation, hypotheses and reference"
+                " lists must have the same number of elements. But I got:"
+                "{0} and {1} correspondingly".format(len(hypotheses), len(references))
+            )
+        for h, r in zip(hypotheses, references):
+            h_list = h.split()
+            r_list = r.split()
+            words += len(r_list)
+            scores += self._levenshtein(h_list, r_list)
+        if words != 0:
+            wer = 1.0 * scores / words
+        else:
+            wer = float("inf")
+        return wer, scores, words
+
+    def evaluate(self):
+        results = []
+        references = []
+        for batch_ndx, sample in enumerate(self.dataloader):
+            inputs = sample["audio"]["array"].squeeze(0)
+            model_inputs = self.tokenizer(
+                inputs, sampling_rate=16000, return_tensors="pt"
+            ).input_features
+            with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+                enabled=True if self.amp_dtype == torch.bfloat16 else False,
+            ):
+                output = self.model.generate(
+                    model_inputs,
+                    do_sample=False,
+                    temperature=0.9,
+                    num_beams=self.num_beams,
+                )
+                gen_text = self.tokenizer.batch_decode(output, skip_special_tokens=True)
+                if len(results) == 0:
+                    results = gen_text
+                    references = sample["text"]
+                else:
+                    results += gen_text
+                    references += sample["text"]
+        references = [r.capitalize() for r in references]
+        wer, scores, words = self.word_error_rate(results, references)
+        return wer, scores, words
+
+
 lm_tasks = []
 lmms_tasks = []
+other_tasks = []
 lm_all_tasks = lm_eval.tasks.ALL_TASKS
 try:
     initialize_tasks()
@@ -1350,6 +1612,8 @@ for task in args.tasks:
         lm_tasks.append(task)
     elif task in ALL_TASKS:
         lmms_tasks.append(task)
+    elif task in ["librispeech_asr"]:
+        other_tasks.append(task)
     else:
         print(f"Task {task} in not supported by lm_eval and lmms_eval")
         exit(0)
@@ -1420,3 +1684,19 @@ elif len(lmms_tasks) != 0:
         cli_args=args,
     )
     print(lmms_evaluator.make_table(results))
+elif len(other_tasks) != 0:
+    if "librispeech_asr" in other_tasks:
+        evaluator = LibriSpeech(
+            pretrained=args.model,
+            device="cpu",
+            batch_size=args.batch_size,
+            with_ipex=args.ipex,
+            with_jit=not args.disable_jit,
+            dtype=args.dtype,
+            config=args.config_file,
+            add_special_tokens=True,
+            with_greedy=False,
+        )
+    wer, scores, num_words = evaluator.evaluate()
+    print("Evaluation WER: {0}".format(wer))
+    print("Accuracy: {:.15f} ".format(1 - wer))

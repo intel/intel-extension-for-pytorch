@@ -38,6 +38,7 @@ from llm.utils.model_class.llava import LlavaConfig
 from llm.utils.model_class.phi import PhiConfig
 from llm.utils.model_class.phi import Phi3Config
 from llm.utils.model_class.yuan import YuanConfig
+from llm.utils.model_class.whisper import WhisperConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -71,6 +72,12 @@ parser.add_argument(
     default="http://images.cocodataset.org/val2017/000000039769.jpg",
     type=str,
     help="image url for image-to-text task",
+)
+parser.add_argument(
+    "--audio",
+    default="example.flac",
+    type=str,
+    help="audio file for speech-to-text task",
 )
 parser.add_argument(
     "--qconfig-summary-file", default="", help="qconfig for static quantization"
@@ -349,6 +356,10 @@ elif re.search("phi", config.architectures[0], re.IGNORECASE):
     model = PhiConfig(args.model_id)
 elif re.search("yuan", config.architectures[0], re.IGNORECASE):
     model = YuanConfig(args.model_id)
+elif re.search("whisper", config.architectures[0], re.IGNORECASE):
+    import librosa
+
+    model = WhisperConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -359,6 +370,8 @@ if model.name == "mpt" and not hasattr(config, "max_seq_len") and args.prompt is
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
 if model.name in ["git", "llava"]:
     config.batch_size = int(args.batch_size) * num_beams
+if model.name == "whisper":
+    config.text_max_length = config.max_source_positions + config.max_target_positions
 
 user_model = model.get_user_model(config, args.benchmark)
 
@@ -529,6 +542,32 @@ def get_example_inputs(model):
             torch.ones((batch_size, 1), dtype=torch.long),
             tuple(past_key_value),
         )
+    elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_ENC:
+        past_key_value = tuple(
+            [
+                (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros(
+                        [1, 32, n_heads, head_dim], dtype=amp_dtype
+                    ).contiguous(),
+                    torch.zeros(
+                        [1, 32, n_heads, head_dim], dtype=amp_dtype
+                    ).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                )
+                for i in range(n_layers)
+            ]
+        )
+        last_hidden_state = torch.rand([1, 32, 1280]).to(amp_dtype)
+        example_inputs = (
+            torch.ones(4).to(torch.long).unsqueeze(0),
+            past_key_value,
+            (last_hidden_state,),
+        )
     else:
         raise RuntimeError(
             "Your model does not match existing example inputs used in ipex quantization, exiting..."
@@ -573,6 +612,12 @@ if args.ipex_smooth_quant:
             def tokenize_function(self, examples):
                 if "prompt" in examples:
                     example = self.tokenizer(examples["prompt"])
+                elif "audio" in examples:
+                    inputs = [d["array"] for d in examples["audio"]]
+                    example = self.tokenizer(
+                        inputs, sampling_rate=16000, return_tensors="pt"
+                    )
+                    example["input_ids"] = example["input_features"]
                 elif "text" in examples:
                     example = self.tokenizer(examples["text"])
                 elif "code" in examples:
@@ -689,6 +734,66 @@ if args.ipex_smooth_quant:
                         tuple(global_past_key_value),
                         (last_hidden_state,),
                     )
+                elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_ENC:
+                    input_bs = int(args.batch_size * num_beams)
+                    model_kwargs = {}
+                    model_kwargs = (
+                        user_model._prepare_encoder_decoder_kwargs_for_generation(
+                            torch.vstack(input_ids_padded).unsqueeze(0),
+                            model_kwargs,
+                            "input_features",
+                        )
+                    )
+                    last_hidden_state = model_kwargs["encoder_outputs"][
+                        "last_hidden_state"
+                    ]
+                    global_past_key_value = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                user_model.model.decoder.layers[i]
+                                .encoder_attn.k_proj(last_hidden_state)
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    user_model.model.decoder.layers[
+                                        i
+                                    ].encoder_attn.num_heads,
+                                    user_model.model.decoder.layers[
+                                        i
+                                    ].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                user_model.model.decoder.layers[i]
+                                .encoder_attn.v_proj(last_hidden_state)
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    user_model.model.decoder.layers[
+                                        i
+                                    ].encoder_attn.num_heads,
+                                    user_model.model.decoder.layers[
+                                        i
+                                    ].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(n_layers)
+                        ]
+                    )
+                    decoder_input_ids = (
+                        torch.zeros(input_bs).to(torch.long).unsqueeze(1)
+                    )
+                    model_inputs = (
+                        decoder_input_ids,
+                        tuple(global_past_key_value),
+                        (last_hidden_state,),
+                    )
                 else:
                     raise RuntimeError(
                         "Your model does not match existing example inputs used in ipex smooth quant, exiting..."
@@ -699,9 +804,12 @@ if args.ipex_smooth_quant:
 
                 return (model_inputs, last_ind)
 
-        calib_dataset = load_dataset(
-            args.dataset if args.dataset else model.default_dataset, split="train"
-        )
+        if model.default_dataset == "librispeech_asr":
+            calib_dataset = load_dataset(model.default_dataset, split="train.clean.100")
+        else:
+            calib_dataset = load_dataset(
+                args.dataset if args.dataset else model.default_dataset, split="train"
+            )
         if args.calib_shuffle:
             calib_dataset = calib_dataset.shuffle(seed=42)
         user_model.eval()
@@ -975,6 +1083,10 @@ if args.benchmark:
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
         image_processor = model.get_image_processor()
+    elif model.name == "whisper":
+        sample = librosa.load(args.audio, sr=16000)
+        prompt = sample[0]
+        generate_kwargs.pop("min_new_tokens", None)
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()
@@ -1028,6 +1140,11 @@ if args.benchmark:
             elif model.name == "git":
                 input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
                 output = user_model.generate(pixel_values=input_ids, **generate_kwargs)
+            elif model.name == "whisper":
+                input_ids = tokenizer(
+                    prompt, sampling_rate=16000, return_tensors="pt"
+                ).input_features
+                output = user_model.generate(input_ids, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = user_model.generate(input_ids, **generate_kwargs)
@@ -1040,7 +1157,7 @@ if args.benchmark:
             input_tokens_lengths = [x.shape[0] for x in input_ids]
             output_tokens_lengths = [x.shape[0] for x in gen_ids]
             total_new_tokens = [
-                o - i if user_model.config.model_type != "t5" else o
+                o if user_model.config.model_type in ["t5", "whisper"] else o - i
                 for i, o in zip(input_tokens_lengths, output_tokens_lengths)
             ]
             print(gen_text, total_new_tokens, flush=True)
@@ -1061,7 +1178,7 @@ if args.benchmark:
             activities=[torch.profiler.ProfilerActivity.CPU],
             schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
             on_trace_ready=trace_handler,
-        ) as prof:
+        ) as prof, torch.no_grad(), torch.cpu.amp.autocast(enabled=amp_enabled):
             for i in range(5):
                 if model.name == "llava":
                     input_ids = torch.stack(
@@ -1088,6 +1205,11 @@ if args.benchmark:
                     output = user_model.generate(
                         pixel_values=input_ids, **generate_kwargs
                     )
+                elif model.name == "whisper":
+                    input_ids = tokenizer(
+                        prompt, sampling_rate=16000, return_tensors="pt"
+                    ).input_features
+                    output = user_model.generate(input_ids, **generate_kwargs)
                 else:
                     input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                     output = user_model.generate(input_ids, **generate_kwargs)

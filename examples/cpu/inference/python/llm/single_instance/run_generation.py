@@ -10,6 +10,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     T5ForConditionalGeneration,
+    WhisperForConditionalGeneration,
     AutoProcessor,
 )
 
@@ -46,6 +47,7 @@ MODEL_CLASSES = {
     "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "phi": (AutoModelForCausalLM, AutoTokenizer),
+    "whisper": (WhisperForConditionalGeneration, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -103,6 +105,12 @@ parser.add_argument(
     default="http://images.cocodataset.org/val2017/000000039769.jpg",
     type=str,
     help="image url for image-to-text task",
+)
+parser.add_argument(
+    "--audio",
+    default="example.flac",
+    type=str,
+    help="audio file for speech-to-text task",
 )
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
@@ -170,6 +178,8 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "mpt" and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
+if model_type == "whisper":
+    config.text_max_length = config.max_source_positions + config.max_target_positions
 
 if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
@@ -246,6 +256,10 @@ if re.search("llava", model.config.architectures[0], re.IGNORECASE):
         roles = conv.roles
 if re.search("yuan", model.config.architectures[0], re.IGNORECASE):
     model.config.batch_size = int(args.batch_size) * num_beams
+if re.search("whisper", model.config.architectures[0], re.IGNORECASE):
+    import librosa
+
+    sample = librosa.load(args.audio, sr=16000)
 
 
 def trace_handler(prof):
@@ -297,6 +311,9 @@ if args.benchmark:
         conv.append_message(conv.roles[0], prompt)
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
+    elif model_type == "whisper":
+        prompt = sample[0]
+        generate_kwargs.pop("min_new_tokens", None)
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()
@@ -351,6 +368,11 @@ if args.benchmark:
             elif model_type == "git":
                 input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
                 output = model.generate(pixel_values=input_ids, **generate_kwargs)
+            elif model_type == "whisper":
+                input_ids = tokenizer(
+                    prompt, sampling_rate=16000, return_tensors="pt"
+                ).input_features
+                output = model.generate(input_ids, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = model.generate(input_ids, **generate_kwargs)
@@ -364,7 +386,7 @@ if args.benchmark:
             input_tokens_lengths = [x.shape[0] for x in input_ids]
             output_tokens_lengths = [x.shape[0] for x in gen_ids]
             total_new_tokens = [
-                o - i if model.config.model_type != "t5" else o
+                o if model.config.model_type in ["t5", "whisper"] else o - i
                 for i, o in zip(input_tokens_lengths, output_tokens_lengths)
             ]
             print(gen_text, total_new_tokens, flush=True)
@@ -409,6 +431,11 @@ if args.benchmark:
                         output = model.generate(
                             pixel_values=input_ids, **generate_kwargs
                         )
+                    elif model_type == "whisper":
+                        input_ids = tokenizer(
+                            prompt, sampling_rate=16000, return_tensors="pt"
+                        ).input_features
+                        output = model.generate(input_ids, **generate_kwargs)
                     else:
                         input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                         output = model.generate(input_ids, **generate_kwargs)

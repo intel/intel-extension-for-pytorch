@@ -2022,6 +2022,101 @@ def _Phi3Attention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _WhisperAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    key_value_states: Optional[torch.Tensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    layer_head_mask: Optional[torch.Tensor] = None,
+    output_attentions: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    is_cross_attention = key_value_states is not None
+    bsz, tgt_len, _ = hidden_states.size()
+    query_states = self.q_proj(hidden_states) * self.scaling
+    if is_cross_attention and past_key_value is not None:
+        key_states = past_key_value[1].contiguous()
+        value_states = past_key_value[2].contiguous()
+    elif is_cross_attention:
+        key_states = (
+            self.k_proj(key_value_states)
+            .view(bsz, -1, self.num_heads, self.head_dim)
+            .contiguous()
+        )
+        value_states = (
+            self.v_proj(key_value_states)
+            .view(bsz, -1, self.num_heads, self.head_dim)
+            .contiguous()
+        )
+    else:
+        key_states = (
+            self.k_proj(hidden_states)
+            .view(bsz, -1, self.num_heads, self.head_dim)
+            .contiguous()
+        )
+        value_states = (
+            self.v_proj(hidden_states)
+            .view(bsz, -1, self.num_heads, self.head_dim)
+            .contiguous()
+        )
+
+    query_states = query_states.view(
+        bsz, -1, self.num_heads, self.head_dim
+    ).contiguous()
+
+    src_len = key_states.size(1)
+    if attention_mask is None:
+        seq_len = (
+            src_len + past_key_value[0].size(-2)
+            if past_key_value is not None
+            else src_len
+        )
+        attention_mask = torch.zeros(
+            [bsz, 1, tgt_len, seq_len], dtype=hidden_states.dtype
+        )
+    if key_value_states is None and self.is_decoder:
+        decoded_tokens = (
+            torch.tensor(past_key_value[0].size(-2))
+            if past_key_value is not None
+            else None
+        )
+    else:
+        decoded_tokens = torch.zeros(1, dtype=torch.long).contiguous()[0]
+
+    (
+        attn_output,
+        attn_weights,
+        past_key_value,
+    ) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        1,
+        past_key_value,
+        layer_head_mask,
+        attention_mask,
+        None,
+        False,
+        decoded_tokens,
+    )
+    if is_cross_attention:
+        past_key_value = (
+            past_key_value[0],
+            key_states,
+            value_states,
+            past_key_value[3],
+        )
+    if not output_attentions:
+        attn_weights = None
+    if not self.is_decoder:
+        past_key_value = None
+
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, tgt_len, -1)
+    # attn_output = self.out_proj(attn_output)
+    return attn_output, attn_weights, past_key_value
+
+
 def _create_attention_mask_for_git(
     self, tgt, memory, tgt_mask, past_key_values_length, memory_key_padding_mask=None
 ):
@@ -2151,6 +2246,7 @@ class _IPEXAttentionRef(nn.Module):
                 "T5ForConditionalGeneration",
                 "MptForCausalLM",
                 "GitForCausalLM",
+                "WhisperForConditionalGeneration",
             ]
             or (
                 self.model_backbone == "BaichuanForCausalLM"
@@ -2647,6 +2743,16 @@ class _IPEXAttentionRef(nn.Module):
                 past_key_value,
                 output_attentions,
                 use_cache,
+            )
+        elif self.model_backbone == "WhisperForConditionalGeneration":
+            return _WhisperAttention_forward(
+                self,
+                hidden_states,
+                key_value_states,
+                past_key_value,
+                attention_mask,
+                layer_head_mask,
+                output_attentions,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

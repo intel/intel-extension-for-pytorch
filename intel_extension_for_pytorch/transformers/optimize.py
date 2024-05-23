@@ -187,10 +187,13 @@ def model_convert_reference(_model):
         PhiForCausalLM_forward,
         PhiModel_forward,
         Phi3Model_forward,
+        WhisperForConditionalGeneration_forward,
+        WhisperModel_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
         prepare_inputs_for_generation_llama,
         prepare_inputs_labels_for_multimodal_llavallama,
+        detect_language,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -786,6 +789,31 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "WhisperForConditionalGeneration":
+        convert_function(_model, "detect_language", detect_language)
+        convert_function(_model, "forward", WhisperForConditionalGeneration_forward)
+        convert_function(_model.model, "forward", WhisperModel_forward)
+        convert_class(
+            _model,
+            type(_model.model.encoder.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.decoder.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.encoder.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
 
     return _model
 
@@ -888,6 +916,60 @@ def get_dummy_input(_model, return_dict=False):
                 (last_hidden_state,),
             )
         )
+    elif _model.config.architectures[0] == "WhisperForConditionalGeneration":
+        dtype = (
+            _model.model.decoder.layers[0].mha_linear_add.dtype
+            if hasattr(_model.model.decoder.layers[0], "mha_linear_add")
+            else _model.dtype
+        )
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros(
+                        [
+                            1,
+                            32,
+                            _model.model.decoder.layers[i].encoder_attn.num_heads,
+                            _model.model.decoder.layers[i].encoder_attn.head_dim,
+                        ],
+                        dtype=dtype,
+                    ).contiguous(),
+                    torch.zeros(
+                        [
+                            1,
+                            32,
+                            _model.model.decoder.layers[i].encoder_attn.num_heads,
+                            _model.model.decoder.layers[i].encoder_attn.head_dim,
+                        ],
+                        dtype=dtype,
+                    ).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                )
+                for i in range(model_num_layers)
+            ]
+        )
+        last_hidden_state = torch.rand([1, 32, 1280]).to(dtype)
+        sample_inputs = (
+            (
+                {
+                    "decoder_input_ids": torch.ones(4).to(torch.long).unsqueeze(0),
+                    "past_key_values": past_key_values,
+                    "encoder_outputs": (last_hidden_state,),
+                }
+            )
+            if return_dict
+            else (
+                torch.ones(1).to(torch.long).unsqueeze(0),
+                past_key_values,
+                (last_hidden_state,),
+            )
+        )
+
     else:
         sample_inputs = (
             {
@@ -1106,6 +1188,13 @@ def model_convert_lowering(
                 getattr(_model, model_name), "_use_sdpa"
             ):
                 getattr(_model, model_name)._use_sdpa = False
+            if hasattr(_model, model_name):
+                cur_mod = getattr(_model, model_name)
+                for submodel_name in ["encoder", "decoder"]:
+                    if hasattr(cur_mod, submodel_name) and hasattr(
+                        getattr(cur_mod, submodel_name), "_use_sdpa"
+                    ):
+                        getattr(cur_mod, submodel_name)._use_sdpa = False
 
         for supported_mlp_class in [_IPEXDecoderLayerRef]:
             lowering_class_cpu(
@@ -1217,7 +1306,7 @@ def optimize(
 
     Well supported model family with full functionalities:
     Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
-    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi.
+    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Whisper.
 
     For the model that is not in the scope of supported model family above, will try to
     apply default ipex.optimize transparently to get benifits (not include quantizations,
@@ -1307,6 +1396,7 @@ def optimize(
                 "YuanForCausalLM",
                 "PhiForCausalLM",
                 "Phi3ForCausalLM",
+                "WhisperForConditionalGeneration",
             ]
 
         if well_supported_model:
@@ -1315,8 +1405,8 @@ def optimize(
             if quantization_config is not None:
                 logger.warning(
                     "ipex.llm.optimize supports quantizations on Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen,"
-                    + " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, Llava, Yuan, "
-                    + "and Phi, fallback to origin model"
+                    + " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, Llava, Yuan,"
+                    + " Phi, and Whisper, fallback to origin model"
                 )
                 return model
 

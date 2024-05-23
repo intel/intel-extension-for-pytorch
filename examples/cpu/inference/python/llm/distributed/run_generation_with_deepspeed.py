@@ -18,6 +18,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     T5ForConditionalGeneration,
+    WhisperForConditionalGeneration,
     AutoProcessor,
     TextStreamer,
 )
@@ -56,6 +57,7 @@ MODEL_CLASSES = {
     "yuan": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "phi": (AutoModelForCausalLM, AutoTokenizer),
+    "whisper": (WhisperForConditionalGeneration, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -140,6 +142,12 @@ parser.add_argument(
     default="http://images.cocodataset.org/val2017/000000039769.jpg",
     type=str,
     help="image url for image-to-text task",
+)
+parser.add_argument(
+    "--audio",
+    default="example.flac",
+    type=str,
+    help="audio file for speech-to-text task",
 )
 parser.add_argument("--print-memory", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
@@ -336,6 +344,8 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "mpt" and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
+if model_type == "whisper":
+    config.text_max_length = config.max_source_positions + config.max_target_positions
 if model_type == "llava":
     config.use_cache = True
 
@@ -374,6 +384,7 @@ elif world_size == 1 or model_type in [
     "git",
     "qwen",
     "yuan",
+    "whisper",
 ]:
     model = model_class[0].from_pretrained(
         model_name,
@@ -586,6 +597,13 @@ elif model_type == "llava":
     conv.append_message(conv.roles[1], None)
     prompt = conv.get_prompt()
     inputs = [prompt] * args.batch_size
+elif model_type == "whisper":
+    import librosa
+
+    sample = librosa.load(args.audio, sr=16000)
+    prompt = sample[0]
+    inputs = [prompt] * args.batch_size
+    generate_kwargs.pop("min_new_tokens", None)
 else:
     # input tokens
     input_sentences = []
@@ -644,6 +662,9 @@ def generate():
             for img in image
         ]
         input_tokens = {"input_ids": input_ids, "images": image_tensor}
+    elif model_type == "whisper":
+        input_tokens = tokenizer(inputs, sampling_rate=16000, return_tensors="pt")
+        input_ids = input_tokens.input_features
     else:
         input_tokens = tokenizer.batch_encode_plus(
             inputs, return_token_type_ids=False, return_tensors="pt"
@@ -654,15 +675,17 @@ def generate():
             input_tokens[t] = input_tokens[t].to(
                 get_accelerator().current_device_name()
             )
-
-    outputs = model.generate(**input_tokens, **generate_kwargs)
+    with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+        enabled=True if infer_dtype == torch.bfloat16 else False
+    ):
+        outputs = model.generate(**input_tokens, **generate_kwargs)
     gen_ids = outputs[0] if args.token_latency else outputs
 
     input_tokens_lengths = [x.shape[0] for x in input_ids]
     output_tokens_lengths = [x.shape[0] for x in gen_ids]
 
     total_new_tokens = [
-        o - i if model.config.model_type != "t5" else o
+        o if model.config.model_type in ["t5", "whisper"] else o - i
         for i, o in zip(input_tokens_lengths, output_tokens_lengths)
     ]
     gen_text = tokenizer.batch_decode(

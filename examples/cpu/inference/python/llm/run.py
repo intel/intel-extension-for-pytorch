@@ -233,7 +233,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument(
         "--image-url", default=None, type=str, help="image url for image-to-text task"
     )
-
+    parser.add_argument(
+        "--audio",
+        default=None,
+        type=str,
+        help="audio file for speech-to-text task",
+    )
     # deepspeed inference related arguments.
     parser.add_argument("--autotp", action="store_true")
     parser.add_argument("--shard-model", action="store_true")
@@ -293,6 +298,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--config-file", str(args.config_file)])
             if args.image_url is not None:
                 infer_cmd.extend(["--image-url", str(args.image_url)])
+            if args.audio is not None:
+                infer_cmd.extend(["--audio", str(args.audio)])
 
             print("LLM RUNTIME INFO: running model geneartion...")
             result = subprocess.run(infer_cmd)
@@ -422,6 +429,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--greedy"])
                 if args.image_url is not None:
                     quant_cmd.extend(["--image-url", str(args.image_url)])
+                if args.audio is not None:
+                    quant_cmd.extend(["--audio", str(args.audio)])
                 if args.ipex_weight_only_quantization:
                     quant_cmd.extend(["--ipex-weight-only-quantization"])
                     quant_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
@@ -551,6 +560,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--token-latency"])
             if args.image_url is not None:
                 infer_cmd.extend(["--image-url", str(args.image_url)])
+            if args.audio is not None:
+                infer_cmd.extend(["--audio", str(args.audio)])
 
             if args.prompt is not None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
@@ -594,6 +605,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "yuan": ("/yuan_local_shard"),
                 "phi-3": ("/phi-3_local_shard"),
                 "phi": ("/phi_local_shard"),
+                "whisper": ("/whisper_local_shard"),
             }
             model_type = next(
                 (
@@ -657,6 +669,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--token-latency"])
         if args.image_url is not None:
             infer_cmd.extend(["--image-url", str(args.image_url)])
+        if args.audio is not None:
+            infer_cmd.extend(["--audio", str(args.audio)])
 
         if args.prompt is not None:
             infer_cmd.extend(["--prompt", str(args.prompt)])
