@@ -358,9 +358,9 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                         mod, concat_scales, concat_zeros
                     )
         elif (
-            self.tpp
-            and hasattr(module, "concat_linear")
+            hasattr(module, "concat_linear")
             and module.concat_linear is not None
+            and (self.tpp or module.concat_linear.weight.dtype == torch.half)
         ):
             self.concat_linear = module.concat_linear
         else:
