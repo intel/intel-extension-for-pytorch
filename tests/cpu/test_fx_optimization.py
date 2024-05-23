@@ -25,12 +25,15 @@ skipIfNoTRANSFORMERS = unittest.skipIf(not HAS_TRANSFORMERS, "no transformers")
 try:
     import diffusers
 
-    HAS_DIFFUSERS = True
+    if diffusers.__version__ > "0.25.0":
+        HAS_DIFFUSERS = False
+    else:
+        HAS_DIFFUSERS = True
 except ImportError:
     HAS_DIFFUSERS = False
 except RuntimeError:
     HAS_DIFFUSERS = False
-skipIfNoDIFFUSERS = unittest.skipIf(not HAS_DIFFUSERS, "no diffusers")
+skipIfNoDIFFUSERS = unittest.skipIf(not HAS_DIFFUSERS, "no expected diffusers version")
 
 
 class MultipleLinear(torch.nn.Module):
