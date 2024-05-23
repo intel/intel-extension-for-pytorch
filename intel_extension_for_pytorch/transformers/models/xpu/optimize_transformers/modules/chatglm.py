@@ -98,7 +98,7 @@ def prepare_inputs_for_generation(
     position_ids: Optional[torch.Tensor] = None,
     use_cache: Optional[bool] = None,
     is_first_forward: bool = True,
-    **kwargs
+    **kwargs,
 ) -> dict:
     # only last token for input_ids if past is not None
     if position_ids is None:
@@ -128,6 +128,7 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         impl_mode=None,
         tp_size=1,
         tp_group=None,
+        **kwargs,
     ):
         super().__init__(module, config, dtype, device, module_name)
         self.ipex_config = self.build_ipex_transformer_config(

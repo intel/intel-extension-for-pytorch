@@ -15,6 +15,7 @@ class NewIPEXBertSelfAttention(nn.Module):
         impl_mode=None,
         tp_size=1,
         tp_group=None,
+        **kwargs,
     ):
         super().__init__()
         if config.hidden_size % config.num_attention_heads != 0 and not hasattr(

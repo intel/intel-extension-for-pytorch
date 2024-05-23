@@ -129,6 +129,16 @@ class ModuleReplacer:
         for name, child in model.named_children():
             if child.__class__.__name__ == "Transformer2DModel":
                 config = child.config
+
+            decoder_kwargs = dict()
+            import transformers
+
+            if (
+                type(child)
+                == transformers.models.llama.modeling_llama.LlamaDecoderLayer
+            ):
+                decoder_kwargs["layer_idx"] = child.self_attn.layer_idx
+
             if type(child) in self.module_dict.keys():
                 new_module = self.module_dict[type(child)](
                     child,
@@ -139,6 +149,7 @@ class ModuleReplacer:
                     impl_mode=impl_mode,
                     tp_size=self.tp_size,
                     tp_group=self.tp_group,
+                    **decoder_kwargs,
                 )
                 if new_module is not None:
                     # IPEXLLMResourceContrainer.push(new_module)
@@ -157,6 +168,7 @@ class ModuleReplacer:
                     impl_mode=impl_mode,
                     tp_size=self.tp_size,
                     tp_group=self.tp_group,
+                    **decoder_kwargs,
                 )
                 if new_module is not None:
                     setattr(model, name, new_module)
@@ -172,6 +184,7 @@ class ModuleReplacer:
                     impl_mode=impl_mode,
                     tp_size=self.tp_size,
                     tp_group=self.tp_group,
+                    **decoder_kwargs,
                 )
                 if new_module is not None:
                     setattr(model, name, new_module)
@@ -187,6 +200,7 @@ class ModuleReplacer:
                     impl_mode=impl_mode,
                     tp_size=self.tp_size,
                     tp_group=self.tp_group,
+                    **decoder_kwargs,
                 )
                 if new_module is not None:
                     setattr(model, name, new_module)
@@ -213,6 +227,12 @@ class ModuleReplacer:
     def replace_op(self, model):
         if model.__class__.__name__ == "ChatGLMForConditionalGeneration":
             model.prepare_inputs_for_generation = prepare_inputs_for_generation.__get__(
+                model, model.__class__
+            )
+        if model.__class__.__name__ == "LlamaModel":
+            from .modules.llama import _update_causal_mask
+
+            model._update_causal_mask = _update_causal_mask.__get__(
                 model, model.__class__
             )
         for name, child in model.named_children():

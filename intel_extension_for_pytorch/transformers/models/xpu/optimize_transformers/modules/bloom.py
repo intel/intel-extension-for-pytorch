@@ -31,6 +31,7 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
         impl_mode=None,
         tp_size=1,
         tp_group=None,
+        **kwargs,
     ):
         super().__init__(module, config, dtype, device, module_name)
         self.ipex_config = self.build_ipex_transformer_config(

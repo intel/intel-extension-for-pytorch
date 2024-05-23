@@ -443,6 +443,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         else:
             seq_len = key.size(2) + self.prompt_len
         if attention_mask is not None:
+            attention_mask = attention_mask[:, :, :, :seq_len]
             if attention_mask.dtype == torch.bool:
                 blocked_attn_mask = None
                 if query.shape[2] != 1:

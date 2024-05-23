@@ -31,6 +31,7 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         impl_mode=None,
         tp_size=1,
         tp_group=None,
+        **kwargs,
     ):
         super().__init__(module, config, dtype, device, module_name)
         self.ipex_config = self.build_ipex_transformer_config(
@@ -210,7 +211,7 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
             hidden_states = hidden_states.transpose(0, 1).contiguous()
 
         # revert _convert_to_rw_cache in transformers
-        if layer_past is not None:
+        if layer_past is not None and layer_past[0].dim() == 3:
             batch_size_times_num_heads, kv_length, head_dim = layer_past[0].shape
             num_heads = batch_size_times_num_heads // bs
             layer_past = (
@@ -267,9 +268,10 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
             layer_past = outputs[0]
             batch_size, num_heads, kv_length, head_dim = layer_past[0].shape
             batch_size_times_num_heads = batch_size * num_heads
+            # layer_past[0][0].shape[2] is used to get seq_length.
             layer_past = (
-                layer_past[0].view(batch_size_times_num_heads, kv_length, head_dim),
-                layer_past[1].view(batch_size_times_num_heads, kv_length, head_dim),
+                layer_past[0],
+                layer_past[1],
             )
             outputs = (hidden_states, layer_past) + outputs[1:]
         else:
