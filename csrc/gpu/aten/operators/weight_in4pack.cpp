@@ -218,7 +218,7 @@ void weight_to_int4pack_kernel(
 }
 } // namespace impl
 
-Tensor _convert_weight_to_int4pack_xpu(const Tensor& in, int64_t innerKTiles) {
+Tensor _convert_weight_to_int4pack(const Tensor& in, int64_t innerKTiles) {
   TORCH_CHECK(in.dim() == 2, __func__, " : expect weight to be 2D tensor.");
   TORCH_CHECK(in.dtype() == at::kInt, __func__, " : expect weight to be kInt.");
   TORCH_CHECK(
@@ -254,16 +254,6 @@ Tensor _convert_weight_to_int4pack_xpu(const Tensor& in, int64_t innerKTiles) {
   impl::weight_to_int4pack_kernel(weight_packed, weight, N, K, 2);
   return weight_packed;
 }
-
-namespace {
-TORCH_LIBRARY_FRAGMENT(aten, m) {
-  m.def("_convert_weight_to_int4pack(Tensor self, int innerKTiles) -> Tensor");
-  m.impl(
-      "_convert_weight_to_int4pack",
-      c10::DispatchKey::XPU,
-      at::AtenIpexTypeXPU::_convert_weight_to_int4pack_xpu);
-}
-} // namespace
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

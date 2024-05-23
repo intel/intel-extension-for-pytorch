@@ -801,6 +801,7 @@ supported:
   - lcm
   - lcm.out
   - lcm_
+  - _convert_weight_to_int4pack
   - _foreach_sub.Scalar
   - _foreach_sub_.Scalar
   - _foreach_add.Scalar
@@ -861,6 +862,7 @@ supported:
   - poisson
   - where.self_out
   - where.self
+  - _weight_int4pack_mm
   - _weight_norm_interface_backward
   - _weight_norm_interface
   - _validate_compressed_sparse_indices

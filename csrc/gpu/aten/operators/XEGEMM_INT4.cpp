@@ -542,7 +542,7 @@ Tensor recast(
       {device});
 }
 
-Tensor _weight_int4pack_mm_xpu(
+Tensor _weight_int4pack_mm(
     const Tensor& A,
     const Tensor& B,
     int64_t qGroupSize,
@@ -579,7 +579,7 @@ Tensor _weight_int4pack_mm_xpu(
   auto C = at::empty({M, N}, A.options());
   auto q_scale_and_zeros_vec = at::split(qScaleAndZeros, 1, -1);
   auto b_recast = recast<uint8_t>(
-      B, {K, N / 2}, {N / 2, 1}, "_weight_int4pack_mm_xpu tensor B");
+      B, {K, N / 2}, {N / 2, 1}, "_weight_int4pack_mm tensor B");
   auto q_scale = q_scale_and_zeros_vec[0].reshape({-1, N}).contiguous();
   auto q_zeros = q_scale_and_zeros_vec[1].reshape({-1, N}).contiguous();
   TORCH_CHECK(A.dim() == 2 && b_recast.dim() == 2);
@@ -626,15 +626,6 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_add_int4.xpu", at::AtenIpexTypeXPU::mm_add_int4);
   IPEX_OP_REGISTER(
       "mm_bias_add_int4.xpu", at::AtenIpexTypeXPU::mm_bias_add_int4);
-}
-
-TORCH_LIBRARY_FRAGMENT(aten, m) {
-  m.def(
-      "_weight_int4pack_mm(Tensor self, Tensor mat2, int qGroupSize, Tensor qScaleAndZeros) -> Tensor");
-  m.impl(
-      "_weight_int4pack_mm",
-      c10::DispatchKey::XPU,
-      at::AtenIpexTypeXPU::_weight_int4pack_mm_xpu);
 }
 } // namespace
 #endif
