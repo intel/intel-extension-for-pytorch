@@ -1,10 +1,6 @@
 import logging
 import warnings
 import functools
-
-format_str = "%(asctime)s - %(filename)s - %(name)s - %(levelname)s - %(message)s"
-logging.basicConfig(format=format_str)
-
 from enum import Enum
 
 
@@ -73,7 +69,13 @@ class _Logger(logging.Logger):
 
 
 logging.setLoggerClass(_Logger)
+
 logger = logging.getLogger("IPEX")
+logger.propagate = False
+format_str = "%(asctime)s - %(filename)s - %(name)s - %(levelname)s - %(message)s"
+_default_stream_handler = logging.StreamHandler()
+_default_stream_handler.setFormatter(logging.Formatter(format_str))
+logger.addHandler(_default_stream_handler)
 
 
 def warn_if_user_explicitly_set(user_have_set, msg):
