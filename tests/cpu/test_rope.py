@@ -7,7 +7,7 @@ import intel_extension_for_pytorch as ipex
 
 class FusedROPETester(TestCase):
     def setUp(self):
-        self.batch = 1
+        self.batch = 2
         self.seq_len = 32
         self.max_seq_len = 384
         self.head_size = 256
@@ -76,7 +76,10 @@ class FusedROPETester(TestCase):
             query, key, position_ids, embed_positions, offset=None, rotary_dim=None
         ):
             embed_positions = _get_embed_positions(embed_positions, position_ids)
-            sincos = embed_positions.squeeze()[position_ids]
+            repeated_position_ids = position_ids.unsqueeze(-1).repeat(
+                1, 1, embed_positions.shape[-1]
+            )
+            sincos = torch.gather(embed_positions, 1, repeated_position_ids)
             sin, cos = torch.split(sincos, sincos.shape[-1] // 2, dim=-1)
 
             if rotary_dim < self.head_size:
