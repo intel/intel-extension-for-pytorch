@@ -21,14 +21,14 @@ class PagedAttentionTest(TestCase):
         torch.manual_seed(seed)
 
         scale = head_size**-0.5
-        key_cache_shape = (num_blocks, block_size, num_head, head_size)
+        key_cache_shape = (num_blocks, num_head, block_size, head_size)
         key_caches = []
         for _ in range(num_layer):
             key_cache = torch.empty(size=key_cache_shape, dtype=dtype)
             key_cache.uniform_(-scale, scale)
             key_caches.append(key_cache)
 
-        value_cache_shape = (num_blocks, block_size, num_head, head_size)
+        value_cache_shape = (num_blocks, num_head, block_size, head_size)
         value_caches = []
         for _ in range(num_layer):
             value_cache = torch.empty(size=value_cache_shape, dtype=dtype)
@@ -64,9 +64,9 @@ class PagedAttentionTest(TestCase):
         alibi_slopes: Optional[torch.Tensor],
     ) -> None:
         num_query_heads = query.shape[1]
-        num_kv_head = value_cache.shape[2]
+        num_kv_head = value_cache.shape[1]
         head_size = value_cache.shape[3]
-        block_size = value_cache.shape[1]
+        block_size = value_cache.shape[2]
         num_seqs = query.shape[0]
 
         block_tables = block_tables.cpu().tolist()
@@ -79,15 +79,19 @@ class PagedAttentionTest(TestCase):
             keys = []
             values = []
             for j in range(context_len):
-                block_number = int(block_table[j // block_size])
-                block_offset = j % block_size
-
-                k = key_cache[block_number, block_offset, :, :]
-                k = k.reshape(num_kv_head, head_size)
-                keys.append(k)
-
-                v = value_cache[block_number, block_offset, :, :]
-                values.append(v)
+                key = torch.empty(
+                    num_kv_head, head_size, dtype=query.dtype, device="cpu"
+                )
+                value = torch.empty(
+                    num_kv_head, head_size, dtype=query.dtype, device="cpu"
+                )
+                for k in range(num_kv_head):
+                    block_number = int(block_table[j // block_size])
+                    block_offset = j % block_size
+                    key[k, :] = key_cache[block_number, k, block_offset, :]
+                    value[k, :] = value_cache[block_number, k, block_offset, :]
+                keys.append(key)
+                values.append(value)
             keys = torch.stack(keys, dim=0)
             values = torch.stack(values, dim=0)
             if num_queries_per_kv > 1:
@@ -281,10 +285,11 @@ class PagedAttentionTest(TestCase):
         block_offsets = slot_mapping % block_size
         block_offsets = block_offsets.cpu().tolist()
         for i in range(num_token):
-            block_idx = block_indicies[i]
-            block_offset = block_offsets[i]
-            cloned_key_cache[block_idx, block_offset, :, :] = key[i]
-            cloned_value_cache[block_idx, block_offset, :, :] = value[i]
+            for j in range(num_head):
+                block_idx = block_indicies[i]
+                block_offset = block_offsets[i]
+                cloned_key_cache[block_idx, j, block_offset, :] = key[i][j]
+                cloned_value_cache[block_idx, j, block_offset, :] = value[i][j]
 
         assert torch.allclose(key_cache, cloned_key_cache)
         assert torch.allclose(value_cache, cloned_value_cache)
