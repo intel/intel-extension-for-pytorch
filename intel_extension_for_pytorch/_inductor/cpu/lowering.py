@@ -1,8 +1,8 @@
 # Custom lowerings overriding those from PyTorch
-import torch
+import torch  # noqa
 import contextlib
 import functools
-from torch._inductor.lowering import ELEMENTWISE_TYPE_PROMOTION_KIND, make_fallback
+from torch._inductor.lowering import ELEMENTWISE_TYPE_PROMOTION_KIND
 
 lowering_overrides = {}
 
@@ -37,37 +37,6 @@ def register_lowering(
         type_promotion_kind=type_promotion_kind,
         convert_input_to_bool=convert_input_to_bool,
     )
-
-
-make_fallback(torch.ops.torch_ipex.convolution_forward)
-make_fallback(torch.ops.torch_ipex.convolution_backward)
-make_fallback(torch.ops.torch_ipex.conv_transpose)
-make_fallback(torch.ops.torch_ipex.conv_transpose_backward)
-make_fallback(torch.ops.torch_ipex.ipex_linear)
-make_fallback(torch.ops.torch_ipex.linear_backward)
-make_fallback(torch.ops.torch_ipex.ipex_MKLSGEMM)
-make_fallback(torch.ops.torch_ipex.ipex_linear_eltwise)
-make_fallback(torch.ops.torch_ipex.linear_eltwise_backward)
-make_fallback(torch.ops.torch_ipex.embedding_bag)
-make_fallback(torch.ops.torch_ipex.ipex_lstm)
-make_fallback(torch.ops.torch_ipex.ROIAlign_forward)
-make_fallback(torch.ops.torch_ipex.ROIAlign_backward)
-make_fallback(torch.ops.torch_ipex.batch_norm_forward)
-make_fallback(torch.ops.torch_ipex.batch_norm_backward)
-make_fallback(torch.ops.torch_ipex.cumsum)
-make_fallback(torch.ops.torch_ipex.tpp_linear)
-make_fallback(torch.ops.torch_ipex.tpp_linear_bias)
-make_fallback(torch.ops.torch_ipex.tpp_linear_gelu)
-make_fallback(torch.ops.torch_ipex.tpp_linear_add_add)
-make_fallback(torch.ops.torch_ipex.tpp_linear_relu)
-make_fallback(torch.ops.torch_ipex.tpp_linear_silu)
-make_fallback(torch.ops.torch_ipex.tpp_linear_add)
-make_fallback(torch.ops.torch_ipex.tpp_linear_mul)
-make_fallback(torch.ops.torch_ipex.masked_multihead_self_attention)
-make_fallback(torch.ops.torch_ipex.rotary_position_embedding)
-
-make_fallback(torch.ops.torch_ipex.add_softmax_)
-make_fallback(torch.ops.torch_ipex.bmm_add)
 
 
 @contextlib.contextmanager

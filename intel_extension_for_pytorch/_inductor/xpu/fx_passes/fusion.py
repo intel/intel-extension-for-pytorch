@@ -832,7 +832,3 @@ def _ipex_fusion_init():
 @functools.lru_cache(None)
 def _ipex_weight_pack_init():
     _register_weight_pack_pass()
-
-
-_ipex_fusion_init()
-_ipex_weight_pack_init()

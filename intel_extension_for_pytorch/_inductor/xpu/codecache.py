@@ -6,7 +6,7 @@ from concurrent.futures import ProcessPoolExecutor
 from types import ModuleType
 
 from typing import Union, Set
-from functools import partial
+from functools import partial, lru_cache
 
 import torch
 
@@ -73,4 +73,6 @@ class XPUAsyncCompile(AsyncCompile):
             return _load_kernel(kernel_name, source_code)
 
 
-XPUAsyncCompile.warm_pool()
+@lru_cache(None)
+def warm_xpu_async_compile_pool():
+    XPUAsyncCompile.warm_pool()

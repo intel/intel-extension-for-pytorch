@@ -2,7 +2,9 @@ import torch
 import intel_extension_for_pytorch  # noqa
 import torch.nn as nn
 from torch.multiprocessing import Process
-from torch.testing._internal.common_utils import TestCase
+
+# torch.testing._internal.common_utils can trigger XPU runtime.
+from expecttest import TestCase
 import time
 
 
@@ -29,6 +31,7 @@ class mini50(nn.Module):
 class TestTorchMethod(TestCase):
     def test_lazy_init(self):
         def run_model():
+            assert not torch.xpu.is_initialized()
             criterion = nn.CrossEntropyLoss().to("xpu")
             model = mini50()
             model = model.to(device="xpu", dtype=torch.float32)
@@ -72,5 +75,7 @@ class TestTorchMethod(TestCase):
             p.join(120)
             return p.exitcode
 
+        self.assertFalse(torch.xpu.is_initialized())
+        self.assertFalse(torch.xpu._is_in_bad_fork())
         self.assertEqual(test_multi_process(), 0)
         self.assertEqual(test_multi_process(), 0)

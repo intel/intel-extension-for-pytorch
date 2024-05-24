@@ -165,11 +165,27 @@ if has_xpu():
     override_tensor_totype()
     exec_path = sys.argv[0].split("/")
     if len(exec_path) > 0 and "pytest" in exec_path:
-        override_assert_equal()
+        _lazy_call(override_assert_equal)
 
     from torch.utils.checkpoint import DefaultDeviceType
 
     DefaultDeviceType.set_device_type("xpu")
+
+    from .._dynamo.xpu import register_xpu_interface_to_dynamo
+
+    _lazy_call(register_xpu_interface_to_dynamo)
+
+    from .._inductor.xpu import (
+        register_xpu_backend_to_inductor,
+        register_xpu_fusion_to_inductor,
+    )
+
+    _lazy_call(register_xpu_backend_to_inductor)
+    _lazy_call(register_xpu_fusion_to_inductor)
+
+    from .._inductor.xpu.codecache import warm_xpu_async_compile_pool
+
+    _lazy_call(warm_xpu_async_compile_pool)
 
 
 # XXX: this is a temporary work-around to replace torch's _prepare_profiler method

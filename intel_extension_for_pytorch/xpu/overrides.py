@@ -1,6 +1,7 @@
 import torch
 import intel_extension_for_pytorch  # noqa F401
 from functools import wraps
+import sys
 
 
 def override_tensor_totype():
@@ -75,9 +76,9 @@ def override_assert_equal():
         pass
 
     torch.backends.disable_global_flags = _disable_global_flags
-    from torch.testing._internal.common_utils import TestCase
-
-    TestCase.assertEqual = fp64_assert_equal_wrapper(TestCase.assertEqual)
+    if "torch.testing._internal.common_utils" in sys.modules:
+        mod = sys.modules["torch.testing._internal.common_utils"]
+        mod.TestCase.assertEqual = fp64_assert_equal_wrapper(mod.TestCase.assertEqual)
 
 
 class WrapAPI:

@@ -1,13 +1,18 @@
 import torch
 
-# Note: import order is significant here due to the defect of triton.compile
-# in XPU backend. Here codecache is a temp WA.
+# Note: import order is significant here. Here codecache is a temp WA.
 from torch._inductor import codecache  # noqa
 from torch._dynamo.device_interface import register_interface_for_device
 
 from ...utils.utils import has_xpu
 from .device_interface import XPUInterface
 from .register import _register_module_function_to_dynamo
+
+
+def register_xpu_interface_to_dynamo():
+    for i in range(torch.xpu.device_count()):
+        register_interface_for_device(f"xpu:{i}", XPUInterface)
+
 
 if torch.xpu._is_compiled() and has_xpu():
     # Register XPU device interfaces in PyTorch Dynamo.

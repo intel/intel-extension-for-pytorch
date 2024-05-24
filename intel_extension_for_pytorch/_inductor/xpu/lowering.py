@@ -123,6 +123,3 @@ def register_onednn_fusion_ops():
         attr,
     ):
         return torch_ir.TensorBox.create(xpu_ir.LinearBinary.create(x, y, w, b, attr))
-
-
-register_onednn_fusion_ops()
