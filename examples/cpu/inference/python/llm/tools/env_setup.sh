@@ -32,7 +32,7 @@ if [ ! -f ${WHEELFOLDER}/lm_eval*.whl ] ||
 fi
 
 # Check existance of required Linux commands
-for CMD in conda gcc g++; do
+for CMD in gcc g++; do
     command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" is required."; exit 1;)
 done
 
@@ -131,12 +131,21 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             echo "         Found GCC version $(gcc -dumpfullversion)"
             echo "         Installing gcc and g++ 12.3 with conda"
             echo ""
-            conda install -y sysroot_linux-64
-            conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
-            if [ -z ${CONDA_BUILD_SYSROOT} ]; then
-                source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
-                source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
-                source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
+            set +e
+            command -v conda > /dev/null
+            EXIST_CONDA=$?
+            set -e
+            if [ ${EXIST_CONDA} -gt 0 ]; then
+                echo "[Error] Command \"conda\" is not available."
+                exit 5
+            else
+                conda install -y sysroot_linux-64
+                conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
+                if [ -z ${CONDA_BUILD_SYSROOT} ]; then
+                    source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
+                    source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
+                    source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
+                fi
             fi
         fi
 
@@ -206,7 +215,15 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd intel-extension-for-pytorch/examples/cpu/inference/python/llm
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    conda install -y gperftools -c conda-forge
+    set +e
+    command -v conda > /dev/null
+    EXIST_CONDA=$?
+    set -e
+    if [ ${EXIST_CONDA} -gt 0 ]; then
+        echo "[WARNING] Command \"conda\" is not available. Please install tcmalloc manually."
+    else
+        conda install -y gperftools -c conda-forge
+    fi
     bash ${AUX_INSTALL_SCRIPT}
     python -m pip install ${WHEELFOLDER}/*.whl
     rm -rf ${WHEELFOLDER}

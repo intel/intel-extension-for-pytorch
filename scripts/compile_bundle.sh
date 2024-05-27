@@ -23,7 +23,7 @@ if [ $# -gt 0 ]; then
 fi
 
 # Check existance of required Linux commands
-for CMD in conda git nproc; do
+for CMD in git nproc; do
     command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" not found." ; exit 1)
 done
 
@@ -97,8 +97,11 @@ function ver_compare() {
     fi
     echo ${RET}
 }
-GCC_CONDA=0
 set +e
+command -v conda > /dev/null
+EXIST_CONDA=$?
+
+GCC_CONDA=0
 command -v gcc > /dev/null
 EXIST_CC=$?
 command -v g++ > /dev/null
@@ -121,7 +124,7 @@ else
         GCC_CONDA=1
     else
         DIR_GCC=$(which gcc)
-        if [[ ${DIR_GCC} =~ ${CONDA_PREFIX} ]]; then
+        if [ ! -z ${CONDA_PREFIX} ] && [[ ${DIR_GCC} =~ ${CONDA_PREFIX} ]]; then
             GCC_CONDA=2
         fi
     fi
@@ -216,6 +219,10 @@ ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 
 # Compile individual component
 if [ ${GCC_CONDA} -eq 1 ]; then
+    if [ ${EXIST_CONDA} -gt 0 ]; then
+        echo "Command \"conda\" not found. Exit."
+		exit 2
+    fi
     conda install -y sysroot_linux-64
     conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
 fi
@@ -240,7 +247,7 @@ fi
 set +e
 command -v make > /dev/null
 if [ $? -gt 0 ]; then
-    conda install -y make -c conda-forge
+    python -m pip install make
 fi
 set -e
 

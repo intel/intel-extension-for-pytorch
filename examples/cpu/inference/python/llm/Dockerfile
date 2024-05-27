@@ -13,55 +13,62 @@ RUN if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.
 RUN apt update && \
     apt full-upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y \
-    sudo \
     ca-certificates \
     git \
     curl \
     wget \
     vim \
+    python3 \
+    python3-dev \
+    python3-pip \
     numactl \
     gcc-12 \
     g++-12 \
-    make
+    make \
+    cmake
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
     update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 && \
     update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 && \
-    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
-RUN apt clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi
+    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3 100
 
-RUN useradd -m ubuntu && \
-    echo 'ubuntu ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-USER ubuntu
-WORKDIR /home/ubuntu
-
-RUN curl -fsSL -v -o miniconda.sh -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh  && \
-    bash miniconda.sh -b -p ./miniconda3 && \
-    rm miniconda.sh && \
-    echo "source ~/miniconda3/bin/activate" >> ./.bashrc
+WORKDIR /root
+ENV PATH=/root/.local/bin:${PATH}
 
 # --build-arg COMPILE=ON to compile from source
 FROM base AS dev
 ARG COMPILE
-COPY --chown=ubuntu:ubuntu . ./intel-extension-for-pytorch
-RUN . ./miniconda3/bin/activate && \
-    conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
-    cd intel-extension-for-pytorch/examples/cpu/inference/python/llm && \
-    if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 6; else bash tools/env_setup.sh 2; fi
+COPY . ./intel-extension-for-pytorch
+RUN cd intel-extension-for-pytorch/examples/cpu/inference/python/llm && \
+    export CC=gcc && export CXX=g++ && \
+    if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 6; else bash tools/env_setup.sh 2; fi && \
+    unset CC && unset CXX
 
 FROM base AS deploy
-COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/cpu/inference/python/llm ./llm
-RUN rm ./llm/tools/get_libstdcpp_lib.sh
-COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/cpu/inference/python/llm/tools/get_libstdcpp_lib.sh ./llm/tools/get_libstdcpp_lib.sh
-RUN . ./miniconda3/bin/activate && \
-    conda create -y -n py310 python=3.10 && conda activate py310 && \
-    echo "conda activate py310" >> ./.bashrc && \
+RUN apt update && \
+    DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y \
+    google-perftools \
+    openssh-server \
+    net-tools && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi
+COPY --from=dev /root/intel-extension-for-pytorch/examples/cpu/inference/python/llm ./llm
+COPY --from=dev /root/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh ./llm/tools
+RUN cd /usr/lib/x86_64-linux-gnu/ && ln -s libtcmalloc.so.4 libtcmalloc.so && cd && \
     echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc && \
     cd ./llm && \
     bash tools/env_setup.sh 1 && \
     python -m pip cache purge && \
-    conda clean -a -y && \
-    sudo mv ./oneCCL_release /opt/oneCCL && \
-    sudo chown -R root:root /opt/oneCCL && \
-    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ./tools/env_activate.sh
+    mv ./oneCCL_release /opt/oneCCL && \
+    chown -R root:root /opt/oneCCL && \
+    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ./tools/env_activate.sh && \
+    LN=$(grep "Conda environment is not available." -n ./tools/env_activate.sh | cut -d ":" -f 1) && sed -i "${LN}s|.*|    export LD_PRELOAD=\${LD_PRELOAD}:/usr/lib/x86_64-linux-gnu/libtcmalloc.so:/usr/local/lib/libiomp5.so|" ./tools/env_activate.sh
+ARG PORT_SSH=22
+RUN mkdir /var/run/sshd && \
+    sed -i "s/#Port.*/Port ${PORT_SSH}/" /etc/ssh/sshd_config && \
+    echo "service ssh start" >> /root/.bashrc && \
+    ssh-keygen -b 4096 -f /root/.ssh/id_rsa -N "" && \
+    mv /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys && \
+    echo "Host *\n    Port ${PORT_SSH}\n    IdentityFile /root/.ssh/id_rsa\n    StrictHostKeyChecking no" > /root/.ssh/config
+EXPOSE ${PORT_SSH}

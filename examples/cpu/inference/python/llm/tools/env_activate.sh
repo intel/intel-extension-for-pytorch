@@ -16,7 +16,7 @@ if [ $? -eq 0 ]; then
     # Tcmalloc is a recommended malloc implementation that emphasizes fragmentation avoidance and scalable concurrency support.
     export LD_PRELOAD=${LD_PRELOAD}:${CONDA_PREFIX}/lib/libtcmalloc.so
 else
-    echo "Conda environment is not available. You need to set environment variable LD_PRELOAD to dynamic libraries of Intel OpenMP and TcMalloc manually."
+    echo "Conda environment is not available. You need to set environment variable LD_PRELOAD to dynamic libraries of Intel OpenMP and TcMalloc manually if they are not in library search paths."
 fi
 
 ONECCL_PATH=${BASEFOLDER}/../oneCCL_release
