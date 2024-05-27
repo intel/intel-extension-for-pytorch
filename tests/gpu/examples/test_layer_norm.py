@@ -304,3 +304,22 @@ class TestNNMethod(TestCase):
         y_dpcpp = layernorm(x_dpcpp_i)
         z_dpcpp = y_dpcpp.mean().backward()
         self.assertEqual(z_cpu, z_dpcpp, atol=1e-5, rtol=1e-5)
+
+    def test_layer_norm_leaf(self, dtype=torch.float):
+        x_i = torch.randn(64, dtype=dtype, device=cpu_device)
+        x_i.requires_grad_(False)
+        x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
+        x_dpcpp_i.requires_grad_(False)
+
+        layernorm = torch.nn.LayerNorm(
+            64, elementwise_affine=True, bias=False, eps=1e-6
+        )
+        y_cpu = layernorm(x_i)
+        y_cpu.mean().backward()
+        grad_wei = layernorm.weight.grad.clone()
+        layernorm.zero_grad()
+        layernorm.to(dpcpp_device).to(dtype)
+        y_dpcpp = layernorm(x_dpcpp_i)
+        y_dpcpp.mean().backward()
+        grad_wei_dpcpp = layernorm.weight.grad.clone()
+        self.assertEqual(grad_wei, grad_wei_dpcpp.cpu(), atol=1e-5, rtol=1e-5)
