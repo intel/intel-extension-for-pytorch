@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ISA Dynamic Dispatching &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -160,10 +162,10 @@
            <div itemprop="articleBody">
              
   <section id="isa-dynamic-dispatching">
-<h1>ISA Dynamic Dispatching<a class="headerlink" href="#isa-dynamic-dispatching" title="Permalink to this heading"></a></h1>
+<h1>ISA Dynamic Dispatching<a class="headerlink" href="#isa-dynamic-dispatching" title="Link to this heading"></a></h1>
 <p>This document explains the dynamic kernel dispatch mechanism for Intel® Extension for PyTorch* (IPEX) based on CPU ISA. It is an extension to the similar mechanism in PyTorch.</p>
 <section id="overview">
-<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading"></a></h2>
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>IPEX dyndisp is forked from <strong>PyTorch:</strong> <code class="docutils literal notranslate"><span class="pre">ATen/native/DispatchStub.h</span></code> and <code class="docutils literal notranslate"><span class="pre">ATen/native/DispatchStub.cpp</span></code>. IPEX adds additional CPU ISA level support, such as <code class="docutils literal notranslate"><span class="pre">AVX512_VNNI</span></code>, <code class="docutils literal notranslate"><span class="pre">AVX512_BF16</span></code> and <code class="docutils literal notranslate"><span class="pre">AMX</span></code>.</p>
 <p>PyTorch &amp; IPEX CPU ISA support statement:</p>
 <table border="1" class="docutils">
@@ -261,7 +263,7 @@
 </tbody>
 </table><p>* Current IPEX DEFAULT level implemented as same as AVX2 level.</p>
 <section id="cpu-isa-build-compiler-requirement">
-<h3>CPU ISA build compiler requirement<a class="headerlink" href="#cpu-isa-build-compiler-requirement" title="Permalink to this heading"></a></h3>
+<h3>CPU ISA build compiler requirement<a class="headerlink" href="#cpu-isa-build-compiler-requirement" title="Link to this heading"></a></h3>
 <p>| ISA Level | GCC requirement |
 | —- | —- |
 | AVX2 | Any |
@@ -275,25 +277,25 @@
 </section>
 </section>
 <section id="dynamic-dispatch-design">
-<h2>Dynamic Dispatch Design<a class="headerlink" href="#dynamic-dispatch-design" title="Permalink to this heading"></a></h2>
+<h2>Dynamic Dispatch Design<a class="headerlink" href="#dynamic-dispatch-design" title="Link to this heading"></a></h2>
 <p>Dynamic dispatch copies the kernel implementation source files to multiple folders for each ISA level. It then builds each file using its ISA specific parameters. Each generated object file will contain its function body (<strong>Kernel Implementation</strong>).</p>
 <p>Kernel Implementation uses an anonymous namespace so that different CPU versions won’t conflict.</p>
 <p><strong>Kernel Stub</strong> is a “virtual function” with polymorphic kernel implementations pertaining to ISA levels.</p>
 <p>At the runtime, <strong>Dispatch Stub implementation</strong> will check CPUIDs and OS status to determins which ISA level pointer best matches the function body.</p>
 <section id="code-folder-struct">
-<h3>Code Folder Struct<a class="headerlink" href="#code-folder-struct" title="Permalink to this heading"></a></h3>
+<h3>Code Folder Struct<a class="headerlink" href="#code-folder-struct" title="Link to this heading"></a></h3>
 <section id="kernel-implementation-csrc-cpu-aten-kernels-xyzkrnl-cpp">
-<h4><strong>Kernel implementation:</strong> <code class="docutils literal notranslate"><span class="pre">csrc/cpu/aten/kernels/xyzKrnl.cpp</span></code><a class="headerlink" href="#kernel-implementation-csrc-cpu-aten-kernels-xyzkrnl-cpp" title="Permalink to this heading"></a></h4>
+<h4><strong>Kernel implementation:</strong> <code class="docutils literal notranslate"><span class="pre">csrc/cpu/aten/kernels/xyzKrnl.cpp</span></code><a class="headerlink" href="#kernel-implementation-csrc-cpu-aten-kernels-xyzkrnl-cpp" title="Link to this heading"></a></h4>
 </section>
 <section id="kernel-stub-csrc-cpu-aten-xyz-cpp-and-csrc-cpu-aten-xyz-h">
-<h4><strong>Kernel Stub:</strong> <code class="docutils literal notranslate"><span class="pre">csrc/cpu/aten/xyz.cpp</span></code> and <code class="docutils literal notranslate"><span class="pre">csrc/cpu/aten/xyz.h</span></code><a class="headerlink" href="#kernel-stub-csrc-cpu-aten-xyz-cpp-and-csrc-cpu-aten-xyz-h" title="Permalink to this heading"></a></h4>
+<h4><strong>Kernel Stub:</strong> <code class="docutils literal notranslate"><span class="pre">csrc/cpu/aten/xyz.cpp</span></code> and <code class="docutils literal notranslate"><span class="pre">csrc/cpu/aten/xyz.h</span></code><a class="headerlink" href="#kernel-stub-csrc-cpu-aten-xyz-cpp-and-csrc-cpu-aten-xyz-h" title="Link to this heading"></a></h4>
 </section>
 <section id="dispatch-stub-implementation-csrc-cpu-dyndisp-dispatchstub-cpp-and-csrc-cpu-dyndisp-dispatchstub-h">
-<h4><strong>Dispatch Stub implementation:</strong> <code class="docutils literal notranslate"><span class="pre">csrc/cpu/dyndisp/DispatchStub.cpp</span></code> and <code class="docutils literal notranslate"><span class="pre">csrc/cpu/dyndisp/DispatchStub.h</span></code><a class="headerlink" href="#dispatch-stub-implementation-csrc-cpu-dyndisp-dispatchstub-cpp-and-csrc-cpu-dyndisp-dispatchstub-h" title="Permalink to this heading"></a></h4>
+<h4><strong>Dispatch Stub implementation:</strong> <code class="docutils literal notranslate"><span class="pre">csrc/cpu/dyndisp/DispatchStub.cpp</span></code> and <code class="docutils literal notranslate"><span class="pre">csrc/cpu/dyndisp/DispatchStub.h</span></code><a class="headerlink" href="#dispatch-stub-implementation-csrc-cpu-dyndisp-dispatchstub-cpp-and-csrc-cpu-dyndisp-dispatchstub-h" title="Link to this heading"></a></h4>
 </section>
 </section>
 <section id="codegen-process">
-<h3>CodeGen Process<a class="headerlink" href="#codegen-process" title="Permalink to this heading"></a></h3>
+<h3>CodeGen Process<a class="headerlink" href="#codegen-process" title="Link to this heading"></a></h3>
 <p>IPEX build system will generate code for each ISA level with specifiy complier parameters. The CodeGen script is located at <code class="docutils literal notranslate"><span class="pre">cmake/cpu/IsaCodegen.cmake</span></code>.</p>
 <p>The CodeGen will copy each cpp files from <strong>Kernel implementation</strong>, and then add ISA level as new file suffix.</p>
 <blockquote>
@@ -324,7 +326,7 @@
 </section>
 </section>
 <section id="add-custom-kernel">
-<h2>Add Custom Kernel<a class="headerlink" href="#add-custom-kernel" title="Permalink to this heading"></a></h2>
+<h2>Add Custom Kernel<a class="headerlink" href="#add-custom-kernel" title="Link to this heading"></a></h2>
 <p>If you want to add a new custom kernel, and the kernel uses CPU ISA instructions, refer to these tips:</p>
 <ol class="simple">
 <li><p>Add CPU ISA related kernel implementation to the folder:  <code class="docutils literal notranslate"><span class="pre">csrc/cpu/aten/kernels/NewKernelKrnl.cpp</span></code></p></li>
@@ -371,7 +373,7 @@
 </ol>
 </div></blockquote>
 <section id="isa-intrinics-specific-kernel-example">
-<h3>ISA intrinics specific kernel example:<a class="headerlink" href="#isa-intrinics-specific-kernel-example" title="Permalink to this heading"></a></h3>
+<h3>ISA intrinics specific kernel example:<a class="headerlink" href="#isa-intrinics-specific-kernel-example" title="Link to this heading"></a></h3>
 <p>This is a FP32 convert to BF16 function example, and it is implemented for <code class="docutils literal notranslate"><span class="pre">AVX512_BF16</span></code>, <code class="docutils literal notranslate"><span class="pre">AVX512</span></code> and <code class="docutils literal notranslate"><span class="pre">DEFAULT</span></code> ISA levels.</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">//csrc/cpu/aten/CvtFp32ToBf16.h</span>
 
@@ -497,7 +499,7 @@
 </div>
 </section>
 <section id="vec-specific-kernel-example">
-<h3>Vec specific kernel example:<a class="headerlink" href="#vec-specific-kernel-example" title="Permalink to this heading"></a></h3>
+<h3>Vec specific kernel example:<a class="headerlink" href="#vec-specific-kernel-example" title="Link to this heading"></a></h3>
 <p>This example shows how to get the data type size and its Vec size. In different ISA, Vec has a different register width and a different Vec size.</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">//csrc/cpu/aten/GetVecLength.h</span>
 <span class="cp">#pragma once</span>
@@ -601,7 +603,7 @@
 </section>
 </section>
 <section id="private-debug-apis">
-<h2>Private Debug APIs<a class="headerlink" href="#private-debug-apis" title="Permalink to this heading"></a></h2>
+<h2>Private Debug APIs<a class="headerlink" href="#private-debug-apis" title="Link to this heading"></a></h2>
 <p>Here are three ISA-related private APIs that can help debugging::</p>
 <ol class="simple">
 <li><p>Query current ISA level.</p></li>
@@ -617,7 +619,7 @@
 </ol>
 </div></blockquote>
 <section id="example">
-<h3>Example:<a class="headerlink" href="#example" title="Permalink to this heading"></a></h3>
+<h3>Example:<a class="headerlink" href="#example" title="Link to this heading"></a></h3>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python
 Python<span class="w"> </span><span class="m">3</span>.9.7<span class="w"> </span><span class="o">(</span>default,<span class="w"> </span>Sep<span class="w"> </span><span class="m">16</span><span class="w"> </span><span class="m">2021</span>,<span class="w"> </span><span class="m">13</span>:09:58<span class="o">)</span>
 <span class="o">[</span>GCC<span class="w"> </span><span class="m">7</span>.5.0<span class="o">]</span><span class="w"> </span>::<span class="w"> </span>Anaconda,<span class="w"> </span>Inc.<span class="w"> </span>on<span class="w"> </span>linux
@@ -635,10 +637,10 @@ Type<span class="w"> </span><span class="s2">&quot;help&quot;</span>,<span class
 </section>
 </section>
 <section id="select-isa-level-manually">
-<h2>Select ISA level manually.<a class="headerlink" href="#select-isa-level-manually" title="Permalink to this heading"></a></h2>
+<h2>Select ISA level manually.<a class="headerlink" href="#select-isa-level-manually" title="Link to this heading"></a></h2>
 <p>By default, IPEX dispatches to the kernels with the maximum ISA level supported by the underlying CPU hardware. This ISA level can be overridden by the environment variable <code class="docutils literal notranslate"><span class="pre">ATEN_CPU_CAPABILITY</span></code> (same environment variable as PyTorch). The available values are {<code class="docutils literal notranslate"><span class="pre">avx2</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512_vnni</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512_bf16</span></code>, <code class="docutils literal notranslate"><span class="pre">amx</span></code>, <code class="docutils literal notranslate"><span class="pre">avx512_fp16</span></code>}. The effective ISA level would be the minimal level between <code class="docutils literal notranslate"><span class="pre">ATEN_CPU_CAPABILITY</span></code> and the maximum level supported by the hardware.</p>
 <section id="id1">
-<h3>Example:<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
+<h3>Example:<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())&#39;</span>
 AMX
 $<span class="w"> </span><span class="nv">ATEN_CPU_CAPABILITY</span><span class="o">=</span>avx2<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import intel_extension_for_pytorch._C as core;print(core._get_current_isa_level())&#39;</span>
@@ -652,7 +654,7 @@ AVX2
 </section>
 </section>
 <section id="cpu-feature-check">
-<h2>CPU feature check<a class="headerlink" href="#cpu-feature-check" title="Permalink to this heading"></a></h2>
+<h2>CPU feature check<a class="headerlink" href="#cpu-feature-check" title="Link to this heading"></a></h2>
 <p>An addtional CPU feature check tool in the subfolder: <code class="docutils literal notranslate"><span class="pre">tests/cpu/isa</span></code></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>cmake<span class="w"> </span>.
 --<span class="w"> </span>The<span class="w"> </span>C<span class="w"> </span>compiler<span class="w"> </span>identification<span class="w"> </span>is<span class="w"> </span>GNU<span class="w"> </span><span class="m">11</span>.2.1
@@ -742,8 +744,8 @@ prefetchwt1:<span class="w">                    </span><span class="nb">false</s
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f70575b8e80> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f9210358b50> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

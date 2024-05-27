@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Channels Last &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -160,9 +162,9 @@
            <div itemprop="articleBody">
              
   <section id="channels-last">
-<h1>Channels Last<a class="headerlink" href="#channels-last" title="Permalink to this heading"></a></h1>
+<h1>Channels Last<a class="headerlink" href="#channels-last" title="Link to this heading"></a></h1>
 <section id="what-is-channels-last">
-<h2>What is Channels Last<a class="headerlink" href="#what-is-channels-last" title="Permalink to this heading"></a></h2>
+<h2>What is Channels Last<a class="headerlink" href="#what-is-channels-last" title="Link to this heading"></a></h2>
 <p><strong>Note</strong>: In PyTorch, <strong>memory format</strong> refers to data representation that describes how multidimensional arrays (nD) are stored in linear (1D) memory address space. <strong>Memory format</strong> has the same semantic meaning as <strong>layout</strong> in oneDNN. <strong>Layout</strong> in PyTorch has other semantic of describing <strong>dense</strong> or <strong>sparse</strong> with the attributes: ‘torch.strided’, ‘torch.sparse_coo’.</p>
 <p>On CNN models, the canonical order of tensor dimensions is assigned with semantic meaning. For example the input tensor of 2D convolution is of NCHW by default on PyTorch - &lt;batch_size, channels, height, width&gt;. NHWC is an alternative way of describing the tensor dimensions - &lt;batch_size, height, width, channels&gt;.</p>
 <p>Look at the following image of illustrating NCHW and NHWC when N=1. Actually when N=1, NHWC has the same format with BMP file image.
@@ -176,11 +178,11 @@
 </ul>
 </section>
 <section id="memory-format-is-all-that-matters">
-<h2>Memory Format Is All That Matters<a class="headerlink" href="#memory-format-is-all-that-matters" title="Permalink to this heading"></a></h2>
+<h2>Memory Format Is All That Matters<a class="headerlink" href="#memory-format-is-all-that-matters" title="Link to this heading"></a></h2>
 <p>On CNN models, memory format is almost the foundation of any upper level design. One important fact is that converting memory format could be very expensive. Thus, in case that multiple CNN operators are performed in sequence, e.g. <code class="docutils literal notranslate"><span class="pre">Conv2d</span> <span class="pre">-&gt;</span> <span class="pre">ReLU</span> <span class="pre">-&gt;</span> <span class="pre">Conv2d</span></code>, it’s beneficial to transform them from different memory formats once, do computation and reorder them back.</p>
 <p>On PyTorch, you can use 3 types of memory formats on CNN models:</p>
 <section id="a-nchw-default">
-<h3>a. NCHW (default)<a class="headerlink" href="#a-nchw-default" title="Permalink to this heading"></a></h3>
+<h3>a. NCHW (default)<a class="headerlink" href="#a-nchw-default" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1">## NB: internally blocked format will still be used.</span>
 <span class="c1">##   aka. we do &#39;reorder&#39; for &#39;input&#39;, &#39;weight&#39; and &#39;output&#39;,</span>
 <span class="c1">##   and believe me this is expensive, roughly 50% perf loss...</span>
@@ -191,7 +193,7 @@
 </div>
 </section>
 <section id="b-nhwc-wip-for-cpu">
-<h3>b. NHWC (WIP for CPU)<a class="headerlink" href="#b-nhwc-wip-for-cpu" title="Permalink to this heading"></a></h3>
+<h3>b. NHWC (WIP for CPU)<a class="headerlink" href="#b-nhwc-wip-for-cpu" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 <span class="c1">## NB: convert to Channels Last memory format.</span>
@@ -205,7 +207,7 @@
 </div>
 </section>
 <section id="c-blocked-nchw16c">
-<h3>c. Blocked (nChw16c)<a class="headerlink" href="#c-blocked-nchw16c" title="Permalink to this heading"></a></h3>
+<h3>c. Blocked (nChw16c)<a class="headerlink" href="#c-blocked-nchw16c" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">torch.utils</span> <span class="kn">import</span> <span class="n">mkldnn</span> <span class="k">as</span> <span class="n">mkldnn_utils</span>
 <span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
@@ -226,7 +228,7 @@
 </section>
 </section>
 <section id="pytorch-strided-layout">
-<h2>PyTorch Strided Layout<a class="headerlink" href="#pytorch-strided-layout" title="Permalink to this heading"></a></h2>
+<h2>PyTorch Strided Layout<a class="headerlink" href="#pytorch-strided-layout" title="Link to this heading"></a></h2>
 <p>Before moving on, I feel it is necessary to explain how PyTorch organizes tensors in memory - the <strong>layout</strong>. Here we only focus on <strong>dense</strong> tensors, skip ‘coo’ layout of <strong>sparse</strong> tensor.</p>
 <p>The question itself can be reinterpreted as for a tensor of size &lt;N, C, H, W&gt;, how does PyTorch access the element with index &lt;n, c, h, w&gt; from memory, the answer is <strong>stride</strong>:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">tensor</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">N</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="o">&gt;</span>
@@ -249,15 +251,15 @@
 <p>Actually, this pattern applies to ALL other memory formats as long as it is 4-dim, e.g. strides for CHWN would be &lt;1, HWN, WN, N&gt;.</p>
 </section>
 <section id="pytorch-channels-last-memory-format-apis">
-<h2>PyTorch Channels Last Memory Format APIs<a class="headerlink" href="#pytorch-channels-last-memory-format-apis" title="Permalink to this heading"></a></h2>
+<h2>PyTorch Channels Last Memory Format APIs<a class="headerlink" href="#pytorch-channels-last-memory-format-apis" title="Link to this heading"></a></h2>
 <section id="a-tensor-creation">
-<h3>a. tensor creation<a class="headerlink" href="#a-tensor-creation" title="Permalink to this heading"></a></h3>
+<h3>a. tensor creation<a class="headerlink" href="#a-tensor-creation" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
 <section id="b-tensor-conversion">
-<h3>b. tensor conversion<a class="headerlink" href="#b-tensor-conversion" title="Permalink to this heading"></a></h3>
+<h3>b. tensor conversion<a class="headerlink" href="#b-tensor-conversion" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1">## .contiguous() transforms NHWC noncontiguous to NHWC contiguous.</span>
 <span class="c1">## .to() converts NCHW tensor to NHWC one, it is outplace.</span>
 <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">contiguous</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
@@ -269,7 +271,7 @@
 </div>
 </section>
 <section id="c-model-conversion">
-<h3>c. model conversion<a class="headerlink" href="#c-model-conversion" title="Permalink to this heading"></a></h3>
+<h3>c. model conversion<a class="headerlink" href="#c-model-conversion" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1">## NB: tensor.to() is an outplace operation</span>
 <span class="c1">##   model.to() is inplace. It calls _apply() which is inplace.</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span>
@@ -278,7 +280,7 @@
 </div>
 </section>
 <section id="d-operator-coverage">
-<h3>d. operator coverage<a class="headerlink" href="#d-operator-coverage" title="Permalink to this heading"></a></h3>
+<h3>d. operator coverage<a class="headerlink" href="#d-operator-coverage" title="Link to this heading"></a></h3>
 <p>Detailed operator coverage information has been listed at reference <a class="reference external" href="https://github.com/pytorch/pytorch/wiki/Operators-with-Channels-Last-support">Operators-with-Channels-Last-support</a>. In brief, ImageNet training topologies on GPU already have full support on Channels Last memory format, while CPU doesn’t.</p>
 <p>Some spontaneous questions:</p>
 <ul class="simple">
@@ -288,9 +290,9 @@
 </section>
 </section>
 <section id="writing-channels-last-kernels">
-<h2>Writing Channels Last Kernels<a class="headerlink" href="#writing-channels-last-kernels" title="Permalink to this heading"></a></h2>
+<h2>Writing Channels Last Kernels<a class="headerlink" href="#writing-channels-last-kernels" title="Link to this heading"></a></h2>
 <section id="a-status-on-cpu">
-<h3>a. Status on CPU<a class="headerlink" href="#a-status-on-cpu" title="Permalink to this heading"></a></h3>
+<h3>a. Status on CPU<a class="headerlink" href="#a-status-on-cpu" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p><strong>No support</strong> - Requires to register Channels Last kernel for CPU path, e.g. Conv2d;</p></li>
 <li><p><strong>Explicit support</strong> - Already have Channels Last kernel for CPU path (in ATen native manner), need to compare oneDNN counterpart performance, e.g. BatchNorm;</p></li>
@@ -298,19 +300,19 @@
 </ul>
 </section>
 <section id="b-register-channels-last-kernel-in-aten-native-manner">
-<h3>b. Register Channels Last Kernel in ATen Native Manner<a class="headerlink" href="#b-register-channels-last-kernel-in-aten-native-manner" title="Permalink to this heading"></a></h3>
+<h3>b. Register Channels Last Kernel in ATen Native Manner<a class="headerlink" href="#b-register-channels-last-kernel-in-aten-native-manner" title="Link to this heading"></a></h3>
 <p>The general guideline has been listed under reference <a class="reference external" href="https://github.com/pytorch/pytorch/wiki/Writing-memory-format-aware-operators">Writing-memory-format-aware-operators</a>, not to repeat here. You may take one of my recent PR <a class="reference external" href="https://github.com/pytorch/pytorch/pull/34864">optimize upsample performance linear mode on CPU</a> as an example, which also demonstrates NHWC performance advantage over NCHW because of the ease of vectorization.</p>
 </section>
 <section id="c-register-onednn-kernel-on-channels-last">
-<h3>c. Register oneDNN Kernel on Channels Last<a class="headerlink" href="#c-register-onednn-kernel-on-channels-last" title="Permalink to this heading"></a></h3>
+<h3>c. Register oneDNN Kernel on Channels Last<a class="headerlink" href="#c-register-onednn-kernel-on-channels-last" title="Link to this heading"></a></h3>
 <p>Registering a oneDNN kernel under Channels Last memory format on CPU is no different from <a class="reference external" href="https://github.com/pytorch/pytorch/pull/23861">cuDNN</a>: Only very few upper level changes are needed, such as accommodate ‘contiguous()’ to ‘contiguous(suggested_memory_format)’. The automatic reorder of oneDNN weight shall have been hidden in ideep.</p>
 </section>
 </section>
 <section id="onednn-nhwc-apis">
-<h2>oneDNN NHWC APIs<a class="headerlink" href="#onednn-nhwc-apis" title="Permalink to this heading"></a></h2>
+<h2>oneDNN NHWC APIs<a class="headerlink" href="#onednn-nhwc-apis" title="Link to this heading"></a></h2>
 <p>Compared to NCHW interfaces, 2 parts need to be addressed on NHWC interfaces:</p>
 <section id="a-create-nhwc-memory">
-<h3>a. Create NHWC Memory<a class="headerlink" href="#a-create-nhwc-memory" title="Permalink to this heading"></a></h3>
+<h3>a. Create NHWC Memory<a class="headerlink" href="#a-create-nhwc-memory" title="Link to this heading"></a></h3>
 <p>The logical size and stride description of oneDNN is always in NCHW, this is identical to PyTorch. Example code such as</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cm">/* create md from memory::format_tag */</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">src_md</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">memory</span><span class="o">::</span><span class="n">desc</span><span class="p">(</span>
@@ -332,7 +334,7 @@
 </div>
 </section>
 <section id="b-create-convolution-primitive">
-<h3>b. Create Convolution Primitive<a class="headerlink" href="#b-create-convolution-primitive" title="Permalink to this heading"></a></h3>
+<h3>b. Create Convolution Primitive<a class="headerlink" href="#b-create-convolution-primitive" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p><strong>NCHW</strong> - create <code class="docutils literal notranslate"><span class="pre">memory::desc</span></code> with <em>any</em> card for ‘input’, ‘output’ and ‘weight’; query proposed <code class="docutils literal notranslate"><span class="pre">memory::desc</span></code> from convolution primitive;</p></li>
 <li><p><strong>NHWC</strong> - create <code class="docutils literal notranslate"><span class="pre">memory::desc</span></code> with <code class="docutils literal notranslate"><span class="pre">format_tag::nhwc</span></code> for ‘input’ and ‘output’, use <em>any</em> for ‘weight’; if we use <code class="docutils literal notranslate"><span class="pre">hwio</span></code> for ‘weight’ convolution primitive will be created with gemm rather jit avx512.</p></li>
@@ -340,7 +342,7 @@
 </section>
 </section>
 <section id="cpu-channels-last-targets">
-<h2>CPU Channels Last Targets<a class="headerlink" href="#cpu-channels-last-targets" title="Permalink to this heading"></a></h2>
+<h2>CPU Channels Last Targets<a class="headerlink" href="#cpu-channels-last-targets" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><strong>User Experience</strong> - No special user level code change, only ‘input’ and ‘model’ conversion is required;</p></li>
 <li><p><strong>Scenarios</strong> - cover both training and inference;</p></li>
@@ -370,8 +372,8 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f705c2eb490> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f92103c94b0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

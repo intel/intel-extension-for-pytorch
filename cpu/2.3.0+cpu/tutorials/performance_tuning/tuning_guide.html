@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Performance Tuning Guide &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -137,14 +139,14 @@
            <div itemprop="articleBody">
              
   <section id="performance-tuning-guide">
-<h1>Performance Tuning Guide<a class="headerlink" href="#performance-tuning-guide" title="Permalink to this heading"></a></h1>
+<h1>Performance Tuning Guide<a class="headerlink" href="#performance-tuning-guide" title="Link to this heading"></a></h1>
 <section id="overview">
-<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading"></a></h2>
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Intel® Extension for PyTorch* is a Python package to extend official PyTorch. It makes the out-of-box user experience of PyTorch CPU better while achieving good performance. To fully utilize the power of Intel® architecture and thus yield high performance, PyTorch, as well as Intel® Extension for PyTorch*, are powered by <a class="reference external" href="https://github.com/oneapi-src/oneDNN">oneAPI Deep Neural Network Library (oneDNN)</a>, an open-source cross-platform performance library of basic building blocks for deep learning applications. It is developed and optimized for Intel Architecture Processors, Intel Processor Graphics, and Xe architecture-based Graphics.</p>
 <p>Although default primitives of PyTorch and Intel® Extension for PyTorch* are highly optimized, there are things users can do improve performance. Most optimized configurations can be automatically set by the launcher script. This article introduces common methods recommended by Intel developers.</p>
 </section>
 <section id="contents-of-this-document">
-<h2>Contents of this Document<a class="headerlink" href="#contents-of-this-document" title="Permalink to this heading"></a></h2>
+<h2>Contents of this Document<a class="headerlink" href="#contents-of-this-document" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference external" href="#hardware-configuration">Hardware Configuration</a></p>
 <ul>
@@ -177,10 +179,10 @@
 </ul>
 </section>
 <section id="hardware-configuration">
-<h2>Hardware Configuration<a class="headerlink" href="#hardware-configuration" title="Permalink to this heading"></a></h2>
+<h2>Hardware Configuration<a class="headerlink" href="#hardware-configuration" title="Link to this heading"></a></h2>
 <p>This section briefly introduces the structure of Intel CPUs, as well as concept of Non-Uniform Memory Access (NUMA).</p>
 <section id="intel-cpu-structure">
-<h3>Intel CPU Structure<a class="headerlink" href="#intel-cpu-structure" title="Permalink to this heading"></a></h3>
+<h3>Intel CPU Structure<a class="headerlink" href="#intel-cpu-structure" title="Link to this heading"></a></h3>
 <p>There are many families of Intel CPUs. We’ll use Intel® Xeon® processor Scalable family as an example to discuss an Intel CPU and how it works. Understanding this background knowledge is helpful to understand the PyTorch optimization methodologies that Intel engineers recommend.</p>
 <p>On the Intel® Xeon® Scalable Processors with Intel® C620 Series Chipsets, (formerly Purley) platform, each chip provides up to 28 cores. Each core has a non-inclusive last-level cache and an 1MB L2 cache. The CPU features fast 2666 MHz DDR4 memory, six memory channels per CPU, Intel Ultra Path Interconnect (UPI) high speed point-to-point processor interconnect, and more. Figure 1 shows microarchitecture of the Intel® Xeon® processor Scalable family chips. Each CPU chip consists of a number of cores, along with core-specific cache. 6 channels of DDR4 memory are connected to the chip directly. Meanwhile, chips communicates through the Intel UPI interconnect, which features a transfer speed of up to 10.4 GT/s.</p>
 <div align="center"><p><img alt="Block Diagram of the Intel® Xeon® processor Scalable family microarchitecture" src="../../_images/block_diagram_xeon_architecture.png" /></p>
@@ -192,7 +194,7 @@
 <p>Figure 3: An ASUS Z11PA-D8 Intel® Xeon® server motherboard. It contains two sockets for Intel® Xeon® processor Scalable family CPUs.</p>
 </div></section>
 <section id="non-uniform-memory-access-numa">
-<h3>Non-Uniform Memory Access (NUMA)<a class="headerlink" href="#non-uniform-memory-access-numa" title="Permalink to this heading"></a></h3>
+<h3>Non-Uniform Memory Access (NUMA)<a class="headerlink" href="#non-uniform-memory-access-numa" title="Link to this heading"></a></h3>
 <p>It is a good thing that more and more CPU cores are provided to users in one socket, because this brings more computation resources. However, this also brings memory access competitions. Program can stall because memory is busy to visit. To address this problem, Non-Uniform Memory Access (NUMA) was introduced. Comparing to Uniform Memory Access (UMA), in which scenario all memories are connected to all cores equally, NUMA tells memories into multiple groups. Certain number of memories are directly attached to one socket’s integrated memory controller to become local memory of this socket. As described in the previous section, local memory access is much faster than remote memory access.</p>
 <p>Users can get CPU information with <code class="docutils literal notranslate"><span class="pre">lscpu</span></code> command on Linux to learn how many cores, sockets there on the machine. Also, NUMA information like how CPU cores are distributed can also be retrieved. The following is an example of <code class="docutils literal notranslate"><span class="pre">lscpu</span></code> execution on a machine with two Intel(R) Xeon(R) Platinum 8180M CPUs. 2 sockets were detected. Each socket has 28 physical cores onboard. Since Hyper-Threading is enabled, each core can run 2 threads. I.e. each socket has another 28 logical cores. Thus, there are 112 CPU cores on service. When indexing CPU cores, usually physical cores are indexed before logical core. In this case, the first 28 cores (0-27) are physical cores on the first NUMA socket (node), the second 28 cores (28-55) are physical cores on the second NUMA socket (node). Logical cores are indexed afterward. 56-83 are 28 logical cores on the first NUMA socket (node), 84-111 are the second 28 logical cores on the second NUMA socket (node). Typically, running Intel® Extension for PyTorch* should avoid using logical cores to get a good performance.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ lscpu
@@ -214,14 +216,14 @@ NUMA node1 CPU(s):   28-55,84-111
 </section>
 </section>
 <section id="software-configuration">
-<h2>Software Configuration<a class="headerlink" href="#software-configuration" title="Permalink to this heading"></a></h2>
+<h2>Software Configuration<a class="headerlink" href="#software-configuration" title="Link to this heading"></a></h2>
 <p>This section introduces software configurations that helps to boost performance.</p>
 <section id="channels-last">
-<h3>Channels Last<a class="headerlink" href="#channels-last" title="Permalink to this heading"></a></h3>
+<h3>Channels Last<a class="headerlink" href="#channels-last" title="Link to this heading"></a></h3>
 <p>Take advantage of <strong>Channels Last</strong> memory format for image processing tasks. Comparing to PyTorch default NCHW (<code class="docutils literal notranslate"><span class="pre">torch.contiguous_format</span></code>) memory format, NHWC (<code class="docutils literal notranslate"><span class="pre">torch.channels_last</span></code>) is more friendly to Intel platforms, and thus generally yields better performance. More detailed introduction can be found at <a class="reference internal" href="../features/nhwc.html"><span class="doc">Channels Last page</span></a>. You can get sample codes with Resnet50 at <a class="reference internal" href="../examples.html"><span class="doc">Example page</span></a>.</p>
 </section>
 <section id="numactl">
-<h3>Numactl<a class="headerlink" href="#numactl" title="Permalink to this heading"></a></h3>
+<h3>Numactl<a class="headerlink" href="#numactl" title="Link to this heading"></a></h3>
 <p>Since NUMA largely influences memory access performance, this functionality should also be implemented in software side.</p>
 <p>During development of Linux kernels, more and more sophisticated implementations/optimizations/strategies had been brought out. Version 2.5 of the Linux kernel already contained basic NUMA support, which was further improved in subsequent kernel releases. Version 3.8 of the Linux kernel brought a new NUMA foundation that allowed development of more efficient NUMA policies in later kernel releases. Version 3.13 of the Linux kernel brought numerous policies that aim at putting a process near its memory, together with the handling of cases such as having memory pages shared between processes, or the use of transparent huge pages. New sysctl settings allow NUMA balancing to be enabled or disabled, as well as the configuration of various NUMA memory balancing parameters.[1] Behavior of Linux kernels are thus different according to kernel version. Newer Linux kernels may contain further optimizations of NUMA strategies, and thus have better performances. For some workloads, NUMA strategy influences performance great.</p>
 <p>Linux provides a tool, <code class="docutils literal notranslate"><span class="pre">numactl</span></code>, that allows user control of NUMA policy for processes or shared memory. It runs processes with a specific NUMA scheduling or memory placement policy. As described in previous section, cores share high-speed cache in one socket, thus it is a good idea to avoid cross socket computations. From a memory access perspective, bounding memory access locally is much faster than accessing remote memories.</p>
@@ -232,7 +234,7 @@ NUMA node1 CPU(s):   28-55,84-111
 <p>[1] <a class="reference external" href="https://en.wikipedia.org/wiki/Non-uniform_memory_access">Wikipedia - Non-uniform memory access</a></p>
 </section>
 <section id="openmp">
-<h3>OpenMP<a class="headerlink" href="#openmp" title="Permalink to this heading"></a></h3>
+<h3>OpenMP<a class="headerlink" href="#openmp" title="Link to this heading"></a></h3>
 <p>OpenMP is an implementation of multithreading, a method of parallelizing where a primary thread (a series of instructions executed consecutively) forks a specified number of sub-threads and the system divides a task among them. The threads then run concurrently, with the runtime environment allocating threads to different processors.[2] Figure 4 illustrates fork-join model of OpenMP execution.</p>
 <div align="center"><p><img alt="A number of parallel block execution threads are forked from primary thread" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Fork_join.svg/1920px-Fork_join.svg.png" /></p>
 <p>Figure 4: A number of parallel block execution threads are forked from primary thread.</p>
@@ -240,7 +242,7 @@ NUMA node1 CPU(s):   28-55,84-111
 <p>GNU OpenMP (libgomp) is the default multi-threading library for both PyTorch and Intel® Extension for PyTorch*.</p>
 <p>[2] <a class="reference external" href="https://en.wikipedia.org/wiki/OpenMP">Wikipedia - OpenMP</a></p>
 <section id="omp-num-threads">
-<h4>OMP_NUM_THREADS<a class="headerlink" href="#omp-num-threads" title="Permalink to this heading"></a></h4>
+<h4>OMP_NUM_THREADS<a class="headerlink" href="#omp-num-threads" title="Link to this heading"></a></h4>
 <p>Environment variable <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code> sets the number of threads used for parallel regions. By default, it is set to be the number of available physical cores. It can be used along with numactl settings, as the following example. If cores 0-3 are on socket 0, this example command runs &lt;script&gt; on cores 0-3, with 4 OpenMP threads.</p>
 <p>This environment variable works on both libgomp and libiomp.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">export</span> <span class="n">OMP_NUM_THREADS</span><span class="o">=</span><span class="mi">4</span>
@@ -249,12 +251,12 @@ NUMA node1 CPU(s):   28-55,84-111
 </div>
 </section>
 <section id="omp-thread-limit">
-<h4>OMP_THREAD_LIMIT<a class="headerlink" href="#omp-thread-limit" title="Permalink to this heading"></a></h4>
+<h4>OMP_THREAD_LIMIT<a class="headerlink" href="#omp-thread-limit" title="Link to this heading"></a></h4>
 <p>Environment variable <code class="docutils literal notranslate"><span class="pre">OMP_THREAD_LIMIT</span></code> specifies the number of threads to use for the whole program. The value of this variable shall be a positive integer. If undefined, the number of threads is not limited.</p>
 <p>Please make sure <code class="docutils literal notranslate"><span class="pre">OMP_THREAD_LIMIT</span></code> is set to a number equal to or larger than <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code> to avoid backward propagation hanging issues.</p>
 </section>
 <section id="gnu-openmp">
-<h4>GNU OpenMP<a class="headerlink" href="#gnu-openmp" title="Permalink to this heading"></a></h4>
+<h4>GNU OpenMP<a class="headerlink" href="#gnu-openmp" title="Link to this heading"></a></h4>
 <p>Beside <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code>, other GNU OpenMP specific environment variables are commonly used to improve performance:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">GOMP_CPU_AFFINITY</span></code>: Binds threads to specific CPUs. The variable should contain a space-separated or comma-separated list of CPUs.</p></li>
@@ -269,7 +271,7 @@ NUMA node1 CPU(s):   28-55,84-111
 </div>
 </section>
 <section id="intel-openmp">
-<h4>Intel OpenMP<a class="headerlink" href="#intel-openmp" title="Permalink to this heading"></a></h4>
+<h4>Intel OpenMP<a class="headerlink" href="#intel-openmp" title="Link to this heading"></a></h4>
 <p>By default, PyTorch uses GNU OpenMP (GNU libgomp) for parallel computation. On Intel platforms, Intel OpenMP Runtime Library (libiomp) provides OpenMP API specification support. It sometimes brings more performance benefits compared to libgomp. Utilizing environment variable <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code> can switch OpenMP library to libiomp:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>export LD_PRELOAD=&lt;path&gt;/libiomp5.so:$LD_PRELOAD
 </pre></div>
@@ -302,14 +304,14 @@ NUMA node1 CPU(s):   28-55,84-111
 </section>
 </section>
 <section id="memory-allocator">
-<h3>Memory Allocator<a class="headerlink" href="#memory-allocator" title="Permalink to this heading"></a></h3>
+<h3>Memory Allocator<a class="headerlink" href="#memory-allocator" title="Link to this heading"></a></h3>
 <p>Memory allocator plays an important role from performance perspective as well. A more efficient memory usage reduces overhead on unnecessary memory allocations or destructions, and thus results in a faster execution. From practical experiences, for deep learning workloads, Jemalloc or TCMalloc can get better performance by reusing memory as much as possible than default malloc function.</p>
 <p>It is as simple as adding path of Jemalloc/TCMalloc dynamic library to environment variable <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code> to switch memory allocator to one of them.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>export LD_PRELOAD=&lt;jemalloc.so/tcmalloc.so&gt;:$LD_PRELOAD
 </pre></div>
 </div>
 <section id="jemalloc">
-<h4>Jemalloc<a class="headerlink" href="#jemalloc" title="Permalink to this heading"></a></h4>
+<h4>Jemalloc<a class="headerlink" href="#jemalloc" title="Link to this heading"></a></h4>
 <p><a class="reference external" href="https://github.com/jemalloc/jemalloc">Jemalloc</a> is a general purpose malloc implementation that emphasizes fragmentation avoidance and scalable concurrency support. More detailed introduction of performance tuning with Jemalloc can be found at <a class="reference external" href="https://android.googlesource.com/platform/external/jemalloc_new/+/6e6a93170475c05ebddbaf3f0df6add65ba19f01/TUNING.md">Jemalloc tuning guide</a></p>
 <p>A recommended setting for <code class="docutils literal notranslate"><span class="pre">MALLOC_CONF</span></code> is <code class="docutils literal notranslate"><span class="pre">oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:9000000000,muzzy_decay_ms:9000000000</span></code> from performance perspective. However, in some cases the <code class="docutils literal notranslate"><span class="pre">dirty_decay_ms:9000000000,mmuzzy_decay_ms:9000000000</span></code> may cause Out-of-Memory crash. Try <code class="docutils literal notranslate"><span class="pre">oversize_threshold:1,background_thread:true,metadata_thp:auto</span></code> instead in this case.</p>
 <p>Getting Jemalloc is straight-forward.</p>
@@ -318,7 +320,7 @@ NUMA node1 CPU(s):   28-55,84-111
 </div>
 </section>
 <section id="tcmalloc">
-<h4>TCMalloc<a class="headerlink" href="#tcmalloc" title="Permalink to this heading"></a></h4>
+<h4>TCMalloc<a class="headerlink" href="#tcmalloc" title="Link to this heading"></a></h4>
 <p><a class="reference external" href="https://github.com/google/tcmalloc">TCMalloc</a> also features a couple of optimizations to speed up program executions. One of them is holding memory in caches to speed up access of commonly-used objects. Holding such caches even after deallocation also helps avoid costly system calls if such memory is later re-allocated. It is part of <a class="reference external" href="https://github.com/gperftools/gperftools">gpertools</a>, a collection of a high-performance multi-threaded malloc() implementation, plus some pretty nifty performance analysis tools.</p>
 <p>Getting TCMalloc is also not complicated.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">gperftools</span>
@@ -327,14 +329,14 @@ NUMA node1 CPU(s):   28-55,84-111
 </section>
 </section>
 <section id="denormal-number">
-<h3>Denormal Number<a class="headerlink" href="#denormal-number" title="Permalink to this heading"></a></h3>
+<h3>Denormal Number<a class="headerlink" href="#denormal-number" title="Link to this heading"></a></h3>
 <p><a class="reference external" href="https://en.wikipedia.org/wiki/Denormal_number">Denormal number</a> is used to store extremely small numbers that are close to 0. Computations with denormal numbers are remarkably slower than normalized number. To solve the low performance issue caused by denormal numbers, users can use the following PyTorch API function.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">torch</span><span class="o">.</span><span class="n">set_flush_denormal</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
 <section id="onednn-primitive-cache">
-<h3>OneDNN primitive cache<a class="headerlink" href="#onednn-primitive-cache" title="Permalink to this heading"></a></h3>
+<h3>OneDNN primitive cache<a class="headerlink" href="#onednn-primitive-cache" title="Link to this heading"></a></h3>
 <p>Intel® Extension for PyTorch* is using OneDNN backend for those most computing bound PyTorch operators such as Linear and Convolution.</p>
 <p>To achieve better performance, OneDNN backend is using its <a class="reference external" href="https://oneapi-src.github.io/oneDNN/dev_guide_primitive_cache.html">primitive cache</a> to store those created primitives for different input shapes during warm-up stage (default primitive cache size is 1024, i.e., 1024 cached primitives). Therefore, when the total size of the primitives created by all the input shapes is within the default threshold, Intel® Extension for PyTorch* could get fully computation performance from OneDNN kernels.</p>
 <p>Different input shapes usualy come from dynamic shapes of datasets. Dynamic shapes commonly exist in <a class="reference external" href="https://github.com/matterport/Mask_RCNN">MaskRCNN model</a> (object detection), <a class="reference external" href="https://github.com/huggingface/transformers/">Transformers</a> Wav2vec2 model (speech-recognition) and other speech/text-generation related Transformers models.</p>
@@ -365,8 +367,8 @@ NUMA node1 CPU(s):   28-55,84-111
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f7056e408b0> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f921020f910> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

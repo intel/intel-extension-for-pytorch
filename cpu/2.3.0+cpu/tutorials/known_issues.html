@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Troubleshooting &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -119,9 +121,9 @@
            <div itemprop="articleBody">
              
   <section id="troubleshooting">
-<h1>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permalink to this heading"></a></h1>
+<h1>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h1>
 <section id="general-usage">
-<h2>General Usage<a class="headerlink" href="#general-usage" title="Permalink to this heading"></a></h2>
+<h2>General Usage<a class="headerlink" href="#general-usage" title="Link to this heading"></a></h2>
 <ul>
 <li><p><strong>Problem</strong>: Issues with the <code class="docutils literal notranslate"><span class="pre">+cpu</span></code> PyTorch package.</p>
 <ul class="simple">
@@ -171,13 +173,13 @@
 </ul>
 </section>
 <section id="performance-regression">
-<h2>Performance Regression<a class="headerlink" href="#performance-regression" title="Permalink to this heading"></a></h2>
+<h2>Performance Regression<a class="headerlink" href="#performance-regression" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>Some models may experience performance regression comparing to 2.0.x due to deprecation of the NNC feature in PyTorch*.</p></li>
 </ul>
 </section>
 <section id="torchdynamo">
-<h2>TorchDynamo<a class="headerlink" href="#torchdynamo" title="Permalink to this heading"></a></h2>
+<h2>TorchDynamo<a class="headerlink" href="#torchdynamo" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><strong>Problem</strong>: A workload that uses <code class="docutils literal notranslate"><span class="pre">torch.compile()</span></code> fails to run or demonstrates poor performance.</p>
 <ul>
@@ -196,7 +198,7 @@
 </ul>
 </section>
 <section id="dynamic-shape">
-<h2>Dynamic Shape<a class="headerlink" href="#dynamic-shape" title="Permalink to this heading"></a></h2>
+<h2>Dynamic Shape<a class="headerlink" href="#dynamic-shape" title="Link to this heading"></a></h2>
 <ul>
 <li><p><strong>Problem</strong>: When working with an NLP model inference with dynamic input data length using TorchScript (either <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.jit.script</span></code>), performance with Intel® Extension for PyTorch* may be less than that without Intel®
 Extension for PyTorch*.</p>
@@ -221,7 +223,7 @@ Extension for PyTorch*.</p>
 </ul>
 </section>
 <section id="int8">
-<h2>INT8<a class="headerlink" href="#int8" title="Permalink to this heading"></a></h2>
+<h2>INT8<a class="headerlink" href="#int8" title="Link to this heading"></a></h2>
 <ul>
 <li><p><strong>Problem</strong>: Limitations of dynamic shapes support of static quantization:</p>
 <ul class="simple">
@@ -265,7 +267,7 @@ Extension for PyTorch*.</p>
 </ul>
 </section>
 <section id="bfloat16">
-<h2>BFloat16<a class="headerlink" href="#bfloat16" title="Permalink to this heading"></a></h2>
+<h2>BFloat16<a class="headerlink" href="#bfloat16" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><strong>Problem</strong>: BF16 AMP(auto-mixed-precision) runs abnormally with the extension on the AVX2-only machine if the topology contains <code class="docutils literal notranslate"><span class="pre">Conv</span></code>, <code class="docutils literal notranslate"><span class="pre">Matmul</span></code>, <code class="docutils literal notranslate"><span class="pre">Linear</span></code>, and <code class="docutils literal notranslate"><span class="pre">BatchNormalization</span></code>.</p>
 <ul>
@@ -280,7 +282,7 @@ Extension for PyTorch*.</p>
 </ul>
 </section>
 <section id="runtime-extension">
-<h2>Runtime Extension<a class="headerlink" href="#runtime-extension" title="Permalink to this heading"></a></h2>
+<h2>Runtime Extension<a class="headerlink" href="#runtime-extension" title="Link to this heading"></a></h2>
 <p>The following limitations currently exist:</p>
 <ul class="simple">
 <li><p>Runtime extension of <code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code> does not support DLRM inference, since the input of DLRM (EmbeddingBag specifically) cannot be simply batch split.</p></li>
@@ -288,7 +290,7 @@ Extension for PyTorch*.</p>
 </ul>
 </section>
 <section id="result-correctness">
-<h2>Result Correctness<a class="headerlink" href="#result-correctness" title="Permalink to this heading"></a></h2>
+<h2>Result Correctness<a class="headerlink" href="#result-correctness" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><strong>Problem</strong>: Incorrect Conv and Linear result if the number of OMP threads is changed at runtime.</p>
 <ul>
@@ -316,8 +318,8 @@ Extension for PyTorch*.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f7057547220> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f92103951b0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

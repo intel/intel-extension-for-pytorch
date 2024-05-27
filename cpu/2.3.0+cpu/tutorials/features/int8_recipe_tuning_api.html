@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>INT8 Recipe Tuning API (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -144,11 +146,11 @@
            <div itemprop="articleBody">
              
   <section id="int8-recipe-tuning-api-prototype">
-<h1>INT8 Recipe Tuning API (Prototype)<a class="headerlink" href="#int8-recipe-tuning-api-prototype" title="Permalink to this heading"></a></h1>
+<h1>INT8 Recipe Tuning API (Prototype)<a class="headerlink" href="#int8-recipe-tuning-api-prototype" title="Link to this heading"></a></h1>
 <p>This <a class="reference external" href="../api_doc.html#ipex.quantization.autotune">new API</a> <code class="docutils literal notranslate"><span class="pre">ipex.quantization.autotune</span></code> supports INT8 recipe tuning by using Intel® Neural Compressor as the backend in Intel® Extension for PyTorch*. In general, we provid default recipe in Intel® Extension for PyTorch*, and we still recommend users to try out the default recipe first without bothering tuning. If the default recipe doesn’t bring about desired accuracy, users can use this API to tune for a more advanced receipe.</p>
 <p>Users need to provide a fp32 model and some parameters required for tuning. The API will return a prepared model with tuned qconfig loaded.</p>
 <section id="usage-example">
-<h2>Usage Example<a class="headerlink" href="#usage-example" title="Permalink to this heading"></a></h2>
+<h2>Usage Example<a class="headerlink" href="#usage-example" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>Static Quantization
 Please refer to <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/main/tutorials/features/../../../examples/cpu/features/int8_recipe_tuning/imagenet_autotune.py">static_quant example</a>.</p></li>
@@ -157,9 +159,9 @@ Please refer to <a class="reference external" href="https://github.com/intel/int
 </ul>
 </section>
 <section id="smooth-quantization-autotune">
-<h2>Smooth Quantization Autotune<a class="headerlink" href="#smooth-quantization-autotune" title="Permalink to this heading"></a></h2>
+<h2>Smooth Quantization Autotune<a class="headerlink" href="#smooth-quantization-autotune" title="Link to this heading"></a></h2>
 <section id="algorithm-auto-tuning-of-alpha">
-<h3>Algorithm: Auto-tuning of $\alpha$.<a class="headerlink" href="#algorithm-auto-tuning-of-alpha" title="Permalink to this heading"></a></h3>
+<h3>Algorithm: Auto-tuning of $\alpha$.<a class="headerlink" href="#algorithm-auto-tuning-of-alpha" title="Link to this heading"></a></h3>
 <p>SmoothQuant method aims to split the quantization difficulty of weight and activation by using a fixed-value $\alpha$ for an entire model. However, as the distributions of activation outliers vary not only across different models but also across different layers within a model, we hereby propose a method to obtain layer-wise optimal $\alpha$ values with the ability to tune automatically.
 Currently, both layer-wise and block-wise auto-tuning methods are supported and the default option is layer-wise.
 In block-wise auto-tuning, layers within one block (e.g an OPTDecoderLayer) would share the same alpha value; users could set <em>‘do_blockwise’: True</em> in <em>auto_alpha_args</em> to enable it.</p>
@@ -178,10 +180,10 @@ In block-wise auto-tuning, layers within one block (e.g an OPTDecoderLayer) woul
 <p>In our experiments, an $\alpha$ range of [0.0, 1.0] with a step_size of 0.1 is found to be well-balanced one for the majority of models.</p>
 </section>
 <section id="alpha-usage">
-<h3>$\alpha$ Usage<a class="headerlink" href="#alpha-usage" title="Permalink to this heading"></a></h3>
+<h3>$\alpha$ Usage<a class="headerlink" href="#alpha-usage" title="Link to this heading"></a></h3>
 <p>There are two ways to apply smooth quantization: 1) using a fixed <code class="docutils literal notranslate"><span class="pre">alpha</span></code> for the entire model or 2) determining the <code class="docutils literal notranslate"><span class="pre">alpha</span></code> through auto-tuning.</p>
 <section id="using-a-fixed-alpha">
-<h4>Using a fixed <code class="docutils literal notranslate"><span class="pre">alpha</span></code><a class="headerlink" href="#using-a-fixed-alpha" title="Permalink to this heading"></a></h4>
+<h4>Using a fixed <code class="docutils literal notranslate"><span class="pre">alpha</span></code><a class="headerlink" href="#using-a-fixed-alpha" title="Link to this heading"></a></h4>
 <p>To set a fixed alpha for the entire model, users can follow this example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 <span class="n">smoothquant_args</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;alpha&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;folding&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
@@ -199,7 +201,7 @@ In block-wise auto-tuning, layers within one block (e.g an OPTDecoderLayer) woul
 </ul>
 </section>
 <section id="determining-the-alpha-through-auto-tuning">
-<h4>Determining the <code class="docutils literal notranslate"><span class="pre">alpha</span></code> through auto-tuning<a class="headerlink" href="#determining-the-alpha-through-auto-tuning" title="Permalink to this heading"></a></h4>
+<h4>Determining the <code class="docutils literal notranslate"><span class="pre">alpha</span></code> through auto-tuning<a class="headerlink" href="#determining-the-alpha-through-auto-tuning" title="Link to this heading"></a></h4>
 <p>Users can search for the best <code class="docutils literal notranslate"><span class="pre">alpha</span></code> at two levels: a) for the entire model, and b) for each layer/block.</p>
 <ol class="simple">
 <li><p>Auto-tune the <code class="docutils literal notranslate"><span class="pre">alpha</span></code> for the entire model
@@ -378,8 +380,8 @@ Here is an example:</p></li>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f705e6832b0> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f92102051b0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

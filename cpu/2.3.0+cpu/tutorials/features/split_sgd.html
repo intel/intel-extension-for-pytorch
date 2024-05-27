@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Split SGD &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -136,10 +138,10 @@
            <div itemprop="articleBody">
              
   <section id="split-sgd">
-<h1>Split SGD<a class="headerlink" href="#split-sgd" title="Permalink to this heading"></a></h1>
+<h1>Split SGD<a class="headerlink" href="#split-sgd" title="Link to this heading"></a></h1>
 <p>Both optimizations for inference workloads and training workloads are within Intel’s optimization scope. Optimizations for train optimizer functions are an important perspective. The optimizations use a mechanism called <strong>Split SGD</strong> and take advantage of BFloat16 data type and operator fusion. Optimizer <strong>adagrad</strong>, <strong>lamb</strong> and <strong>sgd</strong> are supported.</p>
 <section id="bfloat16">
-<h2>BFloat16<a class="headerlink" href="#bfloat16" title="Permalink to this heading"></a></h2>
+<h2>BFloat16<a class="headerlink" href="#bfloat16" title="Link to this heading"></a></h2>
 <p>The figure below shows definition of Float32 (top) and <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/articles/technical/intel-deep-learning-boost-new-instruction-bfloat16.html">BFloat16</a> (bottom) data types. Compared to Float32, BFloat16 is only half as long, and thus saves half the memory. It is supported natively at the instruction set level to boost deep learning workloads from the 3rd Generation of Intel® Xeon® Scalable Processors. It is compatible to Float32 since both have the same bit length for “sign” and “exponent” part. BFloat16 only has a 7-bit “mantissa” part while Float32 has 23 bits. BFloat16 has the same capacity to represent “digit ranges” with that of Float32, but has a shorter “precision” part.</p>
 <a class="reference internal image-reference" href="https://user-images.githubusercontent.com/33838455/86600181-00f5c200-bfa0-11ea-93f0-95af3f0bff08.png"><img alt="Data types" class="align-center" src="https://user-images.githubusercontent.com/33838455/86600181-00f5c200-bfa0-11ea-93f0-95af3f0bff08.png" style="width: 1200px;" /></a>
 <p>An advantage of BFloat16 is that it saves memory and reduces computation workload, but the fewer mantissa bits brings negative effects as well. Let’s use an “ADD” operation as an example to explain the disadvantage. To perform addition of 2 floating point numbers, we need to shift the mantissa part of the numbers left or right to align their exponent parts. Since BFloat16 has a shorter mantissa part, it is much easier than Float32 to lose its mantissa part after the shifting, and thus cause an accuracy loss issue.</p>
@@ -161,7 +163,7 @@ x+y &amp;= 0.12345*10^{10} + 0.12345*10^{5} \\
 <p>Since the data type has only 5 digits for the fraction part, after shifting <strong>y</strong> by 5 digits, its fraction part is fully removed. This causes significant accuracy loss and, buy their nature, is a drawback of lower-precision data types.</p>
 </section>
 <section id="stochastic-gradient-descent-sgd">
-<h2>Stochastic Gradient Descent (SGD)<a class="headerlink" href="#stochastic-gradient-descent-sgd" title="Permalink to this heading"></a></h2>
+<h2>Stochastic Gradient Descent (SGD)<a class="headerlink" href="#stochastic-gradient-descent-sgd" title="Link to this heading"></a></h2>
 <p>Basically, training involves 3 steps:</p>
 <ol class="arabic simple">
 <li><p>Forward propagation: Performance inference once and compare the results with ground truth to get loss number.</p></li>
@@ -174,7 +176,7 @@ x+y &amp;= 0.12345*10^{10} + 0.12345*10^{5} \\
 <p>Where <span class="math notranslate nohighlight">\(W\)</span> denotes parameters to be updated. <span class="math notranslate nohighlight">\(gW\)</span> denotes gradient received during backward propagation and <span class="math notranslate nohighlight">\(α\)</span> denotes learning rate.</p>
 </section>
 <section id="id2">
-<h2>Split SGD<a class="headerlink" href="#id2" title="Permalink to this heading"></a></h2>
+<h2>Split SGD<a class="headerlink" href="#id2" title="Link to this heading"></a></h2>
 <p>Since the addition applied in SGD is repeated, because of the low precision data loss mentioned earlier, if both the <span class="math notranslate nohighlight">\(W\)</span> and <span class="math notranslate nohighlight">\(gW\)</span> are stored in BFloat16 data type, we will most likely lose valid bits and make the training results inaccurate. Using FP32 master parameters is a common practice for avoiding the round-off errors at parameter update step.
 To keep FP32 master parameters, we have 3 design choices:
 1. Only save FP32 parameters: For this choice, we need introduce additional FP32-&gt;BF16 cast at each iter to get benefit from BF16 at forward and backward propagation steps.
@@ -218,8 +220,8 @@ To keep FP32 master parameters, we have 3 design choices:
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f7057517e80> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f9210395420> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Contribution &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -129,9 +131,9 @@
            <div itemprop="articleBody">
              
   <section id="contribution">
-<h1>Contribution<a class="headerlink" href="#contribution" title="Permalink to this heading"></a></h1>
+<h1>Contribution<a class="headerlink" href="#contribution" title="Link to this heading"></a></h1>
 <section id="contributing-to-intel-extension-for-pytorch">
-<h2>Contributing to Intel® Extension for PyTorch*<a class="headerlink" href="#contributing-to-intel-extension-for-pytorch" title="Permalink to this heading"></a></h2>
+<h2>Contributing to Intel® Extension for PyTorch*<a class="headerlink" href="#contributing-to-intel-extension-for-pytorch" title="Link to this heading"></a></h2>
 <p>Thank you for your interest in contributing to Intel® Extension for PyTorch*. Before you begin writing code, it is important that you share your intention to contribute with the team, based on the type of contribution:</p>
 <ol class="simple">
 <li><p>You want to propose a new feature and implement it.</p>
@@ -150,7 +152,7 @@
 <p>Once you implement and test your feature or bug-fix, submit a Pull Request to https://github.com/intel/intel-extension-for-pytorch.</p>
 </section>
 <section id="developing-intel-extension-for-pytorch">
-<h2>Developing Intel® Extension for PyTorch*<a class="headerlink" href="#developing-intel-extension-for-pytorch" title="Permalink to this heading"></a></h2>
+<h2>Developing Intel® Extension for PyTorch*<a class="headerlink" href="#developing-intel-extension-for-pytorch" title="Link to this heading"></a></h2>
 <p>A full set of instructions on installing Intel® Extension for PyTorch* from source is in the <a class="reference external" href="installation.html#install-via-source-compilation">Installation document</a>.</p>
 <p>To develop on your machine, here are some tips:</p>
 <ol>
@@ -192,7 +194,7 @@ git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w
 <p>You do not need to repeatedly install after modifying Python files (<code class="docutils literal notranslate"><span class="pre">.py</span></code>). However, you would need to reinstall if you modify a Python interface (<code class="docutils literal notranslate"><span class="pre">.pyi</span></code>, <code class="docutils literal notranslate"><span class="pre">.pyi.in</span></code>) or non-Python files (<code class="docutils literal notranslate"><span class="pre">.cpp</span></code>, <code class="docutils literal notranslate"><span class="pre">.cc</span></code>, <code class="docutils literal notranslate"><span class="pre">.cu</span></code>, <code class="docutils literal notranslate"><span class="pre">.h</span></code>, etc.).</p>
 <p>If you want to reinstall, make sure that you uninstall Intel® Extension for PyTorch* first by running <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">uninstall</span> <span class="pre">intel_extension_for_pytorch</span></code> until you see <code class="docutils literal notranslate"><span class="pre">WARNING:</span> <span class="pre">Skipping</span> <span class="pre">intel_extension_for_pytorch</span> <span class="pre">as</span> <span class="pre">it</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">installed</span></code>; next run <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">setup.py</span> <span class="pre">clean</span></code>. After that, you can install in <code class="docutils literal notranslate"><span class="pre">develop</span></code> mode again.</p>
 <section id="tips-and-debugging">
-<h3>Tips and Debugging<a class="headerlink" href="#tips-and-debugging" title="Permalink to this heading"></a></h3>
+<h3>Tips and Debugging<a class="headerlink" href="#tips-and-debugging" title="Link to this heading"></a></h3>
 <ul>
 <li><p>Cmake must be installed before installing Intel® Extension for PyTorch*. If youre developing on MacOS or Linux, We recommend installing Cmake with <a class="reference external" href="https://brew.sh/">Homebrew</a> with <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">cmake</span></code>.</p></li>
 <li><p>Our <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> requires Python &gt;= 3.6</p></li>
@@ -220,9 +222,9 @@ python<span class="w"> </span>setup.py<span class="w"> </span>develop<span class
 </section>
 </section>
 <section id="unit-testing">
-<h2>Unit testing<a class="headerlink" href="#unit-testing" title="Permalink to this heading"></a></h2>
+<h2>Unit testing<a class="headerlink" href="#unit-testing" title="Link to this heading"></a></h2>
 <section id="python-unit-testing">
-<h3>Python Unit Testing<a class="headerlink" href="#python-unit-testing" title="Permalink to this heading"></a></h3>
+<h3>Python Unit Testing<a class="headerlink" href="#python-unit-testing" title="Link to this heading"></a></h3>
 <p>All PyTorch test suites are located in the <code class="docutils literal notranslate"><span class="pre">test</span></code> folder and start with <code class="docutils literal notranslate"><span class="pre">test_</span></code>. Run individual test suites using the command <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">test/cpu/FILENAME.py</span></code>, where <code class="docutils literal notranslate"><span class="pre">FILENAME</span></code> represents the file containing the test suite you wish to run.</p>
 <p>For example, to run all the TorchScript JIT tests (located at <code class="docutils literal notranslate"><span class="pre">test/cpu/test_jit.py</span></code>), you would run:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>test/cpu/test_jit.py
@@ -236,7 +238,7 @@ python<span class="w"> </span>setup.py<span class="w"> </span>develop<span class
 <p>The <code class="docutils literal notranslate"><span class="pre">expecttest</span></code> and <code class="docutils literal notranslate"><span class="pre">hypothesis</span></code> libraries must be installed to run the tests. <code class="docutils literal notranslate"><span class="pre">mypy</span></code> is an optional dependency, and <code class="docutils literal notranslate"><span class="pre">pytest</span></code> may help run tests more selectively. All these packages can be installed with <code class="docutils literal notranslate"><span class="pre">conda</span></code> or <code class="docutils literal notranslate"><span class="pre">pip</span></code>.</p>
 </section>
 <section id="better-local-unit-tests-with-pytest">
-<h3>Better local unit tests with <code class="docutils literal notranslate"><span class="pre">pytest</span></code><a class="headerlink" href="#better-local-unit-tests-with-pytest" title="Permalink to this heading"></a></h3>
+<h3>Better local unit tests with <code class="docutils literal notranslate"><span class="pre">pytest</span></code><a class="headerlink" href="#better-local-unit-tests-with-pytest" title="Link to this heading"></a></h3>
 <p>We don’t officially support <code class="docutils literal notranslate"><span class="pre">pytest</span></code>, but it works well with our <code class="docutils literal notranslate"><span class="pre">unittest</span></code> tests and offers a number of useful features for local developing. Install it via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">pytest</span></code>.</p>
 <p>If you want to run only tests that contain a specific substring, you can use the <code class="docutils literal notranslate"><span class="pre">-k</span></code> flag:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pytest<span class="w"> </span>test/cpu/test_nn.py<span class="w"> </span>-k<span class="w"> </span>Loss<span class="w"> </span>-v
@@ -245,7 +247,7 @@ python<span class="w"> </span>setup.py<span class="w"> </span>develop<span class
 <p>The above is an example of testing a change to all Loss functions: this command runs tests such as <code class="docutils literal notranslate"><span class="pre">TestNN.test_BCELoss</span></code> and <code class="docutils literal notranslate"><span class="pre">TestNN.test_MSELoss</span></code> and can be useful to save keystrokes.</p>
 </section>
 <section id="local-linting">
-<h3>Local linting<a class="headerlink" href="#local-linting" title="Permalink to this heading"></a></h3>
+<h3>Local linting<a class="headerlink" href="#local-linting" title="Link to this heading"></a></h3>
 <p>You can run the same linting steps that are used in CI locally via <code class="docutils literal notranslate"><span class="pre">make</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Lint all files</span>
 make<span class="w"> </span>lint<span class="w"> </span>-j<span class="w"> </span><span class="m">6</span><span class="w">  </span><span class="c1"># run lint (using 6 parallel jobs)</span>
@@ -277,7 +279,7 @@ make<span class="w"> </span>clang-tidy
 </div>
 </section>
 <section id="c-unit-testing">
-<h3>C++ Unit Testing<a class="headerlink" href="#c-unit-testing" title="Permalink to this heading"></a></h3>
+<h3>C++ Unit Testing<a class="headerlink" href="#c-unit-testing" title="Link to this heading"></a></h3>
 <p>Intel® Extension for PyTorch* offers tests located in the <code class="docutils literal notranslate"><span class="pre">test/cpp</span></code> folder. These tests are written in C++ and use the Google Test testing framework. After compiling Intel® Extension for PyTorch* from source, the test runner binaries will be written to the <code class="docutils literal notranslate"><span class="pre">build/bin</span></code> folder. The command to run one of these tests is <code class="docutils literal notranslate"><span class="pre">./build/bin/FILENAME</span> <span class="pre">--gtest_filter=TESTSUITE.TESTNAME</span></code>, where <code class="docutils literal notranslate"><span class="pre">TESTNAME</span></code> is the name of the test you’d like to run and <code class="docutils literal notranslate"><span class="pre">TESTSUITE</span></code> is the suite that test is defined in.</p>
 <p>For example, if you wanted to run the test <code class="docutils literal notranslate"><span class="pre">MayContainAlias</span></code>, which is part of the test suite <code class="docutils literal notranslate"><span class="pre">ContainerAliasingTest</span></code> in the file <code class="docutils literal notranslate"><span class="pre">test/cpp/jit/test_alias_analysis.cpp</span></code>, the command would be:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>./build/bin/test_jit<span class="w"> </span>--gtest_filter<span class="o">=</span>ContainerAliasingTest.MayContainAlias
@@ -286,11 +288,11 @@ make<span class="w"> </span>clang-tidy
 </section>
 </section>
 <section id="writing-documentation">
-<h2>Writing documentation<a class="headerlink" href="#writing-documentation" title="Permalink to this heading"></a></h2>
+<h2>Writing documentation<a class="headerlink" href="#writing-documentation" title="Link to this heading"></a></h2>
 <p>So you want to write some documentation for your code contribution and don’t know where to start?</p>
 <p>Intel® Extension for PyTorch* uses <a class="reference external" href="http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html">Google style</a> for formatting docstrings. Length of line inside docstrings block must be limited to 80 characters to fit into Jupyter documentation popups.</p>
 <section id="building-documentation">
-<h3>Building documentation<a class="headerlink" href="#building-documentation" title="Permalink to this heading"></a></h3>
+<h3>Building documentation<a class="headerlink" href="#building-documentation" title="Link to this heading"></a></h3>
 <p>To build the documentation:</p>
 <ol>
 <li><p>Build and install Intel® Extension for PyTorch* (as discussed above)</p></li>
@@ -308,7 +310,7 @@ make<span class="w"> </span>html
 </li>
 </ol>
 <section id="tips">
-<h4>Tips<a class="headerlink" href="#tips" title="Permalink to this heading"></a></h4>
+<h4>Tips<a class="headerlink" href="#tips" title="Link to this heading"></a></h4>
 <p>The <code class="docutils literal notranslate"><span class="pre">.rst</span></code> source files live in <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/main/docs/tutorials">docs/tutorials</a>. Some of the <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files pull in docstrings from Intel® Extension for PyTorch* Python code (for example, via the <code class="docutils literal notranslate"><span class="pre">autofunction</span></code> or <code class="docutils literal notranslate"><span class="pre">autoclass</span></code> directives). To shorten doc build times, it is helpful to remove the files you are not working on, only keeping the base <code class="docutils literal notranslate"><span class="pre">index.rst</span></code> file and the files you are editing. The Sphinx build will produce missing file warnings but will still complete.</p>
 </section>
 </section>
@@ -331,8 +333,8 @@ make<span class="w"> </span>html
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f705c4064f0> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f92103592d0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

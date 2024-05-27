@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Examples &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -180,7 +182,7 @@
            <div itemprop="articleBody">
              
   <section id="examples">
-<h1>Examples<a class="headerlink" href="#examples" title="Permalink to this heading"></a></h1>
+<h1>Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h1>
 <p>These examples will guide you through using the Intel® Extension for PyTorch* on Intel CPUs.</p>
 <p>You can also refer to the <a class="reference internal" href="./features.html">Features</a> section to get the examples and usage instructions related to particular features.</p>
 <p>The source code for these examples, as well as the feature examples, can be found in the GitHub source tree under the <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu">examples</a> directory.</p>
@@ -200,11 +202,11 @@ Before running these examples, please note the following:</p>
 <li><p>Examples using the BFloat16 data type require machines with the  Intel® Advanced Vector Extensions 512 (Intel® AVX-512) BF16 and Intel® Advanced Matrix Extensions (Intel® AMX) BF16 instruction sets.</p></li>
 </ul>
 <section id="python">
-<h2>Python<a class="headerlink" href="#python" title="Permalink to this heading"></a></h2>
+<h2>Python<a class="headerlink" href="#python" title="Link to this heading"></a></h2>
 <section id="training">
-<h3>Training<a class="headerlink" href="#training" title="Permalink to this heading"></a></h3>
+<h3>Training<a class="headerlink" href="#training" title="Link to this heading"></a></h3>
 <section id="single-instance-training">
-<h4>Single-instance Training<a class="headerlink" href="#single-instance-training" title="Permalink to this heading"></a></h4>
+<h4>Single-instance Training<a class="headerlink" href="#single-instance-training" title="Link to this heading"></a></h4>
 <p>To use Intel® Extension for PyTorch* on training, you need to make the following changes in your code:</p>
 <ol class="simple">
 <li><p>Import <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> as <code class="docutils literal notranslate"><span class="pre">ipex</span></code>.</p></li>
@@ -232,7 +234,7 @@ Before running these examples, please note the following:</p>
 </div>
 <p>Below you can find complete code examples demonstrating how to use the extension on training for different data types:</p>
 <section id="float32">
-<h5>Float32<a class="headerlink" href="#float32" title="Permalink to this heading"></a></h5>
+<h5>Float32<a class="headerlink" href="#float32" title="Link to this heading"></a></h5>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision</span>
@@ -285,7 +287,7 @@ Before running these examples, please note the following:</p>
 </div>
 </section>
 <section id="bfloat16">
-<h5>BFloat16<a class="headerlink" href="#bfloat16" title="Permalink to this heading"></a></h5>
+<h5>BFloat16<a class="headerlink" href="#bfloat16" title="Link to this heading"></a></h5>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision</span>
@@ -341,7 +343,7 @@ Before running these examples, please note the following:</p>
 </section>
 </section>
 <section id="distributed-training">
-<h4>Distributed Training<a class="headerlink" href="#distributed-training" title="Permalink to this heading"></a></h4>
+<h4>Distributed Training<a class="headerlink" href="#distributed-training" title="Link to this heading"></a></h4>
 <p>Distributed training with PyTorch DDP is accelerated by oneAPI Collective Communications Library Bindings for Pytorch* (oneCCL Bindings for Pytorch*). The extension supports FP32 and BF16 data types. More detailed information and examples are available at the <a class="reference external" href="https://github.com/intel/torch-ccl">Github repo</a>.</p>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
@@ -412,14 +414,14 @@ Before running these examples, please note the following:</p>
 </section>
 </section>
 <section id="inference">
-<h3>Inference<a class="headerlink" href="#inference" title="Permalink to this heading"></a></h3>
+<h3>Inference<a class="headerlink" href="#inference" title="Link to this heading"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function of Intel® Extension for PyTorch* applies optimizations to the model, bringing additional performance boosts. For both computer vision workloads and NLP workloads, we recommend applying the <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function against the model object.</p>
 <section id="id1">
-<h4>Float32<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h4>
+<h4>Float32<a class="headerlink" href="#id1" title="Link to this heading"></a></h4>
 <section id="eager-mode">
-<h5>Eager Mode<a class="headerlink" href="#eager-mode" title="Permalink to this heading"></a></h5>
+<h5>Eager Mode<a class="headerlink" href="#eager-mode" title="Link to this heading"></a></h5>
 <section id="resnet50">
-<h6>Resnet50<a class="headerlink" href="#resnet50" title="Permalink to this heading"></a></h6>
+<h6>Resnet50<a class="headerlink" href="#resnet50" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
@@ -441,7 +443,7 @@ Before running these examples, please note the following:</p>
 </div>
 </section>
 <section id="bert">
-<h6>BERT<a class="headerlink" href="#bert" title="Permalink to this heading"></a></h6>
+<h6>BERT<a class="headerlink" href="#bert" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">transformers</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
@@ -468,10 +470,10 @@ Before running these examples, please note the following:</p>
 </section>
 </section>
 <section id="torchscript-mode">
-<h5>TorchScript Mode<a class="headerlink" href="#torchscript-mode" title="Permalink to this heading"></a></h5>
+<h5>TorchScript Mode<a class="headerlink" href="#torchscript-mode" title="Link to this heading"></a></h5>
 <p>We recommend using Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a> for further optimizations.</p>
 <section id="id2">
-<h6>Resnet50<a class="headerlink" href="#id2" title="Permalink to this heading"></a></h6>
+<h6>Resnet50<a class="headerlink" href="#id2" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
@@ -497,7 +499,7 @@ Before running these examples, please note the following:</p>
 </div>
 </section>
 <section id="id3">
-<h6>BERT<a class="headerlink" href="#id3" title="Permalink to this heading"></a></h6>
+<h6>BERT<a class="headerlink" href="#id3" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">transformers</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
@@ -528,9 +530,9 @@ Before running these examples, please note the following:</p>
 </section>
 </section>
 <section id="torchdynamo-mode-beta-new-feature-from-2-0-0">
-<h5>TorchDynamo Mode (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#torchdynamo-mode-beta-new-feature-from-2-0-0" title="Permalink to this heading"></a></h5>
+<h5>TorchDynamo Mode (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#torchdynamo-mode-beta-new-feature-from-2-0-0" title="Link to this heading"></a></h5>
 <section id="id4">
-<h6>Resnet50<a class="headerlink" href="#id4" title="Permalink to this heading"></a></h6>
+<h6>Resnet50<a class="headerlink" href="#id4" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
@@ -554,7 +556,7 @@ Before running these examples, please note the following:</p>
 </div>
 </section>
 <section id="id5">
-<h6>BERT<a class="headerlink" href="#id5" title="Permalink to this heading"></a></h6>
+<h6>BERT<a class="headerlink" href="#id5" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">transformers</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
@@ -585,13 +587,13 @@ Before running these examples, please note the following:</p>
 </section>
 </section>
 <section id="id6">
-<h4>BFloat16<a class="headerlink" href="#id6" title="Permalink to this heading"></a></h4>
+<h4>BFloat16<a class="headerlink" href="#id6" title="Link to this heading"></a></h4>
 <p>The <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function works for both Float32 and BFloat16 data type. For BFloat16 data type, set the <code class="docutils literal notranslate"><span class="pre">dtype</span></code> parameter to <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>.
 We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 <section id="id7">
-<h5>Eager Mode<a class="headerlink" href="#id7" title="Permalink to this heading"></a></h5>
+<h5>Eager Mode<a class="headerlink" href="#id7" title="Link to this heading"></a></h5>
 <section id="id8">
-<h6>Resnet50<a class="headerlink" href="#id8" title="Permalink to this heading"></a></h6>
+<h6>Resnet50<a class="headerlink" href="#id8" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
@@ -614,7 +616,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </div>
 </section>
 <section id="id9">
-<h6>BERT<a class="headerlink" href="#id9" title="Permalink to this heading"></a></h6>
+<h6>BERT<a class="headerlink" href="#id9" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">transformers</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
@@ -642,10 +644,10 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </section>
 </section>
 <section id="id10">
-<h5>TorchScript Mode<a class="headerlink" href="#id10" title="Permalink to this heading"></a></h5>
+<h5>TorchScript Mode<a class="headerlink" href="#id10" title="Link to this heading"></a></h5>
 <p>We recommend using Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a> for further optimizations.</p>
 <section id="id11">
-<h6>Resnet50<a class="headerlink" href="#id11" title="Permalink to this heading"></a></h6>
+<h6>Resnet50<a class="headerlink" href="#id11" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
@@ -671,7 +673,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </div>
 </section>
 <section id="id12">
-<h6>BERT<a class="headerlink" href="#id12" title="Permalink to this heading"></a></h6>
+<h6>BERT<a class="headerlink" href="#id12" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">transformers</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
@@ -703,9 +705,9 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </section>
 </section>
 <section id="id13">
-<h5>TorchDynamo Mode (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#id13" title="Permalink to this heading"></a></h5>
+<h5>TorchDynamo Mode (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#id13" title="Link to this heading"></a></h5>
 <section id="id14">
-<h6>Resnet50<a class="headerlink" href="#id14" title="Permalink to this heading"></a></h6>
+<h6>Resnet50<a class="headerlink" href="#id14" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
@@ -730,7 +732,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </div>
 </section>
 <section id="id15">
-<h6>BERT<a class="headerlink" href="#id15" title="Permalink to this heading"></a></h6>
+<h6>BERT<a class="headerlink" href="#id15" title="Link to this heading"></a></h6>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">transformers</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
@@ -761,7 +763,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </section>
 </section>
 <section id="fast-bert-prototype">
-<h4>Fast Bert (<em>Prototype</em>)<a class="headerlink" href="#fast-bert-prototype" title="Permalink to this heading"></a></h4>
+<h4>Fast Bert (<em>Prototype</em>)<a class="headerlink" href="#fast-bert-prototype" title="Link to this heading"></a></h4>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">transformers</span></code> Python package to run the following example.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
@@ -788,12 +790,12 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </div>
 </section>
 <section id="int8">
-<h4>INT8<a class="headerlink" href="#int8" title="Permalink to this heading"></a></h4>
+<h4>INT8<a class="headerlink" href="#int8" title="Link to this heading"></a></h4>
 <p>Starting from Intel® Extension for PyTorch* 1.12.0, quantization feature supports both static and dynamic modes.</p>
 <section id="static-quantization">
-<h5>Static Quantization<a class="headerlink" href="#static-quantization" title="Permalink to this heading"></a></h5>
+<h5>Static Quantization<a class="headerlink" href="#static-quantization" title="Link to this heading"></a></h5>
 <section id="calibration">
-<h6>Calibration<a class="headerlink" href="#calibration" title="Permalink to this heading"></a></h6>
+<h6>Calibration<a class="headerlink" href="#calibration" title="Link to this heading"></a></h6>
 <p>Please follow the steps below to perform calibration for static quantization:</p>
 <ol class="simple">
 <li><p>Import <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> as <code class="docutils literal notranslate"><span class="pre">ipex</span></code>.</p></li>
@@ -866,7 +868,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </div>
 </section>
 <section id="deployment">
-<h6>Deployment<a class="headerlink" href="#deployment" title="Permalink to this heading"></a></h6>
+<h6>Deployment<a class="headerlink" href="#deployment" title="Link to this heading"></a></h6>
 <p>For deployment, the INT8 model is loaded from the local file and can be used directly for sample inference.</p>
 <p>Follow the steps below:</p>
 <ol class="simple">
@@ -893,7 +895,7 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </section>
 </section>
 <section id="dynamic-quantization">
-<h5>Dynamic Quantization<a class="headerlink" href="#dynamic-quantization" title="Permalink to this heading"></a></h5>
+<h5>Dynamic Quantization<a class="headerlink" href="#dynamic-quantization" title="Link to this heading"></a></h5>
 <p>Please follow the steps below to perform dynamic quantization:</p>
 <ol class="simple">
 <li><p>Import <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> as <code class="docutils literal notranslate"><span class="pre">ipex</span></code>.</p></li>
@@ -946,14 +948,14 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </section>
 </section>
 <section id="large-language-model-llm">
-<h3>Large Language Model (LLM)<a class="headerlink" href="#large-language-model-llm" title="Permalink to this heading"></a></h3>
+<h3>Large Language Model (LLM)<a class="headerlink" href="#large-language-model-llm" title="Link to this heading"></a></h3>
 <p>Intel® Extension for PyTorch* provides dedicated optimization for running Large Language Models (LLM) faster.
 A set of data types are supported for various scenarios, including FP32, BF16, Smooth Quantization INT8, Weight Only Quantization INT8/INT4 (prototype).</p>
 <p><strong>Note:</strong> You need to install <code class="docutils literal notranslate"><span class="pre">transformers==4.38.1</span></code> Python package to run the following example.
 In addition, you may need to log in your HuggingFace account to access the pretrained model files.
 Please refer to <a class="reference external" href="https://huggingface.co/docs/huggingface_hub/quick-start#login">HuggingFace login</a>.</p>
 <section id="fp32-bf16">
-<h4>FP32/BF16<a class="headerlink" href="#fp32-bf16" title="Permalink to this heading"></a></h4>
+<h4>FP32/BF16<a class="headerlink" href="#fp32-bf16" title="Link to this heading"></a></h4>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="c1">#################### code changes ####################  # noqa F401</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
@@ -1047,7 +1049,7 @@ Please refer to <a class="reference external" href="https://huggingface.co/docs/
 </div>
 </section>
 <section id="smooth-quantization-int8">
-<h4>Smooth Quantization INT8<a class="headerlink" href="#smooth-quantization-int8" title="Permalink to this heading"></a></h4>
+<h4>Smooth Quantization INT8<a class="headerlink" href="#smooth-quantization-int8" title="Link to this heading"></a></h4>
 <p>The typical steps shown in the example are:</p>
 <ol class="simple">
 <li><p>Calibration process: Run the example script specifying <code class="docutils literal notranslate"><span class="pre">--calibration</span></code>, along with other related arguments.
@@ -1293,7 +1295,7 @@ generate results for the input prompt.</p></li>
 </div>
 </section>
 <section id="weight-only-quantization-int8-int4">
-<h4>Weight Only Quantization INT8/INT4<a class="headerlink" href="#weight-only-quantization-int8-int4" title="Permalink to this heading"></a></h4>
+<h4>Weight Only Quantization INT8/INT4<a class="headerlink" href="#weight-only-quantization-int8-int4" title="Link to this heading"></a></h4>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="c1">#################### code changes ####################  # noqa F401</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
@@ -1452,7 +1454,7 @@ for detailed environment setup and LLM workload running instructions.</p>
 </section>
 </section>
 <section id="c">
-<h2>C++<a class="headerlink" href="#c" title="Permalink to this heading"></a></h2>
+<h2>C++<a class="headerlink" href="#c" title="Link to this heading"></a></h2>
 <p>To work with libtorch, C++ library of PyTorch, Intel® Extension for PyTorch* provides its C++ dynamic library as well. The C++ library is supposed to handle inference workload only, such as service deployment. For regular development, use the Python interface. Unlike using libtorch, no specific code changes are required. Compilation follows the recommended methodology with CMake. Detailed instructions can be found in <a class="reference external" href="https://pytorch.org/tutorials/advanced/cpp_export.html#depending-on-libtorch-and-building-the-application">PyTorch tutorial</a>.</p>
 <p>During compilation, Intel optimizations will be activated automatically once C++ dynamic library of Intel® Extension for PyTorch* is linked.</p>
 <p>The example code below works for all data types.</p>
@@ -1543,7 +1545,7 @@ $<span class="w"> </span>ldd<span class="w"> </span>example-app
 </div>
 </section>
 <section id="intel-ai-reference-models">
-<h2>Intel® AI Reference Models<a class="headerlink" href="#intel-ai-reference-models" title="Permalink to this heading"></a></h2>
+<h2>Intel® AI Reference Models<a class="headerlink" href="#intel-ai-reference-models" title="Link to this heading"></a></h2>
 <p>Use cases that have already been optimized by Intel engineers are available at <a class="reference external" href="https://github.com/IntelAI/models/tree/pytorch-r2.3-models">Intel® AI Reference Models</a> (former Model Zoo).
 A number of PyTorch use cases for benchmarking are also available in the <a class="reference external" href="https://github.com/IntelAI/models/tree/pytorch-r2.3-models/benchmarks#pytorch-use-cases">benchmarks</a>.
 You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.</p>
@@ -1567,8 +1569,8 @@ You can get performance benefits out-of-the-box by simply running scripts in the
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f70570bea30> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f9210232c20> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

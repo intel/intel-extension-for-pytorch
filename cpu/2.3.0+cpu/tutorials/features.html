@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Features &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -169,10 +171,10 @@
            <div itemprop="articleBody">
              
   <section id="features">
-<h1>Features<a class="headerlink" href="#features" title="Permalink to this heading"></a></h1>
+<h1>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h1>
 <p>This section provides a detailed overview of supported features.</p>
 <section id="easy-to-use-python-api">
-<h2>Easy-to-use Python API<a class="headerlink" href="#easy-to-use-python-api" title="Permalink to this heading"></a></h2>
+<h2>Easy-to-use Python API<a class="headerlink" href="#easy-to-use-python-api" title="Link to this heading"></a></h2>
 <p>With only two or three clauses added to your original code, Intel® Extension for PyTorch* provides simple frontend Python APIs and utilities to get performance optimizations such as graph optimization and operator optimization.</p>
 <p>Check the <a class="reference external" href="api_doc.html">API Documentation</a> for API functions description and <a class="reference external" href="examples.html">Examples</a> for usage guidance.</p>
 <div class="admonition note">
@@ -184,13 +186,13 @@ correct package name depending on the version you are using.</p>
 </div>
 </section>
 <section id="large-language-models-llm-new-feature-from-2-1-0">
-<h2>Large Language Models (LLM, <em>NEW feature from 2.1.0</em>)<a class="headerlink" href="#large-language-models-llm-new-feature-from-2-1-0" title="Permalink to this heading"></a></h2>
+<h2>Large Language Models (LLM, <em>NEW feature from 2.1.0</em>)<a class="headerlink" href="#large-language-models-llm-new-feature-from-2-1-0" title="Link to this heading"></a></h2>
 <p>In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are
 introduced in the Intel® Extension for PyTorch*.</p>
 <p>For more detailed information, check <a class="reference external" href="./llm.html">LLM Optimizations Overview</a>.</p>
 </section>
 <section id="torch-compile-beta-new-feature-from-2-0-0">
-<h2>torch.compile (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#torch-compile-beta-new-feature-from-2-0-0" title="Permalink to this heading"></a></h2>
+<h2>torch.compile (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#torch-compile-beta-new-feature-from-2-0-0" title="Link to this heading"></a></h2>
 <p>PyTorch* 2.0 introduces a new feature <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to speed up PyTorch* code. It makes PyTorch code run faster by JIT-compiling of PyTorch code into optimized kernels. Intel® Extension for PyTorch* enables a backend, <code class="docutils literal notranslate"><span class="pre">ipex</span></code>, in the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to optimize generation of the graph model.</p>
 <p>To use the feature, import the Intel® Extension for PyTorch* and set the backend parameter of the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to <code class="docutils literal notranslate"><span class="pre">ipex</span></code>.</p>
 <p>With <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend set to <code class="docutils literal notranslate"><span class="pre">ipex</span></code>, the following will happen:</p>
@@ -209,21 +211,21 @@ introduced in the Intel® Extension for PyTorch*.</p>
 </div>
 </section>
 <section id="isa-dynamic-dispatching">
-<h2>ISA Dynamic Dispatching<a class="headerlink" href="#isa-dynamic-dispatching" title="Permalink to this heading"></a></h2>
+<h2>ISA Dynamic Dispatching<a class="headerlink" href="#isa-dynamic-dispatching" title="Link to this heading"></a></h2>
 <p>Intel® Extension for PyTorch* features dynamic dispatching functionality to automatically adapt execution binaries to the most advanced instruction set available on your machine.</p>
 <p>For details, refer to <a class="reference external" href="features/isa_dynamic_dispatch.html">ISA Dynamic Dispatching</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
 <section id="auto-channels-last">
-<h2>Auto Channels Last<a class="headerlink" href="#auto-channels-last" title="Permalink to this heading"></a></h2>
+<h2>Auto Channels Last<a class="headerlink" href="#auto-channels-last" title="Link to this heading"></a></h2>
 <p>Comparing to the default NCHW memory format, using channels_last (NHWC) memory format could further accelerate convolutional neural networks. In Intel® Extension for PyTorch*, NHWC memory format has been enabled for most key CPU operators. More detailed information is available at <a class="reference external" href="features/nhwc.html">Channels Last</a>.</p>
 <p>Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with <code class="docutils literal notranslate"><span class="pre">ipex.optimize(model)</span></code>. With this feature, there is no need to manually apply <code class="docutils literal notranslate"><span class="pre">model=model.to(memory_format=torch.channels_last)</span></code> anymore. More detailed information is available at <a class="reference external" href="features/auto_channels_last.html">Auto Channels Last</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
 <section id="auto-mixed-precision-amp">
-<h2>Auto Mixed Precision (AMP)<a class="headerlink" href="#auto-mixed-precision-amp" title="Permalink to this heading"></a></h2>
+<h2>Auto Mixed Precision (AMP)<a class="headerlink" href="#auto-mixed-precision-amp" title="Link to this heading"></a></h2>
 <p>Low precision data type BFloat16 has been natively supported on 3rd Generation Xeon® Scalable Processors (aka Cooper Lake) with AVX512 instruction set. It will also be supported on the next generation of Intel® Xeon® Scalable Processors with Intel® Advanced Matrix Extensions (Intel® AMX) instruction set providing further boosted performance. The support of Auto Mixed Precision (AMP) with BFloat16 for CPU and BFloat16 optimization of operators has been enabled in Intel® Extension for PyTorch*, and partially upstreamed to PyTorch master branch. These optimizations will be landed in PyTorch master through PRs that are being submitted and reviewed.</p>
 <p>Prefer to use <cite>torch.cpu.amp.autocast()</cite> instead of <cite>torch.autocast(device_name=”cpu”)</cite>.</p>
 <p>For details, refer to <a class="reference external" href="features/amp.html">Auto Mixed Precision (AMP)</a>.</p>
@@ -232,7 +234,7 @@ introduced in the Intel® Extension for PyTorch*.</p>
 </div>
 </section>
 <section id="graph-optimization">
-<h2>Graph Optimization<a class="headerlink" href="#graph-optimization" title="Permalink to this heading"></a></h2>
+<h2>Graph Optimization<a class="headerlink" href="#graph-optimization" title="Link to this heading"></a></h2>
 <p>To further optimize TorchScript performance, Intel® Extension for PyTorch* supports transparent fusion of frequently used operator patterns such as Conv2D+ReLU and Linear+ReLU.
 For more detailed information, check <a class="reference external" href="features/graph_optimization.html">Graph Optimization</a>.</p>
 <p>Compared to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies such as operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode. We recommend taking advantage of Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a>. You may wish to run with the <code class="docutils literal notranslate"><span class="pre">torch.jit.trace()</span></code> function first, since it generally works better with Intel® Extension for PyTorch* than using the <code class="docutils literal notranslate"><span class="pre">torch.jit.script()</span></code> function. More detailed information can be found at the <a class="reference external" href="https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules">pytorch.org website</a>.</p>
@@ -240,11 +242,11 @@ For more detailed information, check <a class="reference external" href="feature
 </div>
 </section>
 <section id="operator-optimization">
-<h2>Operator Optimization<a class="headerlink" href="#operator-optimization" title="Permalink to this heading"></a></h2>
+<h2>Operator Optimization<a class="headerlink" href="#operator-optimization" title="Link to this heading"></a></h2>
 <p>Intel® Extension for PyTorch* also optimizes operators and implements several customized operators for performance boosts. A few ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch* via the ATen registration mechanism. Some customized operators are implemented for several popular topologies. For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch* also optimized these customized operators.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.nn.FrozenBatchNorm2d">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.</span></span><span class="sig-name descname"><span class="pre">FrozenBatchNorm2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-05</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.FrozenBatchNorm2d" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.</span></span><span class="sig-name descname"><span class="pre">FrozenBatchNorm2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-05</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.FrozenBatchNorm2d" title="Link to this definition"></a></dt>
 <dd><p>BatchNorm2d where the batch statistics and the affine parameters are fixed</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -257,7 +259,7 @@ Output shape: <code class="docutils literal notranslate"><span class="pre">(N,</
 
 <dl class="py function">
 <dt class="sig sig-object py" id="ipex.nn.functional.interaction">
-<span class="sig-prename descclassname"><span class="pre">ipex.nn.functional.</span></span><span class="sig-name descname"><span class="pre">interaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.functional.interaction" title="Permalink to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">ipex.nn.functional.</span></span><span class="sig-name descname"><span class="pre">interaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.functional.interaction" title="Link to this definition"></a></dt>
 <dd><p>Get the interaction feature beyond different kinds of features (like gender
 or hobbies), used in DLRM model.</p>
 <p>For now, we only optimized “dot” interaction at <a class="reference external" href="https://github.com/facebookresearch/dlrm/blob/main/dlrm_s_pytorch.py#L475-L495">DLRM Github repo</a>.
@@ -279,7 +281,7 @@ Output shape: <code class="docutils literal notranslate"><span class="pre">(B,</
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.nn.modules.MergedEmbeddingBag">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.modules.</span></span><span class="sig-name descname"><span class="pre">MergedEmbeddingBag</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">embedding_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">EmbeddingSpec</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.modules.MergedEmbeddingBag" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.modules.</span></span><span class="sig-name descname"><span class="pre">MergedEmbeddingBag</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">embedding_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">EmbeddingSpec</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.modules.MergedEmbeddingBag" title="Link to this definition"></a></dt>
 <dd><p>Merge multiple Pytorch <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.EmbeddingBag.html#embeddingbag">EmbeddingBag</a> objects into a single <cite>torch.nn.Module</cite> object.</p>
 <p>At the current stage:</p>
 <p><cite>MergedEmbeddingBag</cite> assumes to be constructed from <cite>nn.EmbeddingBag</cite> with <cite>sparse=False</cite>, returns dense gradients.</p>
@@ -312,7 +314,7 @@ in the future. Visit <cite>MergedEmbeddingBagWithSGD</cite> for introduction of 
 
 <dl class="py class">
 <dt class="sig sig-object py" id="ipex.nn.modules.MergedEmbeddingBagWithSGD">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.modules.</span></span><span class="sig-name descname"><span class="pre">MergedEmbeddingBagWithSGD</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">embedding_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">EmbeddingSpec</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_decay</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.modules.MergedEmbeddingBagWithSGD" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.modules.</span></span><span class="sig-name descname"><span class="pre">MergedEmbeddingBagWithSGD</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">embedding_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">EmbeddingSpec</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_decay</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.modules.MergedEmbeddingBagWithSGD" title="Link to this definition"></a></dt>
 <dd><p>To support training with <cite>MergedEmbeddingBag</cite> for good performance, optimizer step is fused with backward function.</p>
 <p>Native usage for multiple EmbeddingBag is:</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">EmbLists</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Modulist</span><span class="p">(</span><span class="n">emb1</span><span class="p">,</span> <span class="n">emb2</span><span class="p">,</span> <span class="n">emb3</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">emb_m</span><span class="p">)</span>
@@ -357,7 +359,7 @@ happen on cache more than on memory.</p>
 <p><strong>Auto kernel selection</strong> is a feature that enables users to tune for better performance with GEMM operations. We aim to provide good default performance by leveraging the best of math libraries and enabling <cite>weights_prepack</cite>. The feature was tested with broad set of models. If you want to try other options, you can use <cite>auto_kernel_selection</cite> toggle in <cite>ipex.optimize()</cite> to switch, and you can disable <cite>weights_prepack</cite> in <cite>ipex.optimize()</cite> if you are more concerned about the memory footprint than performance gain. However, in most cases, we recommend sticking with the default settings for the best experience.</p>
 </section>
 <section id="optimizer-optimization">
-<h2>Optimizer Optimization<a class="headerlink" href="#optimizer-optimization" title="Permalink to this heading"></a></h2>
+<h2>Optimizer Optimization<a class="headerlink" href="#optimizer-optimization" title="Link to this heading"></a></h2>
 <p>Optimizers are one of key parts of the training workloads. Intel® Extension for PyTorch* brings two types of optimizations to optimizers:</p>
 <ol class="arabic simple">
 <li><p>Operator fusion for the computation in the optimizers.</p></li>
@@ -368,7 +370,7 @@ happen on cache more than on memory.</p>
 </div>
 </section>
 <section id="runtime-extension">
-<h2>Runtime Extension<a class="headerlink" href="#runtime-extension" title="Permalink to this heading"></a></h2>
+<h2>Runtime Extension<a class="headerlink" href="#runtime-extension" title="Link to this heading"></a></h2>
 <p>Intel® Extension for PyTorch* Runtime Extension provides PyTorch frontend APIs for users to get finer-grained control of the thread runtime and provides:</p>
 <ul class="simple">
 <li><p>Multi-stream inference via the Python frontend module MultiStreamModule.</p></li>
@@ -384,7 +386,7 @@ happen on cache more than on memory.</p>
 </div>
 </section>
 <section id="int8-quantization">
-<h2>INT8 Quantization<a class="headerlink" href="#int8-quantization" title="Permalink to this heading"></a></h2>
+<h2>INT8 Quantization<a class="headerlink" href="#int8-quantization" title="Link to this heading"></a></h2>
 <p>Intel® Extension for PyTorch* provides built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models.</p>
 <p>Users are always recommended to try quantization with the built-in quantization recipe first with Intel® Extension for PyTorch* quantization APIs. For even higher accuracy demandings, users can try with separate <a class="reference external" href="features/int8_recipe_tuning_api.html">recipe tuning APIs</a>. The APIs are powered by Intel® Neural Compressor to take advantage of its tuning feature.</p>
 <p>Smooth quantization (SmoothQuant) is a more recent post-training quantization (PTQ) solution which tackles the quantization error problem caused by systematic outliers in activations. SmoothQuant is commonly used for LLM quantization, and Intel® Extension for PyTorch* has provided built-in support for this solution.</p>
@@ -393,28 +395,28 @@ happen on cache more than on memory.</p>
 </div>
 </section>
 <section id="codeless-optimization-prototype-new-feature-from-1-13-0">
-<h2>Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#codeless-optimization-prototype-new-feature-from-1-13-0" title="Permalink to this heading"></a></h2>
+<h2>Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#codeless-optimization-prototype-new-feature-from-1-13-0" title="Link to this heading"></a></h2>
 <p>This feature enables users to get performance benefits from Intel® Extension for PyTorch* without changing Python scripts. It hopefully eases the usage and has been verified working well with broad scope of models, though in few cases there could be small overhead comparing to applying optimizations with Intel® Extension for PyTorch* APIs.</p>
 <p>For more detailed information, check <a class="reference external" href="features/codeless_optimization.html">Codeless Optimization</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
 <section id="graph-capture-prototype-new-feature-from-1-13-0">
-<h2>Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#graph-capture-prototype-new-feature-from-1-13-0" title="Permalink to this heading"></a></h2>
+<h2>Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#graph-capture-prototype-new-feature-from-1-13-0" title="Link to this heading"></a></h2>
 <p>Since graph mode is key for deployment performance, this feature automatically captures graphs based on set of technologies that PyTorch supports, such as TorchScript and TorchDynamo. Users won’t need to learn and try different PyTorch APIs to capture graphs, instead, they can turn on a new boolean flag <cite>–graph_mode</cite> (default off) in <cite>ipex.optimize()</cite> to get the best of graph optimization.</p>
 <p>For more detailed information, check <a class="reference external" href="features/graph_capture.html">Graph Capture</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
 <section id="hypertune-prototype-new-feature-from-1-13-0">
-<h2>HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#hypertune-prototype-new-feature-from-1-13-0" title="Permalink to this heading"></a></h2>
+<h2>HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#hypertune-prototype-new-feature-from-1-13-0" title="Link to this heading"></a></h2>
 <p>HyperTune is an prototype feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the <a class="reference external" href="performance_tuning/launch_script.html">launcher</a> and Intel® Extension for PyTorch*.</p>
 <p>For more detailed information, check <a class="reference external" href="features/hypertune.html">HyperTune</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
 <section id="fast-bert-optimization-prototype-new-feature-from-2-0-0">
-<h2>Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#fast-bert-optimization-prototype-new-feature-from-2-0-0" title="Permalink to this heading"></a></h2>
+<h2>Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#fast-bert-optimization-prototype-new-feature-from-2-0-0" title="Link to this heading"></a></h2>
 <p>Intel proposed a technique to speed up BERT workloads. Implementation is integrated into Intel® Extension for PyTorch*. An API <cite>ipex.fast_bert()</cite> is provided for a simple usage.</p>
 <p>Currently <cite>ipex.fast_bert</cite> API is well optimized for training tasks. It works for inference tasks, though, please use the <cite>ipex.optimize</cite> API with graph mode to achieve the peak performance.</p>
 <p>For more detailed information, check <a class="reference external" href="features/fast_bert.html">Fast BERT</a>.</p>
@@ -440,8 +442,8 @@ happen on cache more than on memory.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f70575e8820> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f921035f550> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

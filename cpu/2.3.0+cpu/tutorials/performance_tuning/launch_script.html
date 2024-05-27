@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Launch Script Usage Guide &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -141,9 +143,9 @@
            <div itemprop="articleBody">
              
   <section id="launch-script-usage-guide">
-<h1>Launch Script Usage Guide<a class="headerlink" href="#launch-script-usage-guide" title="Permalink to this heading"></a></h1>
+<h1>Launch Script Usage Guide<a class="headerlink" href="#launch-script-usage-guide" title="Link to this heading"></a></h1>
 <section id="overview">
-<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading"></a></h2>
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>As introduced in the <a class="reference internal" href="tuning_guide.html"><span class="doc">Performance Tuning Guide</span></a>, there are several factors that influence performance. Setting configuration options properly contributes to a performance boost. However, there is no unified configuration that is optimal to all topologies. Users need to try different combinations by themselves. A <em>launch</em> script is provided to automate these configuration settings to free users from this complicated work. This guide helps you to learn some common usage examples that cover many optimized configuration cases.</p>
 <p>The configurations are mainly around the following perspectives.</p>
 <ol class="simple">
@@ -153,7 +155,7 @@
 </ol>
 </section>
 <section id="usage-of-launch-script">
-<h2>Usage of launch script<a class="headerlink" href="#usage-of-launch-script" title="Permalink to this heading"></a></h2>
+<h2>Usage of launch script<a class="headerlink" href="#usage-of-launch-script" title="Link to this heading"></a></h2>
 <p>The <em>launch</em> script is provided as a module of <em>intel_extension_for_pytorch</em>. You can take advantage of it with the following command:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="p">[</span><span class="n">knobs</span><span class="p">]</span> <span class="o">&lt;</span><span class="n">your_pytorch_script</span><span class="o">&gt;</span> <span class="p">[</span><span class="n">args</span><span class="p">]</span>
 </pre></div>
@@ -418,7 +420,7 @@
 </div>
 </section>
 <section id="usage-examples">
-<h2>Usage Examples<a class="headerlink" href="#usage-examples" title="Permalink to this heading"></a></h2>
+<h2>Usage Examples<a class="headerlink" href="#usage-examples" title="Link to this heading"></a></h2>
 <p>Example script <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/v2.0.100%2Bcpu/examples/cpu/inference/python/resnet50_general_inference_script.py">resnet50.py</a> will be used in this guide.</p>
 <ul class="simple">
 <li><p>Single instance for inference</p>
@@ -453,9 +455,9 @@
 </ul>
 <p><strong>Note:</strong> GIF files below illustrate CPU usage ONLY. Do NOT infer performance numbers.</p>
 <section id="single-instance-for-inference">
-<h3>Single instance for inference<a class="headerlink" href="#single-instance-for-inference" title="Permalink to this heading"></a></h3>
+<h3>Single instance for inference<a class="headerlink" href="#single-instance-for-inference" title="Link to this heading"></a></h3>
 <section id="i-use-all-physical-cores">
-<h4>I. Use all physical cores<a class="headerlink" href="#i-use-all-physical-cores" title="Permalink to this heading"></a></h4>
+<h4>I. Use all physical cores<a class="headerlink" href="#i-use-all-physical-cores" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
@@ -483,7 +485,7 @@
 </div>
 </section>
 <section id="ii-use-all-cores-including-logical-cores">
-<h4>II. Use all cores including logical cores<a class="headerlink" href="#ii-use-all-cores-including-logical-cores" title="Permalink to this heading"></a></h4>
+<h4>II. Use all cores including logical cores<a class="headerlink" href="#ii-use-all-cores-including-logical-cores" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">use</span><span class="o">-</span><span class="n">logical</span><span class="o">-</span><span class="n">core</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
@@ -511,7 +513,7 @@
 </div>
 </section>
 <section id="iii-use-physical-cores-on-designated-nodes">
-<h4>III. Use physical cores on designated nodes<a class="headerlink" href="#iii-use-physical-cores-on-designated-nodes" title="Permalink to this heading"></a></h4>
+<h4>III. Use physical cores on designated nodes<a class="headerlink" href="#iii-use-physical-cores-on-designated-nodes" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">nodes</span><span class="o">-</span><span class="nb">list</span> <span class="mi">1</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
@@ -538,7 +540,7 @@
 </div>
 </section>
 <section id="iv-use-your-designated-number-of-cores">
-<h4>IV. Use your designated number of cores<a class="headerlink" href="#iv-use-your-designated-number-of-cores" title="Permalink to this heading"></a></h4>
+<h4>IV. Use your designated number of cores<a class="headerlink" href="#iv-use-your-designated-number-of-cores" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">ninstances</span> <span class="mi">1</span> <span class="o">--</span><span class="n">ncores</span><span class="o">-</span><span class="n">per</span><span class="o">-</span><span class="n">instance</span> <span class="mi">10</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
@@ -590,9 +592,9 @@
 </section>
 </section>
 <section id="multiple-instances-for-inference">
-<h3>Multiple instances for inference<a class="headerlink" href="#multiple-instances-for-inference" title="Permalink to this heading"></a></h3>
+<h3>Multiple instances for inference<a class="headerlink" href="#multiple-instances-for-inference" title="Link to this heading"></a></h3>
 <section id="v-throughput-mode">
-<h4>V. Throughput mode<a class="headerlink" href="#v-throughput-mode" title="Permalink to this heading"></a></h4>
+<h4>V. Throughput mode<a class="headerlink" href="#v-throughput-mode" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">throughput</span><span class="o">-</span><span class="n">mode</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
@@ -621,7 +623,7 @@
 </div>
 </section>
 <section id="vi-latency-mode">
-<h4>VI. Latency mode<a class="headerlink" href="#vi-latency-mode" title="Permalink to this heading"></a></h4>
+<h4>VI. Latency mode<a class="headerlink" href="#vi-latency-mode" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">latency</span><span class="o">-</span><span class="n">mode</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
@@ -669,7 +671,7 @@
 </div>
 </section>
 <section id="vii-your-designated-number-of-instances">
-<h4>VII. Your designated number of instances<a class="headerlink" href="#vii-your-designated-number-of-instances" title="Permalink to this heading"></a></h4>
+<h4>VII. Your designated number of instances<a class="headerlink" href="#vii-your-designated-number-of-instances" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">ninstances</span> <span class="mi">4</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
@@ -702,7 +704,7 @@
 </div>
 </section>
 <section id="viii-your-designated-number-of-instances-and-instance-index">
-<h4>VIII. Your designated number of instances and instance index<a class="headerlink" href="#viii-your-designated-number-of-instances-and-instance-index" title="Permalink to this heading"></a></h4>
+<h4>VIII. Your designated number of instances and instance index<a class="headerlink" href="#viii-your-designated-number-of-instances-and-instance-index" title="Link to this heading"></a></h4>
 <p>Launcher by default runs all <code class="docutils literal notranslate"><span class="pre">ninstances</span></code> for multi-instance inference/training as shown above. You can specify <code class="docutils literal notranslate"><span class="pre">instance_idx</span></code> to independently run that instance only among <code class="docutils literal notranslate"><span class="pre">ninstances</span></code></p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">ninstances</span> <span class="mi">4</span> <span class="o">--</span><span class="n">instance</span><span class="o">-</span><span class="n">idx</span> <span class="mi">0</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
@@ -731,10 +733,10 @@
 </section>
 </section>
 <section id="usage-of-jemalloc-tcmalloc-default-memory-allocator">
-<h3>Usage of Jemalloc/TCMalloc/Default memory allocator<a class="headerlink" href="#usage-of-jemalloc-tcmalloc-default-memory-allocator" title="Permalink to this heading"></a></h3>
+<h3>Usage of Jemalloc/TCMalloc/Default memory allocator<a class="headerlink" href="#usage-of-jemalloc-tcmalloc-default-memory-allocator" title="Link to this heading"></a></h3>
 <p>Memory allocator influences performance sometime. If users do not designate desired memory allocator, the <em>launch</em> script searches them in the order of TCMalloc &gt; Jemalloc &gt; PyTorch default memory allocator, and takes the first matched one.</p>
 <section id="jemalloc">
-<h4>Jemalloc<a class="headerlink" href="#jemalloc" title="Permalink to this heading"></a></h4>
+<h4>Jemalloc<a class="headerlink" href="#jemalloc" title="Link to this heading"></a></h4>
 <p><strong>Note:</strong> You can set your favorite value to <em>MALLOC_CONF</em> before running the <em>launch</em> script if you do not want to use its default setting.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">memory</span><span class="o">-</span><span class="n">allocator</span> <span class="n">jemalloc</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
@@ -753,7 +755,7 @@
 </div>
 </section>
 <section id="tcmalloc">
-<h4>TCMalloc<a class="headerlink" href="#tcmalloc" title="Permalink to this heading"></a></h4>
+<h4>TCMalloc<a class="headerlink" href="#tcmalloc" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">memory</span><span class="o">-</span><span class="n">allocator</span> <span class="n">tcmalloc</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
@@ -770,7 +772,7 @@
 </div>
 </section>
 <section id="default-memory-allocator">
-<h4>Default memory allocator<a class="headerlink" href="#default-memory-allocator" title="Permalink to this heading"></a></h4>
+<h4>Default memory allocator<a class="headerlink" href="#default-memory-allocator" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">memory</span><span class="o">-</span><span class="n">allocator</span> <span class="n">default</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
@@ -787,13 +789,13 @@
 </section>
 </section>
 <section id="usage-of-openmp-library">
-<h3>Usage of OpenMP library<a class="headerlink" href="#usage-of-openmp-library" title="Permalink to this heading"></a></h3>
+<h3>Usage of OpenMP library<a class="headerlink" href="#usage-of-openmp-library" title="Link to this heading"></a></h3>
 <section id="intel-openmp-library">
-<h4>Intel OpenMP Library<a class="headerlink" href="#intel-openmp-library" title="Permalink to this heading"></a></h4>
+<h4>Intel OpenMP Library<a class="headerlink" href="#intel-openmp-library" title="Link to this heading"></a></h4>
 <p>Generally, Intel OpenMP library brings better performance. Thus, in the <em>launch</em> script, Intel OpenMP library is used by default, if it is available. Intel OpenMP library takes environment variables like <em>KMP_AFFINITY</em> and <em>KMP_BLOCKTIME</em> to control its behavior. You can set your favorite values to them before running the <em>launch</em> script if you do not want to use the default settings.</p>
 </section>
 <section id="gnu-openmp-library">
-<h4>GNU OpenMP Library<a class="headerlink" href="#gnu-openmp-library" title="Permalink to this heading"></a></h4>
+<h4>GNU OpenMP Library<a class="headerlink" href="#gnu-openmp-library" title="Link to this heading"></a></h4>
 <p>It is, however, not always that Intel OpenMP library brings better performance comparing to GNU OpenMP library. In this case, you can use knob <code class="docutils literal notranslate"><span class="pre">--omp-runtime</span> <span class="pre">default</span></code> to switch active OpenMP library to the GNU one. GNU OpenMP specific environment variables, <em>OMP_SCHEDULE</em> and <em>OMP_PROC_BIND</em>, for setting CPU affinity are set automatically.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipexrun</span> <span class="o">--</span><span class="n">omp</span><span class="o">-</span><span class="n">runtime</span> <span class="n">default</span> <span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="nb">dir</span> <span class="o">./</span><span class="n">logs</span> <span class="n">resnet50</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
@@ -829,8 +831,8 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f7056edca00> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f921038cd00> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Transformers Optimization Frontend API &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -126,15 +128,15 @@
            <div itemprop="articleBody">
              
   <section id="transformers-optimization-frontend-api">
-<h1>Transformers Optimization Frontend API<a class="headerlink" href="#transformers-optimization-frontend-api" title="Permalink to this heading"></a></h1>
+<h1>Transformers Optimization Frontend API<a class="headerlink" href="#transformers-optimization-frontend-api" title="Link to this heading"></a></h1>
 <p>The new API function, <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code>, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> function instead of the <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> function to apply all optimizations transparently.</p>
 <p>This API currently works for inference workloads. Support for training is undergoing. Currently, this API supports certain models. Supported model list can be found at <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/cpu/2.3.0+cpu/tutorials/llm.html#ipex-llm-optimized-model-list">Overview</a>.</p>
 <p>API documentation is available at <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/cpu/2.3.0+cpu/tutorials/api_doc.html#ipex.llm.optimize">API Docs page</a>.</p>
 <section id="pseudocode-of-common-usage-scenarios">
-<h2>Pseudocode of Common Usage Scenarios<a class="headerlink" href="#pseudocode-of-common-usage-scenarios" title="Permalink to this heading"></a></h2>
+<h2>Pseudocode of Common Usage Scenarios<a class="headerlink" href="#pseudocode-of-common-usage-scenarios" title="Link to this heading"></a></h2>
 <p>The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch* APIs to work with LLM models. Complete examples can be found at <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/v2.3.0%2Bcpu/examples/cpu/inference/python/llm">the Example directory</a>.</p>
 <section id="fp32-bf16">
-<h3>FP32/BF16<a class="headerlink" href="#fp32-bf16" title="Permalink to this heading"></a></h3>
+<h3>FP32/BF16<a class="headerlink" href="#fp32-bf16" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 <span class="kn">import</span> <span class="nn">transformers</span>
@@ -150,7 +152,7 @@
 </div>
 </section>
 <section id="smoothquant">
-<h3>SmoothQuant<a class="headerlink" href="#smoothquant" title="Permalink to this heading"></a></h3>
+<h3>SmoothQuant<a class="headerlink" href="#smoothquant" title="Link to this heading"></a></h3>
 <p>Supports INT8.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="c1">#################### code changes ####################  # noqa F401</span>
@@ -193,7 +195,7 @@
 </div>
 </section>
 <section id="weight-only-quantization-woq">
-<h3>Weight Only Quantization (WOQ)<a class="headerlink" href="#weight-only-quantization-woq" title="Permalink to this heading"></a></h3>
+<h3>Weight Only Quantization (WOQ)<a class="headerlink" href="#weight-only-quantization-woq" title="Link to this heading"></a></h3>
 <p>Supports INT8 and INT4.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
@@ -215,7 +217,7 @@
 </div>
 </section>
 <section id="distributed-inference-with-deepspeed">
-<h3>Distributed Inference with DeepSpeed<a class="headerlink" href="#distributed-inference-with-deepspeed" title="Permalink to this heading"></a></h3>
+<h3>Distributed Inference with DeepSpeed<a class="headerlink" href="#distributed-inference-with-deepspeed" title="Link to this heading"></a></h3>
 <p>Distributed inference can be performed with <code class="docutils literal notranslate"><span class="pre">DeepSpeed</span></code>. Based on original Intel® Extension for PyTorch* scripts, the following code changes are required.</p>
 <p>Check <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/v2.3.0%2Bcpu/examples/cpu/inference/python/llm/distributed">LLM distributed inference examples</a> for complete codes.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
@@ -266,8 +268,8 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f70575118e0> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f9210396f50> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

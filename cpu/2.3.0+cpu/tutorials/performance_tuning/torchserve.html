@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TorchServe with Intel® Extension for PyTorch* &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -137,12 +139,12 @@
            <div itemprop="articleBody">
              
   <section id="torchserve-with-intel-extension-for-pytorch">
-<h1>TorchServe with Intel® Extension for PyTorch*<a class="headerlink" href="#torchserve-with-intel-extension-for-pytorch" title="Permalink to this heading"></a></h1>
+<h1>TorchServe with Intel® Extension for PyTorch*<a class="headerlink" href="#torchserve-with-intel-extension-for-pytorch" title="Link to this heading"></a></h1>
 <p>TorchServe can be used with Intel® Extension for PyTorch* to give performance boost on Intel hardware.<sup>1</sup>
 Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 <p><sup>1. While Intel® Extension for PyTorch* benefits all platforms, platforms with AVX512 benefit the most. </sup></p>
 <section id="contents-of-this-document">
-<h2>Contents of this Document<a class="headerlink" href="#contents-of-this-document" title="Permalink to this heading"></a></h2>
+<h2>Contents of this Document<a class="headerlink" href="#contents-of-this-document" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference external" href="#install-intel-extension-for-pytorch">Install Intel® Extension for PyTorch*</a></p></li>
 <li><p><a class="reference external" href="#serving-model-with-intel-extension-for-pytorch">Serving model with Intel® Extension for PyTorch*</a></p></li>
@@ -153,11 +155,11 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 </ul>
 </section>
 <section id="install-intel-extension-for-pytorch">
-<h2>Install Intel® Extension for PyTorch*<a class="headerlink" href="#install-intel-extension-for-pytorch" title="Permalink to this heading"></a></h2>
+<h2>Install Intel® Extension for PyTorch*<a class="headerlink" href="#install-intel-extension-for-pytorch" title="Link to this heading"></a></h2>
 <p>Refer to the documentation <a class="reference internal" href="../installation.html"><span class="doc">here</span></a>.</p>
 </section>
 <section id="serving-model-with-intel-extension-for-pytorch">
-<h2>Serving model with Intel® Extension for PyTorch*<a class="headerlink" href="#serving-model-with-intel-extension-for-pytorch" title="Permalink to this heading"></a></h2>
+<h2>Serving model with Intel® Extension for PyTorch*<a class="headerlink" href="#serving-model-with-intel-extension-for-pytorch" title="Link to this heading"></a></h2>
 <p>After installation, all it needs to use TorchServe with Intel® Extension for PyTorch* is to enable it in <code class="docutils literal notranslate"><span class="pre">config.properties</span></code>.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipex_enable</span><span class="o">=</span><span class="n">true</span>
 </pre></div>
@@ -165,7 +167,7 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 <p>Once Intel® Extension for PyTorch* is enabled, deploying PyTorch model follows the same procedure shown <a class="reference external" href="https://pytorch.org/serve/use_cases.html">here</a>. TorchServe with Intel® Extension for PyTorch* can deploy any model and do inference.</p>
 </section>
 <section id="torchserve-with-launcher">
-<h2>TorchServe with Launcher<a class="headerlink" href="#torchserve-with-launcher" title="Permalink to this heading"></a></h2>
+<h2>TorchServe with Launcher<a class="headerlink" href="#torchserve-with-launcher" title="Link to this heading"></a></h2>
 <p>Launcher is a script to automate the process of tunining configuration setting on Intel hardware to boost performance. Tuning configurations such as OMP_NUM_THREADS, thread affinity, memory allocator can have a dramatic effect on performance. Refer to <a class="reference internal" href="tuning_guide.html"><span class="doc">Performance Tuning Guide</span></a> and <a class="reference internal" href="launch_script.html"><span class="doc">Launch Script Usage Guide</span></a> for details on performance tuning with launcher.</p>
 <p>All it needs to use TorchServe with launcher is to set its configuration in <code class="docutils literal notranslate"><span class="pre">config.properties</span></code>.</p>
 <p>Add the following lines in <code class="docutils literal notranslate"><span class="pre">config.properties</span></code> to use launcher with its default configuration.</p>
@@ -211,12 +213,12 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 </ol>
 <p>Refer to <a class="reference internal" href="launch_script.html"><span class="doc">Launch Script Usage Guide</span></a> for a full list of tunable configuration of launcher. And refer to <a class="reference internal" href="tuning_guide.html"><span class="doc">Performance Tuning Guide</span></a> for more details.</p>
 <section id="launcher-core-pinning-to-boost-performance-of-torchserve-multi-worker-inference">
-<h3>Launcher Core Pinning to Boost Performance of TorchServe Multi Worker Inference<a class="headerlink" href="#launcher-core-pinning-to-boost-performance-of-torchserve-multi-worker-inference" title="Permalink to this heading"></a></h3>
+<h3>Launcher Core Pinning to Boost Performance of TorchServe Multi Worker Inference<a class="headerlink" href="#launcher-core-pinning-to-boost-performance-of-torchserve-multi-worker-inference" title="Link to this heading"></a></h3>
 <p>When running <a class="reference external" href="https://pytorch.org/serve/management_api.html#scale-workers">multi-worker inference</a> with Torchserve (Required torchserve&gt;=0.6.1), launcher pin cores to workers to boost performance. Internally, launcher equally divides the number of cores by the number of workers such that each worker is pinned to assigned cores. Doing so avoids core overlap among workers which can signficantly boost performance for TorchServe multi-worker inference. For example, assume running 4 workers on a machine with Intel(R) Xeon(R) Platinum 8180 CPU, 2 sockets, 28 cores per socket, 2 threads per core. Launcher will bind worker 0 to cores 0-13, worker 1 to cores 14-27, worker 2 to cores 28-41, and worker 3 to cores 42-55.</p>
 <p>CPU usage is shown below. 4 main worker threads were launched, each launching 14 threads affinitized to the assigned physical cores.
 <img alt="26" src="https://user-images.githubusercontent.com/93151422/170373651-fd8a0363-febf-4528-bbae-e1ddef119358.gif" /></p>
 <section id="scaling-workers">
-<h4>Scaling workers<a class="headerlink" href="#scaling-workers" title="Permalink to this heading"></a></h4>
+<h4>Scaling workers<a class="headerlink" href="#scaling-workers" title="Link to this heading"></a></h4>
 <p>Additionally when dynamically <a class="reference external" href="https://pytorch.org/serve/management_api.html#scale-workers">scaling the number of workers</a>, cores that were pinned to killed workers by the launcher could be left unutilized. To address this problem, launcher internally restarts the workers to re-distribute cores that were pinned to killed workers to the remaining, alive workers. This is taken care internally, so users do not have to worry about this.</p>
 <p>Continuing with the above example with 4 workers, assume killing workers 2 and 3. If cores were not re-distributed after the scale down, cores 28-55 would be left unutilized. Instead, launcher re-distributes cores 28-55 to workers 0 and 1 such that now worker 0 binds to cores 0-27 and worker 1 binds to cores 28-55.<sup>2</sup></p>
 <p>CPU usage is shown below. 4 main worker threads were initially launched. Then after scaling down the number of workers from 4 to 2, 2 main worker threads were launched, each launching 28 threads affinitized to the assigned physical cores.
@@ -231,13 +233,13 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 </section>
 </section>
 <section id="creating-and-exporting-int8-model-for-intel-extension-for-pytorch">
-<h2>Creating and Exporting INT8 model for Intel® Extension for PyTorch*<a class="headerlink" href="#creating-and-exporting-int8-model-for-intel-extension-for-pytorch" title="Permalink to this heading"></a></h2>
+<h2>Creating and Exporting INT8 model for Intel® Extension for PyTorch*<a class="headerlink" href="#creating-and-exporting-int8-model-for-intel-extension-for-pytorch" title="Link to this heading"></a></h2>
 <p>Intel® Extension for PyTorch* supports both eager and torchscript mode. In this section, we show how to deploy INT8 model for Intel® Extension for PyTorch*. Refer to <a class="reference internal" href="../features/int8_overview.html"><span class="doc">here</span></a> for more details on Intel® Extension for PyTorch* optimizations for quantization.</p>
 <section id="creating-a-serialized-file">
-<h3>1. Creating a serialized file<a class="headerlink" href="#creating-a-serialized-file" title="Permalink to this heading"></a></h3>
+<h3>1. Creating a serialized file<a class="headerlink" href="#creating-a-serialized-file" title="Link to this heading"></a></h3>
 <p>First create <code class="docutils literal notranslate"><span class="pre">.pt</span></code> serialized file using Intel® Extension for PyTorch* INT8 inference. Here we show two examples with BERT and ResNet50.</p>
 <section id="bert">
-<h4>BERT<a class="headerlink" href="#bert" title="Permalink to this heading"></a></h4>
+<h4>BERT<a class="headerlink" href="#bert" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 <span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
@@ -273,7 +275,7 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 </div>
 </section>
 <section id="resnet50">
-<h4>ResNet50<a class="headerlink" href="#resnet50" title="Permalink to this heading"></a></h4>
+<h4>ResNet50<a class="headerlink" href="#resnet50" title="Link to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
@@ -312,7 +314,7 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 </section>
 </section>
 <section id="creating-a-model-archive">
-<h3>2. Creating a Model Archive<a class="headerlink" href="#creating-a-model-archive" title="Permalink to this heading"></a></h3>
+<h3>2. Creating a Model Archive<a class="headerlink" href="#creating-a-model-archive" title="Link to this heading"></a></h3>
 <p>Once the serialized file ( <code class="docutils literal notranslate"><span class="pre">.pt</span></code>) is created, it can be used with <code class="docutils literal notranslate"><span class="pre">torch-model-archiver</span></code> as ususal.</p>
 <p>Use the following command to package <code class="docutils literal notranslate"><span class="pre">rn50_int8_jit.pt</span></code> into <code class="docutils literal notranslate"><span class="pre">rn50_ipex_int8.mar</span></code>.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">torch</span><span class="o">-</span><span class="n">model</span><span class="o">-</span><span class="n">archiver</span> <span class="o">--</span><span class="n">model</span><span class="o">-</span><span class="n">name</span> <span class="n">rn50_ipex_int8</span> <span class="o">--</span><span class="n">version</span> <span class="mf">1.0</span> <span class="o">--</span><span class="n">serialized</span><span class="o">-</span><span class="n">file</span> <span class="n">rn50_int8_jit</span><span class="o">.</span><span class="n">pt</span> <span class="o">--</span><span class="n">handler</span> <span class="n">image_classifier</span>
@@ -324,19 +326,19 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 </div>
 </section>
 <section id="start-torchserve-to-serve-the-model">
-<h3>3. Start TorchServe to serve the model<a class="headerlink" href="#start-torchserve-to-serve-the-model" title="Permalink to this heading"></a></h3>
+<h3>3. Start TorchServe to serve the model<a class="headerlink" href="#start-torchserve-to-serve-the-model" title="Link to this heading"></a></h3>
 <p>Make sure to set <code class="docutils literal notranslate"><span class="pre">ipex_enable=true</span></code> in <code class="docutils literal notranslate"><span class="pre">config.properties</span></code>. Use the following command to start TorchServe with Intel® Extension for PyTorch*.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">torchserve</span> <span class="o">--</span><span class="n">start</span> <span class="o">--</span><span class="n">ncs</span> <span class="o">--</span><span class="n">model</span><span class="o">-</span><span class="n">store</span> <span class="n">model_store</span> <span class="o">--</span><span class="n">ts</span><span class="o">-</span><span class="n">config</span> <span class="n">config</span><span class="o">.</span><span class="n">properties</span>
 </pre></div>
 </div>
 </section>
 <section id="registering-and-deploying-model">
-<h3>4. Registering and Deploying model<a class="headerlink" href="#registering-and-deploying-model" title="Permalink to this heading"></a></h3>
+<h3>4. Registering and Deploying model<a class="headerlink" href="#registering-and-deploying-model" title="Link to this heading"></a></h3>
 <p>Registering and deploying the model follows the same steps shown <a class="reference external" href="https://pytorch.org/serve/use_cases.html">here</a>.</p>
 </section>
 </section>
 <section id="benchmarking-with-launcher">
-<h2>Benchmarking with Launcher<a class="headerlink" href="#benchmarking-with-launcher" title="Permalink to this heading"></a></h2>
+<h2>Benchmarking with Launcher<a class="headerlink" href="#benchmarking-with-launcher" title="Link to this heading"></a></h2>
 <p>Launcher can be used with TorchServe official <a class="reference external" href="https://github.com/pytorch/serve/tree/master/benchmarks">benchmark</a> to launch server and benchmark requests with optimal configuration on Intel hardware.</p>
 <p>In this section we provide examples of benchmarking with launcher with its default configuration.</p>
 <p>Add the following lines to <code class="docutils literal notranslate"><span class="pre">config.properties</span></code> in the benchmark directory to use launcher with its default setting.</p>
@@ -370,7 +372,7 @@ Here we show how to use TorchServe with Intel® Extension for PyTorch*.</p>
 </pre></div>
 </div>
 <section id="benchmarking-with-launcher-core-pinning">
-<h3>Benchmarking with Launcher Core Pinning<a class="headerlink" href="#benchmarking-with-launcher-core-pinning" title="Permalink to this heading"></a></h3>
+<h3>Benchmarking with Launcher Core Pinning<a class="headerlink" href="#benchmarking-with-launcher-core-pinning" title="Link to this heading"></a></h3>
 <p>As described previously in <a class="reference external" href="#torchserve-with-launcher">TorchServe with Launcher</a>, launcher core pinning boosts performance of multi-worker inference. We’ll demonstrate launcher core pinning with TorchServe benchmark, but keep in mind that launcher core pinning is a generic feature applicable to any TorchServe multi-worker inference use casese.</p>
 <p>For example, assume running 4 workers</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">benchmark</span><span class="o">-</span><span class="n">ab</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">workers</span> <span class="mi">4</span>
@@ -421,7 +423,7 @@ $ cat logs/model_log.log
 </code></pre></section>
 </section>
 <section id="performance-boost-with-intel-extension-for-pytorch-and-launcher">
-<h2>Performance Boost with Intel® Extension for PyTorch* and Launcher<a class="headerlink" href="#performance-boost-with-intel-extension-for-pytorch-and-launcher" title="Permalink to this heading"></a></h2>
+<h2>Performance Boost with Intel® Extension for PyTorch* and Launcher<a class="headerlink" href="#performance-boost-with-intel-extension-for-pytorch-and-launcher" title="Link to this heading"></a></h2>
 <p><img alt="pdt_perf" src="https://user-images.githubusercontent.com/93151422/159067306-dfd604e3-8c66-4365-91ae-c99f68d972d5.png" /></p>
 <p>Above shows performance improvement of Torchserve with Intel® Extension for PyTorch* and launcher on ResNet50 and BERT-base-uncased. Torchserve official <a class="reference external" href="https://github.com/pytorch/serve/tree/master/benchmarks#benchmarking-with-apache-bench">apache-bench benchmark</a> on Amazon EC2 m6i.24xlarge was used to collect the results<sup>2</sup>. Add the following lines in <code class="docutils literal notranslate"><span class="pre">config.properties</span></code> to reproduce the results. Notice that launcher is configured such that a single instance uses all physical cores on a single socket to avoid cross socket communication and core overlap.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipex_enable</span><span class="o">=</span><span class="n">true</span>
@@ -462,8 +464,8 @@ $ cat logs/model_log.log
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f705c27df70> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f921020e5c0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>

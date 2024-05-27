@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Graph Optimization &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.0+cpu documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
 <script type="text/javascript">
   // Configure TMS settings
   window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
@@ -146,17 +148,17 @@
            <div itemprop="articleBody">
              
   <section id="graph-optimization">
-<h1>Graph Optimization<a class="headerlink" href="#graph-optimization" title="Permalink to this heading"></a></h1>
+<h1>Graph Optimization<a class="headerlink" href="#graph-optimization" title="Link to this heading"></a></h1>
 <p>Most Deep Learning models could be described as a DAG (directed acyclic graph). Optimizing a deep learning model from a graph perspective is straight forward. Compared to the operator optimization and algorithm optimization, the graph optimization is at a higher level. It covers not only the graph but also the runtime. From the operator perspective, the graph optimization contains the operator fusing and constant folding. From the runtime perspective, the graph optimization contains the operator scheduling, computation resources management, and memory management.</p>
 <p>The Intel® Extension for PyTorch* focuses on operator related graph optimizations. The extension also provides some prototype features for the related runtime optimizations. Refer to the runtime extension for more details about runtime optimization.</p>
 <section id="ease-of-use-graph-optimization-api">
-<h2>Ease-of-use graph optimization API<a class="headerlink" href="#ease-of-use-graph-optimization-api" title="Permalink to this heading"></a></h2>
+<h2>Ease-of-use graph optimization API<a class="headerlink" href="#ease-of-use-graph-optimization-api" title="Link to this heading"></a></h2>
 <p>The graph optimizations of Intel® Extension for PyTorch* are enabled by default. Users can disable it by calling:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipex</span><span class="o">.</span><span class="n">enable_onednn_fusion</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
 </pre></div>
 </div>
 <section id="fp32-and-bf16-models">
-<h3>FP32 and BF16 models<a class="headerlink" href="#fp32-and-bf16-models" title="Permalink to this heading"></a></h3>
+<h3>FP32 and BF16 models<a class="headerlink" href="#fp32-and-bf16-models" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
 
@@ -183,7 +185,7 @@
 <p>Compared to the original code, the model launcher needs to add a few lines of code and the extension will automatically accelerate the model. Regarding the RN50, the extension will automatically fuse the Conv + ReLU and Conv + Sum + ReLU as ConvReLU and ConvSumReLU. If you check the output of <code class="docutils literal notranslate"><span class="pre">graph_for</span></code>, you will observe the fused operators.</p>
 </section>
 <section id="int8-models">
-<h3>INT8 models<a class="headerlink" href="#int8-models" title="Permalink to this heading"></a></h3>
+<h3>INT8 models<a class="headerlink" href="#int8-models" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
 <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
@@ -243,11 +245,11 @@
 </section>
 </section>
 <section id="methodology">
-<h2>Methodology<a class="headerlink" href="#methodology" title="Permalink to this heading"></a></h2>
+<h2>Methodology<a class="headerlink" href="#methodology" title="Link to this heading"></a></h2>
 <section id="fusion">
-<h3>Fusion<a class="headerlink" href="#fusion" title="Permalink to this heading"></a></h3>
+<h3>Fusion<a class="headerlink" href="#fusion" title="Link to this heading"></a></h3>
 <section id="fp32-and-bf16-fusion-patterns">
-<h4>FP32 and BF16 fusion patterns<a class="headerlink" href="#fp32-and-bf16-fusion-patterns" title="Permalink to this heading"></a></h4>
+<h4>FP32 and BF16 fusion patterns<a class="headerlink" href="#fp32-and-bf16-fusion-patterns" title="Link to this heading"></a></h4>
 <ul class="simple">
 <li><p>Conv1D/Conv2D/Conv3D/Linear/ConvTranspose2D/ConvTranspose3D + Abs/Clamp/Elu/Exp/GELU/HardTanh/HardSwish/Log/Mish/Sigmoid/Pow/ReLU/Round/Sqrt/Square/Tanh/Leaky_ReLU/SiLU</p></li>
 <li><p>Conv1D/Conv2D/Conv3D/Linear/ConvTranspose2D/ConvTranspose3D + Sigmoid + MUL</p></li>
@@ -260,7 +262,7 @@
 </ul>
 </section>
 <section id="int8-fusion-patterns">
-<h4>INT8 fusion patterns<a class="headerlink" href="#int8-fusion-patterns" title="Permalink to this heading"></a></h4>
+<h4>INT8 fusion patterns<a class="headerlink" href="#int8-fusion-patterns" title="Link to this heading"></a></h4>
 <p>The <code class="docutils literal notranslate"><span class="pre">ipex.quantization.convert(model,</span> <span class="pre">conf,</span> <span class="pre">inputs)</span></code> API will convert an FP32 <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code> to a quantized JIT ScriptModule according to the given quantization recipes.</p>
 <p>For example, for a FP32 model of one single convolution, the graph before and after conversion will be:
 <img alt="image" src="../../_images/int8_pattern.png" /></p>
@@ -349,7 +351,7 @@
 </section>
 </section>
 <section id="folding">
-<h3>Folding<a class="headerlink" href="#folding" title="Permalink to this heading"></a></h3>
+<h3>Folding<a class="headerlink" href="#folding" title="Link to this heading"></a></h3>
 <p>Stock PyTorch provids constant propagation and BatchNormalization folding. These optimizations are automatically applied to the jit model by invoking <code class="docutils literal notranslate"><span class="pre">torch.jit.freeze</span></code>. Take the Resnet50 as an example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
@@ -390,8 +392,8 @@
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x7f705753fcd0> 
-  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+   <jinja2.runtime.BlockReference object at 0x7f9210232350> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
 </footer>
