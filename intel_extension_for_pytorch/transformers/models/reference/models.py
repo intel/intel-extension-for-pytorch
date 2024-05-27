@@ -15,6 +15,7 @@ from ....utils._logger import logger, WarningType
 import transformers
 
 try:
+    from transformers.generation.configuration_utils import GenerationConfig
     from transformers.modeling_attn_mask_utils import (
         _prepare_4d_causal_attention_mask,
     )
@@ -27,7 +28,6 @@ try:
         MoeCausalLMOutputWithPast,
         MoeModelOutputWithPast,
     )
-    from transformers.generation.configuration_utils import GenerationConfig
 except ImportError:
     pass
 
