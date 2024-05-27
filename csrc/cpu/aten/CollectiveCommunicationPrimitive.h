@@ -1,5 +1,5 @@
 #pragma once
-#ifdef USE_CCL
+#ifdef BUILD_CPU_WITH_ONECCL
 #include <ATen/ATen.h>
 #include <dyndisp/DispatchStub.h>
 

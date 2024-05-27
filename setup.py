@@ -802,7 +802,7 @@ class IPEXCPPLibBuild(build_clib, object):
             else:
                 build_option_cpu = {**build_option_common, "BUILD_MODULE_TYPE": "CPU"}
                 if _get_build_target() in ["develop", "python"]:
-                    build_option_cpu["USE_CCL"] = "ON"
+                    build_option_cpu["BUILD_CPU_WITH_ONECCL"] = "ON"
                     build_option_cpu["USE_SHM"] = "ON"
                     build_option_cpu["ENABLE_MPI_TESTS"] = "OFF"
                     build_option_cpu["BUILD_REG_TESTS"] = "OFF"
