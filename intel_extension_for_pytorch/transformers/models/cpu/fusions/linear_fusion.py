@@ -41,6 +41,15 @@ class _IPEXlinearSiluCPU(_IPEXlinearFusionCPU):
                 ),
                 self.linear.out_features,
             )
+        elif (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return torch.ops.torch_ipex.woq_linear_silu(
+                x,
+                self.linear._op_context.get_data_handle(),
+            )
         else:  # fallback path
             return nn.functional.silu(self.linear(x))
 
@@ -62,6 +71,15 @@ class _IPEXlinearReluCPU(_IPEXlinearFusionCPU):
                     else x.new_empty(0)
                 ),
                 self.linear.out_features,
+            )
+        elif (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return torch.ops.torch_ipex.woq_linear_relu(
+                x,
+                self.linear._op_context.get_data_handle(),
             )
         else:  # fallback path
             return nn.functional.relu(self.linear(x))
@@ -86,6 +104,16 @@ class _IPEXlinearMulCPU(_IPEXlinearFusionCPU):
                     else x.new_empty(0)
                 ),
                 self.linear.out_features,
+            )
+        elif (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return torch.ops.torch_ipex.woq_linear_mul(
+                x,
+                self.linear._op_context.get_data_handle(),
+                [y],
             )
         else:  # fallback path
             return self.linear(x) * y
@@ -412,6 +440,22 @@ class _IPEXlinearSiluMulCPU(nn.Module):
                     else x.new_empty(0)
                 ),
             )
+        elif (
+            self.woq
+            and hasattr(self.linear_s, "_op_context")
+            and self.linear_s._op_context is not None
+            and hasattr(self.linear_m, "_op_context")
+            and self.linear_m._op_context is not None
+        ):
+            y = torch.ops.torch_ipex.woq_linear_silu(
+                x,
+                self.linear_s._op_context.get_data_handle(),
+            )
+            return torch.ops.torch_ipex.woq_linear_mul(
+                x,
+                self.linear_m._op_context.get_data_handle(),
+                [y],
+            )
         else:  # fallback path
             return nn.functional.silu(self.linear_s(x)) * self.linear_m(x)
 
@@ -438,5 +482,17 @@ class _IPEXlinearSiluAndMulCPU(nn.Module):
                 self.linear.out_features,
             )
             return x1 * y
+        elif (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return (
+                torch.ops.torch_ipex.woq_linear_silu(
+                    x,
+                    self.linear._op_context.get_data_handle(),
+                )
+                * y
+            )
         else:  # fallback path
             return nn.functional.silu(self.linear(x)) * y

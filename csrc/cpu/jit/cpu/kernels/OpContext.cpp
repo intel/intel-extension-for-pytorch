@@ -399,27 +399,21 @@ at::Tensor IpexWoqLinearOpContext::run(const at::Tensor& input) {
   return torch_ipex::cpu::detail::woq_linear::run(op_context_, input);
 }
 
-at::Tensor IpexWoqLinearOpContext::run_eltwise(
+at::Tensor IpexWoqLinearOpContext::run_unary(
     const at::Tensor& input,
     const c10::string_view& post_op,
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm) {
-  return torch_ipex::cpu::detail::woq_linear::run_eltwise(
+  return torch_ipex::cpu::detail::woq_linear::run_unary(
       op_context_, input, post_op, scalars, algorithm);
 }
 
-at::Tensor IpexWoqLinearOpContext::run_add(
+at::Tensor IpexWoqLinearOpContext::run_binary(
     const at::Tensor& input,
+    const c10::string_view& post_op,
     const std::vector<at::Tensor>& others) {
-  return torch_ipex::cpu::detail::woq_linear::run_add(
-      op_context_, input, others);
-}
-
-at::Tensor IpexWoqLinearOpContext::run_add_add(
-    const at::Tensor& input,
-    const std::vector<at::Tensor>& others) {
-  return torch_ipex::cpu::detail::woq_linear::run_add_add(
-      op_context_, input, others);
+  return torch_ipex::cpu::detail::woq_linear::run_binary(
+      op_context_, input, post_op, others);
 }
 
 at::Tensor IpexWoqLinearOpContext::to_public(const at::Tensor& tensor) {

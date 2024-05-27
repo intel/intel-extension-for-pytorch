@@ -311,8 +311,8 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
   return res;
 }
 
-// Called by IpexWoqLinearOpContext::run_eltwise
-at::Tensor run_eltwise(
+// Called by IpexWoqLinearOpContext::run_unary
+at::Tensor run_unary(
     ContextLinearWoq& context,
     const at::Tensor& input,
     const c10::string_view& post_op,
@@ -330,7 +330,7 @@ at::Tensor run_eltwise(
   auto input_ = input.contiguous();
   // handle GPTQ with act-order
   input_ = _shuffle_input_channels_if_needed(context, input_);
-  return woq_linear_eltwise_kernel(
+  return woq_linear_unary_kernel(
       input_,
       context.at_weight_,
       context.weight_dtype_,
@@ -345,10 +345,11 @@ at::Tensor run_eltwise(
       context.act_quant_mode_);
 }
 
-// Called by IpexWoqLinearOpContext::run_add
-at::Tensor run_add(
+// Called by IpexWoqLinearOpContext::run_binary
+at::Tensor run_binary(
     ContextLinearWoq& context,
     const at::Tensor& input,
+    const c10::string_view& post_op,
     const std::vector<at::Tensor>& others) {
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
@@ -362,7 +363,7 @@ at::Tensor run_add(
   auto input_ = input.contiguous();
   // handle GPTQ with act-order
   input_ = _shuffle_input_channels_if_needed(context, input_);
-  return woq_linear_add_kernel(
+  return woq_linear_binary_kernel(
       input_,
       context.at_weight_,
       context.weight_dtype_,
@@ -371,36 +372,7 @@ at::Tensor run_add(
       context.bias_list_,
       context.group_size_,
       context.lowp_mode_,
-      others,
-      context.act_quant_mode_);
-}
-
-// Called by IpexWoqLinearOpContext::run_add_add
-at::Tensor run_add_add(
-    ContextLinearWoq& context,
-    const at::Tensor& input,
-    const std::vector<at::Tensor>& others) {
-  // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
-  auto w_k = context.weight_shape_[1];
-  TORCH_CHECK(
-      input.size(input.dim() - 1) == w_k,
-      "WOQ linear: input and weight shapes do not match, got k = ",
-      input.size(input.dim() - 1),
-      " and ",
-      w_k,
-      " respectively.");
-  auto input_ = input.contiguous();
-  // handle GPTQ with act-order
-  input_ = _shuffle_input_channels_if_needed(context, input_);
-  return woq_linear_add_add_kernel(
-      input_,
-      context.at_weight_,
-      context.weight_dtype_,
-      context.scales_list_,
-      context.zero_points_list_,
-      context.bias_list_,
-      context.group_size_,
-      context.lowp_mode_,
+      post_op,
       others,
       context.act_quant_mode_);
 }

@@ -22,10 +22,10 @@ namespace {
 using namespace tpp;
 using TensorList = std::vector<at::Tensor>;
 
-#define FUSE_GELU_ERF 1
-#define FUSE_ADD 2
-#define FUSE_ADD_ADD 3
-#define FUSE_GELU_TANH 4
+// #define FUSE_GELU_ERF 1
+// #define FUSE_ADD 2
+// #define FUSE_ADD_ADD 3
+// #define FUSE_GELU_TANH 4
 
 #define LOWP_MODE_NONE 0
 #define LOWP_MODE_FP16 1
@@ -1797,16 +1797,16 @@ void qlinear_woq_affine_dequant_upfront_impl(
               Nc /= 2;
               Nb *= 2;
             }
-            auto gelu_fwd_tpp_ptr = fusion_type == FUSE_GELU_ERF
+            auto gelu_fwd_tpp_ptr = fusion_type == WOQ_FUSE_GELU_ERF
                 ? std::make_shared<GeluFwdTPP<T>>(
                       GeluFwdTPP<T>(block_m, Nb, ldy, ldy))
                 : nullptr;
-            auto gelu_fwd_tpp_rem_ptr = fusion_type == FUSE_GELU_ERF
+            auto gelu_fwd_tpp_rem_ptr = fusion_type == WOQ_FUSE_GELU_ERF
                 ? std::make_shared<GeluFwdTPP<T>>(
                       GeluFwdTPP<T>(rem, Nb, ldy, ldy))
                 : nullptr;
             bool has_add_post_op =
-                fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD;
+                fusion_type == WOQ_FUSE_ADD || fusion_type == WOQ_FUSE_ADD_ADD;
             auto add_tpp_ptr = has_add_post_op
                 ? std::make_shared<AddTPP<T, T>>(
                       AddTPP<T, T>(block_m, Nb, ldy, ldy))
@@ -1815,13 +1815,35 @@ void qlinear_woq_affine_dequant_upfront_impl(
                 ? std::make_shared<AddTPP<T, T>>(
                       AddTPP<T, T>(rem, Nb, ldy, ldy))
                 : nullptr;
-            auto gelu_tanh_fwd_tpp_ptr = fusion_type == FUSE_GELU_TANH
+            auto gelu_tanh_fwd_tpp_ptr = fusion_type == WOQ_FUSE_GELU_TANH
                 ? std::make_shared<GeluTanhFwdTPP<T>>(
                       GeluTanhFwdTPP<T>(block_m, Nb, ldy, ldy))
                 : nullptr;
-            auto gelu_tanh_fwd_tpp_rem_ptr = fusion_type == FUSE_GELU_TANH
+            auto gelu_tanh_fwd_tpp_rem_ptr = fusion_type == WOQ_FUSE_GELU_TANH
                 ? std::make_shared<GeluTanhFwdTPP<T>>(
                       GeluTanhFwdTPP<T>(rem, Nb, ldy, ldy))
+                : nullptr;
+            auto relu_fwd_tpp_ptr = fusion_type == WOQ_FUSE_RELU
+                ? std::make_shared<ReLUFwdTPP<T>>(
+                      ReLUFwdTPP<T>(block_m, Nb, ldy, ldy, false))
+                : nullptr;
+            auto relu_fwd_tpp_rem_ptr = fusion_type == WOQ_FUSE_RELU
+                ? std::make_shared<ReLUFwdTPP<T>>(
+                      ReLUFwdTPP<T>(rem, Nb, ldy, ldy, false))
+                : nullptr;
+            auto silu_fwd_tpp_ptr = fusion_type == WOQ_FUSE_SILU
+                ? std::make_shared<SiLUFwdTPP<T>>(
+                      SiLUFwdTPP<T>(block_m, Nb, ldy, ldy))
+                : nullptr;
+            auto silu_fwd_tpp_rem_ptr = fusion_type == WOQ_FUSE_SILU
+                ? std::make_shared<SiLUFwdTPP<T>>(
+                      SiLUFwdTPP<T>(rem, Nb, ldy, ldy))
+                : nullptr;
+            auto mul_tpp_ptr = fusion_type == WOQ_FUSE_MUL
+                ? std::make_shared<MulTPP<T>>(MulTPP<T>(block_m, Nb, ldy, ldy))
+                : nullptr;
+            auto mul_tpp_rem_ptr = fusion_type == WOQ_FUSE_MUL
+                ? std::make_shared<MulTPP<T>>(MulTPP<T>(rem, Nb, ldy, ldy))
                 : nullptr;
             auto in0_ptr = GetVLAPtr<T>(tin0, {Nc, Nb});
             auto in1_ptr = GetVLAPtr<T>(tin1, {Nc, Nb});
@@ -1830,14 +1852,21 @@ void qlinear_woq_affine_dequant_upfront_impl(
             auto tpp_linear_with_post_op = [&](at::Tensor& in,
                                                at::Tensor& out,
                                                int fuse_type = 0) {
-              if (fuse_type == FUSE_GELU_ERF) {
+              if (fuse_type == WOQ_FUSE_GELU_ERF) {
                 tpp_linear_gelu<TComp, Tout>(in, dqw, b, out);
-              } else if (fuse_type == FUSE_ADD || fuse_type == FUSE_ADD_ADD) {
+              } else if (fuse_type == WOQ_FUSE_GELU_TANH) {
+                tpp_linear_gelu_tanh<TComp, Tout>(in, dqw, b, out);
+              } else if (fuse_type == WOQ_FUSE_RELU) {
+                tpp_linear_relu<TComp, Tout>(in, dqw, b, out);
+              } else if (fuse_type == WOQ_FUSE_SILU) {
+                tpp_linear_silu<TComp, Tout>(in, dqw, b, out);
+              } else if (fuse_type == WOQ_FUSE_MUL) {
+                tpp_linear_mul<TComp, Tout>(in, tin0, dqw, b, out);
+              } else if (
+                  fuse_type == WOQ_FUSE_ADD || fuse_type == WOQ_FUSE_ADD_ADD) {
                 TLA_ASSERT(
                     false,
                     "fuse_type should not be ADD or ADD_ADD since it's slower than aten add");
-              } else if (fuse_type == FUSE_GELU_TANH) {
-                tpp_linear_gelu_tanh<TComp, Tout>(in, dqw, b, out);
               } else {
                 tpp_linear_bias<TComp, TGemmOut>(in, dqw, b, out);
               }
@@ -1890,7 +1919,7 @@ void qlinear_woq_affine_dequant_upfront_impl(
               auto in_ptr = GetVLAPtr<TGemmOut>(y_gemm, {Nc, Nb});
               auto out_ptr = GetVLAPtr<Tout>(y, {Nc, Nb});
               // Convert y to T and handle post ops
-              if (fusion_type == 0) {
+              if (fusion_type == WOQ_FUSE_NONE) {
                 post_loop([&](int* ind) {
                   int m = ind[0], nc = ind[1];
                   if (m + block_m <= M) {
@@ -1899,7 +1928,7 @@ void qlinear_woq_affine_dequant_upfront_impl(
                     cvt_y_rem_tpp(in_ptr[m][nc], out_ptr[m][nc]);
                   }
                 });
-              } else if (fusion_type == FUSE_GELU_ERF) {
+              } else if (fusion_type == WOQ_FUSE_GELU_ERF) {
                 post_loop([&](int* ind) {
                   int m = ind[0], nc = ind[1];
                   if (m + block_m <= M) {
@@ -1910,7 +1939,7 @@ void qlinear_woq_affine_dequant_upfront_impl(
                     (*gelu_fwd_tpp_rem_ptr)(out_ptr[m][nc], out_ptr[m][nc]);
                   }
                 });
-              } else if (fusion_type == FUSE_GELU_TANH) {
+              } else if (fusion_type == WOQ_FUSE_GELU_TANH) {
                 post_loop([&](int* ind) {
                   int m = ind[0], nc = ind[1];
                   if (m + block_m <= M) {
@@ -1922,7 +1951,29 @@ void qlinear_woq_affine_dequant_upfront_impl(
                         out_ptr[m][nc], out_ptr[m][nc]);
                   }
                 });
-              } else if (fusion_type == FUSE_ADD) {
+              } else if (fusion_type == WOQ_FUSE_RELU) {
+                post_loop([&](int* ind) {
+                  int m = ind[0], nc = ind[1];
+                  if (m + block_m <= M) {
+                    cvt_y_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*relu_fwd_tpp_ptr)(out_ptr[m][nc], out_ptr[m][nc]);
+                  } else {
+                    cvt_y_rem_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*relu_fwd_tpp_rem_ptr)(out_ptr[m][nc], out_ptr[m][nc]);
+                  }
+                });
+              } else if (fusion_type == WOQ_FUSE_SILU) {
+                post_loop([&](int* ind) {
+                  int m = ind[0], nc = ind[1];
+                  if (m + block_m <= M) {
+                    cvt_y_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*silu_fwd_tpp_ptr)(out_ptr[m][nc], out_ptr[m][nc]);
+                  } else {
+                    cvt_y_rem_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*silu_fwd_tpp_rem_ptr)(out_ptr[m][nc], out_ptr[m][nc]);
+                  }
+                });
+              } else if (fusion_type == WOQ_FUSE_ADD) {
                 post_loop([&](int* ind) {
                   int m = ind[0], nc = ind[1];
                   if (m + block_m <= M) {
@@ -1935,7 +1986,7 @@ void qlinear_woq_affine_dequant_upfront_impl(
                         out_ptr[m][nc], in0_ptr[m][nc], out_ptr[m][nc]);
                   }
                 });
-              } else if (fusion_type == FUSE_ADD_ADD) {
+              } else if (fusion_type == WOQ_FUSE_ADD_ADD) {
                 post_loop([&](int* ind) {
                   int m = ind[0], nc = ind[1];
                   if (m + block_m <= M) {
@@ -1950,12 +2001,26 @@ void qlinear_woq_affine_dequant_upfront_impl(
                         out_ptr[m][nc], in0_ptr[m][nc], out_ptr[m][nc]);
                     (*add_tpp_rem_ptr)(
                         out_ptr[m][nc], in1_ptr[m][nc], out_ptr[m][nc]);
+                  }
+                });
+              } else if (fusion_type == WOQ_FUSE_MUL) {
+                post_loop([&](int* ind) {
+                  int m = ind[0], nc = ind[1];
+                  if (m + block_m <= M) {
+                    cvt_y_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*mul_tpp_ptr)(
+                        out_ptr[m][nc], in0_ptr[m][nc], out_ptr[m][nc]);
+                  } else {
+                    cvt_y_rem_tpp(in_ptr[m][nc], out_ptr[m][nc]);
+                    (*mul_tpp_rem_ptr)(
+                        out_ptr[m][nc], in0_ptr[m][nc], out_ptr[m][nc]);
                   }
                 });
               }
             } else { // Tout == TGemmOut
               // For add/add_add, using aten add is faster than TPP fused kernel
-              if (fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD) {
+              if (fusion_type == WOQ_FUSE_ADD ||
+                  fusion_type == WOQ_FUSE_ADD_ADD) {
                 maybe_cvt_x_and_compute(y, 0);
                 for (auto& tin : others_list) {
                   y.add_(tin.view(y.sizes()));
@@ -2106,40 +2171,58 @@ void qlinear_woq_affine_impl(
   auto gelu_erf_fwd_rem_tpp = GeluFwdTPP<Tout>(BLOCK_M_rem, Nb, ldy, ldy);
   auto gelu_tanh_fwd_tpp = GeluTanhFwdTPP<Tout>(BLOCK_M, Nb, ldy, ldy);
   auto gelu_tanh_fwd_rem_tpp = GeluTanhFwdTPP<Tout>(BLOCK_M_rem, Nb, ldy, ldy);
+  auto relu_fwd_tpp = ReLUFwdTPP<Tout>(BLOCK_M, Nb, ldy, ldy, false);
+  auto relu_fwd_rem_tpp = ReLUFwdTPP<Tout>(BLOCK_M_rem, Nb, ldy, ldy, false);
+  auto silu_fwd_tpp = SiLUFwdTPP<Tout>(BLOCK_M, Nb, ldy, ldy);
+  auto silu_fwd_rem_tpp = SiLUFwdTPP<Tout>(BLOCK_M_rem, Nb, ldy, ldy);
   auto add_tpp = AddTPP<Tout>(BLOCK_M, Nb, ldy, ldy);
   auto add_rem_tpp = AddTPP<Tout>(BLOCK_M_rem, Nb, ldy, ldy);
-  bool is_fusion_type_addrelated =
-      fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD;
+  auto mul_tpp = MulTPP<Tout>(BLOCK_M, Nb, ldy, ldy);
+  auto mul_rem_tpp = MulTPP<Tout>(BLOCK_M_rem, Nb, ldy, ldy);
+  bool has_extra_input = fusion_type == WOQ_FUSE_ADD ||
+      fusion_type == WOQ_FUSE_ADD_ADD || fusion_type == WOQ_FUSE_MUL;
   auto post_ops_fn = [&](int m, int nc) {
     Tout* y_ptr = (Tout*)py[m][nc];
-    Tout* tin0_ptr = is_fusion_type_addrelated ? (Tout*)pin0[m][nc] : nullptr;
-    Tout* tin1_ptr = fusion_type == FUSE_ADD_ADD ? (Tout*)pin1[m][nc] : nullptr;
-    if (fusion_type == FUSE_GELU_ERF) {
+    Tout* tin0_ptr = has_extra_input ? (Tout*)pin0[m][nc] : nullptr;
+    Tout* tin1_ptr =
+        fusion_type == WOQ_FUSE_ADD_ADD ? (Tout*)pin1[m][nc] : nullptr;
+    if (fusion_type == WOQ_FUSE_GELU_ERF) {
       gelu_erf_fwd_tpp(y_ptr, y_ptr);
-    } else if (fusion_type == FUSE_ADD) {
+    } else if (fusion_type == WOQ_FUSE_GELU_TANH) {
+      gelu_tanh_fwd_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == WOQ_FUSE_RELU) {
+      relu_fwd_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == WOQ_FUSE_SILU) {
+      silu_fwd_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == WOQ_FUSE_ADD) {
       add_tpp(y_ptr, tin0_ptr, y_ptr);
-    } else if (fusion_type == FUSE_ADD_ADD) {
+    } else if (fusion_type == WOQ_FUSE_ADD_ADD) {
       add_tpp(y_ptr, tin0_ptr, y_ptr);
       add_tpp(y_ptr, tin1_ptr, y_ptr);
-    } else if (fusion_type == FUSE_GELU_TANH) {
-      gelu_tanh_fwd_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == WOQ_FUSE_MUL) {
+      mul_tpp(y_ptr, tin0_ptr, y_ptr);
     }
   };
   auto post_ops_rem_fn = [&](int m, int nc) {
     Tout* y_ptr = (Tout*)py[m][nc];
-    Tout* tin0_ptr = (fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD)
-        ? (Tout*)pin0[m][nc]
-        : nullptr;
-    Tout* tin1_ptr = fusion_type == FUSE_ADD_ADD ? (Tout*)pin1[m][nc] : nullptr;
-    if (fusion_type == FUSE_GELU_ERF) {
+    Tout* tin0_ptr = has_extra_input ? (Tout*)pin0[m][nc] : nullptr;
+    Tout* tin1_ptr =
+        fusion_type == WOQ_FUSE_ADD_ADD ? (Tout*)pin1[m][nc] : nullptr;
+    if (fusion_type == WOQ_FUSE_GELU_ERF) {
       gelu_erf_fwd_rem_tpp(y_ptr, y_ptr);
-    } else if (fusion_type == FUSE_ADD) {
+    } else if (fusion_type == WOQ_FUSE_GELU_TANH) {
+      gelu_tanh_fwd_rem_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == WOQ_FUSE_RELU) {
+      relu_fwd_rem_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == WOQ_FUSE_SILU) {
+      silu_fwd_rem_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == WOQ_FUSE_ADD) {
       add_rem_tpp(y_ptr, tin0_ptr, y_ptr);
-    } else if (fusion_type == FUSE_ADD_ADD) {
+    } else if (fusion_type == WOQ_FUSE_ADD_ADD) {
       add_rem_tpp(y_ptr, tin0_ptr, y_ptr);
       add_rem_tpp(y_ptr, tin1_ptr, y_ptr);
-    } else if (fusion_type == FUSE_GELU_TANH) {
-      gelu_tanh_fwd_rem_tpp(y_ptr, y_ptr);
+    } else if (fusion_type == WOQ_FUSE_MUL) {
+      mul_rem_tpp(y_ptr, tin0_ptr, y_ptr);
     }
   };
 
@@ -4115,14 +4198,27 @@ at::Tensor qlinear_woq_affine(
                                                  : bf16_idx;
       y = at::add(y, biases[b_index]);
     }
-    if (fusion_type == FUSE_GELU_ERF) {
-      y = at::gelu(y);
-    } else if (fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD) {
+    if (fusion_type == WOQ_FUSE_GELU_ERF) {
+      at::gelu_(y);
+    } else if (fusion_type == WOQ_FUSE_GELU_TANH) {
+      at::gelu_(y, "tanh");
+    } else if (fusion_type == WOQ_FUSE_RELU) {
+      at::relu_(y);
+    } else if (fusion_type == WOQ_FUSE_SILU) {
+      at::silu_(y);
+    } else if (fusion_type == WOQ_FUSE_ADD || fusion_type == WOQ_FUSE_ADD_ADD) {
       for (auto& tin : others_list) {
         y = at::add(y, tin.view(y.sizes()));
       }
-    } else if (fusion_type == FUSE_GELU_TANH) {
-      y = at::gelu(y, "tanh");
+    } else if (fusion_type == WOQ_FUSE_MUL) {
+      for (auto& tin : others_list) {
+        y = at::mul(y, tin.view(y.sizes()));
+      }
+    } else {
+      TORCH_CHECK(
+          fusion_type == WOQ_FUSE_NONE,
+          "WOQ: Unexpected fusion type: ",
+          fusion_type);
     }
     auto out_sizes = x.sizes().vec();
     out_sizes.back() = N;
@@ -4243,14 +4339,27 @@ at::Tensor qlinear_woq_affine(
                                                : bf16_idx;
     y = at::add(y, biases[b_index]);
   }
-  if (fusion_type == FUSE_GELU_ERF) {
-    y = at::gelu(y);
-  } else if (fusion_type == FUSE_ADD || fusion_type == FUSE_ADD_ADD) {
+  if (fusion_type == WOQ_FUSE_GELU_ERF) {
+    at::gelu_(y);
+  } else if (fusion_type == WOQ_FUSE_GELU_TANH) {
+    at::gelu_(y, "tanh");
+  } else if (fusion_type == WOQ_FUSE_RELU) {
+    at::relu_(y);
+  } else if (fusion_type == WOQ_FUSE_SILU) {
+    at::silu_(y);
+  } else if (fusion_type == WOQ_FUSE_ADD || fusion_type == WOQ_FUSE_ADD_ADD) {
     for (auto& tin : others_list) {
       y = at::add(y, tin.view(y.sizes()));
     }
-  } else if (fusion_type == FUSE_GELU_TANH) {
-    y = at::gelu(y, "tanh");
+  } else if (fusion_type == WOQ_FUSE_MUL) {
+    for (auto& tin : others_list) {
+      y = at::mul(y, tin.view(y.sizes()));
+    }
+  } else {
+    TORCH_CHECK(
+        fusion_type == WOQ_FUSE_NONE,
+        "WOQ: Unexpected fusion type: ",
+        fusion_type);
   }
   auto out_sizes = x.sizes().vec();
   out_sizes.back() = N;

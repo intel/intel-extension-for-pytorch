@@ -107,7 +107,7 @@ at::Tensor woq_linear_kernel(
     int64_t lowp_mode,
     int64_t act_quant_mode);
 
-at::Tensor woq_linear_eltwise_kernel(
+at::Tensor woq_linear_unary_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
     int64_t weight_dtype,
@@ -121,7 +121,7 @@ at::Tensor woq_linear_eltwise_kernel(
     int64_t lowp_mode,
     int64_t act_quant_mode);
 
-at::Tensor woq_linear_add_kernel(
+at::Tensor woq_linear_binary_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
     int64_t weight_dtype,
@@ -130,18 +130,7 @@ at::Tensor woq_linear_add_kernel(
     const std::vector<at::Tensor>& bias_list,
     int64_t group_size,
     int64_t lowp_mode,
-    const std::vector<at::Tensor>& others,
-    int64_t act_quant_mode);
-
-at::Tensor woq_linear_add_add_kernel(
-    const at::Tensor& self,
-    const at::Tensor& weight,
-    int64_t weight_dtype,
-    const std::vector<at::Tensor>& scales_list,
-    const std::vector<at::Tensor>& zps_list,
-    const std::vector<at::Tensor>& bias_list,
-    int64_t group_size,
-    int64_t lowp_mode,
+    const c10::string_view& post_op,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode);
 
@@ -230,11 +219,17 @@ IPEX_DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 
-#define WOQ_FUSE_NONE 0
-#define WOQ_FUSE_GELU 1
-#define WOQ_FUSE_ADD 2
-#define WOQ_FUSE_ADD_ADD 3
-#define WOQ_FUSE_NEW_GELU 4
+// Fusion types
+#define WOQ_FUSE_NONE 0x0
+// Unary post ops
+#define WOQ_FUSE_GELU_ERF 0x1
+#define WOQ_FUSE_GELU_TANH 0x2
+#define WOQ_FUSE_RELU 0x3
+#define WOQ_FUSE_SILU 0x4
+// Binary post ops
+#define WOQ_FUSE_ADD 0x10
+#define WOQ_FUSE_ADD_ADD 0x20
+#define WOQ_FUSE_MUL 0x30
 
 #endif
 

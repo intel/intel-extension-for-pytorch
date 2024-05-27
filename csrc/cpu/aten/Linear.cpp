@@ -453,7 +453,7 @@ at::Tensor woq_linear_forward(
       ->run(input);
 }
 
-at::Tensor woq_linear_eltwise_kernel(
+at::Tensor woq_linear_unary_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
     int64_t weight_dtype,
@@ -469,10 +469,14 @@ at::Tensor woq_linear_eltwise_kernel(
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
   if (post_op == "gelu") {
     if (algorithm == "none") {
-      post_op_fusion_type = WOQ_FUSE_GELU;
+      post_op_fusion_type = WOQ_FUSE_GELU_ERF;
     } else if (algorithm == "tanh") {
-      post_op_fusion_type = WOQ_FUSE_NEW_GELU;
+      post_op_fusion_type = WOQ_FUSE_GELU_TANH;
     }
+  } else if (post_op == "relu") {
+    post_op_fusion_type = WOQ_FUSE_RELU;
+  } else if (post_op == "silu") {
+    post_op_fusion_type = WOQ_FUSE_SILU;
   }
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
@@ -496,7 +500,7 @@ at::Tensor woq_linear_gelu_forward(
     const at::Tensor& op_context) {
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run_eltwise(
+      ->run_unary(
           input, "gelu", torch::List<c10::optional<at::Scalar>>(), "none");
 }
 
@@ -505,39 +509,27 @@ at::Tensor woq_linear_new_gelu_forward(
     const at::Tensor& op_context) {
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run_eltwise(
+      ->run_unary(
           input, "gelu", torch::List<c10::optional<at::Scalar>>(), "tanh");
 }
 
-at::Tensor woq_linear_add_kernel(
-    const at::Tensor& self,
-    const at::Tensor& weight,
-    int64_t weight_dtype,
-    const std::vector<at::Tensor>& scales_list,
-    const std::vector<at::Tensor>& zps_list,
-    const std::vector<at::Tensor>& bias_list,
-    int64_t group_size,
-    int64_t lowp_mode,
-    const std::vector<at::Tensor>& others,
-    int64_t act_quant_mode) {
-  int64_t quant_w_mode = group_size > 0 ? 1 : 0;
-  return woq_tpp_gemm_kernel_stub(
-      kCPU,
-      self,
-      weight,
-      scales_list,
-      zps_list,
-      bias_list,
-      weight_dtype,
-      lowp_mode,
-      WOQ_FUSE_ADD, // post op add
-      others,
-      act_quant_mode,
-      quant_w_mode,
-      group_size);
+at::Tensor woq_linear_relu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexWoqLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_unary(input, "relu", torch::List<c10::optional<at::Scalar>>(), "");
 }
 
-at::Tensor woq_linear_add_add_kernel(
+at::Tensor woq_linear_silu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexWoqLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_unary(input, "silu", torch::List<c10::optional<at::Scalar>>(), "");
+}
+
+at::Tensor woq_linear_binary_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
     int64_t weight_dtype,
@@ -546,8 +538,17 @@ at::Tensor woq_linear_add_add_kernel(
     const std::vector<at::Tensor>& bias_list,
     int64_t group_size,
     int64_t lowp_mode,
+    const c10::string_view& post_op,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode) {
+  int64_t post_op_fusion_type = WOQ_FUSE_NONE;
+  if (post_op == "add") {
+    post_op_fusion_type = WOQ_FUSE_ADD;
+  } else if (post_op == "add_add") {
+    post_op_fusion_type = WOQ_FUSE_ADD_ADD;
+  } else if (post_op == "mul") {
+    post_op_fusion_type = WOQ_FUSE_MUL;
+  }
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
       kCPU,
@@ -558,7 +559,7 @@ at::Tensor woq_linear_add_add_kernel(
       bias_list,
       weight_dtype,
       lowp_mode,
-      WOQ_FUSE_ADD_ADD, // post op add-add
+      post_op_fusion_type,
       others,
       act_quant_mode,
       quant_w_mode,
@@ -571,7 +572,7 @@ at::Tensor woq_linear_add_forward(
     const std::vector<at::Tensor>& others) {
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run_add(input, others);
+      ->run_binary(input, "add", others);
 }
 
 at::Tensor woq_linear_add_add_forward(
@@ -580,7 +581,16 @@ at::Tensor woq_linear_add_add_forward(
     const std::vector<at::Tensor>& others) {
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run_add_add(input, others);
+      ->run_binary(input, "add_add", others);
+}
+
+at::Tensor woq_linear_mul_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context,
+    const std::vector<at::Tensor>& others) {
+  return reinterpret_cast<IpexWoqLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_binary(input, "mul", others);
 }
 #endif
 
@@ -745,6 +755,28 @@ at::Tensor woq_linear_new_gelu_forward(
   return op.call(cpu_cached_cast(target_type, input), op_context);
 }
 
+at::Tensor woq_linear_relu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::woq_linear_relu", "")
+                       .typed<decltype(woq_linear_relu_forward)>();
+  auto target_type = get_autocast_dtype();
+  return op.call(cpu_cached_cast(target_type, input), op_context);
+}
+
+at::Tensor woq_linear_silu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::woq_linear_silu", "")
+                       .typed<decltype(woq_linear_silu_forward)>();
+  auto target_type = get_autocast_dtype();
+  return op.call(cpu_cached_cast(target_type, input), op_context);
+}
+
 at::Tensor woq_linear_add_forward(
     const at::Tensor& input,
     const at::Tensor& op_context,
@@ -768,6 +800,21 @@ at::Tensor woq_linear_add_add_forward(
   static auto op = torch::Dispatcher::singleton()
                        .findSchemaOrThrow("torch_ipex::woq_linear_add_add", "")
                        .typed<decltype(woq_linear_add_add_forward)>();
+  auto target_type = get_autocast_dtype();
+  return op.call(
+      cpu_cached_cast(target_type, input),
+      op_context,
+      cpu_cached_cast(target_type, others));
+}
+
+at::Tensor woq_linear_mul_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context,
+    const std::vector<at::Tensor>& others) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::woq_linear_mul", "")
+                       .typed<decltype(woq_linear_mul_forward)>();
   auto target_type = get_autocast_dtype();
   return op.call(
       cpu_cached_cast(target_type, input),
@@ -829,6 +876,24 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "woq_linear_new_gelu",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_new_gelu_forward);
+  m.def("woq_linear_relu(Tensor input, Tensor W_prepack) -> Tensor");
+  m.impl(
+      "woq_linear_relu",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::woq_linear_relu_forward);
+  m.impl(
+      "woq_linear_relu",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::woq_linear_relu_forward);
+  m.def("woq_linear_silu(Tensor input, Tensor W_prepack) -> Tensor");
+  m.impl(
+      "woq_linear_silu",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::woq_linear_silu_forward);
+  m.impl(
+      "woq_linear_silu",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::woq_linear_silu_forward);
   m.def(
       "woq_linear_add(Tensor input, Tensor W_prepack, Tensor[] others) -> Tensor");
   m.impl(
@@ -849,6 +914,16 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "woq_linear_add_add",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_add_add_forward);
+  m.def(
+      "woq_linear_mul(Tensor input, Tensor W_prepack, Tensor[] others) -> Tensor");
+  m.impl(
+      "woq_linear_mul",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::woq_linear_mul_forward);
+  m.impl(
+      "woq_linear_mul",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::woq_linear_mul_forward);
 #endif
   // fuse eltwise
   m.def(

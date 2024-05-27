@@ -53,21 +53,17 @@ ContextLinearWoq create(
 
 at::Tensor run(ContextLinearWoq& context, const at::Tensor& input);
 
-at::Tensor run_eltwise(
+at::Tensor run_unary(
     ContextLinearWoq& context,
     const at::Tensor& input,
     const c10::string_view& post_op,
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm);
 
-at::Tensor run_add(
+at::Tensor run_binary(
     ContextLinearWoq& context,
     const at::Tensor& input,
-    const std::vector<at::Tensor>& others);
-
-at::Tensor run_add_add(
-    ContextLinearWoq& context,
-    const at::Tensor& input,
+    const c10::string_view& post_op,
     const std::vector<at::Tensor>& others);
 
 at::Tensor pack(ContextLinearWoq& context, const at::Tensor& tensor);

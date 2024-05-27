@@ -271,6 +271,7 @@ class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
             mod.out_features,
             mod.mp_group,
             mod.bias,  # save the original bias value
+            mod.bias is not None,
             dtype=dtype,
         )
 
@@ -303,6 +304,9 @@ class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
             act_quant_mode,
         )
         qlinear.weight = qlinear._op_context.get_weight()
+        qlinear._lowp_mode = lowp_mode
+        qlinear._act_quant_mode = act_quant_mode
+        qlinear._group_size = group_size
 
         return qlinear
 
@@ -337,6 +341,7 @@ class IpexWoqLmHeadLinearAllreduce(IpexWoqLinearAllreduce):
             mod.rank,
             mod.world_size,
             mod.bias,  # save the original bias value
+            mod.bias is not None,
             dtype=dtype,
         )
 

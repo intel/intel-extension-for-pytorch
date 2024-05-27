@@ -404,18 +404,15 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
 
   virtual at::Tensor run(const at::Tensor& input) = 0;
 
-  virtual at::Tensor run_eltwise(
+  virtual at::Tensor run_unary(
       const at::Tensor& input,
       const c10::string_view& post_op,
       const torch::List<c10::optional<at::Scalar>>& scalars,
       const c10::optional<c10::string_view>& algorithm) = 0;
 
-  virtual at::Tensor run_add(
+  virtual at::Tensor run_binary(
       const at::Tensor& input,
-      const std::vector<at::Tensor>& others) = 0;
-
-  virtual at::Tensor run_add_add(
-      const at::Tensor& input,
+      const c10::string_view& post_op,
       const std::vector<at::Tensor>& others) = 0;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) = 0;
@@ -462,18 +459,15 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
 
   virtual at::Tensor run(const at::Tensor& input) override;
 
-  virtual at::Tensor run_eltwise(
+  virtual at::Tensor run_unary(
       const at::Tensor& input,
       const c10::string_view& post_op,
       const torch::List<c10::optional<at::Scalar>>& scalars,
       const c10::optional<c10::string_view>& algorithm) override;
 
-  virtual at::Tensor run_add(
+  virtual at::Tensor run_binary(
       const at::Tensor& input,
-      const std::vector<at::Tensor>& others) override;
-
-  virtual at::Tensor run_add_add(
-      const at::Tensor& input,
+      const c10::string_view& post_op,
       const std::vector<at::Tensor>& others) override;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
