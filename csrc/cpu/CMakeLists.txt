@@ -13,7 +13,7 @@ set(DNNL_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 #find_package(TorchCCL REQUIRED)
 # Find OneCCL Lib
 set(DEPENDS_LIB)
-if(USE_CCL)
+if(BUILD_CPU_WITH_ONECCL)
   include(${IPEX_ROOT_DIR}/cmake/Modules/FindoneCCL.cmake)
   # Find OneCCL Lib
   link_directories(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/oneCCL/deps/mpi/lib)
@@ -44,9 +44,9 @@ if(USE_LIBXSMM)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_LIBXSMM")
 endif(USE_LIBXSMM)
 
-if(USE_CCL)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_CCL") 
-endif(USE_CCL)
+if(BUILD_CPU_WITH_ONECCL)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBUILD_CPU_WITH_ONECCL") 
+endif(BUILD_CPU_WITH_ONECCL)
 
 if(USE_SHM)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_SHM")
@@ -144,9 +144,9 @@ target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${ONEDNN_GENERATED_INCLUDE}
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PYTHON_INCLUDE_DIR})
 
-if(USE_CCL)
+if(BUILD_CPU_WITH_ONECCL)
   target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${DEPENDS_LIB})
-endif(USE_CCL)
+endif(BUILD_CPU_WITH_ONECCL)
 
 include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)

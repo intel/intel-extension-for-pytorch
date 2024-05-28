@@ -15,7 +15,7 @@ endif()
 
 if(WIN32)
   set(USE_SHM OFF)
-  set(USE_CCL OFF)
+  set(BUILD_CPU_WITH_ONECCL OFF)
 endif()
 
 
@@ -53,7 +53,7 @@ function (print_cpu_config_summary)
     message(STATUS "  IPEX_DISP_OP          : ${IPEX_DISP_OP}")
     message(STATUS "  BUILD_XSMM_VIA_CMAKE  : ${BUILD_LIBXSMM_VIA_CMAKE}")
     message(STATUS "  USE_LIBXSMM           : ${USE_LIBXSMM}")
-    message(STATUS "  USE_CCL               : ${USE_CCL}")
+    message(STATUS "  BUILD_CPU_WITH_ONECCL : ${BUILD_CPU_WITH_ONECCL}")
     message(STATUS "  USE_SHM               : ${USE_SHM}")
     message(STATUS "")
     message(STATUS "********************************")

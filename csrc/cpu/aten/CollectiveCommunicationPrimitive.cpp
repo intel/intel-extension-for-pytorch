@@ -1,4 +1,4 @@
-#ifdef USE_CCL
+#ifdef BUILD_CPU_WITH_ONECCL
 #include "CollectiveCommunicationPrimitive.h"
 #include <ATen/FunctionalTensorWrapper.h>
 #include <torch/all.h>
