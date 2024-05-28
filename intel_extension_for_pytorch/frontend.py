@@ -295,6 +295,14 @@ def optimize(
         operators in DDP, like allreduce, will not be invoked and thus may cause
         unpredictable accuracy loss.
 
+    .. note::
+
+        Please use ``torch.save(model.state_dict())`` after invoking ``ipex.optimize`` function
+        if you want to save the model into a check-point file. As mentioned in `Pytorch Doc
+        <https://pytorch.org/tutorials/beginner/saving_loading_models.html#saving-and-loading-models>`_,
+        saving the entire model by ``torch.save(model)`` does not save the model class itself,
+        which is not recommended.
+
     Examples:
 
         >>> # bfloat16 inference case.
