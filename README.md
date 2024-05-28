@@ -48,6 +48,10 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 |GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |    |
 |Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |    |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 
 - 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
 

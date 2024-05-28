@@ -41,6 +41,10 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 |GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |    |
 |Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |    |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 
 ## 2.2 Verified for distributed inference mode via DeepSpeed
 
@@ -69,6 +73,10 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |
 |Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |
 |GIT| microsoft/git-base | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 |
 
 - 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
 
