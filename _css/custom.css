@@ -136,3 +136,12 @@
 #install-instructions {
   padding-top: 50px;
 }
+
+/* Footer */
+a#wap_dns {
+   display: none;
+}
+
+a#wap_nac {
+   display: none;
+}
