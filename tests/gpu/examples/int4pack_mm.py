@@ -2,6 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
+import pytest
 
 
 cpu_device = torch.device("cpu")
@@ -12,6 +13,7 @@ checking_rtol = 1e-2
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="ipex build without xetla")
     def test_int4pack_with_zero_x_scale(self):
         N_L = [
             16,

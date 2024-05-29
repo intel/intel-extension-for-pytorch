@@ -628,4 +628,21 @@ IPEX_LIBRARY_FRAGMENT() {
       "mm_bias_add_int4.xpu", at::AtenIpexTypeXPU::mm_bias_add_int4);
 }
 } // namespace
+#else
+#include <ATen/ATen.h>
+#include "utils/CustomOperatorRegistration.h"
+
+namespace at {
+namespace AtenIpexTypeXPU {
+
+Tensor _weight_int4pack_mm(
+    const Tensor& A,
+    const Tensor& B,
+    int64_t qGroupSize,
+    const Tensor& qScaleAndZeros) {
+  TORCH_CHECK(false, "_weight_int4pack_mm is not supported without XeTLA");
+}
+
+} // namespace AtenIpexTypeXPU
+} // namespace at
 #endif

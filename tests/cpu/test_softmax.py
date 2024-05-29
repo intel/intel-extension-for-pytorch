@@ -203,7 +203,8 @@ class SoftmaxTester(JitTestCase):
             self.assertGraphContainsExactly(graph5, ATEN_SOFTMAX, 1)
             # should be inplace and pass the checking in llga fusion group
             graph6 = converted_model.graph_for(test3)
-            self.assertGraphContainsExactly(graph6, IPEX_SOFTMAX_, 2)
+            # expected env variable `export DNNL_GRAPH_BUILD_COMPILER_BACKEND=1`
+            self.assertGraphContainsExactly(graph6, IPEX_SOFTMAX_, 1)
             # should be inplace
             graph7 = model7.graph_for(test7, torch.BoolTensor([True]))
             self.assertGraphContainsExactly(graph7, IPEX_SOFTMAX_, 1)

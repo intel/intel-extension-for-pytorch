@@ -1,4 +1,3 @@
-#include <ipex.h> // SYCL header
 #include <c10/xpu/XPUStream.h>
 #include <torch/extension.h>
 

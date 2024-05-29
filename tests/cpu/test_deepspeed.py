@@ -8,6 +8,7 @@ import torch.nn as nn
 from torch.testing._internal.jit_utils import JitTestCase
 from torch.testing import FileCheck
 import intel_extension_for_pytorch as ipex
+from intel_extension_for_pytorch.cpu import comm as ipex_comm
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
     _IPEXLinear,
@@ -36,6 +37,10 @@ except ImportError:
     )
     import transformers
     from transformers import AutoConfig
+
+
+has_ccl = ipex_comm.has_ccl()
+world_size = 0 if not has_ccl else ipex_comm.get_world_size()
 
 
 class MyAttention(nn.Module):
@@ -169,6 +174,7 @@ class GPTJTestM(nn.Module):
         return z
 
 
+@unittest.skipIf(not (has_ccl and world_size > 1), "oneccl is not built")
 class DeepspeedTester(JitTestCase):
     def _get_ds_model(self, m_linear):
         import deepspeed
