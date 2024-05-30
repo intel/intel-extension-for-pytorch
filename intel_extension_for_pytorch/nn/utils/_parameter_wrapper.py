@@ -233,6 +233,8 @@ def _should_prepack(module, is_training, is_xpu=False):
 
 
 def get_shared_parameter_status(module, shared_p):
+    if module is None:
+        return
     visited_wrapper = []
 
     # TODO: weight and bias of deepspeed modules are no longer
