@@ -1501,11 +1501,12 @@ def optimize_transformers(
             is_quantization,
             is_woq if device == "cpu" else xpu_woq,
         )
-        # do not register output hook when doing calibration in static int8
-        if not (is_quantization and not is_woq and qconfig_summary_file is None):
-            from .models.reference.models import output_hook
+        if device == "cpu":
+            # do not register output hook when doing calibration in static int8
+            if not (is_quantization and not is_woq and qconfig_summary_file is None):
+                from .models.reference.models import output_hook
 
-            _model.register_forward_hook(output_hook, with_kwargs=True)
+                _model.register_forward_hook(output_hook, with_kwargs=True)
         return _model
 
     except RuntimeError as e:

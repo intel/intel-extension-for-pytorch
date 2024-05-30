@@ -2740,7 +2740,7 @@ def LlavaLlamaForCausalLM_forward(
 
 
 def output_hook(module: torch.nn.Module, args, kwargs, outputs: Any):
-    if module.config.use_return_dict or (
+    if ("use_return_dict" in module.config and module.config.use_return_dict) or (
         "return_dict" in kwargs and kwargs["return_dict"]
     ):
         idx = 0
