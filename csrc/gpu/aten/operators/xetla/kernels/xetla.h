@@ -2,6 +2,7 @@
 
 #include <sycl/sycl.hpp>
 #include <xetla.hpp>
+#include <cmath>
 
 #define DEVICE_MEM_ALIGNMENT (64)
 

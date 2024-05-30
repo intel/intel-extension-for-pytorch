@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <type_traits>
 #include "common/core/common.hpp"
 #include "subgroup/tile/api.hpp"
