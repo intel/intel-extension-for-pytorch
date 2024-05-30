@@ -181,3 +181,13 @@ class TestNNMethod(TestCase):
 
         out_xpu = in3(input_tensor)
         self.assertEqual(out_cpu, out_xpu.cpu())
+
+    def test_instance_norm_onednn_path_with_none_weight(self):
+        norm = torch.nn.InstanceNorm2d(24)
+        input_cpu = torch.randn(4, 24, 704, 1024).to(memory_format=torch.channels_last)
+        out_cpu = norm(input_cpu)
+
+        norm.to("xpu")
+        input_xpu = input_cpu.to("xpu")
+        out_xpu = norm(input_xpu)
+        self.assertEqual(out_cpu, out_xpu.cpu())

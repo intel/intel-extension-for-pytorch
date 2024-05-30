@@ -75,7 +75,7 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
   auto feature_size = src.numel() / feature_num;
 
   if (!wgh.defined())
-    wgh = at::ones(feature_num, wgh.options());
+    wgh = at::ones(feature_num, src.options());
 
   if (!bia.defined())
     bia = at::zeros(feature_num, wgh.options());
