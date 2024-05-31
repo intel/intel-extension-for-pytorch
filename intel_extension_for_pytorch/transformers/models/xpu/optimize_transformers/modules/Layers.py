@@ -139,6 +139,12 @@ class IPEXLmHeadLinearAllreduceWithPadding(IPEXOpForInference):
             shape = list(input.size())
             shape[1] = 1
             input = input[:, -1, :].view(shape)
+        # input.dim() == 3 and weight.dim() == 2
+        # The function `matmul` will check if input is contiguous or weight requires grad to determine whether to go into mm or bmm.
+        # mm will fold the input while bmm will expand the weight. Expanding the weight will cause performance regression.
+        # The weight should not require grad in inference. So, we make sure that the input is contiguous.
+        # Refer https://github.com/pytorch/pytorch/blob/v2.1.0/aten/src/ATen/native/LinearAlgebra.cpp#L1882 for the code logic.
+        input = input.contiguous()
         if dist.is_initialized():
             assert (
                 input.shape[-1] % self.world_size == 0
