@@ -108,6 +108,12 @@ void CPUFeature::detect_intel_cpu_feature() {
 
       MICRO_CLASS_MEMBER(amx_fp16) = check_reg_bit(eax, 21);
     }
+
+    if (max_sub_leaf >= 2) {
+      read_cpuidex(0x00000007, 2, &eax, &ebx, &ecx, &edx);
+
+      MICRO_CLASS_MEMBER(mcdt_on) = check_reg_bit(edx, 5);
+    }
   }
 
   if (max_extend_id >= 0x80000001) {
@@ -435,6 +441,8 @@ void CPUFeature::show_features() {
 
   MICRO_CLASS_PRINT_BOOL_STATUS(prefetchw);
   MICRO_CLASS_PRINT_BOOL_STATUS(prefetchwt1);
+
+  MICRO_CLASS_PRINT_BOOL_STATUS(mcdt_on);
 #endif
 }
 } // namespace cpu
