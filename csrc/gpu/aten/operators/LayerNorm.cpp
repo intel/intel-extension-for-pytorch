@@ -823,8 +823,9 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
                 grad_output_, input_, mean, rstd, weight_, 1e-5);
       } else {
         Tensor input_ = (input.dim() == 1) ? input.reshape({M, N}) : input;
-        Tensor grad_input_ =
-            (grad_input.dim() == 1) ? grad_input.reshape({M, N}) : grad_input;
+        Tensor grad_input_ = grad_input_mask[0] && (grad_input.dim() == 1)
+            ? grad_input.reshape({M, N})
+            : grad_input;
         Tensor grad_output_ = (grad_output.dim() == 1)
             ? grad_output.reshape({M, N})
             : grad_output;
@@ -852,7 +853,7 @@ std::tuple<Tensor, Tensor, Tensor> native_layer_norm_backward(
     }
   }
   return std::make_tuple(
-      grad_input.reshape(input.sizes()),
+      grad_input_mask[0] ? grad_input.reshape(input.sizes()) : grad_input,
       grad_input_mask[1] ? grad_weight.reshape(weight.sizes()) : grad_weight,
       grad_input_mask[2] ? grad_bias.reshape(bias.sizes()) : grad_bias);
 }
