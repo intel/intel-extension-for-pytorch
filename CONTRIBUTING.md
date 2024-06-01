@@ -127,45 +127,6 @@ pytest test/cpu/test_nn.py -k Loss -v
 
 The above is an example of testing a change to all Loss functions: this command runs tests such as `TestNN.test_BCELoss` and `TestNN.test_MSELoss` and can be useful to save keystrokes.
 
-### Local linting
-
-You can run the same linting steps that are used in CI locally via `make`:
-
-```bash
-# Lint all files
-make lint -j 6  # run lint (using 6 parallel jobs)
-
-# Lint only the files you have changed
-make quicklint -j 6
-```
-
-These jobs may require extra dependencies that aren't dependencies of Intel® Extension for PyTorch\* itself, so you can install them via this command, which you should only have to run once:
-
-```bash
-make setup_lint
-```
-
-To run a specific linting step, use one of these targets or see the [`Makefile`](Makefile) for a complete list of options.
-
-```bash
-# Check for tabs, trailing newlines, etc.
-make quick_checks
-
-make flake8
-
-make mypy
-
-make cmakelint
-
-make clang-tidy
-```
-
-To run a lint only on changes, add the `CHANGED_ONLY` option:
-
-```bash
-make <name of lint> CHANGED_ONLY=--changed-only
-```
-
 ### C++ Unit Testing
 
 Intel® Extension for PyTorch\* offers tests located in the `test/cpp` folder. These tests are written in C++ and use the Google Test testing framework. After compiling Intel® Extension for PyTorch\* from source, the test runner binaries will be written to the `build/bin` folder. The command to run one of these tests is `./build/bin/FILENAME --gtest_filter=TESTSUITE.TESTNAME`, where `TESTNAME` is the name of the test you'd like to run and `TESTSUITE` is the suite that test is defined in.
