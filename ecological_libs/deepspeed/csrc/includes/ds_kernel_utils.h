@@ -38,14 +38,9 @@ used throughout the codebase.
 // constexpr variant of warpSize for templating
 constexpr int hw_warp_size = 32;
 
-#if DPCT_COMPATIBILITY_TEMP >= 530
 #define HALF_PRECISION_AVAILABLE = 1
 // #define PTX_AVAILABLE
-#endif  // __SYCL_ARCH__ >= 530
 
-#if DPCT_COMPATIBILITY_TEMP >= 800
-/* #define ASYNC_COPY_AVAILABLE */
-#endif  // __SYCL_ARCH__ >= 800
 
 inline int next_pow2(const int val)
 {
