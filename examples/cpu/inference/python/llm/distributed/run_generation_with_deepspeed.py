@@ -487,7 +487,7 @@ else:
 generate_kwargs = dict(do_sample=False, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens, streamer=streamer)
 
 
-if args.token_latency and not args.ipex:
+if args.token_latency and not use_ipex:
     args.token_latency = False
     logger.warning("--token-latency requires --ipex. Disabling --token-latency.")
 if args.token_latency:
