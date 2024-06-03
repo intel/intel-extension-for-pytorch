@@ -180,6 +180,7 @@ def _sample(
             "YuanForCausalLM",
             "PhiForCausalLM",
             "Phi3ForCausalLM",
+            "Qwen2ForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]

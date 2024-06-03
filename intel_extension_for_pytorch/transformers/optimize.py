@@ -176,6 +176,8 @@ def model_convert_reference(_model):
         StableLMEpochModel_forward,
         QWenLMHeadModel_forward,
         QWenModel_forward,
+        QWen2Model_forward,
+        Qwen2ForCausalLM_forward,
         GitForCausalLM_forward,
         GitEncoder_forward,
         GitVisionEncoder_forward,
@@ -646,6 +648,28 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "Qwen2ForCausalLM":
+        convert_function(_model, "forward", Qwen2ForCausalLM_forward)
+        convert_function(_model.model, "forward", QWen2Model_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
+        convert_class(
+            _model,
+            transformers.models.qwen2.modeling_qwen2.Qwen2SdpaAttention,
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            transformers.models.qwen2.modeling_qwen2.Qwen2DecoderLayer,
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     elif _model.config.architectures[0] == "GitForCausalLM":
         convert_function(_model, "forward", GitForCausalLM_forward)
         convert_function(_model.git.encoder, "forward", GitEncoder_forward)
@@ -1083,6 +1107,10 @@ def model_convert_lowering(
                 )
             if _model.config.architectures[0] == "QWenLMHeadModel":
                 supported_classes.append(type(_model.transformer.h[0].ln_1))
+            if _model.config.architectures[0] == "Qwen2ForCausalLM":
+                supported_classes.append(
+                    transformers.models.qwen2.modeling_qwen2.Qwen2RMSNorm
+                )
             if hasattr(transformers.models, "mistral"):
                 supported_classes.append(
                     transformers.models.mistral.modeling_mistral.MistralRMSNorm
@@ -1302,6 +1330,7 @@ def optimize(
                 "MptForCausalLM",
                 "StableLmForCausalLM",
                 "QWenLMHeadModel",
+                "Qwen2ForCausalLM",
                 "GitForCausalLM",
                 "LlavaLlamaForCausalLM",
                 "YuanForCausalLM",
