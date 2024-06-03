@@ -72,7 +72,8 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         if self.is_1st_token():
             self.prompt_len = seq_len
         if (
-            self.runtime_cache.key_cache is None
+            self.is_1st_token()
+            or self.runtime_cache.key_cache is None
             or self.runtime_cache.key_cache.shape[1] != bs_beam
         ):
             cache_len = (
