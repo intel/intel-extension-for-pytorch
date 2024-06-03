@@ -88,12 +88,28 @@ if(NOT XETLA_HEADER)
   message(FATAL_ERROR "XeTLA header ${XETLA_HEADER} not found in ${XETLA_INCLUDE_DIR}")
 endif()
 
+set(XETLA_USED_ARCHS)
+foreach(available_arch IN LISTS XETLA_AVAILABLE_ARCHS)
+  string(TOUPPER ${available_arch} arch_upper)
+  if(USE_XETLA_${arch_upper})
+    list(APPEND XETLA_USED_ARCHS ${available_arch})
+  endif()
+endforeach()
+
+# Generate cpp source files contains template instantiations for kernels with
+# different configs so that they can be compiled as parallel jobs.
+include(SDP/fmha_forward_configure.cmake)
+fmha_forward_configure("${XETLA_USED_ARCHS}")
+include(GEMM/GEMM_int4_configure.cmake)
+GEMM_int4_configure("${XETLA_USED_ARCHS}")
+
 # Xetla kernel apply different offline compiler options than framework.
 # If framework link XeTLA as static lib, link options would conflict now.
 # Temporarily adopting shared lib, will fix it soon.
 FILE(GLOB_RECURSE kernels_src *.cpp)
-add_library(${TARGET} SHARED ${kernels_src})
+add_library(${TARGET} SHARED ${kernels_src} ${FMHA_FORWARD_KERNEL_SRCS} ${GEMM_INT4_SRCS})
 
+target_include_directories(${TARGET} PRIVATE .)
 target_include_directories(${TARGET} PUBLIC ${XETLA_INCLUDE_DIR})
 target_include_directories(${TARGET} PUBLIC ${TORCH_INCLUDE_DIRS})
 target_link_libraries(${TARGET} PUBLIC ${GPU_TORCH_LIBS})

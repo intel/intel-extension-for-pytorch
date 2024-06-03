@@ -1,0 +1,95 @@
+
+/*
+Fused Multi-Head Attention Forward
+
+This is an implementation of the Flash Attention algorithm
+(see: Dao et al., https://arxiv.org/pdf/2205.14135v2.pdf)
+*/
+
+#include "SDP/fmha_forward.hpp"
+#include "SDP/fmha_forward_kernel.hpp"
+
+// clang-format off
+// macros to be filled in CMake 
+#define IMPL_FMHA_POLICY ${IMPL_FMHA_POLICY}
+#define IMPL_T ${IMPL_T}
+#define IMPL_ARCH_TAG gpu_arch::${IMPL_ARCH_TAG}
+#define IMPL_KUSEALIBI ${IMPL_KUSEALIBI}
+#define IMPL_KUSEBIAS ${IMPL_KUSEBIAS}
+#define IMPL_KISCAUSAL ${IMPL_KISCAUSAL}
+#define IMPL_KSEQLAST ${IMPL_KSEQLAST}
+#define IMPL_KISTRAINING ${IMPL_KISTRAINING}
+#define IMPL_KISDROPOUT ${IMPL_KISDROPOUT}
+// clang-format on
+
+namespace gpu::xetla {
+
+namespace fmha {
+// The launcher of fmha forward kernel
+template <
+    typename fmha_policy,
+    typename T,
+    gpu_arch arch_tag,
+    bool kUseAlibi,
+    bool kUseBias,
+    bool kIsCausal,
+    bool kSeqLast,
+    bool kIsTraining,
+    bool kIsDropout>
+cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
+#ifdef SDP_DBG
+  printf(
+      "B, N, Nkv, F, T, H: %u, %u, %u, %u, %u, %u, UseAlibi: %d, UseBias: %d, IsCausal: %d, IsTraining: %d,"
+      "IsDropout: %d, alibi @ 0x%llx, uAT %d, uMT %d, strideB %d, strideN %d, strideF %d, dropout_prob %f, kSeqLast %d\n",
+      args.num_batches,
+      args.num_heads,
+      args.num_kv_heads,
+      args.num_queries,
+      args.num_keys,
+      args.head_size,
+      kUseAlibi,
+      kUseBias,
+      kIsCausal,
+      kIsTraining,
+      kIsDropout,
+      (unsigned long long)args.alibi,
+      args.alibi_padded_block_size,
+      args.attn_mask_padded_block_size,
+      args.bias_strideB,
+      args.bias_strideN,
+      args.bias_strideF,
+      args.dropout_prob,
+      kSeqLast);
+#endif
+  // fmha forward kernel
+  using fmha_forward_op_t = fmha_forward_t<
+      fmha_policy,
+      T,
+      arch_tag,
+      kUseAlibi,
+      kUseBias,
+      kIsCausal,
+      kSeqLast,
+      kIsTraining,
+      kIsDropout>;
+
+  sycl::nd_range<3> NdRange = fmha_forward_op_t::get_nd_range(
+      args.num_batches * args.num_heads, args.num_queries);
+
+  FmhaForwardKernelFunctor<fmha_forward_op_t, T> kfn(args);
+  return {[=](sycl::handler& cgh) { cgh.parallel_for(NdRange, kfn); }};
+}
+
+template cgfs_t xetla_fmha_forward_kernel<
+    IMPL_FMHA_POLICY,
+    IMPL_T,
+    IMPL_ARCH_TAG,
+    IMPL_KUSEALIBI,
+    IMPL_KUSEBIAS,
+    IMPL_KISCAUSAL,
+    IMPL_KSEQLAST,
+    IMPL_KISTRAINING,
+    IMPL_KISDROPOUT>(const dispatch_fmha_forward_args_t<IMPL_T>& args);
+
+} // namespace fmha
+} // namespace gpu::xetla

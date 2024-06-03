@@ -1,0 +1,207 @@
+#include "GEMM/gemm_int4.h"
+
+// clang-format off
+// macros to be filled in CMake 
+#define SCALAR_T ${SCALAR_T}
+#define WG_M ${WG_M}
+#define WG_N ${WG_N}
+#define SG_M ${SG_M}
+#define SG_N ${SG_N}
+#define SG_K ${SG_K}
+#define SLM_KS ${SLM_KS}
+#define L3_KS ${L3_KS}
+#define SYNC_FREQ ${SYNC_FREQ}
+#define STAGES ${STAGES}
+#define ARCH static_cast<int>(gpu_arch::${ARCH})
+#define QUANT_MODE quant_mode::${QUANT_MODE}
+// clang-format on
+
+namespace torch_ipex::xpu::xetla {
+using fp16 = gpu::xetla::fp16;
+using bf16 = gpu::xetla::bf16;
+
+#define HGEMM_WINT4_ASTR_IMPL_FUNC(scalar_t, ...)                              \
+  template cgfs_t XETLA_KERNEL_API hgemm_wint4<scalar_t, ##__VA_ARGS__>(      \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API hgemm_bias_wint4<scalar_t, ##__VA_ARGS__>( \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* bias,                                                   \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_bias_gelu_wint4<scalar_t, ##__VA_ARGS__>(                             \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* bias,                                                   \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API hgemm_silu_wint4<scalar_t, ##__VA_ARGS__>( \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API hgemm_res_wint4<scalar_t, ##__VA_ARGS__>(  \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* res,                                                    \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API hgemm_mul_wint4<scalar_t, ##__VA_ARGS__>(  \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* mul,                                                    \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_bias_res_res_wint4<scalar_t, ##__VA_ARGS__>(                          \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* bias,                                                   \
+      const scalar_t* res0,                                                   \
+      const scalar_t* res1,                                                   \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API hgemm_qkv_wint4<scalar_t, ##__VA_ARGS__>(  \
+      scalar_t * out0,                                                        \
+      scalar_t * out1,                                                        \
+      scalar_t * out2,                                                        \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_silu_mul_wint4<scalar_t, ##__VA_ARGS__>(                              \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* mul,                                                    \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_bias_silu_mul_wint4<scalar_t, ##__VA_ARGS__>(                         \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* bias,                                                   \
+      const scalar_t* mul,                                                    \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_bias_add_wint4<scalar_t, ##__VA_ARGS__>(                              \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* bias,                                                   \
+      const scalar_t* res,                                                    \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_qkv_bias_wint4<scalar_t, ##__VA_ARGS__>(                              \
+      scalar_t * out0,                                                        \
+      scalar_t * out1,                                                        \
+      scalar_t * out2,                                                        \
+      const scalar_t* a,                                                      \
+      const uint8_t* b,                                                       \
+      void* b_zp,                                                             \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* bias,                                                   \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);
+
+#define HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(DEQUANT_S) \
+  HGEMM_WINT4_ASTR_IMPL_FUNC(                    \
+      SCALAR_T,                                 \
+      WG_M,                                     \
+      WG_N,                                     \
+      SG_M,                                     \
+      SG_N,                                     \
+      SG_K,                                     \
+      DEQUANT_S,                                \
+      SLM_KS,                                   \
+      L3_KS,                                    \
+      SYNC_FREQ,                                \
+      STAGES,                                   \
+      ARCH,                                     \
+      QUANT_MODE)
+
+// per channel
+HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(0)
+// k group
+HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(16)
+HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(32)
+HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(64)
+HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(128)
+HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(256)
+HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(512)
+HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(1024)
+
+} // namespace torch_ipex::xpu::xetla
