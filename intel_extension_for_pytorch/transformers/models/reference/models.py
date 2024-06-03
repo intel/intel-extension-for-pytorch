@@ -2431,32 +2431,6 @@ def Qwen2ForCausalLM_forward(
     output_hidden_states: Optional[bool] = None,
     return_dict: Optional[bool] = None,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
-    r"""
-    Args:
-        labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
-            config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
-            (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
-
-    Returns:
-
-    Example:
-
-    ```python
-    >>> from transformers import AutoTokenizer, Qwen2ForCausalLM
-
-    >>> model = Qwen2ForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
-    >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
-
-    >>> prompt = "Hey, are you conscious? Can you talk to me?"
-    >>> inputs = tokenizer(prompt, return_tensors="pt")
-
-    >>> # Generate
-    >>> generate_ids = model.generate(inputs.input_ids, max_length=30)
-    >>> tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-    "Hey, are you conscious? Can you talk to me?\nI'm not conscious, but I can talk to you."
-    ```"""
-
     output_attentions = (
         output_attentions
         if output_attentions is not None
@@ -2485,6 +2459,13 @@ def Qwen2ForCausalLM_forward(
     )
 
     hidden_states = outputs[0]
+    if (
+        hasattr(self, "config")
+        and hasattr(self.config, "lm_head_generation")
+        and self.config.lm_head_generation
+        and hidden_states.size(1) != 1
+    ):
+        hidden_states = hidden_states[:, -1:, :]
     logits = self.lm_head(hidden_states)
     logits = logits.float()
 
