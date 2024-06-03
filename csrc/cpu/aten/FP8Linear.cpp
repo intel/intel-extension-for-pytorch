@@ -152,7 +152,7 @@ at::Tensor fp8_linear(
 namespace {
 
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_IPEX_REGISTER_DISPATCH(
+  IPEX_OP_REGISTER_DISPATCH(
       "fp8_linear", torch_ipex::cpu::fp8_linear, c10::DispatchKey::CPU);
 }
 

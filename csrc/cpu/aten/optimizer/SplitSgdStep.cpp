@@ -25,9 +25,9 @@ at::Tensor packed_add(
 namespace {
 
 IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_IPEX_REGISTER_DISPATCH(
+  IPEX_OP_REGISTER_DISPATCH(
       "packed_add", torch_ipex::cpu::packed_add, at::DispatchKey::CPU);
-  IPEX_OP_IPEX_REGISTER_DISPATCH(
+  IPEX_OP_REGISTER_DISPATCH(
       "packed_add", torch_ipex::cpu::packed_add, at::DispatchKey::SparseCPU);
 }
 
