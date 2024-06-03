@@ -509,15 +509,9 @@ def add_rms_norm_cpu(
 ):
     assert bias is None, "bias is not supported in add_rmsnorm yet"
     if add is not None:
-        if add_back:
-            add.add_(x)
-            input = add
-        else:
-            input = add + x
+        return torch.ops.torch_ipex.add_rmsnorm(x, add, weight, eps, add_back)
     else:
-        input = x
-
-    return torch.ops.torch_ipex.rmsnorm(input, weight, eps)
+        return torch.ops.torch_ipex.rmsnorm(x, weight, eps)
 
 
 def add_layer_norm_cpu(
