@@ -25,51 +25,6 @@ Before running these examples, please note the following:
 
 ### Training
 
-#### Single-instance Training
-
-To use Intel® Extension for PyTorch\* on training, you need to make the following changes in your code:
-
-1. Import `intel_extension_for_pytorch` as `ipex`.
-2. Invoke the `ipex.optimize` function to apply optimizations against the model and optimizer objects, as shown below:
-
-
-```python
-...
-import torch
-import intel_extension_for_pytorch as ipex
-...
-model = Model()
-criterion = ...
-optimizer = ...
-model.train()
-# For Float32
-model, optimizer = ipex.optimize(model, optimizer=optimizer)
-# For BFloat16
-model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)
-# Invoke the code below to enable beta feature torch.compile
-model = torch.compile(model, backend="ipex")
-...
-optimizer.zero_grad()
-output = model(data)
-...
-```
-
-Below you can find complete code examples demonstrating how to use the extension on training for different data types:
-
-##### Float32
-
-**Note:** You need to install `torchvision` Python package to run the following example.
-
-[//]: # (marker_train_single_fp32_complete)
-[//]: # (marker_train_single_fp32_complete)
-
-##### BFloat16
-
-**Note:** You need to install `torchvision` Python package to run the following example.
-
-[//]: # (marker_train_single_bf16_complete)
-[//]: # (marker_train_single_bf16_complete)
-
 #### Distributed Training
 
 Distributed training with PyTorch DDP is accelerated by oneAPI Collective Communications Library Bindings for Pytorch\* (oneCCL Bindings for Pytorch\*). The extension supports FP32 and BF16 data types. More detailed information and examples are available at the [Github repo](https://github.com/intel/torch-ccl).
