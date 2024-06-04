@@ -1,17 +1,18 @@
-From 1b1c17bb765537fa099e8faea12c86f4254323bf Mon Sep 17 00:00:00 2001
-From: "Cui, Yifeng" <yifeng.cui@intel.com>
-Date: Mon, 11 Mar 2024 19:46:04 +0800
-Subject: [PATCH 28/31] Fix Windows Build (#214)
+From 93afdf9604b56e5c1bf420380f775c72431a8a81 Mon Sep 17 00:00:00 2001
+From: xingyuan li <108672484+hoshibara@users.noreply.github.com>
+Date: Thu, 28 Mar 2024 14:04:24 +0800
+Subject: [PATCH 04/25] Fix Windows Build (#214) (#220)
 
+Co-authored-by: Cui, Yifeng <yifeng.cui@intel.com>
 ---
  cmake/public/mkl.cmake | 20 +++++++++++---------
  1 file changed, 11 insertions(+), 9 deletions(-)
 
 diff --git a/cmake/public/mkl.cmake b/cmake/public/mkl.cmake
-index d285a92600f..ebb178ce5e1 100644
+index d98c9ec417a..ec405f33e73 100644
 --- a/cmake/public/mkl.cmake
 +++ b/cmake/public/mkl.cmake
-@@ -16,14 +16,16 @@ set_property(
+@@ -22,14 +22,16 @@ set_property(
    TARGET caffe2::mkl PROPERTY INTERFACE_LINK_DIRECTORIES
    ${MKL_ROOT}/lib ${MKL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64_win ${MKL_ROOT}/lib/win-x64)
  

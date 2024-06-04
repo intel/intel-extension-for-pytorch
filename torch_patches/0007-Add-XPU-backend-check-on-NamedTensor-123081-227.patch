@@ -1,0 +1,53 @@
+From 4b581de60199d6152f8c80ee40dbdd91d0dea7d0 Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Wed, 10 Apr 2024 11:01:04 +0800
+Subject: [PATCH 07/25] Add XPU backend check on NamedTensor (#123081) (#227)
+
+# Motivation
+Support `NamedTensor` on XPU backend.
+
+# Motivation
+No need UTs.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/123081
+Approved by: https://github.com/gujinghui, https://github.com/EikanWang, https://github.com/ezyang
+
+(cherry picked from commit 497bac223c72c14df85353512a77e60f3c8a6290)
+---
+ aten/src/ATen/core/NamedTensor.cpp       | 4 ++--
+ aten/src/ATen/native/TensorFactories.cpp | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/aten/src/ATen/core/NamedTensor.cpp b/aten/src/ATen/core/NamedTensor.cpp
+index 846178f5a00..a1bf6aafd4d 100644
+--- a/aten/src/ATen/core/NamedTensor.cpp
++++ b/aten/src/ATen/core/NamedTensor.cpp
+@@ -87,8 +87,8 @@ void check_names_valid_for(TensorImpl* impl, DimnameList names) {
+ void internal_set_names_inplace(TensorImpl* impl, optional<DimnameList> names, bool validate_names) {
+   TORCH_CHECK(impl->layout() == Layout::Strided,
+       "NYI: named tensors only support strided layout");
+-  TORCH_CHECK(impl->device().is_cpu() || impl->device().is_cuda() || impl->device().is_privateuseone(),
+-      "NYI: named tensors only support CPU, CUDA or ", c10::get_privateuse1_backend(), " tensors.");
++  TORCH_CHECK(impl->device().is_cpu() || impl->device().is_cuda() || impl->device().is_xpu() || impl->device().is_privateuseone(),
++      "NYI: named tensors only support CPU, CUDA, XPU or ", c10::get_privateuse1_backend(), " tensors.");
+   if (!names) {
+     impl->set_named_tensor_meta(nullptr);
+     return;
+diff --git a/aten/src/ATen/native/TensorFactories.cpp b/aten/src/ATen/native/TensorFactories.cpp
+index add09e2f81e..33496474557 100644
+--- a/aten/src/ATen/native/TensorFactories.cpp
++++ b/aten/src/ATen/native/TensorFactories.cpp
+@@ -277,8 +277,8 @@ Tensor empty_names(
+   }
+   TORCH_CHECK(options.layout() == Layout::Strided,
+       "NYI: named tensors only support strided layout");
+-  TORCH_CHECK(options.device().is_cpu() || options.device().is_cuda() || options.device().is_privateuseone(),
+-      "NYI: named tensors only support CPU, CUDA or ", c10::get_privateuse1_backend(), " tensors.");
++  TORCH_CHECK(options.device().is_cpu() || options.device().is_cuda() || options.device().is_xpu() || options.device().is_privateuseone(),
++      "NYI: named tensors only support CPU, CUDA, XPU or ", c10::get_privateuse1_backend(), " tensors.");
+   auto result = at::empty(size, options, optional_memory_format);
+   internal_set_names_inplace(result, names);
+   return result;
+-- 
+2.34.1
+

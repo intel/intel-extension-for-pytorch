@@ -3,7 +3,7 @@ You need to apply these git patches for PyTorch and build PyTorch from source co
    ```bash
    git clone https://github.com/pytorch/pytorch.git
    cd pytorch/
-   git checkout 209f2fa8ff86652f67d75c2f19bf9cb9942fd018
+   git checkout b4f90aae1b375bfe06d3c4a099240e06f93c81c4
    git apply <ipex code repo>/torch_patches/00*.patch
    python setup.py install
    ```

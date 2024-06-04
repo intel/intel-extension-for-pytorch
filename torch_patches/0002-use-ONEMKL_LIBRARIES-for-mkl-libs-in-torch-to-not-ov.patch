@@ -1,37 +1,37 @@
-From 730877fe5a89e11c36ef1873b72083bea9f35c72 Mon Sep 17 00:00:00 2001
-From: min-jean-cho <min.jean.cho@intel.com>
-Date: Wed, 28 Feb 2024 10:00:30 -0800
-Subject: [PATCH 24/31] use ONEMKL_LIBRARIES for mkl libs in torch to not
- overwritten by oneMKL MKL_LIBRARIES cmake config (#208)
+From ecd203a556f426b676741d773d0684821b0f6946 Mon Sep 17 00:00:00 2001
+From: xingyuan li <108672484+hoshibara@users.noreply.github.com>
+Date: Thu, 28 Mar 2024 11:01:30 +0800
+Subject: [PATCH 02/25] use ONEMKL_LIBRARIES for mkl libs in torch to not
+ overwritten by oneMKL MKL_LIBRARIES cmake config (#208) (#218)
 
+Co-authored-by: min-jean-cho <min.jean.cho@intel.com>
 ---
- caffe2/CMakeLists.txt          |  2 +-
+ caffe2/CMakeLists.txt          |  1 +
  cmake/Dependencies.cmake       |  4 +--
  cmake/Modules/FindBLAS.cmake   |  2 +-
  cmake/Modules/FindLAPACK.cmake |  4 +--
- cmake/Modules/FindMKL.cmake    | 58 +++++++++++++++++-----------------
+ cmake/Modules/FindMKL.cmake    | 63 ++++++++++++++++------------------
  cmake/Modules/FindMKLDNN.cmake |  2 +-
- cmake/public/mkl.cmake         |  2 +-
- 7 files changed, 37 insertions(+), 37 deletions(-)
+ cmake/public/mkl.cmake         | 12 +++----
+ 7 files changed, 43 insertions(+), 45 deletions(-)
 
 diff --git a/caffe2/CMakeLists.txt b/caffe2/CMakeLists.txt
-index 74d0d557190..ceac8d7f521 100644
+index a6b6f0f7d1d..e653c1e2563 100644
 --- a/caffe2/CMakeLists.txt
 +++ b/caffe2/CMakeLists.txt
-@@ -1564,7 +1564,7 @@ if(BUILD_SHARED_LIBS)
-   if(USE_MPI)
-       target_link_libraries(torch_global_deps ${MPI_CXX_LIBRARIES})
+@@ -1679,6 +1679,7 @@ if(BUILD_SHARED_LIBS)
+   if(CAFFE2_USE_MKL)
+     target_link_libraries(torch_global_deps caffe2::mkl)
    endif()
--  target_link_libraries(torch_global_deps ${MKL_LIBRARIES})
 +  target_link_libraries(torch_global_deps ${ONEMKL_LIBRARIES})
    # The CUDA libraries are linked here for a different reason: in some
    # cases we load these libraries with ctypes, and if they weren't opened
    # with RTLD_GLOBAL, we'll do the "normal" search process again (and
 diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
-index c3abce52e4c..6ca8411c56c 100644
+index a96075245ae..d5537761232 100644
 --- a/cmake/Dependencies.cmake
 +++ b/cmake/Dependencies.cmake
-@@ -213,7 +213,7 @@ elseif(BLAS STREQUAL "MKL")
+@@ -222,7 +222,7 @@ elseif(BLAS STREQUAL "MKL")
    endif()
    include(${CMAKE_CURRENT_LIST_DIR}/public/mkl.cmake)
    if(MKL_FOUND)
@@ -40,7 +40,7 @@ index c3abce52e4c..6ca8411c56c 100644
      message(STATUS "MKL include directory: ${MKL_INCLUDE_DIR}")
      message(STATUS "MKL OpenMP type: ${MKL_OPENMP_TYPE}")
      message(STATUS "MKL OpenMP library: ${MKL_OPENMP_LIBRARY}")
-@@ -222,7 +222,7 @@ elseif(BLAS STREQUAL "MKL")
+@@ -231,7 +231,7 @@ elseif(BLAS STREQUAL "MKL")
      set(CAFFE2_USE_MKL ON)
      set(BLAS_INFO "mkl")
      set(BLAS_FOUND 1)
@@ -79,7 +79,7 @@ index 02367ff9866..9ca7ff3b661 100644
      SET(LAPACK_INCLUDE_DIR ${MKL_INCLUDE_DIR})
      SET(LAPACK_INFO "mkl")
 diff --git a/cmake/Modules/FindMKL.cmake b/cmake/Modules/FindMKL.cmake
-index b0178ab72e4..6dbd3863b39 100644
+index a02f3e092d1..52aa9908a55 100644
 --- a/cmake/Modules/FindMKL.cmake
 +++ b/cmake/Modules/FindMKL.cmake
 @@ -4,7 +4,7 @@
@@ -100,7 +100,7 @@ index b0178ab72e4..6dbd3863b39 100644
  SET(MKL_OPENMP_TYPE)
  SET(MKL_OPENMP_LIBRARY)
  SET(MKL_LAPACK_LIBRARIES)
-@@ -319,9 +319,9 @@ ELSE(UNIX AND NOT APPLE)
+@@ -320,9 +320,9 @@ ELSE(UNIX AND NOT APPLE)
  ENDIF(UNIX AND NOT APPLE)
  
  # Check for version 10/11
@@ -112,7 +112,7 @@ index b0178ab72e4..6dbd3863b39 100644
  
  # First: search for parallelized ones with intel thread lib
  IF (NOT "${MKL_THREADING}" STREQUAL "SEQ")
-@@ -329,11 +329,11 @@ IF (NOT "${MKL_THREADING}" STREQUAL "SEQ")
+@@ -330,11 +330,11 @@ IF (NOT "${MKL_THREADING}" STREQUAL "SEQ")
      FOREACH(mkliface ${mklifaces})
        FOREACH(mkl64 ${mkl64s} "")
          FOREACH(mklthread ${mklthreads})
@@ -127,7 +127,7 @@ index b0178ab72e4..6dbd3863b39 100644
          ENDFOREACH(mklthread)
        ENDFOREACH(mkl64)
      ENDFOREACH(mkliface)
-@@ -343,14 +343,14 @@ ENDIF (NOT "${MKL_THREADING}" STREQUAL "SEQ")
+@@ -344,14 +344,14 @@ ENDIF (NOT "${MKL_THREADING}" STREQUAL "SEQ")
  # Second: search for sequential ones
  FOREACH(mkliface ${mklifaces})
    FOREACH(mkl64 ${mkl64s} "")
@@ -147,7 +147,7 @@ index b0178ab72e4..6dbd3863b39 100644
    ENDFOREACH(mkl64)
  ENDFOREACH(mkliface)
  
-@@ -358,42 +358,42 @@ ENDFOREACH(mkliface)
+@@ -359,46 +359,43 @@ ENDFOREACH(mkliface)
  FOREACH(mklrtl ${mklrtls} "")
    FOREACH(mkliface ${mklifaces})
      FOREACH(mkl64 ${mkl64s} "")
@@ -168,10 +168,14 @@ index b0178ab72e4..6dbd3863b39 100644
 +IF (ONEMKL_LIBRARIES)
 +  SET(CMAKE_REQUIRED_LIBRARIES ${ONEMKL_LIBRARIES})
    check_function_exists("cblas_gemm_bf16bf16f32" MKL_HAS_SBGEMM)
+   check_function_exists("cblas_gemm_f16f16f32" MKL_HAS_SHGEMM)
    set(CMAKE_REQUIRED_LIBRARIES)
    IF(MKL_HAS_SBGEMM)
      add_compile_options(-DMKL_HAS_SBGEMM)
    ENDIF(MKL_HAS_SBGEMM)
+-  IF(MKL_HAS_SHGEMM)
+-    add_compile_options(-DMKL_HAS_SHGEMM)
+-  ENDIF(MKL_HAS_SHGEMM)
 -ENDIF (MKL_LIBRARIES)
 +ENDIF (ONEMKL_LIBRARIES)
  
@@ -190,8 +194,9 @@ index b0178ab72e4..6dbd3863b39 100644
  
  # Include files
 -IF (MKL_LIBRARIES)
+-  FIND_PATH(MKL_INCLUDE_DIR NAMES "mkl_cblas.h" PATHS "/usr/include/mkl")
 +IF (ONEMKL_LIBRARIES)
-   FIND_PATH(MKL_INCLUDE_DIR "mkl_cblas.h")
++  FIND_PATH(MKL_INCLUDE_DIR "mkl_cblas.h")
    MARK_AS_ADVANCED(MKL_INCLUDE_DIR)
 -ENDIF (MKL_LIBRARIES)
 +ENDIF (ONEMKL_LIBRARIES)
@@ -202,7 +207,7 @@ index b0178ab72e4..6dbd3863b39 100644
    FOREACH(mkl64 ${mkl64s} "_core" "")
      FOREACH(mkls ${mklseq} "")
        IF (NOT MKL_LAPACK_LIBRARIES)
-@@ -414,15 +414,15 @@ IF (MKL_LIBRARIES)
+@@ -423,15 +420,15 @@ IF (MKL_LIBRARIES)
        ENDIF (NOT MKL_CDFT_LIBRARIES)
      ENDFOREACH(mkls)
    ENDFOREACH(mkl64)
@@ -222,7 +227,7 @@ index b0178ab72e4..6dbd3863b39 100644
      MESSAGE(WARNING "MKL libraries files are found, but MKL header files are \
        not. You can get them by `conda install mkl-include` if using conda (if \
        it is missing, run `conda upgrade -n root conda` first), and \
-@@ -432,7 +432,7 @@ ELSE (MKL_LIBRARIES AND MKL_INCLUDE_DIR)
+@@ -441,7 +438,7 @@ ELSE (MKL_LIBRARIES AND MKL_INCLUDE_DIR)
    endif()
    SET(MKL_FOUND FALSE)
    SET(MKL_VERSION)  # clear MKL_VERSION
@@ -232,7 +237,7 @@ index b0178ab72e4..6dbd3863b39 100644
  # Standard termination
  IF(NOT MKL_FOUND AND MKL_FIND_REQUIRED)
 diff --git a/cmake/Modules/FindMKLDNN.cmake b/cmake/Modules/FindMKLDNN.cmake
-index 47694f6856e..cee255cab79 100644
+index d9ca7dfd545..552f6a037e7 100644
 --- a/cmake/Modules/FindMKLDNN.cmake
 +++ b/cmake/Modules/FindMKLDNN.cmake
 @@ -48,7 +48,7 @@ IF(NOT MKLDNN_FOUND)
@@ -245,18 +250,28 @@ index 47694f6856e..cee255cab79 100644
    ELSE(MKL_FOUND)
      SET(MKLDNN_USE_MKL "NONE" CACHE STRING "" FORCE)
 diff --git a/cmake/public/mkl.cmake b/cmake/public/mkl.cmake
-index 22527462b1f..2701c0700f7 100644
+index 68bf1b9dc93..e133969aa9c 100644
 --- a/cmake/public/mkl.cmake
 +++ b/cmake/public/mkl.cmake
-@@ -9,7 +9,7 @@ set_property(
-   ${MKL_INCLUDE_DIR})
- set_property(
-   TARGET caffe2::mkl PROPERTY INTERFACE_LINK_LIBRARIES
--  ${MKL_LIBRARIES} ${MKL_THREAD_LIB})
-+  ${ONEMKL_LIBRARIES} ${MKL_THREAD_LIB})
- # TODO: This is a hack, it will not pick up architecture dependent
- # MKL libraries correctly; see https://github.com/pytorch/pytorch/issues/73008
- set_property(
+@@ -6,12 +6,12 @@ endif()
+ 
+ add_library(caffe2::mkl INTERFACE IMPORTED)
+ target_include_directories(caffe2::mkl INTERFACE ${MKL_INCLUDE_DIR})
+-target_link_libraries(caffe2::mkl INTERFACE ${MKL_LIBRARIES})
+-foreach(MKL_LIB IN LISTS MKL_LIBRARIES)
+-  if(EXISTS "${MKL_LIB}")
+-    get_filename_component(MKL_LINK_DIR "${MKL_LIB}" DIRECTORY)
+-    if(IS_DIRECTORY "${MKL_LINK_DIR}")
+-      target_link_directories(caffe2::mkl INTERFACE "${MKL_LINK_DIR}")
++target_link_libraries(caffe2::mkl INTERFACE ${ONEMKL_LIBRARIES})
++foreach(ONEMKL_LIB IN LISTS ONEMKL_LIBRARIES)
++  if(EXISTS "${ONEMKL_LIB}")
++    get_filename_component(ONEMKL_LINK_DIR "${ONEMKL_LIB}" DIRECTORY)
++    if(IS_DIRECTORY "${ONEMKL_LINK_DIR}")
++      target_link_directories(caffe2::mkl INTERFACE "${ONEMKL_LINK_DIR}")
+     endif()
+   endif()
+ endforeach()
 -- 
 2.34.1
 

@@ -1,0 +1,525 @@
+From ad0cfd4649b6cae4670841310083dcf50b7f1c7f Mon Sep 17 00:00:00 2001
+From: Stonepia <tong.su@intel.com>
+Date: Tue, 9 Apr 2024 10:29:50 +0800
+Subject: [PATCH 06/25] [Inductor Intel GPU backend Upstream] Add Inductor
+ Intel GPU backend. (#121895) (#224)
+
+As the design in RFC https://github.com/pytorch/pytorch/issues/114856, this PR implemented Intel GPU Inductor backend by:
+- Reuse WrapperCodegen and TritonScheduling for python wrapper and kernel code generation. And implenented device-specific code generation in XPUDeviceOpOverrides
+- Reuse fx_pass, lowering, codecache, triton kernel auto-tuning, and compilation.
+
+For the test case, this PR provided test/inductor/test_xpu_basic.py for basic inductor backend functionality testing.
+We'll reuse all the existing Inductor test case in the next PR.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/121895
+Approved by: https://github.com/EikanWang, https://github.com/jansel, https://github.com/desertfire
+
+Co-authored-by: xinan.lin <xinan.lin@intel.com>
+---
+ test/inductor/test_memory_planning.py         |  4 +-
+ test/inductor/test_minifier.py                |  5 +-
+ test/inductor/test_minifier_isolate.py        |  5 +-
+ test/inductor/test_profiler.py                |  4 +-
+ test/inductor/test_xpu_basic.py               | 65 +++++++++++++++++++
+ torch/_inductor/codegen/common.py             |  3 +-
+ torch/_inductor/codegen/xpu/__init__.py       |  0
+ .../codegen/xpu/device_op_overrides.py        | 18 +++++
+ torch/_inductor/graph.py                      |  5 ++
+ torch/_inductor/ir.py                         | 11 ++--
+ torch/_inductor/lowering.py                   |  7 +-
+ torch/_inductor/scheduler.py                  | 29 +++++----
+ torch/_inductor/triton_helpers.py             |  5 +-
+ torch/_inductor/triton_heuristics.py          |  2 +
+ torch/_inductor/utils.py                      | 13 ++++
+ torch/testing/_internal/inductor_utils.py     |  5 +-
+ torch/utils/_triton.py                        |  5 +-
+ 17 files changed, 153 insertions(+), 33 deletions(-)
+ create mode 100644 test/inductor/test_xpu_basic.py
+ create mode 100644 torch/_inductor/codegen/xpu/__init__.py
+ create mode 100644 torch/_inductor/codegen/xpu/device_op_overrides.py
+
+diff --git a/test/inductor/test_memory_planning.py b/test/inductor/test_memory_planning.py
+index faf24b6492a..d8db175237f 100644
+--- a/test/inductor/test_memory_planning.py
++++ b/test/inductor/test_memory_planning.py
+@@ -3,6 +3,7 @@
+ import sys
+ 
+ from torch.testing._internal.common_utils import IS_CI, IS_WINDOWS, skipIfRocm
++from torch.testing._internal.inductor_utils import HAS_CUDA
+ 
+ if IS_WINDOWS and IS_CI:
+     sys.stderr.write(
+@@ -116,4 +117,5 @@ class TestMemoryPlanning(TestCase):
+ 
+ 
+ if __name__ == "__main__":
+-    run_tests()
++    if HAS_CUDA:
++        run_tests()
+diff --git a/test/inductor/test_minifier.py b/test/inductor/test_minifier.py
+index c2620521b76..6ddec1dcdec 100644
+--- a/test/inductor/test_minifier.py
++++ b/test/inductor/test_minifier.py
+@@ -7,10 +7,9 @@ import torch._inductor.config as inductor_config
+ from torch._dynamo.test_minifier_common import MinifierTestBase
+ from torch._inductor import config
+ from torch.testing._internal.common_utils import IS_JETSON, IS_MACOS, TEST_WITH_ASAN
+-from torch.utils._triton import has_triton
++from torch.testing._internal.inductor_utils import HAS_CUDA
+ 
+-_HAS_TRITON = has_triton()
+-requires_cuda = unittest.skipUnless(_HAS_TRITON, "requires cuda")
++requires_cuda = unittest.skipUnless(HAS_CUDA, "requires cuda")
+ 
+ 
+ class MinifierTests(MinifierTestBase):
+diff --git a/test/inductor/test_minifier_isolate.py b/test/inductor/test_minifier_isolate.py
+index 99e5fd0553d..c01849876e2 100644
+--- a/test/inductor/test_minifier_isolate.py
++++ b/test/inductor/test_minifier_isolate.py
+@@ -9,10 +9,9 @@ from torch.testing._internal.common_utils import (
+     skipIfRocm,
+     TEST_WITH_ASAN,
+ )
+-from torch.utils._triton import has_triton
++from torch.testing._internal.inductor_utils import HAS_CUDA
+ 
+-_HAS_TRITON = has_triton()
+-requires_cuda = unittest.skipUnless(_HAS_TRITON, "requires cuda")
++requires_cuda = unittest.skipUnless(HAS_CUDA, "requires cuda")
+ 
+ 
+ # These minifier tests are slow, because they must be run in separate
+diff --git a/test/inductor/test_profiler.py b/test/inductor/test_profiler.py
+index 401097e00b7..02d2c3f81c4 100644
+--- a/test/inductor/test_profiler.py
++++ b/test/inductor/test_profiler.py
+@@ -10,6 +10,7 @@ from torch._inductor import config
+ from torch.profiler import ProfilerActivity
+ 
+ from torch.testing._internal.common_utils import skipIfRocm, TemporaryFileName
++from torch.testing._internal.inductor_utils import HAS_CUDA
+ 
+ from torch.utils._triton import has_triton
+ 
+@@ -150,4 +151,5 @@ class DynamoProfilerTests(torch._dynamo.test_case.TestCase):
+ if __name__ == "__main__":
+     from torch._dynamo.test_case import run_tests
+ 
+-    run_tests()
++    if HAS_CUDA:
++        run_tests()
+diff --git a/test/inductor/test_xpu_basic.py b/test/inductor/test_xpu_basic.py
+new file mode 100644
+index 00000000000..f6e1b53a5a7
+--- /dev/null
++++ b/test/inductor/test_xpu_basic.py
+@@ -0,0 +1,65 @@
++# Owner(s): ["module: inductor"]
++import importlib
++import os
++import sys
++import unittest
++
++import torch
++from torch.testing._internal.common_utils import IS_CI, IS_WINDOWS
++
++if IS_WINDOWS and IS_CI:
++    sys.stderr.write(
++        "Windows CI does not have necessary dependencies for test_xpu_basic yet\n"
++    )
++    if __name__ == "__main__":
++        sys.exit(0)
++    raise unittest.SkipTest("requires sympy/functorch/filelock")
++
++importlib.import_module("filelock")
++
++pytorch_test_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
++sys.path.append(pytorch_test_dir)
++from inductor.test_torchinductor import check_model_gpu, TestCase
++
++
++# TODO: Remove this file.
++# This is a temporary test case to test the base functionality of first Intel GPU Inductor integration.
++# We are working on reuse and pass the test cases in test/inductor/*  step by step.
++# Will remove this file when pass full test in test/inductor/*.
++
++
++class XpuBasicTests(TestCase):
++    common = check_model_gpu
++    device = "xpu"
++
++    def test_add(self):
++        def fn(a, b):
++            return a + b
++
++        self.common(fn, (torch.rand(2, 3, 16, 16), torch.rand(2, 3, 16, 16)))
++
++    def test_sub(self):
++        def fn(a, b):
++            return a - b
++
++        self.common(fn, (torch.rand(2, 3, 16, 16), torch.rand(2, 3, 16, 16)))
++
++    def test_mul(self):
++        def fn(a, b):
++            return a * b
++
++        self.common(fn, (torch.rand(2, 3, 16, 16), torch.rand(2, 3, 16, 16)))
++
++    def test_div(self):
++        def fn(a, b):
++            return a / b
++
++        self.common(fn, (torch.rand(2, 3, 16, 16), torch.rand(2, 3, 16, 16)))
++
++
++if __name__ == "__main__":
++    from torch._dynamo.test_case import run_tests
++    from torch.testing._internal.inductor_utils import HAS_XPU
++
++    if HAS_XPU:
++        run_tests(needs="filelock")
+diff --git a/torch/_inductor/codegen/common.py b/torch/_inductor/codegen/common.py
+index 2dfca704b65..a11488877ff 100644
+--- a/torch/_inductor/codegen/common.py
++++ b/torch/_inductor/codegen/common.py
+@@ -160,12 +160,11 @@ def get_device_op_overrides(device: str):
+ 
+     if not device_op_overrides_dict.keys():
+         from .cuda import device_op_overrides  # noqa: F401
++        from .xpu import device_op_overrides as xpu_op_overrides  # noqa: F401
+ 
+     if device in device_op_overrides_dict.keys():
+         return device_op_overrides_dict[device]
+ 
+-    return DeviceOpOverrides()
+-
+ 
+ @functools.lru_cache(None)
+ def boolean_ops():
+diff --git a/torch/_inductor/codegen/xpu/__init__.py b/torch/_inductor/codegen/xpu/__init__.py
+new file mode 100644
+index 00000000000..e69de29bb2d
+diff --git a/torch/_inductor/codegen/xpu/device_op_overrides.py b/torch/_inductor/codegen/xpu/device_op_overrides.py
+new file mode 100644
+index 00000000000..1f125889829
+--- /dev/null
++++ b/torch/_inductor/codegen/xpu/device_op_overrides.py
+@@ -0,0 +1,18 @@
++from ..common import DeviceOpOverrides, register_device_op_overrides
++
++
++class XPUDeviceOpOverrides(DeviceOpOverrides):
++    def import_get_raw_stream_as(self, name):
++        return f"from torch._C import _xpu_getCurrentRawStream as {name}"
++
++    def set_device(self, device_idx):
++        return f"torch.xpu.set_device({device_idx})"
++
++    def synchronize(self):
++        return "torch.xpu.synchronize()"
++
++    def device_guard(self, device_idx):
++        return f"torch.xpu._DeviceGuard({device_idx})"
++
++
++register_device_op_overrides("xpu", XPUDeviceOpOverrides())
+diff --git a/torch/_inductor/graph.py b/torch/_inductor/graph.py
+index 605ea9c1304..62af6fb05e7 100644
+--- a/torch/_inductor/graph.py
++++ b/torch/_inductor/graph.py
+@@ -195,6 +195,11 @@ class GraphLowering(torch.fx.Interpreter):
+             # CUDACombinedScheduling combines Triton and CUDA C++ scheduling for CUDA devices via delegation
+             register_backend_for_device("cuda", CUDACombinedScheduling, WrapperCodeGen)
+ 
++        if get_scheduling_for_device("xpu") is None:
++            from .codegen.triton import TritonScheduling
++
++            register_backend_for_device("xpu", TritonScheduling, WrapperCodeGen)
++
+     def __init__(
+         self,
+         gm: torch.fx.GraphModule,
+diff --git a/torch/_inductor/ir.py b/torch/_inductor/ir.py
+index a2785e347cb..3b03558a49d 100644
+--- a/torch/_inductor/ir.py
++++ b/torch/_inductor/ir.py
+@@ -68,6 +68,7 @@ from .utils import (
+     developer_warning,
+     get_kernel_metadata,
+     is_dynamic,
++    is_gpu,
+     pad_listlike,
+     sympy_dot,
+     sympy_index_symbol,
+@@ -245,7 +246,7 @@ def get_device_type(x):
+ 
+ 
+ def is_triton(x):
+-    return get_device_type(x) == "cuda"
++    return is_gpu(get_device_type(x))
+ 
+ 
+ def is_cpu(x):
+@@ -679,7 +680,7 @@ class Reduction(Loops):
+         numel_hint = V.graph.sizevars.symbolic_hint(sympy_product(ranges))
+ 
+         should_split = (
+-            is_triton(device)
++            get_device_type(device) == "cuda"
+             and reduction_type
+             not in {
+                 "argmax",
+@@ -1651,7 +1652,7 @@ class Scan(Loops):
+         pointwise_ranges = [*size[:axis], *size[axis + 1 :]]
+         scan_ranges = [size[axis]]
+ 
+-        if device.type != "cuda":
++        if not is_gpu(device.type):
+             # TODO: CPU support
+             return None
+ 
+@@ -3593,7 +3594,7 @@ class ConcatKernel(NopKernel):
+ 
+             if (
+                 input_unwrapped.is_input_buffer()
+-                and inputs[i].get_device().type == "cuda"
++                and is_gpu(inputs[i].get_device().type)
+                 and not is_dynamic(input_buffer)
+             ):
+                 buffer_names.append(input_buffer.get_name())
+@@ -4999,7 +5000,7 @@ class FallbackKernel(ExternKernelAlloc):
+             if len(devices) == 1:
+                 return devices[0]
+             for device in devices:
+-                if device.type == "cuda":
++                if is_gpu(device.type):
+                     return device
+             return devices[0]
+         return None
+diff --git a/torch/_inductor/lowering.py b/torch/_inductor/lowering.py
+index 9f575a9cfd2..28266449a20 100644
+--- a/torch/_inductor/lowering.py
++++ b/torch/_inductor/lowering.py
+@@ -52,6 +52,7 @@ from .utils import (
+     ceildiv,
+     decode_device,
+     is_dynamic,
++    is_gpu,
+     is_pointwise_use,
+     pad_listlike,
+     parallel_num_threads,
+@@ -433,7 +434,7 @@ def make_pointwise(
+         if not override_device:
+             device = None
+             for i in inputs:
+-                if i.get_device().type == "cuda":
++                if is_gpu(i.get_device().type):
+                     device = i.get_device()
+                     break
+             if not device:
+@@ -512,7 +513,7 @@ def make_foreach_pointwise(pw_fn, allow_alpha=False):
+ 
+                 outputs[output_ind] = output
+ 
+-                if device.type == "cuda" and use_foreach and realize_outputs:
++                if is_gpu(device.type) and use_foreach and realize_outputs:
+                     buffer_list.append(output.realize())
+ 
+             if buffer_list:
+@@ -3325,7 +3326,7 @@ def scatter_fallback(
+         reduce not in {None, reduce_ty}
+         or (
+             isinstance(src, TensorBox)
+-            and src.get_device().type == torch.device("cuda").type
++            and is_gpu(src.get_device().type)
+             and needs_fallback_due_to_atomic_add_limitations(src.get_dtype())
+         )
+         or (
+diff --git a/torch/_inductor/scheduler.py b/torch/_inductor/scheduler.py
+index 5091f69000b..6e75387aee5 100644
+--- a/torch/_inductor/scheduler.py
++++ b/torch/_inductor/scheduler.py
+@@ -39,12 +39,14 @@ from .sizevars import SimplifyIndexing
+ from .utils import (
+     cache_on_self,
+     cmp,
++    device_need_guard,
+     free_symbol_has,
+     get_device_tflops,
+     get_dtype_size,
+     get_gpu_dram_gbps,
+     green_text,
+     is_collective,
++    is_gpu,
+     is_wait,
+     red_text,
+     sympy_product,
+@@ -579,7 +581,7 @@ class BaseSchedulerNode:
+             layout = self.node.get_layout()
+             dtype = self.node.get_dtype()
+ 
+-        if "cuda" != layout.device.type:
++        if not is_gpu(layout.device.type):
+             # default to no reordering based on runtime
+             return 0
+ 
+@@ -2250,7 +2252,7 @@ class Scheduler:
+ 
+     def create_backend(self, device: torch.device):
+         assert (
+-            device.type != "cuda" or device.index is not None
++            not is_gpu(device.type) or device.index is not None
+         ), f"{device} should have been normalized in lowering"
+         V.graph.add_device_info(device)
+ 
+@@ -2258,13 +2260,15 @@ class Scheduler:
+         if device_scheduling is None:
+             raise RuntimeError(f"Unsupported device type: {device.type}")
+ 
+-        if device.type == "cuda" and not has_triton():
+-            device_props = torch.cuda.get_device_properties(device)
+-            if device_props.major < 7:
++        if not has_triton():
++            if (
++                device.type == "cuda"
++                and (device_props := torch.cuda.get_device_properties(device)).major < 7
++            ):
+                 raise RuntimeError(
+                     f"Found {device_props.name} which is too old to be supported by the triton GPU compiler, which is used as the backend. Triton only supports devices of CUDA Capability >= 7.0, but your device is of CUDA capability {device_props.major}.{device_props.minor}"  # noqa: B950
+                 )
+-            else:
++            elif is_gpu(device.type):
+                 raise RuntimeError(
+                     "Cannot find a working triton installation. More information on installing Triton can be found at https://github.com/openai/triton"  # noqa: B950
+                 )
+@@ -2317,13 +2321,14 @@ class Scheduler:
+                 ):
+                     self.flush()
+                 if device != self.current_device:
+-                    if device.type == "cuda":
+-                        if self.current_device and self.current_device.type == "cuda":
+-                            V.graph.wrapper_code.codegen_device_guard_exit()
++                    if self.current_device and device_need_guard(
++                        self.current_device.type
++                    ):
++                        V.graph.wrapper_code.codegen_device_guard_exit()
++                    if device_need_guard(device.type):
+                         assert device.index is not None, "device should have an index"
+                         V.graph.wrapper_code.codegen_device_guard_enter(device.index)
+-                    elif self.current_device and self.current_device.type == "cuda":
+-                        V.graph.wrapper_code.codegen_device_guard_exit()
++
+                     self.current_device = device
+ 
+             self.buffer_names_to_free.update(node.last_usage)
+@@ -2354,7 +2359,7 @@ class Scheduler:
+                 if self.get_backend(device).ready_to_flush():
+                     self.flush()
+ 
+-        if self.current_device and self.current_device.type == "cuda":
++        if self.current_device and device_need_guard(self.current_device.type):
+             # exit the outermost CUDA device guard. this is
+             # important for nested indentation codegen-ing.
+             V.graph.wrapper_code.codegen_device_guard_exit()
+diff --git a/torch/_inductor/triton_helpers.py b/torch/_inductor/triton_helpers.py
+index 4f7f3145542..3930d0dd7f2 100644
+--- a/torch/_inductor/triton_helpers.py
++++ b/torch/_inductor/triton_helpers.py
+@@ -3,9 +3,12 @@ import triton.language as tl
+ 
+ # In the latest triton, math functions were shuffled around into different modules:
+ # https://github.com/openai/triton/pull/3172
+-if hasattr(tl.extra.cuda, "libdevice"):
++if hasattr(tl.extra, "cuda") and hasattr(tl.extra.cuda, "libdevice"):
+     libdevice = tl.extra.cuda.libdevice
+     math = tl.math
++elif hasattr(tl.extra, "intel") and hasattr(tl.extra.intel, "libdevice"):
++    libdevice = tl.extra.intel.libdevice
++    math = tl.math
+ else:
+     libdevice = tl.math
+     math = tl
+diff --git a/torch/_inductor/triton_heuristics.py b/torch/_inductor/triton_heuristics.py
+index a7b9cb5ec72..9c75ac5134f 100644
+--- a/torch/_inductor/triton_heuristics.py
++++ b/torch/_inductor/triton_heuristics.py
+@@ -230,6 +230,8 @@ class CachingAutotuner(KernelInterface):
+                 and self.size_hints is not None
+                 # Disable for AMDGPU as Triton is not ready to return n_regs for a compiled_binary.
+                 and torch.version.hip is None
++                # Disable for Intel GPU as Triton is not ready to return n_regs for a compiled_binary.
++                and self.device_type != "xpu"
+                 and device_prop.major >= 8
+             ):
+                 for triton_config, compiled_binary in zip(
+diff --git a/torch/_inductor/utils.py b/torch/_inductor/utils.py
+index 3611f6deaad..e6f74058c18 100644
+--- a/torch/_inductor/utils.py
++++ b/torch/_inductor/utils.py
+@@ -1426,3 +1426,16 @@ def collect_defined_kernels(kernel_list):
+ 
+     with unittest.mock.patch.object(WrapperCodeGen, "define_kernel", new_define_kernel):
+         yield
++
++
++def get_cloned_parameter_buffer_name(name: str):
++    return name + "__original__"
++
++
++def is_gpu(device: str):
++    return device in ["cuda", "xpu"]
++
++
++def device_need_guard(device: str):
++    assert isinstance(device, str)
++    return is_gpu(device)
+diff --git a/torch/testing/_internal/inductor_utils.py b/torch/testing/_internal/inductor_utils.py
+index d64a9436a6f..ee697306b30 100644
+--- a/torch/testing/_internal/inductor_utils.py
++++ b/torch/testing/_internal/inductor_utils.py
+@@ -32,6 +32,8 @@ HAS_CPU = LazyVal(test_cpu)
+ 
+ HAS_CUDA = torch.cuda.is_available() and has_triton()
+ 
++HAS_XPU = torch.xpu.is_available() and has_triton()
++
+ HAS_GPU = HAS_CUDA
+ 
+ GPUS = ["cuda"]
+@@ -41,7 +43,7 @@ HAS_MULTIGPU = any(
+     for gpu in GPUS
+ )
+ 
+-tmp_gpus = [x for x in GPUS if getattr(torch, x).is_available()]
++tmp_gpus = [x for x in ["cuda", "xpu"] if getattr(torch, x).is_available()]
+ assert len(tmp_gpus) <= 1
+ GPU_TYPE = "cuda" if len(tmp_gpus) == 0 else tmp_gpus.pop()
+ del tmp_gpus
+@@ -84,4 +86,5 @@ def skipDeviceIf(cond, msg, *, device):
+     return decorate_fn
+ 
+ skipCUDAIf = functools.partial(skipDeviceIf, device="cuda")
++skipXPUIf = functools.partial(skipDeviceIf, device="xpu")
+ skipCPUIf = functools.partial(skipDeviceIf, device="cpu")
+diff --git a/torch/utils/_triton.py b/torch/utils/_triton.py
+index a568d9eb981..020bc47acfa 100644
+--- a/torch/utils/_triton.py
++++ b/torch/utils/_triton.py
+@@ -19,7 +19,10 @@ def has_triton() -> bool:
+     def cuda_extra_check(device_interface):
+         return device_interface.Worker.get_device_properties().major >= 7
+ 
+-    triton_supported_devices = {"cuda": cuda_extra_check}
++    def _return_true(device_interface):
++        return True
++
++    triton_supported_devices = {"cuda": cuda_extra_check, "xpu": _return_true}
+ 
+     def is_device_compatible_with_triton():
+         for device, extra_check in triton_supported_devices.items():
+-- 
+2.34.1
+

@@ -1,0 +1,78 @@
+From 4e512f4529929f06e047760a7cff62305e81fa92 Mon Sep 17 00:00:00 2001
+From: Nikita Shulga <2453524+malfet@users.noreply.github.com>
+Date: Tue, 7 May 2024 16:56:13 +0000
+Subject: [PATCH 19/25] [Profiler] Do not emit a warning when using CPU
+ profiler (#125654)
+
+This fixes a logic regression introduced by https://github.com/pytorch/pytorch/pull/123247 where
+```python
+if self.use_device and self.use_device != _get_privateuse1_backend_name():
+```
+was replaced with
+```python
+        VALID_DEVICE_OPTIONS = ["cuda", "xpu", "privateuseone"]
+        if self.use_device not in VALID_DEVICE_OPTIONS:
+```
+
+That triggers a warning every time code is invoke with `self.use_device` set to None
+
+This change also skips all the checks which are useless if `use_device` is None to begin with
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/125654
+Approved by: https://github.com/aaronenyeshi
+
+(cherry picked from commit 9782439277fb545ec4e14340ecf75df86ddc4f0f)
+---
+ torch/autograd/profiler.py | 30 +++++++++++++++++-------------
+ 1 file changed, 17 insertions(+), 13 deletions(-)
+
+diff --git a/torch/autograd/profiler.py b/torch/autograd/profiler.py
+index 7134dff9b2c..16ee88fdb13 100644
+--- a/torch/autograd/profiler.py
++++ b/torch/autograd/profiler.py
+@@ -6,6 +6,7 @@ from warnings import warn
+ import torch
+ 
+ import torch.cuda
++from torch._C import _get_privateuse1_backend_name
+ from torch._C._profiler import _ExperimentalConfig
+ 
+ from torch.autograd import (
+@@ -224,19 +225,22 @@ class profile:
+                 use_kineto
+             ), "Device-only events supported only with Kineto (use_kineto=True)"
+ 
+-        VALID_DEVICE_OPTIONS = ["cuda", "xpu", "privateuseone"]
+-        if self.use_device not in VALID_DEVICE_OPTIONS:
+-            warn(f"The {self.use_device} is not a valid device option.")
+-            self.use_device = None
+-
+-        if self.use_device == "cuda" and not torch.cuda.is_available():
+-            warn("CUDA is not available, disabling CUDA profiling")
+-            self.use_cuda = False
+-            self.use_device = None
+-
+-        if self.use_device == "xpu" and not torch.xpu.is_available():
+-            warn("XPU is not available, disabling XPU profiling")
+-            self.use_device = None
++        if self.use_device is not None:
++            VALID_DEVICE_OPTIONS = ["cuda", "xpu"]
++            if _get_privateuse1_backend_name() != "privateuseone":
++                VALID_DEVICE_OPTIONS.append(_get_privateuse1_backend_name())
++            if self.use_device not in VALID_DEVICE_OPTIONS:
++                warn(f"The {self.use_device} is not a valid device option.")
++                self.use_device = None
++
++            if self.use_device == "cuda" and not torch.cuda.is_available():
++                warn("CUDA is not available, disabling CUDA profiling")
++                self.use_cuda = False
++                self.use_device = None
++
++            if self.use_device == "xpu" and not torch.xpu.is_available():
++                warn("XPU is not available, disabling XPU profiling")
++                self.use_device = None
+ 
+         self.kineto_activities = set()
+         if self.use_cpu:
+-- 
+2.34.1
+

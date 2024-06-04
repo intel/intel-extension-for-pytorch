@@ -1,29 +1,27 @@
-From a2a7717a2d25ab71869a33600a28b4728fb8b70d Mon Sep 17 00:00:00 2001
+From 67d5f838d2c4b306ae7a51fb2ad87ef051fb55ec Mon Sep 17 00:00:00 2001
 From: majing <jing1.ma@intel.com>
-Date: Mon, 23 Oct 2023 11:33:05 +0800
-Subject: [PATCH 14/31] ATen scaled_dot_product_attention: follow supposed
- (CUDA/CPU) operators registration strategy (#177)
+Date: Tue, 7 May 2024 13:52:26 +0800
+Subject: [PATCH 16/25] ATen scaled_dot_product_attention: follow supposed
+ (CUDA/CPU) operators registration strategy (#236)
 
-* Enable XPU backend implementation for scaled_dot_product_attention
-
-Signed-off-by: majing <Jing1.Ma@intel.com>
-
-* fixed format
-
-Signed-off-by: majing <Jing1.Ma@intel.com>
-
----------
-
-Signed-off-by: majing <Jing1.Ma@intel.com>
+Signed-off-by: lei,zhenyuan <zhenyuan.lei@intel.com>
 ---
  aten/src/ATen/native/transformers/attention.cpp | 17 +++++++++++++++++
  1 file changed, 17 insertions(+)
 
 diff --git a/aten/src/ATen/native/transformers/attention.cpp b/aten/src/ATen/native/transformers/attention.cpp
-index 81498f97ffa..131999d6040 100644
+index e338cd15fb9..5f8fa2dea14 100644
 --- a/aten/src/ATen/native/transformers/attention.cpp
 +++ b/aten/src/ATen/native/transformers/attention.cpp
-@@ -526,6 +526,21 @@ int64_t _fused_sdp_choice_meta(
+@@ -27,6 +27,7 @@
+ #include <ATen/NativeFunctions.h>
+ #else
+ #include <ATen/ops/_fused_sdp_choice_native.h>
++#include <ATen/ops/_fused_sdp_choice_ops.h>
+ #include <ATen/ops/_masked_softmax.h>
+ #include <ATen/ops/_native_multi_head_attention_native.h>
+ #include <ATen/ops/_nested_from_padded.h>
+@@ -470,6 +471,20 @@ int64_t _fused_sdp_choice_meta(
          scale);
      return choice_int;
    }
@@ -41,12 +39,11 @@ index 81498f97ffa..131999d6040 100644
 +        scale);
 +    return choice_int;
 +  }
-+
+ #endif
    return static_cast<int64_t>(sdp::SDPBackend::math);
  }
- namespace {
-@@ -674,6 +689,8 @@ Tensor scaled_dot_product_attention(
-       || query_.device().type() == DeviceType::CPU){
+@@ -643,6 +658,8 @@ Tensor scaled_dot_product_attention(
+       || query_.device().type() == DeviceType::HIP){
      choice_int = _fused_sdp_choice_stub(query_.device().type(),
        query_, key, value, attn_mask_, dropout_p, is_causal, scale);
 +  } else if (query_.device().type() == DeviceType::XPU) {

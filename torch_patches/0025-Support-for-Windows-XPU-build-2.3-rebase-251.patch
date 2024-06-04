@@ -1,0 +1,311 @@
+From 2e83c03ee98f63120ba31e75978bc67ab822674a Mon Sep 17 00:00:00 2001
+From: Ratnam Parikh <114774508+ratnampa@users.noreply.github.com>
+Date: Fri, 31 May 2024 07:00:04 -0700
+Subject: [PATCH 25/25] Support for Windows XPU build 2.3 rebase (#251)
+
+---
+ CMakeLists.txt                        |  4 +---
+ aten/src/ATen/xpu/XPUEvent.h          |  5 +++++
+ aten/src/ATen/xpu/XPUGeneratorImpl.h  |  2 +-
+ aten/src/ATen/xpu/detail/XPUHooks.cpp | 12 ++++++++++++
+ c10/util/Float8_fnuz_cvt.h            |  6 ++++++
+ c10/xpu/CMakeLists.txt                | 12 ++++++++++++
+ c10/xpu/XPUFunctions.cpp              | 13 ++++++++++---
+ c10/xpu/XPUMacros.h                   | 14 ++++++++++++++
+ c10/xpu/impl/xpu_cmake_macros.h.in    |  5 +++++
+ cmake/Dependencies.cmake              |  4 ++--
+ cmake/Modules/FindSYCLToolkit.cmake   | 18 ++++++++++++++++++
+ torch/csrc/xpu/Module.cpp             |  6 ++++++
+ 12 files changed, 92 insertions(+), 9 deletions(-)
+ create mode 100644 c10/xpu/impl/xpu_cmake_macros.h.in
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b74bf4536f4..9f1c0efded7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -202,9 +202,7 @@ option(USE_COLORIZE_OUTPUT "Colorize output during compilation" ON)
+ option(USE_ASAN "Use Address+Undefined Sanitizers" OFF)
+ option(USE_TSAN "Use Thread Sanitizer" OFF)
+ option(USE_CUDA "Use CUDA" ON)
+-cmake_dependent_option(
+-    USE_XPU "Use XPU. Only available on Linux." ON
+-    "LINUX" OFF)
++option(USE_XPU "Use XPU" ON)
+ cmake_dependent_option(
+      BUILD_LAZY_CUDA_LINALG "Build cuda linalg ops as separate library" ON "USE_CUDA AND LINUX AND BUILD_PYTHON" OFF)
+ cmake_dependent_option(USE_ROCM "Use ROCm" ON "LINUX" OFF)
+diff --git a/aten/src/ATen/xpu/XPUEvent.h b/aten/src/ATen/xpu/XPUEvent.h
+index f82c676daf8..7dd363b4c5c 100644
+--- a/aten/src/ATen/xpu/XPUEvent.h
++++ b/aten/src/ATen/xpu/XPUEvent.h
+@@ -3,6 +3,11 @@
+ 
+ #include <optional>
+ 
++#ifdef WIN32
++#undef TORCH_XPU_API
++#define TORCH_XPU_API __declspec(dllexport)
++#endif
++
+ namespace at::xpu {
+ 
+ /*
+diff --git a/aten/src/ATen/xpu/XPUGeneratorImpl.h b/aten/src/ATen/xpu/XPUGeneratorImpl.h
+index ce77d2e444e..a1f264382a3 100644
+--- a/aten/src/ATen/xpu/XPUGeneratorImpl.h
++++ b/aten/src/ATen/xpu/XPUGeneratorImpl.h
+@@ -4,7 +4,7 @@
+ 
+ namespace at {
+ 
+-struct TORCH_API XPUGeneratorImpl : public GeneratorImpl {
++struct TORCH_XPU_API XPUGeneratorImpl : public GeneratorImpl {
+   // Constructors
+   XPUGeneratorImpl(DeviceIndex device_index = -1);
+   ~XPUGeneratorImpl() override = default;
+diff --git a/aten/src/ATen/xpu/detail/XPUHooks.cpp b/aten/src/ATen/xpu/detail/XPUHooks.cpp
+index ddece6fced0..61a08f1c566 100644
+--- a/aten/src/ATen/xpu/detail/XPUHooks.cpp
++++ b/aten/src/ATen/xpu/detail/XPUHooks.cpp
+@@ -24,7 +24,13 @@ std::string XPUHooks::showConfig() const {
+ 
+ int32_t XPUHooks::getGlobalIdxFromDevice(const at::Device& device) const {
+   TORCH_CHECK(device.is_xpu(), "Only the XPU device type is expected.");
++#ifdef _WIN32
++  TORCH_CHECK(
++      false,
++      "Default context is not supported on XPU on Windows. So we can NOT find its global index of the ATen device.");
++#else
+   return at::xpu::getGlobalIdxFromDevice(device.index());
++#endif
+ }
+ 
+ Generator XPUHooks::getXPUGenerator(DeviceIndex device_index) const {
+@@ -37,7 +43,13 @@ const Generator& XPUHooks::getDefaultXPUGenerator(
+ }
+ 
+ Device XPUHooks::getDeviceFromPtr(void* data) const {
++#ifdef _WIN32
++  TORCH_CHECK(
++      false,
++      "Default context is not supported on XPU on Windows. So we can NOT find the ATen device of a pointer.");
++#else
+   return at::xpu::getDeviceFromPtr(data);
++#endif
+ }
+ 
+ c10::DeviceIndex XPUHooks::getNumGPUs() const {
+diff --git a/c10/util/Float8_fnuz_cvt.h b/c10/util/Float8_fnuz_cvt.h
+index 983063a0230..e71246054ab 100644
+--- a/c10/util/Float8_fnuz_cvt.h
++++ b/c10/util/Float8_fnuz_cvt.h
+@@ -1,5 +1,9 @@
+ #pragma once
+ 
++#if defined(SYCL_LANGUAGE_VERSION)
++#include <sycl/sycl.hpp>
++#endif
++
+ #include <c10/util/floating_point_utils.h>
+ 
+ #include <cstdint>
+@@ -33,6 +37,8 @@ inline C10_HOST_DEVICE float fp8_fnuz_to_fp32_value(uint8_t x) {
+     // guaranteed mantissa!=0 since cases 0x0 and 0x80 are handled above
+ #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+     uint32_t renorm_shift = __clz(mantissa);
++#elif defined(__SYCL_DEVICE_ONLY__)
++    uint32_t renorm_shift = sycl::clz(mantissa);
+ #elif defined(_MSC_VER)
+     unsigned long nonsign_bsr;
+     _BitScanReverse(&nonsign_bsr, (unsigned long)mantissa);
+diff --git a/c10/xpu/CMakeLists.txt b/c10/xpu/CMakeLists.txt
+index c14f1790d9d..634ebf6c146 100644
+--- a/c10/xpu/CMakeLists.txt
++++ b/c10/xpu/CMakeLists.txt
+@@ -3,6 +3,11 @@
+ # C10 XPU is a minimal library, but it does depend on SYCL.
+ 
+ include(../../cmake/public/xpu.cmake)
++# ---[ Configure macro file.
++set(C10_XPU_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS}) # used in xpu_cmake_macros.h.in
++configure_file(
++    ${CMAKE_CURRENT_LIST_DIR}/impl/xpu_cmake_macros.h.in
++    ${CMAKE_BINARY_DIR}/c10/xpu/impl/xpu_cmake_macros.h)
+ 
+ set(C10_XPU_SRCS
+     XPUCachingAllocator.cpp
+@@ -44,3 +49,10 @@ foreach(file ${C10_XPU_HEADERS})
+   get_filename_component(dir ${file} DIRECTORY)
+   install(FILES ${file} DESTINATION include/c10/xpu/${dir})
+ endforeach()
++
++install(FILES ${CMAKE_BINARY_DIR}/c10/xpu/impl/xpu_cmake_macros.h
++  DESTINATION include/c10/xpu/impl)
++
++if(MSVC AND C10_XPU_BUILD_SHARED_LIBS)
++  install(FILES $<TARGET_PDB_FILE:c10_xpu> DESTINATION lib OPTIONAL)
++endif()
+diff --git a/c10/xpu/XPUFunctions.cpp b/c10/xpu/XPUFunctions.cpp
+index e85d708ac6b..4996e7f6ec3 100644
+--- a/c10/xpu/XPUFunctions.cpp
++++ b/c10/xpu/XPUFunctions.cpp
+@@ -2,8 +2,6 @@
+ #include <c10/util/Exception.h>
+ #include <c10/xpu/XPUFunctions.h>
+ 
+-#include <sys/wait.h>
+-#include <unistd.h>
+ #include <vector>
+ 
+ namespace c10::xpu {
+@@ -53,10 +51,20 @@ inline void initGlobalDevicePoolState() {
+     return;
+   }
+ 
++#ifdef _WIN32
++  // default context feature is disabled by default on Windows.
++  std::vector<sycl::device> deviceList;
++  for (auto it = gDevicePool.devices.begin(); it != gDevicePool.devices.end();
++       ++it) {
++    deviceList.push_back(*(*it));
++  }
++  gDevicePool.context = std::make_unique<sycl::context>(deviceList);
++#else
+   // The default context is utilized for each Intel GPU device, allowing the
+   // retrieval of the context from any GPU device.
+   gDevicePool.context = std::make_unique<sycl::context>(
+       gDevicePool.devices[0]->get_platform().ext_oneapi_get_default_context());
++#endif
+ }
+ 
+ inline void initDevicePoolCallOnce() {
+@@ -189,5 +197,4 @@ c10::DeviceIndex exchange_device(c10::DeviceIndex to_device) {
+ c10::DeviceIndex maybe_exchange_device(c10::DeviceIndex to_device) {
+   return exchange_device(to_device);
+ }
+-
+ } // namespace c10::xpu
+diff --git a/c10/xpu/XPUMacros.h b/c10/xpu/XPUMacros.h
+index fc6aad92229..3074a8c2bed 100644
+--- a/c10/xpu/XPUMacros.h
++++ b/c10/xpu/XPUMacros.h
+@@ -4,12 +4,26 @@
+ // of these macros are.  We need one set of macros for every separate library
+ // we build.
+ 
++#ifndef C10_USING_CUSTOM_GENERATED_MACROS
++#include <c10/xpu/impl/xpu_cmake_macros.h>
++#endif
++
++#ifdef _WIN32
++#if defined(C10_XPU_BUILD_SHARED_LIBS)
++#define C10_XPU_EXPORT __declspec(dllexport)
++#define C10_XPU_IMPORT __declspec(dllimport)
++#else
++#define C10_XPU_EXPORT
++#define C10_XPU_IMPORT
++#endif
++#else // _WIN32
+ #if defined(__GNUC__)
+ #define C10_XPU_EXPORT __attribute__((__visibility__("default")))
+ #else // defined(__GNUC__)
+ #define C10_XPU_EXPORT
+ #endif // defined(__GNUC__)
+ #define C10_XPU_IMPORT C10_XPU_EXPORT
++#endif
+ 
+ // This one is being used by libc10_xpu.so
+ #ifdef C10_XPU_BUILD_MAIN_LIB
+diff --git a/c10/xpu/impl/xpu_cmake_macros.h.in b/c10/xpu/impl/xpu_cmake_macros.h.in
+new file mode 100644
+index 00000000000..a27b3157f01
+--- /dev/null
++++ b/c10/xpu/impl/xpu_cmake_macros.h.in
+@@ -0,0 +1,5 @@
++#pragma once
++
++// Automatically generated header file for the C10 XPU library.  Do not
++// include this file directly.  Instead, include c10/xpu/XPUMacros.h
++#cmakedefine C10_XPU_BUILD_SHARED_LIBS
+diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
+index d5537761232..b161fcb5981 100644
+--- a/cmake/Dependencies.cmake
++++ b/cmake/Dependencies.cmake
+@@ -97,8 +97,8 @@ endif()
+ if(USE_XPU)
+   include(${CMAKE_CURRENT_LIST_DIR}/public/xpu.cmake)
+   if(NOT PYTORCH_FOUND_XPU)
+-    # message(WARNING "Not compiling with XPU. Could NOT find SYCL."
+-    # "Suppress this warning with -DUSE_XPU=OFF.")
++    message(WARNING "Not compiling with XPU. Could NOT find SYCL."
++    "Suppress this warning with -DUSE_XPU=OFF.")
+     caffe2_update_option(USE_XPU OFF)
+   endif()
+ endif()
+diff --git a/cmake/Modules/FindSYCLToolkit.cmake b/cmake/Modules/FindSYCLToolkit.cmake
+index 758c4378636..58e48dd9ef7 100644
+--- a/cmake/Modules/FindSYCLToolkit.cmake
++++ b/cmake/Modules/FindSYCLToolkit.cmake
+@@ -55,6 +55,24 @@ find_library(
+   HINTS ${SYCL_LIBRARY_DIR}
+   NO_DEFAULT_PATH
+ )
++# On Windows, currently there's no sycl.lib. Only sycl7.lib with version suffix,
++# where the current version of the SYCL runtime is 7.
++# Until oneAPI adds support to sycl.lib without the version suffix,
++# sycl_runtime_version needs to be hardcoded and uplifted when SYCL runtime version uplifts.
++# TODO: remove this when sycl.lib is supported on Windows
++if(WIN32)
++  set(sycl_runtime_version 7)
++  find_library(
++    SYCL_LIBRARY
++    NAMES "sycl${sycl_runtime_version}"
++    HINTS ${SYCL_LIBRARY_DIR}
++    NO_DEFAULT_PATH
++  )
++  if(SYCL_LIBRARY STREQUAL "SYCL_LIBRARY-NOTFOUND")
++    message(FATAL_ERROR "Cannot find a SYCL library on Windows")
++  endif()
++endif()
++
+ 
+ if((NOT SYCL_INCLUDE_DIR) OR (NOT SYCL_LIBRARY_DIR) OR (NOT SYCL_LIBRARY))
+   set(SYCL_FOUND False)
+diff --git a/torch/csrc/xpu/Module.cpp b/torch/csrc/xpu/Module.cpp
+index 7bf8abdef20..277c87c2a3a 100644
+--- a/torch/csrc/xpu/Module.cpp
++++ b/torch/csrc/xpu/Module.cpp
+@@ -11,24 +11,30 @@
+ #include <torch/csrc/utils/python_numbers.h>
+ #include <torch/csrc/utils/python_strings.h>
+ 
++#ifndef WIN32
+ #include <pthread.h>
++#endif
+ 
+ using namespace torch;
+ 
+ static bool in_bad_fork = false; // True for children forked after xpu init
+ 
+ // Called in the forked child if xpu has already been initialized
++#ifndef WIN32
+ static void forked_child() {
+   in_bad_fork = true;
+   torch::utils::set_requires_device_init(at::kXPU, true);
+ }
++#endif
+ 
+ // Should be called before the first xpu call. It is mainly called in lazy_init.
+ // Note: This is distinct from initExtension because a stub xpu implementation
+ // has some working functions (e.g. device_count) but cannot fully initialize.
+ static void poison_fork() {
++  #ifndef WIN32
+   static c10::once_flag flag;
+   c10::call_once(flag, [] { pthread_atfork(nullptr, nullptr, forked_child); });
++  #endif
+ }
+ 
+ // XPU management methods
+-- 
+2.34.1
+

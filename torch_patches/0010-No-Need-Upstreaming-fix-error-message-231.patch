@@ -1,0 +1,28 @@
+From 6cb6ecef660042cdeab7b6e8b03ae5586074b57e Mon Sep 17 00:00:00 2001
+From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
+Date: Mon, 15 Apr 2024 10:07:12 +0800
+Subject: [PATCH 10/25] [No Need Upstreaming] fix error message (#231)
+
+---
+ c10/xpu/XPUFunctions.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/c10/xpu/XPUFunctions.cpp b/c10/xpu/XPUFunctions.cpp
+index 15e24d94f5d..e85d708ac6b 100644
+--- a/c10/xpu/XPUFunctions.cpp
++++ b/c10/xpu/XPUFunctions.cpp
+@@ -105,9 +105,9 @@ inline void check_device(DeviceIndex device) {
+   TORCH_CHECK(
+       device >= 0 && device < total,
+       "device is out of range, device is ",
+-      device,
++      static_cast<int16_t>(device),
+       ", total number of device is ",
+-      total,
++      static_cast<int16_t>(total),
+       ".");
+ }
+ 
+-- 
+2.34.1
+
