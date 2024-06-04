@@ -73,16 +73,38 @@ class _IPEXRopeXPU(nn.Module):
         if sin.size(-1) * 2 == last_dim:
             sin = sin.repeat(1, 1, 2)
             cos = cos.repeat(1, 1, 2)
-        sin = sin.expand(rotary_query.shape)
-        cos = cos.expand(rotary_key.shape)
-        if rotary_half:
-            torch.ops.torch_ipex.apply_rotary_embedding_half_qk(
-                rotary_query, rotary_key, sin, cos, rotary_query, rotary_key
-            )
+        num_head = rotary_query.size(-2)
+        num_kv_head = rotary_key.size(-2)
+        if num_head == num_kv_head:
+            sin = sin.expand(rotary_query.shape)
+            cos = cos.expand(rotary_query.shape)
+            if rotary_half:
+                torch.ops.torch_ipex.apply_rotary_embedding_half_qk(
+                    rotary_query, rotary_key, sin, cos, rotary_query, rotary_key
+                )
+            else:
+                torch.ops.torch_ipex.apply_rotary_embedding_two_qk(
+                    rotary_query, rotary_key, sin, cos, rotary_query, rotary_key
+                )
         else:
-            torch.ops.torch_ipex.apply_rotary_embedding_two_qk(
-                rotary_query, rotary_key, sin, cos, rotary_query, rotary_key
-            )
+            sin_q = sin.expand(rotary_query.shape)
+            cos_q = cos.expand(rotary_query.shape)
+            sin_k = sin.expand(rotary_key.shape)
+            cos_k = cos.expand(rotary_key.shape)
+            if rotary_half:
+                torch.ops.torch_ipex.apply_rotary_embedding_half(
+                    rotary_query, sin_q, cos_q, rotary_query
+                )
+                torch.ops.torch_ipex.apply_rotary_embedding_half(
+                    rotary_key, sin_k, cos_k, rotary_key
+                )
+            else:
+                torch.ops.torch_ipex.apply_rotary_embedding_two(
+                    rotary_query, sin_q, cos_q, rotary_query
+                )
+                torch.ops.torch_ipex.apply_rotary_embedding_two(
+                    rotary_key, sin_k, cos_k, rotary_key
+                )
 
         return query, key
 
@@ -279,6 +301,7 @@ class _IPEXPagedAttentionXPU:
         max_context_len,
         alibi_slopes,
     ):
+        query = query.contiguous()
         torch.ops.torch_ipex.xetla_paged_attention_v1(
             output,
             query,

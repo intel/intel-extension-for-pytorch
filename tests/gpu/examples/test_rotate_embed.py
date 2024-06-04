@@ -204,3 +204,75 @@ class TestNNMethod(TestCase):
         )
         self.assertEqual(q, q_ref)
         self.assertEqual(k, k_ref)
+
+    def test_rotary_embedding_unequal_head_interleave(self):
+        test_tensor_size = [
+            (1, 1, 1, 16),
+            (64, 32, 1, 16),
+            (64, 32, 1, 32),
+            (64, 32, 1, 130),
+            (64, 32, 1, 116),
+            (64, 32, 1, 1028),
+            (64, 32, 1, 2048),
+            (1024, 1024, 1, 16),
+        ]
+        for size in test_tensor_size:
+            q_size = (size[0], size[1], size[2] * 16, size[3])
+            tensor = torch.randn(q_size).float().to("xpu")
+            tensor1 = torch.randn(size).float().to("xpu")
+            sin = torch.randn(size).float().to("xpu")
+            cos = torch.randn(size).float().to("xpu")
+
+            ref = apply_rotary_pos_emb_interleave(
+                tensor, sin.expand(tensor.size()), cos.expand(tensor.size())
+            )
+            ref1 = apply_rotary_pos_emb_interleave(
+                tensor1, sin.expand(tensor1.size()), cos.expand(tensor1.size())
+            )
+            out = torch.empty_like(tensor)
+            kernel_out = torch.ops.torch_ipex.apply_rotary_embedding_two(
+                tensor, sin.expand(tensor.size()), cos.expand(tensor.size()), out
+            )
+            self.assertEqual(out, ref)
+            ipex.llm.functional.rotary_embedding(
+                tensor, tensor1, sin, cos, tensor.size(-1), False
+            )
+            self.assertEqual(out, ref)
+            self.assertEqual(tensor, ref)
+            self.assertEqual(tensor1, ref1)
+
+    def test_rotary_embedding_unequal_head_half(self):
+        test_tensor_size = [
+            (1, 1, 1, 16),
+            (64, 32, 1, 16),
+            (64, 32, 1, 32),
+            (64, 32, 1, 130),
+            (64, 32, 1, 116),
+            (64, 32, 1, 1028),
+            (64, 32, 1, 2048),
+            (1024, 1024, 1, 16),
+        ]
+        for size in test_tensor_size:
+            q_size = (size[0], size[1], size[2] * 16, size[3])
+            tensor = torch.randn(q_size).float().to("xpu")
+            tensor1 = torch.randn(size).float().to("xpu")
+            sin = torch.randn(size).float().to("xpu")
+            cos = torch.randn(size).float().to("xpu")
+
+            ref = apply_rotary_pos_emb_half(
+                tensor, sin.expand(tensor.size()), cos.expand(tensor.size())
+            )
+            ref1 = apply_rotary_pos_emb_half(
+                tensor1, sin.expand(tensor1.size()), cos.expand(tensor1.size())
+            )
+            out = torch.empty_like(tensor)
+            kernel_out = torch.ops.torch_ipex.apply_rotary_embedding_half(
+                tensor, sin.expand(tensor.size()), cos.expand(tensor.size()), out
+            )
+            self.assertEqual(out, ref)
+            ipex.llm.functional.rotary_embedding(
+                tensor, tensor1, sin, cos, tensor.size(-1), True
+            )
+            self.assertEqual(out, ref)
+            self.assertEqual(tensor, ref)
+            self.assertEqual(tensor1, ref1)
