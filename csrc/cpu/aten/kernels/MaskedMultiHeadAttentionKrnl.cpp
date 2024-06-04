@@ -559,7 +559,7 @@ scale_dot_product_for_indirect_access_kv_cache(
 
   auto target_block_size = 32L;
   if (bs <= 32 and seq_len < 65536) {
-    target_block_size = 1L;
+    target_block_size = 8L;
   }
   auto kv_block_size = bs * head_num >= max_parallel_parts
       ? seq_len
@@ -568,7 +568,11 @@ scale_dot_product_for_indirect_access_kv_cache(
   auto kv_block_count = (seq_len + kv_block_size - 1) / kv_block_size;
   auto need_update_beam_idx = offset > 0 and bs > 1;
   auto b_ptr = beam_idx.data_ptr<long>();
-  long new_beam_idx[beam_batch][offset + query.size(1) + 1];
+  auto max_cache_size = beam_idx.size(0);
+  long new_beam_idx[beam_batch][offset + query.size(1) + 1] = {};
+  auto prompt_len = b_ptr[(max_cache_size - 2) * beam_batch];
+  auto prompt_bs = b_ptr[(max_cache_size - 1) * beam_batch];
+  auto beam_size = beam_batch / prompt_bs;
   if (need_update_beam_idx) {
     // according to the last decoded token to get the target beam for the past
     // token
@@ -576,6 +580,8 @@ scale_dot_product_for_indirect_access_kv_cache(
       new_beam_idx[i][offset - 1] = b_ptr[(offset - 1) * bs + i];
       for (int j = offset - 2; j >= 0;
            j--) { // for the token of input, the target beam is alwarys 0
+        if (j < prompt_len - 1 && bs == beam_size)
+          break; // fast path for latency mode
         new_beam_idx[i][j] = b_ptr[j * bs + new_beam_idx[i][j + 1]];
       }
     }
@@ -910,9 +916,13 @@ scale_dot_product_for_indirect_access_kv_cache_half(
   auto attn_out_ptr = attn_outs.data_ptr<at::Half>();
   // torch_ipex::cpu::kernel::zero_ker(attn_out_ptr, attn_outs.numel());
   auto attn_w_ptr = attn_weights.data_ptr<at::Half>();
-  long new_beam_idx[beam_batch][offset + query.size(1) + 1];
   auto b_ptr = beam_idx.data_ptr<long>();
-  auto need_update_beam_idx = offset > 0 && bs > 1;
+  auto max_cache_size = beam_idx.size(0);
+  long new_beam_idx[beam_batch][offset + query.size(1) + 1] = {};
+  auto prompt_len = b_ptr[(max_cache_size - 2) * beam_batch];
+  auto prompt_bs = b_ptr[(max_cache_size - 1) * beam_batch];
+  auto beam_size = beam_batch / prompt_bs;
+  auto need_update_beam_idx = offset > 0 and bs > 1;
   if (need_update_beam_idx) {
     // according to the last decoded token to get the target beam for the past
     // token
@@ -920,6 +930,8 @@ scale_dot_product_for_indirect_access_kv_cache_half(
       new_beam_idx[i][offset - 1] = b_ptr[(offset - 1) * bs + i];
       for (int j = offset - 2; j >= 0;
            j--) { // for the token of input, the target beam is alwarys 0
+        if (j < prompt_len - 1 && bs == beam_size)
+          break; // fast path for latency mode
         new_beam_idx[i][j] = b_ptr[j * bs + new_beam_idx[i][j + 1]];
       }
     }
@@ -1415,7 +1427,7 @@ masked_multihead_self_attention_kernel_impl(
     value_cache = at::empty(
         {max_positions, beam_batch, value.size(2), value.size(3)},
         value.options());
-    beam_idx = at::empty({max_positions, beam_batch}, beam_idx.options());
+    beam_idx = at::zeros({max_positions + 2, beam_batch}, beam_idx.options());
     auto beam_idx_access = beam_idx.accessor<long, 2>();
 #pragma omp parallel for collapse(2)
     for (auto i = 0; i < max_positions; i++) {
@@ -1428,15 +1440,19 @@ masked_multihead_self_attention_kernel_impl(
         }
       }
     }
+    beam_idx_access[max_positions][0] = cur_len; // record the prompt token len
+    beam_idx_access[max_positions + 1][0] =
+        query.size(0); // record the promt bs info
+
   } else if (offset > 0 && offset + cur_len > cache_size) {
-    auto new_cache_size = cache_size * 2;
+    auto new_cache_size = cache_size * 2 + 2;
     auto new_key_cache = at::empty(
         {new_cache_size, beam_batch, key.size(2), key.size(3)}, key.options());
     auto new_value_cache = at::empty(
         {new_cache_size, beam_batch, value.size(2), value.size(3)},
         value.options());
     auto new_beam_idx =
-        at::empty({new_cache_size, beam_batch}, beam_idx.options());
+        at::zeros({new_cache_size, beam_batch}, beam_idx.options());
     new_key_cache.slice(0, 0, cache_size).copy_(key_cache);
     new_value_cache.slice(0, 0, cache_size).copy_(value_cache);
     new_beam_idx.slice(0, 0, cache_size).copy_(beam_idx);
@@ -1447,6 +1463,10 @@ masked_multihead_self_attention_kernel_impl(
         new_beam_idx_access[i][j] = beam_idx_access[0][j];
       }
     }
+    new_beam_idx_access[new_cache_size - 2][0] =
+        beam_idx_access[cache_size - 2][0];
+    new_beam_idx_access[new_cache_size - 1][0] =
+        beam_idx_access[cache_size - 1][0];
     key_cache = new_key_cache;
     value_cache = new_value_cache;
     beam_idx = new_beam_idx;
