@@ -1,7 +1,7 @@
 ﻿# Model Inference with Intel® Extension for PyTorch\* Optimizations
 
 We provided examples about how to use Intel® Extension for PyTorch\* to accelerate model inference.
-The `ipex.optimize` function of Intel® Extension for PyTorch\* applies optimizations to the model, bringing additional performance boosts.
+The `ipex.optimize` function of Intel® Extension for PyTorch* applies optimizations to the model, bringing additional performance boosts.
 For both computer vision workloads and NLP workloads, we recommend applying the `ipex.optimize` function against the model object.
 
 ## Environment Setup
