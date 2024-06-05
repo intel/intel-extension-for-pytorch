@@ -109,7 +109,7 @@ For weight-only quantization with deepspeed, we quantize the model then run the 
 
 - Command:
 ```bash
-deepspeed --bind_cores_to_rank run.py  --benchmark -m <QWEN2_MODEL_ID_OR_LOCAL_PATH> --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --greedy --input-tokens <INPUT_LENGTH>  --autotp --shard-model --output-dir "saved_results"
+deepspeed --bind_cores_to_rank run.py  --benchmark -m <QWEN2_MODEL_ID_OR_LOCAL_PATH> --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --greedy --input-tokens <INPUT_LENGTH>  --autotp --shard-model
 ```
 
 #### 2.1.1.4 How to Shard Model weight files for Distributed Inference with DeepSpeed
