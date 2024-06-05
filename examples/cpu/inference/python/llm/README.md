@@ -95,6 +95,10 @@ git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
 DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON -t ipex-llm:main .
+# Working behind a corporate HTTP proxy makes everything harder, try add http/https proxy by build args
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON \
+    --build-arg http_proxy=<proxy host>:<proxy port> --build-arg https_proxy=<proxy host>:<proxy port> \
+    -t ipex-llm:main .
 
 # Run the container with command below
 docker run --rm -it --privileged ipex-llm:main bash
