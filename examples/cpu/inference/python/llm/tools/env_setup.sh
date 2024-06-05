@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -ex
+set -e
 
 # Save current directory path
 BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -81,7 +81,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     # Install deps
-    python -m pip install cmake==3.28.4 ninja unzip
+    conda install -y cmake ninja unzip
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
@@ -150,7 +150,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl
     fi
 
-    echo "python -m pip install cpuid accelerate datasets sentencepiece mkl protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC} transformers_stream_generator tiktoken" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate datasets sentencepiece protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC} transformers_stream_generator tiktoken" >> ${AUX_INSTALL_SCRIPT}
 
     # Used for accuracy test only
     if [ -d lm-evaluation-harness ]; then
@@ -165,19 +165,21 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     rm -rf lm-evaluation-harness
 
     # Install DeepSpeed
-
-    if [ -d DeepSpeed ]; then
+    if [ $((${MODE} & 0x08)) -ne 0 ]; then
+        if [ -d DeepSpeed ]; then
+            rm -rf DeepSpeed
+        fi
+        git clone ${REPO_DS_SYCL} DeepSpeed
+        cd DeepSpeed
+        git checkout ${COMMIT_DS_SYCL}
+        python -m pip install -r requirements/requirements.txt
+        python setup.py bdist_wheel
+        cp dist/*.whl ${WHEELFOLDER}
+        cd ..
         rm -rf DeepSpeed
+    else
+        echo "python -m pip install deepspeed==${VER_DS_SYCL}" >> ${AUX_INSTALL_SCRIPT}
     fi
-    git clone ${REPO_DS_SYCL} DeepSpeed
-    cd DeepSpeed
-    git checkout ${COMMIT_DS_SYCL}
-    python -m pip install -r requirements/requirements.txt
-    python setup.py bdist_wheel
-    cp dist/*.whl ${WHEELFOLDER}
-    cd ..
-    rm -rf DeepSpeed
-
 
     # Install OneCCL
     if [ -d oneCCL ]; then
@@ -196,6 +198,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd intel-extension-for-pytorch/examples/cpu/inference/python/llm
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
+    conda install -y mkl
     conda install -y gperftools -c conda-forge
     bash ${AUX_INSTALL_SCRIPT}
     python -m pip install ${WHEELFOLDER}/*.whl
