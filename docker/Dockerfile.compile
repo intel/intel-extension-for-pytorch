@@ -47,6 +47,7 @@ RUN cp ./intel-extension-for-pytorch/scripts/compile_bundle.sh ./ && \
     sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
 RUN . ./miniforge3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
+    conda install -y libstdcxx-ng && \
     bash compile_bundle.sh && \
     cd intel-extension-for-pytorch && \
     python -m pip install pyyaml && \
@@ -66,7 +67,7 @@ RUN . ./miniforge3/bin/activate && \
     bash ./torch_install.sh && rm ./torch_install.sh && \
     python -m pip install ./wheels/*.whl && \
     python -m pip install intel-openmp && \
-    conda install -y jemalloc gperftools -c conda-forge && \
+    conda install -y jemalloc gperftools libstdcxx-ng && \
     python -m pip cache purge && \
     conda clean -a -y && \
     rm -rf ./wheels && \
