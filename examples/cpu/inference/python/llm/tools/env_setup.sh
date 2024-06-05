@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -ex
 
 # Save current directory path
 BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -81,24 +81,16 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     # Install deps
-    conda install -y cmake ninja unzip
+    python -m pip install cmake==3.28.4 ninja unzip
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        set +e
-        echo "${VER_TORCH}" | grep "dev" > /dev/null
-        TORCH_DEV=$?
-        set -e
-        if [ ${TORCH_DEV} -eq 0 ]; then
-            echo ""
-            echo "Error: Detected dependent PyTorch is a nightly built version. Installation from prebuilt wheel files is not supported. Run again to compile from source."
-            exit 4
-        else
-            echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
-            echo "python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/" >> ${AUX_INSTALL_SCRIPT}
-            python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
-            python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
-        fi
+        echo ""
+        echo "Install prebuilt wheels for phi3"
+        echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.3.100%2Bgit0eb3473-cp310-cp310-linux_x86_64.whl https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_stable/cpu/oneccl_bind_pt-2.3.0%2Bcpu-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
+        python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
+        python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.3.100%2Bgit0eb3473-cp310-cp310-linux_x86_64.whl https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_stable/cpu/oneccl_bind_pt-2.3.0%2Bcpu-cp310-cp310-linux_x86_64.whl
     else
         function ver_compare() {
             VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
@@ -158,7 +150,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl
     fi
 
-    echo "python -m pip install cpuid accelerate datasets sentencepiece protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC} transformers_stream_generator tiktoken" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate datasets sentencepiece mkl protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC} transformers_stream_generator tiktoken" >> ${AUX_INSTALL_SCRIPT}
 
     # Used for accuracy test only
     if [ -d lm-evaluation-harness ]; then
@@ -173,21 +165,19 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     rm -rf lm-evaluation-harness
 
     # Install DeepSpeed
-    if [ $((${MODE} & 0x08)) -ne 0 ]; then
-        if [ -d DeepSpeed ]; then
-            rm -rf DeepSpeed
-        fi
-        git clone ${REPO_DS_SYCL} DeepSpeed
-        cd DeepSpeed
-        git checkout ${COMMIT_DS_SYCL}
-        python -m pip install -r requirements/requirements.txt
-        python setup.py bdist_wheel
-        cp dist/*.whl ${WHEELFOLDER}
-        cd ..
+
+    if [ -d DeepSpeed ]; then
         rm -rf DeepSpeed
-    else
-        echo "python -m pip install deepspeed==${VER_DS_SYCL}" >> ${AUX_INSTALL_SCRIPT}
     fi
+    git clone ${REPO_DS_SYCL} DeepSpeed
+    cd DeepSpeed
+    git checkout ${COMMIT_DS_SYCL}
+    python -m pip install -r requirements/requirements.txt
+    python setup.py bdist_wheel
+    cp dist/*.whl ${WHEELFOLDER}
+    cd ..
+    rm -rf DeepSpeed
+
 
     # Install OneCCL
     if [ -d oneCCL ]; then
@@ -206,7 +196,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd intel-extension-for-pytorch/examples/cpu/inference/python/llm
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    conda install -y mkl
     conda install -y gperftools -c conda-forge
     bash ${AUX_INSTALL_SCRIPT}
     python -m pip install ${WHEELFOLDER}/*.whl
@@ -214,7 +203,7 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     if [ -f prompt.json ]; then
         rm -f prompt.json
     fi
-    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt-qwen2.json
+    wget -O prompt.json https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt-qwen2.json
     cd single_instance
     if [ -f prompt.json ]; then
         rm -f prompt.json
