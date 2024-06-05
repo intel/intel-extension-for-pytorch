@@ -1,6 +1,6 @@
-# Intel® Extension for PyTorch\* Large Language Model (LLM) Feature Get Started For Qwen 2 models
+# Intel® Extension for PyTorch\* Large Language Model (LLM) Feature Get Started For Qwen2 models
 
-Intel® Extension for PyTorch\* provides dedicated optimization for running Qwen 2 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization, etc. 
+Intel® Extension for PyTorch\* provides dedicated optimization for running Qwen2 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization, etc. 
 # 1. Environment Setup
 
 There are several environment setup methodologies provided. You can choose either of them according to your usage scenario. The Docker-based ones are recommended.
@@ -52,7 +52,7 @@ source ./tools/env_activate.sh
 ```
 <br>
 
-# 2. How To Run Qwen 2 with ipex.llm
+# 2. How To Run Qwen2 with ipex.llm
 
 **ipex.llm provides a single script to facilitate running generation tasks as below:**
 
@@ -67,7 +67,7 @@ python run.py --help # for more detailed usages
 |---|---|
 | model id | "--model-name-or-path" or "-m" to specify the <QWEN2_MODEL_ID_OR_LOCAL_PATH>, it is model id from Huggingface or downloaded local path |
 | generation | default: beam search (beam size = 4), "--greedy" for greedy search |
-| input tokens | provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [1024, 2048, 4096, 8192, 130944]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
+| input tokens | provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [1024, 2048, 4096, 8192, 16384, 32768]; if "--input-tokens" is not used, use "--prompt" to choose other strings as prompt inputs|
 | output tokens | default: 32, use "--max-new-tokens" to choose any other size |
 | batch size |  default: 1, use "--batch-size" to choose any other size |
 | token latency |  enable "--token-latency" to print out the first or next token latency |
@@ -76,9 +76,9 @@ python run.py --help # for more detailed usages
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
-## 2.1 Usage of running Qwen 2 models
+## 2.1 Usage of running Qwen2 models
 
-The _\<QWEN2_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Qwen 2 model you will run, which can be found from [HuggingFace Models](https://huggingface.co/models).
+The _\<QWEN2_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Qwen2 model you will run, which can be found from [HuggingFace Models](https://huggingface.co/models).
 
 ### 2.1.1 Run generation with multiple instances on multiple CPU numa nodes
 
