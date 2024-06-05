@@ -8,14 +8,14 @@ There are several environment setup methodologies provided. You can choose eithe
 ## 1.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels
 
 ```bash
-# Get the Intel® Extension for PyTorch\* source code
+# Get the Intel® Extension for PyTorch* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
 git checkout 2.3-qwen-2
 git submodule sync
 git submodule update --init --recursive
 
-# Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files
+# Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch* prebuilt wheel files
 DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:qwen2 .
 
 # Run the container with command below
@@ -31,7 +31,7 @@ source ./tools/env_activate.sh
 ## 1.2 Conda-based environment setup with pre-built wheels
 
 ```bash
-# Get the Intel® Extension for PyTorch\* source code
+# Get the Intel® Extension for PyTorch* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
 git checkout 2.3-qwen-2
