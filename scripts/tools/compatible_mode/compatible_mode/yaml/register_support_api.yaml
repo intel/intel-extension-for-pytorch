@@ -1,0 +1,67 @@
+ccl_api:
+  - torch.distributed.get_backend
+
+create_tensor_supported_api:
+  - torch.empty
+  - torch.ones
+  - torch.logspace
+  - torch.randperm
+  - torch.asarray
+  - torch.ones_like
+  - torch.randn_like
+  - torch.rand_like
+  - torch.empty_like
+  - torch.full_like
+  - torch.linspace
+  - torch.arange
+  - torch.kaiser_window
+  - torch.randint
+  - torch.hamming_window
+  - torch.rand
+  - torch.blackman_window
+  - torch.scalar_tensor
+  - torch.randint_like
+  - torch.range
+  - torch.full
+  - torch.tril_indices
+  - torch.eye
+  - torch.tensor
+  - torch.empty_strided
+  - torch.triu_indices
+  - torch.hann_window
+  - torch.empty_quantized
+  - torch.sparse_coo_tensor
+  - torch.zeros
+  - torch.randn
+  - torch.zeros_like
+  - torch.bartlett_window
+  - torch.as_tensor
+  - torch.nested.nested_tensor
+  - torch.nested.as_nested_tensor
+
+create_tensor_unsupported_api:
+  - torch.sparse_bsc_tensor
+  - torch.sparse_compressed_tensor
+  - torch.sparse_csr_tensor
+  - torch.sparse_bsr_tensor
+  - torch.sparse_csc_tensor
+
+data_loader_api:
+  - torch.utils.data.DataLoader.__init__
+
+ddp_api:
+  - torch.distributed.init_process_group
+
+tensor_to_api:
+  - torch.Tensor.to
+  - torch.Tensor.cuda
+  - torch.Tensor.pin_memory
+  - torch.Tensor.is_cuda
+  - torch.nn.Module.cuda
+  - torch.nested.to_padded_tensor
+
+pass_api:
+  - torch.distributed.is_nccl_available
+
+failure_api:
+  - torch.cuda.is_current_stream_capturing
