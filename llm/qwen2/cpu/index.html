@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Qwen2 models &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.100+git0eb3473 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=69107c99" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                2.3.100+git0eb3473
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"><ul>
+<li><a class="reference internal" href="#">Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Qwen2 models</a></li>
+<li><a class="reference internal" href="#environment-setup">1. Environment Setup</a><ul>
+<li><a class="reference internal" href="#recommended-docker-based-environment-setup-with-pre-built-wheels">1.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels</a></li>
+<li><a class="reference internal" href="#conda-based-environment-setup-with-pre-built-wheels">1.2 Conda-based environment setup with pre-built wheels</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#how-to-run-qwen2-with-ipex-llm">2. How To Run Qwen2 with ipex.llm</a><ul>
+<li><a class="reference internal" href="#usage-of-running-qwen2-models">2.1 Usage of running Qwen2 models</a><ul>
+<li><a class="reference internal" href="#run-generation-with-multiple-instances-on-multiple-cpu-numa-nodes">2.1.1 Run generation with multiple instances on multiple CPU numa nodes</a><ul>
+<li><a class="reference internal" href="#prepare">2.1.1.1 Prepare:</a></li>
+<li><a class="reference internal" href="#bf16">2.1.1.2 BF16:</a></li>
+<li><a class="reference internal" href="#weight-only-quantization-int8">2.1.1.3 Weight-only quantization (INT8):</a></li>
+<li><a class="reference internal" href="#how-to-shard-model-weight-files-for-distributed-inference-with-deepspeed">2.1.1.4 How to Shard Model weight files for Distributed Inference with DeepSpeed</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#run-generation-with-single-instance-on-a-single-numa-node">2.1.2 Run generation with single instance on a single numa node</a><ul>
+<li><a class="reference internal" href="#id1">2.1.2.1 BF16:</a></li>
+<li><a class="reference internal" href="#id2">2.1.2.2 Weight-only quantization (INT8):</a></li>
+<li><a class="reference internal" href="#notes">2.1.2.3 Notes:</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#miscellaneous-tips">Miscellaneous Tips</a></li>
+</ul>
+</li>
+</ul>
+</div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Qwen2 models</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="intel-extension-for-pytorch-large-language-model-llm-feature-get-started-for-qwen2-models">
+<h1>Intel® Extension for PyTorch* Large Language Model (LLM) Feature Get Started For Qwen2 models<a class="headerlink" href="#intel-extension-for-pytorch-large-language-model-llm-feature-get-started-for-qwen2-models" title="Link to this heading"></a></h1>
+<p>Intel® Extension for PyTorch* provides dedicated optimization for running Qwen2 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization, etc.</p>
+</section>
+<section id="environment-setup">
+<h1>1. Environment Setup<a class="headerlink" href="#environment-setup" title="Link to this heading"></a></h1>
+<p>There are several environment setup methodologies provided. You can choose either of them according to your usage scenario. The Docker-based ones are recommended.</p>
+<section id="recommended-docker-based-environment-setup-with-pre-built-wheels">
+<h2>1.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels<a class="headerlink" href="#recommended-docker-based-environment-setup-with-pre-built-wheels" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the Intel® Extension for PyTorch* source code</span>
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/intel/intel-extension-for-pytorch.git
+<span class="nb">cd</span><span class="w"> </span>intel-extension-for-pytorch
+git<span class="w"> </span>checkout<span class="w"> </span><span class="m">2</span>.3-qwen-2
+git<span class="w"> </span>submodule<span class="w"> </span>sync
+git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>--recursive
+
+<span class="c1"># Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch* prebuilt wheel files</span>
+<span class="nv">DOCKER_BUILDKIT</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>examples/cpu/inference/python/llm/Dockerfile<span class="w"> </span>-t<span class="w"> </span>ipex-llm:qwen2<span class="w"> </span>.
+
+<span class="c1"># Run the container with command below</span>
+docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>--privileged<span class="w"> </span>ipex-llm:qwen2<span class="w"> </span>bash
+
+<span class="c1"># When the command prompt shows inside the docker container, enter llm examples directory</span>
+<span class="nb">cd</span><span class="w"> </span>llm
+
+<span class="c1"># Activate environment variables</span>
+<span class="nb">source</span><span class="w"> </span>./tools/env_activate.sh
+</pre></div>
+</div>
+</section>
+<section id="conda-based-environment-setup-with-pre-built-wheels">
+<h2>1.2 Conda-based environment setup with pre-built wheels<a class="headerlink" href="#conda-based-environment-setup-with-pre-built-wheels" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the Intel® Extension for PyTorch* source code</span>
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/intel/intel-extension-for-pytorch.git
+<span class="nb">cd</span><span class="w"> </span>intel-extension-for-pytorch
+git<span class="w"> </span>checkout<span class="w"> </span><span class="m">2</span>.3-qwen-2
+git<span class="w"> </span>submodule<span class="w"> </span>sync
+git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>--recursive
+
+<span class="c1"># Create a conda environment (pre-built wheel only available with python=3.10)</span>
+conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>llm<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.10<span class="w"> </span>-y
+conda<span class="w"> </span>activate<span class="w"> </span>llm
+
+<span class="c1"># Setup the environment with the provided script</span>
+<span class="c1"># A sample &quot;prompt.json&quot; file for benchmarking is also downloaded</span>
+<span class="nb">cd</span><span class="w"> </span>examples/cpu/inference/python/llm
+bash<span class="w"> </span>./tools/env_setup.sh<span class="w"> </span><span class="m">7</span>
+
+<span class="c1"># Activate environment variables</span>
+<span class="nb">source</span><span class="w"> </span>./tools/env_activate.sh
+</pre></div>
+</div>
+<br></section>
+</section>
+<section id="how-to-run-qwen2-with-ipex-llm">
+<h1>2. How To Run Qwen2 with ipex.llm<a class="headerlink" href="#how-to-run-qwen2-with-ipex-llm" title="Link to this heading"></a></h1>
+<p><strong>ipex.llm provides a single script to facilitate running generation tasks as below:</strong></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># if you are using a docker container built from commands above in Sec. 1.1, the placeholder LLM_DIR below is /home/ubuntu/llm</span>
+<span class="c1"># if you are using a conda env created with commands above in Sec. 1.2, the placeholder LLM_DIR below is intel-extension-for-pytorch/examples/cpu/inference/python/llm</span>
+<span class="n">cd</span> <span class="o">&lt;</span><span class="n">LLM_DIR</span><span class="o">&gt;</span>
+<span class="n">python</span> <span class="n">run</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">help</span> <span class="c1"># for more detailed usages</span>
+</pre></div>
+</div>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>Key args of run.py</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>model id</td>
+<td><code>--model-name-or-path</code> or <code>-m</code> to specify the &lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;, it is model id from Huggingface or downloaded local path</td>
+</tr>
+<tr>
+<td>generation</td>
+<td>default: beam search (beam size = 4), <code>--greedy</code> for greedy search</td>
+</tr>
+<tr>
+<td>input tokens</td>
+<td>provide fixed sizes for input prompt size, use <code>--input-tokens</code> for &lt;INPUT_LENGTH&gt; in [1024, 2048, 4096, 8192, 16384, 32768]; if <code>--input-tokens</code> is not used, use <code>--prompt</code> to choose other strings as prompt inputs</td>
+</tr>
+<tr>
+<td>output tokens</td>
+<td>default: 32, use <code>--max-new-tokens</code> to choose any other size</td>
+</tr>
+<tr>
+<td>batch size</td>
+<td>default: 1, use <code>--batch-size</code> to choose any other size</td>
+</tr>
+<tr>
+<td>token latency</td>
+<td>enable <code>--token-latency</code> to print out the first or next token latency</td>
+</tr>
+<tr>
+<td>generation iterations</td>
+<td>use <code>--num-iter</code> and <code>--num-warmup</code> to control the repeated iterations of generation, default: 100-iter/10-warmup</td>
+</tr>
+<tr>
+<td>streaming mode output</td>
+<td>greedy search only (work with <code>--greedy</code>), use <code>--streaming</code> to enable the streaming generation output</td>
+</tr>
+</tbody>
+</table><p><em>Note:</em> You may need to log in your HuggingFace account to access the model files. Please refer to <a class="reference external" href="https://huggingface.co/docs/huggingface_hub/quick-start#login">HuggingFace login</a>.</p>
+<section id="usage-of-running-qwen2-models">
+<h2>2.1 Usage of running Qwen2 models<a class="headerlink" href="#usage-of-running-qwen2-models" title="Link to this heading"></a></h2>
+<p>The <em>&lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;</em> in the below commands specifies the Qwen2 model you will run, which can be found from <a class="reference external" href="https://huggingface.co/models">HuggingFace Models</a>.</p>
+<section id="run-generation-with-multiple-instances-on-multiple-cpu-numa-nodes">
+<h3>2.1.1 Run generation with multiple instances on multiple CPU numa nodes<a class="headerlink" href="#run-generation-with-multiple-instances-on-multiple-cpu-numa-nodes" title="Link to this heading"></a></h3>
+<section id="prepare">
+<h4>2.1.1.1 Prepare:<a class="headerlink" href="#prepare" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">unset</span><span class="w"> </span>KMP_AFFINITY
+</pre></div>
+</div>
+<p>In the DeepSpeed cases below, we recommend <code class="docutils literal notranslate"><span class="pre">--shard-model</span></code> to shard model weight sizes more even for better memory usage when running with DeepSpeed.</p>
+<p>If using <code class="docutils literal notranslate"><span class="pre">--shard-model</span></code>, it will save a copy of the shard model weights file in the path of <code class="docutils literal notranslate"><span class="pre">--output-dir</span></code> (default path is <code class="docutils literal notranslate"><span class="pre">./saved_results</span></code> if not provided).
+If you have used <code class="docutils literal notranslate"><span class="pre">--shard-model</span></code> and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove <code class="docutils literal notranslate"><span class="pre">--shard-model</span></code>, and replace <code class="docutils literal notranslate"><span class="pre">-m</span> <span class="pre">&lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;</span></code> with <code class="docutils literal notranslate"><span class="pre">-m</span> <span class="pre">&lt;shard</span> <span class="pre">model</span> <span class="pre">path&gt;</span></code> to skip the repeated shard steps.</p>
+<p>Besides, the standalone shard model function/scripts are also provided in section 2.1.1.4, in case you would like to generate the shard model weights files in advance before running distributed inference.</p>
+</section>
+<section id="bf16">
+<h4>2.1.1.2 BF16:<a class="headerlink" href="#bf16" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p>Command:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>deepspeed<span class="w"> </span>--bind_cores_to_rank<span class="w">  </span>run.py<span class="w"> </span>--benchmark<span class="w"> </span>-m<span class="w"> </span>&lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;<span class="w"> </span>--dtype<span class="w"> </span>bfloat16<span class="w"> </span>--ipex<span class="w">  </span>--greedy<span class="w"> </span>--input-tokens<span class="w"> </span>&lt;INPUT_LENGTH&gt;<span class="w"> </span>--autotp<span class="w"> </span>--shard-model
+</pre></div>
+</div>
+</section>
+<section id="weight-only-quantization-int8">
+<h4>2.1.1.3 Weight-only quantization (INT8):<a class="headerlink" href="#weight-only-quantization-int8" title="Link to this heading"></a></h4>
+<p>By default, for weight-only quantization, we use quantization with <a class="reference external" href="https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html">Automatic Mixed Precision</a> inference (<code class="docutils literal notranslate"><span class="pre">--quant-with-amp</span></code>) to get peak performance and fair accuracy.
+For weight-only quantization with deepspeed, we quantize the model then run the benchmark. The quantized model won’t be saved.</p>
+<ul class="simple">
+<li><p>Command:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>deepspeed<span class="w"> </span>--bind_cores_to_rank<span class="w"> </span>run.py<span class="w">  </span>--benchmark<span class="w"> </span>-m<span class="w"> </span>&lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;<span class="w"> </span>--ipex<span class="w"> </span>--ipex-weight-only-quantization<span class="w"> </span>--weight-dtype<span class="w"> </span>INT8<span class="w"> </span>--quant-with-amp<span class="w"> </span>--greedy<span class="w"> </span>--input-tokens<span class="w"> </span>&lt;INPUT_LENGTH&gt;<span class="w">  </span>--autotp<span class="w"> </span>--shard-model
+</pre></div>
+</div>
+</section>
+<section id="how-to-shard-model-weight-files-for-distributed-inference-with-deepspeed">
+<h4>2.1.1.4 How to Shard Model weight files for Distributed Inference with DeepSpeed<a class="headerlink" href="#how-to-shard-model-weight-files-for-distributed-inference-with-deepspeed" title="Link to this heading"></a></h4>
+<p>To save memory usage, we could shard the model weights files under the local path before we launch distributed tests with DeepSpeed.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="o">./</span><span class="n">utils</span>
+<span class="c1"># general command:</span>
+<span class="n">python</span> <span class="n">create_shard_model</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">m</span> <span class="o">&lt;</span><span class="n">QWEN2_MODEL_ID_OR_LOCAL_PATH</span><span class="o">&gt;</span>  <span class="o">--</span><span class="n">save</span><span class="o">-</span><span class="n">path</span> <span class="o">./</span><span class="n">local_qwen2_model_shard</span>
+<span class="c1"># After sharding the model, using &quot;-m ./local_qwen2_model_shard&quot; in later tests</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="run-generation-with-single-instance-on-a-single-numa-node">
+<h3>2.1.2 Run generation with single instance on a single numa node<a class="headerlink" href="#run-generation-with-single-instance-on-a-single-numa-node" title="Link to this heading"></a></h3>
+<section id="id1">
+<h4>2.1.2.1 BF16:<a class="headerlink" href="#id1" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p>Command:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>num&gt;<span class="w"> </span>numactl<span class="w"> </span>-m<span class="w"> </span>&lt;node<span class="w"> </span>N&gt;<span class="w"> </span>-C<span class="w"> </span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>list&gt;<span class="w"> </span>python<span class="w"> </span>run.py<span class="w"> </span>--benchmark<span class="w"> </span>-m<span class="w"> </span>&lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;<span class="w"> </span>--dtype<span class="w"> </span>bfloat16<span class="w"> </span>--ipex<span class="w"> </span>--greedy<span class="w"> </span>--input-tokens<span class="w"> </span>&lt;INPUT_LENGTH&gt;<span class="w"> </span>
+</pre></div>
+</div>
+</section>
+<section id="id2">
+<h4>2.1.2.2 Weight-only quantization (INT8):<a class="headerlink" href="#id2" title="Link to this heading"></a></h4>
+<p>By default, for weight-only quantization, we use quantization with <a class="reference external" href="https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html">Automatic Mixed Precision</a> inference (<code class="docutils literal notranslate"><span class="pre">--quant-with-amp</span></code>) to get peak performance and fair accuracy.</p>
+<ul class="simple">
+<li><p>Command:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>num&gt;<span class="w"> </span>numactl<span class="w"> </span>-m<span class="w"> </span>&lt;node<span class="w"> </span>N&gt;<span class="w"> </span>-C<span class="w"> </span>&lt;physical<span class="w"> </span>cores<span class="w"> </span>list&gt;<span class="w">  </span>python<span class="w"> </span>run.py<span class="w">  </span>--benchmark<span class="w"> </span>-m<span class="w"> </span>&lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;<span class="w"> </span>--ipex-weight-only-quantization<span class="w"> </span>--weight-dtype<span class="w"> </span>INT8<span class="w"> </span>--quant-with-amp<span class="w"> </span>--output-dir<span class="w"> </span><span class="s2">&quot;saved_results&quot;</span><span class="w">  </span>--greedy<span class="w"> </span>--input-tokens<span class="w"> </span>&lt;INPUT_LENGTH&gt;
+</pre></div>
+</div>
+</section>
+<section id="notes">
+<h4>2.1.2.3 Notes:<a class="headerlink" href="#notes" title="Link to this heading"></a></h4>
+<p>(1) <a class="reference external" href="https://linux.die.net/man/8/numactl"><code class="docutils literal notranslate"><span class="pre">numactl</span></code></a> is used to specify memory and cores of your hardware to get better performance. <em>&lt;node N&gt;</em> specifies the <a class="reference external" href="https://en.wikipedia.org/wiki/Non-uniform_memory_access">numa</a> node id (e.g., 0 to use the memory from the first numa node). <em>&lt;physical cores list&gt;</em> specifies phsysical cores which you are using from the <em>&lt;node N&gt;</em> numa node. You can use <a class="reference external" href="https://man7.org/linux/man-pages/man1/lscpu.1.html"><code class="docutils literal notranslate"><span class="pre">lscpu</span></code></a> command in Linux to check the numa node information.</p>
+<p>(2) For all quantization benchmarks, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named <code class="docutils literal notranslate"><span class="pre">best_model.pt</span></code> in the <code class="docutils literal notranslate"><span class="pre">--output-dir</span></code> path, and for inference stage, it will launch the inference with the quantized model <code class="docutils literal notranslate"><span class="pre">best_model.pt</span></code>.  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding <code class="docutils literal notranslate"><span class="pre">--quantized-model-path</span> <span class="pre">&lt;output_dir</span> <span class="pre">+</span> <span class="pre">&quot;best_model.pt&quot;&gt;</span></code>.</p>
+</section>
+</section>
+</section>
+<section id="miscellaneous-tips">
+<h2>Miscellaneous Tips<a class="headerlink" href="#miscellaneous-tips" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* also provides dedicated optimization for many other Large Language Models (LLM), which cover a set of data types that are supported for various scenarios. For more details, please check this <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/release/2.3/README.md">Intel® Extension for PyTorch* doc</a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7fe40f2b2110> 
+  <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a data-wap_ref='dns' id='wap_dns' href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html'>| Do Not Share My Personal Information</a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
