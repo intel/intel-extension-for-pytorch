@@ -5,21 +5,119 @@ import math
 from torch.nn import functional as F
 
 
+@torch.library.impl("myops::longrope", "cpu")
+def longrope(
+    inv_freq,
+    max_seq_len_cached,
+    max_position_embeddings,
+    sin_cos,
+    sin_cached,
+    cos_cached,
+    sin_cos_long,
+    sin_cached_long,
+    cos_cached_long,
+    seq_len,
+    rope_type,
+):
+    if seq_len > max_seq_len_cached:
+        if rope_type == 1:  # Phi3ForCausalLM
+            return (
+                max_position_embeddings,
+                sin_cos_long,
+                sin_cached_long,
+                cos_cached_long,
+            )
+        elif rope_type == 2:  # Falcon
+            t = torch.arange(seq_len, dtype=inv_freq.dtype)
+            freqs = torch.einsum("i,j->ij", t, inv_freq)
+            sin_cos = torch.cat(
+                (freqs.sin().repeat(1, 2), freqs.cos().repeat(1, 2)), dim=-1
+            )
+            emb = torch.cat((freqs, freqs), dim=-1).float()
+            cos_cached = emb.cos()[None, :, :]
+            sin_cached = emb.sin()[None, :, :]
+            return seq_len, sin_cos, sin_cached, cos_cached
+        else:  # Default
+            t = torch.arange(seq_len, dtype=inv_freq.dtype)
+            freqs = torch.einsum("i,j->ij", t, inv_freq)
+            sin_cos = torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
+            emb = torch.cat((freqs, freqs), dim=-1)
+            cos_cached = emb.cos()[None, None, :, :]
+            sin_cached = emb.sin()[None, None, :, :]
+            return (
+                seq_len,
+                sin_cos,
+                sin_cached[:, :, :seq_len, ...],
+                cos_cached[:, :, :seq_len, ...],
+            )
+    return max_seq_len_cached, sin_cos, sin_cached, cos_cached
+
+
+torch.library.define(
+    "myops::longrope",
+    "(Tensor inv_freq, Tensor max_seq_len_cached, Tensor max_position_embeddings, Tensor sin_cos, "
+    + " Tensor sin_cached, Tensor cos_cached, Tensor? sin_cos_long, Tensor? sin_cached_long, "
+    + "Tensor? cos_cached_long,  Tensor seq_len, Tensor rope_type) -> (Tensor, Tensor, Tensor, Tensor)",
+)
+
+
 class RotaryEmbedding(torch.nn.Module):
     def __init__(
-        self, max_position_embeddings, dim, backbone, base=10000, device="cpu"
+        self,
+        max_position_embeddings,
+        dim,
+        backbone,
+        base=10000,
+        device="cpu",
+        kwargs=None,
     ):
         super().__init__()
         self.device = device
-        inv_freq = 1.0 / (
-            base ** (torch.arange(0, dim, 2, device=self.device).float() / dim)
-        )
-        self.register_buffer("inv_freq", inv_freq, persistent=False)
+        self.scaling_factor = 1.0
+        self.max_position_embeddings = max_position_embeddings
         self.max_seq_len_cached = max_position_embeddings
+        if kwargs is not None and "short_factor" in kwargs:
+            self.short_factor = kwargs["short_factor"]
+            ext_factors = torch.tensor(
+                self.short_factor, dtype=torch.float32, device=self.device
+            )
+            inv_freq = 1.0 / (
+                ext_factors
+                * base ** (torch.arange(0, dim, 2, device=self.device).float() / dim)
+            )
+        else:
+            inv_freq = 1.0 / (
+                base ** (torch.arange(0, dim, 2, device=self.device).float() / dim)
+            )
+        if kwargs is not None and "long_factor" in kwargs:
+            self.long_factor = kwargs["long_factor"]
+            ext_factors_long = torch.tensor(
+                self.long_factor, dtype=torch.float32, device=self.device
+            )
+            inv_freq_long = 1.0 / (
+                ext_factors_long
+                * base ** (torch.arange(0, dim, 2, device=self.device).float() / dim)
+            )
+        if kwargs is not None and "original_max_position_embeddings" in kwargs:
+            self.original_max_position_embeddings = kwargs[
+                "original_max_position_embeddings"
+            ]
+            scale = max_position_embeddings / self.original_max_position_embeddings
+            if scale > 1.0:
+                if "type" in kwargs and kwargs["type"] == "su":
+                    self.scaling_factor = math.sqrt(
+                        1
+                        + math.log(scale)
+                        / math.log(self.original_max_position_embeddings)
+                    )
+                elif "type" in kwargs and kwargs["type"] == "yarn":
+                    self.scaling_factor = 0.1 * math.log(scale) + 1.0
+            self.max_seq_len_cached = self.original_max_position_embeddings
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+        if backbone == "Phi3ForCausalLM" and "long_factor" not in kwargs:
+            self.max_seq_len_cached = self.max_seq_len_cached + 256
         t = torch.arange(
-            self.max_seq_len_cached,
-            dtype=self.inv_freq.dtype,
-            device=self.device,
+            self.max_seq_len_cached, dtype=self.inv_freq.dtype, device=self.device
         )
         self.model_backbone = str(backbone)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
@@ -34,39 +132,65 @@ class RotaryEmbedding(torch.nn.Module):
             self.cos_cached = self.emb.cos()[None, :, :]
             self.sin_cached = self.emb.sin()[None, :, :]
         else:
-            self.sin_cos = torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
+            self.sin_cos = (
+                torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
+                * self.scaling_factor
+            )
             self.emb = torch.cat((freqs, freqs), dim=-1)
             self.register_buffer(
-                "cos_cached", self.emb.cos()[None, None, :, :], persistent=False
+                "cos_cached",
+                self.emb.cos()[None, None, :, :] * self.scaling_factor,
+                persistent=False,
             )
             self.register_buffer(
-                "sin_cached", self.emb.sin()[None, None, :, :], persistent=False
+                "sin_cached",
+                self.emb.sin()[None, None, :, :] * self.scaling_factor,
+                persistent=False,
             )
+            if hasattr(self, "long_factor"):
+                t_long = torch.arange(
+                    max_position_embeddings, dtype=self.inv_freq.dtype
+                )
+                freqs_long = torch.einsum("i,j->ij", t_long, inv_freq_long)
+                self.sin_cos_long = (
+                    torch.cat((torch.sin(freqs_long), torch.cos(freqs_long)), dim=1)
+                    * self.scaling_factor
+                )
+                self.emb_long = torch.cat((freqs_long, freqs_long), dim=-1)
+                self.register_buffer(
+                    "cos_cached_long",
+                    self.emb_long.cos()[None, None, :, :] * self.scaling_factor,
+                    persistent=False,
+                )
+                self.register_buffer(
+                    "sin_cached_long",
+                    self.emb_long.sin()[None, None, :, :] * self.scaling_factor,
+                    persistent=False,
+                )
 
     def forward(self, seq_len=None):
-        if seq_len is not None and seq_len > self.max_seq_len_cached:
-            self.max_seq_len_cached = seq_len
-            t = torch.arange(
-                self.max_seq_len_cached, dtype=self.inv_freq.dtype, device=self.device
-            )
-            freqs = torch.einsum("i,j->ij", t, self.inv_freq)
-            if (
-                self.model_backbone == "FalconForCausalLM"
-                or self.model_backbone == "RWForCausalLM"
-            ):
-                self.sin_cos = torch.cat(
-                    (freqs.sin().repeat(1, 2), freqs.cos().repeat(1, 2)), dim=-1
+        rope_type = 0
+        if self.model_backbone == "Phi3ForCausalLM" and hasattr(self, "long_factor"):
+            rope_type = 1
+        elif self.model_backbone in ["FalconForCausalLM", "RWForCausalLM"]:
+            rope_type = 2
+        if seq_len is not None:
+            max_seq_len_cached, self.sin_cos, self.sin_cached, self.cos_cached = (
+                torch.ops.myops.longrope(
+                    torch.tensor(self.inv_freq).contiguous(),
+                    torch.tensor(self.max_seq_len_cached).contiguous(),
+                    torch.tensor(self.max_position_embeddings).contiguous(),
+                    self.sin_cos.contiguous(),
+                    self.sin_cached.contiguous(),
+                    self.cos_cached.contiguous(),
+                    self.sin_cos_long.contiguous() if rope_type == 1 else None,
+                    self.sin_cached_long.contiguous() if rope_type == 1 else None,
+                    self.cos_cached_long.contiguous() if rope_type == 1 else None,
+                    torch.tensor(seq_len).contiguous(),
+                    torch.tensor(rope_type).contiguous(),
                 )
-                self.emb = torch.cat((freqs, freqs), dim=-1).float()
-                self.cos_cached = self.emb.cos()[None, :, :]
-                self.sin_cached = self.emb.sin()[None, :, :]
-            else:
-                self.sin_cos = torch.cat((torch.sin(freqs), torch.cos(freqs)), dim=1)
-                self.emb = torch.cat((freqs, freqs), dim=-1)
-                self.cos_cached = self.emb.cos()[None, None, :, :]
-                self.sin_cached = self.emb.sin()[None, None, :, :]
-                self.cos_cached[:, :, :seq_len, ...]
-                self.sin_cached[:, :, :seq_len, ...]
+            )
+            self.max_seq_len_cached = max_seq_len_cached.item()
         return self.sin_cos, self.sin_cached, self.cos_cached
 
 
@@ -77,11 +201,12 @@ class _IPEXRopeRef(nn.Module):
         pos_embd_dim,
         base=10000,
         backbone=None,
+        kwargs=None,
     ):
         super().__init__()
         self.model_backbone = backbone
         self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, backbone, base
+            max_position_embeddings, pos_embd_dim, backbone, base, kwargs
         )
 
     def rotate_every_two(self, x: torch.Tensor) -> torch.Tensor:
@@ -162,6 +287,7 @@ class _IPEXRopeRef(nn.Module):
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "LlavaLlamaForCausalLM",
+            "YuanForCausalLM",
         ]:
             x = x.transpose(1, 2)
             x = self.apply_rotary_pos_emb_llama(x, _cos, _sin, position_ids)
@@ -212,7 +338,7 @@ class _IPEXRopeRef(nn.Module):
                 .transpose(1, 2)
             )
             x = torch.cat([x_rot, x_pass], dim=-1)
-        elif self.model_backbone == "StableLmForCausalLM":
+        elif self.model_backbone in ["StableLmForCausalLM", "PhiForCausalLM"]:
             x = x.transpose(1, 2)
             x_rot = x[..., :rotary_ndims]
             x_pass = x[..., rotary_ndims:]
@@ -223,6 +349,12 @@ class _IPEXRopeRef(nn.Module):
                 ),
                 dim=-1,
             )
+        elif self.model_backbone == "Phi3ForCausalLM":
+            x = x.view(x.shape[0], -1, num_head, head_dim)
+            x = x.transpose(1, 2)
+            cos = _cos[..., seq_len - x.shape[2] : seq_len, :]
+            sin = _sin[..., seq_len - x.shape[2] : seq_len, :]
+            x = (x * cos) + (self.rotate_half(x) * sin)
         elif self.model_backbone == "QWenLMHeadModel":
             x = x.view(x.size(0), x.size(1), num_head, head_dim)
             b, sq, np, hn = x.size(0), x.size(1), x.size(2), x.size(3)
@@ -302,6 +434,9 @@ class _IPEXScaleDotProductRef(nn.Module):
             "MixtralForCausalLM",
             "StableLmForCausalLM",
             "LlavaLlamaForCausalLM",
+            "YuanForCausalLM",
+            "PhiForCausalLM",
+            "Phi3ForCausalLM",
         ]:
             self.num_key_value_groups = (
                 module.num_key_value_groups
@@ -516,6 +651,9 @@ class _IPEXScaleDotProductRef(nn.Module):
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",
+            "YuanForCausalLM",
+            "PhiForCausalLM",
+            "Phi3ForCausalLM",
         ]:
             # repeat k/v heads if n_kv_heads < n_heads
             key = self._repeat_kv(key, self.num_key_value_groups)

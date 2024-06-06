@@ -19,7 +19,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             if k.startswith("__"):
                 continue
             setattr(self.__class__, k, getattr(module.__class__, k))
-        if self.model_backbone == "GPTJForCausalLM":
+        if self.model_backbone in ["GPTJForCausalLM", "PhiForCausalLM"]:
             if not self.distributed:
                 self.linear_add_add = _IPEXlinearAddAddCPU(
                     module.linear_add_add.linear, tpp=tpp, woq=woq
@@ -32,6 +32,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "BaichuanForCausalLM",
             "MistralForCausalLM",
             "QWenLMHeadModel",
+            "YuanForCausalLM",
         ]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddCPU(
@@ -204,6 +205,14 @@ class _IPEXDecoderLayerCPU(nn.Module):
                     module.linear_silu_mul.linear_m,
                     tpp=tpp,
                     woq=woq,
+                )
+        elif self.model_backbone == "Phi3ForCausalLM":
+            if not self.distributed:
+                self.mlp_linear_add = _IPEXlinearAddCPU(
+                    module.mlp_linear_add.linear, tpp=tpp, woq=woq
+                )
+                self.mha_linear_add = _IPEXlinearAddCPU(
+                    module.mha_linear_add.linear, tpp=tpp, woq=woq
                 )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

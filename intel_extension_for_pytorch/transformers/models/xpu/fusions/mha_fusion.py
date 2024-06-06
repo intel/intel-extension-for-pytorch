@@ -11,6 +11,7 @@ class _IPEXRopeXPU(nn.Module):
         pos_embd_dim,
         base=10000,
         backbone=None,
+        kwargs=None,
     ):
         super().__init__()
         self.embed_positions = RotaryEmbedding(

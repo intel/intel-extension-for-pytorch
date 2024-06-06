@@ -11,10 +11,11 @@ class _IPEXRopeCPU(nn.Module):
         pos_embd_dim,
         base=10000,
         backbone=None,
+        kwargs=None,
     ):
         super().__init__()
         self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, backbone, base
+            max_position_embeddings, pos_embd_dim, backbone, base, kwargs
         )
 
     def forward(
@@ -79,8 +80,11 @@ class _IPEXRopeCPU(nn.Module):
 
         if query.dim() == 3:
             input_3d = True
-            query = query.unsqueeze(0)
-            key = key.unsqueeze(0)
+            query_ = query.unsqueeze(0)
+            key_ = key.unsqueeze(0)
+        else:
+            query_ = query
+            key_ = key
 
         if rotary_half:
             offset = rotary_dim // 2
@@ -110,8 +114,8 @@ class _IPEXRopeCPU(nn.Module):
             .view(-1, head_dim)
         )
 
-        query, _, _ = torch.ops.torch_ipex.rotary_position_embedding(
-            query,
+        query_, _, _ = torch.ops.torch_ipex.rotary_position_embedding(
+            query_,
             sin_cos,
             position_ids,
             num_head,
@@ -120,8 +124,8 @@ class _IPEXRopeCPU(nn.Module):
             rotary_dim,
         )
 
-        key, _, _ = torch.ops.torch_ipex.rotary_position_embedding(
-            key,
+        key_, _, _ = torch.ops.torch_ipex.rotary_position_embedding(
+            key_,
             sin_cos,
             position_ids,
             num_kv_head,
@@ -130,8 +134,11 @@ class _IPEXRopeCPU(nn.Module):
             rotary_dim,
         )
         if input_3d:
-            query = query.view([-1, num_head, head_dim])
-            key = key.view([-1, num_kv_head, head_dim])
+            query_ = query_.view([-1, num_head, head_dim])
+            key_ = key_.view([-1, num_kv_head, head_dim])
+        # keep the inplace context as used in TGI
+        query.copy_(query_)
+        key.copy_(key_)
 
         return query, key
 

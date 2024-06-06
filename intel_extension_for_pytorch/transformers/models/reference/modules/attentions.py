@@ -1746,6 +1746,282 @@ def _CLIPAttention_forward(
     return attn_output, attn_weights
 
 
+def _YuanAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    before_hidden_states = None
+    if past_key_value is None:
+        inference_hidden_states_memory = torch.zeros(
+            bsz, 2, hidden_states.shape[2], dtype=hidden_states.dtype
+        )
+        target = hidden_states[:, q_len - 2 :, :]
+        inference_hidden_states_memory[:, -target.shape[1] :, :] = target
+    else:
+        before_hidden_states = past_key_value[-1][0]
+        hidden_states_tmp = before_hidden_states[:, -1:, :]
+        inference_hidden_states_memory = torch.cat(
+            (hidden_states_tmp, hidden_states), dim=1
+        )
+
+    value_states = self.v_proj(hidden_states).view(
+        bsz, q_len, self.num_heads, self.head_dim
+    )
+    if self.use_shareqk:
+        qk_states = self.qk_proj(hidden_states).view(
+            bsz, q_len, self.num_heads * self.head_dim
+        )
+        query_key = qk_states.unsqueeze(2) * self.qk_weight + self.qk_bias
+        query_states, key_states = torch.unbind(query_key, dim=2)
+
+        query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim)
+        key_states = key_states.view(bsz, q_len, self.num_heads, self.head_dim)
+    else:
+        hidden_states = self.lf_gate(hidden_states, before_hidden_states)
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        if self.distributed:
+            import torch.distributed as dist
+
+            world_size = dist.get_world_size()
+            if world_size > 1:
+                query_gather_list = [
+                    torch.zeros_like(query_states) for _ in range(dist.get_world_size())
+                ]
+                key_gather_list = [
+                    torch.zeros_like(key_states) for _ in range(dist.get_world_size())
+                ]
+                dist.all_gather(query_gather_list, query_states)
+                dist.all_gather(key_gather_list, key_states)
+                query_states = torch.cat(query_gather_list, -1)
+                key_states = torch.cat(key_gather_list, -1)
+                qk_states = torch.cat([query_states, key_states], dim=-1)
+                qk_states = qk_states.view(
+                    bsz,
+                    q_len,
+                    self.num_heads * world_size,
+                    int(qk_states.shape[-1] // (self.num_heads * world_size)),
+                )
+                qk_chunk = torch.chunk(qk_states, 2, dim=-1)
+                rank = dist.get_rank()
+                stride = 64 // world_size
+                start = rank * stride
+                end = (rank + 1) * stride
+                query_states = qk_chunk[0][:, :, start:end, :].transpose(1, 2)
+                key_states = qk_chunk[1][:, :, start:end, :].transpose(1, 2)
+            else:
+                qk_states = torch.cat([query_states, key_states], dim=-1)
+                qk_states = qk_states.view(
+                    bsz,
+                    q_len,
+                    self.num_heads,
+                    int(qk_states.shape[-1] // self.num_heads),
+                )
+                (query_states, key_states) = torch.chunk(qk_states, 2, dim=-1)
+                query_states = query_states.transpose(1, 2)
+                key_states = key_states.transpose(1, 2)
+        else:
+            qk_states = torch.cat([query_states, key_states], dim=-1)
+            qk_states = qk_states.view(
+                bsz, q_len, self.num_heads, int(qk_states.shape[-1] // self.num_heads)
+            )
+            (query_states, key_states) = torch.chunk(qk_states, 2, dim=-1)
+
+    kv_seq_len = key_states.shape[-2]
+    if past_key_value is not None:
+        kv_seq_len += past_key_value[0].shape[-2]
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+
+    key_states = self._IPEXROPE(
+        key_states,
+        position_ids,
+        self.num_key_value_heads,
+        self.head_dim,
+        self.head_dim // 2,
+        self.head_dim,
+        kv_seq_len,
+    )
+    query_states = self._IPEXROPE(
+        query_states,
+        position_ids,
+        self.num_heads,
+        self.head_dim,
+        self.head_dim // 2,
+        self.head_dim,
+        kv_seq_len,
+    )
+    (attn_output, attn_weights, present) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        math.sqrt(self.head_dim),
+        past_key_value,
+        None,
+        attention_mask,
+    )
+
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+    # attn_output = self.o_proj(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+    past_key_value = present + (inference_hidden_states_memory.unsqueeze(0),)
+    return attn_output, attn_weights, past_key_value
+
+
+def _PhiAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    concat_qkv = None
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+    else:
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+
+    if self.qk_layernorm:
+        query_states = self.q_layernorm(query_states)
+        key_states = self.k_layernorm(key_states)
+
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+    if concat_qkv is not None and type(concat_qkv) is not tuple:
+        query_states, key_states, value_states = self._IPEXROPE(
+            concat_qkv,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.pos_embd_dim // 2,
+            self.pos_embd_dim,
+            kv_seq_len,
+            self.concat_qkv.num_concat,
+        )
+    else:
+        if concat_qkv is not None:
+            query_states, key_states, value_states = concat_qkv
+        query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim)
+        key_states = key_states.view(
+            bsz, q_len, self.num_key_value_heads, self.head_dim
+        )
+        value_states = value_states.view(
+            bsz, q_len, self.num_key_value_heads, self.head_dim
+        )
+        key_states = self._IPEXROPE(
+            key_states,
+            position_ids,
+            self.num_key_value_heads,
+            self.head_dim,
+            self.pos_embd_dim // 2,
+            self.pos_embd_dim,
+            kv_seq_len,
+        )
+        query_states = self._IPEXROPE(
+            query_states,
+            position_ids,
+            self.num_attention_heads,
+            self.head_dim,
+            self.pos_embd_dim // 2,
+            self.pos_embd_dim,
+            kv_seq_len,
+        )
+
+    key_states = _repeat_kv(key_states, self.num_key_value_groups)
+    value_states = _repeat_kv(value_states, self.num_key_value_groups)
+
+    (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        math.sqrt(self.head_dim),
+        past_key_value,
+        None,
+        attention_mask,
+    )
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    attn_output = self.dense(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
+def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
+    batch, slen, num_key_value_heads, head_dim = hidden_states.shape
+    if n_rep == 1:
+        return hidden_states
+    hidden_states = hidden_states[:, :, :, None, :].expand(
+        batch, slen, num_key_value_heads, n_rep, head_dim
+    )
+    return hidden_states.reshape(batch, slen, num_key_value_heads * n_rep, head_dim)
+
+
+def _Phi3Attention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    qkv = self.qkv_proj(hidden_states)
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+    query_states, key_states, value_states = self._IPEXROPE(
+        qkv,
+        position_ids,
+        self.num_heads,
+        self.head_dim,
+        self.pos_embd_dim // 2,
+        self.pos_embd_dim,
+        kv_seq_len,
+        3,
+    )
+    value_states = value_states.view(
+        bsz, q_len, self.num_key_value_heads, self.head_dim
+    )
+    (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        math.sqrt(self.head_dim),
+        past_key_value,
+        None,
+        attention_mask,
+        add_casual_mask=False,
+    )
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    # attn_output = self.o_proj(attn_output)
+    if not output_attentions:
+        attn_weights = None
+    return attn_output, attn_weights, past_key_value
+
+
 def _create_attention_mask_for_git(
     self, tgt, memory, tgt_mask, past_key_values_length, memory_key_padding_mask=None
 ):
@@ -1816,6 +2092,7 @@ class _IPEXAttentionRef(nn.Module):
             setattr(self.__class__, k, getattr(module.__class__, k))
 
         self.model_backbone = config.architectures[0]
+        self.distributed = distributed
 
         # common known as hidden_size
         if hasattr(module, "hidden_size"):
@@ -1895,7 +2172,7 @@ class _IPEXAttentionRef(nn.Module):
                     else config.kv_channels
                 )
                 self.pos_embd_dim = rotary_dim // 2
-            elif self.model_backbone == "StableLmForCausalLM":
+            elif self.model_backbone in ["StableLmForCausalLM", "PhiForCausalLM"]:
                 self.pos_embd_dim = self.rotary_emb.dim
             else:
                 self.pos_embd_dim = self.head_dim
@@ -1904,12 +2181,35 @@ class _IPEXAttentionRef(nn.Module):
                 self.rope_base = config.rotary_emb_base
             elif hasattr(config, "rope_theta"):
                 self.rope_base = config.rope_theta
-            self._IPEXROPE = _IPEXRopeRef(
-                self.max_position_embeddings,
-                self.pos_embd_dim,
-                self.rope_base,
-                self.model_backbone,
-            )
+            if self.model_backbone in ["Phi3ForCausalLM"]:
+                extra_inputs = {}
+                if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
+                    if "short_factor" in config.rope_scaling:
+                        extra_inputs["short_factor"] = config.rope_scaling[
+                            "short_factor"
+                        ]
+                    if "long_factor" in config.rope_scaling:
+                        extra_inputs["long_factor"] = config.rope_scaling["long_factor"]
+                    if "type" in config.rope_scaling:
+                        extra_inputs["type"] = config.rope_scaling["type"]
+                if hasattr(config, "original_max_position_embeddings"):
+                    extra_inputs["original_max_position_embeddings"] = (
+                        config.original_max_position_embeddings
+                    )
+                self._IPEXROPE = _IPEXRopeRef(
+                    self.max_position_embeddings,
+                    self.pos_embd_dim,
+                    self.rope_base,
+                    self.model_backbone,
+                    extra_inputs,
+                )
+            else:
+                self._IPEXROPE = _IPEXRopeRef(
+                    self.max_position_embeddings,
+                    self.pos_embd_dim,
+                    self.rope_base,
+                    self.model_backbone,
+                )
 
         if self.model_backbone in [
             "GPTJForCausalLM",
@@ -1918,23 +2218,28 @@ class _IPEXAttentionRef(nn.Module):
             "MixtralForCausalLM",
             "StableLmForCausalLM",
             "LlavaLlamaForCausalLM",
+            "PhiForCausalLM",
         ]:
+            supported_linear_types = [
+                torch.nn.Linear,
+                WeightOnlyQuantizedLinear,
+            ]
+            try:
+                import deepspeed
+
+                supported_linear_types.append(
+                    deepspeed.module_inject.layers.LinearLayer
+                )
+            except ImportError:
+                pass
+            supported_linear_types = tuple(supported_linear_types)
             if (
                 hasattr(module, "q_proj")
                 and hasattr(module, "k_proj")
                 and hasattr(module, "v_proj")
-                and (
-                    isinstance(module.q_proj, torch.nn.Linear)
-                    or isinstance(module.q_proj, WeightOnlyQuantizedLinear)
-                )
-                and (
-                    isinstance(module.k_proj, torch.nn.Linear)
-                    or isinstance(module.k_proj, WeightOnlyQuantizedLinear)
-                )
-                and (
-                    isinstance(module.v_proj, torch.nn.Linear)
-                    or isinstance(module.v_proj, WeightOnlyQuantizedLinear)
-                )
+                and (isinstance(module.q_proj, supported_linear_types))
+                and (isinstance(module.k_proj, supported_linear_types))
+                and (isinstance(module.v_proj, supported_linear_types))
             ) and not (hasattr(self, "use_qk_layernorm") and self.use_qk_layernorm):
                 # we support MHA, GQA, MQA for concat linear
                 self.concat_qkv = _IPEXConcatLinearRef(
@@ -2313,6 +2618,36 @@ class _IPEXAttentionRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
+        elif self.model_backbone == "YuanForCausalLM":
+            return _YuanAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "PhiForCausalLM":
+            return _PhiAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "Phi3ForCausalLM":
+            return _Phi3Attention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2331,6 +2666,20 @@ def _reorder_cache(
             layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
             layer_past[7][layer_past[0].size(-2) - 1] = beam_idx
         return past_key_values
+    elif len(past_key_values[0]) == 5:
+        for layer_past in past_key_values:
+            layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
+            layer_past[-1][0] = layer_past[-1][0].index_select(0, beam_idx)
+        return past_key_values
+    elif len(past_key_values[0]) == 3:
+        return tuple(
+            (
+                layer_past[0].index_select(0, beam_idx),
+                layer_past[1].index_select(0, beam_idx),
+                layer_past[2][0].index_select(0, beam_idx).unsqueeze(0),
+            )
+            for layer_past in past_key_values
+        )
     else:
         return tuple(
             tuple(

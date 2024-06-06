@@ -4,7 +4,7 @@
 //  https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/layer_norm.cpp
 
 #include "AddLayerNorm.h"
-
+#include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
 
 namespace torch_ipex {
@@ -57,5 +57,32 @@ at::Tensor dil_add_layernorm(
     return at::layer_norm(add_res, normalized_shape, weight_opt, bias_opt, eps);
   }
 }
+
+// register as a python op
+at::Tensor add_layernorm(
+    const at::Tensor& a,
+    const at::Tensor& b,
+    int64_t alpha,
+    at::IntArrayRef normalized_shape,
+    const c10::optional<at::Tensor>& weight_opt,
+    const c10::optional<at::Tensor>& bias_opt,
+    double eps) {
+  RECORD_FUNCTION("add_layernorm", c10::ArrayRef<c10::IValue>({}));
+  return dil_add_layernorm(
+      a, b, alpha, normalized_shape, weight_opt, bias_opt, eps, false);
+}
+
 } // namespace cpu
 } // namespace torch_ipex
+
+namespace {
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "add_layernorm(Tensor a, Tensor b, int alpha, int[] normalized_shape, Tensor ? weight_opt, \
+        Tensor ? bias_opt, float eps) -> Tensor");
+  m.impl(
+      "add_layernorm", c10::DispatchKey::CPU, torch_ipex::cpu::add_layernorm);
+}
+
+} // namespace
