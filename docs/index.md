@@ -65,9 +65,9 @@ python run.py --help # for more detailed usages
 
 | Key args of run.py | Notes |
 |---|---|
-| model id | "--model-name-or-path" or "-m" to specify the <QWEN2_MODEL_ID_OR_LOCAL_PATH>, it is model id from Huggingface or downloaded local path |
+| model id | "--model-name-or-path" or "-m" to specify the &lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;, it is model id from Huggingface or downloaded local path |
 | generation | default: beam search (beam size = 4), "--greedy" for greedy search |
-| input tokens | provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [1024, 2048, 4096, 8192, 16384, 32768]; if "--input-tokens" is not used, use "--prompt" to choose other strings as prompt inputs|
+| input tokens | provide fixed sizes for input prompt size, use "--input-tokens" for &lt;INPUT_LENGTH&gt; in [1024, 2048, 4096, 8192, 16384, 32768]; if "--input-tokens" is not used, use "--prompt" to choose other strings as prompt inputs|
 | output tokens | default: 32, use "--max-new-tokens" to choose any other size |
 | batch size |  default: 1, use "--batch-size" to choose any other size |
 | token latency |  enable "--token-latency" to print out the first or next token latency |
@@ -78,7 +78,7 @@ python run.py --help # for more detailed usages
 
 ## 2.1 Usage of running Qwen2 models
 
-The _\<QWEN2_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Qwen2 model you will run, which can be found from [HuggingFace Models](https://huggingface.co/models).
+The *&lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;* in the below commands specifies the Qwen2 model you will run, which can be found from [HuggingFace Models](https://huggingface.co/models).
 
 ### 2.1.1 Run generation with multiple instances on multiple CPU numa nodes
 
@@ -91,7 +91,7 @@ unset KMP_AFFINITY
 In the DeepSpeed cases below, we recommend "--shard-model" to shard model weight sizes more even for better memory usage when running with DeepSpeed.
 
 If using "--shard-model", it will save a copy of the shard model weights file in the path of "--output-dir" (default path is "./saved_results" if not provided).
-If you have used "--shard-model" and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove "--shard-model", and replace "-m <QWEN2_MODEL_ID_OR_LOCAL_PATH>" with "-m <shard model path>" to skip the repeated shard steps.
+If you have used "--shard-model" and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove "--shard-model", and replace "-m &lt;QWEN2_MODEL_ID_OR_LOCAL_PATH&gt;" with "-m &lt;shard model path&gt;" to skip the repeated shard steps.
 
 Besides, the standalone shard model function/scripts are also provided in section 2.1.1.4, in case you would like to generate the shard model weights files in advance before running distributed inference.
 
@@ -142,9 +142,9 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 
 #### 2.1.2.3 Notes:
 
-(1) [_numactl_](https://linux.die.net/man/8/numactl) is used to specify memory and cores of your hardware to get better performance. _\<node N\>_ specifies the [numa](https://en.wikipedia.org/wiki/Non-uniform_memory_access) node id (e.g., 0 to use the memory from the first numa node). _\<physical cores list\>_ specifies phsysical cores which you are using from the _\<node N\>_ numa node. You can use [_lscpu_](https://man7.org/linux/man-pages/man1/lscpu.1.html) command in Linux to check the numa node information.
+(1) [`numactl`](https://linux.die.net/man/8/numactl) is used to specify memory and cores of your hardware to get better performance. *&lt;node N&gt;* specifies the [numa](https://en.wikipedia.org/wiki/Non-uniform_memory_access) node id (e.g., 0 to use the memory from the first numa node). *&lt;physical cores list&gt;* specifies phsysical cores which you are using from the *&lt;node N&gt;* numa node. You can use [`lscpu`](https://man7.org/linux/man-pages/man1/lscpu.1.html) command in Linux to check the numa node information.
 
-(2) For all quantization benchmarks, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path <output_dir + "best_model.pt">" .
+(2) For all quantization benchmarks, both quantization and inference stages will be triggered by default. For quantization stage, it will auto-generate the quantized model named "best_model.pt" in the "--output-dir" path, and for inference stage, it will launch the inference with the quantized model "best_model.pt".  For inference-only benchmarks (avoid the repeating quantization stage), you can also reuse these quantized models for by adding "--quantized-model-path &lt;output_dir + "best_model.pt"&gt;" .
 
 ## Miscellaneous Tips
 Intel® Extension for PyTorch\* also provides dedicated optimization for many other Large Language Models (LLM), which cover a set of data types that are supported for various scenarios. For more details, please check this [Intel® Extension for PyTorch\* doc](https://github.com/intel/intel-extension-for-pytorch/blob/release/2.3/README.md).
