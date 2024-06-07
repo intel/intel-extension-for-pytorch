@@ -94,7 +94,10 @@ git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON -t ipex-llm:main .
+# To have a custom ssh server port for multi-nodes run, please add --build-arg PORT_SSH=<CUSTOM_PORT> ex: 2345, otherwise use the default 22 SSH port
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON --build-arg PORT_SSH=2345 -t ipex-llm:main .
+
+
 
 # Run the container with command below
 docker run --rm -it --privileged ipex-llm:main bash
@@ -263,6 +266,32 @@ deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'`
 # Distributed inference with Weight-Only Quantization
 deepspeed  --num_accelerators 2 --master_addr `hostname -I | sed -e 's/\s.*$//'` --bind_cores_to_rank run_accuracy_with_deepspeed.py  --model  meta-llama/Llama-2-7b-hf --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --tasks lambada_openai  
 ```
+
+#### 4.1.2.3 Distributed inference among multiple nodes with TCP 
+
+A bash script (`tools/run_scaling.sh`) is provided to simplify environment configuration and the command launch.
+
+Steps:
+
+2. Enter the `llm` directory
+3. Create a `hostfile.txt` following [instructions of deepspeed](https://www.deepspeed.ai/getting-started/#resource-configuration-multi-node)
+4. Find out the network interface name used for node communication via `ifconfig` or `ibv_devices` ex : eth0
+5. Open `tools/run_scaling.sh` script to update required information in line 3 to line 11 according to your environment and needs
+6. run the command below to run distributed inference among nodes
+
+```bash
+bash tools/run_scaling.sh
+```
+
+The docker image built in Section 3.1 functions ssh connection for distributed executions across multiple machines via Ethernet. However, it is supposed to be running with 1 single container on each machine. Inside each docker container, multiple inference instances can be launched by the `deepspeed` command.
+
+Use the command below on all machines to launch the docker containers. This command uses the host network interfaces inside the docker container. Thus, you need to put the host ip addresses into the `hostfile.txt`. Do NOT launch multiple docker containers on one single machine from the same docker image. These docker containers listen on the same machine on the same port, will result in unpredicable ssh connections.
+
+```bash
+docker run --rm -it --privileged --net host ipex-llm:main bash
+```
+
+**Note:** For models on HuggingFace require access privileges, you need to run the `huggingface-cli login` command in each docker container to config a HuggingFace access token.
 
 ## 4.2 Detail usage of running LLM models
 

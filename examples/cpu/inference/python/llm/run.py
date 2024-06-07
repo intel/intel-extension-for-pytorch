@@ -624,7 +624,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             shard_cmd.extend(
                 ["--save-path", str(args.output_dir) + str(MODEL_CLASSES[model_type])]
             )
-            shard_cmd.extend(["--local_rank", str(args.local_rank)])
+            if args.local_rank is not None:
+                shard_cmd.extend(["--local_rank", str(args.local_rank)])
             print("LLM RUNTIME INFO: sharding model...")
             result = subprocess.run(shard_cmd)
             if result.returncode != 0:
@@ -652,7 +653,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
         infer_cmd.extend(["--num-iter", str(args.num_iter)])
         infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
         infer_cmd.extend(["--batch-size", str(args.batch_size)])
-        infer_cmd.extend(["--local_rank", str(args.local_rank)])
+        if args.local_rank is not None:
+            infer_cmd.extend(["--local_rank", str(args.local_rank)])
         if args.greedy:
             infer_cmd.extend(["--greedy"])
         if args.streaming:
