@@ -937,7 +937,7 @@ class HGEMMXetla_INT4 final {
   bool is_b_col_major_;
   bool fallback_;
   int m_, n_, k_;
-  int64_t calib_gz_;
+  int64_t group_size_;
   int8_t arch_ = static_cast<int>(gpu::xetla::gpu_arch::XeHpc);
   torch_ipex::xpu::xetla::quant_mode quant_mode_ =
       torch_ipex::xpu::xetla::quant_mode::S4_FULLRANGE_NO_ZP;
@@ -1016,8 +1016,8 @@ class HGEMMXetla_INT4 final {
     weight_zp_ = const_cast<Tensor*>(&zero_points);
     return *this;
   }
-  HGEMMXetla_INT4& add_calib_gz(int64_t calib_gz) {
-    calib_gz_ = calib_gz;
+  HGEMMXetla_INT4& add_group_size(int64_t group_size) {
+    group_size_ = group_size;
     return *this;
   }
   HGEMMXetla_INT4& add_epilogue(const Tensor& t, EpilogueType eptype) {
@@ -1069,8 +1069,8 @@ class HGEMMXetla_INT4 final {
     m_ = a_sizes[0];
     k_ = a_sizes[1];
     // Normalize calibration group size.
-    if (calib_gz_ == -1 || calib_gz_ == k_)
-      calib_gz_ = 0;
+    if (group_size_ == -1 || group_size_ == k_)
+      group_size_ = 0;
     // Set correct n dim.
     if (has_split3)
       n_ = b_sizes[2] * 2;
@@ -1193,7 +1193,7 @@ class HGEMMXetla_INT4 final {
     } else {
       static constexpr int mid = (configs_size - 1) / 2;
       using MiddleConfig = std::tuple_element_t<mid, ConfigsTuple>;
-      if (MiddleConfig::less_than(m_, n_, k_, calib_gz_)) {
+      if (MiddleConfig::less_than(m_, n_, k_, group_size_)) {
         return binary_search_and_run<
             typename TupleExtractor<mid + 1, configs_size - 1, ConfigsTuple>::
                 type>(q);

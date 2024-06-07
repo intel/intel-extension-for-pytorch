@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import os
 import torch.distributed as dist
+from intel_extension_for_pytorch.nn.utils._quantize_convert import (
+    WeightOnlyQuantizedLinear,
+)
 
 
 class EnvParam:
@@ -164,6 +167,46 @@ class IPEXLmHeadLinearAllreduceWithPadding(IPEXOpForInference):
             return torch.nn.functional.linear(input, self.weight, bias=self.bias)[
                 :, :, : self.n_dim
             ]
+
+
+class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
+    def __init__(self, module: WeightOnlyQuantizedLinear):
+        super().__init__(module)
+        self.qweight = None
+        self.bias = None
+        self.scales = None
+        self.qzeros = None
+        self.blocksize = None
+        self.port_data()
+
+    def port_data(self):
+        self.n_dim = self.module.scales.shape[1]  # 32000 or 128256
+        self.bias = self.module.bias
+        self.qweight = self.module.qweight
+        self.scales = self.module.scales
+        self.qzeros = self.module.qzeros
+        self.blocksize = self.module.blocksize
+
+    def forward(self, input):
+        if input.dim() > 3:
+            input = input.reshape([-1, input.shape[-2], input.shape[-1]])
+        if not self.acc_test:
+            shape = list(input.size())
+            shape[1] = 1
+            input = input[:, -1, :].view(shape)
+        if self.bias is None:
+            return torch.ops.torch_ipex.mm_int4(
+                input, self.qweight, self.scales, self.qzeros, self.blocksize
+            )[:, :, : self.n_dim]
+        else:
+            return torch.ops.torch_ipex.mm_bias_int4(
+                input,
+                self.qweight,
+                self.bias,
+                self.scales,
+                self.qzeros,
+                self.blocksize,
+            )[:, :, : self.n_dim]
 
 
 class IPEXLmHeadLinearAllreduceWithPaddingBaichuan(

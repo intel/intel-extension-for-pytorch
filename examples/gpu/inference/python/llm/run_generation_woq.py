@@ -92,13 +92,13 @@ parser.add_argument("--calib_nsamples", default=128, type=int)
 parser.add_argument("--calib_wbits", default=4, type=int)
 parser.add_argument("--calib_seed", default=0, type=int)
 parser.add_argument("--woq_checkpoint_path", default="", type=str)
+parser.add_argument("--woq_algo", default="RTN", choices=["RTN"], help="WOQ algorithm to apply")
+parser.add_argument("--save_model", action="store_true")
+parser.add_argument("--output_dir", type=str, default="./", help="the dir to save quantized model")
 parser.add_argument("--accuracy-only", action="store_true")
 parser.add_argument(
     "--acc-tasks",
-    nargs="+",
-    default=[
-        "lambada_standard",
-    ],
+    default="lambada_standard",
     type=str,
     help="tasks list for accuracy validation, only enabled lambada_standard and lambada_standard at present",
 )
@@ -127,23 +127,40 @@ model_type = next(
     (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
 )
 model_class = MODEL_CLASSES[model_type]
-config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit, trust_remote_code=True)
+if args.woq_checkpoint_path:
+    tokenizer = AutoTokenizer.from_pretrained(args.woq_checkpoint_path, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(args.woq_checkpoint_path, use_cache=True, # to use kv cache.
+                                        trust_remote_code=True)
+else:
+    config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit, trust_remote_code=True)
+    tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
-if amp_dtype == torch.float16 and args.woq and args.woq_checkpoint_path == "":
-    load_dtype = torch.float32
-else:
-    load_dtype = amp_dtype
 
-woq_quantization_config = RtnConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=64)
-model = model_class[0].from_pretrained(
-    args.model_id,
-    device_map=device,
-    quantization_config=woq_quantization_config,
-    trust_remote_code=True,
-    use_llm_runtime=False
-)
-tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
+
+if args.woq_checkpoint_path:
+    # directly load already quantized model
+    model = AutoModelForCausalLM.from_pretrained(
+        args.woq_checkpoint_path, trust_remote_code=True, device_map="xpu", torch_dtype=torch.float16)
+    model = model.to(memory_format=torch.channels_last)
+    woq_quantization_config = getattr(model, "quantization_config", None)
+else:
+    # do quantization 
+    if args.woq_algo == "RTN":
+        woq_quantization_config = RtnConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=64)
+    else:
+        print(f"unsupported woq algorithm: {args.woq_algo}")
+        sys.exit(0)
+    model = model_class[0].from_pretrained(
+        args.model_id,
+        device_map=device,
+        quantization_config=woq_quantization_config,
+        trust_remote_code=True,
+        use_llm_runtime=False
+    )
+    if args.save_model:
+        model.save_pretrained(args.output_dir)
+        tokenizer.save_pretrained(args.output_dir)
 
 model = model.eval().to(device)
 model = model.to(memory_format=torch.channels_last)
@@ -160,129 +177,32 @@ generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
 
 ######################## run lm eval accuracy check ########################
 def run_accuracy():
-    import lm_eval
     from lm_eval import evaluator
-    from lm_eval.base import BaseLM
-    from typing import Union, List, Optional
-    from transformers import BatchEncoding
+    from lm_eval.models.huggingface import HFLM
+    from lm_eval.utils import make_table
 
-    TokenSequence = Union[List[int], torch.LongTensor, torch.Tensor, BatchEncoding]
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    class HuggingFaceModel(BaseLM):
-        _DEFAULT_MAX_LENGTH = 2048
-
-        def __init__(
-            self,
-            config=None,
-            model=None,
-            tokenizer=None,
-            device="xpu",
-            num_beams=1,
-            batch_size=1,
-            max_length=None,
-            dtype: Optional[Union[str, torch.dtype]] = "auto",
-            tp_number=1,
-        ):
-            super().__init__()
-
-            self._device = device
-            self._batch_size = batch_size
-            self._max_length = max_length
-            self._num_beams = num_beams
-            self._dtype = dtype
-            self._tp_number = tp_number
-
-            self.config = config
-            self.model = model
-            self.base_model = model
-            self.tokenizer = tokenizer
-
-        def _model_call(
-            self, inputs: TokenSequence, labels: Optional[TokenSequence] = None
-        ) -> TokenSequence:
-            with torch.inference_mode():
-                output = self.base_model(inputs)
-
-            if isinstance(output, tuple):
-                return output[0]
-
-            return output["logits"]
-
-        @property
-        def eot_token_id(self):
-            # we use EOT because end of *text* is more accurate for what we're doing than end of *sentence*
-            return self.tokenizer.eos_token_id
-
-        @property
-        def max_length(self):
-            if self._max_length:  # if max length manually set, return it
-                return self._max_length
-            seqlen_config_attrs = (
-                "n_positions", "max_position_embeddings", "n_ctx")
-            for attr in seqlen_config_attrs:
-                if hasattr(self.config, attr):
-                    return getattr(self.config, attr)
-            if hasattr(self.tokenizer, "model_max_length"):
-                if self.tokenizer.model_max_length == 1000000000000000019884624838656:
-                    return self._DEFAULT_MAX_LENGTH
-                return self.tokenizer.model_max_length
-
-            return self._DEFAULT_MAX_LENGTH
-
-        @property
-        def max_gen_toks(self):
-            return 256
-
-        @property
-        def batch_size(self):
-            # TODO: fix multi-gpu
-            return self._batch_size  # * gpus
-
-        @property
-        def device(self):
-            # TODO: fix multi-gpu
-            return self._device
-
-        def tok_encode(self, string: str):
-            return self.tokenizer.encode(string, add_special_tokens=False)
-
-        def tok_decode(self, tokens):
-            return self.tokenizer.decode(tokens)
-
-        def _model_generate(self, context, max_length, eos_token_id):
-            generation_kwargs = {"do_sample": False, "max_length": max_length, "num_beams": self._num_beams}
-            if eos_token_id is not None:
-                generation_kwargs["eos_token_id"] = eos_token_id
-                generation_kwargs[
-                    "pad_token_id"
-                ] = eos_token_id  # setting eos_token_id as pad token
-            return self.model.generate(context, **generation_kwargs)
-
-    task_dict = lm_eval.tasks.get_task_dict(args.acc_tasks)
-    hfmodel = HuggingFaceModel(
-        config=config,
-        model=model,
+    hfmodel = HFLM(
+        pretrained=model,
         tokenizer=tokenizer,
-        device="xpu",
-        num_beams=args.num_beams,
         batch_size=args.batch_size,
-        dtype=args.dtype,
+        device=args.device,
     )
 
     if args.acc_iter == -1:
-        results = evaluator.evaluate(
-            hfmodel,
-            task_dict,
+        results = evaluator.simple_evaluate(
+            model=hfmodel,
+            tasks=args.acc_tasks,
         )
     else:
-        results = evaluator.evaluate(
-            hfmodel,
-            task_dict,
+        results = evaluator.simple_evaluate(
+            model=hfmodel,
+            tasks=args.acc_tasks,
             limit=args.acc_iter
         )
 
-    print(evaluator.make_table(results))
+    print(make_table(results))
 
 
 if args.accuracy_only:

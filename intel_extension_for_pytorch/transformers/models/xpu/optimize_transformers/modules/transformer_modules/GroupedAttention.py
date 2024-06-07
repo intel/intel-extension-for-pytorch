@@ -6,6 +6,8 @@ from .QuantizedAttention import IPEXTransformerAttnOptimizedInt4
 
 from .Linear import IPEXTransformerLinear
 
+from .model_utils import xpu_1st_token_sdpa_support_gqa, xpu_next_token_sdpa_support_gqa
+
 
 class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
     def __init__(self, config: IPEXTransformerConfig) -> None:
@@ -289,11 +291,12 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
             return super().compute_qkv_gemm(hidden_states, query, key, value)
         hidden_states_flat = hidden_states.flatten(0, -2)
         if self.q_proj.bias is None:
-            query = torch.ops.torch_ipex.mm_int4(
+            torch.ops.torch_ipex.mm_int4_out(
                 hidden_states_flat,
                 self.q_proj_quant.qweight,
                 self.q_proj_quant.scales,
                 self.q_proj_quant.qzeros,
+                query,
                 self.q_proj_quant.blocksize,
             )
         else:
@@ -307,11 +310,12 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
             )
 
         if self.k_proj.bias is None:
-            key = torch.ops.torch_ipex.mm_int4(
+            torch.ops.torch_ipex.mm_int4_out(
                 hidden_states_flat,
                 self.k_proj_quant.qweight,
                 self.k_proj_quant.scales,
                 self.k_proj_quant.qzeros,
+                key,
                 self.k_proj_quant.blocksize,
             )
         else:
@@ -325,11 +329,12 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
             )
 
         if self.v_proj.bias is None:
-            value = torch.ops.torch_ipex.mm_int4(
+            torch.ops.torch_ipex.mm_int4_out(
                 hidden_states_flat,
                 self.v_proj_quant.qweight,
                 self.v_proj_quant.scales,
                 self.v_proj_quant.qzeros,
+                value,
                 self.v_proj_quant.blocksize,
             )
         else:
@@ -363,18 +368,31 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
     def sdp_kv_preprocess_1st_token_beam_search(self, key, value):
         if self.num_kv_group <= 1:
             return super().sdp_kv_preprocess_1st_token_beam_search(key, value)
-        key = self.repeat_kv(key, self.num_kv_group)
-        value = self.repeat_kv(value, self.num_kv_group)
-        key_prompt, value_prompt = key, value
-        return key, value, key_prompt, value_prompt
+        if xpu_1st_token_sdpa_support_gqa():
+            return key, value, key, value
+        else:
+            key = self.repeat_kv(key, self.num_kv_group)
+            value = self.repeat_kv(value, self.num_kv_group)
+            key_prompt, value_prompt = key, value
+            return key, value, key_prompt, value_prompt
 
     def sdp_kv_preprocess_2nd2last(self, key, value):
         if self.num_kv_group <= 1:
             return super().sdp_kv_preprocess_2nd2last(key, value)
-        key = self.repeat_kv(key, self.num_kv_group)
-        value = self.repeat_kv(value, self.num_kv_group)
-        key_prompt = self.repeat_kv(self.runtime_cache.key_prompt, self.num_kv_group)
-        value_prompt = self.repeat_kv(
-            self.runtime_cache.value_prompt, self.num_kv_group
-        )
-        return key, value, key_prompt, value_prompt
+        if xpu_next_token_sdpa_support_gqa(self.is_beam_search()):
+            return (
+                key,
+                value,
+                self.runtime_cache.key_prompt,
+                self.runtime_cache.value_prompt,
+            )
+        else:
+            key = self.repeat_kv(key, self.num_kv_group)
+            value = self.repeat_kv(value, self.num_kv_group)
+            key_prompt = self.repeat_kv(
+                self.runtime_cache.key_prompt, self.num_kv_group
+            )
+            value_prompt = self.repeat_kv(
+                self.runtime_cache.value_prompt, self.num_kv_group
+            )
+            return key, value, key_prompt, value_prompt

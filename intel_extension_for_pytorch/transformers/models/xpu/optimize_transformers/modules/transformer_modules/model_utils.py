@@ -170,3 +170,26 @@ def qwen_sdp(self, query, key, value, attention_mask, head_mask, alibi):
         attention_output.size()[:-2] + (self.head_dim * self.num_attn_head,)
     )
     return attention_output, attn_weight
+
+
+# Currently, only machines that have both 2D load instructions and XMX support,
+# or machines with 2D load instructions, no XMX but with XETLA, and not running beam_search,
+# support next token SDPA fusion fusion.
+def xpu_sdpa_support(is_beam_search):
+    has_2d_block = torch.xpu.has_2d_block_array()
+    has_xmx = torch.xpu.has_xmx()
+    has_xetla = torch.xpu.has_xetla()
+
+    return has_2d_block and (has_xmx or (has_xetla and not is_beam_search))
+
+
+# Currently, only machines that have both 2D load instructions and XMX support
+# can enable first token SDPA GQA fusion.
+def xpu_1st_token_sdpa_support_gqa():
+    return torch.xpu.has_2d_block_array() and torch.xpu.has_xmx()
+
+
+# Currently, only machines that have both 2D load instructions and XMX support,
+# and not running beam_search, support next token SDPA GQA fusion.
+def xpu_next_token_sdpa_support_gqa(is_beam_search):
+    return torch.xpu.has_2d_block_array() and torch.xpu.has_xmx() and not is_beam_search

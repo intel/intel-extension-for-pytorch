@@ -23,7 +23,6 @@ from transformers import (
     FalconForCausalLM,
     T5ForConditionalGeneration,
     AutoTokenizer,
-    LlamaTokenizer,
 )
 
 
@@ -33,6 +32,7 @@ MODEL_CLASSES = {
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "llama3": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, AutoTokenizer),
     "t5": (T5ForConditionalGeneration, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
@@ -96,6 +96,7 @@ parser.add_argument(
     help="tasks list for accuracy validation, only enabled lambada_standard and lambada_standard at present",
 )
 parser.add_argument("--acc-iter", default=-1, type=int)
+parser.add_argument("--disable_optimize_transformers", action="store_true")
 args = parser.parse_args()
 
 
@@ -273,10 +274,13 @@ if args.benchmark:
 
 # to ipex
 if args.ipex:
-    if "low_precision_checkpoint" in ipex.optimize_transformers.__code__.co_varnames:
-        model = ipex.optimize_transformers(model.eval(), dtype=infer_dtype, device="xpu", inplace=True)
+    if args.disable_optimize_transformers:
+        model = ipex.optimize(model.eval().to("xpu"), dtype=infer_dtype)
     else:
-        model = ipex.optimize_transformers(model.eval().to("xpu"), dtype=infer_dtype)
+        if "low_precision_checkpoint" in ipex.optimize_transformers.__code__.co_varnames:
+            model = ipex.optimize_transformers(model.eval(), dtype=infer_dtype, device="xpu", inplace=True)
+        else:
+            model = ipex.optimize_transformers(model.eval().to("xpu"), dtype=infer_dtype)
     print_rank0("*** model after optimize_transformers", model)
 
 # bypass assertion for beam4

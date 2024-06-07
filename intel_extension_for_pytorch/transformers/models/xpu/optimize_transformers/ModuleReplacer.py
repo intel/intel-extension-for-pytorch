@@ -21,7 +21,11 @@ from .modules.Layers import (
     IpexFastLinear,
     IpexFastAllReduceLinear,
     IPEXLmHeadLinearAllreduceWithPadding,
+    IPEXLmHeadLinearAllreduceWithPaddingInt4,
     IPEXLmHeadLinearAllreduceWithPaddingBaichuan,
+)
+from intel_extension_for_pytorch.nn.utils._quantize_convert import (
+    WeightOnlyQuantizedLinear,
 )
 from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
@@ -245,8 +249,14 @@ class ModuleReplacer:
                 or child.__class__.__name__ == "GLMBlock"
             ):
                 continue
-            if name == "lm_head" and (not is_int4(model)):
-                if model.__class__.__name__ == "BaichuanForCausalLM":
+            if name == "lm_head":
+                if is_int4(model) and isinstance(
+                    model.lm_head, WeightOnlyQuantizedLinear
+                ):
+                    setattr(
+                        model, name, IPEXLmHeadLinearAllreduceWithPaddingInt4(child)
+                    )
+                elif model.__class__.__name__ == "BaichuanForCausalLM":
                     setattr(
                         model, name, IPEXLmHeadLinearAllreduceWithPaddingBaichuan(child)
                     )
