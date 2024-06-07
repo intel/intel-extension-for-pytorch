@@ -1,5 +1,5 @@
 diff --git a/src/accelerate/accelerator.py b/src/accelerate/accelerator.py
-index 2815a00..bad3737 100755
+index dcf37ea..cd066fd 100755
 --- a/src/accelerate/accelerator.py
 +++ b/src/accelerate/accelerator.py
 @@ -306,7 +306,11 @@ class Accelerator:
@@ -16,10 +16,10 @@ index 2815a00..bad3737 100755
          if fsdp_plugin is None:  # init from env variables
              fsdp_plugin = (
 diff --git a/src/accelerate/utils/fsdp_utils.py b/src/accelerate/utils/fsdp_utils.py
-index edff9de..32cd162 100644
+index 01bb54b..c102e6b 100644
 --- a/src/accelerate/utils/fsdp_utils.py
 +++ b/src/accelerate/utils/fsdp_utils.py
-@@ -21,7 +21,8 @@ from .imports import is_torch_distributed_available
+@@ -22,7 +22,8 @@ from .modeling import is_peft_model
  from .versions import is_torch_version
  
  
