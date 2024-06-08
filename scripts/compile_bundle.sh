@@ -136,7 +136,7 @@ if [ ! -z "${MAX_JOBS}" ]; then
 fi
 
 # Install dependencies
-python -m pip install cmake==3.28.4
+python -m pip install cmake==3.28.4 make
 
 # Compare the torch torchvision and torchaudio version
 function ver_compare_eq() {
@@ -159,29 +159,26 @@ if python -c "import torch; print(torch.__version__)" &> /dev/null; then
         VER_COMP_AUDIO=$(ver_compare_eq ${torchaudio_version} ${VER_TORCHAUDIO})
     fi
     if [ ${VER_COMP_TORCH} -ne 1 ] || [ ${VER_COMP_VISION} -ne 1 ] || [ ${VER_COMP_AUDIO} -ne 1 ]; then
-        if [ ${VER_COMP_TORCH} -ne 1 ]; then
+        if [ ! -z ${VER_COMP_TORCH} ] && [ ${VER_COMP_TORCH} -ne 1 ]; then
             printf "WARNING: Found installed torch version ${torch_version}, the required version for compiling is ${VER_TORCH}\\n"
         fi
-        if [ ${VER_COMP_VISION} -ne 1 ]; then
+        if [ ! -z ${VER_COMP_VISION} ] && [ ${VER_COMP_VISION} -ne 1 ]; then
             printf "         Found installed torchvision version ${torchvision_version}, the required version for compiling is ${VER_TORCHVISION}\\n"
         fi
-        if [ ${VER_COMP_AUDIO} -ne 1 ]; then
+        if [ ! -z ${VER_COMP_AUDIO} ] && [ ${VER_COMP_AUDIO} -ne 1 ]; then
             printf "         Found installed torchaudio version ${torchaudio_version}, the required version for compiling is ${VER_COMP_AUDIO}\\n"
         fi
-	printf "Continue to run the compile script will replace the current torch/torchvision/torchaudio package\\n"
+        printf "Continue to run the compile script will replace the current torch/torchvision/torchaudio package\\n"
         printf "Are sure you want to continue the compilation? yes for continue, no for quit. [yes|no]\\n"
         printf "[yes] >>> "
         read -r ans
         ans=$(echo "${ans}" | tr '[:lower:]' '[:upper:]')
-        if [ "${ans}" != "YES" ] && [ "${ans}" != "Y" ]
-        then
+        if [ ! -z ${ans} ] && [ "${ans}" != "YES" ] && [ "${ans}" != "Y" ]; then
             printf "Aborting compilation\\n"
             exit 2
         fi
     fi
 fi
-
-
 
 python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch oneccl_bind_pt
 set +e
@@ -221,7 +218,7 @@ ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 if [ ${GCC_CONDA} -eq 1 ]; then
     if [ ${EXIST_CONDA} -gt 0 ]; then
         echo "Command \"conda\" not found. Exit."
-		exit 2
+        exit 2
     fi
     conda install -y sysroot_linux-64
     conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
@@ -244,12 +241,6 @@ if [[ ! -z ${LDFLAGS} ]]; then
     function join { local IFS="$1"; shift; echo "$*"; }
     export LDFLAGS=$(join ' ' "${ldflags[@]}")
 fi
-set +e
-command -v make > /dev/null
-if [ $? -gt 0 ]; then
-    python -m pip install make
-fi
-set -e
 
 #  LLVM
 LLVM_ROOT="$(pwd)/llvm-release"
@@ -296,14 +287,14 @@ unset LLVM_DIR
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH_BK}
 export PATH=${PATH_BK}
 python -m pip uninstall -y mkl-static mkl-include
-python -m pip install dist/*.whl
+python -m pip install --force-reinstall dist/*.whl
 cd ..
 #  Torch-CCL
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     cd torch-ccl
     python setup.py clean
     python setup.py bdist_wheel 2>&1 | tee build.log
-    python -m pip install dist/*.whl
+    python -m pip install --force-reinstall dist/*.whl
     cd ..
 fi
 export LD_PRELOAD=$(bash ./intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh)
