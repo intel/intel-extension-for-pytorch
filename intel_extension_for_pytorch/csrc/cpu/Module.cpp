@@ -166,6 +166,15 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_jit_linear_repack", []() {
     return AutoOptConfig::singleton().get_jit_repack_for_linear();
   });
+  m.def("disable_jit_concat_linear", []() {
+    AutoOptConfig::singleton().set_jit_concat_linear(false);
+  });
+  m.def("enable_jit_concat_linear", []() {
+    AutoOptConfig::singleton().set_jit_concat_linear(true);
+  });
+  m.def("get_jit_concat_linear", []() {
+    return AutoOptConfig::singleton().get_jit_concat_linear();
+  });
 
   // BF32
   py::enum_<FP32MathMode>(m, "FP32MathMode")

@@ -1610,6 +1610,14 @@ class Tester(TestCase):
         finally:
             torch._C._jit_set_texpr_fuser_enabled(old_texpr_fuser_state)
 
+    @contextlib.contextmanager
+    def _disable_concat_linear(self):
+        ipex._C.disable_jit_concat_linear()
+        try:
+            yield
+        finally:
+            ipex._C.enable_jit_concat_linear()
+
     def _test_output(
         self,
         base_model,
@@ -2010,6 +2018,90 @@ class Tester(TestCase):
                 graph_opt_v1, ["ipex_prepack::linear_run"]
             )
             self.assertEqual(linear_count_ori_v1, 2)
+
+        # Test disable concat linear
+        origin_model = ModMultLinear(50, 60).eval()
+        test_val1 = torch.rand([50, 5])
+        with self._disable_concat_linear():
+            # call mkl path(fp32)
+            model = ipex.optimize(
+                origin_model,
+                dtype=torch.float32,
+                weights_prepack=False,
+            )
+            ori_res = model(test_val1)
+            with torch.no_grad():
+                model_jit = torch.jit.trace(model, (test_val1))
+                graph_ori = str(model_jit.graph_for(test_val1))
+                linear_count_ori = check_op_count(graph_ori, ["aten::linear"])
+                self.assertEqual(linear_count_ori, 4)
+                model_jit = torch.jit.freeze(model_jit)
+                jit_res = model_jit(test_val1)
+                self.assertEqual(ori_res, jit_res)
+                graph_opt = str(model_jit.graph_for(test_val1))
+                linear_count_ori = check_op_count(graph_opt, ["aten::linear"])
+                self.assertEqual(linear_count_ori, 4)
+            # call prepack mkl path(fp32)
+            model = ipex.optimize(origin_model, dtype=torch.float32)
+            ori_res = model(test_val1)
+            with torch.no_grad():
+                model_jit = torch.jit.trace(model, (test_val1))
+                graph_ori = str(model_jit.graph_for(test_val1))
+                linear_count_ori = check_op_count(
+                    graph_ori, ["ipex_prepack::mkl_sgemm_run"]
+                )
+                self.assertEqual(linear_count_ori, 4)
+                model_jit = torch.jit.freeze(model_jit)
+                jit_res = model_jit(test_val1)
+                self.assertEqual(ori_res, jit_res)
+                graph_opt = str(model_jit.graph_for(test_val1))
+                linear_count_ori = check_op_count(
+                    graph_opt, ["ipex_prepack::mkl_sgemm_run"]
+                )
+                self.assertEqual(linear_count_ori, 4)
+
+            # call onednn path(fp32)
+            model = ipex.optimize(
+                origin_model,
+                dtype=torch.float32,
+                auto_kernel_selection=True,
+            )
+            ori_res = model(test_val1)
+            with torch.no_grad():
+                model_jit = torch.jit.trace(model, (test_val1))
+                graph_ori = str(model_jit.graph_for(test_val1))
+                linear_count_ori = check_op_count(
+                    graph_ori, ["ipex_prepack::linear_run"]
+                )
+                self.assertEqual(linear_count_ori, 4)
+                model_jit = torch.jit.freeze(model_jit)
+                jit_res = model_jit(test_val1)
+                self.assertEqual(ori_res, jit_res)
+                graph_opt = str(model_jit.graph_for(test_val1))
+                linear_count_ori = check_op_count(
+                    graph_opt, ["ipex_prepack::linear_run"]
+                )
+                self.assertEqual(linear_count_ori, 4)
+
+            model = ipex.optimize(origin_model, dtype=torch.bfloat16)
+            test_val1 = test_val1.bfloat16()
+            with torch.cpu.amp.autocast(), torch.no_grad():
+                ori_res = model(test_val1)
+                model_jit = torch.jit.trace(model, (test_val1))
+                graph_ori = str(model_jit.graph_for(test_val1))
+                linear_count_ori = check_op_count(
+                    graph_ori, ["ipex_prepack::linear_run"]
+                )
+                self.assertEqual(linear_count_ori, 4)
+                model_jit = torch.jit.freeze(model_jit)
+                model_jit(test_val1)
+                graph_opt = str(model_jit.graph_for(test_val1))
+                jit_res = model_jit(test_val1)
+                self.assertEqual(ori_res[1], jit_res[1])
+                linear_count_ori = check_op_count(
+                    graph_opt, ["ipex_prepack::linear_run"]
+                )
+                self.assertEqual(linear_count_ori, 4)
 
     def test_add_layernorm(self):
         for dim in [768, 100]:

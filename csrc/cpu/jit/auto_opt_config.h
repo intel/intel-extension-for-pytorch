@@ -26,6 +26,14 @@ class IPEX_API AutoOptConfig {
     return jit_repack_for_linear_;
   }
 
+  inline void set_jit_concat_linear(bool jit_concat_linear) {
+    jit_concat_linear_ = jit_concat_linear;
+  }
+
+  inline bool get_jit_concat_linear() {
+    return jit_concat_linear_;
+  }
+
  private:
   AutoOptConfig()
       : jit_fuse_(true),
@@ -38,6 +46,7 @@ class IPEX_API AutoOptConfig {
         //    will be the best format. (2) Linear + binary cannot be folded if
         //    we do not do repack, since it is implemented on aten:linear
         jit_repack_for_linear_(true),
+        jit_concat_linear_(true),
         calibration_step_(false),
         qscheme_(at::QScheme::PER_TENSOR_AFFINE) {}
 
@@ -47,6 +56,7 @@ class IPEX_API AutoOptConfig {
 
   bool jit_fuse_;
   bool jit_repack_for_linear_;
+  bool jit_concat_linear_;
   // the flag for one iteration of calibration step whether end or not.
   bool calibration_step_;
   at::QScheme qscheme_;

@@ -138,8 +138,10 @@ void IPEXFusionPass(std::shared_ptr<Graph>& graph) {
         graph, aten_linear_recorder.use_mkl());
   }
   // concat multi-linear with same input
-  torch_ipex::jit::FrozenConcatLinear(
-      graph, aten_linear_recorder.get_records());
+  if (AutoOptConfig::singleton().get_jit_concat_linear()) {
+    torch_ipex::jit::FrozenConcatLinear(
+        graph, aten_linear_recorder.get_records());
+  }
   graph_rewrite::FrozenLinearFolding(graph);
 
   // linear fusion
