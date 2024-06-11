@@ -1337,6 +1337,71 @@ class WeightOnlyQuantizationTester(TestCase):
                 out = out[: orig_shape[0], : orig_shape[1]].contiguous()
             return out
 
+    def _fakequant_by_group_sym(self, t, quant_a_mode, groupsize):
+        assert quant_a_mode >= 4 and quant_a_mode <= 7
+        if quant_a_mode == 4:
+            obs = torch.ao.quantization.MinMaxObserver(
+                torch.qint8, qscheme=torch.per_tensor_symmetric
+            )
+            obs(t)
+            scale, zero_point = obs.calculate_qparams()
+            return (
+                torch.quantize_per_tensor(
+                    t.to(torch.float), scale, zero_point, torch.qint8
+                )
+                .dequantize()
+                .to(t.dtype)
+            )
+        orig_shape = t.shape
+        if t.shape[-1] % groupsize:
+            pad_len = t.shape[-1] // groupsize * groupsize + groupsize - t.shape[-1]
+            t = torch.nn.functional.pad(t, (0, pad_len), value=0)
+        grouped = t.view(-1, t.shape[-1] // groupsize, groupsize)
+        if quant_a_mode == 5:
+            grouped_min = grouped.min(dim=-1)[0].min(dim=0)[0]
+            grouped_max = grouped.max(dim=-1)[0].max(dim=0)[0]
+        elif quant_a_mode == 6:
+            grouped_min = grouped.min(dim=-1)[0].min(dim=1)[0]
+            grouped_max = grouped.max(dim=-1)[0].max(dim=1)[0]
+        else:
+            grouped_min = grouped.min(dim=-1)[0]
+            grouped_max = grouped.max(dim=-1)[0]
+        min = grouped_min
+        max = grouped_max
+        eps = torch.tensor([torch.finfo(torch.float32).eps])
+        scales = torch.max(torch.abs(max), torch.abs(min)) / 127
+        scales = torch.max(scales, eps)
+        if quant_a_mode == 5:
+            qt = torch.clamp(
+                torch.round(grouped / scales.unsqueeze(1)),
+                min=-128,
+                max=127,
+            )
+            out = ((qt) * scales.unsqueeze(1)).to(t.dtype).view(t.shape)
+            if orig_shape != out.shape:
+                out = out[: orig_shape[0], : orig_shape[1]].contiguous()
+            return out
+        elif quant_a_mode == 6:
+            qt = torch.clamp(
+                torch.round(grouped / scales.unsqueeze(1).unsqueeze(2)),
+                min=-128,
+                max=127,
+            )
+            out = ((qt) * scales.unsqueeze(1).unsqueeze(2)).to(t.dtype).view(t.shape)
+            if orig_shape != out.shape:
+                out = out[: orig_shape[0], : orig_shape[1]].contiguous()
+            return out
+        else:
+            qt = torch.clamp(
+                torch.round(grouped / scales.unsqueeze(-1)),
+                min=-128,
+                max=127,
+            )
+            out = ((qt) * scales.unsqueeze(-1)).to(t.dtype).view(t.shape)
+            if orig_shape != out.shape:
+                out = out[: orig_shape[0], : orig_shape[1]].contiguous()
+            return out
+
     def test_weight_only_quantization_act_quant_mode(self):
 
         class Mod(nn.Module):
@@ -1401,6 +1466,80 @@ class WeightOnlyQuantizationTester(TestCase):
         cases = itertools.product(has_bias_list, quant_mode_list, batch_size_list)
         for has_bias, quant_mode, M in cases:
             test(has_bias, quant_mode, M)
+
+    def test_weight_only_quantization_act_quant_sym_mode(self):
+
+        class Mod(nn.Module):
+            def __init__(self, has_bias, K, N):
+                super(Mod, self).__init__()
+                self.linear = torch.nn.Linear(K, N, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test_sym(has_bias, act_quant_mode, shape):
+            dtype = torch.bfloat16
+            model = Mod(has_bias, shape[1], shape[2])
+            m = model.eval()
+            m2 = copy.deepcopy(m)
+            data = torch.randn(shape[0], shape[1]) * 0.5
+            qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=WoqWeightDtype.INT4,
+                lowp_mode=WoqLowpMode.INT8,
+                act_quant_mode=act_quant_mode,
+            )
+            fake_quant_x_sym = self._fakequant_by_group_sym(
+                data, act_quant_mode, groupsize
+            )
+            prepared_model = prepare(m2, qconfig_mapping, inplace=True)
+            with torch.no_grad(), torch.autocast(
+                device_type="cpu", enabled=True, dtype=dtype
+            ):
+                woq_model = convert(prepared_model)
+                # Behavior of WOQ Linear to simulate:
+                # Quantize weight to int4 by float qparams at quantization time
+                # Quantize activation to int8 at runtime
+                # Convert weight and its zero points to INT8 for computation
+                qw = woq_model.linear._op_context.to_public(
+                    woq_model.linear._op_context.get_weight()
+                )
+                w_scales = woq_model.linear._op_context.get_scales()
+                w_zero_points = woq_model.linear._op_context.get_zero_points()
+                w = copy.deepcopy(m.linear.weight.data)
+
+                qw, _, _ = quantize_per_channel(
+                    w, WoqWeightDtype.INT4, w_scales, w_zero_points
+                )
+                fake_quant_w = dequantize_per_channel(
+                    qw, w_scales, w_zero_points.int(), WoqWeightDtype.INT4, w.shape
+                )
+                m.linear.weight.data = fake_quant_w
+                y_ref = m(fake_quant_x_sym).to(dtype)
+                y = woq_model(data)
+                try:
+                    torch.testing.assert_close(y, y_ref, atol=1e-2 * 5, rtol=1e-1 * 2)
+                except Exception:
+                    # The fallback kernel does not support act quant mode
+                    # It computes in fp32 by dequantizing weight.
+                    fake_quant_w = qw.dequantize()
+                    y_ref = data @ fake_quant_w.T + (m.linear.bias if has_bias else 0)
+                    y_ref = y_ref.to(dtype)
+                    torch.testing.assert_close(y, y_ref, atol=1e-2, rtol=1e-1)
+
+        groupsize = 64
+        shape_list = [
+            [3, 31, 31],
+            [4, 4096, 4096],
+            [4, 4096, 4095],
+            [9, 4095, 4095],
+            [196, 4095, 4095],
+            [1024, 512, 512],
+        ]
+        has_bias_list = [False, True]
+        quant_mode_sym_list = [4, 5, 6, 7]
+        cases_sym = itertools.product(has_bias_list, quant_mode_sym_list, shape_list)
+        for has_bias, quant_mode, shape in cases_sym:
+            test_sym(has_bias, quant_mode, shape)
 
     def test_weight_only_quantization_group_size(self):
         class Mod(nn.Module):

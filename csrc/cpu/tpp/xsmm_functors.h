@@ -1873,7 +1873,8 @@ class BrgemmTPP {
       float beta,
       int a_trans,
       int unroll_hint,
-      int b_vnni = 1)
+      int b_vnni = 1,
+      bool is_s8s8 = false)
       : M(M),
         N(N),
         K(K),
@@ -1886,6 +1887,7 @@ class BrgemmTPP {
         a_trans(a_trans),
         unroll_hint(unroll_hint),
         b_vnni(b_vnni),
+        is_s8s8(is_s8s8),
         k_gemm_with_tc(this, 0),
         k_cfg(this, 1),
         k_rls(this, 2),
@@ -1998,7 +2000,7 @@ class BrgemmTPP {
 
    protected:
     uint64_t hash_int() override {
-      std::array<int, 14> params = {
+      std::array<int, 15> params = {
           p->M,
           p->N,
           p->K,
@@ -2012,8 +2014,9 @@ class BrgemmTPP {
           p->ldb,
           p->ldc,
           config,
-          p->b_vnni};
-      uint64_t hash_value = string_to_hash_int<14>("brgemm", params);
+          p->b_vnni,
+          p->is_s8s8};
+      uint64_t hash_value = string_to_hash_int<15>("brgemm", params);
       return hash_value;
     }
     void* build_kernel() override {
@@ -2062,7 +2065,9 @@ class BrgemmTPP {
       l_shape.comp_type = LIBXSMM_DATATYPE_F32;
       // TODO(jgong5): we should not always assume u8*i8 for int8 gemm
       if (std::is_same<Tin, int8_t>()) {
-        l_flags |= LIBXSMM_GEMM_FLAG_B_UNSIGNED;
+        if (!p->is_s8s8) {
+          l_flags |= LIBXSMM_GEMM_FLAG_B_UNSIGNED;
+        }
         l_shape.comp_type = LIBXSMM_DATATYPE_I32;
       }
       l_shape.out_type = XsmmDtype<Tout>();
@@ -2114,6 +2119,7 @@ class BrgemmTPP {
   int64_t brgemm_type = -1;
   int unroll_hint;
   int b_vnni;
+  bool is_s8s8;
   BrgemmKernel k_gemm_with_tc;
   BrgemmKernel k_cfg;
   BrgemmKernel k_rls;

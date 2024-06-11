@@ -116,6 +116,10 @@ class WoqActQuantMode(IntEnum):
     PER_IC_BLOCK = 1  # IC = Input Channel
     PER_BATCH = 2
     PER_BATCH_IC_BLOCK = 3
+    PER_TENSOR_SYM = 4
+    PER_IC_BLOCK_SYM = 5
+    PER_BATCH_SYM = 6
+    PER_BATCH_IC_BLOCK_SYM = 7
 
 
 # Start from 1 to align with kernel

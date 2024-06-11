@@ -212,7 +212,16 @@ parser.add_argument(
 )
 parser.add_argument(
     "--act-quant-mode",
-    choices=["PER_TENSOR", "PER_IC_BLOCK", "PER_BATCH", "PER_BATCH_IC_BLOCK"],
+    choices=[
+        "PER_TENSOR",
+        "PER_IC_BLOCK",
+        "PER_BATCH",
+        "PER_BATCH_IC_BLOCK",
+        "PER_TENSOR_SYM",
+        "PER_IC_BLOCK_SYM",
+        "PER_BATCH_SYM",
+        "PER_BATCH_IC_BLOCK_SYM",
+    ],
     default="PER_IC_BLOCK",
     type=str,
     help="Quantization mode for activation with different granularity. "
@@ -222,6 +231,10 @@ parser.add_argument(
     "PER_IC_BLOCK(1): quantize per group along IC with group size = IC_BLOCK; "
     "PER_BATCH(2): quantize per batch; "
     "PER_BATCH_IC_BLOCK(3): quantize per block of size 1 x IC_BLOCK. "
+    "PER_TENSOR_SYM(4): symmetrically quantize per tensor; "
+    "PER_IC_BLOCK_SYM(5): symmetrically quantize per group along IC with group size = IC_BLOCK; "
+    "PER_BATCH_SYM(6): symmetrically quantize per batch; "
+    "PER_BATCH_IC_BLOCK_SYM(7): symmetrically quantize per block of size 1 x IC_BLOCK. "
     "IC_BLOCK is determined by IC automatically.",
 )
 parser.add_argument(
@@ -967,6 +980,10 @@ elif args.ipex_weight_only_quantization:
         "PER_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
         "PER_BATCH": ipex.quantization.WoqActQuantMode.PER_BATCH,
         "PER_BATCH_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK,
+        "PER_TENSOR_SYM": ipex.quantization.WoqActQuantMode.PER_TENSOR_SYM,
+        "PER_IC_BLOCK_SYM": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK_SYM,
+        "PER_BATCH_SYM": ipex.quantization.WoqActQuantMode.PER_BATCH_SYM,
+        "PER_BATCH_IC_BLOCK_SYM": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
     }
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype,
