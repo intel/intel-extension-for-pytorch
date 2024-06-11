@@ -1,10 +1,13 @@
 #include <profiler/kineto_shim.h>
 
+#include <c10/util/Exception.h>
 #include <torch/csrc/profiler/api.h>
 
 #ifdef USE_PTI
 #include <profiler/XPUActivityProfilerProxy.h>
 #include <profiler/include/kineto/libkineto.h>
+
+#include <pti/pti_view.h>
 
 namespace KINETO_NAMESPACE {
 class XPUActivityProfilerProxy;
@@ -39,6 +42,11 @@ const std::set<libkineto::ActivityType> xpuTypes = {
 
 void libkineto_init_xpu(bool cpuOnly, bool logOnError) {
   // libkineto::ConfigLoader& config_loader = libkineto::api().configLoader();
+  auto returnCode = ptiViewGPULocalAvailable();
+  TORCH_CHECK(
+      returnCode == PTI_SUCCESS,
+      "Fail to enable Kineto Profiler on XPU due to error code: ",
+      returnCode);
   libkineto::api().registerProfiler(
       std::make_unique<KINETO_NAMESPACE::XPUActivityProfilerProxy>(cpuOnly));
 }

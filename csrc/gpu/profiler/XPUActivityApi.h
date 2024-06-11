@@ -5,6 +5,7 @@
 #include <mutex>
 #include <set>
 
+#include <c10/util/Exception.h>
 #include <profiler/XPUActivityBuffer.h>
 #include <profiler/include/kineto/ActivityType.h>
 
@@ -18,6 +19,16 @@ namespace KINETO_NAMESPACE {
 using namespace libkineto;
 
 using Onepti_Activity = pti_view_record_base;
+
+#define AT_XPU_PTI_CHECK(returnCode)                       \
+  {                                                        \
+    TORCH_CHECK(                                           \
+        returnCode == PTI_SUCCESS,                         \
+        "Kineto Profiler on XPU got error from function ", \
+        __func__,                                          \
+        ". The error code is ",                            \
+        returnCode);                                       \
+  }
 
 class XPUActivityApi {
  public:

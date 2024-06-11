@@ -52,7 +52,7 @@ endif()
 
 # Kineto + PTI-sdk dependency part
 if(USE_PTI)
-  find_package(Pti 0.7.0 QUIET)
+  find_package(Pti)
   if(NOT TARGET Pti::pti_view)
     message(WARNING "PTI-sdk library not found. Will continue building without profiler.\n")
     set(USE_PTI OFF CACHE BOOL "Disable PTI support." FORCE)
