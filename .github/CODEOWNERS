@@ -11,16 +11,36 @@
 # Each line is a file pattern followed by one or more owners.
 # Order is important; the last matching pattern takes the most precedence.
 
-* @gujinghui @arthuryuan1987
-
 # Frontend
-/intel_extension_for_pytorch @gujinghui @wuhuikx @zejun-chen
+/intel_extension_for_pytorch @gujinghui @zejun-chen @jgong5
 
 # IPEX GPU code base
-/csrc/gpu @gujinghui @arthuryuan1987 @wuhuikx @majing921201
+/csrc/gpu @gujinghui @fengyuan14 @majing921201
+
+# IPEX GPU runtime
+/csrc/gpu/runtime @gujinghui @fengyuan14 @guangyey
+
+# IPEX GPU oneDNN
+/csrc/gpu/oneDNN @fengyuan14 @ZhiweiYan-96
+
+# IPEX quantization
+intel_extension_for_pytorch/quantization @xiaolil1
+csrc/gpu/aten/operators/fp8 @xiaolil1
+csrc/gpu/aten/quantized @xiaolil1
+
+# IPEX inductor
+intel_extension_for_pytorch/fx @EikanWang
+intel_extension_for_pytorch/_dynamo @EikanWang
+intel_extension_for_pytorch/_inductor @EikanWang
+
+# IPEX DS kernels
+ecological_libs/deepspeed @rogerxfeng8
+
+# XeTLA kernels
+csrc/gpu/aten/operators/xetla @rogerxfeng8 @airMeng
 
 # Documentation and tutorials
-/docs @gujinghui @tye1
+/docs @tye1
 
 # Docker files
 /docker @tye1
@@ -29,7 +49,7 @@
 /cmake @gujinghui @zejun-chen @xuhancn
 
 # Tools and scripts
-/scripts @gujinghui @xunsongh
+/scripts @gujinghui @leizhenyuan
 
 # IPEX CPU code base
 /csrc/cpu @xuhancn @zejun-chen
