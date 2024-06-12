@@ -1,4 +1,4 @@
-from ....utils._logger import logger, WarningType
+import logging
 import math
 import random
 import re
@@ -16,6 +16,10 @@ from .model_utils import (
 )
 
 DEBUG = False
+format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+logging.basicConfig(level=logging.INFO, format=format_str)
+logger = logging.getLogger("GPTQ")
+logger.setLevel(logging.INFO)
 
 
 class GPTQuantizer(object):
@@ -134,8 +138,7 @@ class GPTQuantizer(object):
                     length = batch["input_ids"].shape[-1]
                 except Exception:
                     logger.warning(
-                        "Please make sure your dict'like data contains key of 'input_ids'.",
-                        _type=WarningType.WrongArgument,
+                        "Please make sure your dict'like data contains key of 'input_ids'."
                     )
                     continue
                 batch_final = {}
@@ -163,8 +166,7 @@ class GPTQuantizer(object):
             self.dataloader.append(batch_final)
         if len(self.dataloader) < self.nsamples:
             logger.warning(
-                f"Try to use {self.nsamples} data, but entire dataset size is {len(self.dataloader)}.",
-                _type=WarningType.WrongArgument,
+                f"Try to use {self.nsamples} data, but entire dataset size is {len(self.dataloader)}."
             )
 
     def obtain_first_n_samples_fulllength(self, seed=0):
@@ -197,8 +199,7 @@ class GPTQuantizer(object):
                     length = batch["input_ids"].shape[-1]
                 except Exception:
                     logger.warning(
-                        "Please make sure your dict'like data contains key of 'input_ids'.",
-                        _type=WarningType.WrongArgument,
+                        "Please make sure your dict'like data contains key of 'input_ids'."
                     )
                     continue
                 batch_final = {}
@@ -233,8 +234,7 @@ class GPTQuantizer(object):
         if len(self.dataloader) < self.nsamples:  # pragma: no cover
             logger.warning(
                 f"Trying to allocate {self.nsamples} data with fixed length {unified_length},"
-                + f"but only {len(self.dataloader)} samples are found. Please use smaller 'self.pad_max_length' value.",
-                _type=WarningType.WrongArgument,
+                + f"but only {len(self.dataloader)} samples are found. Please use smaller 'self.pad_max_length' value."
             )
 
     def get_full_layer_name(self, sub_layer_name, block_idx):

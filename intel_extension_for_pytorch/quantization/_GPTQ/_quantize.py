@@ -1,7 +1,11 @@
 import logging
 import torch
 from pathlib import Path
-from ...utils._logger import logger, WarningType
+
+format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+logging.basicConfig(level=logging.INFO, format=format_str)
+logger = logging.getLogger("GPTQ")
+logger.setLevel(logging.INFO)
 
 
 @torch.no_grad()
@@ -66,8 +70,7 @@ def gptq(
         logger.warning(
             "You choose to use unified sequence length for calibration"
             + "but you have not set length value. Default sequence length"
-            + "is 2048 and this might cause inference error!",
-            _type=WarningType.WrongArgument,
+            + "is 2048 and this might cause inference error!"
         )
     model, gptq_config = gptq_quantize(
         model,
@@ -79,6 +82,7 @@ def gptq(
         layer_wise,
         model_path,
     )
+    logger.info("Exporting compressed model...")
     compressed_model = gptq_export(
         model,
         weight_config,
@@ -91,7 +95,7 @@ def gptq(
     output_file_name = f"gptq_checkpoint_g{group_size}.pt"
     output_file_path = save_dir + "/" + output_file_name
     torch.save(compressed_model.state_dict(), output_file_path)
-    logging.info(
+    logger.info(
         "Low-precision checkpoint generated and saved to {}.".format(output_file_path)
     )
     return compressed_model

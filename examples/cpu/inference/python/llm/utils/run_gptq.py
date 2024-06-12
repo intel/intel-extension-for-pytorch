@@ -140,7 +140,7 @@ def get_user_model():
             torchscript=torchscript,  # torchscript will force `return_dict=False` to avoid jit errors
             trust_remote_code=True,
         )
-        tokenizer = AutoTokenizer.from_pretrained(args.model)
+        tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
 
     # Set model's seq_len when GPTQ calibration is enabled.
     user_model.seqlen = 2048
