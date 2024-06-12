@@ -4,8 +4,8 @@ from .fusions import (
     fast_layer_norm,
     indirect_access_kv_cache_attention,
     varlen_attention,
+    add_layer_norm,
+    add_rms_norm,
     silu_mul,
     gelu_mul,
-    add_rms_norm,
-    add_layer_norm,
 )

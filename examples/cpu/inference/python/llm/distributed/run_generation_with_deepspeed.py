@@ -8,7 +8,6 @@ from argparse import ArgumentParser
 from pathlib import Path
 import torch
 import re
-
 import deepspeed
 from deepspeed.accelerator import get_accelerator
 import deepspeed.comm as dist
@@ -18,9 +17,19 @@ from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    LlamaTokenizer,
+    T5ForConditionalGeneration,
+    AutoProcessor,
+    TextStreamer
 )
 
+import sys
+
+sys.path.append(sys.path[0] + '/../../')
+
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 # supported models now
 MODEL_CLASSES = {
@@ -28,12 +37,37 @@ MODEL_CLASSES = {
     "gptj": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "gptneox": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, LlamaTokenizer),
+    "llama": (AutoModelForCausalLM, AutoTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm": (AutoModelForCausalLM, AutoTokenizer),
+    "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
+    "t5": (T5ForConditionalGeneration, AutoTokenizer),
+    "mistral": (AutoModelForCausalLM, AutoTokenizer),
+    "mixtral": (AutoModelForCausalLM, AutoTokenizer),
+    "mpt": (AutoModelForCausalLM, AutoTokenizer),
+    "stablelm": (AutoModelForCausalLM, AutoTokenizer),
+    "qwen": (AutoModelForCausalLM, AutoTokenizer),
+    "git": (AutoModelForCausalLM, AutoProcessor),
+    "yuan": (AutoModelForCausalLM, AutoTokenizer),
+    "phi-3": (AutoModelForCausalLM, AutoTokenizer),
+    "phi": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
+
+try:
+    from llava.model.language_model.llava_llama import LlavaLlamaForCausalLM
+    from llava.model.builder import load_pretrained_model
+    from llava.conversation import conv_templates
+    from llava.mm_utils import get_model_name_from_path, tokenizer_image_token
+    from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+    MODEL_CLASSES["llava"] = (LlavaLlamaForCausalLM, AutoTokenizer)
+except ImportError:
+    pass
 
 # the Deepspeed team made these so it's super fast to load (~1 minute), rather than wait 10-20min loading time.
 tp_presharded_models = [
@@ -74,6 +108,9 @@ parser.add_argument("--ki", action="store_true")
 parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
 )
+parser.add_argument(
+    "--streaming", action="store_true", help="enable streaming mode for generation output (greedy search only)"
+)
 parser.add_argument("--input-tokens", default="32", type=str)
 parser.add_argument("--prompt", default=None, type=str)
 parser.add_argument("--ipex", action="store_true", help="ipex is not enabled now")
@@ -86,9 +123,12 @@ parser.add_argument(
     "--local_rank", required=False, type=int, help="used by dist launchers"
 )
 parser.add_argument(
-    "--int8-bf16-mixed",
+    "--quant-with-amp",
     action="store_true",
     help="by default it is int8-fp32 mixed, to enable int8 mixed amp bf16 (work on platforms like SPR)",
+)
+parser.add_argument(
+    "--image-url", default="http://images.cocodataset.org/val2017/000000039769.jpg", type=str, help="image url for image-to-text task"
 )
 parser.add_argument("--print-memory", action="store_true")
 parser.add_argument("--token-latency", action="store_true")
@@ -108,10 +148,35 @@ parser.add_argument(
 )
 parser.add_argument(
     "--weight-dtype",
-    choices=["INT8", "INT4"],
+    choices=["INT8", "INT4", "NF4"],
     default="INT8",
     type=str,
     help="weight data type for weight only quantization. Unrelated to activation data type or lowp-mode.",
+)
+parser.add_argument(
+    "--group-size",
+    default=-1,
+    type=int,
+    help="For weight-only quantization only. Specifies the group size along"
+    " input channel for block-wise quantization of weight. It must be a"
+    " positive power of 2 or -1. If it is -1, weight is quantized per"
+    " output channel. Otherwise, weight is quantized per block with block size"
+    " = [1, group_size]. If `--low-precision-checkpoint` is given, group"
+    " size is determined automatically and this argument has no effect.",
+)
+parser.add_argument(
+    "--act-quant-mode",
+    choices=["PER_TENSOR", "PER_IC_BLOCK", "PER_BATCH", "PER_BATCH_IC_BLOCK"],
+    default="PER_IC_BLOCK",
+    type=str,
+    help="Quantization mode for activation with different granularity. "
+    "For lowp-mode=INT8 only. For other cases, it has no effect. "
+    "Assume the activation tensor has shape batch_size x input_channel. "
+    "PER_TENSOR(0): quantize per tensor; "
+    "PER_IC_BLOCK(1): quantize per group along IC with group size = IC_BLOCK; "
+    "PER_BATCH(2): quantize per batch; "
+    "PER_BATCH_IC_BLOCK(3): quantize per block of size 1 x IC_BLOCK. "
+    "IC_BLOCK is determined by IC automatically.",
 )
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
@@ -120,8 +185,10 @@ args = parser.parse_args()
 
 
 num_tokens = args.max_new_tokens
+use_ipex = args.ipex or args.ipex_weight_only_quantization
+
 # import extension
-if args.ipex:
+if use_ipex:
     import intel_extension_for_pytorch as ipex
 
     torch._C._jit_set_texpr_fuser_enabled(False)
@@ -154,8 +221,8 @@ def print_rank0(*msg):
 
 # Model loading and instantiating on GPUs
 def get_repo_root(model_name_or_path):
-    local_prefix = ("/", "./", "../")
-    if model_name_or_path.startswith(local_prefix):
+    if os.path.exists(model_name_or_path):
+        # local path
         return model_name_or_path
     # checks if online or not
     if is_offline_mode():
@@ -196,7 +263,7 @@ def get_checkpoint_files(model_name_or_path):
 
 
 model_name = args.model_id
-if args.int8_bf16_mixed:
+if args.quant_with_amp:
     load_dtype = torch.bfloat16
     infer_dtype = torch.bfloat16
 else:
@@ -229,22 +296,40 @@ if model_type == "auto":
         "rw", config.architectures[0], re.IGNORECASE
     ):
         model_type = "falcon"
+    if re.search("gptbigcode", config.architectures[0], re.IGNORECASE):
+        model_type = "gptbigcode"
+    if re.search("gptneox", config.architectures[0], re.IGNORECASE):
+        model_type = "gpt-neox"
 
 if model_type == "falcon":
     model_input_names = ["input_ids", "attention_mask"]
     tokenizer.model_input_names = model_input_names
 
 if args.config_file is None:
-    config = AutoConfig.from_pretrained(
-        args.model_id, torchscript=True, trust_remote_code=True
-    )
+    if model_type == "chatglm":
+        config = AutoConfig.from_pretrained(
+            args.model_id, torchscript=True, trust_remote_code=True, torch_dtype=load_dtype,
+        )
+    else:
+        config = AutoConfig.from_pretrained(
+            args.model_id, torchscript=True, trust_remote_code=True
+        )
 else:
     config = AutoConfig.from_pretrained(
         args.config_file, torchscript=True, trust_remote_code=True
     )
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
+if model_type == "mpt" and args.prompt is None:
+    config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
+if model_type == "llava":
+    config.use_cache=True
 
+if not hasattr(config, "lm_head_generation"):
+    config.lm_head_generation = True
+num_beams = 1 if args.greedy else 4
+if model_type in ["git", "llava"]:
+    config.batch_size = int(args.batch_size) * num_beams
 # XXX: can't automatically derive dtype via config's `from_pretrained`
 # dtype = torch.bfloat16 if model_name in ["bigscience/bloom", "bigscience/bigscience-small-testing"] else torch.float16
 
@@ -259,8 +344,13 @@ if args.benchmark:
     gc.collect()
     deepspeed.runtime.utils.see_memory_usage("pre-from-pretrained", force=True)
 
-# Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
-if world_size == 1 or model_type == "falcon":
+# For now, Falcon, baichuan, baichuan2, and gptbigcode have accuracy issue with from_config with deepspeed meta device load.
+# TODO: we will change the scope once deepspeed providing the support
+
+if model_type in ["llava"]:
+    tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_id)
+    model.config = config
+elif world_size == 1 or model_type in ["falcon", "baichuan", "baichuan2", "gptbigcode", "git", "qwen", "yuan"]:
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
@@ -268,11 +358,14 @@ if world_size == 1 or model_type == "falcon":
         torch_dtype=load_dtype,
         trust_remote_code=True,
     )
-else:
+else: # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
     with deepspeed.OnDevice(dtype=load_dtype, device="meta"):
-        model = (
-            model_class[0].from_config(config, trust_remote_code=True).to(load_dtype)
-        )
+        if  model_type in ["t5"]:
+            model =  model_class[0](config=config)
+        else:
+            model = (
+                model_class[0].from_config(config, trust_remote_code=True).to(load_dtype)
+            )
 
 if args.benchmark:
     deepspeed.runtime.utils.see_memory_usage("post-from-pretrained", force=True)
@@ -338,10 +431,17 @@ if args.benchmark:
     t_ready = time.time()
 
 # to ipex
-if args.ipex:
+if use_ipex:
     ipex_woq_enabled = args.ipex_weight_only_quantization
     if ipex_woq_enabled:
-        weight_dtype = torch.quint4x2 if args.weight_dtype == "INT4" else torch.qint8
+        from intel_extension_for_pytorch.quantization import WoqWeightDtype
+        if args.weight_dtype == "INT8":
+            weight_dtype = WoqWeightDtype.INT8
+        elif args.weight_dtype == "INT4":
+            weight_dtype = WoqWeightDtype.INT4
+        else:
+            assert args.weight_dtype == "NF4"
+            weight_dtype = WoqWeightDtype.NF4
         if args.lowp_mode == "INT8":
             lowp_mode = ipex.quantization.WoqLowpMode.INT8
         elif args.lowp_mode == "FP32":
@@ -351,15 +451,24 @@ if args.ipex:
         elif args.lowp_mode == "BF16":
             lowp_mode = ipex.quantization.WoqLowpMode.BF16
         else:  # AUTO
-            if weight_dtype == torch.quint4x2:
+            if weight_dtype == WoqWeightDtype.INT4:
                 lowp_mode = ipex.quantization.WoqLowpMode.INT8
             else:
                 lowp_mode = ipex.quantization.WoqLowpMode.BF16
 
+        act_quant_mode_dict = {
+            "PER_TENSOR": ipex.quantization.WoqActQuantMode.PER_TENSOR,
+            "PER_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
+            "PER_BATCH": ipex.quantization.WoqActQuantMode.PER_BATCH,
+            "PER_BATCH_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK,
+        }
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-            weight_dtype=weight_dtype, lowp_mode=lowp_mode
+            weight_dtype=weight_dtype,
+            lowp_mode=lowp_mode,
+            act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
+            group_size=args.group_size,
         )
-    model = ipex.optimize_transformers(
+    model = ipex.llm.optimize(
         model.eval(),
         dtype=infer_dtype,
         quantization_config=qconfig if ipex_woq_enabled else None,
@@ -369,59 +478,119 @@ if args.ipex:
 
 
 # Generate
-
-
 print_rank0(f"*** Starting to generate {num_tokens} tokens with bs={args.batch_size}")
 
-# input tokens
-input_sentences = []
-current_path = pathlib.Path(__file__).parent.resolve()
-with open(str(current_path) + "/prompt.json") as f:
-    prompt_pool = json.load(f)
-if model_type == "gptj":
-    model_type = "gpt-j"
-if model_type == "gptneox":
-    model_type = "gpt-neox"
-if args.prompt is not None:
-    input_sentences.append(args.prompt)
-elif model_type == "auto":
-    raise SystemExit(
-        "[ERROR] model prompt is not supported, please use --prompt for this model: "
-        + args.model_id
-    )
-elif int(args.input_tokens) > 8192:
-    input_sentences.append(
-        prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
-    )
-elif args.input_tokens in prompt_pool[model_type]:
-    input_sentences.append(prompt_pool[model_type][args.input_tokens])
+if args.streaming:
+    streamer = TextStreamer(tokenizer)
 else:
-    raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+    streamer = None
+generate_kwargs = dict(do_sample=False, num_beams=num_beams, max_new_tokens=args.max_new_tokens, min_new_tokens=args.max_new_tokens, streamer=streamer)
 
 
-if args.batch_size > len(input_sentences):
-    # dynamically extend to support larger bs by repetition
-    input_sentences *= math.ceil(args.batch_size / len(input_sentences))
-num_beams = 1 if args.greedy else 4
-generate_kwargs = dict(max_new_tokens=num_tokens, do_sample=False, num_beams=num_beams)
+if args.token_latency and not args.ipex:
+    args.token_latency = False
+    logger.warning("--token-latency requires --ipex. Disabling --token-latency.")
 if args.token_latency:
     if not hasattr(model.config, "token_latency"):
         model.config.token_latency = True
 
+if re.search("t5", model.config.architectures[0], re.IGNORECASE):
+    generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
+    generate_kwargs.pop("max_new_tokens")
 print_rank0(f"Generate args {generate_kwargs}")
 
+if model_type == "git":
+    from PIL import Image
+    import requests
+    prompt = Image.open(requests.get(args.image_url, stream=True).raw)
+    inputs = [prompt] * args.batch_size
+    generate_kwargs.pop("min_new_tokens", None)
+elif model_type == "llava":
+    from PIL import Image
+    import requests
+    from io import BytesIO
+    def load_image(image_file):
+        if image_file.startswith('http://') or image_file.startswith('https://'):
+            response = requests.get(image_file)
+            image = Image.open(BytesIO(response.content)).convert('RGB')
+        else:
+            image = Image.open(image_file).convert('RGB')
+        return image
+    model_name = get_model_name_from_path(args.model_id)
+    if 'llama-2' in model_name.lower():
+        conv_mode = "llava_llama_2"
+    elif "v1" in model_name.lower():
+        conv_mode = "llava_v1"
+    elif "mpt" in model_name.lower():
+        conv_mode = "mpt"
+    else:
+        conv_mode = "llava_v0"
+    conv = conv_templates[conv_mode].copy()
+    if "mpt" in model_name.lower():
+        roles = ('user', 'assistant')
+    else:
+        roles = conv.roles
+    if args.prompt is not None:
+        prompt = args.prompt
+    image = load_image(args.image_url)
+    image = [image] * args.batch_size
+    if model.config.mm_use_im_start_end:
+        prompt = DEFAULT_IM_START_TOKEN + DEFAULT_IMAGE_TOKEN + DEFAULT_IM_END_TOKEN + '\n' + prompt
+    else:
+        prompt = DEFAULT_IMAGE_TOKEN + '\n' + prompt
+    conv.append_message(conv.roles[0], prompt)
+    conv.append_message(conv.roles[1], None)
+    prompt = conv.get_prompt()
+    inputs = [prompt] * args.batch_size
+else:
+    # input tokens
+    input_sentences = []
+    current_path = pathlib.Path(__file__).parent.resolve()
+    with open(str(current_path) + "/prompt.json") as f:
+        prompt_pool = json.load(f)
+    if model_type == "gptj":
+        model_type = "gpt-j"
+    if model_type == "gptneox":
+        model_type = "gpt-neox"
+    if args.prompt is not None:
+        input_sentences.append(args.prompt)
+    elif model_type == "auto":
+        raise SystemExit(
+            "[ERROR] model prompt is not supported, please use --prompt for this model: "
+            + args.model_id
+        )
+    # elif int(args.input_tokens) > 8192:
+    #     input_sentences.append(
+    #         prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+    #     )
+    elif args.input_tokens in prompt_pool[model_type]:
+        input_sentences.append(prompt_pool[model_type][args.input_tokens])
+    else:
+        raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+    if args.batch_size > len(input_sentences):
+        # dynamically extend to support larger bs by repetition
+        input_sentences *= math.ceil(args.batch_size / len(input_sentences))
 
-inputs = input_sentences[: args.batch_size]
-input_size = tokenizer.batch_encode_plus(inputs, return_tensors="pt").input_ids.size(
-    dim=1
-)
-print("*** Prompt size: ", input_size)
+    inputs = input_sentences[: args.batch_size]
+    input_size = tokenizer.batch_encode_plus(inputs, return_tensors="pt").input_ids.size(
+        dim=1
+    )
+    print("*** Prompt size: ", input_size)
 
 
 def generate():
     """returns a list of zipped inputs, outputs and number of new tokens"""
 
-    input_tokens = tokenizer.batch_encode_plus(inputs, return_tensors="pt")
+    if model_type == "git":
+        input_tokens = tokenizer(images=inputs, return_tensors="pt")
+        input_ids = input_tokens.pixel_values
+    elif model_type == "llava":
+        input_ids = torch.stack([tokenizer_image_token(pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt') for pmt in inputs])
+        image_tensor = [image_processor.preprocess(img, return_tensors='pt')['pixel_values'].to(infer_dtype) for img in image]
+        input_tokens = {"input_ids": input_ids, "images": image_tensor}
+    else:
+        input_tokens = tokenizer.batch_encode_plus(inputs, return_token_type_ids=False, return_tensors="pt")
+        input_ids = input_tokens.input_ids
     for t in input_tokens:
         if torch.is_tensor(input_tokens[t]):
             input_tokens[t] = input_tokens[t].to(
@@ -431,14 +600,14 @@ def generate():
     outputs = model.generate(**input_tokens, **generate_kwargs)
     gen_ids = outputs[0] if args.token_latency else outputs
 
-    input_tokens_lengths = [x.shape[0] for x in input_tokens.input_ids]
+    input_tokens_lengths = [x.shape[0] for x in input_ids]
     output_tokens_lengths = [x.shape[0] for x in gen_ids]
 
     total_new_tokens = [
         o - i if model.config.model_type != "t5" else o
         for i, o in zip(input_tokens_lengths, output_tokens_lengths)
     ]
-    gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+    gen_text = tokenizer.batch_decode(gen_ids[:, input_ids.shape[1]:] if model_type=="llava" else gen_ids, skip_special_tokens=True)
 
     return zip(inputs, gen_text, total_new_tokens), outputs
 

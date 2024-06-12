@@ -430,17 +430,12 @@ def weight_prepack_with_ipex(model, optimizer, params_attr, device_type="cpu"):
         patch_state_dict,
         get_shared_parameter_status,
         IPEX_WEIGHT_PREPACK_MODULE_CPU,
+        found_wrapper,
     )
 
     is_training = optimizer is not None
     if len(params_attr) == 0:
         get_shared_parameter_status(model, params_attr)
-
-    def found_wrapper(parameter, params_attr):
-        for _, v in params_attr.items():
-            if parameter is v.parameter:
-                return v
-        return None
 
     def convert(m, optimizer, params_attr):
         # already packed for reentrancy test

@@ -149,7 +149,9 @@ class RotaryEmbedding(torch.nn.Module):
             )
             if hasattr(self, "long_factor"):
                 t_long = torch.arange(
-                    max_position_embeddings, dtype=self.inv_freq.dtype
+                    max_position_embeddings,
+                    dtype=self.inv_freq.dtype,
+                    device=self.device,
                 )
                 freqs_long = torch.einsum("i,j->ij", t_long, inv_freq_long)
                 self.sin_cos_long = (

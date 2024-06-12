@@ -15,7 +15,7 @@ class _IPEXRopeCPU(nn.Module):
     ):
         super().__init__()
         self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, backbone, base, kwargs
+            max_position_embeddings, pos_embd_dim, backbone, base, kwargs=kwargs
         )
 
     def forward(
@@ -382,7 +382,13 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         super().__init__()
 
     @classmethod
-    def apply_functions(
+    def repeat_kv(cls, x: torch.Tensor, n_rep: int) -> torch.Tensor:
+        if n_rep == 1:
+            return x
+        return torch.repeat_interleave(x, dim=1, repeats=n_rep)
+
+    @classmethod
+    def apply_function(
         cls,
         query,  # [total_q, num_head, head_size]
         key,  # [total_k, num_head_k, head_size]
@@ -402,6 +408,11 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         assert return_softmax is False, "ipex do not support return_softmax option"
         assert gen_ is None, "ipex do not support custom random generator"
         assert zero_tensors is False, "ipex varlen_fwd do not support zero tensors"
+
+        # Repeat kv if it is GQA.
+        key = cls.repeat_kv(key, int(query.shape[1] / key.shape[1]))
+        value = cls.repeat_kv(value, int(query.shape[1] / value.shape[1]))
+
         total_q, num_head, head_size = query.size()
         total_k, num_head_k, _ = key.size()
         batch_size = seqlen_q.size(0) - 1
@@ -457,8 +468,8 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
             attn_mask=attn_mask if not is_causal else None,
             is_causal=is_causal,
         )
-        out.copy_(out_.transpose(1, 2).reshape(-1, out.shape[-2], out.shape[-1]))
-
+        out_ = out_.permute(0, 2, 1, 3)
+        out.copy_(out_[q_mask])
         return out
 
     def forward(
@@ -478,7 +489,7 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         return_softmax,
         gen_,
     ):
-        self.apply_function(
+        return self.apply_function(
             query,
             key,
             value,
@@ -494,3 +505,57 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
             return_softmax,
             gen_,
         )
+
+
+def add_rms_norm_cpu(
+    add: torch.Tensor,
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+    eps: float,
+    add_back: bool,
+):
+    assert bias is None, "bias is not supported in add_rmsnorm yet"
+    if add is not None:
+        if add_back:
+            add.add_(x)
+            input = add
+        else:
+            input = add + x
+    else:
+        input = x
+
+    return torch.ops.torch_ipex.rmsnorm(input, weight, eps)
+
+
+def add_layer_norm_cpu(
+    add: torch.Tensor,
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+    eps: float,
+    add_back: bool,
+):
+    if add is not None:
+        out = torch.ops.torch_ipex.add_layernorm(
+            x, add, 1, [x.size(-1)], weight, bias, eps
+        )
+        if add_back:
+            add.add_(x)
+        return out
+    else:
+        return torch.nn.functional.layer_norm(
+            x, [x.size(-1)], weight=weight, bias=bias, eps=eps
+        )
+
+
+def silu_mul_cpu(x, y, out=None):
+    from .lazy_mha_fusion import lazy_silu_mul_cpu
+
+    return lazy_silu_mul_cpu(x=x, y=y, out=out)
+
+
+def gelu_mul_cpu(x, y, out=None, approximate="none"):
+    from .lazy_mha_fusion import lazy_gelu_mul_cpu
+
+    return lazy_gelu_mul_cpu(x=x, y=y, out=out, approximate=approximate)

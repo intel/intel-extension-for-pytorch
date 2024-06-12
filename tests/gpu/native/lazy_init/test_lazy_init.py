@@ -14,7 +14,11 @@ class mini50(nn.Module):
         self.m = nn.Sequential(
             nn.Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False),
             nn.BatchNorm2d(
-                2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True
+                2048,
+                eps=1e-05,
+                momentum=0.1,
+                affine=True,
+                track_running_stats=True,
             ),
             nn.ReLU(inplace=True),
             nn.AvgPool2d(kernel_size=7, stride=1, padding=0),

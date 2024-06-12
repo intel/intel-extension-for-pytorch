@@ -1,0 +1,11 @@
+accelerate==0.28.0
+appdirs
+bitsandbytes
+black
+black[jupyter]
+datasets
+fire
+peft
+transformers==4.38.1
+gradio
+sentencepiece

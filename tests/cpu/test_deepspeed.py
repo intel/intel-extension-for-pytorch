@@ -38,10 +38,8 @@ except ImportError:
     import transformers
     from transformers import AutoConfig
 
-
 has_ccl = ipex_comm.has_ccl()
 world_size = 0 if not has_ccl else ipex_comm.get_world_size()
-
 
 class MyAttention(nn.Module):
     def __init__(self):

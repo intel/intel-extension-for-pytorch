@@ -15,7 +15,12 @@ class _IPEXRopeXPU(nn.Module):
     ):
         super().__init__()
         self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, backbone, base, device="xpu"
+            max_position_embeddings,
+            pos_embd_dim,
+            backbone,
+            base,
+            device="xpu",
+            kwargs=kwargs,
         )
         self.max_seqlen_cached = self.embed_positions.max_seq_len_cached
         self.emb_dim = self.embed_positions.emb.size(-1)
@@ -147,7 +152,7 @@ class _IPEXRopeXPU(nn.Module):
 
 
 class _IPEXRMSNormXPU(nn.Module):
-    def __init__(self, module):
+    def __init__(self, module, config=None, tpp=False, woq=False):
         super().__init__()
         self.weight = module.weight
         self.eps = module.eps

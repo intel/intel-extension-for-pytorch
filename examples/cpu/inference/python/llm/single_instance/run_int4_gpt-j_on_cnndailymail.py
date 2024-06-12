@@ -54,10 +54,8 @@ args = parser.parse_args()
 assert not (args.fp32 and args.bf16), "--fp32 and --bf16 cannot be used at the same time"
 
 random.seed(9973)
-logging.basicConfig(
-    format='%(asctime)s %(levelname)-8s %(message)s',
-    level=logging.INFO,
-    datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger("INT4 GPT-J")
+logger.setLevel(logging.INFO)
 PROMPT_DICT = {
     "prompt_input": (
         "Below is an instruction that describes a task, paired with an input that provides further context. "
@@ -161,13 +159,13 @@ parent_path = Path(__file__).parent.absolute()
 Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
 def load_original_model(args):
-    logging.info("Loading model {}...".format(args.model))
+    logger.info("Loading model {}...".format(args.model))
     config = AutoConfig.from_pretrained(args.model, torchscript=True)
     user_model = AutoModelForCausalLM.from_pretrained(
         args.model, torch_dtype=torch.float, config=config, low_cpu_mem_usage=True
     )
     tokenizer = AutoTokenizer.from_pretrained(args.model)
-    logging.info("model loaded.")
+    logger.info("model loaded.")
     return user_model, tokenizer
 
 dataset_id = 'cnn_dailymail'
@@ -175,7 +173,7 @@ dataset_version = '3.0.0'
 dataset_split = "validation"
 if args.dataset_path == "":
     instruction_template = "Summarize the following news article:"
-    logging.info("Loading {} split of {} dataset...".format(dataset_split, args.model))
+    logger.info("Loading {} split of {} dataset...".format(dataset_split, args.model))
     dataset = load_dataset(dataset_id, name=dataset_version, split=dataset_split)
     train = dict((x['id'], x) for x in dataset)
     inputs = []
@@ -191,20 +189,20 @@ if args.dataset_path == "":
     with open(val_data_path, 'w') as write_f:
         json.dump(inputs, write_f, indent=4, ensure_ascii=False)
 
-    logging.info("{} data saved at {}".format(dataset_split, val_data_path))
+    logger.info("{} data saved at {}".format(dataset_split, val_data_path))
 else:
-    logging.info("Use the given dataset {}".format(args.dataset_path))
+    logger.info("Use the given dataset {}".format(args.dataset_path))
     val_data_path = args.dataset_path
 
 num_beams = 4
 batch_size = 1
 if args.fp32 or args.bf16:
     user_model, tokenizer = load_original_model(args)
-    logging.info("Optimize model by ipex.optimize_transformers")
+    logger.info("Optimize model by ipex.llm.optimize")
     user_model = user_model.eval()
     user_model = user_model.to(memory_format=torch.channels_last)
     inf_dtype = torch.float if args.fp32 else torch.bfloat16
-    user_model = ipex.optimize_transformers(
+    user_model = ipex.llm.optimize(
         user_model.eval(),
         dtype=inf_dtype,
         inplace=True,
@@ -212,8 +210,8 @@ if args.fp32 or args.bf16:
     )
 elif args.int4_model == "":
     if args.low_precision_checkpoint == "":
-        logging.info("Do calibration with GPTQ to generate lowp-precision checkpoint.")
-        logging.info("Calibration with GPTQ will take an hour or so. Please wait.")
+        logger.info("Do calibration with GPTQ to generate lowp-precision checkpoint.")
+        logger.info("Calibration with GPTQ will take an hour or so. Please wait.")
         user_model, tokenizer = load_original_model(args)
         calib_iters = 128
         calib_dataset = CNNDAILYMAIL(args.model, val_data_path, is_calib=True, num_samples=calib_iters)
@@ -224,80 +222,39 @@ elif args.int4_model == "":
             collate_fn=calib_dataset.collate_batch
         )
 
-        def calib_func(prepared_model):
-            for i, calib_input in enumerate(calib_dataloader):
-                if i > calib_iters:
-                    break
-                prepared_model(calib_input[0])
-
-        recipes = {}
-        eval_func = None
-        from neural_compressor import PostTrainingQuantConfig, quantization
-        # specify the op_type_dict and op_name_dict
-        op_type_dict = {
-            '.*': {  # re.match
-                "weight": {
-                    'bits': 4,  # only support 4-bit for now
-                    'group_size': -1,  # only support per-channel for now
-                    'scheme': 'asym',  # only support asym for now
-                    'algorithm': 'GPTQ',  # RTN/AWQ/TEQ
-                },
-            },
-        }
-        op_name_dict = {
-            'lm_head': {"weight": {'dtype': 'fp32'}, },
-            'embed_out': {"weight": {'dtype': 'fp32'}, },
-        }
-        recipes["rtn_args"] = {
-            "enable_mse_search": False,
-            "enable_full_range": False,
-        }
-        recipes['gptq_args'] = {
-            'percdamp': .01,
-            'act_order': False,
-            'block_size': 128,
-            'nsamples': 128,
-            'use_max_length': True,
-        }
-
-        conf = PostTrainingQuantConfig(
-            approach='weight_only',
-            op_type_dict=op_type_dict,
-            op_name_dict=op_name_dict,
-            recipes=recipes,
-        )
-
-        q_model = quantization.fit(
-            user_model,
-            conf,
-            calib_dataloader=calib_dataloader,
-            calib_func=calib_func,
-            eval_func=eval_func,
-        )
-        compressed_model = q_model.export_compressed_model(
+        compressed_model = ipex.quantization.gptq(  
+            model=user_model,
+            dataloader=calib_dataloader,
+            group_size=128, 
+            use_max_length=True,
             compression_dtype=torch.int32,
             compression_dim=1,
             scale_dtype=torch.float16,
-        )
-        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-        low_precision_checkpoint_file_path = args.output_dir + "/gptq_checkpoint.pt"
-        torch.save(compressed_model.state_dict(), low_precision_checkpoint_file_path)
+            save_dir=args.output_dir)
 
-        logging.info("Calibration finished. Low-precision checkpoint generated as {}.".format(low_precision_checkpoint_file_path))
+        logger.info("Calibration finished. Low-precision checkpoint generated as {}.".format(args.output_dir))
         # Quit here because we want to use different environment variables to run GPTQ and benchmark.
         # So, run this script twice and specify the GPTQ checkpoint file for the second run.
         quit()
     else:
-        logging.info("low_precision_checkpoint is given. Calibration skipped.")
+        logger.info("low_precision_checkpoint is given. Calibration skipped.")
         low_precision_checkpoint_file_path = args.low_precision_checkpoint
 
-    logging.info("Loading low_precision_checkpoint...")
+    logger.info("Loading low_precision_checkpoint...")
     low_precision_checkpoint = torch.load(low_precision_checkpoint_file_path)
-    logging.info("low_precision_checkpoint loaded.")
+    config_dict = {
+            "weight_key": "qweight",
+            "scale_key": "scales",
+            "zero_point_key": "qzeros",
+            "bias_key": "bias",
+            "g_idx_key": "g_idx"
+        }
+    state_dict_and_config = (low_precision_checkpoint, config_dict)
+    logger.info("low_precision_checkpoint loaded.")
 
     user_model, tokenizer = load_original_model(args)
 
-    logging.info("Quantize model to INT4.")
+    logger.info("Quantize model to INT4.")
     beam_idx_tmp = torch.zeros(
         (2048, int(batch_size * num_beams)), dtype=torch.long
     ).contiguous()
@@ -330,18 +287,18 @@ elif args.int4_model == "":
         )
         for i in range(user_model.config.num_hidden_layers)
     ]
-    weight_dtype = torch.quint4x2
+    weight_dtype = ipex.quantization.WoqWeightDtype.INT4
     lowp_mode = ipex.quantization.WoqLowpMode.INT8
     qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype, lowp_mode=lowp_mode
     )
-    logging.info("Start quantizing model to INT4 by ipex.optimize_transformers.")
-    user_model = ipex.optimize_transformers(
+    logger.info("Start quantizing model to INT4 by ipex.llm.optimize.")
+    user_model = ipex.llm.optimize(
         user_model.eval(),
         dtype=torch.bfloat16,
         quantization_config=qconfig_mapping,
         inplace=True,
-        low_precision_checkpoint=low_precision_checkpoint,
+        low_precision_checkpoint=state_dict_and_config,
         deployment_mode=False,
     )
     example_inputs = None
@@ -351,25 +308,25 @@ elif args.int4_model == "":
     example_inputs = (
         input_ids.unsqueeze(0),
         attention_mask.unsqueeze(0),
-        position_ids.unsqueeze(0),
         tuple(global_past_key_value),
+        position_ids.unsqueeze(0),
     )
     with torch.no_grad(), torch.cpu.amp.autocast(enabled=True):
         self_jit = torch.jit.trace(user_model.eval(), example_inputs, strict=False)
         self_jit = torch.jit.freeze(self_jit.eval())
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         self_jit.save(args.output_dir + "/int4_model.pt")
-    logging.info("Quantization finished. INT4 model saved to {}.".format(args.output_dir + "/int4_model.pt"))
+    logger.info("Quantization finished. INT4 model saved to {}.".format(args.output_dir + "/int4_model.pt"))
 else:
     user_model, tokenizer = load_original_model(args)
-    logging.info("INT4 model is given. Quantization skipped.")
-    logging.info("Loading INT4 model...")
+    logger.info("INT4 model is given. Quantization skipped.")
+    logger.info("Loading INT4 model...")
     self_jit = torch.jit.load(args.int4_model)
     self_jit = torch.jit.freeze(self_jit.eval())
     ipex._set_optimized_model_for_generation(user_model, optimized_model=self_jit)
-    logging.info("INT4 model loaded.")
+    logger.info("INT4 model loaded.")
 
-logging.info("Ready to run accuracy task.")
+logger.info("Ready to run accuracy task.")
 generate_kwargs = {
     "early_stopping": True,
     "max_new_tokens": 128,
@@ -395,8 +352,8 @@ iters = 1000
 val_dataset = CNNDAILYMAIL(args.model, val_data_path, is_calib=False, max_len=max_len, num_samples=iters)
 sources = val_dataset.sources
 targets = val_dataset.targets
-logging.info("Start running accuracy task...")
-logging.info("Number of samples to run = {}".format(iters))
+logger.info("Start running accuracy task...")
+logger.info("Number of samples to run = {}".format(iters))
 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
     enabled=(False if args.fp32 else True),
     dtype=(None if args.fp32 else torch.bfloat16)
@@ -424,5 +381,5 @@ with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
 
 result = metric.compute(predictions=predictions, references=ground_truths, use_stemmer=True, use_aggregator=False)
 result = {k: round(np.mean(v) * 100, 4) for k, v in result.items()}
-logging.info("Accuracy test results:")
-logging.info(result)
+logger.info("Accuracy test results:")
+logger.info(result)

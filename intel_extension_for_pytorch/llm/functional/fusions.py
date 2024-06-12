@@ -58,9 +58,9 @@ def rms_norm(hidden_states: torch.Tensor, weight: torch.Tensor, eps: float):
     (see https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76)
 
     Args:
-    - hidden_states(torch.Tensor) : the input tensor to apply RMSNorm.
-    - weight (torch.Tensor): the weight to apply RMSnorm.
-    - eps (float) : the variance_epsilon to apply RMSnorm.
+        hidden_states(torch.Tensor) : the input tensor to apply RMSNorm.
+        weight (torch.Tensor): the weight to apply RMSnorm.
+        eps (float) : the variance_epsilon to apply RMSnorm.
 
     """
 
@@ -229,7 +229,6 @@ def varlen_attention(
         is_causal (bool): whether to apply causal attention masking, default is True.
 
     """
-
     return VarlenAttention.apply_function(
         query,
         key,
@@ -282,12 +281,12 @@ def gelu_mul(
 
 
 def add_rms_norm(
-    add: torch.Tensor,
+    residual: torch.Tensor,
     x: torch.Tensor,
     weight: torch.Tensor,
     bias: torch.Tensor,
     eps: float,
-    add_back: bool,
+    add_back: bool = False,
 ):
     r"""
     Add residual on input x and apply RMSnorm on the result.
@@ -304,16 +303,16 @@ def add_rms_norm(
 
     """
     f = _get_function_from_device(x.device.type, add_rms_norm)
-    return f(add, x, weight, bias, eps, add_back)
+    return f(residual, x, weight, bias, eps, add_back)
 
 
 def add_layer_norm(
-    add: torch.Tensor,
+    residual: torch.Tensor,
     x: torch.Tensor,
     weight: torch.Tensor,
     bias: torch.Tensor,
     eps: float,
-    add_back: bool,
+    add_back: bool = False,
 ):
     r"""
     Add residual on input x and apply layernorm on the result.
@@ -330,4 +329,4 @@ def add_layer_norm(
 
     """
     f = _get_function_from_device(x.device.type, add_layer_norm)
-    return f(add, x, weight, bias, eps, add_back)
+    return f(residual, x, weight, bias, eps, add_back)

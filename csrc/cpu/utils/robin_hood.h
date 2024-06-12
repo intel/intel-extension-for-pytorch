@@ -2499,7 +2499,7 @@ class Table
     mKeyVals = reinterpret_cast<Node*>(
         detail::assertNotNull<std::bad_alloc>(std::malloc(numBytesTotal)));
     mInfo = reinterpret_cast<uint8_t*>(mKeyVals + numElementsWithBuffer);
-    std::memset(mInfo, 0, numBytesTotal - numElementsWithBuffer * sizeof(Node));
+    std::fill_n(mInfo, numBytesTotal - numElementsWithBuffer * sizeof(Node), 0);
 
     // set sentinel
     mInfo[numElementsWithBuffer] = 1;

@@ -86,7 +86,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ApplyROPEKernel(
   auto out_stride_kb = concat_qkv ? key.stride(0) : 0;
   auto out_stride_ks = concat_qkv ? key.stride(1) : 0;
   auto emb_pos_ptr = t_emb_pos.data_ptr<float>(); // [MP][HR]
-  auto pos_ptr = t_pos.data_ptr<long>(); // [MB][S]
+  auto pos_ptr = t_pos.data_ptr<long>(); // [B][S] or [1][S]
+  bool t_pos_no_repeated_for_batch = false;
+  if (t_pos.numel() != 1 && t_pos.size(0) == 1 && B > 1) {
+    // we do not perform t_pos.repeat here to avoid the overhead of copying
+    t_pos_no_repeated_for_batch = true;
+  }
   {
 #pragma omp parallel for collapse(3)
     for (int b = 0; b < B; b++) {
@@ -106,7 +111,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ApplyROPEKernel(
             sin_start = emb_pos_ptr + (p + s) * HR;
             cos_start = emb_pos_ptr + (p + s) * HR + COFF;
           } else {
-            p = pos_ptr[b * S + s];
+            auto start_idx = t_pos_no_repeated_for_batch ? 0 : b * S;
+            p = pos_ptr[start_idx + s];
             sin_start = emb_pos_ptr + p * HR;
             cos_start = emb_pos_ptr + p * HR + COFF;
           }

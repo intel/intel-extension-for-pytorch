@@ -187,6 +187,11 @@ def model_convert_reference(_model):
         GitModel_forward,
         CLIPEncoder_forward,
         LlavaLlamaForCausalLM_forward,
+        YuanForCausalLM_forward,
+        YuanModel_forward,
+        PhiForCausalLM_forward,
+        PhiModel_forward,
+        Phi3Model_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
         prepare_inputs_for_generation_llama,
@@ -358,7 +363,7 @@ def model_convert_reference(_model):
                     distributed = True
 
     # model-wise optimizations - MHA module
-    for supported_mha_class in [
+    supported_mha_classes = [
         transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXAttention,
         transformers.models.llama.modeling_llama.LlamaAttention,
         transformers.models.gptj.modeling_gptj.GPTJAttention,
@@ -367,17 +372,41 @@ def model_convert_reference(_model):
         transformers.models.codegen.modeling_codegen.CodeGenAttention,
         transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeAttention,
         transformers.models.t5.modeling_t5.T5Attention,
+    ]
+    ipex_tp_supported_mha_classes = [
+        transformers.models.llama.modeling_llama.LlamaAttention,
+        transformers.models.gptj.modeling_gptj.GPTJAttention,
+    ]
+    ipex_tp_supported_mlp_classes = [
+        transformers.models.llama.modeling_llama.LlamaMLP,
+        transformers.models.gptj.modeling_gptj.GPTJMLP,
+    ]
+    ipex_tp_supported_model_classes = [
+        transformers.models.llama.modeling_llama.LlamaForCausalLM,
+        transformers.models.gptj.modeling_gptj.GPTJForCausalLM,
+    ]
+    yuan_attention = None
+    if _model.config.architectures[0] == "YuanForCausalLM":
+        yuan_attention = type(_model.model.layers[0].self_attn)
+    if _model.config.architectures[0] in [
+        "YuanForCausalLM",
+        "PhiForCausalLM",
     ]:
-        if need_ipex_tp and supported_mha_class in [
-            transformers.models.llama.modeling_llama.LlamaAttention,
-            transformers.models.gptj.modeling_gptj.GPTJAttention,
-        ]:
+        supported_mha_classes.append(type(_model.model.layers[0].self_attn))
+        ipex_tp_supported_mha_classes.append(type(_model.model.layers[0].self_attn))
+        ipex_tp_supported_mlp_classes.append(type(_model.model.layers[0].mlp))
+        ipex_tp_supported_model_classes.append(type(_model))
+    # model-wise optimizations - MHA module
+    for supported_mha_class in supported_mha_classes:
+        if need_ipex_tp and supported_mha_class in ipex_tp_supported_mha_classes:
             num_heads = _model.config.num_attention_heads
             num_kv_heads = num_heads
             for name in ["num_key_value_heads"]:
                 if hasattr(_model.config, name):
                     num_kv_heads = getattr(_model.config, name)
             head_dim = _model.config.hidden_size // num_heads
+            value_with_share_qk = supported_mha_class == yuan_attention
+            shard_local_filtering = supported_mha_class == yuan_attention
             shard_mha_weights(
                 _model,
                 supported_mha_class,
@@ -386,8 +415,9 @@ def model_convert_reference(_model):
                 head_dim,
                 rank,
                 world_size,
+                value_with_share_qk,
+                shard_local_filtering,
             )
-
         convert_class(
             _model,
             supported_mha_class,
@@ -396,10 +426,7 @@ def model_convert_reference(_model):
             distributed=distributed,
         )
     if need_ipex_tp:
-        for supported_mlp_class in [
-            transformers.models.llama.modeling_llama.LlamaMLP,
-            transformers.models.gptj.modeling_gptj.GPTJMLP,
-        ]:
+        for supported_mlp_class in ipex_tp_supported_mlp_classes:
             shard_mlp_weights(
                 _model,
                 supported_mlp_class,
@@ -409,10 +436,7 @@ def model_convert_reference(_model):
                 rank,
                 world_size,
             )
-        for supported_model_class in [
-            transformers.models.llama.modeling_llama.LlamaForCausalLM,
-            transformers.models.gptj.modeling_gptj.GPTJForCausalLM,
-        ]:
+        for supported_model_class in ipex_tp_supported_model_classes:
             if isinstance(_model, supported_model_class):
                 shard_lm_head_weights(
                     _model,
@@ -442,7 +466,6 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-
     # special list that has not official transformers design
     if _model.config.architectures[0] == "BloomForCausalLM":
         convert_function(
@@ -477,11 +500,6 @@ def model_convert_reference(_model):
             _IPEXDecoderLayerRef,
             _model.config,
             distributed=distributed,
-        )
-        convert_function(
-            _model,
-            "prepare_inputs_for_generation",
-            prepare_inputs_for_generation,
         )
         convert_function(
             _model.transformer,
@@ -725,6 +743,57 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "YuanForCausalLM":
+        convert_function(_model, "forward", YuanForCausalLM_forward)
+        convert_function(_model.model, "forward", YuanModel_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+    elif _model.config.architectures[0] == "PhiForCausalLM":
+        convert_function(_model, "forward", PhiForCausalLM_forward)
+        convert_function(_model.model, "forward", PhiModel_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+    elif _model.config.architectures[0] == "Phi3ForCausalLM":
+        convert_function(_model, "forward", PhiForCausalLM_forward)
+        convert_function(_model.model, "forward", Phi3Model_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
 
     return _model
 
@@ -878,14 +947,46 @@ def get_dummy_input(_model, return_dict=False):
         )
         if return_dict:
             sample_inputs.pop("input_ids", None)
+            sample_inputs["attention_mask"] = torch.ones(
+                (batch_size, 1), dtype=torch.long
+            )
             sample_inputs["inputs_embeds"] = torch.zeros(batch_size, 1, 4096).to(
                 _model.dtype
             )
         else:
             sample_inputs = (
                 torch.zeros(batch_size, 1, 4096).to(_model.dtype),
-            ) + sample_inputs[1:]
+                torch.ones((batch_size, 1), dtype=torch.long),
+            ) + sample_inputs[2:]
+    if _model.config.architectures[0] == "YuanForCausalLM":
+        hidden_size = _model.config.hidden_size
+        if _model.device.type == "cpu":
+            from ..cpu import comm as ipex_comm
 
+            world_size = ipex_comm.get_world_size()
+            hidden_size = hidden_size * world_size
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                    torch.zeros(1, 1, 2, hidden_size),
+                )
+                for i in range(model_num_layers)
+            ]
+        )
+        sample_inputs = (
+            {
+                "input_ids": input_ids[:, -1:],
+                "attention_mask": attention_mask[:, -1:],
+                "past_key_values": past_key_values,
+                "position_ids": position_ids[:, -1:],
+            }
+            if return_dict
+            else (input_ids, attention_mask, position_ids, past_key_values)
+        )
     if "return_last_logit" in model_inputs:
         if return_dict:
             sample_inputs["return_last_logit"] = torch.tensor(True)
@@ -912,6 +1013,7 @@ def ipex_quantization_flow(
         print("ipex.optimize_transformers is doing the static quantization")
     else:
         print("ipex.optimize_transformers is doing the weight only quantization")
+
     with torch.no_grad(), torch.cpu.amp.autocast(
         enabled=True if dtype in [torch.bfloat16, torch.half] else False, dtype=dtype
     ):
@@ -974,7 +1076,11 @@ def model_convert_lowering(
             supported_classes = [
                 transformers.models.llama.modeling_llama.LlamaRMSNorm,
             ]
-            if _model.config.architectures[0] == "BaichuanForCausalLM":
+            if _model.config.architectures[0] in [
+                "BaichuanForCausalLM",
+                "YuanForCausalLM",
+                "Phi3ForCausalLM",
+            ]:
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
             if (
                 _model.config.architectures[0] == "ChatGLMModel"
@@ -1046,9 +1152,38 @@ def model_convert_lowering(
                     check_trace=False,
                 )
                 trace_model = torch.jit.freeze(trace_model)
-                _model = _set_optimized_model_for_generation(
-                    _model, optimized_model=trace_model
-                )
+                if _model.config.architectures[0] == "YuanForCausalLM":
+                    sample_inputs.pop("past_key_values", None)
+                    batch_size = (
+                        _model.config.batch_size
+                        if hasattr(_model.config, "batch_size")
+                        else 1
+                    )
+                    sample_inputs["input_ids"] = sample_inputs["input_ids"].repeat(
+                        batch_size, 1
+                    )
+                    sample_inputs["attention_mask"] = sample_inputs[
+                        "attention_mask"
+                    ].repeat(batch_size, 1)
+                    sample_inputs["position_ids"] = sample_inputs[
+                        "position_ids"
+                    ].repeat(batch_size, 1)
+                    trace_model_first = torch.jit.trace(
+                        _model,
+                        example_kwarg_inputs=sample_inputs,
+                        strict=False,
+                        check_trace=False,
+                    )
+                    trace_model_first = torch.jit.freeze(trace_model_first)
+                    _model = _set_optimized_model_for_generation(
+                        _model,
+                        optimized_model=trace_model,
+                        first_token_optimized_model=trace_model_first,
+                    )
+                else:
+                    _model = _set_optimized_model_for_generation(
+                        _model, optimized_model=trace_model
+                    )
     elif device == "xpu":
         print("xpu optimize_transformers function is activated")
         from .models.xpu.optimize_transformers.Converter import Converter
@@ -1135,6 +1270,7 @@ def check_cpu_llm_support(model):
     cpu_supported_pattern = (
         r"GPTJ|llama|gptneox|OPT|falcon|rw|bloom|codegen|baichuan|chatglm"
         r"|gptbigcode|t5|mistral|mixtral|mpt|stablelm|qwenlmhead|git|llava"
+        r"|yuan|phi|phi3"
     )
     cpu_supported_model = re.search(
         cpu_supported_pattern, model.config.architectures[0], re.IGNORECASE
@@ -1144,7 +1280,9 @@ def check_cpu_llm_support(model):
             "The compatibility of ipex.optimize_transformers depends on the CPU/XPU platform "
             " and the transformer model."
             " If the platform is CPU, "
-            " ipex.optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, and OPT."
+            " ipex.optimize_transformers supports Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen,"
+            " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, Llava, Yuan,"
+            " and Phi, fallback to origin model"
         )
     return cpu_supported_model
 
@@ -1469,9 +1607,38 @@ def optimize_transformers(
                             check_trace=False,
                         )
                         trace_model = torch.jit.freeze(trace_model)
-                        _model = _set_optimized_model_for_generation(
-                            _model, optimized_model=trace_model
-                        )
+                        if _model.config.architectures[0] == "YuanForCausalLM":
+                            sample_inputs.pop("past_key_values", None)
+                            batch_size = (
+                                _model.config.batch_size
+                                if hasattr(_model.config, "batch_size")
+                                else 1
+                            )
+                            sample_inputs["input_ids"] = sample_inputs[
+                                "input_ids"
+                            ].repeat(batch_size, 1)
+                            sample_inputs["attention_mask"] = sample_inputs[
+                                "attention_mask"
+                            ].repeat(batch_size, 1)
+                            sample_inputs["position_ids"] = sample_inputs[
+                                "position_ids"
+                            ].repeat(batch_size, 1)
+                            trace_model_first = torch.jit.trace(
+                                _model,
+                                example_kwarg_inputs=sample_inputs,
+                                strict=False,
+                                check_trace=False,
+                            )
+                            trace_model_first = torch.jit.freeze(trace_model_first)
+                            _model = _set_optimized_model_for_generation(
+                                _model,
+                                optimized_model=trace_model,
+                                first_token_optimized_model=trace_model_first,
+                            )
+                        else:
+                            _model = _set_optimized_model_for_generation(
+                                _model, optimized_model=trace_model
+                            )
                     return _model
                 else:
                     print(

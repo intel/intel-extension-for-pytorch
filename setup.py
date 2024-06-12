@@ -756,6 +756,12 @@ class IPEXCPPLibBuild(build_clib, object):
                 **build_option_common,
                 "BUILD_MODULE_TYPE": "CPU",
             }
+            if _get_build_target() in ["develop", "python"]:
+                build_option_cpu["BUILD_CPU_WITH_ONECCL"] = "OFF"
+                build_option_cpu["USE_SHM"] = "ON"
+                build_option_cpu["ENABLE_MPI_TESTS"] = "OFF"
+                build_option_cpu["BUILD_REG_TESTS"] = "OFF"
+                build_option_cpu["ENABLE_MPI_TESTS"] = "OFF"
 
             cmake_args_cpu = []
             define_build_options(cmake_args_cpu, **build_option_cpu)

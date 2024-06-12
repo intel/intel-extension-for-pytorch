@@ -483,6 +483,7 @@ class TestPrepackCases(TestCase):
         # TODO: add inference case.
 
     def _test_conv_nc11_base(self, dim):
+        # related issue: https://github.com/intel-innersource/frameworks.ai.pytorch.ipex-cpu/pull/86.
         channels_last = torch.channels_last if dim == 2 else torch.channels_last_3d
         test_dtypes = [torch.float]
         if core.onednn_has_bf16_support():

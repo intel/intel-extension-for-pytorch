@@ -392,10 +392,10 @@ at::Tensor woq_linear_pack_weight(
       int64_t weight_int4_size_bytes = weight_int4.numel();
       int64_t pad_size_bytes = weight_int4_size_bytes - weight_size_bytes;
       std::memcpy(weight_int4.data_ptr(), weight.data_ptr(), weight_size_bytes);
-      std::memset(
+      std::fill_n(
           (uint8_t*)weight_int4.data_ptr() + weight_size_bytes,
-          0,
-          pad_size_bytes);
+          pad_size_bytes,
+          0);
       return woq_tpp_gemm_packB_stub(
           kCPU, weight_int4, weight_dtype, block_n, block_k, lowp_mode);
     }
@@ -448,8 +448,6 @@ at::Tensor woq_linear_kernel(
 at::Tensor woq_linear_forward(
     const at::Tensor& input,
     const at::Tensor& op_context) {
-  RECORD_FUNCTION(
-      "torch_ipex::ipex_woq_linear", c10::ArrayRef<c10::IValue>({}));
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run(input);
@@ -496,8 +494,6 @@ at::Tensor woq_linear_eltwise_kernel(
 at::Tensor woq_linear_gelu_forward(
     const at::Tensor& input,
     const at::Tensor& op_context) {
-  RECORD_FUNCTION(
-      "torch_ipex::woq_linear_gelu", c10::ArrayRef<c10::IValue>({}));
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_eltwise(
@@ -507,8 +503,6 @@ at::Tensor woq_linear_gelu_forward(
 at::Tensor woq_linear_new_gelu_forward(
     const at::Tensor& input,
     const at::Tensor& op_context) {
-  RECORD_FUNCTION(
-      "torch_ipex::woq_linear_new_gelu", c10::ArrayRef<c10::IValue>({}));
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_eltwise(
@@ -575,7 +569,6 @@ at::Tensor woq_linear_add_forward(
     const at::Tensor& input,
     const at::Tensor& op_context,
     const std::vector<at::Tensor>& others) {
-  RECORD_FUNCTION("torch_ipex::woq_linear_add", c10::ArrayRef<c10::IValue>({}));
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_add(input, others);
@@ -585,8 +578,6 @@ at::Tensor woq_linear_add_add_forward(
     const at::Tensor& input,
     const at::Tensor& op_context,
     const std::vector<at::Tensor>& others) {
-  RECORD_FUNCTION(
-      "torch_ipex::woq_linear_add_add", c10::ArrayRef<c10::IValue>({}));
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run_add_add(input, others);

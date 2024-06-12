@@ -13,4 +13,5 @@ if has_cpu():
         TensorParallelColumnLinear,
         TensorParallelRowLinear,
         TensorParallelLMhead,
+        TensorParallelConv2d,
     )

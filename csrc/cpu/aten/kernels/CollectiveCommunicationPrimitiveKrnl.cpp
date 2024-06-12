@@ -1,4 +1,4 @@
-#ifdef USE_CCL
+#ifdef BUILD_CPU_WITH_ONECCL
 #include <ATen/ATen.h>
 #include <ATen/Tensor.h>
 #include <aten/CollectiveCommunicationPrimitive.h>

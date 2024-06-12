@@ -1,17 +1,41 @@
 import torch
 import argparse
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, T5ForConditionalGeneration, AutoProcessor
+# Here import ipex for Baichuan loading compatibility, for other models we can ignore this import
+import intel_extension_for_pytorch
 
 # supported models
 MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, LlamaTokenizer),
+    "llama": (AutoModelForCausalLM, AutoTokenizer),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "bloom": (AutoModelForCausalLM, AutoTokenizer),
+    "codegen": (AutoModelForCausalLM, AutoTokenizer),
+    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
+    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
+    "t5": (T5ForConditionalGeneration, AutoTokenizer),
+    "mistral": (AutoModelForCausalLM, AutoTokenizer),
+    "mixtral": (AutoModelForCausalLM, AutoTokenizer),
+    "mpt": (AutoModelForCausalLM, AutoTokenizer),
+    "stablelm": (AutoModelForCausalLM, AutoTokenizer),
+    "qwen": (AutoModelForCausalLM, AutoTokenizer),
+    "git": (AutoModelForCausalLM, AutoProcessor),
+    "yuan": (AutoModelForCausalLM, AutoTokenizer),
+    "phi-3": (AutoModelForCausalLM, AutoTokenizer),
+    "phi": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
+
+try:
+    from llava.model.language_model.llava_llama import LlavaLlamaForCausalLM
+    from llava.model.builder import load_pretrained_model
+    MODEL_CLASSES["llava"] = (LlavaLlamaForCausalLM, AutoTokenizer)
+except ImportError:
+    pass
 
 # args
 parser = argparse.ArgumentParser("shard model weight script", add_help=False)
@@ -50,19 +74,22 @@ if args.local_rank == 0 :
         (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
     )
     model_class = MODEL_CLASSES[model_type]
-
     load_dtype = torch.float32
     if args.dtype == "float16":
         load_dtype = torch.half
     elif args.dtype == "bfloat16":
         load_dtype = torch.bfloat16
-
-    tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
-    model = model_class[0].from_pretrained(
-        args.model_id,
-        torch_dtype=load_dtype,
-        low_cpu_mem_usage=True,
-        trust_remote_code=True,
-    )
-    model.save_pretrained(save_directory=args.save_path, max_shard_size=args.max_shard_size)
+    if model_type != "llava":
+        tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
+        model = model_class[0].from_pretrained(
+            args.model_id,
+            torch_dtype=load_dtype,
+            low_cpu_mem_usage=True,
+            trust_remote_code=True,
+        )
+    else:
+        tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_id)
+    model.save_pretrained(save_directory=args.save_path, max_shard_size=args.max_shard_size, safe_serialization=False)
     tokenizer.save_pretrained(save_directory=args.save_path)
+    if model_type == "llava":
+        image_processor.save_pretrained(save_directory=args.save_path)
