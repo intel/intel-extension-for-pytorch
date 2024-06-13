@@ -36,6 +36,7 @@
 
 #include "TaskModule.h"
 #include "aten/EmbeddingBag.h"
+#include "aten/TPPShmAllReduceAdd.h"
 #include "comm/comm.h"
 #include "runtime/CPUPool.h"
 #include "runtime/TaskExecutor.h"
@@ -280,6 +281,7 @@ void InitIpexModuleBindings(py::module m) {
 
   // communication related
   m.def("get_rank", &torch_ipex::cpu::get_rank);
+  m.def("tpp_shm_allreduce", &torch_ipex::cpu::tpp_shmallreduce_forward);
   m.def("get_world_size", &torch_ipex::cpu::get_world_size);
   m.def("barrier", &torch_ipex::cpu::barrier);
 
