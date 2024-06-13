@@ -140,6 +140,16 @@ COMMIT_TORCHCCL=$(python scripts/tools/compilation_helper/yaml_utils.py -f depen
 python -m pip uninstall -y pyyaml
 cd ..
 
+if [ "${COMMIT_TORCHVISION}" = "N/A" ]; then
+    (( MODE &= 0xFB ))
+fi
+if [ "${COMMIT_TORCHAUDIO}" = "N/A" ]; then
+    (( MODE &= 0xFD ))
+fi
+if [ "${COMMIT_TORCHCCL}" = "N/A" ]; then
+    (( MODE &= 0xFE ))
+fi
+
 if [ ! -d pytorch ]; then
     git clone https://github.com/pytorch/pytorch.git
 fi
@@ -213,14 +223,19 @@ fi
 
 # Install python dependency
 python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch intel-extension-for-pytorch-deepspeed oneccl_bind_pt
-python -m pip install cmake ninja
-conda install -y make
+python -m pip install cmake make ninja
 if [ $((${MODE} & 0x04)) -ne 0 ]; then
     python -m pip install Pillow
     conda install -y libpng libjpeg-turbo -c conda-forge
 fi
 
 ABI=1
+
+# don't fail on external scripts
+source ${DPCPP_ENV}
+source ${ONEMKL_ENV}
+source ${CCL_ENV}
+source ${MPI_ENV}
 
 #  PyTorch
 cd pytorch
@@ -265,11 +280,6 @@ if [ $((${MODE} & 0x04)) -ne 0 ]; then
     python -m pip install dist/*.whl
     cd ..
 fi
-# don't fail on external scripts
-source ${DPCPP_ENV}
-source ${ONEMKL_ENV}
-source ${CCL_ENV}
-source ${MPI_ENV}
 #  TorchAudio
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd audio

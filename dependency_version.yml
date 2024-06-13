@@ -14,7 +14,7 @@ torchvision:
   commit: v0.18.0
 torch-ccl:
   repo: https://github.com/intel/torch-ccl.git
-  commit: 1053f1354f6293abc11e93af085524fe3664219f
+  commit: N/A
   version: 2.1.300+xpu
 deepspeed:
   version: 0.14.0
