@@ -21,12 +21,13 @@ int main(int argc, const char* argv[]) {
 
   std::vector<torch::jit::IValue> inputs;
   c10::xpu::XPUStream stream = c10::xpu::getCurrentXPUStream();
+  auto options = at::TensorOptions().dtype(at::kFloat).device(stream.device());
   float *input_ptr = malloc_device<float>(224 * 224 * 3, stream);
   auto input = torch::from_blob(
       input_ptr,
       {1, 3, 224, 224},
       nullptr,
-      stream.device().dtype(at::kFloat),
+      options,
       {stream.device()});
   std::cout << "input tensor created from usm " << std::endl;
   inputs.push_back(input);
