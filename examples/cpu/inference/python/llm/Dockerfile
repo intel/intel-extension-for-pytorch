@@ -36,16 +36,16 @@ RUN useradd -m ubuntu && \
 USER ubuntu
 WORKDIR /home/ubuntu
 
-RUN curl -fsSL -v -o miniconda.sh -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh  && \
-    bash miniconda.sh -b -p ./miniconda3 && \
-    rm miniconda.sh && \
-    echo "source ~/miniconda3/bin/activate" >> ./.bashrc
+RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/download/24.1.2-0/Miniforge3-24.1.2-0-Linux-x86_64.sh && \
+    bash miniforge.sh -b -p ./miniforge3 && \
+    rm miniforge.sh && \
+    echo "source ~/miniforge3/bin/activate" >> ./.bashrc
 
 # --build-arg COMPILE=ON to compile from source
 FROM base AS dev
 ARG COMPILE
 COPY --chown=ubuntu:ubuntu . ./intel-extension-for-pytorch
-RUN . ./miniconda3/bin/activate && \
+RUN . ./miniforge3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
     cd intel-extension-for-pytorch/examples/cpu/inference/python/llm && \
     if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 6; else bash tools/env_setup.sh 2; fi
@@ -54,7 +54,7 @@ FROM base AS deploy
 COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/cpu/inference/python/llm ./llm
 RUN rm ./llm/tools/get_libstdcpp_lib.sh
 COPY --from=dev --chown=ubuntu:ubuntu /home/ubuntu/intel-extension-for-pytorch/examples/cpu/inference/python/llm/tools/get_libstdcpp_lib.sh ./llm/tools/get_libstdcpp_lib.sh
-RUN . ./miniconda3/bin/activate && \
+RUN . ./miniforge3/bin/activate && \
     conda create -y -n py310 python=3.10 && conda activate py310 && \
     echo "conda activate py310" >> ./.bashrc && \
     echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc && \

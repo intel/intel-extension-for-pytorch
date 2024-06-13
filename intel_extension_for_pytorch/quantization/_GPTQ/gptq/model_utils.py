@@ -6,7 +6,8 @@ from collections import UserDict
 
 format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.INFO, format=format_str)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("GPTQ")
+logger.setLevel(logging.INFO)
 
 
 def move_input_to_device(input, device=torch.device("cpu")):
