@@ -1,0 +1,43 @@
+name: format-check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - xpu-main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions: read-all
+
+jobs:
+  format-check:
+    # Don't run on forked repos
+    # if: github.repository_owner == 'intel'
+    name: format-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout intel_extension_for_pytorch
+        uses: actions/checkout@v2
+
+      - name: Checkout submodules
+        run: |
+          git submodule update --init --recursive
+      
+      - name: flake8-check
+        run: |
+          pwd
+          pip install lintrunner pip install lintrunner-adapters
+          lintrunner init
+          python scripts/tools/setup/flake8.py
+ 
+      - name: clang-check
+        run: |
+          pwd
+          python -m pip install clang-format==12.0.1
+          git diff -U0 --no-color  ${{ github.event.pull_request.base.ref }} | python scripts/tools/setup/clang-format-diff.py -p1
+
+
+
