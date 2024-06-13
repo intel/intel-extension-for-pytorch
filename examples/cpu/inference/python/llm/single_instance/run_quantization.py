@@ -817,7 +817,10 @@ if args.ipex_smooth_quant:
 
                 return (model_inputs, last_ind)
 
-        if model.default_dataset == "librispeech_asr":
+        if (
+            hasattr(model, "default_dataset")
+            and model.default_dataset == "librispeech_asr"
+        ):
             calib_dataset = load_dataset(model.default_dataset, split="train.clean.100")
         else:
             calib_dataset = load_dataset(

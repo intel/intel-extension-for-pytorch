@@ -6,7 +6,7 @@ from . import functional
 try:
     from . import generation
 except ImportError as e:
-    warnings.warn(f"failed to use huggingface generation fuctions due to: {e}.")
+    pass
 
 try:
     from .utils import (

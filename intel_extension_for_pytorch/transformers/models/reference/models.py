@@ -3545,9 +3545,9 @@ def detect_language(
 
 
 def output_hook(module: torch.nn.Module, args, kwargs, outputs: Any):
-    if module.config.use_return_dict or (
-        "return_dict" in kwargs and kwargs["return_dict"]
-    ):
+    if (
+        hasattr(module.config, "use_return_dict") and module.config.use_return_dict
+    ) or ("return_dict" in kwargs and kwargs["return_dict"]):
         idx = 0
         loss = None
         aux_loss = None
