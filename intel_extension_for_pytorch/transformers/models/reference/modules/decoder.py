@@ -192,9 +192,13 @@ def FalconDecoderLayer_forward(
     output_attentions: bool = False,
 ):
     residual = hidden_states
-    if self.self_attention.new_decoder_architecture or not hasattr(
-        self, "input_layernorm"
-    ):
+    if (
+        self.self_attention.new_decoder_architecture
+        and not (
+            hasattr(self.config, "num_ln_in_parallel_attn")
+            and self.config.num_ln_in_parallel_attn == 1
+        )
+    ) or not hasattr(self, "input_layernorm"):
         attention_layernorm_out = self.ln_attn(hidden_states)
         mlp_layernorm_out = self.ln_mlp(hidden_states)
     else:
@@ -219,6 +223,13 @@ def FalconDecoderLayer_forward(
         else:
             residual = attention_output + residual
             mlp_layernorm_out = self.post_attention_layernorm(residual)
+    if (
+        self.config.new_decoder_architecture
+        and self.config.parallel_attn
+        and hasattr(self.config, "num_ln_in_parallel_attn")
+        and self.config.num_ln_in_parallel_attn == 1
+    ):
+        mlp_layernorm_out = attention_layernorm_out
     outputs = attn_outputs[1:]
     # MLP.
 
