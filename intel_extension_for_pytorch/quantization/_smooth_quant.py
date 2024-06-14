@@ -76,7 +76,7 @@ class SmoothQuantActivationObserver(UniformQuantizationObserverBase):
         # if smooth_quant_enabled is false, this observer acts as
         # a normal per-tensor observer
         self.smooth_quant_enabled = smooth_quant_enabled
-        self.alpha = alpha
+        self.alpha = float(alpha)
         # Normally we don't use min_val or max_val here
         # They are for checks, like `_check_observer_has_run`
         self.min_val = self.act_obs.min_val
@@ -214,7 +214,7 @@ class SmoothQuantWeightObserver(UniformQuantizationObserverBase):
         # if smooth_quant_enabled is false, this observer acts as
         # a normal observer
         self.smooth_quant_enabled = smooth_quant_enabled
-        self.alpha = alpha
+        self.alpha = float(alpha)
         # Normally we don't use min_val or max_val here
         # They are for checks, like `_check_observer_has_run`
         self.min_val = self.oc_obs.min_val
