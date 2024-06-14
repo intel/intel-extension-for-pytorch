@@ -1,7 +1,7 @@
 from typing import Callable, List, Tuple, Any, Optional, Dict
 import torch
 import torch.nn.functional as F
-from ..utils.utils import has_cpu
+from intel_extension_for_pytorch.utils.utils import has_cpu
 
 from ._utils import (
     OpQuantizeabilityType,
@@ -311,7 +311,7 @@ class AutoQuantizationState(torch.nn.Module):
                         observer(op._flat_weights[i])
                     else:
                         pass
-                elif isinstance(op, MergedEmbeddingBagWithCat):
+                elif has_cpu() and isinstance(op, MergedEmbeddingBagWithCat):
                     observer(op.weights[i])
                 else:
                     observer(op.weight)
@@ -531,7 +531,7 @@ class AutoQuantizationState(torch.nn.Module):
                 new_args.append(arg)
             else:
                 new_args.append(op.weight)
-        elif isinstance(op, MergedEmbeddingBagWithCat):
+        elif has_cpu() and isinstance(op, MergedEmbeddingBagWithCat):
             weights = op.weights
             for tensor_arg_idx in range(0, len(arg_quant_infos)):
                 quant_info = arg_quant_infos[tensor_arg_idx]
@@ -903,7 +903,9 @@ class AutoQuantizationState(torch.nn.Module):
             weight_tensor_infos = []
             weight_idx = 0
             if type(op) in quantized_modules_has_weights:
-                if isinstance(op, (torch.nn.LSTM, MergedEmbeddingBagWithCat)):
+                if has_cpu() and isinstance(
+                    op, (torch.nn.LSTM, MergedEmbeddingBagWithCat)
+                ):
                     if isinstance(op, torch.nn.LSTM):
                         weights = op._flat_weights
                     else:

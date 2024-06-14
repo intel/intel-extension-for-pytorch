@@ -25,7 +25,7 @@ class Fp8BaseModule(torch.nn.Module):
         self.fp8_meta["recipe"] = get_default_fp8_recipe()
         self.fp8_meta_tensors_initialized = False
 
-    def set_meta_tensor(self, fwd: bool) -> None:
+    def set_meta_tensor(self, fwd: bool, device="xpu") -> None:
         """Init scales and amaxes for fwd | bwd."""
         fp8_meta_tensor_key = "scaling_fwd" if fwd else "scaling_bwd"
 
@@ -55,24 +55,24 @@ class Fp8BaseModule(torch.nn.Module):
 
         self.fp8_meta[fp8_meta_tensor_key] = ipex.FP8TensorMeta()
         self.fp8_meta[fp8_meta_tensor_key].scale = torch.ones(
-            num_fp8_tensors, dtype=torch.float32, device=get_fp8_device_type()
+            num_fp8_tensors, dtype=torch.float32, device=device
         )
         self.fp8_meta[fp8_meta_tensor_key].scale_inv = torch.ones(
-            num_fp8_tensors, dtype=torch.float32, device=get_fp8_device_type()
+            num_fp8_tensors, dtype=torch.float32, device=device
         )
         self.fp8_meta[fp8_meta_tensor_key].amax_history = torch.zeros(
             [self.fp8_meta["recipe"].amax_history_len, num_fp8_tensors],
             dtype=torch.float32,
-            device=get_fp8_device_type(),
+            device=device,
         )
 
-    def init_fp8_meta_tensors(self) -> None:
+    def init_fp8_meta_tensors(self, device="xpu") -> None:
         """Init scales and amaxes."""
-        self.set_meta_tensor(True)
-        self.set_meta_tensor(False)
+        self.set_meta_tensor(True, device=device)
+        self.set_meta_tensor(False, device=device)
         self.fp8_meta_tensors_initialized = True
 
-    def fp8_init(self, num_gemms: int = 1) -> None:
+    def fp8_init(self, num_gemms: int = 1, device="xpu") -> None:
         """Initialize fp8 related metadata and tensors during fprop."""
         self.fp8 = is_fp8_enabled()
         self.fp8_calibration = is_fp8_calibration()
@@ -95,7 +95,7 @@ class Fp8BaseModule(torch.nn.Module):
             ].fp8_format.value.max_bwd
 
             # Allocate scales and amaxes
-            self.init_fp8_meta_tensors()
+            self.init_fp8_meta_tensors(device=device)
             self.fp8_initialized = True
         else:
             # If fp8 isn't enabled, turn off and return.
@@ -103,9 +103,9 @@ class Fp8BaseModule(torch.nn.Module):
             return
 
     @contextmanager
-    def prepare_forward(self, num_gemms=1):
+    def prepare_forward(self, num_gemms=1, device="xpu"):
         """Checks and prep for FWD."""
-        self.fp8_init(num_gemms)
+        self.fp8_init(num_gemms, device=device)
         amax_and_scale_update(self.fp8_meta, fwd_update=True)
         yield
 
@@ -155,7 +155,7 @@ class Fp8BaseModule(torch.nn.Module):
         self.fp8_meta["recipe"].amax_history_len = state["amax_history_fwd"].shape[0]
 
         # Initialize before loading.
-        self.init_fp8_meta_tensors()
+        self.init_fp8_meta_tensors(get_fp8_device_type())
         self.fp8_initialized = True
         self.fp8_meta["scaling_fwd"].scale.copy_(state["scale_fwd"])
         self.fp8_meta["scaling_fwd"].amax_history.copy_(state["amax_history_fwd"])

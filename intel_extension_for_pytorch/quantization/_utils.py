@@ -15,7 +15,7 @@ from intel_extension_for_pytorch.nn.functional import interaction
 from ._quantization_state_utils import QTensorInfo
 from ._smooth_quant import SmoothQuantActivationObserver, SmoothQuantWeightObserver
 from ._qconfig import QConfigSmoothQuant
-from ..utils.utils import has_cpu
+from intel_extension_for_pytorch.utils.utils import has_cpu
 
 add_and_mul_ops = set(
     [
@@ -31,7 +31,6 @@ quantized_modules_has_weights = set(
         torch.nn.Conv3d,
         torch.nn.Linear,
         torch.nn.EmbeddingBag,
-        # MergedEmbeddingBagWithCat,
         torch.nn.ConvTranspose2d,
         torch.nn.ConvTranspose3d,
         torch.nn.LSTM,
@@ -75,18 +74,16 @@ int8_int8_ops = set(
         # ipex customer op
         str(interaction),
         str(torch.ops.torch_ipex.interaction_forward),
-        # str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
         str(torch.embedding_bag),
         str(F.embedding_bag),
         str(torch.nn.EmbeddingBag),
-        # str(MergedEmbeddingBagWithCat),
         str(torch.nn.LSTM),
     ]
 )
 
 if has_cpu():
-    int8_int8_ops.add(str(MergedEmbeddingBagWithCat))
     int8_int8_ops.add(str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward))
+    int8_int8_ops.add(str(MergedEmbeddingBagWithCat))
 
 
 class OpQuantizeabilityType(enum.Enum):

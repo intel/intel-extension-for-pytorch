@@ -24,15 +24,18 @@ FP8 Linear operator is supported.
 BERT model is supported as a FP8 training showcase, see the following example:
 
 ```python
-from intel_extension_for_pytorch.xpu.fp8.fp8 import fp8_autocast
-from intel_extension_for_pytorch.xpu.fp8.recipe import DelayedScaling
-from intel_extension_for_pytorch.nn.utils._fp8_convert import convert_fp8_model
+from intel_extension_for_pytorch.quantization.fp8 import (
+    fp8_autocast,
+    DelayedScaling,
+    Format,
+    FP8Linear,
+)
 
-## 'fp8_autocase' is the handler of FP8
+## Convert the original model to a new model composed of FP8 operators.
+fp8_model = prepare_fp8(model)
+## Run FP8 model.
 with fp8_autocast(enabled=True, fp8_recipe=DelayedScaling()):
-    ## The original model will be automatically converted to a new model with FP8 operators with 'convert_fp8_model'
-    convert_fp8_model(model)
-    outputs = model(input_ids=input_ids,
+    outputs = fp8_model(input_ids=input_ids,
                     token_type_ids=segment_ids,
                     attention_mask=input_mask,
                     labels=masked_lm_labels,

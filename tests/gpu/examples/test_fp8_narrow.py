@@ -1,7 +1,7 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch as ipex  # noqa
-from intel_extension_for_pytorch.xpu.fp8.utils import (
+from intel_extension_for_pytorch.quantization.fp8.util import (
     cast_to_fp8,
 )
 

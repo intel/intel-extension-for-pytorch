@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from intel_extension_for_pytorch.nn.functional import interaction
-
-from ..utils.utils import has_cpu
+from intel_extension_for_pytorch.utils.utils import has_cpu
 from ._utils import ParentNode, set_node_output_quantized
 
 if has_cpu():
@@ -73,7 +72,6 @@ rnn_ops = [str(torch.nn.LSTM)]
 s8_s8_symmetric_ops = [
     str(interaction),
     str(torch.ops.torch_ipex.interaction_forward),
-    # str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
     str(torch.embedding_bag),
     str(F.embedding_bag),
     str(torch.nn.EmbeddingBag),
@@ -541,9 +539,14 @@ def get_default_recipe(nodes):
         str(torch.embedding_bag),
         str(F.embedding_bag),
         str(torch.nn.EmbeddingBag),
-        str(MergedEmbeddingBagWithCat),
-        str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward),
     ]
+
+    if has_cpu():
+        embedding_bag_ops.append(str(MergedEmbeddingBagWithCat))
+        embedding_bag_ops.append(
+            str(torch.ops.torch_ipex.merged_embeddingbag_cat_forward)
+        )
+
     for node in nodes:
         if isinstance(node, ParentNode):
             continue

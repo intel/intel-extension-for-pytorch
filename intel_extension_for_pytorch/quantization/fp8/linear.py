@@ -17,6 +17,148 @@ from intel_extension_for_pytorch.quantization.fp8.fp8 import (
 
 
 class _FP8Linear(torch.autograd.Function):
+    @staticmethod
+    def forward(
+        ctx,
+        input_,
+        weight_,
+        bias_,
+        fp8_meta,
+        use_bias,
+        activation_dtype,
+        is_grad_enabled=False,
+        fp8_calibration=False,
+    ) -> torch.Tensor:
+        input = cast_if_needed(input_, activation_dtype)
+        weight = cast_if_needed(weight_, activation_dtype)
+        bias = cast_if_needed(bias_, activation_dtype) if use_bias else bias_
+
+        fp8_dtype_forward = get_fp8_dtype(fp8_meta["recipe"], fprop_tensor=True)
+
+        if fp8_calibration:
+            fp8_meta["scaling_fwd"].amax_history[0][ipex.FP8FwdTensors.GEMM1_INPUT] = (
+                torch.abs(inputmat).max().float()
+            )
+            fp8_meta["scaling_fwd"].amax_history[0][ipex.FP8FwdTensors.GEMM1_WEIGHT] = (
+                torch.abs(weight).max().float()
+            )
+            calibration_out = input @ weight.transpose(0, 1)
+            if use_bias:
+                calibration_out = calibration_out + bias
+            return calibration_out
+
+        input_fp8 = cast_to_fp8(
+            input,
+            fp8_meta["scaling_fwd"],
+            ipex.FP8FwdTensors.GEMM1_INPUT,
+            fp8_dtype_forward,
+        )
+        weight_fp8 = cast_to_fp8(
+            weight,
+            fp8_meta["scaling_fwd"],
+            ipex.FP8FwdTensors.GEMM1_WEIGHT,
+            fp8_dtype_forward,
+        )
+        output = torch.ops.torch_ipex.fp8_gemm(
+            input_fp8,
+            fp8_dtype_forward,
+            ipex.FP8FwdTensors.GEMM1_INPUT,
+            weight_fp8,
+            fp8_dtype_forward,
+            ipex.FP8FwdTensors.GEMM1_WEIGHT,
+            bias,
+            fp8_meta["scaling_fwd"].scale,
+            fp8_meta["scaling_fwd"].scale_inv,
+            fp8_meta["scaling_fwd"].amax_history,
+        )
+
+        output = (
+            output
+            * fp8_meta["scaling_fwd"].scale_inv[0]
+            * fp8_meta["scaling_fwd"].scale_inv[1]
+        )
+        ctx.save_for_backward(
+            input,
+            input_fp8,
+            weight,
+            weight_fp8,
+            fp8_meta["scaling_fwd"].scale_inv.clone(),
+        )
+        ctx.activation_dtype = activation_dtype
+        ctx.fp8_meta = fp8_meta
+        ctx.use_bias = use_bias
+        return output
+
+    @staticmethod
+    def backward(
+        ctx, grad_output: torch.Tensor
+    ) -> Tuple[Union[torch.Tensor, None], ...]:
+        (
+            input,
+            input_fp8,
+            weight,
+            weight_fp8,
+            fp8_scale_invs,
+        ) = ctx.saved_tensors
+
+        fp8_dtype_forward = get_fp8_dtype(ctx.fp8_meta["recipe"], fprop_tensor=True)
+        fp8_dtype_backward = get_fp8_dtype(ctx.fp8_meta["recipe"], fprop_tensor=False)
+
+        (input, input_fp8, weight, weight_fp8, fwd_scale_inverses) = ctx.saved_tensors
+        grad_output_fp8 = cast_to_fp8(
+            grad_output,
+            ctx.fp8_meta["scaling_bwd"],
+            ipex.FP8BwdTensors.GRAD_OUTPUT1,
+            fp8_dtype_backward,
+        )
+        if ctx.use_bias:
+            grad_bias = grad_output.sum(dim=0)
+        else:
+            grad_bias = None
+
+        grad_input = torch.ops.torch_ipex.fp8_gemm_backward(
+            grad_output_fp8,
+            fp8_dtype_backward,
+            ipex.FP8BwdTensors.GRAD_OUTPUT1,
+            weight_fp8,
+            fp8_dtype_forward,
+            ipex.FP8FwdTensors.GEMM1_WEIGHT,
+            ctx.fp8_meta["scaling_bwd"].scale,
+            ctx.fp8_meta["scaling_bwd"].scale_inv,
+            ctx.fp8_meta["scaling_bwd"].amax_history,
+        )
+
+        grad_weight = torch.ops.torch_ipex.fp8_gemm_backward(
+            (
+                torch.permute(grad_output_fp8, (0, 2, 1))
+                if grad_output_fp8.dim() == 3
+                else torch.transpose(grad_output_fp8, 0, 1)
+            ),
+            fp8_dtype_backward,
+            ipex.FP8BwdTensors.GRAD_OUTPUT1,
+            input_fp8,
+            fp8_dtype_forward,
+            ipex.FP8FwdTensors.GEMM1_INPUT,
+            ctx.fp8_meta["scaling_bwd"].scale,
+            ctx.fp8_meta["scaling_bwd"].scale_inv,
+            ctx.fp8_meta["scaling_bwd"].amax_history,
+        )
+
+        grad_input = (
+            grad_input
+            * ctx.fp8_meta["scaling_fwd"].scale_inv[1]
+            * ctx.fp8_meta["scaling_bwd"].scale_inv[0]
+        )
+        grad_weight = (
+            grad_weight
+            * ctx.fp8_meta["scaling_fwd"].scale_inv[0]
+            * ctx.fp8_meta["scaling_bwd"].scale_inv[0]
+        )
+        grad_bias = grad_bias * ctx.fp8_meta["scaling_bwd"].scale_inv[0]
+        return (grad_input, grad_weight, grad_bias, None, None, None, None, None)
+
+
+class _FP8Linear_cpu(torch.autograd.Function):
     """FP8Linear implementation with backward."""
 
     @staticmethod
@@ -181,9 +323,8 @@ class FP8Linear(Fp8BaseModule):
         in_features: int,
         out_features: int,
         bias: bool = True,
-        device: Union[torch.device, str] = "cpu",
+        device: Union[torch.device, str] = "xpu",
         params_dtype: Optional[torch.dtype] = None,
-        activation_dtype: torch.dtype = torch.float32,
     ) -> None:
         super().__init__()
         params_dtype = (
@@ -193,7 +334,6 @@ class FP8Linear(Fp8BaseModule):
         self.in_features = in_features
         self.out_features = out_features
         self.use_bias = bias
-        self.activation_dtype = activation_dtype
 
         self.weight = Parameter(
             torch.empty(
@@ -223,14 +363,21 @@ class FP8Linear(Fp8BaseModule):
             init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input: torch.Tensor):
-        with self.prepare_forward():
+        is_cpu = True if input.device.type == "cpu" else False
+
+        with self.prepare_forward(device=input.device):
             if torch.is_grad_enabled():
-                fn = _FP8Linear.apply
+                fn = _FP8Linear.apply if not is_cpu else _FP8Linear_cpu.apply
                 args = []
             else:
-                fn = _FP8Linear.forward
+                fn = _FP8Linear.forward if not is_cpu else _FP8Linear_cpu.forward
                 args = [None]
-            self.activation_dtype = input.dtype
+
+            activation_dtype = torch.float32
+            if torch.xpu.is_autocast_xpu_enabled():
+                activation_dtype = torch.get_autocast_gpu_dtype()
+            elif is_cpu and torch.is_autocast_cpu_enabled():
+                activation_dtype = torch.get_autocast_cpu_dtype()
 
             args += (
                 input,
@@ -238,7 +385,7 @@ class FP8Linear(Fp8BaseModule):
                 self.bias,
                 self.fp8_meta,
                 self.use_bias,
-                self.activation_dtype,
+                activation_dtype,
                 torch.is_grad_enabled(),
                 self.fp8_calibration,
             )

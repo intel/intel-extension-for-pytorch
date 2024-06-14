@@ -156,7 +156,9 @@ sycl::event matmul(
       m1_dt == memory::data_type::f8_e5m2) {
     dst_dt = memory::data_type::f32;
     dst_usr_dt = memory::data_type::f32;
-    b = b.to(at::kFloat);
+    if (with_bias) {
+      b = b.to(at::kFloat);
+    }
     result = result.to(at::kFloat);
     // TODO: refine code to remove unnecessary datatype conversion for better
     // performance.

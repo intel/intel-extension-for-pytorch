@@ -128,7 +128,7 @@ def fp8_autocast(
     enabled: bool = False,
     calibrating: bool = False,
     fp8_recipe: Optional[DelayedScaling] = None,
-    device: str = "cpu",
+    device: str = "xpu",
 ) -> None:
     """
     Context manager for FP8 usage.

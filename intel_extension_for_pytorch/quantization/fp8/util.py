@@ -1,7 +1,7 @@
 """Utility functions for IPEX FP8 modules"""
 
 import torch
-from intel_extension_for_pytorch.frontend import _copy_model_and_optimizer
+import copy
 
 
 def cast_if_needed(tensor: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
@@ -43,7 +43,7 @@ def cast_from_fp8(
     )
 
 
-def convert(model, optimizer):
+def convert(model, device="xpu"):
     from .linear import FP8Linear
 
     torch_modules = {
@@ -57,29 +57,31 @@ def convert(model, optimizer):
     for attr in module_attr:
         args.append(getattr(model, attr))
     new_m = torch_modules[model.__class__](
-        *args, bias=True if model.bias is not None else False
+        *args, bias=True if model.bias is not None else False, device=device
     )
 
     for k, v in model.__dict__.items():
         if k == "_parameters":
+            print(k)
+            print(v)
             for p in list(v):
+                print(p)
                 setattr(new_m, p, getattr(model, p))
         else:
             new_m.__dict__[k] = v
+
     return new_m
 
 
-def convert_rec(m, optimizer):
-    new_m = convert(m, optimizer)
+def convert_rec(m, device="xpu"):
+    new_m = convert(m, device)
     for name, sub_m in m.named_children():
-        setattr(new_m, name, convert_rec(sub_m, optimizer)[0])
-    return new_m, optimizer
+        setattr(new_m, name, convert_rec(sub_m))
+    return new_m
 
 
-def prepare_fp8(m, optimizer=None):
+def prepare_fp8(model, device="xpu"):
     """Convert modules to FP8 modules (e.g, convert nn.Linear to FP8Linear) in the model."""
-    optimized_model, optimized_optimizer = _copy_model_and_optimizer(m, optimizer)
-    new_m, new_optimizer = convert_rec(optimized_model, optimized_optimizer)
-    if optimizer is None:
-        return new_m
-    return new_m, new_optimizer
+    new_model = copy.deepcopy(model)
+    fp8_model = convert_rec(new_model, device)
+    return fp8_model
