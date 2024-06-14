@@ -97,15 +97,15 @@ There are several environment setup methodologies provided. You can choose eithe
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.3.0+cpu
+git checkout v2.3.100+cpu
 git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.0 .
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.100 .
 
 # Run the container with command below
-docker run --rm -it --privileged ipex-llm:2.3.0 bash
+docker run --rm -it --privileged ipex-llm:2.3.100 bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -120,7 +120,7 @@ source ./tools/env_activate.sh
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.3.0+cpu
+git checkout v2.3.100+cpu
 git submodule sync
 git submodule update --init --recursive
 
@@ -144,15 +144,15 @@ source ./tools/env_activate.sh
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.3.0+cpu
+git checkout v2.3.100+cpu
 git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON -t ipex-llm:2.3.0 .
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON -t ipex-llm:2.3.100 .
 
 # Run the container with command below
-docker run --rm -it --privileged ipex-llm:2.3.0 bash
+docker run --rm -it --privileged ipex-llm:2.3.100 bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -167,7 +167,7 @@ source ./tools/env_activate.sh
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout v2.3.0+cpu
+git checkout v2.3.100+cpu
 git submodule sync
 git submodule update --init --recursive
 

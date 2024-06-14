@@ -16,7 +16,7 @@ the `Large Language Models (LLM) <llm.html>`_ section.
 
 Get Started
 -----------
-- `Installation <../../../index.html#installation?platform=cpu&version=v2.3.0%2Bcpu>`_
+- `Installation <../../../index.html#installation?platform=cpu&version=v2.3.100%2Bcpu>`_
 - `Quick Start <getting_started.md>`_
 - `Examples <examples.md>`_
 

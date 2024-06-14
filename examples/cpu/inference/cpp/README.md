@@ -23,8 +23,8 @@ unzip libtorch-cxx11-abi-shared-with-deps-2.3.0+cpu.zip
 Download and execute `libintel-ext-pt` installation script:
 
 ```bash
-wget https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/cpu/libintel-ext-pt-cxx11-abi-2.3.0%2Bcpu.run
-bash libintel-ext-pt-cxx11-abi-2.3.0+cpu.run install ./libtorch
+wget https://intel-extension-for-pytorch.s3.amazonaws.com/libipex/cpu/libintel-ext-pt-cxx11-abi-2.3.100%2Bcpu.run
+bash libintel-ext-pt-cxx11-abi-2.3.100+cpu.run install ./libtorch
 ```
 
 *Note:* If your C++ project has pre-C\+\+11 library dependencies,
