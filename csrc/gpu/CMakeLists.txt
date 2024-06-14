@@ -100,6 +100,7 @@ if(BUILD_SEPARATE_OPS)
       target_link_directories(${op_lib} PUBLIC ${SYCL_LIBRARY_DIR})
       target_link_libraries(${op_lib} PUBLIC ${GPU_TORCH_LIBS})
       target_link_options(${op_lib} PRIVATE ${IPEX_SYCL_LINK_FLAGS})
+      add_dependencies(${op_lib} IPEX_GPU_GEN_TARGET)  # For the XXXFunctions.h files
       list(APPEND IPEX_GPU_OP_LIBRARIES ${op_lib})
   endforeach()
 

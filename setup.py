@@ -693,8 +693,6 @@ class IPEXCPPLibBuild(build_clib, object):
                     # fall through
                 build_option_common[var] = val
 
-        define_build_options(cmake_common_args, **build_option_common)
-
         nproc = min(int(os.environ.get("MAX_JOBS", os.cpu_count())), os.cpu_count())
         if sequential_build:
             nproc = 1
@@ -730,7 +728,7 @@ class IPEXCPPLibBuild(build_clib, object):
                     "USE_ITT_ANNOTATION": "ON",
                 }
 
-            cmake_args_gpu = []
+            cmake_args_gpu = cmake_common_args[:]
             define_build_options(cmake_args_gpu, **build_option_gpu)
             my_env_local = my_env.copy()
             ldflags = ""
@@ -763,7 +761,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 build_option_cpu["BUILD_REG_TESTS"] = "OFF"
                 build_option_cpu["ENABLE_MPI_TESTS"] = "OFF"
 
-            cmake_args_cpu = []
+            cmake_args_cpu = cmake_common_args[:]
             define_build_options(cmake_args_cpu, **build_option_cpu)
             _gen_build_cfg_from_cmake(
                 cmake_exec, project_root_dir, cmake_args_cpu, ipex_cpu_build_dir, my_env
@@ -777,7 +775,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 "CPP_TEST_BUILD_DIR": get_cpp_test_build_dir(),
             }
 
-            cmake_args_cpp_test = []
+            cmake_args_cpp_test = cmake_common_args[:]
             define_build_options(cmake_args_cpp_test, **build_option_cpp_test)
             _gen_build_cfg_from_cmake(
                 cmake_exec,
@@ -795,7 +793,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 "PYBIND11_CL_FLAGS": get_pybind11_abi_compiler_flags(),
             }
 
-            cmake_args_python = []
+            cmake_args_python = cmake_common_args[:]
             define_build_options(cmake_args_python, **build_option_python)
             _gen_build_cfg_from_cmake(
                 cmake_exec,
@@ -816,7 +814,7 @@ class IPEXCPPLibBuild(build_clib, object):
                 "LIBIPEX_GEN_SCRIPT": self_extract_script,
             }
 
-            cmake_args_cppsdk = []
+            cmake_args_cppsdk = cmake_common_args[:]
             define_build_options(cmake_args_cppsdk, **build_option_cppsdk)
             _gen_build_cfg_from_cmake(
                 cmake_exec,
