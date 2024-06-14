@@ -323,7 +323,7 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py --benchmark -m meta-llama/
 
 #### 4.2.1.3 Static quantization (INT8):
 
-We use the SmoothQuant algorithm to get good accuracy of static quantization, which is a popular method for LLM models. Besides, by default, we enable quantization mixed fp32 inference (non-quantized OPs run with fp32 dtype). To get better performance, please add "--quant-with-amp" to enable quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference (non-quantized OPs run with bf16 dtype, which may affect the accuracy).
+We use the SmoothQuant algorithm to get good accuracy of static quantization, which is a popular method for LLM models. Besides, by default, we enable quantization mixed fp32 inference (non-quantized OPs run with fp32 dtype). To get better performance, you may add "--quant-with-amp" to enable quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference (non-quantized OPs run with bf16 dtype). Please note that static quantization with AMP is still experimental and it may lead to accuracy drop and other issues.
 
 - Command:
 ```bash
@@ -541,7 +541,7 @@ deepspeed --bind_cores_to_rank run.py --benchmark -m ./local_llama2_7b --dtype b
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The low precision checkpoint is saved as a `state_dict` in a `.pt` file and can be loaded later for weight only quantization. We provide an example here to run GPTQ.
 
-*Note:* Currently GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon, starcoder. Some of them are not in the list of optimized models. Please use with care.
+*Note:* The GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, Llama-3, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon, starcoder, condegen, mistral, mixtral, stablelm, phi-2, phi-3. Pleaes note that it's still experimental, please use with care.
 
 Here is how to use it:
 

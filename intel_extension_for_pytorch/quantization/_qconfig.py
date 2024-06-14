@@ -86,14 +86,14 @@ dtype=torch.qint8, qscheme=torch.per_channel_symmetric)``
     qconfig = QConfigSmoothQuant(
         activation=SmoothQuantActivationObserver.with_args(
             reduce_range=False,
-            alpha=alpha,
+            alpha=float(alpha),
             act_observer=act_observer,
             act_ic_observer=act_ic_observer,
         ),
         weight=SmoothQuantWeightObserver.with_args(
             dtype=torch.qint8,
             qscheme=torch.per_channel_symmetric,
-            alpha=alpha,
+            alpha=float(alpha),
             wei_observer=wei_observer,
             wei_ic_observer=wei_ic_observer,
         ),
