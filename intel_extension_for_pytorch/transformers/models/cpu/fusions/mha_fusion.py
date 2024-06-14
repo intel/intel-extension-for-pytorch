@@ -385,6 +385,12 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         super().__init__()
 
     @classmethod
+    def repeat_kv(cls, x: torch.Tensor, n_rep: int) -> torch.Tensor:
+        if n_rep == 1:
+            return x
+        return torch.repeat_interleave(x, dim=1, repeats=n_rep)
+
+    @classmethod
     def apply_function(
         cls,
         query,  # [total_q, num_head, head_size]
@@ -405,6 +411,11 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         assert return_softmax is False, "ipex do not support return_softmax option"
         assert gen_ is None, "ipex do not support custom random generator"
         assert zero_tensors is False, "ipex varlen_fwd do not support zero tensors"
+
+        # Repeat kv if it is GQA.
+        key = cls.repeat_kv(key, int(query.shape[1] / key.shape[1]))
+        value = cls.repeat_kv(value, int(query.shape[1] / value.shape[1]))
+
         total_q, num_head, head_size = query.size()
         total_k, num_head_k, _ = key.size()
         batch_size = seqlen_q.size(0) - 1
