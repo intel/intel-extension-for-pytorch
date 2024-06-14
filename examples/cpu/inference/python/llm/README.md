@@ -373,6 +373,8 @@ The command above works for most models we listed. However, to get better accura
 | EleutherAI/gpt-neox-20b | Remove "`--quant-with-amp`"; add "`--group-size 256`" |
 | facebook/opt-30b | Remove "`--quant-with-amp`" |
 | databricks/dolly-v2-12b | Remove "`--quant-with-amp`"; add "`--lowp-mode FP32`" |
+| stabilityai/stablelm-2-1_6b | Add "`--group-size 128`" |
+| meta-llama/Meta-Llama-3-70B | Add "`--group-size 128`" |
 
 - Command (INT4):
 ```bash
@@ -458,6 +460,8 @@ Similar to single instance usage, we need to update some arguments of the runnin
 | bigscience/bloom-1b7 | Remove "`--quant-with-amp`"; add "`--group-size 128`" |
 | facebook/opt-30b | Remove "`--quant-with-amp`"; add "`--dtype float32`" |
 | databricks/dolly-v2-12b | Remove "`--quant-with-amp`"; add "`--lowp-mode FP32 --dtype float32`" |
+| stabilityai/stablelm-2-1_6b | Add "`--group-size 128`" |
+| meta-llama/Meta-Llama-3-70B | Add "`--group-size 128`" |
 
 - An example of llama2 7b model:
 ```bash
