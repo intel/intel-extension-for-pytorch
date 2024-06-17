@@ -682,8 +682,10 @@ bool is_xetla_gru_available(
     const int input_size,
     const int hidden_size,
     const ScalarType dtype) {
+  DeviceIndex curDevID;
+  AT_DPCPP_CHECK(dpcppGetDevice(&curDevID));
   // TODO: XeTLA will proive a general API to check supported platform
-  if (dpcppSupportFP64()) {
+  if (Settings::I().has_2d_block_array(curDevID)) {
     if (dtype == ScalarType::BFloat16) { // TODO: support fp16
       // More shapes could be supported by adding kernel configs manually
       if (batch_size <= 1024 && input_size <= 512 && hidden_size <= 1024) {
