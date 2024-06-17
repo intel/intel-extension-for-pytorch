@@ -266,3 +266,13 @@ elif [[ ${DEVICE} == "gpu" ]]; then
     rm -rf xml
     mv tutorials/features/advanced_configuration.md.bk tutorials/features/advanced_configuration.md
 fi
+
+LN=$(grep "searchtools.js" -n _build/html/search.html | cut -d ":" -f 1)
+sed -i "${LN}i \ \ \ \ <script src=\"_static/js/theme.js\"></script>" _build/html/search.html
+sed -i "${LN}i \ \ \ \ <script src=\"_static/sphinx_highlight.js?v=dc90522c\"></script>" _build/html/search.html
+sed -i "${LN}i \ \ \ \ <script src=\"_static/doctools.js?v=9a2dae69\"></script>" _build/html/search.html
+sed -i "${LN}i \ \ \ \ <script src=\"_static/documentation_options.js?v=fc837d61\"></script>" _build/html/search.html
+sed -i "${LN}i \ \ \ \ <script src=\"_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c\"></script>" _build/html/search.html
+sed -i "${LN}i \ \ \ \ <script src=\"_static/jquery.js?v=5d32c60e\"></script>" _build/html/search.html
+sed -i "${LN}i \ \ \ \ <\!\-\-[if lt IE 9]><script src=\"_static/js/html5shiv.min.js\"></script><\![endif]\-\->" _build/html/search.html
+

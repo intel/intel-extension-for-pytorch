@@ -38,6 +38,8 @@ extensions = ['sphinx.ext.githubpages',
               'recommonmark',
               'sphinx_markdown_tables',
               'sphinx_md',
+              'sphinx_rtd_theme',
+              'sphinxcontrib.jquery',
               'sphinxemoji.sphinxemoji'
 ]
 
