@@ -69,10 +69,12 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 |
 |T5| google/flan-t5-xl | 🟩 | 🟩 |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 |
+|Mistral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 |
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |
 |Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |
 |GIT| microsoft/git-base | 🟩 | 🟩 |
+|Phi| microsoft/phi-2 | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 |
