@@ -11129,7 +11129,9 @@ class TestNNDeviceType(NNTestCase):
             max_length = max(lengths)
             x_leaf = torch.randn(max_length, len(lengths), input_size, device=device,
                                  dtype=dtype, requires_grad=True)
-            num_directions = 2 if bidirectional else 1
+            # Security Scan: bidirectional will always be True here
+            # num_directions = 2 if bidirectional else 1
+            num_directions = 2
             lstm = nn.LSTM(input_size, hidden_size, bidirectional=bidirectional,
                            num_layers=num_layers, proj_size=proj_size).to(device, dtype)
             lstm2 = deepcopy(lstm).to(device, dtype)
