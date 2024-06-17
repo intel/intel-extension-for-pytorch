@@ -1,6 +1,6 @@
 <div align="center">
   
-Intel® Extension for Pytorch*
+Intel® Extension for PyTorch*
 ===========================
 
 [💻Examples](./docs/tutorials/examples.md)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[📖CPU Documentations](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/)&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;[📖GPU Documentations](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/)
