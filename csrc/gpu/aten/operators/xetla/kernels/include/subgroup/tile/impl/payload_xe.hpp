@@ -84,7 +84,7 @@ struct mem_payload_t<
   xetla_vector<uint32_t, 16 * num_block> payloads;
 
   inline mem_payload_t(const this_payload_t& rhs) {
-    this->payload = rhs.payload;
+    this->payloads = rhs.payloads;
   }
 
   inline mem_payload_t(mem_desc_t& mem_desc) {
@@ -149,7 +149,7 @@ struct mem_payload_t<
   // ~mem_payload_t(){}
 
   inline this_payload_t& operator=(const this_payload_t& rhs) {
-    this->payload = rhs.payload;
+    this->payloads = rhs.payloads;
     return *this;
   }
 
@@ -1584,9 +1584,6 @@ struct prefetch_payload_t<
     this->width_in_elems = rhs.width_in_elems;
     this->height_in_elems = rhs.height_in_elems;
 
-    this->step_x = rhs.step_x;
-    this->step_y = rhs.step_y;
-
     this->channel_offset = rhs.channel_offset;
   }
 
@@ -1601,8 +1598,6 @@ struct prefetch_payload_t<
     this->width_in_elems = rhs.width_in_elems;
     this->height_in_elems = rhs.height_in_elems;
 
-    this->step_x = rhs.step_x;
-    this->step_y = rhs.step_y;
     this->channel_offset = rhs.channel_offset;
     return *this;
   }
