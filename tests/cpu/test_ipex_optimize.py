@@ -929,8 +929,8 @@ class TestOptimizeCases(TestCase):
         loc = os.path.dirname(os.path.abspath(__file__))
         loss = -1
         with subprocess.Popen(
-            "python -m intel_extension_for_pytorch.cpu.launch --ccl_worker_count=1"
-            + f" --nproc_per_node=2 --distributed --nnodes 1 {loc}/ipex-optimize-ddp-static-graph.py --get-state-dict",
+            "python -m intel_extension_for_pytorch.cpu.launch --ccl-worker-count=1"
+            + f" --nprocs-per-node=2 --nnodes 1 {loc}/ipex-optimize-ddp-static-graph.py --get-state-dict",
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -944,8 +944,8 @@ class TestOptimizeCases(TestCase):
 
         num = 0
         with subprocess.Popen(
-            "python -m intel_extension_for_pytorch.cpu.launch --ccl_worker_count=1"
-            + f" --nproc_per_node=2 --distributed --nnodes 1 {loc}/ipex-optimize-ddp-static-graph.py",
+            "python -m intel_extension_for_pytorch.cpu.launch --ccl-worker-count=1"
+            + f" --nprocs-per-node=2 --nnodes 1 {loc}/ipex-optimize-ddp-static-graph.py",
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

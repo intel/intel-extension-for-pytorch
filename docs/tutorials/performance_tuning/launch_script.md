@@ -32,11 +32,12 @@ Launcher Common Arguments:
 
 | knob | type | default value | help |
 | :-- | :--: | :--: | :-- |
-| `--ncores-per-instance` | int | 0 | Number of cores per instance |
+| `--ncores-per-instance` | int | 0 | Number of cores per instance. It has to be an integer larger than or equal to `-1`. When set to `0`, cores are evenly assigned to each instance. If number of cores cannot be divided by number of instances, residual cores are unused. When set to `-1`, cores are evenly assigned to each instance as much as possible to fully utilize all cores. When set to a number larger than `0`, designated number of cores are assigned to each instance. |
 | `--nodes-list` | str | '' | Specify nodes list for multiple instances to run on, in format of list of single node ids "node_id,node_id,..." or list of node ranges "node_id-node_id,...". By default all nodes will be used. |
 | `--use-e-cores` | - | False | Use Efficient-Cores on the workloads or not. By default, only Performance-Cores are used. |
 | `--memory-allocator` | str | 'auto' | Choose which memory allocator to run the workloads with. Supported choices are ['auto', 'default', 'tcmalloc', 'jemalloc']. |
 | `--omp-runtime` | str | 'auto' | Choose which OpenMP runtime to run the workloads with. Supported choices are ['auto', 'default', 'intel']. |
+| `--strategy` | str | 'scatter' | Tell how cores are distributed over instances when only part of all cores are needed on a machine with multiple NUMA nodes. Supported choices are ['scatter', 'close']. With 'scatter', instances are distributed evenly as much as possible over all available NUMA nodes. While with 'close', instances are assigned to cores in order continuously. |
 
 Multi-instance Arguments:
 
@@ -45,7 +46,7 @@ Multi-instance Arguments:
 | `--ninstances` | int | 0 | Number of instances |
 | `--instance-idx` | int | -1 | Inside the multi instance list, execute a specific instance at index. If it is set to -1, run all of them. |
 | `--use-logical-cores` | - | False | Use logical cores on the workloads or not. By default, only physical cores are used. |
-| `--skip-cross-node-cores` | - | False | Allow instances to be executed on cores across NUMA nodes. |
+| `--bind-numa-node` | - | False | Bind instances to be executed on cores on a single NUMA node. |
 | `--multi-task-manager` | str | 'auto' | Choose which multi task manager to run the workloads with. Supported choices are ['auto', 'none', 'numactl', 'taskset']. |
 | `--latency-mode` | - | False | Use 4 cores per instance over all physical cores. |
 | `--throughput-mode` | - | False | Run one instance per node with all physical cores. |

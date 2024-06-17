@@ -29,8 +29,8 @@ class MultiInstancesLauncher(Launcher):
             "--instance_idx",
             default="",
             type=str,
-            help="Inside the multi instance list, execute a specific instance at indices. \
-                If it is set to -1 or empty, run all of them.",
+            help="Inside the multi instance list, execute a specific instance at indices. "
+            + "If it is set to -1 or empty, run all of them.",
         )
         group.add_argument(
             "--use-logical-cores",
@@ -40,11 +40,11 @@ class MultiInstancesLauncher(Launcher):
             help="Use logical cores on the workloads or not. By default, only physical cores are used.",
         )
         group.add_argument(
-            "--skip-cross-node-cores",
-            "--skip_cross_node_cores",
+            "--bind-numa-node",
+            "--bind_numa_node",
             action="store_true",
             default=False,
-            help="Allow instances to be executed on cores across NUMA nodes.",
+            help="Bind instances to be executed on cores on a single NUMA node.",
         )
         group.add_argument(
             "--multi-task-manager",
@@ -52,8 +52,7 @@ class MultiInstancesLauncher(Launcher):
             default="auto",
             type=str,
             choices=self.tm_supported,
-            help=f"Choose which multi task manager to run the workloads with. Supported choices are \
-                {self.tm_supported}.",
+            help="Choose which multi task manager to run the workloads with. Supported choices are {self.tm_supported}.",
         )
         group.add_argument(
             "--latency-mode",
@@ -74,17 +73,17 @@ class MultiInstancesLauncher(Launcher):
             "--cores_list",
             default="",
             type=str,
-            help='Specify cores list for multiple instances to run on, in format of list of single core ids \
-                "core_id,core_id,..." or list of core ranges "core_id-core_id,...". \
-                By default all cores will be used.',
+            help="Specify cores list for multiple instances to run on, in format of list of single core ids "
+            + '"core_id,core_id,..." or list of core ranges "core_id-core_id,...". '
+            + "By default all cores will be used.",
         )
         group.add_argument(
             "--benchmark",
             action="store_true",
             default=False,
-            help="Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. \
-                Recommend to use this for benchmarking purpose; for other use cases, \
-                this MALLOC_CONF may cause Out-of-Memory crash.",
+            help="Enable benchmark config. JeMalloc's MALLOC_CONF has been tuned for low latency. "
+            + "Recommend to use this for benchmarking purpose; for other use cases, "
+            + "this MALLOC_CONF may cause Out-of-Memory crash.",
         )
 
     def is_command_available(self, cmd):
@@ -135,6 +134,7 @@ class MultiInstancesLauncher(Launcher):
         pool_txt = pool.get_pool_txt()
         cores_list_local = pool_txt["cores"]
         nodes_list_local = pool_txt["nodes"]
+        self.verbose("info", f"========== instance {index} ==========")
         if task_mgr != self.tm_supported[1]:
             params = ""
             if task_mgr == "numactl":
@@ -154,9 +154,11 @@ class MultiInstancesLauncher(Launcher):
                 k = "KMP_AFFINITY"
                 v = f"granularity=fine,proclist=[{cores_list_local}],explicit"
             if k != "":
-                self.verbose("info", "==========")
                 self.verbose("info", f"env: {k}={v}")
                 environ_local[k] = v
+        omp_num_threads = self.check_env("OMP_NUM_THREADS", len(pool))
+        environ_local["OMP_NUM_THREADS"] = str(omp_num_threads)
+        self.verbose("info", f"env: OMP_NUM_THREADS={omp_num_threads}")
 
         if not args.no_python:
             cmd.append(sys.executable)
@@ -225,12 +227,12 @@ class MultiInstancesLauncher(Launcher):
             ncores_per_instance=args.ncores_per_instance,
             use_logical_cores=args.use_logical_cores,
             use_e_cores=args.use_e_cores,
-            skip_cross_node_cores=args.skip_cross_node_cores,
+            bind_numa_node=args.bind_numa_node,
             nodes_list=nodes_list,
             cores_list=cores_list,
+            strategy=args.strategy,
         )
         args.ninstances = len(self.cpuinfo.pools_ondemand)
-        args.ncores_per_instance = len(self.cpuinfo.pools_ondemand[0])
 
         is_iomp_set = False
         for item in self.ld_preload:
@@ -239,7 +241,7 @@ class MultiInstancesLauncher(Launcher):
                 break
         is_kmp_affinity_set = True if "KMP_AFFINITY" in os.environ else False
         set_kmp_affinity = True
-        # When using all cores on all nodes, including logical cores, setting KMP_AFFINITY disables logical cores. \
+        # When using all cores on all nodes, including logical cores, setting KMP_AFFINITY disables logical cores.
         #   Thus, KMP_AFFINITY should not be set.
         if args.use_logical_cores and len(
             set([c for p in self.cpuinfo.pools_ondemand for c in p])
@@ -251,7 +253,6 @@ class MultiInstancesLauncher(Launcher):
 
         self.set_memory_allocator(args.memory_allocator, args.benchmark)
         omp_runtime = self.set_omp_runtime(args.omp_runtime, set_kmp_affinity)
-        self.add_env("OMP_NUM_THREADS", str(args.ncores_per_instance))
 
         skip_list = []
         if is_iomp_set and is_kmp_affinity_set:

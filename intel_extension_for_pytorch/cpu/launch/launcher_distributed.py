@@ -150,9 +150,9 @@ class DistributedTrainingLauncher(Launcher):
         if args.nnodes > 1:
             assert os.path.exists(
                 args.hostfile
-            ), "A hostfile is required when you perform multi-node distributed training. \
-                Please create the hostfile which includes ip addresses of nodes that you will use for \
-                the distributed computation workload."
+            ), "A hostfile is required when you perform multi-node distributed training. "
+            +"Please create the hostfile which includes ip addresses of nodes that you will "
+            +"use for the distributed computation workload."
             ipv4_addr_pattern = r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
             ip_list = []
             with open(args.hostfile) as f:
@@ -177,8 +177,8 @@ class DistributedTrainingLauncher(Launcher):
                         master_check = True
             assert (
                 master_check
-            ), "MASTER_ADDR is incorrect. Please make sure the first line ({ip_list[0]}) of the hostfile is the \
-                ip address of the current node."
+            ), f"MASTER_ADDR is incorrect. Please make sure the first line ({ip_list[0]}) of the hostfile "
+            +"is the ip address of the current node."
 
             self.verbose("info", "Begin to validate SSH connections")
             args.master_addr = ip_list[0]
@@ -218,16 +218,22 @@ class DistributedTrainingLauncher(Launcher):
             use_logical_cores=True,
             use_e_cores=args.use_e_cores,
             nodes_list=nodes_list,
+            strategy=args.strategy,
+            bind_numa_node=args.bind_numa_node,
         )
 
         self.set_memory_allocator(args.memory_allocator, False, ["jemalloc"])
         self.set_omp_runtime(args.omp_runtime, True)
-        omp_num_threads = len(
-            [c for c in self.cpuinfo.pools_ondemand[0] if c.is_physical_core]
-        )
+        ninstances = len(self.cpuinfo.pools_ondemand)
+        omp_num_threads = []
+        for i in range(ninstances):
+            omp_num_threads.append(
+                len([c for c in self.cpuinfo.pools_ondemand[i] if c.is_physical_core])
+            )
+        omp_num_threads_value = min(omp_num_threads)
         if not args.logical_cores_for_ccl:
-            omp_num_threads -= args.ccl_worker_count
-        self.add_env("OMP_NUM_THREADS", str(omp_num_threads))
+            omp_num_threads_value -= args.ccl_worker_count
+        self.add_env("OMP_NUM_THREADS", str(omp_num_threads_value))
 
         # set distributed related environmental variables
         self.add_env("MASTER_ADDR", args.master_addr)
