@@ -87,10 +87,20 @@ Troubleshooting
 
     If you continue seeing similar issues for other shared object files, add the corresponding files under `${MKL_DPCPP_ROOT}/lib/intel64/` by `LD_PRELOAD`. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.
 
+
+## Performance Issue 
+
+- **Problem**: Extended durations for data transfers from the host system to the device (H2D) and from the device back to the host system (D2H).
+  - **Cause**: Absence of certain Dynamic Kernel Module Support (DKMS) packages on Ubuntu 22.04 or earlier versions.
+  - **Solution**: For those running Ubuntu 22.04 or below, it's crucial to follow all the recommended installation procedures, including those labeled as [optional](https://dgpu-docs.intel.com/driver/client/overview.html#optional-out-of-tree-kernel-mode-driver-install). These steps are likely necessary to install the missing DKMS packages and ensure your system is functioning optimally. The Kernel Mode Driver (KMD) package that addresses this issue has been integrated into the Linux kernel for Ubuntu 23.04 and subsequent releases.
+
+
 ## Unit Test
 
 - Unit test failures on Intel® Data Center GPU Flex Series 170
 
   The following unit test fails on Intel® Data Center GPU Flex Series 170 but the same test case passes on Intel® Data Center GPU Max Series. The root cause of the failure is under investigation.
     - `test_weight_norm.py::TestNNMethod::test_weight_norm_differnt_type`
+
+
 
