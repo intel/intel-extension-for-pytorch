@@ -124,8 +124,8 @@ inline bool xetla_supported(sdp::sdp_params params) {
     if ((params.query.dtype() == at::kHalf ||
          params.query.dtype() == at::kBFloat16) &&
         Settings::I().has_2d_block_array(curDevID)) {
-      if ((params.query.sym_size(-1) * params.query.itemsize() % 128 == 0) &&
-          (params.value.sym_size(-1) * params.value.itemsize() % 128 == 0))
+      if ((params.query.sym_size(-1) * params.query.itemsize() % 8 == 0) &&
+          (params.value.sym_size(-1) * params.value.itemsize() % 8 == 0))
         is_supported = true;
     }
   }

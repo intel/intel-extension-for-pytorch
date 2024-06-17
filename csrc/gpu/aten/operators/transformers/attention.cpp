@@ -636,26 +636,6 @@ Tensor xetla_sdp_dropout(
   return out_and_lse[0];
 }
 
-inline bool xetla_supported(
-    Tensor q,
-    Tensor k,
-    Tensor v,
-    const c10::optional<Tensor>& b) {
-  bool is_supported = false;
-#if defined(USE_XETLA)
-  if (dpcppGetDeviceHasXMX()) {
-    DeviceId curDevID = at::xpu::current_device();
-    if ((q.dtype() == at::kHalf || q.dtype() == at::kBFloat16) &&
-        Settings::I().has_2d_block_array(curDevID)) {
-      if ((q.sym_size(-1) * q.itemsize() % 128 == 0) &&
-          (v.sym_size(-1) * v.itemsize() % 128 == 0))
-        is_supported = true;
-    }
-  }
-#endif
-  return is_supported;
-}
-
 int64_t _fused_sdp_choice(
     const Tensor& query,
     const Tensor& key,

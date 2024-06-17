@@ -271,16 +271,13 @@ class fmha_forward_t {
         end_y = end_y > boundary_y ? boundary_y : end_y;
 
         int32_t start_acc = head_id * args.uH;
+        uint32_t end_acc = start_acc + args.uH;
         const uint32_t ld_qo = args.uH * args.uN;
 
         mem_desc_Qi.init(
-            args.Q_ptr,
-            {args.uH * args.uN, end_y, ld_qo},
-            {start_acc, start_y});
+            args.Q_ptr, {end_acc, end_y, ld_qo}, {start_acc, start_y});
         mem_desc_Oi.init(
-            args.O_ptr,
-            {args.uH * args.uN, end_y, ld_qo},
-            {start_acc, start_y});
+            args.O_ptr, {end_acc, end_y, ld_qo}, {start_acc, start_y});
       }
 
       int32_t start_x_ml = item.get_group(1) * kBr + sg_idy * kSgBr;
@@ -332,14 +329,15 @@ class fmha_forward_t {
         end_x = end_x > boundary_x ? boundary_x : end_x;
 
         int32_t start_acc = head_id_kv * args.uH;
+        uint32_t end_acc = start_acc + args.uH;
 
         mem_desc_Kj_T.init(
             args.K_ptr,
-            {end_x, args.uH * args.uNkv, args.uH * args.uNkv},
+            {end_x, end_acc, args.uH * args.uNkv},
             {start_x, start_acc});
         mem_desc_Vj.init(
             args.V_ptr,
-            {args.uH * args.uNkv, end_x, args.uH * args.uNkv},
+            {end_acc, end_x, args.uH * args.uNkv},
             {start_acc, start_x});
       }
 
