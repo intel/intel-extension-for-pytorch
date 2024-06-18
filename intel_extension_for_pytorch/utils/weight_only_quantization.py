@@ -1,6 +1,7 @@
 import copy
 import torch
 from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
+from intel_extension_for_pytorch.quantization import QConfigWoq, WoqLowpMode
 from torch.ao.quantization import PlaceholderObserver, QConfigMapping
 
 # The config describes how to load low precision checkpoint for weight only quantization.
@@ -37,6 +38,23 @@ def _is_woq_qconfig(qconfig_mapping):
         isinstance(qconfig.activation(), PlaceholderObserver)
         and not qconfig.activation().is_dynamic
     )
+
+
+def _woq_enable_weight_cache_for_large_batch(qconfig_mapping):
+    qconfig = (
+        qconfig_mapping.global_qconfig
+        if isinstance(qconfig_mapping, QConfigMapping)
+        else qconfig_mapping
+    )
+    assert (
+        qconfig.lowp_mode == WoqLowpMode.BF16
+    ), "Weight cache is only supported for lowp-mode=BF16"
+    qconfig_dict = qconfig._asdict()
+    qconfig_dict["cache_weight_for_large_batch"] = True
+    if isinstance(qconfig_mapping, QConfigMapping):
+        qconfig_mapping.set_global(QConfigWoq(**qconfig_dict))
+        return qconfig_mapping
+    return QConfigWoq(**qconfig_dict)
 
 
 def _default_lowp_checkpoint_config():

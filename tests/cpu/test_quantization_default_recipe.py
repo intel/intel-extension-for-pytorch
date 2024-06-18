@@ -1793,6 +1793,57 @@ class WeightOnlyQuantizationTester(TestCase):
                 # Dequantized weights should be close
                 torch.testing.assert_close(dqw, dqw_2)
 
+    def test_weight_only_quantization_weight_for_first_token(self):
+        class M(nn.Module):
+            def __init__(self, input_channel, output_channel, has_bias):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(input_channel, output_channel, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(feature, has_bias, w_dtype):
+            model = M(feature[1], feature[2], has_bias)
+            m = model.to(torch.bfloat16).eval()
+            data = torch.rand(feature[0], feature[1])
+
+            qconfig_ref = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=w_dtype,
+                lowp_mode=ipex.quantization.WoqLowpMode.BF16,
+            )
+            prepared_model_ref = prepare(
+                m, qconfig_ref, example_inputs=data, inplace=False
+            )
+            from intel_extension_for_pytorch.utils.weight_only_quantization import (
+                _woq_enable_weight_cache_for_large_batch,
+            )
+
+            qconfig = _woq_enable_weight_cache_for_large_batch(qconfig_ref)
+            prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
+
+            with torch.no_grad(), torch.autocast(
+                device_type="cpu", enabled=True, dtype=torch.bfloat16
+            ):
+                woq_model_ref = convert(prepared_model_ref)
+                woq_model_ref = torch.jit.trace(woq_model_ref, data)
+                woq_model_ref = torch.jit.freeze(woq_model_ref)
+                woq_model = convert(prepared_model)
+                woq_model = torch.jit.trace(woq_model, data)
+                woq_model = torch.jit.freeze(woq_model)
+                out_ref = woq_model_ref(data).bfloat16()
+                out = woq_model(data).bfloat16()
+                torch.testing.assert_close(out_ref, out, atol=1.5e-4, rtol=1.6e-2)
+
+        shape_list = [
+            [196, 4096, 4096],
+            [1024, 512, 512],
+        ]
+        use_bias_list = [True, False]
+        w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
+        cases = itertools.product(shape_list, use_bias_list, w_dtype_list)
+        for shape, use_bias, w_dtype in cases:
+            test(shape, use_bias, w_dtype)
+
 
 class QuantizedOpsTester(TestCase):
     def test_matmul_i8i8i32(self):

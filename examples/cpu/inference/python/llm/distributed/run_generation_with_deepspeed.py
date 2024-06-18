@@ -198,6 +198,13 @@ parser.add_argument(
     "IC_BLOCK is determined by IC automatically.",
 )
 parser.add_argument(
+    "--cache-weight-for-large-batch",
+    action="store_true",
+    help="Cache an extra linear weight for large batch inference, such as the first token (prefill phase)."
+    " It brings better performance at the cost of higher memory usage. It is only valid for full bf16 path"
+    " and weight-only quantization with lowp-mode=BF16. Otherwise, it has no effect.",
+)
+parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
 )
 args = parser.parse_args()
@@ -512,6 +519,7 @@ if use_ipex:
         quantization_config=qconfig if ipex_woq_enabled else None,
         inplace=True,
         deployment_mode=args.deployment_mode,
+        cache_weight_for_large_batch=args.cache_weight_for_large_batch,
     )
 
 

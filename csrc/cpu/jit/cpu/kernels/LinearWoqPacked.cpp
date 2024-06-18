@@ -3,6 +3,9 @@
 #include <ideep.hpp>
 #include "aten/Linear.h"
 #include "aten/WeightPack.h"
+#include "aten/utils/woq.h"
+#include "csrc/cpu/aten/TPPGEMM.h"
+#include "csrc/cpu/tpp/utils.h"
 #include "csrc/cpu/tpp/woq/tla.h"
 #include "ideep/IDeepConversions.h"
 
@@ -10,6 +13,8 @@ namespace torch_ipex {
 namespace cpu {
 namespace detail {
 namespace woq_linear {
+
+#define SMALL_BATCH_THRESHOLD 32
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     at::Tensor&& weight,
@@ -22,7 +27,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     c10::optional<int64_t> batch_size,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    bool cache_weight_for_large_batch) {
   RECORD_FUNCTION(
       "ipex_prepack::createWoqLinearPrePackOpContext",
       c10::ArrayRef<c10::IValue>({}));
@@ -38,7 +44,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
       batch_size,
       group_size,
       lowp_mode,
-      act_quant_mode);
+      act_quant_mode,
+      cache_weight_for_large_batch);
 }
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
@@ -50,7 +57,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     c10::optional<int64_t> batch_size,
     int64_t group_size, // group_size along input channel
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    bool cache_weight_for_large_batch) {
   RECORD_FUNCTION(
       "ipex_prepack::createWoqLinearPrePackOpContextInt4",
       c10::ArrayRef<c10::IValue>({}));
@@ -166,7 +174,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
       batch_size,
       group_size,
       lowp_mode,
-      act_quant_mode);
+      act_quant_mode,
+      cache_weight_for_large_batch);
 }
 
 at::Tensor woq_linear_run(
@@ -189,7 +198,8 @@ ContextLinearWoq create(
     const c10::optional<int64_t> batch_size,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    bool cache_weight_for_large_batch) {
   at::Tensor packed_weight;
   int64_t N = weight_shape[0];
   int64_t K = weight_shape[1];
@@ -246,7 +256,8 @@ ContextLinearWoq create(
         std::move(g_idx),
         group_size,
         lowp_mode,
-        act_quant_mode);
+        act_quant_mode,
+        cache_weight_for_large_batch);
   }
   c10::optional<at::Tensor> zero_points_float = c10::nullopt;
   if (zero_points.has_value() && zero_points.value().defined()) {
@@ -262,7 +273,8 @@ ContextLinearWoq create(
       std::move(g_idx),
       group_size,
       lowp_mode,
-      act_quant_mode);
+      act_quant_mode,
+      cache_weight_for_large_batch);
 }
 
 static at::Tensor _shuffle_input_channels_if_needed(
@@ -281,7 +293,61 @@ static at::Tensor _shuffle_input_channels_if_needed(
   return input;
 }
 
+// Unpack WOQ Linear weight to plain format, dequantize it, then repack it to
+// blocked format for BF16 computation.
+static at::Tensor _weight_unpack_dequantize_repack(ContextLinearWoq& context) {
+  // Requres lowp_mode=BF16, g_idx disabled, and N/K divisible by block size
+  auto N = context.weight_shape_[0];
+  auto K = context.weight_shape_[1];
+  bool supported = context.lowp_mode_ == 2 && !context.g_idx_.has_value() &&
+      K % 64 == 0 && (N % 100 == 0 || N % 64 == 0);
+  if (!supported)
+    return at::Tensor();
+  auto unpacked_weight = unpack(context, context.at_weight_);
+  auto block_weight = [&](const at::Tensor& weight, int64_t Nb, int64_t Kb) {
+    return weight.reshape({N / Nb, Nb, K / Kb, Kb / 2, 2})
+        .permute({0, 2, 3, 1, 4})
+        .contiguous()
+        .to(c10::kBFloat16);
+  };
+  at::Tensor scale, zp;
+  scale = context.scales_list_[0].unsqueeze(-1);
+  if (context.weight_dtype_ != WOQ_DTYPE_NF4) {
+    zp = context.zero_points_list_[0].unsqueeze(-1);
+  }
+  int64_t quant_w_mode = context.group_size_ > 0 ? 1 : 0;
+  auto dequant_weight = torch_ipex::cpu::dequantize_woq_weight(
+      unpacked_weight,
+      context.weight_shape_,
+      scale,
+      zp,
+      context.weight_dtype_,
+      quant_w_mode);
+  if (N % 100 == 0) {
+    return block_weight(dequant_weight, 100, 64);
+  }
+  return block_weight(dequant_weight, 64, 64);
+}
+
 at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
+  if (context.cache_weight_for_large_batch_ &&
+      !context.cached_weight_.has_value()) {
+    auto dequant_weight =
+        _weight_unpack_dequantize_repack(context).to(c10::kBFloat16);
+    context.cached_weight_ =
+        c10::make_optional<at::Tensor>(std::move(dequant_weight));
+  }
+  auto M = input.numel() > 0 ? input.numel() / input.size(-1) : 0;
+  if (M > SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
+      context.cached_weight_.value().defined()) {
+    auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
+    auto out = tpp_linear_bias_forward_cpu(
+        input_reshaped.to(c10::kBFloat16).contiguous(),
+        context.cached_weight_.value(),
+        context.bias_list_[2],
+        c10::nullopt);
+    return input.dim() == 2 ? out.squeeze(0) : out;
+  }
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
@@ -318,6 +384,48 @@ at::Tensor run_unary(
     const c10::string_view& post_op,
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm) {
+  if (context.cache_weight_for_large_batch_ &&
+      !context.cached_weight_.has_value()) {
+    auto dequant_weight =
+        _weight_unpack_dequantize_repack(context).to(c10::kBFloat16);
+    context.cached_weight_ = c10::make_optional<at::Tensor>(dequant_weight);
+  }
+  auto M = input.numel() > 0 ? input.numel() / input.size(-1) : 0;
+  if (M > SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
+      context.cached_weight_.value().defined()) {
+    auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
+    if (post_op == "gelu") {
+      if (algorithm == "none") {
+        auto out = tpp_linear_gelu_forward_cpu(
+            input_reshaped.to(c10::kBFloat16).contiguous(),
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      } else if (algorithm == "tanh") {
+        auto out = tpp_linear_gelu_tanh_forward_cpu(
+            input_reshaped.to(c10::kBFloat16).contiguous(),
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      }
+    } else if (post_op == "silu") {
+      auto out = tpp_linear_silu_forward_cpu(
+          input_reshaped.to(c10::kBFloat16).contiguous(),
+          context.cached_weight_.value(),
+          context.bias_list_[2],
+          c10::nullopt);
+      return input.dim() == 2 ? out.squeeze(0) : out;
+    } else if (post_op == "relu") {
+      auto out = tpp_linear_relu_forward_cpu(
+          input_reshaped.to(c10::kBFloat16).contiguous(),
+          context.cached_weight_.value(),
+          context.bias_list_[2],
+          c10::nullopt);
+      return input.dim() == 2 ? out.squeeze(0) : out;
+    }
+  }
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
@@ -351,6 +459,45 @@ at::Tensor run_binary(
     const at::Tensor& input,
     const c10::string_view& post_op,
     const std::vector<at::Tensor>& others) {
+  auto M = input.numel() > 0 ? input.numel() / input.size(-1) : 0;
+  if (context.cache_weight_for_large_batch_ &&
+      !context.cached_weight_.has_value()) {
+    auto dequant_weight =
+        _weight_unpack_dequantize_repack(context).to(c10::kBFloat16);
+    context.cached_weight_ = c10::make_optional<at::Tensor>(dequant_weight);
+  }
+  if (M > SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
+      context.cached_weight_.value().defined()) {
+    auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
+    if (post_op == "add") {
+      auto out = tpp_linear_add_forward_cpu(
+          input_reshaped.to(c10::kBFloat16).contiguous(),
+          others[0],
+          context.cached_weight_.value(),
+          context.bias_list_[2],
+          1.0,
+          c10::nullopt);
+      return input.dim() == 2 ? out.squeeze(0) : out;
+    } else if (post_op == "add_add") {
+      auto out = tpp_linear_add_add_forward_cpu(
+          input_reshaped.to(c10::kBFloat16),
+          others[0],
+          others[1],
+          context.cached_weight_.value(),
+          context.bias_list_[2],
+          1.0,
+          c10::nullopt);
+      return input.dim() == 2 ? out.squeeze(0) : out;
+    } else if (post_op == "mul") {
+      auto out = tpp_linear_mul_forward_cpu(
+          input_reshaped.to(c10::kBFloat16),
+          others[0],
+          context.cached_weight_.value(),
+          context.bias_list_[2],
+          c10::nullopt);
+      return input.dim() == 2 ? out.squeeze(0) : out;
+    }
+  }
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(

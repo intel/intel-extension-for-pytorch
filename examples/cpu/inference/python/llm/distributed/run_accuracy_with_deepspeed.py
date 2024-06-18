@@ -185,6 +185,13 @@ parser.add_argument(
     "PER_BATCH_IC_BLOCK(3): quantize per block of size 1 x IC_BLOCK. "
     "IC_BLOCK is determined by IC automatically.",
 )
+parser.add_argument(
+    "--cache-weight-for-large-batch",
+    action="store_true",
+    help="Cache an extra linear weight for large batch inference, such as the first token (prefill phase)."
+    " It brings better performance at the cost of higher memory usage. It is only valid for full bf16 path"
+    " and weight-only quantization with lowp-mode=BF16. Otherwise, it has no effect.",
+)
 
 args = parser.parse_args()
 
@@ -442,6 +449,7 @@ class HuggingFaceModel(BaseLM):
                 quantization_config=qconfig if ipex_woq_enabled else None,
                 inplace=True,
                 deployment_mode=False,
+                cache_weight_for_large_batch=args.cache_weight_for_large_batch,
             )
 
         self.base_model = self.model
@@ -1211,6 +1219,7 @@ class LMMS(lmms):
                 quantization_config=qconfig if ipex_woq_enabled else None,
                 inplace=True,
                 deployment_mode=False,
+                cache_weight_for_large_batch=args.cache_weight_for_large_batch,
             )
 
         self._base_model = self._model
@@ -1856,6 +1865,7 @@ class LibriSpeech:
                 quantization_config=qconfig if ipex_woq_enabled else None,
                 inplace=True,
                 deployment_mode=False,
+                cache_weight_for_large_batch=args.cache_weight_for_large_batch,
             )
 
         self.base_model = self.model

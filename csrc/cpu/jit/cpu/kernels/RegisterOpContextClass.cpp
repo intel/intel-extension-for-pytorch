@@ -141,7 +141,8 @@ TORCH_LIBRARY(ipex_prepack, m) {
                 std::move(std::get<7>(state)), // batch size
                 std::move(std::get<8>(state)), // group size
                 std::move(std::get<9>(state)), // lowp_mode
-                std::move(std::get<10>(state))); // act_quant_mode
+                std::move(std::get<10>(state)), // act_quant_mode
+                std::move(std::get<11>(state))); // cache_weight_for_large_batch
           })
       .def(
           "get_weight",
@@ -155,6 +156,9 @@ TORCH_LIBRARY(ipex_prepack, m) {
           "get_weight_shape",
           &torch_ipex::cpu::WoqLinearOpContext::get_weight_shape)
       .def("get_g_idx", &torch_ipex::cpu::WoqLinearOpContext::get_g_idx)
+      .def(
+          "get_cached_weight",
+          &torch_ipex::cpu::WoqLinearOpContext::get_cached_weight)
       .def("pack", &torch_ipex::cpu::WoqLinearOpContext::pack)
       .def("to_public", &torch_ipex::cpu::WoqLinearOpContext::to_public)
       .def(
@@ -181,10 +185,10 @@ TORCH_LIBRARY(ipex_prepack, m) {
       "-> __torch__.torch.classes.ipex_prepack.ConvTransposeOpContext");
 #ifdef USE_LIBXSMM
   m.def(
-      "weight_only_qlinear_prepack(Tensor W, int W_dtype, int[] W_shape, Tensor scales, Tensor? zero_points, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int act_quant_mode) "
+      "weight_only_qlinear_prepack(Tensor W, int W_dtype, int[] W_shape, Tensor scales, Tensor? zero_points, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int act_quant_mode, bool cache_weight_for_large_batch) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
   m.def(
-      "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int act_quant_mode) "
+      "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int act_quant_mode, bool cache_weight_for_large_batch) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
 #endif
 }

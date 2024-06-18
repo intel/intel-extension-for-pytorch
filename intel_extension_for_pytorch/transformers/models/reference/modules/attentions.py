@@ -2416,14 +2416,12 @@ class _IPEXAttentionRef(nn.Module):
                 torch.nn.Linear,
                 WeightOnlyQuantizedLinear,
             ]
-            try:
-                import deepspeed
+            from intel_extension_for_pytorch.nn.utils._weight_prepack import (
+                may_import_deepspeed_modules,
+            )
 
-                supported_linear_types.append(
-                    deepspeed.module_inject.layers.LinearLayer
-                )
-            except ImportError:
-                pass
+            ds_modules = may_import_deepspeed_modules()
+            supported_linear_types.extend(ds_modules)
             supported_linear_types = tuple(supported_linear_types)
             if (
                 hasattr(module, "q_proj")

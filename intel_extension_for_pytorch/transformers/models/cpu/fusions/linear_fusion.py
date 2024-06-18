@@ -31,9 +31,12 @@ class _IPEXlinearSiluCPU(_IPEXlinearFusionCPU):
     def forward(self, x):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_silu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -62,9 +65,12 @@ class _IPEXlinearReluCPU(_IPEXlinearFusionCPU):
     def forward(self, x):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_relu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -94,10 +100,13 @@ class _IPEXlinearMulCPU(_IPEXlinearFusionCPU):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             y = y.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_mul(
                 x,
                 y,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -128,10 +137,13 @@ class _IPEXlinearAddCPU(_IPEXlinearFusionCPU):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             y = y.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_add(
                 x,
                 y,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -164,11 +176,14 @@ class _IPEXlinearAddAddCPU(_IPEXlinearFusionCPU):
             x = x.to(self.dtype).contiguous()
             y = y.to(self.dtype).contiguous()
             z = z.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_add_add(
                 x,
                 y,
                 z,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -199,9 +214,12 @@ class _IPEXlinearNewGeluCPU(_IPEXlinearFusionCPU):
     def forward(self, x):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_gelu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -241,9 +259,12 @@ class _IPEXlinearGeluCPU(_IPEXlinearFusionCPU):
     def forward(self, x):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_gelu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -302,12 +323,23 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             lowp_mode = self.linear_list[0]._lowp_mode
             act_quant_mode = self.linear_list[0]._act_quant_mode
             group_size = self.linear_list[0]._group_size
+            cache_weight_for_large_batch = self.linear_list[
+                0
+            ]._cache_weight_for_large_batch
             qconfig_mapping = get_weight_only_quant_qconfig_mapping(
                 weight_dtype=w_dtype,
                 lowp_mode=lowp_mode,
                 act_quant_mode=act_quant_mode,
                 group_size=group_size,
             )
+            if cache_weight_for_large_batch:
+                from intel_extension_for_pytorch.utils.weight_only_quantization import (
+                    _woq_enable_weight_cache_for_large_batch,
+                )
+
+                qconfig_mapping = _woq_enable_weight_cache_for_large_batch(
+                    qconfig_mapping
+                )
             qconfig = qconfig_mapping.global_qconfig
             for i in range(self.num_concat):
                 linear = self.linear_list[i]
@@ -425,15 +457,21 @@ class _IPEXlinearSiluMulCPU(nn.Module):
             and not self.linear_m.tpp_fallback
         ):
             x = x.to(self.dtype).contiguous()
+            w_s = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear_s.weight, self.linear_s.weight_for_large_batch
+            )
+            w_m = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear_m.weight, self.linear_m.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_fused_gate_up_proj(
                 x,
-                self.linear_s.weight.detach(),
+                w_s.detach(),
                 (
                     self.linear_s.bias.detach()
                     if self.linear_s.bias is not None
                     else x.new_empty(0)
                 ),
-                self.linear_m.weight.detach(),
+                w_m.detach(),
                 (
                     self.linear_m.bias.detach()
                     if self.linear_m.bias is not None
@@ -471,9 +509,12 @@ class _IPEXlinearSiluAndMulCPU(nn.Module):
     def forward(self, x, y):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             x1 = torch.ops.torch_ipex.tpp_linear_silu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None

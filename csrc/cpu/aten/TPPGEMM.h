@@ -23,6 +23,12 @@ at::Tensor tpp_linear_gelu_forward_cpu(
     const at::Tensor& t_bias,
     c10::optional<int64_t> out_features);
 
+at::Tensor tpp_linear_gelu_tanh_forward_cpu(
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
+    c10::optional<int64_t> out_features);
+
 at::Tensor tpp_fused_gate_up_proj_forward_cpu(
     const at::Tensor& t_in,
     const at::Tensor& t_wt_gate,
@@ -67,14 +73,25 @@ at::Tensor tpp_linear_add_add_forward_cpu(
     double scale,
     c10::optional<int64_t> out_features);
 
+void tpp_gelu_tanh_bf16_forward_cpu(
+    at::BFloat16* in,
+    at::BFloat16* out,
+    int M,
+    int N,
+    int ldi,
+    int ldo);
+
 using tpp_linear_nobias_impl_fn =
     at::Tensor (*)(const at::Tensor&, const at::Tensor&);
 
 using tpp_linear_bias_kernel_impl_fn =
     at::Tensor (*)(const at::Tensor&, const at::Tensor&, const at::Tensor&);
 
-using tpp_linear_gelu_kernel_impl_fn =
-    at::Tensor (*)(const at::Tensor&, const at::Tensor&, const at::Tensor&);
+using tpp_linear_gelu_kernel_impl_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    const c10::string_view&);
 
 using tpp_fused_gate_up_proj_kernel_impl_fn = at::Tensor (*)(
     const at::Tensor&,
@@ -110,6 +127,9 @@ using tpp_linear_add_add_kernel_impl_fn = at::Tensor (*)(
     const at::Tensor&,
     double);
 
+using tpp_gelu_tanh_bf16_kernel_impl_fn =
+    void (*)(at::BFloat16*, at::BFloat16*, int, int, int, int);
+
 IPEX_DECLARE_DISPATCH(tpp_linear_nobias_impl_fn, tpp_linear_nobias_kernel_stub);
 IPEX_DECLARE_DISPATCH(
     tpp_linear_bias_kernel_impl_fn,
@@ -135,6 +155,9 @@ IPEX_DECLARE_DISPATCH(
 IPEX_DECLARE_DISPATCH(
     tpp_linear_add_add_kernel_impl_fn,
     tpp_linear_add_add_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    tpp_gelu_tanh_bf16_kernel_impl_fn,
+    tpp_gelu_tanh_bf16_kernel_stub);
 
 } // namespace cpu
 } // namespace torch_ipex

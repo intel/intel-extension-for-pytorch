@@ -1337,24 +1337,26 @@ void replaceAtenMaxPool2dWithIpexMaxPool2d(std::shared_ptr<Graph>& graph) {
 
 void simplifyAllReduce(std::shared_ptr<Graph>& graph) {
   std::string all_reduce_v1 = R"(
-    graph(%a, %weight, %out_features1, %out_features2, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+    graph(%a, %weight, %out_features1, %none, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %no, %dtype, %zero):
       %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
       %r2 = deepspeed_comm::all_reduce(%r1)
-      %r3 = torch_ipex::tpp_linear_gelu(%b, %fc_in_weight, %fc_in_bias, %out_features2)
-      %r4 = aten::to(%r3, %idx, %no, %no, %dtype)
+      %r3 = torch_ipex::tpp_linear_gelu(%b, %fc_in_weight, %fc_in_bias, %none)
+      %r4 = aten::to(%r3, %dtype, %no, %no, %none)
       %r5 = aten::contiguous(%r4, %zero)
-      %r6 = torch_ipex::tpp_linear(%r5, %fc_out_weight, %out_features1)
+      %w = torch_ipex::choose_tpp_linear_weight(%r5, %fc_out_weight, %none)
+      %r6 = torch_ipex::tpp_linear(%r5, %w, %out_features1)
       %r7 = deepspeed_comm::all_reduce(%r6)
       %r8 = aten::add_(%r7, %fc_out_bias, %alpha)
       %r = aten::add(%r2, %r8, %alpha)
       return (%r) )";
   std::string all_reduce_repl_v1 = R"(
-    graph(%a, %weight, %out_features1, %out_features2, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %idx, %no, %dtype, %zero):
+    graph(%a, %weight, %out_features1, %none, %b, %fc_in_weight, %fc_in_bias, %fc_out_weight, %fc_out_bias, %alpha, %no, %dtype, %zero):
       %r1 = torch_ipex::tpp_linear(%a, %weight, %out_features1)
-      %r2 = torch_ipex::tpp_linear_gelu(%b, %fc_in_weight, %fc_in_bias, %out_features2)
-      %r3 = aten::to(%r2, %idx, %no, %no, %dtype)
+      %r2 = torch_ipex::tpp_linear_gelu(%b, %fc_in_weight, %fc_in_bias, %none)
+      %r3 = aten::to(%r2, %dtype, %no, %no, %none)
       %r4 = aten::contiguous(%r3, %zero)
-      %r5 = torch_ipex::tpp_linear(%r4, %fc_out_weight, %out_features1)
+      %w = torch_ipex::choose_tpp_linear_weight(%r4, %fc_out_weight, %none)
+      %r5 = torch_ipex::tpp_linear(%r4, %w, %out_features1)
       %r6 = aten::add(%r1, %r5, %alpha)
       %r7 = deepspeed_comm::all_reduce(%r6)
       %r = aten::add_(%r7, %fc_out_bias, %alpha)

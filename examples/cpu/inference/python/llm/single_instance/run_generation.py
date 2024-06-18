@@ -130,6 +130,13 @@ parser.add_argument("--batch-size", default=1, type=int, help="batch size")
 parser.add_argument(
     "--token-latency", action="store_true", help="get token latency breakdown"
 )
+parser.add_argument(
+    "--cache-weight-for-large-batch",
+    action="store_true",
+    help="Cache an extra linear weight for large batch inference, such as the first token (prefill phase)."
+    " It brings better performance at the cost of higher memory usage. It is only valid for dtype=bfloat16."
+    " Otherwise, it has no effect.",
+)
 args = parser.parse_args()
 print(args)
 
@@ -273,6 +280,7 @@ if args.ipex:
         dtype=amp_dtype,
         inplace=True,
         deployment_mode=args.deployment_mode,
+        cache_weight_for_large_batch=args.cache_weight_for_large_batch,
     )
 if args.torch_compile:
     if args.deployment_mode:

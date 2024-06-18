@@ -372,7 +372,8 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     c10::optional<int64_t> batch_size,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    bool cache_weight_for_large_batch) {
   auto op_context = torch_ipex::cpu::detail::woq_linear::create(
       weight,
       weight_dtype,
@@ -384,7 +385,8 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
       batch_size,
       group_size,
       lowp_mode,
-      act_quant_mode);
+      act_quant_mode,
+      cache_weight_for_large_batch);
   return c10::make_intrusive<IpexWoqLinearOpContext>(
       batch_size, std::move(op_context));
 }
@@ -430,6 +432,10 @@ c10::optional<at::Tensor> IpexWoqLinearOpContext::get_at_bias() {
 
 c10::optional<at::Tensor> IpexWoqLinearOpContext::get_g_idx() {
   return op_context_.g_idx_;
+}
+
+c10::optional<at::Tensor> IpexWoqLinearOpContext::get_cached_weight() {
+  return op_context_.cached_weight_;
 }
 
 at::Tensor IpexWoqLinearOpContext::get_scales() {

@@ -110,6 +110,14 @@ class WoqLowpMode(IntEnum):
     INT8 = 3
 
 
+WOQ_LOWP_MODE_TO_STR = {
+    WoqLowpMode.NONE: "none",
+    WoqLowpMode.FP16: "fp16",
+    WoqLowpMode.BF16: "bf16",
+    WoqLowpMode.INT8: "int8",
+}
+
+
 class WoqActQuantMode(IntEnum):
     NONE = -1
     PER_TENSOR = 0
@@ -122,6 +130,15 @@ class WoqActQuantMode(IntEnum):
     PER_BATCH_IC_BLOCK_SYM = 7
 
 
+WOQ_ACT_QUANT_MODE_TO_STR = {
+    WoqActQuantMode.NONE: "none",
+    WoqActQuantMode.PER_TENSOR: "per_tensor",
+    WoqActQuantMode.PER_IC_BLOCK: "per_ic_block",
+    WoqActQuantMode.PER_BATCH: "per_batch",
+    WoqActQuantMode.PER_BATCH_IC_BLOCK: "per_batch_ic_block",
+}
+
+
 # Start from 1 to align with kernel
 class WoqWeightDtype(IntEnum):
     INT8 = 1
@@ -129,9 +146,23 @@ class WoqWeightDtype(IntEnum):
     NF4 = 3
 
 
+WOQ_DTYPE_TO_STR = {
+    WoqWeightDtype.INT8: "int8",
+    WoqWeightDtype.INT4: "int4",
+    WoqWeightDtype.NF4: "nf4",
+}
+
+
 QConfigWoq = namedtuple(
     "QConfigWoq",
-    [*QConfig._fields, "lowp_mode", "act_quant_mode", "weight_dtype", "group_size"],
+    [
+        *QConfig._fields,
+        "lowp_mode",
+        "act_quant_mode",
+        "weight_dtype",
+        "group_size",
+        "cache_weight_for_large_batch",
+    ],
 )
 
 
@@ -196,6 +227,10 @@ def get_weight_only_quant_qconfig_mapping(
     assert (
         weight_dtype in valid_values
     ), f"Invalid weight data type for weight only quantization: {weight_dtype}"
+
+    if lowp_mode != WoqLowpMode.INT8:
+        act_quant_mode = WoqActQuantMode.NONE
+
     _weight_only_quant_qconfig = QConfigWoq(
         activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=False),
         weight=PerChannelMinMaxObserver(),
@@ -203,6 +238,7 @@ def get_weight_only_quant_qconfig_mapping(
         act_quant_mode=act_quant_mode,
         weight_dtype=weight_dtype,
         group_size=group_size,
+        cache_weight_for_large_batch=False,
     )
     weight_only_quant_qconfig_mapping = QConfigMapping().set_global(
         _weight_only_quant_qconfig

@@ -25,6 +25,7 @@ def TPPLinear_weight_prepack(m, bk=None, bc=None, layer_dtype=torch.float32):
             [0, 2, 3, 1],
         )
     )
+    m.weight_for_large_batch = None
     layer_use_low_prec = layer_dtype != torch.float32
     if layer_use_low_prec is True and USE_LOW_PREC_PARAMS:
         low_prec_vnni_blocking = get_vnni_blocking(layer_dtype)
@@ -231,9 +232,26 @@ class _IPEXConv3d(_IPEXConvNd):
         super(_IPEXConv3d, self).__init__()
 
 
+torch.library.define(
+    "torch_ipex::choose_tpp_linear_weight",
+    "(Tensor x, Tensor weight, Tensor? weight_for_large_batch) -> Tensor",
+)
+
+
+@torch.library.impl("torch_ipex::choose_tpp_linear_weight", "cpu")
+def choose_tpp_linear_weight(x, weight, weight_for_large_batch):
+    M = x.numel() // x.size(-1)
+    return (
+        weight_for_large_batch
+        if weight_for_large_batch is not None and M >= 256
+        else weight
+    )
+
+
 class _IPEXLinear(_IPEXPrepackModule):
     def __init__(self):
         super(_IPEXLinear, self).__init__()
+        self.weight_for_large_batch = None  # for LLM large batch/first token inference
 
     def maybe_block_params(self):
         self.weight.block()
@@ -262,13 +280,21 @@ class _IPEXLinear(_IPEXPrepackModule):
                 output = torch.nn.functional.linear(x, self.weight, self.bias)
             else:
                 x = x.to(self.weight.dtype).contiguous()
+                weight_for_large_batch = (
+                    self.weight_for_large_batch
+                    if hasattr(self, "weight_for_large_batch")
+                    else None
+                )
+                w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                    x, self.weight, weight_for_large_batch
+                )
                 if self.bias is not None:
                     output = torch.ops.torch_ipex.tpp_linear_bias(
-                        x, self.weight.detach(), self.bias.detach(), self.out_features
+                        x, w.detach(), self.bias.detach(), self.out_features
                     )
                 else:
                     output = torch.ops.torch_ipex.tpp_linear(
-                        x, self.weight.detach(), self.out_features
+                        x, w.detach(), self.out_features
                     )
         else:
             output = torch.ops.torch_ipex.ipex_MKLSGEMM(

@@ -65,7 +65,13 @@ at::Tensor tpp_linear_nobias_kernel_impl(
 at::Tensor tpp_linear_gelu_kernel_impl(
     const at::Tensor& t_in,
     const at::Tensor& t_wt,
-    const at::Tensor& t_bias) {
+    const at::Tensor& t_bias,
+    const c10::string_view& algorithm) {
+  AT_ASSERT(
+      algorithm == "none" || algorithm == "tanh",
+      "tpp_linear_gelu: Invalid gelu algorithm %s\n",
+      algorithm);
+
   auto sizes = t_in.sizes().vec();
   auto wt_sizes = t_wt.sizes();
   sizes[2] = wt_sizes[0] * wt_sizes[3];
@@ -74,9 +80,18 @@ at::Tensor tpp_linear_gelu_kernel_impl(
 
   auto dt = t_wt.dtype();
   if (dt == at::kFloat) {
-    torch_ipex::tpp::tpp_linear_gelu<float>(t_in, t_wt, t_bias, t_out);
+    if (algorithm == "none") {
+      torch_ipex::tpp::tpp_linear_gelu<float>(t_in, t_wt, t_bias, t_out);
+    } else { // tanh
+      torch_ipex::tpp::tpp_linear_gelu_tanh<float>(t_in, t_wt, t_bias, t_out);
+    }
   } else if (dt == at::kBFloat16) {
-    torch_ipex::tpp::tpp_linear_gelu<at::BFloat16>(t_in, t_wt, t_bias, t_out);
+    if (algorithm == "none") {
+      torch_ipex::tpp::tpp_linear_gelu<at::BFloat16>(t_in, t_wt, t_bias, t_out);
+    } else { // tanh
+      torch_ipex::tpp::tpp_linear_gelu_tanh<at::BFloat16>(
+          t_in, t_wt, t_bias, t_out);
+    }
   } else {
     AT_ASSERT(
         0,
@@ -240,6 +255,54 @@ at::Tensor tpp_linear_mul_kernel_impl(
   return t_out;
 }
 
+void tpp_gelu_tanh_bf16_kernel_impl(
+    at::BFloat16* in,
+    at::BFloat16* out,
+    int M,
+    int N,
+    int ldi,
+    int ldo) {
+#ifdef CPU_CAPABILITY_AVX512
+  const __m512 c1 = _mm512_set1_ps((float)0.7978846);
+  const __m512 c2 = _mm512_set1_ps((float)0.0356814);
+  const __m512 c_half = _mm512_set1_ps((float)0.5);
+  for (int j = 0; j < M; j++) {
+    int i;
+    for (i = 0; i < ALIGNDOWN(N, 16); i += 16) {
+      auto vin = torch_ipex::tpp::_mm512_loadu_ps_auto(&in[j * ldi + i]);
+      __m512 x_half = _mm512_mul_ps(vin, c_half);
+      __m512 x_sq = _mm512_mul_ps(vin, vin);
+      __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
+      __m512 tanh_poly_x = LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
+      __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
+      torch_ipex::tpp::_mm512_storeu_ps_auto(&out[j * ldo + i], vout);
+    }
+    if (i < N) {
+      int rem = N - i;
+      __mmask16 mask = (1 << rem) - 1;
+      auto vin =
+          torch_ipex::tpp::_mm512_maskz_loadu_ps_auto(mask, &in[j * ldi + i]);
+      __m512 x_half = _mm512_mul_ps(vin, c_half);
+      __m512 x_sq = _mm512_mul_ps(vin, vin);
+      __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
+      __m512 tanh_poly_x = LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
+      __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
+      torch_ipex::tpp::_mm512_mask_storeu_ps_auto(
+          &out[j * ldo + i], mask, vout);
+    }
+  }
+#else
+  for (int j = 0; j < M; j++) {
+    for (int i = 0; i < N; i++) {
+      float x = in[j * ldi + i];
+      out[j * ldo + i] =
+          ((tanh(sqrt(2 / M_PI) * (x + 0.044715 * std::pow(x, 3)))) + 1) * x *
+          0.5;
+    }
+  }
+#endif
+}
+
 } // namespace
 
 IPEX_REGISTER_DISPATCH(
@@ -265,6 +328,9 @@ IPEX_REGISTER_DISPATCH(tpp_linear_add_kernel_stub, &tpp_linear_add_kernel_impl);
 IPEX_REGISTER_DISPATCH(
     tpp_linear_add_add_kernel_stub,
     &tpp_linear_add_add_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    tpp_gelu_tanh_bf16_kernel_stub,
+    &tpp_gelu_tanh_bf16_kernel_impl);
 } // namespace cpu
 } // namespace torch_ipex
 #endif

@@ -92,6 +92,13 @@ parser.add_argument(
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
 )
+parser.add_argument(
+    "--cache-weight-for-large-batch",
+    action="store_true",
+    help="Cache an extra linear weight for large batch inference, such as the first token (prefill phase)."
+    " It brings better performance at the cost of higher memory usage. It is only valid for full bf16 path"
+    " and weight-only quantization with lowp-mode=BF16. Otherwise, it has no effect.",
+)
 
 args = parser.parse_args()
 
@@ -239,6 +246,7 @@ class HuggingFaceModel(BaseLM):
                 dtype=infer_dtype,
                 inplace=True,
                 deployment_mode=False,
+                cache_weight_for_large_batch=args.cache_weight_for_large_batch,
             )
 
         if args.torch_compile:
@@ -896,6 +904,7 @@ class LMMS(lmms):
                 dtype=infer_dtype,
                 inplace=True,
                 deployment_mode=False,
+                cache_weight_for_large_batch=args.cache_weight_for_large_batch,
             )
 
         if args.torch_compile:
@@ -1424,6 +1433,7 @@ class LibriSpeech:
                 dtype=infer_dtype,
                 inplace=True,
                 deployment_mode=False,
+                cache_weight_for_large_batch=args.cache_weight_for_large_batch,
             )
 
         if args.torch_compile:

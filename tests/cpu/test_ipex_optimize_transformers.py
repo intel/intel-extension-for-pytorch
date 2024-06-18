@@ -30,8 +30,8 @@ torch.manual_seed(128)
 curpath = os.path.abspath(os.path.dirname(__file__))
 
 
-def _get_gptj_example_inputs():
-    input_ids = torch.ones(8).to(torch.long)
+def _get_gptj_example_inputs(batch_size=8):
+    input_ids = torch.ones(batch_size).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
     past_key_values = tuple(
@@ -249,6 +249,50 @@ class OptimizeTransformersTester(TestCase):
         m = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
         self._model_replacement_check_woq(m)
 
+    def test_weight_only_quant_cache_weight_for_large_batch(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptj", return_dict=False
+        )
+        model = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+
+        for weight_dtype in [
+            ipex.quantization.WoqWeightDtype.INT8,
+            ipex.quantization.WoqWeightDtype.INT4,
+            ipex.quantization.WoqWeightDtype.NF4,
+        ]:
+            qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=weight_dtype,
+                lowp_mode=ipex.quantization.WoqLowpMode.BF16,
+            )
+            model_ref = ipex.llm.optimize(
+                copy.deepcopy(model),
+                dtype=torch.bfloat16,
+                quantization_config=qconfig_mapping,
+                deployment_mode=True,
+                cache_weight_for_large_batch=False,
+            )
+            model = ipex.llm.optimize(
+                model,
+                dtype=torch.bfloat16,
+                quantization_config=qconfig_mapping,
+                deployment_mode=True,
+                cache_weight_for_large_batch=True,
+            )
+            linear_list = [
+                model.transformer.h[0].attn.concat_qkv.concat_linear,
+                model.transformer.h[0].attn.out_proj,
+                model.transformer.h[0].linear_add_add.linear,
+                model.transformer.h[0].linear_gelu.linear,
+            ]
+            with torch.no_grad(), torch.cpu.amp.autocast(enabled=True):
+                example_inputs = _get_gptj_example_inputs(batch_size=128)
+                y = model(*example_inputs)
+                y_ref = model_ref(*example_inputs)
+                assert all(
+                    l._op_context.get_cached_weight() is not None for l in linear_list
+                )
+                self.assertEqual(y[0], y_ref[0], prec=5e-2)
+
     def test_static_quant_flow(self):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
@@ -450,6 +494,38 @@ class OptimizeTransformersTester(TestCase):
                 ipex_res = ipex_m.generate(input_ids, **generate_kwargs)
                 ref_res = ref_m.generate(input_ids, **generate_kwargs)
                 self.assertEqual(ipex_res, ref_res)
+
+    def test_cache_weight_for_large_batch(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptj", return_dict=False
+        )
+        model = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+        model_ref = ipex.llm.optimize(
+            copy.deepcopy(model),
+            dtype=torch.bfloat16,
+            deployment_mode=True,
+            cache_weight_for_large_batch=False,
+        )
+
+        model = ipex.llm.optimize(
+            model,
+            dtype=torch.bfloat16,
+            deployment_mode=True,
+            cache_weight_for_large_batch=True,
+        )
+        linear_list = [
+            model.transformer.h[0].attn.concat_qkv.concat_linear,
+            model.transformer.h[0].attn.out_proj,
+            model.transformer.h[0].linear_add_add.linear,
+            model.transformer.h[0].linear_gelu.linear,
+        ]
+        with torch.no_grad(), torch.cpu.amp.autocast(enabled=True):
+            example_inputs = _get_gptj_example_inputs(batch_size=512)
+            y = model(*example_inputs)
+            y_ref = model_ref(*example_inputs)
+            assert all(hasattr(l, "weight_for_large_batch") for l in linear_list)
+            assert all(l.weight_for_large_batch is not None for l in linear_list)
+            self.assertEqual(y[0], y_ref[0])
 
 
 if __name__ == "__main__":

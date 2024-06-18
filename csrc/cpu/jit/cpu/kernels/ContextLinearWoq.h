@@ -25,6 +25,8 @@ struct ContextLinearWoq final {
   int64_t group_size_;
   int64_t lowp_mode_;
   int64_t act_quant_mode_;
+  bool cache_weight_for_large_batch_ = false;
+  c10::optional<at::Tensor> cached_weight_ = c10::nullopt;
 
   ContextLinearWoq() = delete;
 
@@ -38,7 +40,8 @@ struct ContextLinearWoq final {
       c10::optional<at::Tensor>&& g_idx,
       int64_t group_size = -1,
       int64_t lowp_mode = 0,
-      int64_t act_quant_mode = 0)
+      int64_t act_quant_mode = 0,
+      bool cache_weight_for_large_batch = false)
       : at_weight_(std::move(at_weight)),
         weight_dtype_(weight_dtype),
         weight_shape_(std::move(weight_shape)),
@@ -46,7 +49,8 @@ struct ContextLinearWoq final {
         g_idx_(std::move(g_idx)),
         group_size_(group_size),
         lowp_mode_(lowp_mode),
-        act_quant_mode_(act_quant_mode) {
+        act_quant_mode_(act_quant_mode),
+        cache_weight_for_large_batch_(cache_weight_for_large_batch) {
     is_4bit_ =
         (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4);
     // Make three dtype versions of scale, zp and bias

@@ -196,6 +196,13 @@ parser.add_argument(
     " HuggingFace Optimum format for backward compatibility. It must be used with"
     " --low-precision-checkpoint. Otherwise, it has no effect.",
 )
+parser.add_argument(
+    "--cache-weight-for-large-batch",
+    action="store_true",
+    help="Cache an extra linear weight for large batch inference, such as the first token (prefill phase)."
+    " It brings better performance at the cost of higher memory usage. It is only valid for full bf16 path"
+    " and weight-only quantization with lowp-mode=BF16. Otherwise, it has no effect.",
+)
 args = parser.parse_args()
 print(args)
 
@@ -322,6 +329,7 @@ if args.ipex:
         dtype=amp_dtype,
         inplace=True,
         deployment_mode=args.deployment_mode,
+        cache_weight_for_large_batch=args.cache_weight_for_large_batch,
     )
 elif args.ipex_weight_only_quantization:
     from intel_extension_for_pytorch.quantization import WoqWeightDtype
@@ -375,6 +383,7 @@ elif args.ipex_weight_only_quantization:
         dtype=amp_dtype,
         quantization_config=qconfig,
         inplace=True,
+        cache_weight_for_large_batch=args.cache_weight_for_large_batch,
     )
 
 if args.torch_compile:

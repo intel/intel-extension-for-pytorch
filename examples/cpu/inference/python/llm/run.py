@@ -210,6 +210,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
         " automatically, -1 for INT8 and 128 for INT4. If --low-precision-checkpoint is given, this parameter is "
         "overwritten by data in the checkpoint file.",
     )
+    parser.add_argument(
+        "--cache-weight-for-large-batch",
+        action="store_true",
+        help="Cache an extra linear weight for large batch inference, such as the first token (prefill phase)."
+        " It brings better performance at the cost of higher memory usage. It is only valid for full bf16 path"
+        " and weight-only quantization with lowp-mode=BF16. Otherwise, it has no effect.",
+    )
 
     # inference related arguments.
     parser.add_argument(
@@ -298,6 +305,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--config-file", str(args.config_file)])
             if args.image_url is not None:
                 infer_cmd.extend(["--image-url", str(args.image_url)])
+            if args.cache_weight_for_large_batch:
+                infer_cmd.extend(["--cache-weight-for-large-batch"])
             if args.audio is not None:
                 infer_cmd.extend(["--audio", str(args.audio)])
 
@@ -400,6 +409,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
             if args.prompt is not None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
 
+            if args.cache_weight_for_large_batch:
+                infer_cmd.extend(["--cache-weight-for-large-batch"])
+
             print("LLM RUNTIME INFO: quantizing model ...")
             result = subprocess.run(infer_cmd)
             if result.returncode != 0:
@@ -429,6 +441,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--greedy"])
                 if args.image_url is not None:
                     quant_cmd.extend(["--image-url", str(args.image_url)])
+                if args.cache_weight_for_large_batch:
+                    quant_cmd.extend(["--cache-weight-for-large-batch"])
                 if args.audio is not None:
                     quant_cmd.extend(["--audio", str(args.audio)])
                 if args.ipex_weight_only_quantization:
@@ -686,6 +700,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--group-size", str(group_size)])
             if args.quant_with_amp:
                 infer_cmd.extend(["--quant-with-amp"])
+        if args.cache_weight_for_large_batch:
+            infer_cmd.extend(["--cache-weight-for-large-batch"])
 
         print("LLM RUNTIME INFO: running model geneartion with deepspeed (autotp)...")
         result = subprocess.run(infer_cmd)

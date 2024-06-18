@@ -9,6 +9,7 @@
 #include <libxsmm_intrinsics_x86.h>
 #include <string>
 #include <unordered_map>
+#include "csrc/cpu/aten/TPPGEMM.h"
 
 namespace torch_ipex {
 namespace tpp {
@@ -2203,43 +2204,50 @@ class GeluTanhFwdTPP {
       : M(M), N(N), ldi(ldi), ldo(ldo) {}
 
   void operator()(Tin* in, Tout* out) {
+    if constexpr (
+        std::is_same<Tin, bfloat16>() && std::is_same<Tout, bfloat16>()) {
+      torch_ipex::cpu::tpp_gelu_tanh_bf16_forward_cpu(in, out, M, N, ldi, ldo);
+    } else {
 #ifdef __AVX512F__
-    const __m512 c1 = _mm512_set1_ps((float)0.7978846);
-    const __m512 c2 = _mm512_set1_ps((float)0.0356814);
-    const __m512 c_half = _mm512_set1_ps((float)0.5);
-    for (int j = 0; j < M; j++) {
-      int i;
-      for (i = 0; i < ALIGNDOWN(N, 16); i += 16) {
-        auto vin = _mm512_loadu_ps_auto(&in[j * ldi + i]);
-        __m512 x_half = _mm512_mul_ps(vin, c_half);
-        __m512 x_sq = _mm512_mul_ps(vin, vin);
-        __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
-        __m512 tanh_poly_x = LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
-        __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
-        _mm512_storeu_ps_auto(&out[j * ldo + i], vout);
+      const __m512 c1 = _mm512_set1_ps((float)0.7978846);
+      const __m512 c2 = _mm512_set1_ps((float)0.0356814);
+      const __m512 c_half = _mm512_set1_ps((float)0.5);
+      for (int j = 0; j < M; j++) {
+        int i;
+        for (i = 0; i < ALIGNDOWN(N, 16); i += 16) {
+          auto vin = _mm512_loadu_ps_auto(&in[j * ldi + i]);
+          __m512 x_half = _mm512_mul_ps(vin, c_half);
+          __m512 x_sq = _mm512_mul_ps(vin, vin);
+          __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
+          __m512 tanh_poly_x =
+              LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
+          __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
+          _mm512_storeu_ps_auto(&out[j * ldo + i], vout);
+        }
+        if (i < N) {
+          int rem = N - i;
+          __mmask16 mask = (1 << rem) - 1;
+          auto vin = _mm512_maskz_loadu_ps_auto(mask, &in[j * ldi + i]);
+          __m512 x_half = _mm512_mul_ps(vin, c_half);
+          __m512 x_sq = _mm512_mul_ps(vin, vin);
+          __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
+          __m512 tanh_poly_x =
+              LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
+          __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
+          _mm512_mask_storeu_ps_auto(&out[j * ldo + i], mask, vout);
+        }
       }
-      if (i < N) {
-        int rem = N - i;
-        __mmask16 mask = (1 << rem) - 1;
-        auto vin = _mm512_maskz_loadu_ps_auto(mask, &in[j * ldi + i]);
-        __m512 x_half = _mm512_mul_ps(vin, c_half);
-        __m512 x_sq = _mm512_mul_ps(vin, vin);
-        __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
-        __m512 tanh_poly_x = LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
-        __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
-        _mm512_mask_storeu_ps_auto(&out[j * ldo + i], mask, vout);
-      }
-    }
 #else
-    for (int j = 0; j < M; j++) {
-      for (int i = 0; i < N; i++) {
-        float x = in[j * ldi + i];
-        out[j * ldo + i] =
-            ((tanh(sqrt(2 / M_PI) * (x + 0.044715 * std::pow(x, 3)))) + 1) * x *
-            0.5;
+      for (int j = 0; j < M; j++) {
+        for (int i = 0; i < N; i++) {
+          float x = in[j * ldi + i];
+          out[j * ldo + i] =
+              ((tanh(sqrt(2 / M_PI) * (x + 0.044715 * std::pow(x, 3)))) + 1) *
+              x * 0.5;
+        }
       }
-    }
 #endif
+    }
   }
 
   void ref(Tin* in, Tout* out) {

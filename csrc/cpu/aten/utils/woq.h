@@ -126,6 +126,138 @@ DotMicroKernelRef<BLOCK_M, BLOCK_N, BLOCK_K> create_or_get_dot_microkernel(
   }
 }
 } // namespace
+
+static constexpr std::array<float, 16> NF4_QUANT_TABLE = {
+    -1.0 - 1e-2, // 0b0000
+    -0.8480964004993439, // 0b0001
+    -0.6106329262256622, // 0b0010
+    -0.4599952697753906, // 0b0011
+    -0.33967943489551544, // 0b0100
+    -0.23460740596055984, // 0b0101
+    -0.13791173323988914, // 0b0110
+    -0.045525018125772476, // 0b0111
+    0.03979014977812767, // 0b1000
+    0.1202552504837513, // 0b1001
+    0.2035212516784668, // 0b1010
+    0.2920137718319893, // 0b1011
+    0.3893125355243683, // 0b1100
+    0.5016634166240692, // 0b1101
+    0.6427869200706482, // 0b1110
+    0.8614784181118011, // 0b1111
+};
+
+static constexpr std::array<float, 16> NF4_DEQUANT_TABLE = {
+    -1.0,
+    -0.6961928009986877,
+    -0.5250730514526367,
+    -0.39491748809814453,
+    -0.28444138169288635,
+    -0.18477343022823334,
+    -0.09105003625154495,
+    0.0,
+    0.07958029955625534,
+    0.16093020141124725,
+    0.24611230194568634,
+    0.33791524171829224,
+    0.44070982933044434,
+    0.5626170039176941,
+    0.7229568362236023,
+    1.0,
+};
+
+static at::Tensor map_float_tensor_to_nf4(const at::Tensor& t) {
+  // Map [-1, 1] to nf4. Assume t in [-1, 1]
+  // Logic:
+  // for i in range(len(NF4_QUANT_TABLE)):
+  //     out_uint8[t > NF4_QUANT_TABLE[i]] = i
+  using namespace at::indexing;
+  auto out_uint8 = at::empty(t.sizes(), t.options().dtype(at::kByte));
+  for (size_t i = 0; i < NF4_QUANT_TABLE.size(); ++i) {
+    out_uint8.index_put_({t.greater(NF4_QUANT_TABLE[i])}, i);
+  }
+  return out_uint8;
+}
+
+static at::Tensor map_nf4_tensor_to_float(const at::Tensor& t) {
+  // Map nf4 to [-1, 1], t is already unpacked as uint8
+  // Logic:
+  // for i in range(len(NF4_DEQUANT_TABLE)):
+  //     out_dq[t == i] = NF4_DEQUANT_TABLE[i]
+  using namespace at::indexing;
+  auto out_dq = at::empty(t.sizes(), t.options().dtype(at::kFloat));
+  for (size_t i = 0; i < NF4_DEQUANT_TABLE.size(); ++i) {
+    out_dq.index_put_({t.eq(i)}, NF4_DEQUANT_TABLE[i]);
+  }
+  return out_dq;
+}
+
+#define WOQ_DTYPE_INT8 1
+#define WOQ_DTYPE_INT4 2
+#define WOQ_DTYPE_NF4 3
+
+static at::Tensor dequantize_woq_weight(
+    const at::Tensor& qw,
+    const std::vector<int64_t>& weight_shape,
+    const at::Tensor& scale,
+    const at::Tensor& zp,
+    int64_t qw_type, // weight dtype
+    int64_t quant_w_mode // weight quant mode
+) {
+  bool sym_quant = qw_type == WOQ_DTYPE_NF4;
+  TORCH_CHECK(qw.dim() == 2, "Weight must 2D but got ", qw.dim(), "D");
+  auto N = weight_shape[0];
+  auto K = weight_shape[1];
+  at::Tensor dqw;
+  if (qw_type == WOQ_DTYPE_NF4) {
+    TORCH_CHECK(sym_quant, "Weight must be symmetrically quantized for NF4");
+    using namespace at::indexing;
+    auto w_int8 = at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
+    w_int8.index({Slice(), Slice(None, None, 2)}).copy_(qw.bitwise_and(0xf));
+    w_int8.index({Slice(), Slice(1, None, 2)}).copy_(qw.bitwise_right_shift(4));
+    auto w_ret = map_nf4_tensor_to_float(w_int8);
+    if (quant_w_mode == 0) {
+      dqw = w_ret * scale;
+    } else {
+      int64_t num_blocks = scale.size(-2);
+      auto w_int8_view = w_ret.view({N, num_blocks, -1});
+      dqw = w_int8_view * scale;
+      dqw = dqw.view({N, -1});
+    }
+  } else if (qw_type == WOQ_DTYPE_INT4) {
+    TORCH_CHECK(!sym_quant, "Weight must be asymmetrically quantized for INT4");
+    using namespace at::indexing;
+    auto w_int8 = at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
+    w_int8.index({Slice(), Slice(None, None, 2)}).copy_(qw.bitwise_and(0xf));
+    w_int8.index({Slice(), Slice(1, None, 2)}).copy_(qw.bitwise_right_shift(4));
+    if (quant_w_mode == 0) {
+      dqw = (w_int8.to(at::kFloat) - zp) * scale;
+    } else {
+      int64_t num_blocks = scale.size(-2);
+      auto w_int8_view = w_int8.view({N, num_blocks, -1});
+      dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
+      dqw = dqw.view({N, -1});
+    }
+  } else {
+    TORCH_CHECK(!sym_quant, "Weight must be asymmetrically quantized for INT8");
+    if (quant_w_mode == 0) {
+      dqw = sym_quant ? qw.to(at::kFloat) * scale
+                      : (qw.to(at::kFloat) - zp) * scale;
+    } else {
+      int64_t num_blocks = scale.size(-2);
+      auto w_int8_view = qw.view({N, num_blocks, -1});
+      dqw = sym_quant ? w_int8_view.to(at::kFloat) * scale
+                      : (w_int8_view.to(at::kFloat) - zp) * scale;
+      dqw = dqw.view({N, -1});
+    }
+  }
+  if (K != qw.size(1) * 2) {
+    TORCH_CHECK(
+        K < qw.size(1) * 2, 'WOQ Linear kernel: Unexpected weight shape');
+    dqw = dqw.narrow(1, 0, K);
+  }
+  return dqw;
+}
+
 } // namespace cpu
 } // namespace torch_ipex
 

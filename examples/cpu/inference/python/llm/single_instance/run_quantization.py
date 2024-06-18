@@ -245,6 +245,13 @@ parser.add_argument(
     " HuggingFace Optimum format for backward compatibility. It must be used with"
     " --low-precision-checkpoint. Otherwise, it has no effect.",
 )
+parser.add_argument(
+    "--cache-weight-for-large-batch",
+    action="store_true",
+    help="Cache an extra linear weight for large batch inference, such as the first token (prefill phase)."
+    " It brings better performance at the cost of higher memory usage. It is only valid for weight-only"
+    " quantization with lowp-mode=BF16. Otherwise, it has no effect.",
+)
 args = parser.parse_args()
 
 
@@ -1028,6 +1035,7 @@ elif args.ipex_weight_only_quantization:
         inplace=True,
         low_precision_checkpoint=low_precision_checkpoint,
         deployment_mode=False,
+        cache_weight_for_large_batch=args.cache_weight_for_large_batch,
     )
     example_inputs = get_example_inputs(model)
     with torch.no_grad(), torch.cpu.amp.autocast(
