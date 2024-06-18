@@ -250,7 +250,7 @@ def varlen_attention(
 
 def silu_mul(x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None):
     r"""
-    Applies PyTorch silu on input x, and them mul input y:
+    Applies PyTorch silu on input x, and mul input y:
     out = silu(x)*y
 
     Args:
@@ -267,7 +267,7 @@ def gelu_mul(
     x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None, approximate="none"
 ):
     r"""
-    Applies PyTorch gelu on input x, and them mul input y:
+    Applies PyTorch gelu on input x, and mul input y:
     out = gelu(x)*y
 
     Args:

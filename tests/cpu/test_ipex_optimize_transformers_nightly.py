@@ -138,6 +138,13 @@ supported_models = [
         lambda m: m.transformer.h[0].__class__,
     ),
     model_info(
+        "qwen2",
+        transformers.models.qwen2.modeling_qwen2.Qwen2ForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
         "git",
         transformers.models.git.modeling_git.GitForCausalLM,
         False,

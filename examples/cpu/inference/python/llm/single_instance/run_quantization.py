@@ -33,6 +33,7 @@ from llm.utils.model_class.mixtral import MixtralConfig
 from llm.utils.model_class.mpt import MPTConfig
 from llm.utils.model_class.stablelm import StableLMConfig
 from llm.utils.model_class.qwen import QwenConfig
+from llm.utils.model_class.qwen2 import Qwen2Config
 from llm.utils.model_class.git import GitConfig
 from llm.utils.model_class.llava import LlavaConfig
 from llm.utils.model_class.phi import PhiConfig
@@ -317,7 +318,10 @@ elif re.search("mixtral", config.architectures[0], re.IGNORECASE):
 elif re.search("stablelm", config.architectures[0], re.IGNORECASE):
     model = StableLMConfig(args.model_id)
 elif re.search("qwen", config.architectures[0], re.IGNORECASE):
-    model = QwenConfig(args.model_id)
+    if re.search("qwen2", config.architectures[0], re.IGNORECASE):
+        model = Qwen2Config(args.model_id)
+    else:
+        model = QwenConfig(args.model_id)
 elif re.search("git", config.architectures[0], re.IGNORECASE):
     from PIL import Image
     import requests

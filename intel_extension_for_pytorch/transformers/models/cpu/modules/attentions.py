@@ -66,6 +66,7 @@ class _IPEXAttentionCPU(nn.Module):
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "PhiForCausalLM",
+            "Qwen2ForCausalLM",
         ]:
             if hasattr(module, "concat_qkv"):
                 self.concat_qkv = _IPEXConcatLinearCPU(

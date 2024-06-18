@@ -194,6 +194,7 @@ def _beam_search(
             "PhiForCausalLM",
             "Phi3ForCausalLM",
             "WhisperForConditionalGeneration",
+            "Qwen2ForCausalLM",
         ]:
             first_token = False
             has_position_id = model_inputs.get("position_ids", None) is not None

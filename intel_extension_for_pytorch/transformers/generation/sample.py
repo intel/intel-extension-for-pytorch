@@ -181,6 +181,7 @@ def _sample(
             "PhiForCausalLM",
             "Phi3ForCausalLM",
             "WhisperForConditionalGeneration",
+            "Qwen2ForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
