@@ -126,7 +126,7 @@ if defined CONDA_PREFIX (
      set "CMAKE_PREFIX_PATH=%VIRTUAL_ENV%"
 )
 set "CMAKE_INCLUDE_PATH=%CONDA_PREFIX%\Library\include"
-set "LIB=%CONDA_PREFIX%\Library\lib;%LIB%"
+set "LIB=%LIB%;%CONDA_PREFIX%\Library\lib"
 set "USE_NUMA=0"
 set "USE_CUDA=0"
 python setup.py clean
@@ -134,7 +134,6 @@ python setup.py bdist_wheel
 
 set "USE_CUDA="
 set "USE_NUMA="
-set "LIB="
 set "CMAKE_INCLUDE_PATH="
 set "CMAKE_PREFIX_PATH="
 call conda remove mkl-static mkl-include -y
