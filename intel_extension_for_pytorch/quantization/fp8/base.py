@@ -4,11 +4,8 @@ from contextlib import contextmanager
 import torch.nn.functional as F
 import intel_extension_for_pytorch._isa_help as ipex
 from .fp8 import (
-    is_fp8_enabled,
-    is_fp8_calibration,
     get_default_fp8_recipe,
-    get_fp8_recipe,
-    get_fp8_device_type,
+    FP8GlobalStateManager,
     amax_and_scale_update,
 )
 
@@ -74,16 +71,19 @@ class Fp8BaseModule(torch.nn.Module):
 
     def fp8_init(self, num_gemms: int = 1, device="xpu") -> None:
         """Initialize fp8 related metadata and tensors during fprop."""
-        self.fp8 = is_fp8_enabled()
-        self.fp8_calibration = is_fp8_calibration()
+        self.fp8 = FP8GlobalStateManager.is_fp8_enabled()
+        self.fp8_calibration = FP8GlobalStateManager.is_fp8_calibration()
 
         if self.fp8 or self.fp8_calibration:
             # FP8 init has already been run and recipe is the same, don't do anything.
-            if self.fp8_initialized and get_fp8_recipe() == self.fp8_meta["recipe"]:
+            if (
+                self.fp8_initialized
+                and FP8GlobalStateManager.get_fp8_recipe() == self.fp8_meta["recipe"]
+            ):
                 return
 
             # Set FP8, recipe, and other FP8 metadata
-            self.fp8_meta["recipe"] = get_fp8_recipe()
+            self.fp8_meta["recipe"] = FP8GlobalStateManager.get_fp8_recipe()
             self.fp8_meta["num_gemms"] = num_gemms
 
             # Set FP8_MAX per tensor according to recipe
@@ -143,7 +143,9 @@ class Fp8BaseModule(torch.nn.Module):
 
         if isinstance(state, io.BytesIO):
             state.seek(0)
-            state = torch.load(state, map_location=get_fp8_device_type())
+            state = torch.load(
+                state, map_location=FP8GlobalStateManager.get_fp8_device_type()
+            )
         else:
             raise RuntimeError("Unsupported checkpoint format.")
 
@@ -155,7 +157,7 @@ class Fp8BaseModule(torch.nn.Module):
         self.fp8_meta["recipe"].amax_history_len = state["amax_history_fwd"].shape[0]
 
         # Initialize before loading.
-        self.init_fp8_meta_tensors(get_fp8_device_type())
+        self.init_fp8_meta_tensors(FP8GlobalStateManager.get_fp8_device_type())
         self.fp8_initialized = True
         self.fp8_meta["scaling_fwd"].scale.copy_(state["scale_fwd"])
         self.fp8_meta["scaling_fwd"].amax_history.copy_(state["amax_history_fwd"])

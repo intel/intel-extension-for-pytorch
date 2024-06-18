@@ -12,7 +12,6 @@ import intel_extension_for_pytorch._isa_help as ipex
 from .base import Fp8BaseModule, prepare_backward
 from intel_extension_for_pytorch.quantization.fp8.fp8 import (
     get_fp8_dtype,
-    get_fp8_device_type,
 )
 
 
@@ -330,7 +329,6 @@ class FP8Linear(Fp8BaseModule):
         params_dtype = (
             torch.get_default_dtype() if params_dtype is None else params_dtype
         )
-        device = get_fp8_device_type()
         self.in_features = in_features
         self.out_features = out_features
         self.use_bias = bias

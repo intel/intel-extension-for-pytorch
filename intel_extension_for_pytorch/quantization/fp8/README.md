@@ -41,12 +41,12 @@ Use `prepare_fp8` to convert modules to FP8 modules (e.g, convert `nn.Linear` to
 fp8_model = prepare_fp8(model)
 ```
 
-#### Perform Calibration
+# Perform Calibration
 
-FP8 calibration is performed in FP32 mode, by using `fp8_autocast` with `enabled=False` and `calibrating=True`. It allows collecting statistics such as a max and scale data of FP8 tensors without FP8 enabled.
+FP8 calibration is performed in FP32 mode, by using `fp8_autocast` with `enabled = False` and `calibrating = True`. It allows collecting statistics such as a max and scale data of FP8 tensors without FP8 enabled.
 
 ```python
-with fp8_autocast(enabled=False, calibrating=True, fp8_recipe=DelayedScaling(fp8_format=Format.E4M3), device="cpu"):
+with fp8_autocast(enabled=False, calibrating=True, fp8_recipe=DelayedScaling(fp8_format=Format.E4M3)):
     output = fp8_model(input)
 ```
 
@@ -56,7 +56,7 @@ Then use `fp8_model.state_dict()` to save FP8 model. FP8 related information is 
 torch.save(fp8_model.state_dict(), "fp8_model.pt")
 ```
 
-#### Load and Run FP8 Model
+# Load and Run FP8 Model
 
 Use `model.load_state_dict()` to load FP8 model for inference. FP8 related information is loaded by `set_extra_state`, which will be called in `load_state_dict()`.
 
@@ -69,27 +69,27 @@ fp8_model_with_calibration.eval()
 Use context manager `fp8_autocast` to run FP8 model:
 
 ```python
-with fp8_autocast(enabled=True, calibrating=False, fp8_recipe=DelayedScaling(fp8_format=Format.E4M3), device="cpu"):
+with fp8_autocast(enabled=True, calibrating=False, fp8_recipe=DelayedScaling(fp8_format=Format.E4M3)):
     output = fp8_model_with_calibration(input)
 ```
 
-### Training
+# Training
 
-#### Convert Model
+# Convert Model
 
-Use `prepare_fp8` to convert modules to FP8 modules (e.g, convert `nn.Linear` to `FP8Linear`) in the model:
+Use `prepare_fp8` to convert modules to FP8 modules(e.g, convert `nn.Linear` to `FP8Linear`) in the model:
 
 ```python
 fp8_model, ipex_optimizer = prepare_fp8(model, optimizer)
 ```
 
-#### Run FP8 Model
+# Run FP8 Model
 
 Use context manager `fp8_autocast` to run FP8 model:
 
 ```python
 fp8_model.train()
-with fp8_autocast(enabled=True, fp8_recipe=DelayedScaling(fp8_format=Format.E4M3), device="cpu"):
+with fp8_autocast(enabled=True, fp8_recipe=DelayedScaling(fp8_format=Format.E4M3)):
     out = fp8_model(input)
     ipex_optimizer.zero_grad()
     out.mean().backward()

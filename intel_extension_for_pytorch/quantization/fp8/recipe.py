@@ -39,3 +39,14 @@ class DelayedScaling:
     fp8_format: Format = Format.HYBRID
     amax_history_len: int = 1024
     amax_compute_algo: Literal["max", "most_recent"] = "max"
+    override_linear_precision: Optional[Callable] = None
+    scaling_factor_compute_algo: Optional[Callable] = None
+    reduce_amax: Optional[Callable] = False
+
+    def __post_init__(self) -> None:
+        assert (
+            self.override_linear_precision is None
+        ), "override_linear_precision is not supported, will support when enable distributed running."
+        assert (
+            self.reduce_amax is False
+        ), "reduce_amax is not supported at present, will support when enable distributed running."

@@ -248,6 +248,26 @@ at::Tensor cast_to_fp8(
   return output;
 }
 
+at::Tensor cast_to_fp8_out(
+    const at::Tensor& input_,
+    const at::Tensor& scale,
+    at::Tensor output,
+    at::Tensor& amax,
+    at::Tensor& scale_inv,
+    int64_t fp8_tensor,
+    int64_t otype) {
+  at::ScalarType out_type = convert_to_dtype(otype);
+  auto input = input_.is_contiguous() ? input_ : input_.contiguous();
+  fp8_quantize_op(
+      input,
+      output,
+      otype,
+      amax[fp8_tensor].data_ptr<float>(),
+      scale[fp8_tensor].data_ptr<float>(),
+      scale_inv[fp8_tensor].data_ptr<float>());
+  return output;
+}
+
 at::Tensor cast_from_fp8(
     at::Tensor& input_,
     at::Tensor& scale_inv,
