@@ -209,8 +209,25 @@ void FuseRMSNorm(std::shared_ptr<Graph>& graph) {
       graph(%hidden_states, %weight, %exponent:int, %dim:int[], %keepdim:bool, %dtype:NoneType, %eps:float, %alpha:int):
         %r = ipex::RMSNorm(%hidden_states, %weight, %eps)
         return (%r) )";
-  SubgraphRewriter rewriter_aten;
+  std::string aten_RMSNorm_v2 = R"(
+      graph(%hidden_states, %weight, %exponent:int, %dim:int[], %keepdim:bool, %dtype:NoneType, %eps:float, %alpha:int, %idx, %idx2, %no):
+        %h2 = aten::to(%hidden_states, %idx, %no, %no, %dtype)
+        %s = aten::pow(%h2, %exponent)
+        %v = aten::mean(%s, %dim, %keepdim, %dtype)
+        %m = aten::add(%v, %eps, %alpha)
+        %n = aten::rsqrt(%m)
+        %l = aten::mul(%h2, %n)
+        %r1 = aten::mul(%weight, %l)
+        %r = aten::to(%r1, %idx2, %no, %no, %dtype)
+        return (%r) )";
+  std::string fused_RMSNorm_v2 = R"(
+      graph(%hidden_states, %weight, %exponent:int, %dim:int[], %keepdim:bool, %dtype:NoneType, %eps:float, %alpha:int, %idx, %idx2, %no):
+        %r = ipex::RMSNorm(%hidden_states, %weight, %eps)
+        return (%r) )";
+  SubgraphRewriter rewriter_aten, rewriter_aten_v2;
+  rewriter_aten_v2.RegisterRewritePattern(aten_RMSNorm_v2, fused_RMSNorm_v2);
   rewriter_aten.RegisterRewritePattern(aten_RMSNorm, fused_RMSNorm);
+  rewriter_aten_v2.runOnGraph(graph);
   rewriter_aten.runOnGraph(graph);
 }
 

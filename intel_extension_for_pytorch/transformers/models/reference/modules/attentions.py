@@ -825,72 +825,63 @@ def _GLM2Attention_forward(
     # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)]
     mixed_x_layer = self.query_key_value(hidden_states)
     mixed_x_layer = mixed_x_layer.transpose(0, 1)
-
-    if self.multi_query_attention:
-        (query_layer, key_layer, value_layer) = mixed_x_layer.split(
-            [
-                self.num_attention_heads_per_partition
-                * self.hidden_size_per_attention_head,
-                self.num_multi_query_groups_per_partition
-                * self.hidden_size_per_attention_head,
-                self.num_multi_query_groups_per_partition
-                * self.hidden_size_per_attention_head,
-            ],
-            dim=-1,
-        )
-        query_layer = query_layer.view(
-            query_layer.size()[:-1]
-            + (
-                self.num_attention_heads_per_partition,
-                self.hidden_size_per_attention_head,
-            )
-        )
-        key_layer = key_layer.view(
-            key_layer.size()[:-1]
-            + (
-                self.num_multi_query_groups_per_partition,
-                self.hidden_size_per_attention_head,
-            )
-        )
-        value_layer = value_layer.view(
-            value_layer.size()[:-1]
-            + (
-                self.num_multi_query_groups_per_partition,
-                self.hidden_size_per_attention_head,
-            )
-        )
-    else:
-        new_tensor_shape = mixed_x_layer.size()[:-1] + (
-            self.num_attention_heads_per_partition,
-            3 * self.hidden_size_per_attention_head,
-        )
-        mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
-
-        # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
-        (query_layer, key_layer, value_layer) = self.split_tensor_along_last_dim(
-            mixed_x_layer, 3
-        )
     past_len = kv_cache[0].shape[-2] if kv_cache is not None else 0
     # apply relative positional encoding (rotary embedding)
     if rotary_pos_emb is not None:
-        query_layer = query_layer.contiguous()
-        key_layer = key_layer.contiguous()
-        key_layer = self._IPEXROPE(
-            key_layer,
+        query_layer, key_layer, value_layer = self._IPEXROPE(
+            mixed_x_layer,
             torch.tensor(past_len),
-            key_layer.size(-2),
-            key_layer.size(-1),
+            self.num_attention_heads_per_partition,
+            self.hidden_size_per_attention_head,
             1,
             64,
+            num_concats=3,
         )
-        query_layer = self._IPEXROPE(
-            query_layer,
-            torch.tensor(past_len),
-            query_layer.size(-2),
-            query_layer.size(-1),
-            1,
-            64,
-        )
+    else:
+        if self.multi_query_attention:
+            (query_layer, key_layer, value_layer) = mixed_x_layer.split(
+                [
+                    self.num_attention_heads_per_partition
+                    * self.hidden_size_per_attention_head,
+                    self.num_multi_query_groups_per_partition
+                    * self.hidden_size_per_attention_head,
+                    self.num_multi_query_groups_per_partition
+                    * self.hidden_size_per_attention_head,
+                ],
+                dim=-1,
+            )
+            query_layer = query_layer.view(
+                query_layer.size()[:-1]
+                + (
+                    self.num_attention_heads_per_partition,
+                    self.hidden_size_per_attention_head,
+                )
+            )
+            key_layer = key_layer.view(
+                key_layer.size()[:-1]
+                + (
+                    self.num_multi_query_groups_per_partition,
+                    self.hidden_size_per_attention_head,
+                )
+            )
+            value_layer = value_layer.view(
+                value_layer.size()[:-1]
+                + (
+                    self.num_multi_query_groups_per_partition,
+                    self.hidden_size_per_attention_head,
+                )
+            )
+        else:
+            new_tensor_shape = mixed_x_layer.size()[:-1] + (
+                self.num_attention_heads_per_partition,
+                3 * self.hidden_size_per_attention_head,
+            )
+            mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
+
+            # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
+            (query_layer, key_layer, value_layer) = self.split_tensor_along_last_dim(
+                mixed_x_layer, 3
+            )
 
     if attention_mask is None:
         attention_mask = torch.ones(

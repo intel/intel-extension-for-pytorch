@@ -65,7 +65,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ApplyROPEKernel(
 
   if (is_fused_qkv(t_in, N * H)) {
     TORCH_CHECK(
-        in_stride_s == HS,
+        t_in.dim() == 3,
         "The shape of input tensor of rotary_position_embedding should be in (batch, seq_len, qkv_hidden_size) when using fused qkv)");
     N_KV = (HS - N * H) / (2 * H);
   }
