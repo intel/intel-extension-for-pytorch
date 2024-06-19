@@ -211,3 +211,5 @@ if (
         import intel_extension_for_pytorch_deepspeed
     except ModuleNotFoundError as e:
         pass  # skip
+
+from .compatible_mode import compatible_mode

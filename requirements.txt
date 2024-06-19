@@ -10,3 +10,4 @@ setuptools
 types-dataclasses
 typing_extensions
 pydantic
+ruamel.yaml
