@@ -1,5 +1,5 @@
 #include <ATen/ATen.h>
-#include <aten/core/HostAllocator.h>
+#include <ATen/xpu/CachingHostAllocator.h>
 #include <core/detail/IndexUtils.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Memory.h>
@@ -201,9 +201,9 @@ void parallel_pad(
     // Re-allocate stackInputs every iteration to avoid read-after-write hazard
     {
       CatArrInputTensor<scalar_t, unsigned int>* stackInputs;
-      stackInputs = (CatArrInputTensor<scalar_t, unsigned int>*)
-                        torch_ipex::xpu::dpcpp::HostAllocator::Instance()
-                            ->raw_allocate(tensorMetadataSize);
+      auto stackInputs_dptr = at::xpu::HostAlloc(tensorMetadataSize);
+      stackInputs =
+          (CatArrInputTensor<scalar_t, unsigned int>*)stackInputs_dptr.get();
       for (batchCounter = 0; batchCounter < PAD_ARRAY_BATCH_SIZE &&
            (i + batchCounter) < inputs.size();
            ++batchCounter) {
@@ -219,8 +219,12 @@ void parallel_pad(
         offset += dimSize;
       }
       torch_ipex::xpu::dpcpp::memcpyHostToDevice(
-          d_inputs, stackInputs, tensorMetadataSize, /* async= */ true);
-      torch_ipex::xpu::dpcpp::HostAllocator::Instance()->release(stackInputs);
+          d_inputs,
+          stackInputs,
+          tensorMetadataSize,
+          /* async= */ true,
+          stackInputs_dptr.get_context(),
+          true);
     }
 
 #define HANDLE_CASE(DIMS)                            \

@@ -34,14 +34,5 @@ IPEX_API void dumpMemoryStatusFromDevAlloc(at::DeviceIndex device_index);
 
 std::mutex* getFreeMutexOfDevAlloc();
 
-/// Host Allocator
-// Provide a caching allocator for host allocation by USM malloc_host
-at::Allocator* getHostAllocator();
-
-// Releases all cached host memory allocations
-void emptyCacheInHostAlloc();
-
-bool isAllocatedByHostAlloc(const void* ptr);
-
 } // namespace dpcpp
 } // namespace torch_ipex::xpu

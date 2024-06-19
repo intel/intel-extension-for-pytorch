@@ -406,10 +406,13 @@ void copy_kernel_dpcpp(TensorIterator& iter, bool non_blocking) {
   int64_t nbytes = iter.numel() * iter.element_size(0);
 
   if (non_blocking) {
-    // here do the dpcpp copy synchronisation.
-    // we use a very simple version for the singleton sycl queue.
-    // TODO: enhance the full functionality in multi-queue scenario.
-    dpcppMemcpyAsync(dst, src, nbytes, kind);
+    void* hctx;
+    if (kind == HostToDevice) {
+      hctx = iter.tensor(1).storage().data_ptr().get_context();
+    } else {
+      hctx = iter.tensor(0).storage().data_ptr().get_context();
+    }
+    dpcppMemcpyAsync(dst, src, nbytes, kind, hctx);
   } else {
     dpcppMemcpy(dst, src, nbytes, kind);
   }

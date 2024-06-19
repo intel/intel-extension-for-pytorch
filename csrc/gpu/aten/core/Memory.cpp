@@ -1,3 +1,4 @@
+#include <ATen/detail/XPUHooksInterface.h>
 #include <aten/operators/comm/ScalarType.h>
 #include <core/Memory.h>
 #include <runtime/Memory.h>
@@ -12,16 +13,18 @@ void dpcppMemcpy(
     dpcppMemcpyKind kind) {
   switch (kind) {
     case HostToDevice:
-      memcpyHostToDevice(dst, src, n_bytes, false);
+      // for synchronous copy, the context of host data pointer is unnecessary.
+      memcpyHostToDevice(dst, src, n_bytes, false, nullptr);
       break;
     case DeviceToHost:
-      memcpyDeviceToHost(dst, src, n_bytes, false);
+      // for synchronous copy, the context of host data pointer is unnecessary.
+      memcpyDeviceToHost(dst, src, n_bytes, false, nullptr);
       break;
     case DeviceToDevice:
       memcpyDeviceToDevice(dst, src, n_bytes, false);
       break;
     default:
-      throw std::runtime_error("Unknown dpcpp memory kind");
+      TORCH_CHECK(false, "Unknown dpcpp memory kind");
   }
 }
 
@@ -29,19 +32,32 @@ void dpcppMemcpyAsync(
     void* dst,
     const void* src,
     size_t n_bytes,
-    dpcppMemcpyKind kind) {
+    dpcppMemcpyKind kind,
+    const void* hctx) {
   switch (kind) {
     case HostToDevice:
-      memcpyHostToDevice(dst, src, n_bytes, true);
+      memcpyHostToDevice(
+          dst,
+          src,
+          n_bytes,
+          true,
+          hctx,
+          at::detail::getXPUHooks().isPinnedPtr(src));
       break;
     case DeviceToHost:
-      memcpyDeviceToHost(dst, src, n_bytes, true);
+      memcpyDeviceToHost(
+          dst,
+          src,
+          n_bytes,
+          true,
+          hctx,
+          at::detail::getXPUHooks().isPinnedPtr(dst));
       break;
     case DeviceToDevice:
       memcpyDeviceToDevice(dst, src, n_bytes, true);
       break;
     default:
-      throw std::runtime_error("Unknown dpcpp memory kind");
+      TORCH_CHECK(false, "Unknown dpcpp memory kind");
   }
 }
 

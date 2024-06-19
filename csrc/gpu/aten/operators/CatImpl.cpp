@@ -2,8 +2,8 @@
 #include <ATen/MemoryOverlap.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/native/TypeProperties.h>
+#include <ATen/xpu/CachingHostAllocator.h>
 
-#include <aten/core/HostAllocator.h>
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Memory.h>
@@ -270,9 +270,9 @@ void parallel_cat(
     // Re-allocate stackInputs every iteration to avoid read-after-write hazard
     {
       CatArrInputTensor<scalar_in_t, unsigned int>* stackInputs;
-      stackInputs = (CatArrInputTensor<scalar_in_t, unsigned int>*)
-                        HostAllocator::Instance()
-                            ->raw_allocate(tensorMetadataSize);
+      auto stackInputs_dptr = at::xpu::HostAlloc(tensorMetadataSize);
+      stackInputs =
+          (CatArrInputTensor<scalar_in_t, unsigned int>*)stackInputs_dptr.get();
       for (batchCounter = 0; batchCounter < CAT_ARRAY_BATCH_SIZE &&
            (i + batchCounter) < inputs.size();
            ++batchCounter) {
@@ -299,8 +299,12 @@ void parallel_cat(
         offset += dimSize;
       }
       torch_ipex::xpu::dpcpp::memcpyHostToDevice(
-          d_inputs, stackInputs, tensorMetadataSize, /* async= */ true);
-      HostAllocator::Instance()->release(stackInputs);
+          d_inputs,
+          stackInputs,
+          tensorMetadataSize,
+          /* async= */ true,
+          stackInputs_dptr.get_context(),
+          true);
     }
 
 #define HANDLE_CASE(DIMS)            \

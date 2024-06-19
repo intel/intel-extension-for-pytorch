@@ -1,13 +1,13 @@
 #pragma once
 #include <ATen/ATen.h>
-#include <iostream>
-#include <vector>
+#include <ATen/xpu/CachingHostAllocator.h>
+#include <c10/core/ScalarType.h>
+
 #include "Loops.h"
 #include "MemoryAccess.h"
-// #include "autograd/function.h"
-#include <aten/core/HostAllocator.h>
-#include "c10/core/ScalarType.h"
 #include "runtime/Memory.h"
+
+#include <vector>
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -148,11 +148,9 @@ void multi_tensor_apply(
   // There might be some unkonw computation error when the passed
   // structure is too large in ATSP (>512 Byte) or ATSM(> 1MB). In this
   // implementation, metadata is copied into device by H2D.
-  tlAddress =
-      (TLMetaForAddressScalar<scalar_t, depth>*)
-          torch_ipex::xpu::dpcpp::HostAllocator::Instance()
-              ->raw_allocate(
-                  sizeof(TLMetaForAddressScalar<scalar_t, depth>) * n_tensors);
+  auto tlAddress_dptr = at::xpu::HostAlloc(
+      sizeof(TLMetaForAddressScalar<scalar_t, depth>) * n_tensors);
+  tlAddress = (TLMetaForAddressScalar<scalar_t, depth>*)tlAddress_dptr.get();
   uint64_t totalWG = 0;
 
   // this loop record all the tensor address and numel info.
@@ -169,7 +167,9 @@ void multi_tensor_apply(
       metaAddressInput,
       tlAddress,
       sizeof(TLMetaForAddressScalar<scalar_t, depth>) * n_tensors,
-      /*async*/ true);
+      /* async= */ true,
+      tlAddress_dptr.get_context(),
+      true);
 
   auto wgMetaStorage = at::empty(
       {sizeof(TLMetaForWG) * totalWG},
@@ -177,8 +177,8 @@ void multi_tensor_apply(
   auto metaWGInput = static_cast<TLMetaForWG*>(wgMetaStorage.data_ptr());
   TLMetaForWG* tlWGMeta = nullptr;
 
-  tlWGMeta = (TLMetaForWG*)torch_ipex::xpu::dpcpp::HostAllocator::Instance()
-                 ->raw_allocate(sizeof(TLMetaForWG) * totalWG);
+  auto tlWGMeta_dptr = at::xpu::HostAlloc(sizeof(TLMetaForWG) * totalWG);
+  tlWGMeta = (TLMetaForWG*)tlWGMeta_dptr.get();
   uint64_t posWG = 0;
   // this loop record the correspond tensor and chunk info for each work group.
   for (size_t t = 0; t < n_tensors; ++t) {
@@ -193,14 +193,15 @@ void multi_tensor_apply(
       posWG == totalWG,
       "Work group index dose not equal to the allocated memory size, segment fault might occur");
   torch_ipex::xpu::dpcpp::memcpyHostToDevice(
-      metaWGInput, tlWGMeta, sizeof(TLMetaForWG) * totalWG, /*async*/ true);
+      metaWGInput,
+      tlWGMeta,
+      sizeof(TLMetaForWG) * totalWG,
+      /* async= */ true,
+      tlWGMeta_dptr.get_context(),
+      true);
 
   multi_tensor_apply_kernel<false>(
       metaAddressInput, metaWGInput, callable, totalWG, args...);
-
-  // free
-  torch_ipex::xpu::dpcpp::HostAllocator::Instance()->release(tlAddress);
-  torch_ipex::xpu::dpcpp::HostAllocator::Instance()->release(tlWGMeta);
 }
 
 template <int depth, typename T, typename... ArgTypes>
@@ -229,10 +230,9 @@ void multi_tensor_apply(
   // There might be some unkonw computation error when the passed
   // structure is too large in ATSP (>512 Byte) or ATSM(> 1MB). In this
   // implementation, metadata is copied into device by H2D.
-  tlAddress =
-      (TLMetaForAddress<depth>*)
-          torch_ipex::xpu::dpcpp::HostAllocator::Instance()
-              ->raw_allocate(sizeof(TLMetaForAddress<depth>) * n_tensors);
+  auto tlAddress_dptr =
+      at::xpu::HostAlloc(sizeof(TLMetaForAddress<depth>) * n_tensors);
+  tlAddress = (TLMetaForAddress<depth>*)tlAddress_dptr.get();
   uint64_t totalWG = 0;
 
   // this loop record all the tensor address and numel info.
@@ -248,7 +248,9 @@ void multi_tensor_apply(
       metaAddressInput,
       tlAddress,
       sizeof(TLMetaForAddress<depth>) * n_tensors,
-      /*async*/ true);
+      /* async= */ true,
+      tlAddress_dptr.get_context(),
+      true);
 
   auto wgMetaStorage = at::empty(
       {sizeof(TLMetaForWG) * totalWG},
@@ -256,8 +258,8 @@ void multi_tensor_apply(
   auto metaWGInput = static_cast<TLMetaForWG*>(wgMetaStorage.data_ptr());
   TLMetaForWG* tlWGMeta = nullptr;
 
-  tlWGMeta = (TLMetaForWG*)torch_ipex::xpu::dpcpp::HostAllocator::Instance()
-                 ->raw_allocate(sizeof(TLMetaForWG) * totalWG);
+  auto tlWGMeta_dptr = at::xpu::HostAlloc(sizeof(TLMetaForWG) * totalWG);
+  tlWGMeta = (TLMetaForWG*)tlWGMeta_dptr.get();
   uint64_t posWG = 0;
   // this loop record the correspond tensor and chunk info for each work group.
   for (size_t t = 0; t < n_tensors; ++t) {
@@ -272,13 +274,15 @@ void multi_tensor_apply(
       posWG == totalWG,
       "Work group index dose not equal to the allocated memory size, segment fault might occur");
   torch_ipex::xpu::dpcpp::memcpyHostToDevice(
-      metaWGInput, tlWGMeta, sizeof(TLMetaForWG) * totalWG, /*async*/ true);
+      metaWGInput,
+      tlWGMeta,
+      sizeof(TLMetaForWG) * totalWG,
+      /* async= */ true,
+      tlWGMeta_dptr.get_context(),
+      true);
 
   multi_tensor_apply_kernel<false>(
       metaAddressInput, metaWGInput, callable, totalWG, args...);
-  // free
-  torch_ipex::xpu::dpcpp::HostAllocator::Instance()->release(tlAddress);
-  torch_ipex::xpu::dpcpp::HostAllocator::Instance()->release(tlWGMeta);
 }
 
 template <int depth, typename T, typename... ArgTypes>
@@ -307,10 +311,9 @@ void multi_tensor_apply_for_fused_optimizer(
   // There might be some unkonw computation error when the passed
   // structure is too large in ATSP (>512 Byte) or ATSM(> 1MB). In this
   // implementation, metadata is copied into device by H2D.
-  tlAddress =
-      (TLFusedMetaForAddress<depth>*)
-          torch_ipex::xpu::dpcpp::HostAllocator::Instance()
-              ->raw_allocate(sizeof(TLFusedMetaForAddress<depth>) * n_tensors);
+  auto tlAddress_dptr =
+      at::xpu::HostAlloc(sizeof(TLFusedMetaForAddress<depth>) * n_tensors);
+  tlAddress = (TLFusedMetaForAddress<depth>*)tlAddress_dptr.get();
   uint64_t totalWG = 0;
 
   // this loop record all the tensor address and numel info.
@@ -323,12 +326,13 @@ void multi_tensor_apply_for_fused_optimizer(
       tlAddress[t].addresses[d] = tensor_lists[d][t].data_ptr();
     }
   }
-
   torch_ipex::xpu::dpcpp::memcpyHostToDevice(
       metaFusedAddressInput,
       tlAddress,
       sizeof(TLFusedMetaForAddress<depth>) * n_tensors,
-      /*async*/ true);
+      /* async= */ true,
+      tlAddress_dptr.get_context(),
+      true);
 
   auto wgMetaStorage = at::empty(
       {sizeof(TLMetaForWG) * totalWG},
@@ -336,8 +340,8 @@ void multi_tensor_apply_for_fused_optimizer(
   auto metaWGInput = static_cast<TLMetaForWG*>(wgMetaStorage.data_ptr());
   TLMetaForWG* tlWGMeta = nullptr;
 
-  tlWGMeta = (TLMetaForWG*)torch_ipex::xpu::dpcpp::HostAllocator::Instance()
-                 ->raw_allocate(sizeof(TLMetaForWG) * totalWG);
+  auto tlWGMeta_dptr = at::xpu::HostAlloc(sizeof(TLMetaForWG) * totalWG);
+  tlWGMeta = (TLMetaForWG*)tlWGMeta_dptr.get();
   uint64_t posWG = 0;
   // this loop record the correspond tensor and chunk info for each work group.
   for (size_t t = 0; t < n_tensors; ++t) {
@@ -352,13 +356,15 @@ void multi_tensor_apply_for_fused_optimizer(
       posWG == totalWG,
       "Work group index dose not equal to the allocated memory size, segment fault might occur");
   torch_ipex::xpu::dpcpp::memcpyHostToDevice(
-      metaWGInput, tlWGMeta, sizeof(TLMetaForWG) * totalWG, /*async*/ true);
+      metaWGInput,
+      tlWGMeta,
+      sizeof(TLMetaForWG) * totalWG,
+      /* async= */ true,
+      tlWGMeta_dptr.get_context(),
+      true);
 
   multi_tensor_apply_kernel<true>(
       metaFusedAddressInput, metaWGInput, callable, totalWG, args...);
-  // free
-  torch_ipex::xpu::dpcpp::HostAllocator::Instance()->release(tlAddress);
-  torch_ipex::xpu::dpcpp::HostAllocator::Instance()->release(tlWGMeta);
 }
 
 } // namespace AtenIpexTypeXPU

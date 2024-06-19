@@ -1,11 +1,9 @@
 #include <core/Allocator.h>
 #include <runtime/CachingDeviceAllocator.h>
-#include <runtime/CachingHostAllocator.h>
 #include <runtime/Exception.h>
 #include <runtime/Utils.h>
 #include <tensor/Context.h>
 #include "DeviceAllocator.h"
-#include "HostAllocator.h"
 
 namespace torch_ipex::xpu {
 namespace dpcpp {
@@ -175,69 +173,6 @@ std::vector<SegmentInfo> snapshotOfDevAlloc() {
 
 std::mutex* getFreeMutexOfDevAlloc() {
   return DeviceAllocator::Instance()->getFreeMutex();
-}
-
-/// Host Allocator
-HostAllocator* HostAllocator::Instance() {
-  static HostAllocator myInstance;
-  return &myInstance;
-}
-
-void HostAllocator::deleter(void* ptr) {
-  Instance()->release(ptr);
-}
-
-at::DataPtr HostAllocator::allocate(size_t size) {
-  void* ptr = nullptr;
-  Instance()->alloc()->malloc(&ptr, size);
-  return {ptr, ptr, &deleter, at::DeviceType::CPU};
-}
-
-void* HostAllocator::raw_allocate(size_t size) {
-  void* ptr = nullptr;
-  Instance()->alloc()->malloc(&ptr, size);
-  return ptr;
-}
-
-at::DeleterFnPtr HostAllocator::raw_deleter() const {
-  return &deleter;
-}
-
-bool HostAllocator::isHostPtr(const void* ptr) {
-  return alloc()->isHostPtr(ptr);
-}
-
-void HostAllocator::emptyCache() {
-  alloc()->emptyCache();
-}
-
-void HostAllocator::recordEvent(void* ptr, sycl::event& e) {
-  alloc()->recordEvent(ptr, e);
-}
-
-CachingHostAllocator* HostAllocator::alloc() {
-  return CachingHostAllocator::Instance();
-}
-
-void HostAllocator::release(void* ptr) {
-  alloc()->release(ptr);
-}
-
-void HostAllocator::copy_data(void* dest, const void* src, std::size_t count)
-    const {
-  at::xpu::getCurrentXPUStream().queue().memcpy(dest, src, count);
-}
-
-Allocator* getHostAllocator() {
-  return HostAllocator::Instance();
-}
-
-void emptyCacheInHostAlloc() {
-  HostAllocator::Instance()->emptyCache();
-}
-
-bool isAllocatedByHostAlloc(const void* ptr) {
-  return HostAllocator::Instance()->isHostPtr(ptr);
 }
 
 } // namespace dpcpp

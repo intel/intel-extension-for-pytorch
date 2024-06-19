@@ -1,5 +1,7 @@
 #include <ATen/CPUFunctions.h>
 #include <ATen/TensorUtils.h>
+#include <ATen/detail/XPUHooksInterface.h>
+#include <ATen/xpu/PinnedMemoryAllocator.h>
 #include <c10/core/Storage.h>
 #include <core/Allocator.h>
 #include <core/detail/TensorInfo.h>
@@ -18,7 +20,7 @@ bool is_pinned(const Tensor& self, c10::optional<Device> device) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       !device.has_value() || device->type() == c10::DeviceType::XPU);
 
-  return torch_ipex::xpu::dpcpp::isAllocatedByHostAlloc(self.storage().data());
+  return at::detail::getXPUHooks().isPinnedPtr(self.storage().data());
 }
 
 // Note: The user must call tensor.pin_memory(device='xpu') to explicitly call
@@ -27,7 +29,7 @@ Tensor _pin_memory(const Tensor& self, c10::optional<Device> device) {
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
       !device.has_value() || device->type() == c10::DeviceType::XPU);
 
-  auto* allocator = torch_ipex::xpu::dpcpp::getHostAllocator();
+  auto* allocator = at::xpu::getPinnedMemoryAllocator();
   auto storage = c10::Storage(
       c10::Storage::use_byte_size_t(),
       at::detail::computeStorageNbytes(

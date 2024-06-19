@@ -5,9 +5,21 @@
 namespace torch_ipex::xpu {
 namespace dpcpp {
 
-void memcpyHostToDevice(void* dst, const void* src, size_t n_bytes, bool async);
+void memcpyHostToDevice(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    bool async,
+    const void* hctx,
+    bool is_pinned = false);
 
-void memcpyDeviceToHost(void* dst, const void* src, size_t n_bytes, bool async);
+void memcpyDeviceToHost(
+    void* dst,
+    const void* src,
+    size_t n_bytes,
+    bool async,
+    const void* hctx,
+    bool is_pinned = false);
 
 void memcpyDeviceToDevice(
     void* dst,
