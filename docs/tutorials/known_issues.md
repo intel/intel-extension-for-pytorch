@@ -42,6 +42,16 @@ Troubleshooting
   - **Cause**: PyTorch FX limitation.
   - **Solution**: You can avoid this error by calling `m = ipex.optimize(m, level="O0")`, which doesn't apply ipex optimization, or disable `conv+bn` folding by calling `m = ipex.optimize(m, level="O1", conv_bn_folding=False)`.
 
+## Package Compatibility
+
+- **Problem**: Error raised during the import of `numpy`.
+  - **Cause**: `numpy` has some API update in latest 2.0.0 release, but it comes incompatible with some other packages.
+  - **Solution**: Reinstall a lagacy version of `numpy` with the command:
+
+  ```
+  python -m pip install numpy==1.26.4 --force-reinstall
+  ```
+
 ## Performance Regression
 
 - Some models may experience performance regression comparing to 2.0.x due to deprecation of the NNC feature in PyTorch\*.
