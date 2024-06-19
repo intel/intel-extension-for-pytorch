@@ -1,9 +1,10 @@
 @echo off
 
-set "VER_PYTORCH=v2.1.0"
-set "VER_TORCHVISION=v0.16.0"
-set "VER_TORCHAUDIO=v2.1.0"
 set "VER_IPEX=xpu-main"
+
+for /f %%A in ('python scripts\tools\compilation_helper\yaml_utils.py -f dependency_version.yml -d pytorch -k commit') do set COMMIT_TORCH=%%A
+for /f %%A in ('python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torchvision -k commit') do set COMMIT_TORCHVISION=%%A
+for /f %%A in ('python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torchaudio -k commit') do set COMMIT_TORCHAUDIO=%%A
 
 if "%~2"=="" (
     echo Usage: %~nx0 ^<DPCPPROOT^> ^<MKLROOT^> [AOT]
@@ -57,42 +58,42 @@ if NOT EXIST intel-extension-for-pytorch (
 
 rem Checkout required branch/commit and update submodules
 cd pytorch
-if not "%VER_PYTORCH%"=="" (
+if not "%COMMIT_TORCH%"=="" (
     git rm -rf .
     git clean -fxd
     git reset
     git checkout .
     git checkout main
     git pull
-    git checkout %VER_PYTORCH%
+    git checkout %COMMIT_TORCH%
 )
 git submodule sync
 git submodule update --init --recursive
 cd ..
 
 cd vision
-if not "%VER_TORCHVISION%"=="" (
+if not "%COMMIT_TORCHVISION%"=="" (
     git rm -rf .
     git clean -fxd
     git reset
     git checkout .
     git checkout main
     git pull
-    git checkout %VER_TORCHVISION%
+    git checkout %COMMIT_TORCHVISION%
 )
 git submodule sync
 git submodule update --init --recursive
 cd ..
 
 cd audio
-if not "%VER_TORCHAUDIO%"=="" (
+if not "%COMMIT_TORCHAUDIO%"=="" (
     git rm -rf .
     git clean -fxd
     git reset
     git checkout .
     git checkout main
     git pull
-    git checkout %VER_TORCHAUDIO%
+    git checkout %COMMIT_TORCHAUDIO%
 )
 git submodule sync
 git submodule update --init --recursive
