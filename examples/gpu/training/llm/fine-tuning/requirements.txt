@@ -3,9 +3,9 @@ peft
 rouge_score
 fire
 datasets
-transformers>=4.38.1
+transformers>=4.41.2
 torch
 sentencepiece
 tokenizers>=0.13.3
 wandb
-trl
+trl==0.9.4

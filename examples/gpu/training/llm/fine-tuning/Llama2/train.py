@@ -26,7 +26,7 @@ from transformers import Trainer
 import os
 # import deepspeed
 from peft import LoraConfig
-from trl import SFTTrainer
+from trl import SFTConfig, SFTTrainer
 from datasets import load_dataset
 
 IGNORE_INDEX = -100
@@ -79,9 +79,9 @@ class DataArguments:
 
 
 @dataclass
-class TrainingArguments(transformers.TrainingArguments):
+class CustomArguments:
     cache_dir: Optional[str] = field(default=None)
-    optim: str = field(default="adamw_torch")
+    # optim: str = field(default="adamw_torch")
     model_max_length: int = field(
         default=512,
         metadata={"help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."},
@@ -223,8 +223,8 @@ def print_trainable_parameters(model):
     )
 
 def train():
-    parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    parser = transformers.HfArgumentParser((ModelArguments, DataArguments, transformers.TrainingArguments, CustomArguments))
+    model_args, data_args, training_args, custom_args = parser.parse_args_into_dataclasses()
 
     # distributed setup
     os.environ['CCL_PROCESS_LAUNCHER'] = 'none'
@@ -236,7 +236,7 @@ def train():
 
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        cache_dir=training_args.cache_dir,
+        cache_dir=custom_args.cache_dir,
         attn_implementation="sdpa" if model_args.use_flashattn else "eager",
         use_safetensors=False
         # num_hidden_layers=1, # set only 1 decoder layer
@@ -244,8 +244,8 @@ def train():
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
-        cache_dir=training_args.cache_dir,
-        model_max_length=training_args.model_max_length,
+        cache_dir=custom_args.cache_dir,
+        model_max_length=custom_args.model_max_length,
         padding_side="right",
         use_fast=False,
     )
@@ -287,14 +287,13 @@ def train():
     
     if data_args.data_path is not None:
         data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
-        trainer = SFTTrainer(
-            model=model, 
-            tokenizer=tokenizer, 
-            args=training_args, 
+        sft_config = SFTConfig(**training_args.to_dict())
+        trainer = SFTTrainer(model=model,
+            tokenizer=tokenizer,
+            args=sft_config,
             **data_module, # use defined dataset and data_collator
             dataset_text_field="text",
-            peft_config=peft_config,
-        )
+            peft_config=peft_config,)
     elif data_args.dataset is not None:
         dataset = load_dataset(data_args.dataset, split=f"train[:{data_args.train_num_samples}]" if data_args.train_num_samples > 0 else "train")
         trainer = SFTTrainer(
@@ -304,7 +303,7 @@ def train():
             train_dataset=dataset,
             dataset_text_field="text",
             packing=True,
-            max_seq_length=training_args.max_seq_length,
+            max_seq_length=custom_args.max_seq_length,
             peft_config=peft_config, 
         )
     else:

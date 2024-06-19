@@ -65,9 +65,7 @@ Run_llama2-70b_fsdp_huggingface_dataset_peft() {
         --warmup_ratio 0.03 \
         --lr_scheduler_type "cosine" \
         --logging_steps 1 \
-        --max_seq_length 256 \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' 2>&1 | tee llama3_70b_fsdp_huggingface_peft_seq256_bs1.log
+        --max_seq_length 256 2>&1 | tee llama3_70b_fsdp_huggingface_peft_seq256_bs1.log
  
 }
 

@@ -3,7 +3,7 @@ Run_llama2-7b_fsdp_alpaca_dataset() {
 
     model='/raid/huggingface/hub/llama2-7b'
 
-    torchrun --nproc_per_node=8 --master_port='29900' train_cuda.py \
+    accelerate launch --config_file "fsdp_config.yaml" train_cuda.py \
         --model_name_or_path ${model} \
         --data_path ./alpaca_data.json \
         --bf16 True \
@@ -22,10 +22,7 @@ Run_llama2-7b_fsdp_alpaca_dataset() {
         --warmup_ratio 0.03 \
         --lr_scheduler_type "cosine" \
         --logging_steps 1 \
-        --optim "adamw_torch_fused" \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' \
-        --tf32 True 2>&1 | tee llama2_fsdp_alpaca_adamfuse_tf32_bs1.log
+        --optim "adamw_torch_fused" 2>&1 | tee llama2_fsdp_alpaca_adamfuse_bs1.log
 
 }
 
@@ -34,7 +31,7 @@ Run_llama2-7b_fsdp_alpaca_dataset_peft() {
 
     model='/raid/huggingface/hub/llama2-7b'
 
-    torchrun --nproc_per_node=8 --master_port='29900' train_cuda.py \
+    accelerate launch --config_file "fsdp_config.yaml" train_cuda.py \
         --model_name_or_path ${model} \
         --data_path ./alpaca_data.json \
         --bf16 True \
@@ -54,10 +51,7 @@ Run_llama2-7b_fsdp_alpaca_dataset_peft() {
         --warmup_ratio 0.03 \
         --lr_scheduler_type "cosine" \
         --logging_steps 1 \
-        --optim "adamw_torch_fused" \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' \
-        --tf32 True 2>&1 | tee llama2_fsdp_alpaca_peft_adamfuse_tf32_bs1.log
+        --optim "adamw_torch_fused" True 2>&1 | tee llama2_fsdp_alpaca_peft_adamfuse_bs1.log
  
 }
 
@@ -66,7 +60,7 @@ Run_llama2-7b_fsdp_huggingface_dataset() {
 
     model='/raid/huggingface/hub/llama2-7b'
 
-    torchrun --nproc_per_node=8 --master_port='29900' train_cuda.py \
+    accelerate launch --config_file "fsdp_config.yaml" train_cuda.py \
         --model_name_or_path ${model} \
         --bf16 True \
         --use_flashattn True \
@@ -85,17 +79,14 @@ Run_llama2-7b_fsdp_huggingface_dataset() {
         --lr_scheduler_type "cosine" \
         --logging_steps 1 \
         --max_seq_length 2048 \
-        --optim "adamw_torch_fused" \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' \
-        --tf32 True 2>&1 | tee llama2_fsdp_huggingface_adamfuse_seq2048_tf32_bs1.log
+        --optim "adamw_torch_fused" 2>&1 | tee llama2_fsdp_huggingface_adamfuse_seq2048_bs1.log
 }
 
 Run_llama2-7b_fsdp_huggingface_dataset_peft() {
 
     model='/raid/huggingface/hub/llama2-7b'
 
-    torchrun --nproc_per_node=8 --master_port='29900' train_cuda.py \
+    accelerate launch --config_file "fsdp_config.yaml" train_cuda.py \
         --model_name_or_path ${model} \
         --bf16 True \
         --use_flashattn True \
@@ -115,10 +106,7 @@ Run_llama2-7b_fsdp_huggingface_dataset_peft() {
         --lr_scheduler_type "cosine" \
         --logging_steps 1 \
         --max_seq_length 2048 \
-        --optim "adamw_torch_fused" \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' \
-        --tf32 True 2>&1 | tee llama2_fsdp_huggingface_peft_adamwfuse_seq2048_tf32_bs1.log
+        --optim "adamw_torch_fused" 2>&1 | tee llama2_fsdp_huggingface_peft_adamwfuse_seq2048_bs1.log
 
 }
 
@@ -145,9 +133,7 @@ Run_llama2-70b_fsdp_alpaca_dataset_peft() {
         --weight_decay 0. \
         --warmup_ratio 0.03 \
         --lr_scheduler_type "cosine" \
-        --logging_steps 1 \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' 2>&1 | tee llama2_70b_fsdp_alpaca_peft_bs1.log
+        --logging_steps 1 2>&1 | tee llama2_70b_fsdp_alpaca_peft_bs1.log
  
 }
 
@@ -174,9 +160,7 @@ Run_llama2-70b_fsdp_huggingface_dataset_peft() {
         --warmup_ratio 0.03 \
         --lr_scheduler_type "cosine" \
         --logging_steps 1 \
-        --max_seq_length 256 \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' 2>&1 | tee llama2_70b_fsdp_huggingface_peft_seq256_bs1.log
+        --max_seq_length 256 2>&1 | tee llama2_70b_fsdp_huggingface_peft_seq256_bs1.log
  
 }
 
