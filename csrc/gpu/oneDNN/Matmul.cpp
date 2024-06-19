@@ -376,7 +376,8 @@ sycl::event matmul(
     args.insert({DNNL_ARG_BIAS, bias_m});
   }
 
-  DPCPP_ONEDNN_EXEC_WITH_EVENT(matmul_p, strm, args, deps);
+  sycl::event output_event;
+  DPCPP_ONEDNN_EXEC_WITH_EVENT(matmul_p, strm, args, deps, output_event);
 
   if (is_onednn_layout_suggested && dst_m != dst_usr_m && dims == 2) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_);
@@ -386,8 +387,7 @@ sycl::event matmul(
   if (!dst.is_same(result))
     result.copy_(dst);
 
-  // e is a sycl::event defined in DPCPP_ONEDNN_EXEC_WITH_EVENT
-  return e;
+  return output_event;
 }
 
 } // namespace oneDNN

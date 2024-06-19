@@ -387,14 +387,15 @@ sycl::event convolution(
   args.insert({DNNL_ARG_SCRATCHPAD, scratchpad_m});
 #endif
 
-  DPCPP_ONEDNN_EXEC_WITH_EVENT(conv_fwd, strm, args, deps);
+  sycl::event output_event;
+  DPCPP_ONEDNN_EXEC_WITH_EVENT(conv_fwd, strm, args, deps, output_event);
 
   if (is_onednn_layout_suggested && dst_blocked.data_ptr() != dst.data_ptr()) {
     auto blk_ctx = DPCPPTensorContext::release_tensor_ctx(dst_blocked);
     DPCPPTensorContext::set_tensor_ctx(dst, std::move(blk_ctx));
   }
 
-  return e;
+  return output_event;
 }
 
 sycl::event convolution_backward_weights(
@@ -589,7 +590,8 @@ sycl::event convolution_backward_weights(
 #endif
 
   // execute primitive
-  DPCPP_ONEDNN_EXEC_WITH_EVENT(conv_bwd_w, strm, args, deps);
+  sycl::event output_event;
+  DPCPP_ONEDNN_EXEC_WITH_EVENT(conv_bwd_w, strm, args, deps, output_event);
 
   if (is_onednn_layout_suggested && diff_wgh_m.get_desc() != wgh_usr_md) {
     // expected_diff_wgh contains the result of gw backward in blk format.
@@ -614,8 +616,7 @@ sycl::event convolution_backward_weights(
     torch_ipex::xpu::oneDNN::reorder(expected_diff_wgh, reshaped_diff_wgh);
   }
 
-  // e is a sycl::event defined in DPCPP_ONEDNN_EXEC_WITH_EVENT
-  return e;
+  return output_event;
 }
 
 sycl::event convolution_backward_data(
@@ -793,7 +794,8 @@ sycl::event convolution_backward_data(
   args.insert({DNNL_ARG_DIFF_SRC, diff_src_m});
 
   // execute primitive
-  DPCPP_ONEDNN_EXEC_WITH_EVENT(conv_bwd_data, strm, args, deps);
+  sycl::event output_event;
+  DPCPP_ONEDNN_EXEC_WITH_EVENT(conv_bwd_data, strm, args, deps, output_event);
 
   // propagate blk format
   if (is_onednn_layout_suggested &&
@@ -802,8 +804,7 @@ sycl::event convolution_backward_data(
     DPCPPTensorContext::set_tensor_ctx(diff_src, std::move(blk_ctx));
   }
 
-  // e is a sycl::event defined in DPCPP_ONEDNN_EXEC_WITH_EVENT
-  return e;
+  return output_event;
 }
 
 } // namespace oneDNN

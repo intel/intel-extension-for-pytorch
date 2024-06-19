@@ -35,11 +35,12 @@ using namespace dnnl;
         dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__)); \
   }
 
-#define DPCPP_ONEDNN_EXEC_WITH_EVENT(prim, stream, args, deps) \
-  auto q = dnnl::sycl_interop::get_queue((stream));            \
-  DPCPP_ONEDNN_EXT_SUBMIT(                                     \
-      (q),                                                     \
-      "onednn_kernel_with_event",                              \
+#define DPCPP_ONEDNN_EXEC_WITH_EVENT(prim, stream, args, deps, output_event) \
+  auto q = dnnl::sycl_interop::get_queue((stream));                          \
+  DPCPP_ONEDNN_EXT_SUBMIT(                                                   \
+      (q),                                                                   \
+      "onednn_kernel_with_event",                                            \
+      output_event,                                                          \
       dnnl::sycl_interop::execute((prim), (stream), args, deps));
 
 // FIXME: In some cases, for example, concat, reorder, and etc.

@@ -105,20 +105,19 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
     DPCPP_EXCEP_CATCH                                                       \
   }
 
-#define DPCPP_ONEDNN_EXT_SUBMIT(q, str, ker_submit)                       \
-  sycl::event e;                                                          \
+#define DPCPP_ONEDNN_EXT_SUBMIT(q, str, output_event, ker_submit)         \
   DPCPP_EXCEP_TRY                                                         \
   auto log_level = torch_ipex::xpu::dpcpp::Settings::I().get_log_level(); \
   if (log_level >= LOG_LEVEL_DEBUG) {                                     \
     EventLogger l;                                                        \
     l.add_event("OPS", "", "", "begin", "event name:{}", __func__);       \
-    e = (ker_submit);                                                     \
+    output_event = (ker_submit);                                          \
     l.add_event("OPS", "", "", "submit", "submit event end");             \
-    e.wait_and_throw();                                                   \
+    output_event.wait_and_throw();                                        \
     l.add_event("OPS", "", "", "event wait", "event wait end");           \
   } else {                                                                \
-    e = (ker_submit);                                                     \
-    DPCPP_E_SYNC_FOR_DEBUG(e);                                            \
+    output_event = (ker_submit);                                          \
+    DPCPP_E_SYNC_FOR_DEBUG(output_event);                                 \
   }                                                                       \
   (q).throw_asynchronous();                                               \
   DPCPP_EXCEP_CATCH
