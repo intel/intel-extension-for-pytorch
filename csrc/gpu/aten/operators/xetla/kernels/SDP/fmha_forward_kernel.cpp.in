@@ -11,15 +11,15 @@ This is an implementation of the Flash Attention algorithm
 
 // clang-format off
 // macros to be filled in CMake 
-#define IMPL_FMHA_POLICY ${IMPL_FMHA_POLICY}
 #define IMPL_T ${IMPL_T}
 #define IMPL_ARCH_TAG gpu_arch::${IMPL_ARCH_TAG}
-#define IMPL_KUSEALIBI ${IMPL_KUSEALIBI}
-#define IMPL_KUSEBIAS ${IMPL_KUSEBIAS}
-#define IMPL_KISCAUSAL ${IMPL_KISCAUSAL}
-#define IMPL_KSEQLAST ${IMPL_KSEQLAST}
-#define IMPL_KISTRAINING ${IMPL_KISTRAINING}
-#define IMPL_KISDROPOUT ${IMPL_KISDROPOUT}
+#define GPU_ARCH_${IMPL_ARCH_TAG}
+#cmakedefine01 IMPL_KUSEALIBI
+#cmakedefine01 IMPL_KUSEBIAS
+#cmakedefine01 IMPL_KISCAUSAL
+#cmakedefine01 IMPL_KSEQLAST
+#cmakedefine01 IMPL_KISTRAINING
+#cmakedefine01 IMPL_KISDROPOUT
 // clang-format on
 
 namespace gpu::xetla {
@@ -80,16 +80,52 @@ cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
   return {[=](sycl::handler& cgh) { cgh.parallel_for(NdRange, kfn); }};
 }
 
-template cgfs_t xetla_fmha_forward_kernel<
-    IMPL_FMHA_POLICY,
-    IMPL_T,
-    IMPL_ARCH_TAG,
-    IMPL_KUSEALIBI,
-    IMPL_KUSEBIAS,
-    IMPL_KISCAUSAL,
-    IMPL_KSEQLAST,
-    IMPL_KISTRAINING,
-    IMPL_KISDROPOUT>(const dispatch_fmha_forward_args_t<IMPL_T>& args);
+#define INSTANTIATE_POLICY(policy)           \
+  template cgfs_t xetla_fmha_forward_kernel< \
+      policy,                                \
+      IMPL_T,                                \
+      IMPL_ARCH_TAG,                         \
+      IMPL_KUSEALIBI,                        \
+      IMPL_KUSEBIAS,                         \
+      IMPL_KISCAUSAL,                        \
+      IMPL_KSEQLAST,                         \
+      IMPL_KISTRAINING,                      \
+      IMPL_KISDROPOUT>(const dispatch_fmha_forward_args_t<IMPL_T>& args)
 
+#if (IMPL_KISTRAINING && IMPL_KISDROPOUT && defined(GPU_ARCH_XeHpc))
+INSTANTIATE_POLICY(fmha_policy_64x64x64);
+INSTANTIATE_POLICY(fmha_policy_128x128x128);
+INSTANTIATE_POLICY(fmha_policy_128x128x256);
+INSTANTIATE_POLICY(fmha_policy_64x128x512);
+#endif
+
+INSTANTIATE_POLICY(fmha_policy_8x128x64);
+INSTANTIATE_POLICY(fmha_policy_64x128x64);
+
+#if (!IMPL_KISDROPOUT && defined(GPU_ARCH_XeLpg))
+INSTANTIATE_POLICY(stage0<fmha_policy_1x256x128>);
+INSTANTIATE_POLICY(stage0<fmha_policy_1x512x128>);
+#endif
+
+INSTANTIATE_POLICY(fmha_policy_8x256x128);
+INSTANTIATE_POLICY(fmha_policy_8x512x128);
+
+#if defined(GPU_ARCH_XeLpg)
+INSTANTIATE_POLICY(stage0<fmha_policy_32x128x128>);
+#else
+INSTANTIATE_POLICY(fmha_policy_64x128x128);
+#endif
+
+#if defined(GPU_ARCH_XeLpg)
+#else
+INSTANTIATE_POLICY(fmha_policy_8x256x256);
+INSTANTIATE_POLICY(fmha_policy_64x128x256);
+#if defined(GPU_ARCH_XeHpc)
+INSTANTIATE_POLICY(fmha_policy_64x256x256);
+#if !(IMPL_KISTRAINING && IMPL_KISDROPOUT)
+INSTANTIATE_POLICY(fmha_policy_64x128x512);
+#endif
+#endif
+#endif
 } // namespace fmha
 } // namespace gpu::xetla
