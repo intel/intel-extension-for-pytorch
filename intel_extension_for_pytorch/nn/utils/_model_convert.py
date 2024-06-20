@@ -58,7 +58,7 @@ def convert_model_data_type(model, dtype):
     return params_attr, model
 
 
-def awq_reverse_reorder_int_tensor(self, int_tensor, bits: int):
+def awq_reverse_reorder_int_tensor(int_tensor, bits: int):
     assert bits == 4
 
     int_tensor = int_tensor.T.contiguous()

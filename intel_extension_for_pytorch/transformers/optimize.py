@@ -1514,7 +1514,13 @@ def optimize(
                     ),
                 )
             elif dtype is torch.bfloat16:
-                _model = ipex.optimize(model.eval(), dtype=dtype, inplace=inplace)
+                _model = ipex.optimize(
+                    model.eval(),
+                    dtype=dtype,
+                    inplace=inplace,
+                    conv_bn_folding=False,
+                    linear_bn_folding=False,
+                )
             elif dtype is torch.half:
                 _model = ipex.optimize(
                     model.eval(),
