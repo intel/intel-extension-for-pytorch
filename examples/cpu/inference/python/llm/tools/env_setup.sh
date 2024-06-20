@@ -218,3 +218,6 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     fi
     ln -s ../prompt.json
 fi
+
+# Install a legacy numpy version to avoid compatibility issue with deepspeed
+python -m pip install numpy==1.26.4 --force-reinstall
