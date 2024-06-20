@@ -9,6 +9,7 @@ from intel_extension_for_pytorch.transformers.models.cpu.fusions.linear_fusion i
     _IPEXlinearSiluCPU,
     _IPEXlinearSiluMulCPU,
     _IPEXlinearSiluAndMulCPU,
+    _IPEXlinearMOECPU,
 )
 
 from intel_extension_for_pytorch.transformers.models.cpu.fusions.mha_fusion import (
@@ -37,6 +38,7 @@ class IPEXCustomOpType(Enum):
     FAST_LAYERNORM: int = 12
     VARLEN_ATTENTION: int = 13
     INDIRECTACCESS_KVCACHE_ATTENTION: int = 14
+    LINEAR_MOE: int = 15
 
 
 CPU_fusion_modules = {
@@ -55,6 +57,7 @@ CPU_fusion_modules = {
     IPEXCustomOpType.LINEAR_ADD: _IPEXlinearAddCPU,
     IPEXCustomOpType.LINEAR_ADD_ADD: _IPEXlinearAddAddCPU,
     IPEXCustomOpType.LINEAR_MUL: _IPEXlinearMulCPU,
+    IPEXCustomOpType.LINEAR_MOE: _IPEXlinearMOECPU,
 }
 
 

@@ -1,4 +1,5 @@
 import torch.nn as nn
+import intel_extension_for_pytorch
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
 )
@@ -51,6 +52,11 @@ class IPEXLinear2Fusion(nn.Module):
             ),
             woq=isinstance(self.linear, WeightOnlyQuantizedLinear),
         )
+
+
+LinearMOE = (
+    intel_extension_for_pytorch.transformers.models.cpu.fusions.linear_fusion._IPEXlinearMOECPU
+)
 
 
 class LinearSilu(IPEXLinearFusion):
