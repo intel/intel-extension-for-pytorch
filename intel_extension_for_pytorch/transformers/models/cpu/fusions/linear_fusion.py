@@ -669,5 +669,19 @@ class _IPEXlinearMOECPU(nn.Module):
                         final_hidden_states,
                         False,
                     )
+            else:
+                # nn.Linear
+                final_hidden_states = torch.ops.torch_ipex.mixtral_moe_tpp(
+                    hidden_states,
+                    top_x,
+                    idx,
+                    self.linear_module_list[expert_idx][0].weight.detach(),
+                    self.linear_module_list[expert_idx][2].weight.detach(),
+                    self.linear_module_list[expert_idx][1].weight.detach(),
+                    True,
+                    routing_weights,
+                    final_hidden_states,
+                    False,
+                )
 
         return final_hidden_states.view(-1, head_dim)
