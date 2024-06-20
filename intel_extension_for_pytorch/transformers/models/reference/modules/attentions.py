@@ -2421,7 +2421,8 @@ class _IPEXAttentionRef(nn.Module):
             )
 
             ds_modules = may_import_deepspeed_modules()
-            supported_linear_types.extend(ds_modules)
+            if ds_modules is not None:
+                supported_linear_types.extend(ds_modules)
             supported_linear_types = tuple(supported_linear_types)
             if (
                 hasattr(module, "q_proj")
