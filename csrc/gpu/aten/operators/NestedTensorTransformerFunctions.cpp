@@ -556,11 +556,9 @@ void remove_padding_kernelLauncher(
     const int* output_sizes,
     int output_dim,
     const int batch_size) {
-  std::cout << "inside remove_padding_kernelLauncher\n" << std::endl;
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto max_wg_size = dpcppMaxWorkGroupSize();
   if (output_dim == 2) {
-    std::cout << "output_dim=2\n";
     auto cgf = DPCPP_Q_CGF(cgh) {
       impl::remove_padding_2_functor<T> kfn(
           input,
@@ -579,8 +577,6 @@ void remove_padding_kernelLauncher(
     };
     DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
   } else {
-    std::cout << "output_dim!=2\n";
-
     auto cgf = DPCPP_Q_CGF(cgh) {
       impl::remove_padding_functor<T> kfn(
           input,
@@ -811,14 +807,6 @@ Tensor _nested_from_padded(
     auto offsets_ptr = target_offsets.data_ptr<int>();
 
     Tensor padded_contiguous = padded.contiguous();
-    std::cout << "padded_contiguous:" << padded_contiguous << std::endl;
-    std::cout << "output:" << output << std::endl;
-    std::cout << "input_size_ptr:" << padded_sizes_tensor << std::endl;
-    std::cout << "output_size_ptr:" << target_size_sizes << std::endl;
-    std::cout << "padded_contiguous dim :" << padded_contiguous.dim()
-              << std::endl;
-    std::cout << "padded_contiguous size:" << padded_contiguous.sizes()[0]
-              << std::endl;
 
     if (padded.dtype() == at::kFloat) {
       if (do_transform_0213) {

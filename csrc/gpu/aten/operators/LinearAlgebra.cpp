@@ -464,7 +464,6 @@ Tensor& cholesky_inverse_out(const Tensor& self, bool upper, Tensor& out) {
 
 Tensor cholesky_inverse(const Tensor& self, bool upper) {
   Tensor out = native::cloneBatchedColumnMajor(self);
-  ;
   return AtenIpexTypeXPU::cholesky_inverse_out(self, upper, out);
 }
 
