@@ -1025,18 +1025,14 @@ def get_dummy_input(_model, return_dict=False):
             ]
         )
         if return_dict:
-            sample_inputs["input_ids"] = sample_inputs["input_ids"].repeat(
-                batch_size, 1
-            )
-            sample_inputs["attention_mask"] = sample_inputs["attention_mask"].repeat(
-                batch_size, 1
-            )
+            sample_inputs["input_ids"] = torch.ones(batch_size, 1).to(torch.long)
+            sample_inputs["attention_mask"] = torch.ones(batch_size, 1)
             sample_inputs["pixel_values"] = torch.zeros(batch_size, 3, 224, 224)
             sample_inputs["past_key_values"] = past_key_values
         else:
             sample_inputs = (
-                input_ids.repeat(_model.config.batch_size, 1),
-                attention_mask.repeat(_model.config.batch_size, 1),
+                torch.ones(batch_size, 1).to(torch.long),
+                torch.ones(batch_size, 1),
                 past_key_values,
                 torch.zeros(_model.config.batch_size, 3, 224, 224),
             )

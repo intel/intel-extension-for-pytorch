@@ -260,6 +260,8 @@ class OptimizeTransformersNightlyTester(TestCase):
         if re.search("t5", model.config.architectures[0], re.IGNORECASE):
             input_dict["decoder_input_ids"] = decoder_input_ids.unsqueeze(0)
         if m.name == "git":
+            input_dict["input_ids"] = torch.ones(1, 1).to(torch.long)
+            input_dict["attention_mask"] = torch.ones(1, 1)
             input_dict["pixel_values"] = torch.zeros(1, 3, 224, 224)
         if m.name == "whisper":
             last_hidden_state = torch.rand([1, 32, 1280])

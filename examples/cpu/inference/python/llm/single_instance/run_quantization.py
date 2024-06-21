@@ -544,8 +544,8 @@ def get_example_inputs(model):
         ]
         pixel_inputs = torch.ones(batch_size, 3, 224, 224)
         example_inputs = (
-            input_ids.unsqueeze(0).repeat(batch_size, 1),
-            attention_mask.unsqueeze(0).repeat(batch_size, 1),
+            torch.ones(batch_size, 1).to(torch.long),
+            torch.ones(batch_size, 1),
             tuple(past_key_value),
             pixel_inputs,
         )

@@ -952,10 +952,8 @@ class LMMS(lmms):
                     self.amp_dtype
                 )
             elif re.search("git", pretrained, re.IGNORECASE):
-                sample_inputs["input_ids"] = input_ids.repeat(self.batch_size, 1)
-                sample_inputs["attention_mask"] = attention_mask.repeat(
-                    self.batch_size, 1
-                )
+                sample_inputs["input_ids"] = torch.ones(batch_size, 1).to(torch.long)
+                sample_inputs["attention_mask"] = torch.ones(batch_size, 1)
                 sample_inputs["pixel_values"] = torch.zeros(batch_size, 3, 224, 224)
                 num_head = self.model.config.num_attention_heads
                 head_dim = int(self.model.config.hidden_size / num_head)
