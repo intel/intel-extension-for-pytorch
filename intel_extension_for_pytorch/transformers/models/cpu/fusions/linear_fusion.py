@@ -417,11 +417,7 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                     self.concat_linear = WeightOnlyQuantizedLinear.from_float(
                         mod, concat_scales, concat_zeros
                     )
-        elif (
-            hasattr(module, "concat_linear")
-            and module.concat_linear is not None
-            and (self.tpp or module.concat_linear.weight.dtype == torch.half)
-        ):
+        elif hasattr(module, "concat_linear") and module.concat_linear is not None:
             self.concat_linear = module.concat_linear
         else:
             for i in range(self.num_concat):
