@@ -2171,6 +2171,7 @@ class TestFusionPattern(JitLlgaTestCase):
                 return x5
 
         patterns = [
+            ["aten::layer_norm", "aten::quantize_per_tensor"],
             [
                 "aten::dequantize",
                 "aten::linear",
@@ -2182,7 +2183,7 @@ class TestFusionPattern(JitLlgaTestCase):
         m = FFN_Residual(1024, 4096).eval()
         x = torch.rand(128, 1024)
         graph = self.checkQuantizeTrace(m, [x], atol=2e-1)
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 3)
         self.assertFused(graph, ["aten::linear", "aten::gelu"])
         self.assertFused(graph, ["aten::linear", "aten::add"])
         self.checkPatterns(graph, patterns)
