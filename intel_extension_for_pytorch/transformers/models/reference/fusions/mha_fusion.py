@@ -1000,7 +1000,7 @@ class _IPEXRMSNormRef(nn.Module):
 class _IPEXPagedAttentionRef:
     @classmethod
     def reshape_and_cache(cls, key, value, key_cache, value_cache, slot_mapping):
-        if key.dtype is torch.bfloat16:
+        if key.dtype in [torch.bfloat16, torch.float16]:
             x = 16 // torch.tensor([], dtype=key.dtype).element_size()
         else:
             x = 32 // torch.tensor([], dtype=key.dtype).element_size()

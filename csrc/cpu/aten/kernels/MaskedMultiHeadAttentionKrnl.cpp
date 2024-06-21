@@ -77,7 +77,7 @@ void reduce_head(
     }
     qk_sum_vec = _mm512_fmadd_ps(q_vec_fp32, k_vec_fp32, qk_sum_vec);
   }
-  attn_w_pos[0] += (at::BFloat16)_mm512_reduce_add_ps(qk_sum_vec);
+  attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
   for (; hsi < head_size; hsi++) {
     k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
     attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
@@ -85,6 +85,7 @@ void reduce_head(
   return;
 }
 
+template <>
 void reduce_head(
     const at::Half* q_ptr_start,
     const at::Half* k_ptr_start,
@@ -107,7 +108,7 @@ void reduce_head(
     }
     qk_sum_vec = _mm512_fmadd_ps(q_vec_fp32, k_vec_fp32, qk_sum_vec);
   }
-  attn_w_pos[0] += (at::Half)_mm512_reduce_add_ps(qk_sum_vec);
+  attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
   for (; hsi < head_size; hsi++) {
     k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
     attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
@@ -1575,6 +1576,22 @@ at::Tensor prepare_4d_causal_attention_mask_kernel_impl(
         past_key_value_length,
         length,
         diagonal);
+  } else if (dtype == at::kHalf) {
+    at::Half* attention_mask_ptr = attention_mask.data_ptr<at::Half>();
+    at::Half* causal_4d_mask_ptr = causal_4d_mask.data_ptr<at::Half>();
+    attention_mask_2d_to_4d<at::Half>(
+        attention_mask_ptr,
+        causal_4d_mask_ptr,
+        finfo_min,
+        batch_size,
+        seq_length,
+        src_length,
+        past_key_value_length,
+        length,
+        diagonal);
+  } else {
+    AT_ASSERT(
+        0, "TPP does not support current dtype %s:%d\n", __FILE__, __LINE__);
   }
 
   return causal_4d_mask;

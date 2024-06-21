@@ -8,6 +8,7 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _using_tpp,
 )
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from ..utils.weight_only_quantization import (
     _is_woq_qconfig,
     _woq_enable_weight_cache_for_large_batch,
@@ -1210,12 +1211,9 @@ def model_convert_lowering(
                         auto_kernel_selection=True,
                     )
                 elif dtype is torch.half:
-                    _model = ipex.optimize(
-                        _model.eval(),
-                        dtype=dtype,
-                        inplace=True,
-                        auto_kernel_selection=True,
-                    )
+                    if core.isa_has_amx_fp16_support():
+                        _enable_tpp()
+                    _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
                 elif dtype is torch.bfloat16:
                     _enable_tpp()
                     _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
@@ -1486,7 +1484,6 @@ def optimize(
                 "Phi3ForCausalLM",
                 "WhisperForConditionalGeneration",
             ]
-
         if well_supported_model:
             check_transformers_for_llm_support()
         else:
@@ -1509,15 +1506,8 @@ def optimize(
                         else False
                     ),
                 )
-            elif dtype is torch.bfloat16:
+            elif dtype in [torch.bfloat16, torch.half]:
                 _model = ipex.optimize(model.eval(), dtype=dtype, inplace=inplace)
-            elif dtype is torch.half:
-                _model = ipex.optimize(
-                    model.eval(),
-                    dtype=dtype,
-                    auto_kernel_selection=True,
-                    inplace=inplace,
-                )
 
             return _model
 

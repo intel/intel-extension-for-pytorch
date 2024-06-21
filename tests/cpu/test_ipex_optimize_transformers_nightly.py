@@ -1,6 +1,7 @@
 import unittest
 import torch
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 import sys
 import subprocess
 import os
@@ -270,10 +271,14 @@ class OptimizeTransformersNightlyTester(TestCase):
                 "encoder_outputs": (last_hidden_state,),
             }
 
-        with torch.no_grad():
+        with torch.no_grad(), torch.cpu.amp.autocast(
+            enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
+            dtype=dtype,
+        ):
             key_hf = ref_m(**input_dict)
         with torch.no_grad(), torch.cpu.amp.autocast(
-            enabled=True if dtype is torch.bfloat16 else False
+            enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
+            dtype=dtype,
         ):
             key_ipex = ipex_m(**input_dict)
         error_message = f"model={m.name}, deployment_mode={deployment_mode}, torchcompile={torchcompile}, return_dict={return_dict}"
@@ -288,6 +293,8 @@ class OptimizeTransformersNightlyTester(TestCase):
 
     def test_model_replacement(self):
         dtypes = [torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         enable_torchcompile = [False, True]
         deployment_mode = [True, False]
         return_dict = [False, True]

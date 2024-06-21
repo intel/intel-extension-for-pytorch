@@ -10,6 +10,7 @@
 #include "tpp/threaded_loops.h"
 #endif
 #include <cstdint>
+#include "../../utils/isa_utils.h"
 #include "tpp/tensor_helper.h"
 #include "tpp/xsmm_functors.h"
 
@@ -136,7 +137,9 @@ inline void tpp_linear_bias(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  constexpr int b_vnni = std::is_same<T, bfloat16>();
+  int b_vnni = std::is_same<T, bfloat16>() ||
+      (std::is_same<T, half>() &&
+       torch_ipex::utils::isa_has_amx_fp16_support());
   auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
       BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
@@ -485,7 +488,9 @@ inline void tpp_linear_gelu(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  constexpr int b_vnni = std::is_same<T, bfloat16>();
+  int b_vnni = std::is_same<T, bfloat16>() ||
+      (std::is_same<T, half>() &&
+       torch_ipex::utils::isa_has_amx_fp16_support());
   auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
       BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
@@ -577,7 +582,9 @@ inline void tpp_linear_gelu_tanh(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  constexpr int b_vnni = std::is_same<T, bfloat16>();
+  int b_vnni = std::is_same<T, bfloat16>() ||
+      (std::is_same<T, half>() &&
+       torch_ipex::utils::isa_has_amx_fp16_support());
   auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
       BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(

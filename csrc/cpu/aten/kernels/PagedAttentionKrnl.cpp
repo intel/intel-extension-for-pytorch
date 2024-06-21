@@ -538,6 +538,18 @@ void single_query_cached_kv_attention_kernel_impl(
         block_size,
         max_context_len,
         alibi_slopes);
+  } else if (out.scalar_type() == at::ScalarType::Half) {
+    single_query_cached_kv_attention_kernel<at::Half>(
+        out,
+        query,
+        key_cache,
+        value_cache,
+        scale,
+        block_tables,
+        context_lens,
+        block_size,
+        max_context_len,
+        alibi_slopes);
   } else {
     TORCH_CHECK(
         false, "Unsupported data type for single_query_cached_kv_attention");
@@ -567,6 +579,9 @@ void reshape_and_cache_cpu_kernel_impl(
         key, value, key_cache, value_cache, slot_mapping);
   } else if (key.scalar_type() == at::ScalarType::BFloat16) {
     reshape_and_cache_kernel<at::BFloat16, at::BFloat16>(
+        key, value, key_cache, value_cache, slot_mapping);
+  } else if (key.scalar_type() == at::ScalarType::Half) {
+    reshape_and_cache_kernel<at::Half, at::Half>(
         key, value, key_cache, value_cache, slot_mapping);
   } else {
     TORCH_CHECK(false, "Unsupported data type for ipex::reshape_and_cache");

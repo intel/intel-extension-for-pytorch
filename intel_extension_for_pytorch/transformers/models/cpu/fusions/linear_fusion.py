@@ -16,7 +16,7 @@ class _IPEXlinearFusionCPU(nn.Module):
         super().__init__()
         self.tpp = tpp
         self.woq = woq
-        self.dtype = linear.weight.dtype if self.tpp else None
+        self.dtype = None if woq else linear.weight.dtype
 
     def extra_repr(self):
         extra_repr_str = f"dtype = {self.dtype}, tpp = {self.tpp}, woq = {self.woq}"

@@ -445,7 +445,10 @@ def _FalconAttention_forward(
             )
     attention_mask_float = (
         (attention_mask * 1.0)
-        .masked_fill(attention_mask.to(torch.bool), float("-1e9"))
+        .masked_fill(
+            attention_mask.to(torch.bool),
+            float("-6e4") if query_layer.dtype == torch.half else float("-1e9"),
+        )
         .to(query_layer.dtype)
     )
 

@@ -708,8 +708,9 @@ at::Tensor ipex_linear_eltwise(
   auto target_type = get_autocast_dtype();
   TORCH_CHECK(
       weight.scalar_type() == at::kBFloat16 ||
+          weight.scalar_type() == at::kHalf ||
           weight.scalar_type() == at::kFloat,
-      "ipex_linear_eltwise only support bfloat16 and float autocast dtype");
+      "ipex_linear_eltwise only support bfloat16, float16 and float autocast dtype");
   // should not autocast weight/bias here since we are using it from op_context,
   // The cast for weight/bias should be only handled in ipex.optimize
   return op.call(

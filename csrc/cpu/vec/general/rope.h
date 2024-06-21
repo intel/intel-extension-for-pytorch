@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
+#include <ATen/cpu/vec/functional.h>
 #include <ATen/cpu/vec/vec.h>
 #include <torch/types.h>
 
@@ -11,7 +12,10 @@ namespace kernel {
 using namespace at::vec;
 
 template <typename scalar_t>
-inline void apply_rope_along_head_kernel(
+inline typename std::enable_if_t<
+    !is_reduced_floating_point_v<scalar_t> && !std::is_same_v<float, scalar_t>,
+    void>
+apply_rope_along_head_kernel(
     scalar_t* in_ptr_start,
     scalar_t* out_ptr_start,
     float* cos_start,
@@ -31,10 +35,11 @@ inline void apply_rope_along_head_kernel(
   }
 }
 
-template <>
-inline void apply_rope_along_head_kernel(
-    float* in_ptr_start,
-    float* out_ptr_start,
+template <typename scalar_t>
+inline typename std::enable_if_t<std::is_same_v<float, scalar_t>, void>
+apply_rope_along_head_kernel(
+    scalar_t* in_ptr_start,
+    scalar_t* out_ptr_start,
     float* cos_start,
     float* sin_start,
     int64_t rotary_ndims,
@@ -64,16 +69,17 @@ inline void apply_rope_along_head_kernel(
   }
 }
 
-template <>
-inline void apply_rope_along_head_kernel(
-    at::BFloat16* in_ptr_start,
-    at::BFloat16* out_ptr_start,
+template <typename scalar_t>
+inline typename std::enable_if_t<is_reduced_floating_point_v<scalar_t>, void>
+apply_rope_along_head_kernel(
+    scalar_t* in_ptr_start,
+    scalar_t* out_ptr_start,
     float* cos_start,
     float* sin_start,
     int64_t rotary_ndims,
     int64_t offset) {
   auto h = 0;
-  using bVec = Vectorized<at::BFloat16>;
+  using bVec = Vectorized<scalar_t>;
   using fVec = Vectorized<float>;
   const int fvec_size = fVec::size();
   const int bvec_size = bVec::size();
@@ -81,8 +87,8 @@ inline void apply_rope_along_head_kernel(
     bVec x = bVec::loadu(in_ptr_start + h);
     bVec y = bVec::loadu(in_ptr_start + h + offset);
     fVec x0, x1, y0, y1;
-    std::tie(x0, x1) = convert_bfloat16_float(x);
-    std::tie(y0, y1) = convert_bfloat16_float(y);
+    std::tie(x0, x1) = convert_to_float<scalar_t>(x);
+    std::tie(y0, y1) = convert_to_float<scalar_t>(y);
     fVec c0 = fVec::loadu(cos_start + h);
     fVec s0 = fVec::loadu(sin_start + h);
     fVec c1 = fVec::loadu(cos_start + h + fvec_size);
@@ -91,8 +97,8 @@ inline void apply_rope_along_head_kernel(
     fVec x_out1 = x1 * c1 - y1 * s1;
     fVec y_out0 = y0 * c0 + x0 * s0;
     fVec y_out1 = y1 * c1 + x1 * s1;
-    bVec x_out = convert_float_bfloat16(x_out0, x_out1);
-    bVec y_out = convert_float_bfloat16(y_out0, y_out1);
+    bVec x_out = convert_from_float<scalar_t>(x_out0, x_out1);
+    bVec y_out = convert_from_float<scalar_t>(y_out0, y_out1);
     x_out.store(out_ptr_start + h);
     y_out.store(out_ptr_start + h + offset);
   }

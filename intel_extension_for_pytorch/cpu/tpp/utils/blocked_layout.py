@@ -19,7 +19,7 @@ def _prod(myList):
 def get_vnni_blocking(dtype):
     if dtype == torch.float32:
         return 1
-    elif dtype == torch.bfloat16:
+    elif dtype in [torch.bfloat16, torch.float16]:
         return 2
     elif dtype == torch.bfloat8:
         return 4

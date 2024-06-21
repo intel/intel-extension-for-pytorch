@@ -1405,6 +1405,8 @@ class TestPrepackCases(TestCase):
                 test_dtypes = [torch.float]
                 if core.onednn_has_bf16_support():
                     test_dtypes.append(torch.bfloat16)
+                if core.onednn_has_fp16_support():
+                    test_dtypes.append(torch.float16)
                 for dtype, feed_sample_input in itertools.product(
                     test_dtypes, [True, False]
                 ):
@@ -1455,6 +1457,8 @@ class TestPrepackCases(TestCase):
                             y_origin, y_ipex.float(), rtol=1e-2, atol=1e-03
                         )
                     else:
+                        if dtype == torch.float16:
+                            scaler = torch.cpu.amp.GradScaler(init_scale=1)
                         model.train()
                         origin_model = copy.deepcopy(model).train()
                         origin_optimizer = SGD(
@@ -1513,8 +1517,13 @@ class TestPrepackCases(TestCase):
                             y2 = ipex_model(x2)
                             loss2 = y2.sum()
                             ipex_optimizer.zero_grad()
-                            loss2.backward()
-                            ipex_optimizer.step()
+                            if dtype == torch.float16:
+                                scaler.scale(loss2).backward()
+                                scaler.step(ipex_optimizer)
+                                scaler.update(new_scale=1.0)
+                            else:
+                                loss2.backward()
+                                ipex_optimizer.step()
                             self.assertEqual(y1, y2.float(), rtol=1e-2, atol=1e-3)
                             self.assertEqual(x1.grad, x2.grad, rtol=1e-2, atol=1e-3)
                             if bias:

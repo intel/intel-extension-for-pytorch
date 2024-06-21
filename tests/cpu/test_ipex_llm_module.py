@@ -2,6 +2,7 @@ import unittest
 import torch
 import math
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from torch.testing._internal.common_utils import TestCase
 import copy
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
@@ -209,16 +210,19 @@ class TestLLMModules(TestCase):
             ipex.llm.modules.LinearRelu,
             ipex.llm.modules.Linear2SiluMul,
         ]
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         with torch.no_grad():
             for i in range(len(ref_scope)):
-                for dtype in [torch.float32, torch.bfloat16]:
+                for dtype in dtypes:
                     for use_ipex_optimize in [True, False]:
                         for use_tpp in [True, False]:
                             model = ref_scope[i]().eval().to(dtype)
                             ref_out = model(x1.to(dtype))
                             if use_ipex_optimize:
                                 if use_tpp:
-                                    if dtype == torch.bfloat16:
+                                    if dtype in [torch.bfloat16, torch.float16]:
                                         _enable_tpp()
                                     else:
                                         continue
@@ -231,7 +235,15 @@ class TestLLMModules(TestCase):
                             else:
                                 model = ipex_scope[i](model.linear_1, model.linear_2)
                             out = model(x2.to(dtype))
-                            self.assertEqual(out, ref_out)
+                            atol = None
+                            rtol = None
+                            if dtype is torch.float16:
+                                atol = 1e-3
+                                rtol = 1e-3
+                            elif dtype is torch.bfloat16:
+                                atol = 1e-3
+                                rtol = 0.016
+                            self.assertEqual(out, ref_out, atol=atol, rtol=rtol)
                             _disable_tpp()
 
     def test_linearfusion_args1(self):
@@ -243,16 +255,19 @@ class TestLLMModules(TestCase):
             ipex.llm.modules.LinearAdd,
             ipex.llm.modules.LinearSiluMul,
         ]
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         with torch.no_grad():
             for i in range(len(ref_scope)):
-                for dtype in [torch.float32, torch.bfloat16]:
+                for dtype in dtypes:
                     for use_ipex_optimize in [True, False]:
                         for use_tpp in [True, False]:
                             model = ref_scope[i]().eval().to(dtype)
                             ref_out = model(x1.to(dtype), x1.to(dtype))
                             if use_ipex_optimize:
                                 if use_tpp:
-                                    if dtype == torch.bfloat16:
+                                    if dtype in [torch.bfloat16, torch.float16]:
                                         _enable_tpp()
                                     else:
                                         continue
@@ -264,7 +279,12 @@ class TestLLMModules(TestCase):
                             model = ipex_scope[i](model.linear)
 
                             out = model(x2.to(dtype), x2.to(dtype))
-                            self.assertEqual(out, ref_out)
+                            atol = None
+                            rtol = None
+                            if dtype is torch.float16:
+                                atol = 1e-3
+                                rtol = 1e-3
+                            self.assertEqual(out, ref_out, atol=atol, rtol=rtol)
                             _disable_tpp()
 
     def test_linearfusion_args2(self):
@@ -272,16 +292,19 @@ class TestLLMModules(TestCase):
         x2 = copy.deepcopy(x1)
         ref_scope = [Linear_add_add]
         ipex_scope = [ipex.llm.modules.LinearAddAdd]
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         with torch.no_grad():
             for i in range(len(ref_scope)):
-                for dtype in [torch.float32, torch.bfloat16]:
+                for dtype in dtypes:
                     for use_ipex_optimize in [True, False]:
                         for use_tpp in [True, False]:
                             model = ref_scope[i]().eval().to(dtype)
                             ref_out = model(x1.to(dtype), x1.to(dtype), x1.to(dtype))
                             if use_ipex_optimize:
                                 if use_tpp:
-                                    if dtype == torch.bfloat16:
+                                    if dtype in [torch.bfloat16, torch.float16]:
                                         _enable_tpp()
                                     else:
                                         continue
@@ -293,7 +316,12 @@ class TestLLMModules(TestCase):
                             model = ipex_scope[i](model.linear)
 
                             out = model(x2.to(dtype), x2.to(dtype), x2.to(dtype))
-                            self.assertEqual(out, ref_out)
+                            atol = None
+                            rtol = None
+                            if dtype is torch.float16:
+                                atol = 1e-4
+                                rtol = 1e-3
+                            self.assertEqual(out, ref_out, atol=atol, rtol=rtol)
                             _disable_tpp()
 
     def test_rmsnorm(self):
@@ -301,7 +329,10 @@ class TestLLMModules(TestCase):
         x2 = copy.deepcopy(x1)
         ref_m = LlamaRMSNorm(4096)
         target_m = ipex.llm.modules.RMSNorm(4096)
-        for dtype in [torch.float32, torch.bfloat16]:
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+        for dtype in dtypes:
             ref_m = LlamaRMSNorm(4096).eval().to(dtype)
             target_m = ipex.llm.modules.RMSNorm(4096).to(dtype)
             ref_out = ref_m(x1.to(dtype))
@@ -359,7 +390,7 @@ class TestLLMModules(TestCase):
 
     def test_add_layernorm(self):
         for add_back in [True, False]:
-            for dtype in [torch.float, torch.bfloat16]:
+            for dtype in [torch.float, torch.bfloat16, torch.float16]:
                 for residual_is_none in [True, False]:
                     weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
                     eps = 1e-6
@@ -387,7 +418,7 @@ class TestLLMModules(TestCase):
 
     def test_add_rmsnorm(self):
         for add_back in [True, False]:
-            for dtype in [torch.float, torch.bfloat16]:
+            for dtype in [torch.float, torch.bfloat16, torch.float16]:
                 for residual_is_none in [True, False]:
                     weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
                     eps = 1e-6
@@ -414,7 +445,7 @@ class TestLLMModules(TestCase):
                     self.assertEqual(ref_out, ipex_out)
 
     def test_gelu_mul(self):
-        for dtype in [torch.float, torch.bfloat16]:
+        for dtype in [torch.float, torch.bfloat16, torch.float16]:
             for approximate in ["tanh", "none"]:
                 x = torch.rand(1, 32, 4096).to(dtype)
                 x_ = copy.deepcopy(x)
@@ -423,7 +454,7 @@ class TestLLMModules(TestCase):
                 self.assertEqual(ref_out, ipex_out)
 
     def test_silu_mul(self):
-        for dtype in [torch.float, torch.bfloat16]:
+        for dtype in [torch.float, torch.bfloat16, torch.float16]:
             x = torch.rand(1, 32, 4096).to(dtype)
             x_ = copy.deepcopy(x)
             ref_out = silu_mul(x_, x_)

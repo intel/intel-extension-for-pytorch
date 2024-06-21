@@ -349,9 +349,14 @@ std::tuple<at::Tensor, at::Tensor> conv_transpose_backward_weights(
   if (grad_output.scalar_type() == at::ScalarType::Float) {
     mkldnn_grad_weight.init(
         packed_weight_desc, grad_weight.template data_ptr<float>());
-  } else {
+  } else if (grad_output.scalar_type() == at::ScalarType::BFloat16) {
     mkldnn_grad_weight.init(
         packed_weight_desc, grad_weight.template data_ptr<c10::BFloat16>());
+  } else if (grad_output.scalar_type() == at::ScalarType::Half) {
+    mkldnn_grad_weight.init(
+        packed_weight_desc, grad_weight.template data_ptr<c10::Half>());
+  } else {
+    TORCH_CHECK(false, "only fp32, bf16, and fp16 are supported");
   }
 
   std::vector<int64_t> real_weight_size = {

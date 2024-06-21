@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iostream>
 #include <vector>
+#include "../../utils/isa_utils.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -27,6 +28,11 @@ at::Tensor tpp_linear_bias_kernel_impl(
     torch_ipex::tpp::tpp_linear_bias<float>(t_in, t_wt, t_bias, t_out);
   } else if (dt == at::kBFloat16) {
     torch_ipex::tpp::tpp_linear_bias<at::BFloat16>(t_in, t_wt, t_bias, t_out);
+  } else if (dt == at::kHalf) {
+    TORCH_CHECK(
+        torch_ipex::utils::isa_has_amx_fp16_support(),
+        "TPP does not support fp16 on platforms without amx_fp16 support");
+    torch_ipex::tpp::tpp_linear_bias<at::Half>(t_in, t_wt, t_bias, t_out);
   } else {
     AT_ASSERT(
         0,
@@ -52,6 +58,11 @@ at::Tensor tpp_linear_nobias_kernel_impl(
     torch_ipex::tpp::tpp_linear_no_bias<float>(t_in, t_wt, t_out);
   } else if (dt == at::kBFloat16) {
     torch_ipex::tpp::tpp_linear_no_bias<at::BFloat16>(t_in, t_wt, t_out);
+  } else if (dt == at::kHalf) {
+    TORCH_CHECK(
+        torch_ipex::utils::isa_has_amx_fp16_support(),
+        "TPP does not support fp16 on platforms without amx_fp16 support");
+    torch_ipex::tpp::tpp_linear_no_bias<at::Half>(t_in, t_wt, t_out);
   } else {
     AT_ASSERT(
         0,
@@ -92,6 +103,16 @@ at::Tensor tpp_linear_gelu_kernel_impl(
       torch_ipex::tpp::tpp_linear_gelu_tanh<at::BFloat16>(
           t_in, t_wt, t_bias, t_out);
     }
+  } else if (dt == at::kHalf) {
+    TORCH_CHECK(
+        torch_ipex::utils::isa_has_amx_fp16_support(),
+        "TPP does not support fp16 on platforms without amx_fp16 support");
+    if (algorithm == "none") {
+      torch_ipex::tpp::tpp_linear_gelu<at::Half>(t_in, t_wt, t_bias, t_out);
+    } else { // tanh
+      torch_ipex::tpp::tpp_linear_gelu_tanh<at::Half>(
+          t_in, t_wt, t_bias, t_out);
+    }
   } else {
     AT_ASSERT(
         0,
@@ -124,6 +145,12 @@ at::Tensor tpp_fused_gate_up_proj_kernel_impl(
   } else if (dt == at::kBFloat16) {
     torch_ipex::tpp::tpp_fused_gate_up_proj<at::BFloat16>(
         t_in, t_wt_gate, t_bias_gate, t_wt_up, t_bias_up, t_out);
+  } else if (dt == at::kHalf) {
+    TORCH_CHECK(
+        torch_ipex::utils::isa_has_amx_fp16_support(),
+        "TPP does not support fp16 on platforms without amx_fp16 support");
+    torch_ipex::tpp::tpp_fused_gate_up_proj<at::Half>(
+        t_in, t_wt_gate, t_bias_gate, t_wt_up, t_bias_up, t_out);
   } else {
     AT_ASSERT(
         0,
@@ -149,6 +176,11 @@ at::Tensor tpp_linear_silu_kernel_impl(
     torch_ipex::tpp::tpp_linear_silu<float>(t_in, t_wt, t_bias, t_out);
   } else if (dt == at::kBFloat16) {
     torch_ipex::tpp::tpp_linear_silu<at::BFloat16>(t_in, t_wt, t_bias, t_out);
+  } else if (dt == at::kHalf) {
+    TORCH_CHECK(
+        torch_ipex::utils::isa_has_amx_fp16_support(),
+        "TPP does not support fp16 on platforms without amx_fp16 support");
+    torch_ipex::tpp::tpp_linear_silu<at::Half>(t_in, t_wt, t_bias, t_out);
   } else {
     AT_ASSERT(
         0,
@@ -174,6 +206,11 @@ at::Tensor tpp_linear_relu_kernel_impl(
     torch_ipex::tpp::tpp_linear_relu<float>(t_in, t_wt, t_bias, t_out);
   } else if (dt == at::kBFloat16) {
     torch_ipex::tpp::tpp_linear_relu<at::BFloat16>(t_in, t_wt, t_bias, t_out);
+  } else if (dt == at::kHalf) {
+    TORCH_CHECK(
+        torch_ipex::utils::isa_has_amx_fp16_support(),
+        "TPP does not support fp16 on platforms without amx_fp16 support");
+    torch_ipex::tpp::tpp_linear_relu<at::Half>(t_in, t_wt, t_bias, t_out);
   } else {
     AT_ASSERT(
         0,
@@ -199,6 +236,12 @@ at::Tensor tpp_linear_add_add_kernel_impl(
   } else if (dt == at::kBFloat16) {
     torch_ipex::tpp::tpp_linear_add_add<at::BFloat16>(
         t_in, t_in1, t_in2, t_wt, t_bias, t_out, scale);
+  } else if (dt == at::kHalf) {
+    TORCH_CHECK(
+        torch_ipex::utils::isa_has_amx_fp16_support(),
+        "TPP does not support fp16 on platforms without amx_fp16 support");
+    torch_ipex::tpp::tpp_linear_add_add<at::Half>(
+        t_in, t_in1, t_in2, t_wt, t_bias, t_out, scale);
   } else {
     AT_ASSERT(
         0,
@@ -223,6 +266,12 @@ at::Tensor tpp_linear_add_kernel_impl(
   } else if (dt == at::kBFloat16) {
     torch_ipex::tpp::tpp_linear_add<at::BFloat16>(
         t_in, t_in1, t_wt, t_bias, t_out, scale);
+  } else if (dt == at::kHalf) {
+    TORCH_CHECK(
+        torch_ipex::utils::isa_has_amx_fp16_support(),
+        "TPP does not support fp16 on platforms without amx_fp16 support");
+    torch_ipex::tpp::tpp_linear_add<at::Half>(
+        t_in, t_in1, t_wt, t_bias, t_out, scale);
   } else {
     AT_ASSERT(
         0,
@@ -245,6 +294,11 @@ at::Tensor tpp_linear_mul_kernel_impl(
   } else if (dt == at::kBFloat16) {
     torch_ipex::tpp::tpp_linear_mul<at::BFloat16>(
         t_in, t_in1, t_wt, t_bias, t_out);
+  } else if (dt == at::kHalf) {
+    TORCH_CHECK(
+        torch_ipex::utils::isa_has_amx_fp16_support(),
+        "TPP does not support fp16 on platforms without amx_fp16 support");
+    torch_ipex::tpp::tpp_linear_mul<at::Half>(t_in, t_in1, t_wt, t_bias, t_out);
   } else {
     AT_ASSERT(
         0,
