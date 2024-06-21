@@ -198,7 +198,7 @@ void XPUActivityApi::enablePtiActivities(
       AT_XPU_PTI_CHECK(ptiViewEnable(PTI_VIEW_SYCL_RUNTIME_CALLS));
     }
     if (activity == ActivityType::OVERHEAD) {
-      // ptiViewEnable(PTI_VIEW_COLLECTION_OVERHEAD);
+      AT_XPU_PTI_CHECK(ptiViewEnable(PTI_VIEW_COLLECTION_OVERHEAD));
     }
   }
 
@@ -226,7 +226,7 @@ void XPUActivityApi::disablePtiActivities(
       AT_XPU_PTI_CHECK(ptiViewDisable(PTI_VIEW_SYCL_RUNTIME_CALLS));
     }
     if (activity == ActivityType::OVERHEAD) {
-      // ptiViewDisable(PTI_VIEW_COLLECTION_OVERHEAD);
+      AT_XPU_PTI_CHECK(ptiViewDisable(PTI_VIEW_COLLECTION_OVERHEAD));
     }
   }
   externalCorrelationEnabled_ = false;
