@@ -11,21 +11,9 @@ To use the Kineto supported profiler tool, you need to build Intel® Extension f
 
 ### Build Tool
 
-The build option `USE_KINETO` is switched on by default but you can switch it off via setting `USE_KINETO=OFF` while building Intel® Extension for PyTorch\* from source. Besides, an affiliated build option `USE_ONETRACE` will be automatically switched on following the build option `USE_KINETO`. With `USE_KINETO=OFF`, no Kineto related profiler code will be compiled and all python scripts using Kineto supported profiler with XPU backend will not work. In this case, you can still keep using profiler on CPU backend.
-
-Some affiliated build options are defined for choosing different tracing tools. Currently, only onetrace tool is supported. Configure `USE_KINETO=ON` and `USE_ONETRACE=OFF` will not enable Kineto support in Intel® Extension for PyTorch\* on GPU.
-
-```bash
-[USE_KINETO=ON] python setup.py install     # build from source with Kineto supported profiler tool
-USE_KINETO=OFF python setup.py install      # build from source without Kineto supported profiler tool
-```
-
+Set the build flag `export USE_PTI=1` to enable the PTI-based Kineto Profiler in Intel® Extension for PyTorch*. You must export this environment variable, make sure the PTI-SDK is preinstalled and source PTI by `source ~/intel/oneapi/pti/latest/env/vars.sh` ahead of building Intel® Extension for PyTorch*.
 
 ### Use Tool
-
-#### Set Environment Variable
-
-Set global environment variable `IPEX_ZE_TRACING=1` to enable the level zero tracing layer for tracing kernels and runtime functions. You must export this environment variable ahead of all the run.
 
 #### Add Profiler Into Script
 
@@ -109,10 +97,6 @@ with profiler_setup(profiling=should_profile,
             prof.step()
 ```
 
-#### Disable Tool Partly for XPU Backend
-
-`unset IPEX_ZE_TRACING` to disable the Level-Zero tracing layer which tracing kernels and runtime functions. This operation will not completely disable the profiler on other backend such as CPU or CUDA, but only stops tracing on XPU backend.
-
 #### Profile on Multi-device Application
 
 Follow typical usages for profiling multi-device application. Explicitly call `torch.xpu.synchronize(device_id)` for all involved devices. Such as:
@@ -168,13 +152,3 @@ prof.export_chrome_trace("trace_file.json")
 You can examine the sequence of profiled operators, runtime functions and XPU kernels in these trace viewers. Here shows a trace result for ResNet50 run on XPU backend viewed by Perfetto viewer:
 
 ![profiler_kineto_result_perfetto_viewer](../../images/profiler_kineto/profiler_kineto_result_perfetto_viewer.png)
-
-## Known issues
-
-You may meet an issue that cannot collect profiling information of XPU kernels and device memory operations due to the failures in creating the tracers, when using Kineto profiler based on oneTrace. If you meet such failures that any tracer or collector could not be successfully created, please try the following workaround.
-
-```bash
-export ZE_ENABLE_TRACING_LAYER=1
-```
-
-> Note that this environment variable should be set as global before running any user level applications.

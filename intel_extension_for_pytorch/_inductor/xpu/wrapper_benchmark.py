@@ -1,10 +1,9 @@
 import dataclasses
 import tempfile
 from collections import defaultdict
-import warnings
 
 import torch
-import intel_extension_for_pytorch
+import intel_extension_for_pytorch  # noqa F401
 from torch.autograd import DeviceType
 
 from torch._inductor.wrapper_benchmark import get_kernel_category
@@ -249,12 +248,6 @@ def compiled_module_main(benchmark_name, benchmark_compiled_module_fn):
         # This is a known issue. So we strongly recommend setting
         # torch._inductor.config.compile_threads=1 to profile using only one
         # process.
-        if not intel_extension_for_pytorch._C._is_onetrace_enabled():
-            warnings.warn(
-                "Level Zero Tracer is disabled. Please set environment variable `IPEX_ZE_TRACING=1` to profile on XPU device."  # noqa: B950
-            )
-            return
-
         with torch.profiler.profile(record_shapes=True) as p:
             benchmark_compiled_module_fn(times=times, repeat=repeat)
 

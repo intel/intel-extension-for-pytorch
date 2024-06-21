@@ -6,7 +6,6 @@
 
 # export PROFILE=1
 # export KINETO=1
-# export IPEX_ZE_TRACING=1
 # export DNNL_VERBOSE=1
 
 # settings for torchccl

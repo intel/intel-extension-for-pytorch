@@ -4,7 +4,6 @@ export CCL_PROCESS_LAUNCHER=none
 # profiling set
 # export PROFILE=1
 # export KINETO=1
-# export IPEX_ZE_TRACING=1
 
 # settings for torch-ccl
 export TORCH_LLM_ALLREDUCE=1
