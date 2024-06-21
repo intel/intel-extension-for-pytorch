@@ -1803,8 +1803,10 @@ std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> native_batch_norm_out(
   // implementation
   bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
 
-  if (input.is_quantized() || adopt_onednn_path) {
+  if (input.is_quantized())
     real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
+  else if (adopt_onednn_path) {
+    real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, input);
   } else {
     real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
   }
@@ -4289,7 +4291,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> native_batch_norm_backward(
   // implementation
   bool adopt_onednn_path = onednn_nhwc_optimized && onednn_block_size > 1;
   if (adopt_onednn_path) {
-    real_eng = torch_ipex::xpu::COMPUTE_ENG::ONEDNN;
+    real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, input);
   } else {
     real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
   }
