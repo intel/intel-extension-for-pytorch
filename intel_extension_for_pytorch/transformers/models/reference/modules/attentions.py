@@ -152,7 +152,7 @@ def _LlamaAttention_forward(
             self.head_dim,
             self.head_dim // 2,
             self.head_dim,
-            kv_seq_len,
+            None,
             self.concat_qkv.num_concat,
         )
     else:
@@ -168,7 +168,7 @@ def _LlamaAttention_forward(
             self.head_dim,
             self.head_dim // 2,
             self.head_dim,
-            kv_seq_len,
+            None,
         )
         query = self._IPEXROPE(
             query,
@@ -177,7 +177,7 @@ def _LlamaAttention_forward(
             self.head_dim,
             self.head_dim // 2,
             self.head_dim,
-            kv_seq_len,
+            None,
         )
 
     if use_cache:
