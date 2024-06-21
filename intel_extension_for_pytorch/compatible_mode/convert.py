@@ -227,6 +227,8 @@ class WrapHelper:
 
             class fake_device(metaclass=device_meta_class):
                 def __new__(cls, ss, i=0):
+                    if isinstance(ss, pre_device_class):
+                        return pre_device_class("xpu") if ss.type != "xpu" else ss
                     ss = ss.replace("cuda", "xpu")
                     return (
                         pre_device_class(ss)
