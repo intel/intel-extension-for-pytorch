@@ -1,7 +1,7 @@
 From 94557b0f6f97b521cfeae3e4112c79d073b8d09a Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Tue, 21 May 2024 10:11:53 +0800
-Subject: [PATCH 22/25] [XPU] call empty_cache for dynamo tests (#126377)
+Subject: [PATCH 22/32] [XPU] call empty_cache for dynamo tests (#126377)
  (#245)
 
 When running a batch of models, lacking `empty_cache()` would result in OOM for subsequent models.

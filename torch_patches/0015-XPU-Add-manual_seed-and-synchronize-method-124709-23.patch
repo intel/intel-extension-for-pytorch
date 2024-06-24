@@ -1,7 +1,7 @@
 From d3624bb30a0dbb3aaa423aa5396679ea4d61282f Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Mon, 6 May 2024 14:52:42 +0800
-Subject: [PATCH 15/25] [XPU] Add manual_seed and synchronize method (#124709)
+Subject: [PATCH 15/32] [XPU] Add manual_seed and synchronize method (#124709)
  (#239)
 
 This PR set the following device-specific settings for xpu(Intel GPU) specific:

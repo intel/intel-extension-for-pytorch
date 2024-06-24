@@ -1,7 +1,7 @@
 From 4e512f4529929f06e047760a7cff62305e81fa92 Mon Sep 17 00:00:00 2001
 From: Nikita Shulga <2453524+malfet@users.noreply.github.com>
 Date: Tue, 7 May 2024 16:56:13 +0000
-Subject: [PATCH 19/25] [Profiler] Do not emit a warning when using CPU
+Subject: [PATCH 19/32] [Profiler] Do not emit a warning when using CPU
  profiler (#125654)
 
 This fixes a logic regression introduced by https://github.com/pytorch/pytorch/pull/123247 where

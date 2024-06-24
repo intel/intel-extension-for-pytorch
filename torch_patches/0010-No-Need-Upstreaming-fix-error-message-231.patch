@@ -1,7 +1,7 @@
 From 6cb6ecef660042cdeab7b6e8b03ae5586074b57e Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Mon, 15 Apr 2024 10:07:12 +0800
-Subject: [PATCH 10/25] [No Need Upstreaming] fix error message (#231)
+Subject: [PATCH 10/32] [No Need Upstreaming] fix error message (#231)
 
 ---
  c10/xpu/XPUFunctions.cpp | 4 ++--

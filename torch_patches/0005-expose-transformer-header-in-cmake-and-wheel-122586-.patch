@@ -1,7 +1,7 @@
 From bd0cbc4849346a063d2a8c4d93119b209fc3b5fe Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Wed, 3 Apr 2024 15:44:34 +0800
-Subject: [PATCH 05/25] expose transformer header in cmake and wheel (#122586)
+Subject: [PATCH 05/32] expose transformer header in cmake and wheel (#122586)
  (#222)
 
 expose transformer header in cmake and wheel, some utils functions are used in nested transformer development on IPEX side

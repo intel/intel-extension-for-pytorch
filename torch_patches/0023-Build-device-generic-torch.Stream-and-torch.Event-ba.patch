@@ -1,7 +1,7 @@
 From be4074489c1d22af03bc934d1106ed94ce93036e Mon Sep 17 00:00:00 2001
 From: egienvalue <junluo@meta.com>
 Date: Tue, 23 Apr 2024 13:17:37 -0700
-Subject: [PATCH 23/25] Build device generic torch.Stream and torch.Event based
+Subject: [PATCH 23/32] Build device generic torch.Stream and torch.Event based
  on c10::Stream/Event (#123611)
 
 This diff intends to build device generic torch.Stream and torch.Event for newly added accelerators in PyTorch.

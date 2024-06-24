@@ -1,7 +1,7 @@
 From dc92270d8feca8db9935dea36b7883dcbf4c38fa Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Tue, 23 Apr 2024 09:34:46 +0000
-Subject: [PATCH 13/25] refactor autocast python APIs (#124479)
+Subject: [PATCH 13/32] refactor autocast python APIs (#124479)
 
 Refactor autocast usage scenario in `torch/amp/autocast_mode.py` and `torch/utils/checkpoint.py` to fix the bug - convention conflict between `torch.xxx.get_autocast_xxx_dtype` defined in `autocast_mode.py` and `torch.xxx.get_autocast_dtype` defined in `checkpoint.py`.
 

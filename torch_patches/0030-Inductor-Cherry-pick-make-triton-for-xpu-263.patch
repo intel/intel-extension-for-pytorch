@@ -1,0 +1,91 @@
+From f7189c4661ea91a9394c47fcaa2c58d9e014ecb2 Mon Sep 17 00:00:00 2001
+From: Stonepia <tong.su@intel.com>
+Date: Fri, 21 Jun 2024 10:13:58 +0800
+Subject: [PATCH 30/32] [Inductor] Cherry-pick `make triton` for xpu (#263)
+
+* [XPU] Add xpu support of `make triton` (#126513)
+
+This PR is to add XPU support for `make triton`.
+
+If a user wishes to use Triton with XPU support, the user needs to install the  [intel-xpu-backend-for-triton](https://github.com/intel/intel-xpu-backend-for-triton).
+
+This PR allows the user to easily install Triton for xpu backend support:
+
+```
+# clone the pytorch repo
+export USE_XPU=1
+make triton
+```
+The XPU version of triton will always be built from the source. It will cat the commit id from `.ci/docker/ci_commit_pins/triton-xpu.txt`, for example, `b8c64f64c18d8cac598b3adb355c21e7439c21de`.
+
+So the final call would be like:
+
+```
+pip install --force-reinstall "git+https://github.com/intel/intel-xpu-backend-for-triton@b8c64f64c18d8cac598b3adb355c21e7439c21de#subdirectory=python"
+```
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/126513
+Approved by: https://github.com/EikanWang, https://github.com/atalman
+
+* Update triton-xpu commit
+---
+ .ci/docker/ci_commit_pins/triton-xpu.txt |  1 +
+ README.md                                |  1 +
+ scripts/install_triton_wheel.sh          | 22 +++++++++++++++++-----
+ 3 files changed, 19 insertions(+), 5 deletions(-)
+ create mode 100644 .ci/docker/ci_commit_pins/triton-xpu.txt
+
+diff --git a/.ci/docker/ci_commit_pins/triton-xpu.txt b/.ci/docker/ci_commit_pins/triton-xpu.txt
+new file mode 100644
+index 00000000000..10cf35c79d5
+--- /dev/null
++++ b/.ci/docker/ci_commit_pins/triton-xpu.txt
+@@ -0,0 +1 @@
++d72e1e65c78b7b79405023e684338697579ea391
+diff --git a/README.md b/README.md
+index 3ff42586109..0f55451aefc 100644
+--- a/README.md
++++ b/README.md
+@@ -200,6 +200,7 @@ conda install -c pytorch magma-cuda110  # or the magma-cuda* that matches your C
+ 
+ # (optional) If using torch.compile with inductor/triton, install the matching version of triton
+ # Run from the pytorch directory after cloning
++# For Intel GPU support, please explicitly `export USE_XPU=1` before running command.
+ make triton
+ ```
+ 
+diff --git a/scripts/install_triton_wheel.sh b/scripts/install_triton_wheel.sh
+index 269b80d0759..793c9a604ed 100755
+--- a/scripts/install_triton_wheel.sh
++++ b/scripts/install_triton_wheel.sh
+@@ -1,11 +1,23 @@
+ #!/bin/bash
+ # Updates Triton to the pinned version for this copy of PyTorch
+ BRANCH=$(git rev-parse --abbrev-ref HEAD)
+-TRITON_VERSION="pytorch-triton==$(cat .ci/docker/triton_version.txt)"
+-DOWNLOAD_PYTORCH_ORG="https://download.pytorch.org/whl"
+ 
+-if [[ "$BRANCH" =~ .*release.* ]]; then
+-    pip install --index-url ${DOWNLOAD_PYTORCH_ORG}/test/ $TRITON_VERSION
++if [[ -z "${USE_XPU}" ]]; then
++    # Default install from PyTorch source
++
++    TRITON_VERSION="pytorch-triton==$(cat .ci/docker/triton_version.txt)"
++    DOWNLOAD_PYTORCH_ORG="https://download.pytorch.org/whl"
++    if [[ "$BRANCH" =~ .*release.* ]]; then
++        pip install --index-url ${DOWNLOAD_PYTORCH_ORG}/test/ $TRITON_VERSION
++    else
++        pip install --index-url ${DOWNLOAD_PYTORCH_ORG}/nightly/ $TRITON_VERSION+$(head -c 10 .ci/docker/ci_commit_pins/triton.txt)
++    fi
+ else
+-    pip install --index-url ${DOWNLOAD_PYTORCH_ORG}/nightly/ $TRITON_VERSION+$(head -c 10 .ci/docker/ci_commit_pins/triton.txt)
++    # Always install Triton for XPU from source
++
++    TRITON_XPU_REPO="https://github.com/intel/intel-xpu-backend-for-triton"
++    TRITON_XPU_COMMIT_ID="$(cat .ci/docker/ci_commit_pins/triton-xpu.txt)"
++
++    # force-reinstall to ensure the pinned version is installed
++    pip install --force-reinstall "git+${TRITON_XPU_REPO}@${TRITON_XPU_COMMIT_ID}#subdirectory=python"
+ fi
+-- 
+2.34.1
+
