@@ -195,13 +195,13 @@ inline void _dil_div_add_reduce_max_fusion_kernel_half(
     const int& size,
     at::Half* out,
     at::Half& max) {
-  auto vec_ps_min = _mm512_set1_ph((at::Half)(-65504.0));
+  auto vec_ps_min = _mm512_set1_ph(-65504.0f16);
   auto vec_a = vec_ps_min;
   auto vec_b = vec_ps_min;
   auto vec_out = vec_ps_min;
 
   int i = 0;
-  auto vec_r_dim_per_head = _mm512_set1_ph((at::Half)(1.0 / dim_per_head));
+  auto vec_r_dim_per_head = _mm512_set1_ph(_Float16(1.0 / dim_per_head));
   for (; i <= size - 32; i += 32) {
     vec_a = _loadu_half(a + i);
     vec_b = _loadu_half(b + i);
@@ -304,9 +304,9 @@ inline void _dil_exp_reduce_sum_fusion_kernel_half(
     const int& size,
     at::Half* out,
     at::Half& val) {
-  static auto vec_zero = _mm512_set1_ph((at::Half)(0.0));
-  auto vec_max = _mm512_set1_ph(val);
-  auto vec_sum = _mm512_set1_ph(at::Half(0.0));
+  static auto vec_zero = _mm512_set1_ph(0.0f16);
+  auto vec_max = _mm512_set1_ph(*(_Float16*)&val);
+  auto vec_sum = _mm512_set1_ph(0.0f16);
   __m512h vec_a = {};
   __m512h vec_out = {};
 
@@ -364,7 +364,7 @@ inline void _dil_normalization_kernel_half(
     const at::Half& sum,
     const int& size,
     at::Half* out) {
-  auto vec_sum = _mm512_set1_ph(sum);
+  auto vec_sum = _mm512_set1_ph(*(_Float16*)&sum);
   __m512h vec_a = {};
   __m512h vec_out = {};
 
