@@ -226,8 +226,9 @@ struct mse_backward_kernel_functor {
 };
 
 void mse_backward_kernel(TensorIterator& iter, Scalar norm) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
+      at::ScalarType::Half,
       iter.dtype(),
       "mse_backward_kernel",
       [&iter, &norm] {
