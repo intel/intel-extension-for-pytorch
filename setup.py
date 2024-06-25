@@ -210,6 +210,7 @@ def _build_installation_dependency():
     install_requires.append("numpy")
     install_requires.append("packaging")
     install_requires.append("pydantic")
+    install_requires.append("ruamel.yaml")
     return install_requires
 
 
