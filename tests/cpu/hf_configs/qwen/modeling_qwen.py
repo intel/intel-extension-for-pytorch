@@ -1297,16 +1297,15 @@ class QWenLMHeadModel(QWenPreTrainedModel):
         stop_words_ids.extend(
             get_stop_words_ids(generation_config.chat_format, tokenizer)
         )
-        if stop_words_ids is not None:
-            assert hasattr(generation_config, "eos_token_id")
-            stop_words_logits_processor = StopWordsLogitsProcessor(
-                stop_words_ids=stop_words_ids,
-                eos_token_id=generation_config.eos_token_id,
-            )
-            if logits_processor is None:
-                logits_processor = LogitsProcessorList([stop_words_logits_processor])
-            else:
-                logits_processor.append(stop_words_logits_processor)
+        assert hasattr(generation_config, "eos_token_id")
+        stop_words_logits_processor = StopWordsLogitsProcessor(
+            stop_words_ids=stop_words_ids,
+            eos_token_id=generation_config.eos_token_id,
+        )
+        if logits_processor is None:
+            logits_processor = LogitsProcessorList([stop_words_logits_processor])
+        else:
+            logits_processor.append(stop_words_logits_processor)
         input_ids = torch.tensor([context_tokens]).to(self.device)
 
         from transformers_stream_generator.main import (
