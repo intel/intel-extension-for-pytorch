@@ -75,4 +75,6 @@ sycl::event matmul(
     bool m2_trans,
     torch_ipex::xpu::oneDNN::Attr attr,
     const std::vector<sycl::event>& deps = {});
+
+sycl::event dot_matmul(Tensor& result, const Tensor& mat1, const Tensor mat2);
 } // namespace torch_ipex::xpu::oneDNN

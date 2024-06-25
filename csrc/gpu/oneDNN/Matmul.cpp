@@ -390,5 +390,67 @@ sycl::event matmul(
   return output_event;
 }
 
+sycl::event dot_matmul(Tensor& result, const Tensor& mat1, const Tensor mat2) {
+  at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
+  auto engine = xpu::oneDNN::GpuEngineManager::Instance().get_engine(curDevice);
+  auto engine_index = curDevice.index();
+  auto strm = xpu::oneDNN::GpuStreamManager::Instance().get_stream();
+
+  Tensor m1 =
+      xpu::oneDNN::is_onednn_matmul_strides(mat1) ? mat1 : mat1.contiguous();
+  Tensor m2 =
+      xpu::oneDNN::is_onednn_matmul_strides(mat2) ? mat2 : mat2.contiguous();
+  Tensor dst = xpu::oneDNN::is_onednn_matmul_strides(result, true)
+      ? result
+      : result.contiguous();
+
+  const auto M = 1;
+  const auto K = mat1.sizes()[1];
+  const auto N = 1;
+
+  auto m1_dt = xpu::oneDNN::get_onednn_dtype_include_double(m1);
+  auto m2_dt = xpu::oneDNN::get_onednn_dtype_include_double(m2);
+  auto dst_dt = xpu::oneDNN::get_onednn_dtype_include_double(dst);
+
+  memory::dims m1_dims = {M, K};
+  memory::dims m2_dims = {K, N};
+  memory::dims dst_dims = {M, N};
+
+  memory::dims m1_strides = {m1.stride(0), m1.stride(1)};
+  memory::dims m2_strides = {m2.stride(0), m2.stride(1)};
+  memory::dims dst_strides = {1, 1};
+
+  auto m1_md = memory::desc(m1_dims, m1_dt, m1_strides);
+  auto m2_md = memory::desc(m2_dims, m2_dt, m2_strides);
+  auto dst_md = memory::desc(dst_dims, dst_dt, dst_strides);
+
+  auto m1_usr_md = m1_md;
+  auto m2_usr_md = m2_md;
+  auto dst_usr_md = dst_md;
+
+  primitive_attr pattr;
+  dnnl::matmul::primitive_desc matmul_pd =
+      matmul::primitive_desc(engine, m1_md, m2_md, dst_md, pattr);
+  std::unordered_map<int, memory> args;
+  dnnl::matmul matmul_p = dnnl::matmul(matmul_pd);
+
+  auto m1_usr_m =
+      xpu::oneDNN::dpcpp_onednn_memory(m1_usr_md, engine, m1.data_ptr());
+  auto m2_usr_m =
+      xpu::oneDNN::dpcpp_onednn_memory(m2_usr_md, engine, m2.data_ptr());
+  auto dst_usr_m =
+      xpu::oneDNN::dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
+
+  args.insert({DNNL_ARG_SRC, m1_usr_m});
+  args.insert({DNNL_ARG_WEIGHTS, m2_usr_m});
+  args.insert({DNNL_ARG_DST, dst_usr_m});
+
+  std::vector<sycl::event> deps;
+  sycl::event output_event;
+  DPCPP_ONEDNN_EXEC_WITH_EVENT(matmul_p, strm, args, deps, output_event);
+
+  return output_event;
+}
+
 } // namespace oneDNN
 } // namespace torch_ipex::xpu

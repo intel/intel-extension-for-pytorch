@@ -2,12 +2,12 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/LinearAlgebraUtils.h>
 #include <ATen/native/Resize.h>
-
 #include <core/detail/OffsetCalculator.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
 #include <tensor/TensorMeta.h>
 #include <utils/oneMKLUtils.h>
+#include <iostream>
 #include "Loops.h"
 #include "Resize.h"
 #include "comm/ATDispatch.h"
@@ -564,11 +564,25 @@ Tensor dot(const Tensor& self, const Tensor& other) {
       return at::AtenIpexTypeXPU::vdot(other.conj(), self);
     }
   }
-#ifdef USE_ONEMKL
+
+  // oneMKL will cover complex dtype and double, others will use oneDNN
+  // once double is support by oneDNN will use it
   dot_check(self, other);
   Tensor result = at::empty({}, self.options());
+  if (!result.is_complex()) {
+    Tensor self_ = self.reshape({1, self.numel()});
+    Tensor other_ = other.reshape({other.numel(), 1});
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        self.scalar_type(),
+        "dot",
+        [&] { torch_ipex::xpu::oneDNN::dot_matmul(result, self_, other_); });
+    return result;
+  }
 
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(self.scalar_type(), "dot", [&] {
+#ifdef USE_ONEMKL
+  IPEX_DISPATCH_COMPLEX_TYPES(self.scalar_type(), "dot", [&] {
     auto& dpcpp_queue = dpcppGetCurrentQueue();
     impl::mkl_dot<scalar_t>(
         dpcpp_queue,
