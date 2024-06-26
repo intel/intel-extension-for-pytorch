@@ -179,6 +179,33 @@ def main(args_in: Optional[List[str]] = None) -> None:
         " data type is always INT4 and this argument is not needed.",
     )
     parser.add_argument(
+        "--act-quant-mode",
+        choices=[
+            "PER_TENSOR",
+            "PER_IC_BLOCK",
+            "PER_BATCH",
+            "PER_BATCH_IC_BLOCK",
+            "PER_TENSOR_SYM",
+            "PER_IC_BLOCK_SYM",
+            "PER_BATCH_SYM",
+            "PER_BATCH_IC_BLOCK_SYM",
+        ],
+        default="PER_IC_BLOCK",
+        type=str,
+        help="Quantization mode for activation with different granularity. "
+        "For lowp-mode=INT8 only. For other cases, it has no effect. "
+        "Assume the activation tensor has shape batch_size x input_channel. "
+        "PER_TENSOR(0): quantize per tensor; "
+        "PER_IC_BLOCK(1): quantize per group along IC with group size = IC_BLOCK; "
+        "PER_BATCH(2): quantize per batch; "
+        "PER_BATCH_IC_BLOCK(3): quantize per block of size 1 x IC_BLOCK. "
+        "PER_TENSOR_SYM(4): symmetrically quantize per tensor; "
+        "PER_IC_BLOCK_SYM(5): symmetrically quantize per group along IC with group size = IC_BLOCK; "
+        "PER_BATCH_SYM(6): symmetrically quantize per batch; "
+        "PER_BATCH_IC_BLOCK_SYM(7): symmetrically quantize per block of size 1 x IC_BLOCK. "
+        "IC_BLOCK is determined by IC automatically.",
+    )
+    parser.add_argument(
         "--low-precision-checkpoint",
         default="",
         type=str,
@@ -330,6 +357,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--ipex-weight-only-quantization"])
                 infer_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
                 infer_cmd.extend(["--lowp-mode", str(args.lowp_mode)])
+                infer_cmd.extend(["--act-quant-mode", str(args.act_quant_mode)])
                 if args.gptq:
                     print(
                         "LLM RUNTIME INFO: Weight dtype set to INT4 since `--gptq` is sepcified"
@@ -449,6 +477,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--ipex-weight-only-quantization"])
                     quant_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
                     quant_cmd.extend(["--lowp-mode", str(args.lowp_mode)])
+                    quant_cmd.extend(["--act-quant-mode", str(args.act_quant_mode)])
                     if args.gptq:
                         print(
                             "LLM RUNTIME INFO: Weight dtype set to INT4 since `--gptq` is sepcified"
