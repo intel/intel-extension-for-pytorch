@@ -1,0 +1,2 @@
+transformers==4.38.1
+diffusers==0.27.2

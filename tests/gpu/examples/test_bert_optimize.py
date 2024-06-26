@@ -1,12 +1,10 @@
 import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch as ipex
-import pytest
 
 
 class TestBertOptimize(TestCase):
-    @pytest.mark.skipif(True, reason="A develop UT")
-    def test_bert_self_attention_replace(self, dtype=torch.bfloat16):
+    def test_bert_self_attention_replace(self, dtype=torch.half):
         from transformers import BertConfig, AutoModelForPreTraining
 
         config = BertConfig(
@@ -36,8 +34,8 @@ class TestBertOptimize(TestCase):
             attention_mask=attention_mask,
         )
 
-        optimized_model = ipex.optimize_transformers(
-            raw_model, dtype=dtype, device="xpu"
+        optimized_model, _ = ipex.optimize_transformers(
+            raw_model.to("xpu"), dtype=dtype, device="xpu"
         )
         actual_output = optimized_model.bert.encoder.layer[0].attention.self(
             hidden_states=hidden_states.to("xpu"),

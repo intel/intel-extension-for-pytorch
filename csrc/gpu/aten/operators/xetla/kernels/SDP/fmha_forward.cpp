@@ -174,7 +174,7 @@ cgfs_t _fmha_forward_kernel(
         args.is_training,
         args.is_dropout);
   } else {
-    printf("No bf16 for igpu!!\n\n");
+    printf("bfloat16 is not supported on the XeLpg platform\n");
     return {};
   }
 }
