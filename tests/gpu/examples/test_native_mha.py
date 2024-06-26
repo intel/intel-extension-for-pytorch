@@ -152,24 +152,23 @@ class TestTorchMethod(TestCase):
             )
 
             if use_padding:
-                if pad_all:
-                    for q_i in q:
-                        q_i[-1] = torch.zeros_like(
-                            q[0][-1], device=cpu_device, dtype=torch.float32
-                        )
-                    mask = torch.zeros(
-                        q.shape[:-1], device=cpu_device, dtype=torch.bool
-                    )
-                    for mask_i in mask:
-                        mask_i[-1] = True
-                else:
-                    q[0][-1] = torch.zeros_like(
-                        q[0][-1], device=cpu_device, dtype=torch.float32
-                    )
-                    mask = torch.zeros(
-                        q.shape[:-1], device=cpu_device, dtype=torch.bool
-                    )
-                    mask[0][-1] = True
+                # Security Scan: pad_all is False and the following code is logically dead.
+                # if pad_all:
+                #    for q_i in q:
+                #        q_i[-1] = torch.zeros_like(
+                #            q[0][-1], device=cpu_device, dtype=torch.float32
+                #        )
+                #    mask = torch.zeros(
+                #        q.shape[:-1], device=cpu_device, dtype=torch.bool
+                #    )
+                #    for mask_i in mask:
+                #        mask_i[-1] = True
+                # else:
+                q[0][-1] = torch.zeros_like(
+                    q[0][-1], device=cpu_device, dtype=torch.float32
+                )
+                mask = torch.zeros(q.shape[:-1], device=cpu_device, dtype=torch.bool)
+                mask[0][-1] = True
 
             k = (
                 6

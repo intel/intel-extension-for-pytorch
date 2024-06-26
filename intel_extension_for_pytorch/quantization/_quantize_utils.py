@@ -1051,6 +1051,7 @@ def quantize_per_block(
     if dtype == WoqWeightDtype.INT8:
         qmin = -128
         qmax = 127
+        assert zps_com is not None
         qt = torch.clamp(
             torch.round(t_com * inv_scales_com) + zps_com.unsqueeze(-1),
             min=qmin,

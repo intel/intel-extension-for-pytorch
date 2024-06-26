@@ -311,7 +311,10 @@ def unpack_args(f: NativeFunction) -> Tuple[List[str], List[Binding]]:
 
         is_tensor_list = is_tensor_list_type(binding.argument.type)
         ref = (not is_nullable) and not is_tensor_list
-        suffix = "_opt" if is_nullable and not is_tensor_list else ""
+        # Security Scan: if is_nullable is True, loop will continue at #L275
+        # which makes below line dead
+        # suffix = "_opt" if is_nullable and not is_tensor_list else ""
+        suffix = ""
         body.append(
             UNPACK_TENSOR.substitute(
                 arg_name=binding.name,

@@ -3532,10 +3532,11 @@ class CommonTemplate:
     def test_adaptive_avg_pool_with_output_size_0(self):
         # TODO : Tong, skip this
         return
-        m1 = nn.AdaptiveAvgPool1d(0)
-        self.common(m1, (torch.randn(1, 2),))
-        m2 = nn.AdaptiveAvgPool2d(0)
-        self.common(m2, (torch.randn(1, 2, 3),))
+        # Security Scan: Code block is unreachable because of the syntactic structure of the code.
+        #m1 = nn.AdaptiveAvgPool1d(0)
+        #self.common(m1, (torch.randn(1, 2),))
+        #m2 = nn.AdaptiveAvgPool2d(0)
+        #self.common(m2, (torch.randn(1, 2, 3),))
 
     def test_max_pool2d1(self):
         def fn(x):

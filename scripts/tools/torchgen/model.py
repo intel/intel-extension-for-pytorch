@@ -1007,13 +1007,14 @@ class NativeFunction:
     @property
     def has_composite_kernel(self) -> bool:
         return (
-            self.has_composite_implicit_autograd_kernel
-            or self.has_composite_explicit_autograd_kernel
-            or self.has_composite_explicit_autograd_non_functional_kernel
-        ) or (
-            self.has_composite_implicit_autograd_kernel
-            and self.has_composite_implicit_autograd_nested_tensor_kernel
-        )
+            self.has_composite_implicit_autograd_kernel or
+            self.has_composite_explicit_autograd_kernel or
+            self.has_composite_explicit_autograd_non_functional_kernel
+        ) #  or (
+          # Security Scan: If the process goes into the condition, self.has_composite_implicit_autograd_kernel must be false and the condition must be false.
+          #     self.has_composite_implicit_autograd_kernel
+          #     and self.has_composite_implicit_autograd_nested_tensor_kernel
+          # )
 
     @property
     def is_view_op(self) -> bool:
