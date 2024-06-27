@@ -370,7 +370,8 @@ at::Tensor woq_linear_pack_weight(
   // For TPP kernel, we only consider even K
   if (K % 2 == 0) {
     size_t block_n = 32;
-    size_t block_k = group_size > 0 ? std::min(group_size, (int64_t)64) : 64;
+    size_t default_block_k = (weight_dtype == WOQ_DTYPE_INT4 && lowp_mode == 3) ? 128 : 64;
+    size_t block_k = group_size > 0 ? std::min((size_t)group_size, default_block_k) : default_block_k;
     while (K % block_k != 0) {
       block_k /= 2;
     }

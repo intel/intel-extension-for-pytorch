@@ -54,7 +54,7 @@ constexpr bool is_sym_quant(const int qw_type) {
 #if defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
 
 #define QUANT_A_THRESHOLD 30720
-#define SMALL_BATCH_THRESHOLD 32
+#define SMALL_BATCH_THRESHOLD 16
 #define DEQUANT_UPFRONT_THRESHOLD 1024
 #define PARALLEL_M_THRESHOLD 128
 constexpr long PREFETCH_K_DIST = 64; // TODO(jgong5): do not hard-code
@@ -72,6 +72,10 @@ constexpr long LOOP_K_UNROLL = 4; // TODO(jgong5): do not hard-code
 
 #define QUANT_W_PER_CHANNEL 0
 #define QUANT_W_PER_K_BLOCK 1
+
+constexpr bool is_asymmetric_quant_a(const int quant_a_mode) {
+  return quant_a_mode <= QUANT_A_PER_M_K_BLOCK;
+}
 
 // negate elements in a according to b's sign
 static inline __m512i _mm512_sign_epi8(__m512i a, __m512i b) {
@@ -749,7 +753,7 @@ struct GemmMicroKernel<
       vscales[i] = _mm512_loadu_ps(scales + i * 16);
       // TODO(jgong5): should we use 512 or two 256 here?
       vzps[i] = combine_m256i(load_zps_4vnni(zps + i * 16));
-      if (zp_a) {
+      if constexpr (is_asymmetric_quant_a(quant_a_mode)) {
         vcompensate[i] = _mm512_setzero_epi32();
       }
     });
@@ -772,7 +776,7 @@ struct GemmMicroKernel<
       if constexpr (row == 0) {
         vb[col] = combine_m256i(load_int4_as_int8(pqB[k / 4][col * 16]));
         vb[col] = _mm512_sub_epi8(vb[col], vzps[col]);
-        if (zp_a) {
+        if constexpr (is_asymmetric_quant_a(quant_a_mode)) {
           vcompensate[col] =
               _mm512_dpbusd_epi32(vcompensate[col], ones, vb[col]);
         }
@@ -780,7 +784,7 @@ struct GemmMicroKernel<
           _mm_prefetch(pqB[(k + PREFETCH_K_DIST) / 4][col * 16], _MM_HINT_T0);
         }
       }
-      if (zp_a) {
+      if constexpr (is_asymmetric_quant_a(quant_a_mode)) {
         vc[i] = _mm512_dpbusd_epi32(vc[i], va, vb[col]);
       } else {
         auto vsb = _mm512_sign_epi8(vb[col], va);
@@ -814,7 +818,9 @@ struct GemmMicroKernel<
           quant_a_mode == QUANT_A_PER_K_BLOCK ||
           quant_a_mode == QUANT_A_PER_TENSOR_SYM ||
           quant_a_mode == QUANT_A_PER_K_BLOCK_SYM) {
-        if (zp_a) {
+        if constexpr (
+            quant_a_mode == QUANT_A_PER_TENSOR ||
+            quant_a_mode == QUANT_A_PER_K_BLOCK) {
           vc[i] = _mm512_sub_epi32(
               vc[i],
               _mm512_mullo_epi32(vcompensate[col], _mm512_set1_epi32(*zp_a)));
@@ -823,7 +829,7 @@ struct GemmMicroKernel<
         vc_float = _mm512_mul_ps(vc_float, _mm512_set1_ps(*scale_a));
       } else if constexpr (
           quant_a_mode == QUANT_A_PER_M || quant_a_mode == QUANT_A_PER_M_SYM) {
-        if (zp_a) {
+        if constexpr (quant_a_mode == QUANT_A_PER_M) {
           vc[i] = _mm512_sub_epi32(
               vc[i],
               _mm512_mullo_epi32(
@@ -832,7 +838,7 @@ struct GemmMicroKernel<
         vc_float = _mm512_cvtepi32_ps(vc[i]);
         vc_float = _mm512_mul_ps(vc_float, _mm512_set1_ps(*(scale_a + row)));
       } else {
-        if (zp_a) {
+        if constexpr (is_asymmetric_quant_a(quant_a_mode)) {
           vc[i] = _mm512_sub_epi32(
               vc[i],
               _mm512_mullo_epi32(
@@ -1625,17 +1631,19 @@ class DequantGemmTPP<
               quant_a_mode == QUANT_A_PER_M_SYM ||
               quant_a_mode == QUANT_A_PER_M_K_BLOCK_SYM) {
             scale_a_m = scale_a + m * k_groups;
-            if (zp_a) {
+            if constexpr (
+                quant_a_mode == QUANT_A_PER_M ||
+                quant_a_mode == QUANT_A_PER_M_K_BLOCK) {
               zp_a_m = zp_a + m * k_groups;
             }
           } else {
             scale_a_m = scale_a;
-            if (zp_a) {
+            if constexpr (is_asymmetric_quant_a(quant_a_mode)) {
               zp_a_m = zp_a;
             }
           }
           float c = 0;
-          if (zp_a_m) {
+          if constexpr (is_asymmetric_quant_a(quant_a_mode)) {
             c = (qC[m][n] - compensation[n] * (*zp_a_m)) * (*scale_a_m) *
                 scales[n];
           } else {
