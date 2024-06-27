@@ -75,6 +75,8 @@
 # BUILD_OPT_LEVEL       - to add build option -Ox, accept values: 0/1
 # BUILD_NO_CLANGFORMAT  - to build without force clang-format
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path
+# BUILD_WITH_SANITIZER  - use sanitizer check, support one of address, thread, and leak options at a time.
+#                         The default option is address
 #
 ##############################################################
 
@@ -117,6 +119,24 @@ FULL_ENV_VAL = ON_ENV_VAL + OFF_ENV_VAL
 IS_LINUX = platform.system() == "Linux"
 IS_DARWIN = platform.system() == "Darwin"
 IS_WINDOWS = platform.system() == "Windows"
+
+sanitize_value = None
+sanitize_flag = False
+sanitize_pattern = re.compile(r"--sanitize(=.+)?")
+if "-s" in sys.argv:
+    index = sys.argv.index("-s")
+    if index + 1 < len(sys.argv) and not sys.argv[index + 1].startswith("-"):
+        sanitize_value = sys.argv.pop(index + 1)
+    sys.argv.pop(index)
+    sanitize_flag = True
+else:
+    for i, arg in enumerate(sys.argv):
+        if sanitize_pattern.match(arg):
+            match = sanitize_pattern.match(arg)
+            if match.group(1):
+                sanitize_value = match.group(1)[1:]
+            sys.argv.pop(i)
+            sanitize_flag = True
 
 
 @lru_cache(maxsize=128)
@@ -728,7 +748,15 @@ class IPEXCPPLibBuild(build_clib, object):
                     "USE_SYCL_ASSERT": "ON",
                     "USE_ITT_ANNOTATION": "ON",
                 }
-
+            if sanitize_flag:
+                if sanitize_value is not None:
+                    sanitize_options = sanitize_value
+                else:
+                    sanitize_options = "address"  # default value
+                build_option_gpu = {
+                    **build_option_gpu,
+                    "BUILD_WITH_SANITIZER": sanitize_options,
+                }
             cmake_args_gpu = cmake_common_args[:]
             define_build_options(cmake_args_gpu, **build_option_gpu)
             my_env_local = my_env.copy()

@@ -29,6 +29,7 @@ option(BUILD_INTERNAL_DEBUG "Use internal debug code path" OFF)
 option(BUILD_SEPARATE_OPS "Build each operator in separate library" OFF)
 option(BUILD_SIMPLE_TRACE "Build simple trace for each registered operator" ON)
 set(BUILD_OPT_LEVEL "" CACHE STRING "Add build option -Ox, accept values: 0/1")
+set(BUILD_WITH_SANITIZER "" CACHE STRING "Build with sanitizer check. Support one of address, thread, and leak options at a time. The default option is address.") 
 
 set(EXTRA_BUILD_OPTION)
 if (DEFINED ENV{IPEX_GPU_EXTRA_BUILD_OPTION})
@@ -47,6 +48,7 @@ endif()
 
 function (print_xpu_config_summary)
   # Fetch configurations of intel-ext-pt-gpu
+  get_target_property(SANITIZER_OPTION intel-ext-pt-gpu SANITIZER_OPTION)
   get_target_property(GPU_NATIVE_DEFINITIONS intel-ext-pt-gpu COMPILE_DEFINITIONS)
   get_target_property(GPU_LINK_LIBRARIES intel-ext-pt-gpu LINK_LIBRARIES)
   get_target_property(ONEDNN_INCLUDE_DIR intel-ext-pt-gpu ONEDNN_INCLUDE_DIR)
@@ -122,7 +124,13 @@ function (print_xpu_config_summary)
   else()
     message(STATUS "  USE_AOT_DEVLIST       : OFF")
   endif()
-
+  
+  if(SANITIZER_OPTION)
+    message(STATUS "  BUILD_WITH_SANITIZER  : ${SANITIZER_OPTION}")
+  else()
+    message(STATUS "  BUILD_WITH_SANITIZER  : OFF")
+  endif()
+  
   if (USE_ONEMKL)
     message(STATUS "  BUILD_STATIC_ONEMKL   : ${BUILD_STATIC_ONEMKL}")
   endif(USE_ONEMKL)

@@ -204,6 +204,10 @@ if (USE_ONEMKL)
     endif()
 endif()
 
+if (SANITIZER_OPTION)
+  set_target_properties(intel-ext-pt-gpu PROPERTIES SANITIZER_OPTION "${SANITIZER_OPTION}")
+endif()
+
 find_package(spdlog QUIET)
 
 if(SPDLOG_FOUND) 

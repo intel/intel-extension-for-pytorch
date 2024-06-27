@@ -151,6 +151,25 @@ if(NOT BUILD_SEPARATE_OPS)
   endif()
 endif()
 
+if (BUILD_WITH_SANITIZER)
+  set(VALID_SANITIZERS "address" "leak" "thread")
+  set(DEFAULT_SANITIZERS "1" "yes" "on")
+  string(TOLOWER "${BUILD_WITH_SANITIZER}" BUILD_WITH_SANITIZER)
+  list(FIND VALID_SANITIZERS ${BUILD_WITH_SANITIZER} SANITIZER_INDEX)
+  if (SANITIZER_INDEX EQUAL -1)
+    list(FIND DEFAULT_SANITIZERS ${BUILD_WITH_SANITIZER} DEFAULT_INDEX)
+    if (DEFAULT_INDEX EQUAL -1)
+      message(FATAL_ERROR "The sanitizer check option, ${BUILD_WITH_SANITIZER}, is invalid! Only one of the following sanitizer options is supported: ${VALID_SANITIZERS}.")
+    else()
+      set(SANITIZER_OPTION "address")
+    endif()
+  else()
+    set(SANITIZER_OPTION ${BUILD_WITH_SANITIZER})
+  endif()
+
+  set(IPEX_SYCL_LINK_FLAGS "${IPEX_SYCL_LINK_FLAGS} -fsanitize=${SANITIZER_OPTION}")
+endif()
+
 # WARNING: Append link flags in kernel flags before adding offline options
 set(IPEX_SYCL_KERNEL_FLAGS ${SYCL_FLAGS} ${IPEX_SYCL_KERNEL_FLAGS} ${IPEX_SYCL_LINK_FLAGS})
 
