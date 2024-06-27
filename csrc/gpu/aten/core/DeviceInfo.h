@@ -34,6 +34,7 @@ struct DeviceInfo {
   uint32_t max_num_sub_groups;
   std::vector<size_t> sub_group_sizes;
   bool support_fp64;
+  bool support_cl_bf16_conversion;
 };
 
 } // namespace dpcpp

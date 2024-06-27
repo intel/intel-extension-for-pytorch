@@ -322,6 +322,8 @@ static void initDeviceProperty(DeviceId device_id) {
       : 8;
   device_prop.support_atomic64 = device.has(dpcpp_dev_aspect_atomic64);
   device_prop.support_fp64 = device.has(dpcpp_dev_aspect_fp64);
+  sycl::ext::oneapi::experimental::cl_version version{20, 20, 20};
+  device_prop.support_cl_bf16_conversion = device.ext_oneapi_supports_cl_extension("cl_intel_bfloat16_conversions", &version);
 
   device_properties[device_id] = device_prop;
 
@@ -358,6 +360,7 @@ static void initDeviceProperty(DeviceId device_id) {
   dev_info.support_fp64 = device_prop.support_fp64;
 #if (defined(__INTEL_LLVM_COMPILER) && __INTEL_LLVM_COMPILER >= 20240100)
   dev_info.device_arch = static_cast<uint64_t>(device_prop.device_arch);
+  dev_info.support_cl_bf16_conversion = device_prop.support_cl_bf16_conversion;
 #else
   dev_info.device_arch = (uint64_t)0;
 #endif

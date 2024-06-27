@@ -143,6 +143,7 @@ struct DeviceProp {
 
   bool support_fp64;
   bool support_atomic64;
+  bool support_cl_bf16_conversion;
 };
 
 } // namespace dpcpp
