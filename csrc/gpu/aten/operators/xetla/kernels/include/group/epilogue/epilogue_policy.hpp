@@ -69,6 +69,18 @@ template <gpu_arch arch_tag_>
 struct epilogue_policy_unaligned {
   static constexpr gpu_arch arch_tag = arch_tag_;
 };
+
+/// @brief Epilogue policy for storing with stride into NHWC space from NPQC
+/// descriptor.
+/// @tparam arch_tag_ Is the HW architecture.
+/// @tparam stride_h_ Is the stride in H dimension.
+/// @tparam stride_w_ Is the stride in W dimension.
+template <gpu_arch arch_tag_, uint32_t stride_w_ = 1, uint32_t stride_h_ = 1>
+struct epilogue_policy_strided {
+  static constexpr gpu_arch arch_tag = arch_tag_;
+  static constexpr uint32_t stride_w = stride_w;
+  static constexpr uint32_t stride_h = stride_h;
+};
 /// @} xetla_epilogue
 
 } // namespace gpu::xetla::group

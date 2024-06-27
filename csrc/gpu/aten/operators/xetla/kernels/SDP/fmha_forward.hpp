@@ -56,6 +56,7 @@ class fmha_forward_t {
     uint32_t uMT;
     uint64_t seed;
     uint64_t offset;
+    uint64_t q_strideF;
     bool is_bias_add;
 
     inline arguments_t() = default;
@@ -82,7 +83,8 @@ class fmha_forward_t {
         uint32_t alibi_padded_block_size,
         uint32_t attn_mask_padded_block_size,
         uint64_t seed_t,
-        uint64_t offset_t)
+        uint64_t offset_t,
+        uint64_t q_strideF)
         : Q_ptr(query),
           K_ptr(key),
           V_ptr(value),
@@ -107,6 +109,7 @@ class fmha_forward_t {
           uMT(attn_mask_padded_block_size),
           seed(seed_t),
           offset(offset_t),
+          q_strideF(q_strideF),
           is_bias_add(bias_strideF == 0) {}
   };
 
@@ -255,9 +258,7 @@ class fmha_forward_t {
         uint32_t end_x = start_acc + args.uH;
 
         mem_desc_Qi.init(
-            args.Q_ptr,
-            {end_x, end_y, b_stride * args.uB},
-            {start_acc, start_y});
+            args.Q_ptr, {end_x, end_y, args.q_strideF}, {start_acc, start_y});
         mem_desc_Oi.init(
             args.O_ptr,
             {end_x, end_y, b_stride * args.uB},
@@ -272,12 +273,13 @@ class fmha_forward_t {
 
         int32_t start_acc = head_id * args.uH;
         uint32_t end_acc = start_acc + args.uH;
-        const uint32_t ld_qo = args.uH * args.uN;
+        const uint32_t ld_q = args.q_strideF;
+        const uint32_t ld_o = args.uH * args.uN;
 
         mem_desc_Qi.init(
-            args.Q_ptr, {end_acc, end_y, ld_qo}, {start_acc, start_y});
+            args.Q_ptr, {end_acc, end_y, ld_q}, {start_acc, start_y});
         mem_desc_Oi.init(
-            args.O_ptr, {end_acc, end_y, ld_qo}, {start_acc, start_y});
+            args.O_ptr, {end_acc, end_y, ld_o}, {start_acc, start_y});
       }
 
       int32_t start_x_ml = item.get_group(1) * kBr + sg_idy * kSgBr;
@@ -612,8 +614,12 @@ class fmha_forward_t {
                 mem_desc_Dp_Mask_t::layout,
                 mem_desc_Dp_Mask_t::space>,
             dp_mask_tile_desc_t,
-            subgroup::
-                msg_type_v<dp_mask_tile_desc_t, mem_desc_Dp_Mask_t::space>,
+            subgroup::msg_type_v<
+                dp_mask_tile_desc_t,
+                mem_desc_t<
+                    uint8_t,
+                    mem_desc_Dp_Mask_t::layout,
+                    mem_desc_Dp_Mask_t::space>>,
             gpu_arch::XeHpc>;
         load_payload_mask_t load_payload_mask(ctx.mem_desc_Dpij);
         subgroup::tile_load(mask_in, load_payload_mask);
@@ -714,7 +720,12 @@ class fmha_forward_t {
       using matOi_store_t = subgroup::mem_payload_t<
           mem_desc_t<scalar_t, mem_desc_Oi_t::layout, mem_desc_Oi_t::space>,
           matOi_tile_desc_t,
-          subgroup::msg_type_v<matOi_tile_desc_t, mem_desc_Oi_t::space>,
+          subgroup::msg_type_v<
+              matOi_tile_desc_t,
+              mem_desc_t<
+                  scalar_t,
+                  mem_desc_Oi_t::layout,
+                  mem_desc_Oi_t::space>>,
           arch_tag>;
       matOi_store_t matOi_store(mem_desc_Oi);
       subgroup::tile_store<cache_hint::write_back, cache_hint::write_back>(
@@ -754,12 +765,19 @@ class fmha_forward_t {
     using matQi_load_t = subgroup::mem_payload_t<
         mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
         matQi_tile_desc_t,
-        subgroup::msg_type_v<matQi_tile_desc_t, mem_desc_Qi_t::space>,
+        subgroup::msg_type_v<
+            matQi_tile_desc_t,
+            mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>>,
         arch_tag>;
     using matQi_store_t = subgroup::mem_payload_t<
         mem_desc_t<scalar_t, mem_desc_Qi_L_t::layout, mem_desc_Qi_L_t::space>,
         matQi_tile_desc_t,
-        subgroup::msg_type_v<matQi_tile_desc_t, mem_desc_Qi_L_t::space>,
+        subgroup::msg_type_v<
+            matQi_tile_desc_t,
+            mem_desc_t<
+                scalar_t,
+                mem_desc_Qi_L_t::layout,
+                mem_desc_Qi_L_t::space>>,
         arch_tag>;
 
     int32_t tile_offset_x = ctx.sg_idx * kSgHm;

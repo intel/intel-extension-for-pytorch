@@ -1,10 +1,12 @@
 #pragma once
 #include <stddef.h>
+#include <sycl/sycl.hpp>
 #include <xetla_common_types.hpp>
 #include "xetla_kernel_api.h"
 
 namespace torch_ipex::xpu::xetla {
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -15,15 +17,13 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc),
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -31,6 +31,7 @@ XETLA_KERNEL_API cgfs_t hgemm_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -41,16 +42,14 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc),
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_bias_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
-    void* bias,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -58,6 +57,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -68,16 +68,14 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc),
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_bias_gelu_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
-    void* bias,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -85,6 +83,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_gelu_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -95,16 +94,14 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc),
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_mul_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
-    void* mul,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* mul,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -112,6 +109,7 @@ XETLA_KERNEL_API cgfs_t hgemm_mul_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -122,15 +120,13 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc),
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_silu_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -138,6 +134,7 @@ XETLA_KERNEL_API cgfs_t hgemm_silu_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -148,18 +145,16 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc),
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_bias_res_res_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
-    void* bias,
-    void* res0,
-    void* res1,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias,
+    const scalar_t* res0,
+    const scalar_t* res1,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -167,6 +162,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_res_res_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -177,17 +173,15 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc),
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_qkv_wint4(
-    XetlaType xe_type,
-    void* out0,
-    void* out1,
-    void* out2,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
+    scalar_t* out0,
+    scalar_t* out1,
+    scalar_t* out2,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -195,6 +189,7 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -205,18 +200,16 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc),
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_qkv_bias_wint4(
-    XetlaType xe_type,
-    void* out0,
-    void* out1,
-    void* out2,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
-    void* bias,
+    scalar_t* out0,
+    scalar_t* out1,
+    scalar_t* out2,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -224,6 +217,7 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv_bias_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 64,
     int SG_M = 8,
@@ -234,16 +228,14 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 0,
     int STAGES = 0,
-    int ARCH = 1,
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = 0>
 XETLA_KERNEL_API cgfs_t hgemm_silu_mul_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
-    void* mul,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* mul,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -251,6 +243,7 @@ XETLA_KERNEL_API cgfs_t hgemm_silu_mul_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 64,
     int SG_M = 8,
@@ -261,17 +254,15 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 0,
     int STAGES = 0,
-    int ARCH = 1,
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = 0>
 XETLA_KERNEL_API cgfs_t hgemm_bias_silu_mul_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
-    void* bias,
-    void* mul,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias,
+    const scalar_t* mul,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -279,6 +270,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_silu_mul_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 64,
     int SG_M = 8,
@@ -289,17 +281,15 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 0,
     int STAGES = 0,
-    int ARCH = 1,
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = 0>
 XETLA_KERNEL_API cgfs_t hgemm_bias_add_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
-    void* bias,
-    void* res,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias,
+    const scalar_t* res,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,
@@ -307,6 +297,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_add_wint4(
     const uint32_t k);
 
 template <
+    typename scalar_t,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -317,16 +308,14 @@ template <
     int L3_KS = 1,
     int SYNC_FREQ = 1,
     int STAGES = 3,
-    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc),
-    int QUANT_MODE = static_cast<int>(quant_mode::S4_FULLRANGE_NO_ZP)>
+    int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_res_wint4(
-    XetlaType xe_type,
-    void* out,
-    void* a,
-    const uint8_t* b,
-    void* b_zp,
-    void* b_scale,
-    void* res,
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* res,
     float* acc_ptr,
     uint32_t* cnt_ptr,
     const uint32_t m,

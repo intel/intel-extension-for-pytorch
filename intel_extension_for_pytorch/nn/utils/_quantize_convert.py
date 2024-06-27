@@ -1,7 +1,6 @@
 import torch
 import intel_extension_for_pytorch as ipex  # noqa
 import torch.nn as nn
-import math
 from torch import Tensor
 
 
@@ -90,7 +89,8 @@ class WeightOnlyQuantizedLinear(nn.Module):
         ], "compute_dtype must be 'fp32', 'fp16'."
         assert scale_dtype in [
             "fp16",
-        ], "scale_dtype only support 'fp16' now."
+            "fp32",
+        ], "scale_dtype only support 'fp32', 'fp16'. now."
         self.scale_dtype = scale_dtype
         self.double_quant_scale_dtype = double_quant_scale_dtype
         self.compute_dtype = compute_dtype
@@ -136,16 +136,19 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self.register_parameter("bias", None)
 
     def forward(self, input: Tensor) -> Tensor:
-        if (
-            input.dtype != convert_dtype_str2torch(self.compute_dtype)
-            and self.compute_dtype == "fp16"
-        ):
+        if self.compute_dtype == "fp16":
             input = input.to(convert_dtype_str2torch(self.compute_dtype))
         if not self.weight_transposed:
-            if not self.use_optimum_format:
-                self.qweight.data = self.qweight.t_().contiguous()
-                self.scales.data = self.scales.t_().contiguous()
+            self.qweight.data = self.qweight.t().contiguous()
+            self.scales.data = self.scales.t().contiguous().to(torch.float16)
+            if self.bias is not None:
+                self.bias.data = self.bias.contiguous().to(torch.float16)
+            if self.scheme == "sym":
+                self.qzeros = None
+            else:
+                self.qzeros += 0x11111111
             self.weight_transposed = True
+
         return torch.ops.torch_ipex.mm_low_bits(
             input,
             self.qweight,
@@ -160,7 +163,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
 
     def set_weights_bias(self, weight_data, bias=None):
         qweight = ParamsLowBits(
-            data=weight_data.byte(),
+            data=weight_data,
             requires_grad=False,
             quant_state={"scheme": self.scheme},
             blocksize=self.blocksize,
@@ -172,41 +175,21 @@ class WeightOnlyQuantizedLinear(nn.Module):
         )
         self.qweight = qweight
         if bias is not None:
-            self.bias = torch.nn.Parameter(bias, requires_grad=False)
+            if bias.abs().sum().item() == 0:
+                self.bias = None
+            else:
+                self.bias = torch.nn.Parameter(
+                    bias.contiguous().to(torch.float16), requires_grad=False
+                )
 
     def set_scales_zps_gidx(self, scales, qzeros=None, g_idx=None):
         self.register_buffer("scales", scales)
-        if qzeros is None:
-            if self.use_optimum_format:
-                qzeros = torch.zeros(
-                    (
-                        math.ceil(self.in_features / self.blocksize),
-                        math.ceil(self.out_features / self.n_pack),
-                    ),
-                    dtype=self.compression_dtype,
-                    device=self.device,
-                )
-                qzeros = qzeros.T
-            elif self.compression_dim == 1:
-                qzeros = torch.zeros(
-                    (
-                        self.out_features,
-                        math.ceil(self.in_features / self.blocksize / self.n_pack),
-                    ),
-                    dtype=self.compression_dtype,
-                    device=self.device,
-                )
-            else:
-                qzeros = torch.zeros(
-                    (
-                        math.ceil(self.out_features / self.n_pack),
-                        math.ceil(self.in_features / self.blocksize),
-                    ),
-                    dtype=self.compression_dtype,
-                    device=self.device,
-                )
-        self.register_buffer("qzeros", qzeros.byte())
+        self.register_buffer("qzeros", qzeros)
         self.register_buffer("g_idx", g_idx)
+        if self.scheme == "sym":
+            self.qzeros = None
+        else:
+            self.qzeros += 0x11111111
 
     def extra_repr(self) -> str:
         tmp_str = (

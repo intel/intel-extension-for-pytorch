@@ -7,6 +7,11 @@
 namespace gpu::xetla {
 using namespace torch_ipex::xpu::xetla;
 
+enum class XetlaType {
+  fp16,
+  bf16,
+};
+
 struct fmha_forward_kernel_args_t {
   void* query;
   void* key;
@@ -36,6 +41,7 @@ struct fmha_forward_kernel_args_t {
   bool is_dropout;
   uint64_t seed_t;
   uint64_t offset_t;
+  uint64_t q_strideF;
 };
 
 // * General interface kernel for FSDP

@@ -46,77 +46,44 @@ struct compute_policy_default_xmx<
     compute_attr_,
     perf_tuning_knob_,
     arch_tag_,
-    std::enable_if_t<arch_has_xmx(arch_tag_)>> {
-  using compute_attr = compute_attr_;
-  using perf_tuning_knob = perf_tuning_knob_;
-  static constexpr int k_stride = perf_tuning_knob::k_stride;
-  static constexpr int stages = perf_tuning_knob::stages;
-  static constexpr int sync_freq = perf_tuning_knob::sync_freq;
+    std::enable_if_t<arch_has_xmx<arch_tag_>>> {
   static constexpr gpu_arch arch_tag = arch_tag_;
+
+  using compute_attr = compute_attr_;
   using dtype_mma_acc = typename compute_attr::dtype_acc;
   using dtype_mma_a = typename compute_attr::dtype_a;
   using dtype_mma_b = typename compute_attr::dtype_b;
 
-  static constexpr uint32_t block_bytes_x_a = 32;
+  using perf_tuning_knob = perf_tuning_knob_;
+  static constexpr int stages = perf_tuning_knob::stages;
+  static constexpr int sync_freq = perf_tuning_knob::sync_freq;
+  static constexpr int k_stride = perf_tuning_knob::k_stride;
+
+  static constexpr uint32_t block_size_y_a = 16;
+  using mma_attr = mma_attr_t<arch_tag, block_size_y_a>;
+  static constexpr uint32_t block_bytes_x_a = mma_attr::mma_k_in_bytes;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_size_y_a = 16;
 
-  static constexpr uint32_t block_size_x_b =
-      arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem;
-  static constexpr uint32_t block_bytes_y_b = 32;
-  static constexpr uint32_t block_size_y_b =
-      block_bytes_y_b / sizeof(dtype_mma_b);
-  static_assert(
-      block_size_x_a == block_size_y_b,
-      "mat_a x need to match with mat_b y");
+  static constexpr uint32_t block_size_x_b = mma_attr::mma_n_in_elem;
+  static constexpr uint32_t block_size_y_b = block_size_x_a;
+  static constexpr uint32_t block_bytes_y_b =
+      block_size_x_a * sizeof(dtype_mma_b);
 };
 
 /// @brief Compute policy for unaligned shape and xmx engine.
 /// @tparam compute_attr_ Is compute-related attributes.
 /// @tparam perf_tuning_knob_ Is performance-related knobs.
 /// @tparam arch_tag_ Is the HW architecture.
-template <
-    typename compute_attr_,
-    typename perf_tuning_knob_,
-    gpu_arch arch_tag_ = gpu_arch::XeHpc,
-    typename enable = void>
-struct compute_policy_unaligned_xmx {};
-
 /// @brief Specialized for Xe architecture.
 template <
     typename compute_attr_,
     typename perf_tuning_knob_,
     gpu_arch arch_tag_>
-struct compute_policy_unaligned_xmx<
-    compute_attr_,
-    perf_tuning_knob_,
-    arch_tag_,
-    std::enable_if_t<arch_has_xmx(arch_tag_)>> {
-  using compute_attr = compute_attr_;
-  using perf_tuning_knob = perf_tuning_knob_;
-  static constexpr int k_stride = perf_tuning_knob::k_stride;
-  static constexpr int stages = perf_tuning_knob::stages;
-  static constexpr int sync_freq = perf_tuning_knob::sync_freq;
-  static constexpr gpu_arch arch_tag = arch_tag_;
-  using dtype_mma_acc = typename compute_attr::dtype_acc;
-  using dtype_mma_a = typename compute_attr::dtype_a;
-  using dtype_mma_b = typename compute_attr::dtype_b;
-
-  static constexpr uint32_t block_bytes_x_a = 32;
-  static constexpr uint32_t block_size_x_a =
-      block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_size_y_a = 16;
-
-  static constexpr uint32_t block_size_x_b =
-      arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem;
-  static constexpr uint32_t block_bytes_y_b = 32;
-  static constexpr uint32_t block_size_y_b =
-      block_bytes_y_b / sizeof(dtype_mma_b);
-  static_assert(
-      block_size_x_a == block_size_y_b,
-      "mat_a x need to match with mat_b y");
-};
+struct compute_policy_unaligned_xmx : public compute_policy_default_xmx<
+                                          compute_attr_,
+                                          perf_tuning_knob_,
+                                          arch_tag_> {};
 
 /// @brief Compute policy for fpu engine.
 /// @tparam compute_attr_ Is compute-related attributes.
@@ -138,25 +105,26 @@ struct compute_policy_default_fpu<
     compute_attr_,
     perf_tuning_knob_,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
-  using compute_attr = compute_attr_;
-  using perf_tuning_knob = perf_tuning_knob_;
-  static constexpr int k_stride = perf_tuning_knob::k_stride;
-  static constexpr int stages = perf_tuning_knob::stages;
-  static constexpr int sync_freq = perf_tuning_knob::sync_freq;
+    std::enable_if_t<arch_has_fpu<arch_tag_>>> {
   static constexpr gpu_arch arch_tag = arch_tag_;
 
+  using compute_attr = compute_attr_;
   using dtype_mma_acc = typename compute_attr::dtype_acc;
   using dtype_mma_a = typename compute_attr::dtype_a;
   using dtype_mma_b = typename compute_attr::dtype_b;
 
+  using perf_tuning_knob = perf_tuning_knob_;
+  static constexpr int stages = perf_tuning_knob::stages;
+  static constexpr int sync_freq = perf_tuning_knob::sync_freq;
+  static constexpr int k_stride = perf_tuning_knob::k_stride;
+
+  static constexpr uint32_t block_size_y_a =
+      arch_tag_ == gpu_arch::XeLpg ? 8 : 16;
   static constexpr uint32_t block_bytes_x_a = 32;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_size_y_a =
-      arch_tag_ == gpu_arch::XeLpg ? 8 : 16;
   static constexpr uint32_t block_bytes_x_b =
-      arch_tag_ == gpu_arch::XeLpg ? 32 : 64;
+      arch_attr_t<arch_tag>::template register_attr<>::reg_in_bytes;
   static constexpr uint32_t block_size_x_b =
       block_bytes_x_b / sizeof(dtype_mma_b);
   static constexpr uint32_t block_size_y_b = block_size_x_a;

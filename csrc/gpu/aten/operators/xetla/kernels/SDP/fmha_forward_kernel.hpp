@@ -38,6 +38,7 @@ struct dispatch_fmha_forward_args_t {
   uint32_t attn_mask_padded_block_size;
   uint64_t seed_t;
   uint64_t offset_t;
+  uint64_t q_strideF;
   dispatch_fmha_forward_args_t(const fmha_forward_kernel_args_t& args)
       : query(reinterpret_cast<T*>(args.query)),
         key(reinterpret_cast<T*>(args.key)),
@@ -61,7 +62,8 @@ struct dispatch_fmha_forward_args_t {
         alibi_padded_block_size(args.alibi_padded_block_size),
         attn_mask_padded_block_size(args.attn_mask_padded_block_size),
         seed_t(args.seed_t),
-        offset_t(args.offset_t){};
+        offset_t(args.offset_t),
+        q_strideF(args.q_strideF){};
 };
 
 template <typename fmha_forward_op_t, typename T>
@@ -93,7 +95,8 @@ struct FmhaForwardKernelFunctor {
         args.alibi_padded_block_size,
         args.attn_mask_padded_block_size,
         args.seed_t,
-        args.offset_t);
+        args.offset_t,
+        args.q_strideF);
 
     // call the functor
     fmha_fwd_op(item, op_args);

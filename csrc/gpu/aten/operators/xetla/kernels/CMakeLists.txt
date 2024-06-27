@@ -22,8 +22,9 @@ if (USE_AOT_DEVLIST)
   set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
 endif()
 
-# For large registers mode, enable 256 registers for kernels
-set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
+# Currently normal GRF to benefit next token performance, Considering seperating link option
+# that double GRF for first token and normal GRF for next token.
+# set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-codegen")
 # For registers usage verbose at AOT

@@ -137,7 +137,6 @@ class global_reduce_t<
     xetla_store_global<
         dtype_cnt,
         1,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>((dtype_cnt*)address, 0, zeros);
   }

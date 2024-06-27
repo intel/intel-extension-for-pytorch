@@ -1,4 +1,3 @@
-import contextlib
 import torch
 import intel_extension_for_pytorch as ipex
 import time
@@ -264,14 +263,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     ):
         for i in range(num_iter):
             tic = time.time()
-            with (
-                contextlib.nullcontext() if not do_profiling else
-                torch.profiler.profile(
-                    activities=[torch.profiler.ProfilerActivity.CPU,
-                                torch.profiler.ProfilerActivity.XPU],
-                    record_shapes=True,
-                )
-            ) as prof:
+            with torch.autograd.profiler_legacy.profile(enabled=do_profiling, use_xpu=True, record_shapes=True) as prof:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
                 output = model.generate(
                     input_ids, max_new_tokens=int(args.max_new_tokens), **generate_kwargs
@@ -282,8 +274,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
                     torch.xpu.synchronize()
             if do_profiling:
                 torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), "./profile.pt")
-                # Cannot sort by id when using kineto
-                # torch.save(prof.table(sort_by="id", row_limit=-1),'./profile_id.pt')
+                torch.save(prof.table(sort_by="id", row_limit=-1),'./profile_id.pt')
                 torch.save(prof.key_averages(group_by_input_shape=True).table(), "./profile_detail.pt")
                 prof.export_chrome_trace("./trace.json")
             toc = time.time()

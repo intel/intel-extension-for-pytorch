@@ -180,7 +180,9 @@ struct gru_layer_bpk {
   using matA_payload_0_t = mem_payload_t<
       mem_desc_t<T, mem_layout::row_major, mem_space::global>,
       matA_tile_desc_t,
-      msg_type_v<matA_tile_desc_t, mem_space::global>,
+      msg_type_v<
+          matA_tile_desc_t,
+          mem_desc_t<T, mem_layout::row_major, mem_space::global>>,
 
       gpu_arch::XeHpc>;
 
@@ -189,14 +191,14 @@ struct gru_layer_bpk {
   using matC_payload_t0 = mem_payload_t<
       mem_desc_t<T, layout_weight, mem_loc_weight>,
       matAcc_desc_t0,
-      msg_type_v<matAcc_desc_t0, mem_loc_weight>,
+      msg_type_v<matAcc_desc_t0, mem_desc_t<T, layout_weight, mem_loc_weight>>,
 
       gpu_arch::XeHpc>;
   using matC_t0 = tile_t<T, matAcc_desc_t0>;
   using matC_payload_t1 = mem_payload_t<
       mem_desc_t<T, layout_weight, mem_loc_weight>,
       matAcc_desc_t1,
-      msg_type_v<matAcc_desc_t1, mem_loc_weight>,
+      msg_type_v<matAcc_desc_t1, mem_desc_t<T, layout_weight, mem_loc_weight>>,
       gpu_arch::XeHpc>;
   using matC_t1 = tile_t<T, matAcc_desc_t1>;
 
@@ -210,7 +212,7 @@ struct gru_layer_bpk {
   using bias_payload_t = mem_payload_t<
       mem_desc_t<Act_T, layout_bias, mem_loc_bias>,
       bias_desc_t,
-      msg_type_v<bias_desc_t, mem_loc_bias>,
+      msg_type_v<bias_desc_t, mem_desc_t<Act_T, layout_bias, mem_loc_bias>>,
       gpu_arch::XeHpc>;
 
   using prefetch_t = prefetch_payload_t<

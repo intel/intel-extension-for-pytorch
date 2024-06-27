@@ -108,10 +108,12 @@ struct xetla_row_reduction_t<
       block_size_y,
       reg_layout::tiled>;
   using global_ld_t = subgroup::tile_t<dtype_in, global_ld_tile_desc_t>;
+  using mem_desc_in_t =
+      mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
   using global_ld_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
+      mem_desc_in_t,
       global_ld_tile_desc_t,
-      subgroup::msg_type_v<global_ld_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<global_ld_tile_desc_t, mem_desc_in_t>,
       gpu_arch::XeHpc>;
   using mat_buffer_t = subgroup::tile_t<
       dtype_acc,

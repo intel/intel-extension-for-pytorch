@@ -187,7 +187,7 @@ class HGEMM_XETLA final {
     auto c_sizes = c_for_gemm.sizes();
     m_ = a_sizes[0];
     k_ = a_sizes[1];
-    n_ = b_sizes[1];
+    n_ = b_sizes[0];
     __CHECK(k_ % 4 == 0 && n_ % 4 == 0);
     __CHECK((m_ == 1028) || (!(m_ > 1000 && n_ > 8192)));
     __CHECK(

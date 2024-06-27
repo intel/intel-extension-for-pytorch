@@ -42,7 +42,7 @@ class gemm_t<
     mem_desc_a_t_, // memory attribute of matA
     mem_desc_b_t_, // memory attribute of matB
     pre_processing_t_, // pre_processing functor
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<arch_has_fpu<arch_tag_>>> {
  public:
   using mem_desc_a_t = mem_desc_a_t_;
   using mem_desc_b_t = mem_desc_b_t_;
@@ -150,7 +150,7 @@ class gemm_t<
   using matA_payload_t = subgroup::mem_payload_t<
       mem_desc_a_t,
       matA_tile_desc_t,
-      subgroup::msg_type_v<matA_tile_desc_t, mem_space_a>,
+      subgroup::msg_type_v<matA_tile_desc_t, mem_desc_a_t>,
       arch_tag>;
   // the tile size in register may bigger than in memory because of the padding
   using matA_acc_t = subgroup::tile_t<dtype_mma_a, matA_tile_desc_t>;
@@ -171,7 +171,7 @@ class gemm_t<
   using matB_payload_t = subgroup::mem_payload_t<
       mem_desc_b_t,
       matB_tile_desc_t,
-      subgroup::msg_type_v<matB_tile_desc_t, mem_space_b>,
+      subgroup::msg_type_v<matB_tile_desc_t, mem_desc_b_t>,
       arch_tag>;
   using matB_acc_t = subgroup::tile_t<dtype_mma_b, matB_tile_desc_t>;
   using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
@@ -380,9 +380,6 @@ class gemm_t<
       SW_BARRIER();
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matA, matA_payload);
-      if constexpr (!is_col_major_a)
-        reorder_matA(matA);
-
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matB, matB_payload);
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
@@ -421,20 +418,6 @@ class gemm_t<
   }
 
  private:
-  inline void reorder_matA(matA_t& matA) {
-    constexpr uint32_t num_block_x = tile_size_x_a / block_size_x_a;
-    constexpr uint32_t num_block_y = tile_size_y_a / block_size_y_a;
-    for (uint32_t i = 0; i < num_block_y * num_block_x; i++) {
-      auto dst_blk = matA.reg.xetla_select<matA_t::block_elems, 1>(
-          i * matA_t::block_elems);
-      xetla_vector<dtype_a, matA_t::block_elems> trans_blk;
-      for (uint32_t j = 0; j < block_size_y_a; j++) {
-        trans_blk.xetla_select<block_size_x_a, block_size_y_a>(j) =
-            dst_blk.xetla_select<block_size_x_a, 1>(j * block_size_x_a);
-      }
-      dst_blk = trans_blk;
-    }
-  }
   /// @brief Updates tile base descriptor based on the tid.
   __XETLA_API static void update_sg_tile_tdesc(
       arguments_t& args,

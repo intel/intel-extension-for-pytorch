@@ -105,7 +105,7 @@ class softmax_t<
     using mat_in_payload_t = subgroup::mem_payload_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
-        subgroup::msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
+        subgroup::msg_type_v<mat_in_tile_desc_t, mem_desc_in_t>,
         gpu_arch::XeHpc>;
 
     int32_t sg_idx = g.get_id() % wg_size_x;
