@@ -5,6 +5,7 @@
 #include <torch/csrc/autograd/function.h>
 #include <limits>
 #include "vec/vec.h"
+#include "../../utils/isa_utils.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -1345,7 +1346,7 @@ first_token_masked_mha(
   auto attn_outputs = at::Tensor();
   auto attn_weights = at::Tensor();
   if ((key.scalar_type() == at::kFloat || key.scalar_type() == at::kBFloat16 ||
-       key.scalar_type() == at::kHalf) &&
+       (key.scalar_type() == at::kHalf && utils::isa_has_avx512_fp16_support())) &&
       attention_mask.stride(-1) == 1) {
     query = query.transpose(1, 2);
     key = key.transpose(1, 2);
