@@ -11,7 +11,7 @@ namespace torch_ipex {
 namespace cpu {
 
 namespace {
-
+#if defined(CPU_CAPABILITY_AVX512)
 #define BS 512
 
 static const long master_port = torch_ipex::tpp::env2int("MASTER_PORT", 0);
@@ -27,23 +27,22 @@ struct TppOps {
       torch_ipex::tpp::AddTPP<float, float, T>(BS);
 };
 
-static TppOps<float> ops_f;
-static TppOps<at::BFloat16> ops_bf;
-static TppOps<at::Half> ops_hf;
-
 template <typename T>
 static TppOps<T> getOps() {}
 
 template <>
 TppOps<float> getOps<float>() {
+  TppOps<float> ops_f;
   return ops_f;
 }
 template <>
 TppOps<at::BFloat16> getOps<at::BFloat16>() {
+  TppOps<at::BFloat16> ops_bf;
   return ops_bf;
 }
 template <>
 TppOps<at::Half> getOps<at::Half>() {
+  TppOps<at::Half> ops_hf;
   return ops_hf;
 }
 } // namespace shm_tpp
@@ -309,6 +308,14 @@ void tpp_allreduce_impl(
   }
 }
 #undef BS
+#else
+void tpp_allreduce_impl(
+    at::Tensor t_in,
+    c10::intrusive_ptr<c10d::ProcessGroup> process_group) {
+  std::vector<at::Tensor> temp_vec = {t_in};
+  process_group->allreduce(temp_vec)->wait();
+}
+#endif
 
 } // namespace
 
