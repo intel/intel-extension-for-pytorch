@@ -577,6 +577,10 @@ static void register_xpu_device_info(PyObject* module) {
       .def_readonly("max_num_sub_groups", &DeviceInfo::max_num_sub_groups)
       .def_readonly("sub_group_sizes", &DeviceInfo::sub_group_sizes)
       .def_readonly("has_fp64", &DeviceInfo::support_fp64)
+      .def_readonly("support_cl_bf16_conversion", &DeviceInfo::support_cl_bf16_conversion)
+      .def_readonly("support_cl_sg_matmul_acc", &DeviceInfo::support_cl_sg_matmul_acc)
+      .def_readonly("support_cl_sg_matmul_acc_tf32", &DeviceInfo::support_cl_sg_matmul_acc_tf32)
+      .def_readonly("support_cl_sg_2d_block_io", &DeviceInfo::support_cl_sg_2d_block_io)
       .def_readonly("device_arch", &DeviceInfo::device_arch)
       .def_property_readonly(
           "dev_type", [](const DeviceInfo& info) { return get_dev_type(info); })
@@ -589,7 +593,12 @@ static void register_xpu_device_info(PyObject* module) {
                << ", total_memory=" << info.global_mem_size / (1024 * 1024)
                << "MB, max_compute_units=" << info.max_compute_units
                << ", gpu_eu_count=" << info.gpu_eu_count
-               << ", device_arch=" << info.device_arch << ")";
+               << ", device_arch=" << info.device_arch 
+               << ", support_cl_bf16_conversion=" << info.support_cl_bf16_conversion
+               << ", support_cl_sg_matmul_acc=" << info.support_cl_sg_matmul_acc
+               << ", support_cl_sg_matmul_acc_tf32=" << info.support_cl_sg_matmul_acc_tf32
+               << ", support_cl_sg_2d_block_io=" << info.support_cl_sg_2d_block_io
+               << ")";
         return stream.str();
       });
 }
