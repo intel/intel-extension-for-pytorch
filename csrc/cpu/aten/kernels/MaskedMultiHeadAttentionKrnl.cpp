@@ -1473,17 +1473,44 @@ masked_multihead_self_attention_kernel_impl(
     value_cache = new_value_cache;
     beam_idx = new_beam_idx;
   }
-  if (offset > 0) {
-    return zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
-        query,
-        key,
-        value,
-        key_cache,
-        value_cache,
-        beam_idx,
-        offset,
-        scale_attn,
-        attention_mask_v);
+  if (offset != 0) {
+    auto cur_len = query.size(1);
+    if (cur_len == 1)
+      return zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
+          query,
+          key,
+          value,
+          key_cache,
+          value_cache,
+          beam_idx,
+          offset,
+          scale_attn,
+          attention_mask_v);
+    // just a  funcationality path,need to optimize
+    auto tokens_outs = std::vector<at::Tensor>(cur_len);
+    for (auto i = 0; i < cur_len; i++) {
+      auto query_i = query.select(1, i).unsqueeze(1);
+      ;
+      auto key_i = key.select(1, i).unsqueeze(1);
+      ;
+      auto value_i = value.select(1, i).unsqueeze(1);
+      ;
+      auto next_outs =
+          zero_copy_kv_cache_masked_multihead_self_attention_kernel_impl(
+              query_i,
+              key_i,
+              value_i,
+              key_cache,
+              value_cache,
+              beam_idx,
+              offset,
+              scale_attn,
+              attention_mask_v);
+      tokens_outs[i] = std::get<0>(next_outs);
+    }
+    auto attn_outs = at::cat(tokens_outs, 2);
+    return std::make_tuple(
+        attn_outs, at::Tensor(), key_cache, value_cache, beam_idx);
   } else {
     return first_token_masked_mha(
         query,
