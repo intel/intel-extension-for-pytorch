@@ -54,7 +54,7 @@ constexpr bool is_sym_quant(const int qw_type) {
 #if defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
 
 #define QUANT_A_THRESHOLD 30720
-#define SMALL_BATCH_THRESHOLD 32
+#define SMALL_BATCH_THRESHOLD 16
 #define DEQUANT_UPFRONT_THRESHOLD 1024
 #define PARALLEL_M_THRESHOLD 128
 constexpr long PREFETCH_K_DIST = 64; // TODO(jgong5): do not hard-code
