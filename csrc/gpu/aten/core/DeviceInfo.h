@@ -35,6 +35,9 @@ struct DeviceInfo {
   std::vector<size_t> sub_group_sizes;
   bool support_fp64;
   bool support_cl_bf16_conversion;
+  bool support_cl_sg_matmul_acc;
+  bool support_cl_sg_matmul_acc_tf32;
+  bool support_cl_sg_2d_block_io;
 };
 
 } // namespace dpcpp

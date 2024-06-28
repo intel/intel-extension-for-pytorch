@@ -322,8 +322,11 @@ static void initDeviceProperty(DeviceId device_id) {
       : 8;
   device_prop.support_atomic64 = device.has(dpcpp_dev_aspect_atomic64);
   device_prop.support_fp64 = device.has(dpcpp_dev_aspect_fp64);
-  sycl::ext::oneapi::experimental::cl_version version{20, 20, 20};
+  sycl::ext::oneapi::experimental::cl_version version;
   device_prop.support_cl_bf16_conversion = device.ext_oneapi_supports_cl_extension("cl_intel_bfloat16_conversions", &version);
+  device_prop.support_cl_sg_matmul_acc = device.ext_oneapi_supports_cl_extension("cl_intel_subgroup_matrix_multiply_accumulate", &version);
+  device_prop.support_cl_sg_matmul_acc_tf32 = device.ext_oneapi_supports_cl_extension("cl_intel_subgroup_matrix_multiply_accumulate_tensor_float32", &version);
+  device_prop.support_cl_sg_2d_block_io = device.ext_oneapi_supports_cl_extension("cl_intel_subgroup_2d_block_io", &version);
 
   device_properties[device_id] = device_prop;
 
@@ -358,9 +361,12 @@ static void initDeviceProperty(DeviceId device_id) {
   dev_info.max_num_sub_groups = device_prop.max_num_subgroup;
   dev_info.sub_group_sizes = device_prop.subgroup_sizes;
   dev_info.support_fp64 = device_prop.support_fp64;
+  dev_info.support_cl_bf16_conversion = device_prop.support_cl_bf16_conversion;
+  dev_info.support_cl_sg_matmul_acc = device_prop.support_cl_sg_matmul_acc;
+  dev_info.support_cl_sg_matmul_acc_tf32 = device_prop.support_cl_sg_matmul_acc_tf32;
+  dev_info.support_cl_sg_2d_block_io = device_prop.support_cl_sg_2d_block_io;
 #if (defined(__INTEL_LLVM_COMPILER) && __INTEL_LLVM_COMPILER >= 20240100)
   dev_info.device_arch = static_cast<uint64_t>(device_prop.device_arch);
-  dev_info.support_cl_bf16_conversion = device_prop.support_cl_bf16_conversion;
 #else
   dev_info.device_arch = (uint64_t)0;
 #endif
