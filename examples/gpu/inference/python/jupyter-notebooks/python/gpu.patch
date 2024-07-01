@@ -1,0 +1,19 @@
+diff --git a/AI-and-Analytics/Getting-Started-Samples/Intel_Extension_For_PyTorch_GettingStarted/resnet50_general_inference_script.py b/AI-and-Analytics/Getting-Started-Samples/Intel_Extension_For_PyTorch_GettingStarted/resnet50_general_inference_script_gpu.py
+similarity index 92%
+rename from AI-and-Analytics/Getting-Started-Samples/Intel_Extension_For_PyTorch_GettingStarted/resnet50_general_inference_script.py
+rename to AI-and-Analytics/Getting-Started-Samples/Intel_Extension_For_PyTorch_GettingStarted/resnet50_general_inference_script_gpu.py
+index dae594af..edd0fcb3 100644
+--- a/AI-and-Analytics/Getting-Started-Samples/Intel_Extension_For_PyTorch_GettingStarted/resnet50_general_inference_script.py
++++ b/AI-and-Analytics/Getting-Started-Samples/Intel_Extension_For_PyTorch_GettingStarted/resnet50_general_inference_script_gpu.py
+@@ -23,8 +23,8 @@ def main(args):
+ 
+   import intel_extension_for_pytorch as ipex
+ 
+-    model = model.to(memory_format=torch.channels_last)
+-    data = data.to(memory_format=torch.channels_last)
++    model = model.to("xpu",memory_format=torch.channels_last)
++    data = data.to("xpu",memory_format=torch.channels_last)
+ 
+   if args.dtype == 'float32':
+     model = ipex.optimize(model, dtype=torch.float32)
+ 
