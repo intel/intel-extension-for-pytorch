@@ -58,12 +58,10 @@ struct group_row_reduce_store_t<
   using local_st_tile_desc_t =
       subgroup::tile_desc_t<row_size, 1, block_size_x, 1, reg_layout::tiled>;
   using local_st_t = subgroup::tile_t<dtype_acc, local_st_tile_desc_t>;
-  using mem_desc_acc =
-      mem_desc_t<dtype_acc, mem_layout::row_major, mem_space::local>;
   using local_st_payload_t = subgroup::mem_payload_t<
-      mem_desc_acc,
+      mem_desc_t<dtype_acc, mem_layout::row_major, mem_space::local>,
       local_st_tile_desc_t,
-      subgroup::msg_type_v<local_st_tile_desc_t, mem_desc_acc>,
+      subgroup::msg_type_v<local_st_tile_desc_t, mem_space::local>,
       gpu_arch::XeHpc>;
   using local_ld_tile_desc_t = subgroup::tile_desc_t<
       local_tile_size_x,
@@ -72,12 +70,10 @@ struct group_row_reduce_store_t<
       wg_size_y,
       reg_layout::tiled>;
   using local_ld_t = subgroup::tile_t<dtype_acc, local_ld_tile_desc_t>;
-  using mem_desc_ld_t =
-      mem_desc_t<dtype_acc, mem_layout::row_major, mem_space::local>;
   using local_ld_payload_t = subgroup::mem_payload_t<
-      mem_desc_ld_t,
+      mem_desc_t<dtype_acc, mem_layout::row_major, mem_space::local>,
       local_ld_tile_desc_t,
-      subgroup::msg_type_v<local_ld_tile_desc_t, mem_desc_ld_t>,
+      subgroup::msg_type_v<local_ld_tile_desc_t, mem_space::local>,
       gpu_arch::XeHpc>;
 
   // If the local tile size is small, we still can use 2D block store

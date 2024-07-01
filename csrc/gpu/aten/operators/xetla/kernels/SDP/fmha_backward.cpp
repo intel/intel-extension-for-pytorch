@@ -6,6 +6,7 @@
 #include "fmha_utils.h"
 
 namespace gpu::xetla {
+using namespace torch_ipex::xpu::xetla;
 
 namespace fmha {
 
@@ -564,12 +565,8 @@ class fmha_backward_t {
                 mem_desc_Dp_Mask_t::layout,
                 mem_desc_Dp_Mask_t::space>,
             dp_mask_tile_desc_t,
-            subgroup::msg_type_v<
-                dp_mask_tile_desc_t,
-                mem_desc_t<
-                    uint8_t,
-                    mem_desc_Dp_Mask_t::layout,
-                    mem_desc_Dp_Mask_t::space>>,
+            subgroup::
+                msg_type_v<dp_mask_tile_desc_t, mem_desc_Dp_Mask_t::space>,
             gpu_arch::XeHpc>;
         load_payload_mask_t load_payload_mask(ctx.mem_desc_Dpij);
         subgroup::tile_load(*mask_in, load_payload_mask);

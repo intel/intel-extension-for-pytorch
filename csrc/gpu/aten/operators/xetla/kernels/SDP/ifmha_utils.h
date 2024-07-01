@@ -242,9 +242,7 @@ struct group_row_reduce_t {
   using load_payload_t = subgroup::mem_payload_t<
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       load_tile_desc,
-      subgroup::msg_type_v<
-          load_tile_desc,
-          mem_desc_t<T, mem_layout::row_major, mem_space::local>>,
+      subgroup::msg_type_v<load_tile_desc, mem_space::local>,
       gpu_arch::XeHpc>;
 
   xetla_nbarrier_t<kNumSg, kNumSg> nbarrier;

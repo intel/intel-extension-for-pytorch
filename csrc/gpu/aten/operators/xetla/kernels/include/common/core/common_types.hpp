@@ -22,17 +22,14 @@
 
 namespace gpu::xetla {
 enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2 };
+inline constexpr bool arch_has_xmx(gpu_arch arch) {
+  return arch >= gpu_arch::XeHpg;
+}
+inline constexpr bool arch_has_2d_load_store(gpu_arch arch) {
+  return arch >= gpu_arch::XeHpc;
+}
 
 enum class grf_mode : uint8_t { normal = 0, double_grf = 1 };
 
 enum class mem_layout : uint8_t { row_major = 0, col_major = 1 };
-
-enum class quant_mode : uint8_t { S4_ASYM = 0, S4_FULLRANGE_NO_ZP = 1 };
-
-struct quant_info {
-  quant_mode quant_mode;
-  uint32_t dequant_s;
-  mem_layout weight_mem_layout;
-};
-
 } // namespace gpu::xetla

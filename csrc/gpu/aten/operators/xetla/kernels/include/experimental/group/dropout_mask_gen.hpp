@@ -117,9 +117,12 @@ struct mask_gen_t {
       uint32_t sg_idx,
       uint32_t sg_idy,
       uint32_t linear_idx) {
-    xetla_vector<uint64_t, 1> rand_offset_ptr_v =
-        xetla_load_global<uint64_t, 1, cache_hint::cached, cache_hint::cached>(
-            args->rand_offset_ptr, 0);
+    xetla_vector<uint64_t, 1> rand_offset_ptr_v = xetla_load_global<
+        uint64_t,
+        1,
+        data_size::default_size,
+        cache_hint::cached,
+        cache_hint::cached>(args->rand_offset_ptr, 0);
     uint32_t threshold = uint32_t(args->dropout_prob * float(4294967296));
     mask_out_tile_t mask_out;
     int start_m = wg_idy * wg_tile_m + sg_idy * sg_tile_m;

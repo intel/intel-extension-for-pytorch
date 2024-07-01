@@ -501,9 +501,12 @@ struct ln_fwd_fused_op_t<
       uint32_t sg_idy,
       uint32_t start_m) {
     int start_n = wg_idx * wg_tile_n + sg_idx * sg_tile_n;
-    xetla_vector<uint64_t, 1> rand_offset_ptr_v =
-        xetla_load_global<uint64_t, 1, cache_hint::cached, cache_hint::cached>(
-            args->rand_offset_ptr, 0);
+    xetla_vector<uint64_t, 1> rand_offset_ptr_v = xetla_load_global<
+        uint64_t,
+        1,
+        data_size::default_size,
+        cache_hint::cached,
+        cache_hint::cached>(args->rand_offset_ptr, 0);
     mat_ld = args->mat_ld;
     mask_ld = args->mask_ld;
     matrix_n = args->matrix_n;
@@ -665,9 +668,12 @@ struct ln_fwd_fused_op_t<
       uint32_t sg_idy,
       uint32_t start_m) {
     int start_n = wg_idx * wg_tile_n + sg_idx * sg_tile_n;
-    xetla_vector<uint64_t, 1> rand_offset_ptr_v =
-        xetla_load_global<uint64_t, 1, cache_hint::cached, cache_hint::cached>(
-            args->rand_offset_ptr, 0);
+    xetla_vector<uint64_t, 1> rand_offset_ptr_v = xetla_load_global<
+        uint64_t,
+        1,
+        data_size::default_size,
+        cache_hint::cached,
+        cache_hint::cached>(args->rand_offset_ptr, 0);
     mask_ld = args->mask_ld;
     matrix_m = args->matrix_m;
     matrix_n = args->matrix_n;

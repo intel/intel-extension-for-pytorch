@@ -71,9 +71,6 @@ struct chained_tile_op_arg_t<idx, curr_args_t, remain_args_t...>
   inline chained_tile_op_arg_t(
       chained_tile_op_arg_t<idx, curr_args_t, remain_args_t...> const& args) =
       default;
-  inline chained_tile_op_arg_t& operator=(
-      chained_tile_op_arg_t<idx, curr_args_t, remain_args_t...> const& args) =
-      default;
 
   template <int idx_, typename T>
   inline T get() const {

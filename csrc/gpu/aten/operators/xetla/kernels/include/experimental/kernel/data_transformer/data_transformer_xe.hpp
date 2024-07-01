@@ -122,11 +122,10 @@ struct xetla_data_transformer<
       block_size_y,
       in_reg_layout>;
   using global_ld_t = subgroup::tile_t<dtype_in, global_ld_tile_desc_t>;
-  using mem_desc_ld_t = mem_desc_t<dtype_in, mem_layout_in, mem_space::global>;
   using global_ld_payload_t = subgroup::mem_payload_t<
-      mem_desc_ld_t,
+      mem_desc_t<dtype_in, mem_layout_in, mem_space::global>,
       global_ld_tile_desc_t,
-      subgroup::msg_type_v<global_ld_tile_desc_t, mem_desc_ld_t>,
+      subgroup::msg_type_v<global_ld_tile_desc_t, mem_space::global>,
       gpu_arch::XeHpc>;
 
   using global_st_tile_desc_t = subgroup::tile_desc_t<
@@ -262,6 +261,7 @@ struct xetla_data_transformer<
       xetla_vector<dtype_compute, 1> local_scale = xetla_load_global<
           dtype_compute,
           1,
+          data_size::default_size,
           cache_hint::cached,
           cache_hint::cached>(args->scale, offset);
 

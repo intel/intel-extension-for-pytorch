@@ -41,17 +41,14 @@ struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::XeHpc> {
       subgroup::tile_desc_t<N_SG * N, 1, N_SG * N, 1, reg_layout::tiled>;
   using local_ld_t = subgroup::tile_t<T, local_ld_tile_desc>;
   using local_st_t = subgroup::tile_t<T, local_st_tile_desc>;
-  using mem_desc_ld_t = mem_desc_t<T, mem_layout::row_major, mem_space::local>;
   using local_ld_payload_t = subgroup::mem_payload_t<
-      mem_desc_ld_t,
+      mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       local_ld_tile_desc,
-      subgroup::msg_type_v<local_ld_tile_desc, mem_desc_ld_t>,
+      subgroup::msg_type_v<local_ld_tile_desc, mem_space::local>,
       gpu_arch::XeHpc>;
-  using mem_desc_st_t = mem_desc_t<T, mem_layout::row_major, mem_space::local>;
   using local_st_payload_t = subgroup::mem_payload_t<
-      mem_desc_st_t,
+      mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       local_st_tile_desc,
-      // subgroup::msg_type_v<local_ld_tile_desc, mem_desc_st_t>,
       msg_type::block_1d,
       gpu_arch::XeHpc>;
   inline group_reduce_t() = default;

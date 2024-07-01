@@ -55,9 +55,6 @@ __XETLA_API typename std::enable_if_t<
     std::is_same<T_dst, bf16>::value && std::is_same<T_src, float>::value,
     xetla_vector<T_dst, N>>
 xetla_cvt(xetla_vector<T_src, N> src) {
-  // xetla_vector<int32_t, N> a = src.template bit_cast_view<int32_t>();
-  // xetla_vector<int16_t, N> c = a >> 16;
-  // return c.xetla_format<bf16>();
   xetla_vector<T_dst, N> dst = src;
   return dst;
 }
@@ -71,10 +68,6 @@ __XETLA_API typename std::enable_if_t<
     std::is_same<T_dst, float>::value && std::is_same<T_src, bf16>::value,
     xetla_vector<T_dst, N>>
 xetla_cvt(xetla_vector<T_src, N> src) {
-  // xetla_vector<int16_t, N> a = src.template bit_cast_view<int16_t>();
-  // xetla_vector<int32_t, N> b = a;
-  // auto c = b << 16;
-  // return c.xetla_format<float>();
   xetla_vector<T_dst, N> dst = src;
   return dst;
 }
@@ -144,97 +137,6 @@ xetla_cvt(xetla_vector<T_src, N> src, float scaling_value) {
   auto tmp = xetla_rnde<float>(scaling_value * src);
   auto dst = __ESIMD_NS::saturate<T_dst, float, N>(tmp);
   return dst;
-}
-
-/// @brief xetla explicit data conversion, fp16->mx_fp4.
-/// @tparam T_src is the float16 data type.
-/// @tparam T_dst is the mx_fp4(E2M1) data type.
-/// @tparam N is the element number in xetla_vector.
-template <typename T_dst, typename T_src, int N>
-__XETLA_API typename std::enable_if_t<
-    std::is_same<T_dst, mx_fp4>::value && std::is_same<T_src, fp16>::value,
-    xetla_vector<T_dst, N / get_packed_num<T_dst>::value>>
-xetla_cvt(
-    xetla_vector<T_src, N> src,
-    xetla_vector<uint16_t, N> rand_vec = 0x100) {
-  /*********prepare, 4 instructions******/
-  xetla_vector<T_src, N> src_abs;
-  src_abs.xetla_format<uint16_t>() = src.xetla_format<uint16_t>() & 0x7fff;
-  xetla_vector<uint16_t, N> sign =
-      (src.xetla_format<uint16_t>() & 0x8000) >> 12;
-  // only compare 9bits mantissa
-  rand_vec = rand_vec & 0x1ff;
-
-  xetla_vector<T_src, N> src_abs_carried;
-  // if src_abs is 0.3, then it only has 30% possibility to carry (rand_vec
-  // >=0.7) inf If it is 0_11110_1xxxxxxxxx, and carry, then it will become
-  // 0_11111_0, and finally round to 6 If it is 0_11111_0000000000, no  carry,
-  // then it will become 0_11111_0, and finally round to 6 nan If it is
-  // 0_11111_1xxxxxxxxx, and carry, then it will become 1_00000_0, and finally
-  // round to 0 If it is 0_11111_1xxxxxxxxx, no carry,  then it will become
-  // 0_11111_1, and finally round to 6 If it is 0_11111_0xxxxxxxxx, and carry,
-  // then it will become 0_11111_1, and finally round to 6 If it is
-  // 0_11111_0xxxxxxxxx, no  carry, then it will become 0_11111_0, and finally
-  // round to 4 subnormal If it is 0_00000_1xxxxxxxxx, and carry, then it will
-  // become 0_00001_0, and finally round to 0
-
-  // clean the low 9bits to make sure inf will not become nan
-  /*********rounding, 1 instruction******/
-  src_abs_carried.xetla_format<uint16_t>() =
-      src_abs.xetla_format<uint16_t>() + rand_vec.xetla_format<uint16_t>();
-
-  // dst = 0_00_0
-  // if src_abs_carried >= 0.5(0_01110_0) => dst = 0_00_1
-  // if src_abs_carried >= 1  (0_01111_0) => dst = 0_01_0
-  // if src_abs_carried >= 1.5(0_01111_1) => dst = 0_01_1
-  // if src_abs_carried >= 2  (0_10000_0) => dst = 0_10_0
-  // if src_abs_carried >= 3  (0_10000_1) => dst = 0_10_1
-  // if src_abs_carried >= 4  (0_10001_0) => dst = 0_11_0
-  // if src_abs_carried >= 6  (0_10001_1) => dst = 0_11_1
-  /*********common path, 5 instructions******/
-  xetla_vector<uint16_t, N> dst =
-      ((src_abs_carried.xetla_format<uint16_t>() >> 9) & 3) |
-      ((src_abs_carried.xetla_format<uint16_t>() >> 12) & 4);
-
-  /*********handle conner case, 6 instructions******/
-  // if src_abs_carried is nan, there flags should all be false, only go with
-  // common path still srnd for subnormal case
-  xetla_mask<N> zero_flag = src_abs_carried < 0.5;
-  xetla_mask<N> subnormal_flag = src_abs_carried < 1;
-  xetla_mask<N> saturate_flag = src_abs >= 6;
-  dst.xetla_merge(0x7, saturate_flag);
-  // subnormal_flag should prior to zero_flag
-  dst.xetla_merge(0x1, subnormal_flag);
-  dst.xetla_merge(0x0, zero_flag);
-
-  /*********add sign bit, 1 instructions******/
-  dst |= sign;
-
-  /*********pack data, 7 instructions******/
-  // T_dst is uint8_t, get_packed_num<T_dst>::value is 2
-  xetla_vector<T_dst, N / get_packed_num<T_dst>::value> out;
-  auto out_u16 = out.xetla_format<uint16_t>();
-  out_u16 = dst.xetla_select<N / 4, 4>(0);
-  out_u16 |= dst.xetla_select<N / 4, 4>(1) << 4;
-  out_u16 |= dst.xetla_select<N / 4, 4>(2) << 8;
-  out_u16 |= dst.xetla_select<N / 4, 4>(3) << 12;
-
-  return out;
-}
-
-/// @brief xetla explicit data conversion, fp32->mx_fp4.
-/// @tparam T_src is the float32 data type.
-/// @tparam T_dst is the mx_fp4(E2M1) data type.
-/// @tparam N is the element number in xetla_vector.
-template <typename T_dst, typename T_src, int N>
-__XETLA_API typename std::enable_if_t<
-    std::is_same<T_dst, mx_fp4>::value && std::is_same<T_src, float>::value,
-    xetla_vector<T_dst, N / get_packed_num<T_dst>::value>>
-xetla_cvt(
-    xetla_vector<T_src, N> src,
-    xetla_vector<uint16_t, N> rand_vec = 0x100) {
-  xetla_vector<fp16, N> src_f16 = src;
-  return xetla_cvt<T_dst, fp16>(src_f16, rand_vec);
 }
 
 /// @brief xetla explicit data conversion, same type.

@@ -43,7 +43,7 @@ class gemm_t<
     mem_desc_a_t_, // memory attribute of matA
     mem_desc_b_t_, // memory attribute of matB
     pre_processing_t_, // pre_processing functor
-    std::enable_if_t<arch_has_xmx<arch_tag_>>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   using mem_desc_a_t = mem_desc_a_t_;
   using mem_desc_b_t = mem_desc_b_t_;
@@ -61,7 +61,7 @@ class gemm_t<
   static constexpr uint32_t wg_size_y = tile_shape::wg_size_y;
   using work_group_t = typename tile_shape::work_group_t;
 
-  constexpr static gpu_arch arch_tag = arch_tag_;
+  constexpr static gpu_arch arch_tag = compute_policy::arch_tag;
 
   static constexpr mem_layout mem_layout_a = mem_desc_a_t::layout;
   static constexpr mem_layout mem_layout_b = mem_desc_b_t::layout;
@@ -129,6 +129,8 @@ class gemm_t<
 
   /******** set tile  **********/
   static constexpr reg_layout reg_layout_a = reg_layout::tiled;
+
+ public:
   using matA_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_a,
       tile_size_y_a,
@@ -214,7 +216,6 @@ class gemm_t<
       wg_size_y,
       arch_tag>;
 
- public:
   using matAcc_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_c,
       tile_size_y_c,

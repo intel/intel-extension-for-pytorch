@@ -493,9 +493,7 @@ class ifmha_forward_t {
     using matB_payload_t = subgroup::mem_payload_t<
         mem_desc_t<scalar_t, layout_b, mem_space::global>,
         matB_tile_desc_t,
-        subgroup::msg_type_v<
-            matB_tile_desc_t,
-            mem_desc_t<scalar_t, layout_b, mem_space::global>>,
+        subgroup::msg_type_v<matB_tile_desc_t, mem_space::global>,
         gpu_arch::XeHpc>;
     using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
         mem_desc_t<scalar_t, layout_b, mem_space::global>,

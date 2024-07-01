@@ -9,6 +9,17 @@ namespace torch_ipex::xpu::xetla {
 using cgf_t = std::function<void(sycl::handler&)>;
 using cgfs_t = std::vector<cgf_t>;
 
+enum quant_mode : uint8_t {
+  S4_ASYM,
+  S4_FULLRANGE_NO_ZP,
+  S4_ASYM_ZERO_NO_DEGRAD
+};
+
+enum class XetlaType : uint8_t {
+  fp16,
+  bf16,
+};
+
 #ifdef _WIN32
 #define XETLA_KERNEL_EXPORT __declspec(dllexport)
 #define XETLA_KERNEL_IMPORT __declspec(dllimport)

@@ -145,13 +145,13 @@ struct gru_cell {
   using mat_hidden_payload_t = mem_payload_t<
       mem_desc_t<T, layout_hidden, mem_loc_hidden>,
       mat_tile_desc_t,
-      msg_type_v<mat_tile_desc_t, mem_desc_t<T, layout_hidden, mem_loc_hidden>>,
+      msg_type_v<mat_tile_desc_t, mem_loc_hidden>,
       gpu_arch::XeHpc>;
 
   using matC_payload_t = mem_payload_t<
       mem_desc_t<T, layout_out, mem_loc_out>,
       mat_tile_desc_t,
-      msg_type_v<mat_tile_desc_t, mem_desc_t<T, layout_out, mem_loc_out>>,
+      msg_type_v<mat_tile_desc_t, mem_loc_out>,
       gpu_arch::XeHpc>;
 
   using mask_t = tile_t<Act_T, mat_tile_desc_t>;
@@ -159,7 +159,7 @@ struct gru_cell {
   using mask_payload_t = mem_payload_t<
       mem_desc_t<Act_T, layout_out, mem_loc_out>,
       mat_tile_desc_t,
-      msg_type_v<mat_tile_desc_t, mem_desc_t<Act_T, layout_out, mem_loc_out>>,
+      msg_type_v<mat_tile_desc_t, mem_loc_out>,
       gpu_arch::XeHpc>;
 
   using sigmoid_t = typename subgroup::sigmoid_op_t;
@@ -373,9 +373,7 @@ struct gru_cell {
     using bias_payload_t = mem_payload_t<
         mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>,
         bias_tile_desc_t,
-        msg_type_v<
-            bias_tile_desc_t,
-            mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>>,
+        msg_type_v<bias_tile_desc_t, mem_space::global>,
         gpu_arch::XeHpc>;
 
     bias_t bias;
@@ -407,9 +405,7 @@ struct gru_cell {
     using bias_payload_t = mem_payload_t<
         mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>,
         bias_tile_desc_t,
-        msg_type_v<
-            bias_tile_desc_t,
-            mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>>,
+        msg_type_v<bias_tile_desc_t, mem_space::global>,
         gpu_arch::XeHpc>;
 
     bias_t bias1;

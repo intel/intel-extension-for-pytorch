@@ -508,40 +508,6 @@ __XETLA_API T xetla_tanh(T src) {
   return (src >= 10) ? 1 : ret;
 }
 
-/// @brief Calculate sigmoid value for each element of the input vector.
-/// @tparam T element type of the input and return vectors.
-/// @tparam SZ size of the input and returned vectors.
-/// @param src the input vector.
-/// @return vector of sigmoid of component-wise elements.
-template <typename T, int SZ>
-__XETLA_API xetla_vector<T, SZ> xetla_sigmoid(xetla_vector<T, SZ> src) {
-  static_assert(
-      (std::is_same<remove_const_t<T>, float>::value) ||
-          (std::is_same<remove_const_t<T>, fp16>::value),
-      "Only support fp32 and fp16");
-  xetla_mask<SZ> mask = src <= -10;
-  xetla_vector<T, SZ> exp = xetla_exp<T, SZ>(-src);
-  xetla_vector<T, SZ> ret_sub = 1.f / (exp + 1.f);
-  ret_sub.xetla_merge(0, mask);
-
-  return ret_sub;
-}
-
-/// @brief Calculate sigmoid of a scalar.
-/// @tparam T element type of the input and return a scalar.
-/// @param src the scalar value.
-/// @return sigmoid value.
-template <typename T>
-__XETLA_API T xetla_sigmoid(T src) {
-  static_assert(
-      (std::is_same<remove_const_t<T>, float>::value) ||
-          (std::is_same<remove_const_t<T>, fp16>::value),
-      "Only support fp32 and fp16");
-  T exp = xetla_exp<T>(-src);
-  T ret = 1.f / (exp + 1.f);
-  return (src <= -10) ? 0 : ret;
-}
-
 /// Add two unsigned integer vectors, return the result and in-place update the
 /// carry.
 /// @tparam T element type of the src, should be uint32_t.
@@ -590,7 +556,6 @@ __XETLA_API xetla_vector<T, SZ> xetla_add_c(
 #else
   xetla_vector<T, SZ> out = __ESIMD_ENS::addc(carry_tmp, src0, src1);
 #endif
-
   carry = carry_tmp;
   return out;
 }
@@ -696,27 +661,6 @@ __XETLA_API xetla_vector<T1, SZ> xetla_sat(xetla_vector<T0, SZ> src) {
       !((is_internal_type<T0>::value) || (is_internal_type<T1>::value)),
       "The internal types are not yet supported!");
   return __ESIMD_NS::saturate<T1, T0, SZ>(src);
-}
-
-/// Count number of bits set in the source operand per element.
-/// @param src0 the source operand to count bits in.
-/// @return a vector of \c uint32_t, where each element is set to bit count of
-///     the corresponding element of the source operand.
-template <typename T, int N>
-__XETLA_API std::enable_if_t<
-    std::is_integral<T>::value && (sizeof(T) <= 4),
-    xetla_vector<uint32_t, N>>
-xetla_cbit(xetla_vector<T, N> src) {
-  return __ESIMD_NS::cbit<T, N>(src);
-}
-
-/// Scalar version of \c cbit - both input and output are scalars rather
-/// than vectors.
-template <typename T>
-__XETLA_API std::
-    enable_if_t<std::is_integral<T>::value && (sizeof(T) <= 4), uint32_t>
-    xetla_cbit(T src) {
-  return __ESIMD_NS::cbit<T>(src);
 }
 
 /// @} xetla_core_math

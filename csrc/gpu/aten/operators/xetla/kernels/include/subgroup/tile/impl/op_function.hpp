@@ -36,7 +36,7 @@ template <typename T_dst, typename T_src>
 __XETLA_API typename std::enable_if_t<
     (T_src::register_layout != reg_layout::linear) &&
     (T_dst::register_layout != reg_layout::linear) &&
-    (is_same_elements<T_dst, T_src>::value) &&
+    is_same_layout<T_dst, T_src>::value &&
     (!is_floating_to_integer<T_dst, T_src>::value)>
 elemwise_cvt(T_dst& dst, T_src& src) {
   constexpr uint32_t block_size_x = T_dst::block_size_x;
@@ -44,7 +44,7 @@ elemwise_cvt(T_dst& dst, T_src& src) {
   using dtype_src = typename T_src::dtype;
   using dtype_dst = typename T_dst::dtype;
   if constexpr (std::is_same<dtype_src, dtype_dst>::value) {
-    dst.reg = xetla_cvt<dtype_dst, dtype_src>(src.reg);
+    dst.reg = src.reg;
   } else {
 #pragma unroll
     for (uint32_t i = 0; i < tile_elems; i += block_size_x) {
@@ -52,25 +52,6 @@ elemwise_cvt(T_dst& dst, T_src& src) {
           xetla_cvt<dtype_dst, dtype_src, block_size_x>(
               src.reg.xetla_select<block_size_x, 1>(i));
     }
-  }
-}
-
-template <typename T_dst, typename T_src>
-__XETLA_API typename std::enable_if_t<
-    std::is_same<mx_fp4, typename T_dst::dtype>::value>
-elemwise_cvt(T_dst& dst, T_src& src) {
-  using dtype_src = typename T_src::dtype;
-  using dtype_dst = typename T_dst::dtype;
-  constexpr uint32_t tile_elems = T_src::tile_elems;
-  constexpr uint32_t unroll_src_size = 64;
-  constexpr uint32_t unroll_dst_size =
-      unroll_src_size / get_packed_num<dtype_dst>::value;
-#pragma unroll
-  for (uint32_t i = 0; i < tile_elems; i += unroll_src_size) {
-    dst.reg.xetla_select<unroll_dst_size, 1>(
-        i / get_packed_num<dtype_dst>::value) =
-        xetla_cvt<dtype_dst, dtype_src, unroll_src_size>(
-            src.reg.xetla_select<unroll_src_size, 1>(i));
   }
 }
 
@@ -167,7 +148,7 @@ __XETLA_API
       auto reg_dst_2d =
           reg_dst.xetla_format<native_type_t<dtype>, move_rows, move_cols>();
 #pragma unroll
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<move_rows, 1, block_size_x, vnni_stride>(
             0, vnni_i) =
             reg_2d.xetla_select<move_rows, vnni_stride, block_size_x, 1>(
@@ -185,7 +166,7 @@ __XETLA_API
     constexpr int32_t remain_move_cols = block_size_x * vnni_stride;
     constexpr int32_t remain_move_rows = remain_size_y / vnni_stride;
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg = (mat_Acc.reg)
                      .xetla_select<remain_block_elems, 1>(
                          remain_elems_start + j * remain_block_elems);
@@ -197,7 +178,7 @@ __XETLA_API
           native_type_t<dtype>,
           remain_move_rows,
           remain_move_cols>();
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<remain_move_rows, 1, block_size_x, vnni_stride>(
             0, vnni_i) =
             reg_2d.xetla_select<remain_move_rows, vnni_stride, block_size_x, 1>(
@@ -214,9 +195,7 @@ __XETLA_API
 /// @param mat_Acc Is the reference of the tile object.
 /// @return No return, update the data in-place.
 template <typename T>
-__XETLA_API typename std::enable_if_t<
-    T::register_layout == reg_layout::tiled ||
-    T::register_layout == reg_layout::vnni_tiled>
+__XETLA_API typename std::enable_if_t<T::register_layout == reg_layout::tiled>
 vnni_reverse(T& mat_Acc) {
   constexpr uint32_t tile_size_y = T::tile_size_y;
   constexpr uint32_t tile_size_x = T::tile_size_x;
@@ -249,7 +228,7 @@ vnni_reverse(T& mat_Acc) {
           reg_dst
               .xetla_format<native_type_t<dtype>, block_size_y, block_size_x>();
 #pragma unroll
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<move_rows, vnni_stride, block_size_x, 1>(
             vnni_i, 0) =
             reg_2d.xetla_select<move_rows, 1, block_size_x, vnni_stride>(
@@ -267,7 +246,7 @@ vnni_reverse(T& mat_Acc) {
     constexpr int32_t remain_move_cols = block_size_x * vnni_stride;
     constexpr int32_t remain_move_rows = remain_size_y / vnni_stride;
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg = (mat_Acc.reg)
                      .xetla_select<remain_block_elems, 1>(
                          remain_elems_start + j * remain_block_elems);
@@ -281,7 +260,7 @@ vnni_reverse(T& mat_Acc) {
           native_type_t<dtype>,
           remain_size_y,
           block_size_x>();
-      for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
+      for (uint32_t vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<remain_move_rows, vnni_stride, block_size_x, 1>(
             vnni_i, 0) =
             reg_2d.xetla_select<remain_move_rows, 1, block_size_x, vnni_stride>(
@@ -489,15 +468,10 @@ vnni_transform(T_dst& dst, T_src& src) {
 /// @return No return, update the data in-place.
 template <typename T>
 __XETLA_API void tile_transpose(T& mat_Acc) {
-  constexpr uint32_t tile_size_y =
-      T ::reg_transpose ? T::tile_size_y : T::tile_size_x;
-  constexpr uint32_t tile_size_x =
-      T ::reg_transpose ? T::tile_size_x : T::tile_size_y;
-  constexpr uint32_t block_size_y =
-      T ::reg_transpose ? T::block_size_y : T::block_size_x;
-  constexpr uint32_t block_size_x =
-      T ::reg_transpose ? T::block_size_x : T::block_size_y;
-
+  constexpr uint32_t tile_size_y = T::tile_size_y;
+  constexpr uint32_t tile_size_x = T::tile_size_x;
+  constexpr uint32_t block_size_y = T::block_size_y;
+  constexpr uint32_t block_size_x = T::block_size_x;
   constexpr uint32_t block_elems = block_size_y * block_size_x;
   constexpr int32_t num_block_x = tile_size_x / block_size_x;
   constexpr int32_t num_block_y = tile_size_y / block_size_y;
@@ -702,37 +676,4 @@ layout_convert(T_dst& dst, T_src& src) {
     }
   }
 }
-
-template <typename T>
-void dump_mat(
-    T mat,
-    size_t tile_x = T::reg_transpose ? T::tile_size_y : T::tile_size_x,
-    size_t tile_y = T::reg_transpose ? T::tile_size_x : T::tile_size_y) {
-#pragma unroll
-  for (size_t row = 0; row < tile_y; row++) {
-#pragma unroll
-    for (size_t col = 0; col < tile_x; col++) {
-      sycl::ext::oneapi::experimental::printf(
-          "%x(%d) ",
-          int(native_type_t<typename T::dtype>(mat.reg[row * tile_x + col])),
-          int(native_type_t<typename T::dtype>(mat.reg[row * tile_x + col])));
-    }
-    sycl::ext::oneapi::experimental::printf("\n");
-  }
-  sycl::ext::oneapi::experimental::printf("\n ");
-}
-template <typename T>
-void dump_mat_reg(T mat, size_t tile_x, size_t tile_y) {
-#pragma unroll
-  for (size_t row = 0; row < tile_y; row++) {
-#pragma unroll
-    for (size_t col = 0; col < tile_x; col++) {
-      sycl::ext::oneapi::experimental::printf(
-          "%d ", (int)(sycl::half)mat[row * tile_x + col]);
-    }
-    sycl::ext::oneapi::experimental::printf("\n");
-  }
-  sycl::ext::oneapi::experimental::printf("\n");
-}
-
 } // namespace gpu::xetla::subgroup

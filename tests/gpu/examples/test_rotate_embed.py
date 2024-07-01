@@ -1,9 +1,5 @@
 import torch
-from torch.testing._internal.common_utils import (
-    TestCase,
-    instantiate_parametrized_tests,
-    run_tests,
-)
+from torch.testing._internal.common_utils import TestCase
 from intel_extension_for_pytorch.transformers.models.xpu.optimize_transformers.modules.transformer_modules.RoPE import (
     LlamaRotaryEmbedding,
     GPTJRotaryEmbedding,
@@ -280,9 +276,3 @@ class TestNNMethod(TestCase):
             self.assertEqual(out, ref)
             self.assertEqual(tensor, ref)
             self.assertEqual(tensor1, ref1)
-
-
-instantiate_parametrized_tests(TestNNMethod)
-
-if __name__ == "__main__":
-    run_tests()

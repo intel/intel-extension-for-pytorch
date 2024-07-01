@@ -25,29 +25,27 @@
 
 namespace gpu::xetla::subgroup {
 namespace detail {
-
-template <typename payload_t, typename = void>
-struct check_prefetch_type;
 template <typename payload_t>
-struct check_prefetch_type<
-    payload_t,
-    std::enable_if_t<payload_t::memory_space == mem_space::local>> {
-  static constexpr bool is_global_2d = false;
-  static constexpr bool is_global_block_1d = false;
-  static constexpr bool is_global_unaligned_2d = false;
-  static constexpr bool is_local = true;
-};
-template <typename payload_t>
-struct check_prefetch_type<
-    payload_t,
-    std::enable_if_t<payload_t::memory_space == mem_space::global>> {
+struct check_prefetch_type {
   static constexpr bool is_global_2d =
-      payload_t::message_type == msg_type::block_2d;
-  static constexpr bool is_global_block_1d =
-      payload_t::message_type == msg_type::block_1d;
-  static constexpr bool is_global_unaligned_2d =
-      payload_t::message_type == msg_type::unaligned_2d;
-  static constexpr bool is_local = false;
+      ((payload_t::memory_space == mem_space::global) &&
+       (payload_t::tile_desc::tile_size_y != 1) &&
+       (payload_t::arch_tag <= gpu_arch::XeHpc));
+
+  static constexpr bool is_global_block_1d_xe =
+      ((payload_t::memory_space == mem_space::global) &&
+       (payload_t::tile_desc::tile_size_y == 1) &&
+       (payload_t::arch_tag <= gpu_arch::XeHpc));
+
+  static constexpr bool is_global_unaligned_2d_xe =
+      ((payload_t::memory_space == mem_space::global) &&
+       (payload_t::tile_desc::tile_size_y != 1) &&
+       (payload_t::arch_tag -= gpu_arch::XeHpc) &&
+       (payload_t::message_type == msg_type::unaligned_2d));
+
+  static constexpr bool is_local_xe =
+      ((payload_t::memory_space == mem_space::local) &&
+       (payload_t::arch_tag <= gpu_arch::XeHpc));
 };
 
 } // namespace detail
@@ -68,7 +66,7 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_prefetch_type<payload_t>::is_global_2d &&
-    arch_has_2d_load_store<payload_t::arch_tag>>
+    payload_t::arch_tag == gpu_arch::XeHpc>
 tile_prefetch(payload_t& payload) {
   using dtype = typename payload_t::dtype;
   static constexpr uint32_t num_tdesc = payload_t::num_tdesc;
@@ -97,7 +95,7 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_prefetch_type<payload_t>::is_global_2d &&
-    !arch_has_2d_load_store<payload_t::arch_tag>>
+    payload_t::arch_tag <= gpu_arch::XeHpg>
 tile_prefetch(payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
@@ -110,25 +108,32 @@ tile_prefetch(payload_t& payload) {
 #pragma unroll
     for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
       uint32_t offset_x = j * tile_desc::block_size_x;
-      // #pragma unroll
-      //       for (uint32_t sub_block_y = 0; sub_block_y <
-      //       tile_desc::block_size_y;
-      //            sub_block_y += num_channel) {
-      uint32_t address_offset = payload_t::mem_transpose
-          ? offset_x * payload.pitch_in_bytes + (offset_y + 0) * sizeof(dtype)
-          : offset_x * sizeof(dtype) + (offset_y + 0) * payload.pitch_in_bytes;
+#pragma unroll
+      for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
+           sub_block_y += num_channel) {
+        uint32_t address_offset = payload_t::trans
+            ? offset_x * payload.pitch_in_bytes +
+                (offset_y + sub_block_y) * sizeof(dtype)
+            : offset_x * sizeof(dtype) +
+                (offset_y + sub_block_y) * payload.pitch_in_bytes;
+        xetla_mask<num_channel> pred_y =
+            payload.base_y + offset_y + sub_block_y + num_channel >
+                payload.height_in_elems
+            ? (xetla_vector_gen<uint32_t, num_channel>(0, 1) <
+               (payload.height_in_elems % num_channel))
+            : 1;
 
-      xetla_prefetch_global<
-          prefetch_dtype,
-          payload_t::simd_exec_size,
-          data_size::default_size,
-          L1,
-          L2,
-          num_channel>(
-          payload.base_ptr,
-          payload.channel_offset + payload.base_offset + address_offset,
-          1);
-      //   }
+        xetla_prefetch_global<
+            prefetch_dtype,
+            payload_t::simd_exec_size,
+            data_size::default_size,
+            L1,
+            L2,
+            payload_t::num_channel>(
+            payload.base_ptr,
+            payload.channel_offset + payload.base_offset + address_offset,
+            pred_y);
+      }
     }
   }
 }
@@ -148,35 +153,34 @@ template <
     cache_hint L2 = cache_hint::cached,
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
-    detail::check_prefetch_type<payload_t>::is_global_block_1d>
+    detail::check_prefetch_type<payload_t>::is_global_block_1d_xe>
 tile_prefetch(payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
   using prefetch_dtype = typename payload_t::prefetch_dtype;
   constexpr uint32_t prefetch_len =
       tile_desc::tile_size_x / payload_t::scale_factor;
-  constexpr uint32_t max_prefetch_in_bytes =
-      load_store_attr_t<msg_type::block_1d, payload_t::arch_tag>::
-          max_prefetch_vec_len;
-  if constexpr (prefetch_len >= max_prefetch_in_bytes) {
+  // TODO (read from arch register info)
+  constexpr uint32_t reg_in_bytes =
+      payload_t::arch_tag == gpu_arch::XeHpc ? 64 : 32;
+  if constexpr (prefetch_len >= reg_in_bytes) {
 #pragma unroll
-    for (uint32_t j = 0; j < prefetch_len / max_prefetch_in_bytes; j++) {
-      uint32_t offset_x = j * max_prefetch_in_bytes * payload_t::scale_factor;
+    for (uint32_t j = 0; j < prefetch_len / reg_in_bytes; j++) {
+      uint32_t offset_x = j * reg_in_bytes * payload_t::scale_factor;
       uint32_t address_offset = offset_x * sizeof(dtype);
       xetla_prefetch_global<
           prefetch_dtype,
-          max_prefetch_in_bytes,
+          reg_in_bytes,
           data_size::default_size,
           L1,
           L2>(payload.base_ptr, payload.base_offset + address_offset);
     }
   }
-  constexpr uint32_t tail_len = prefetch_len % max_prefetch_in_bytes;
-  uint32_t tail_offset = prefetch_len / max_prefetch_in_bytes *
-      max_prefetch_in_bytes * payload_t::scale_factor;
-  detail::
-      process_1d_tail<tail_len, max_prefetch_in_bytes / 2, L1, L2, payload_t>(
-          payload, tail_offset);
+  constexpr uint32_t tail_len = prefetch_len % reg_in_bytes;
+  uint32_t tail_offset =
+      prefetch_len / reg_in_bytes * reg_in_bytes * payload_t::scale_factor;
+  detail::process_1d_tail<tail_len, reg_in_bytes / 2, L1, L2, payload_t>(
+      payload, tail_offset);
 }
 
 /// @brief Is prefetch data func.
@@ -191,8 +195,8 @@ template <
     cache_hint L1 = cache_hint::cached,
     cache_hint L2 = cache_hint::cached,
     typename payload_t>
-__XETLA_API
-    typename std::enable_if_t<detail::check_prefetch_type<payload_t>::is_local>
-    tile_prefetch([[maybe_unused]] payload_t& payload) {}
+__XETLA_API typename std::enable_if_t<
+    detail::check_prefetch_type<payload_t>::is_local_xe>
+tile_prefetch([[maybe_unused]] payload_t& payload) {}
 
 } // namespace gpu::xetla::subgroup

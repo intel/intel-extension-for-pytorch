@@ -455,28 +455,20 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
         key: torch.Tensor,
         sin: torch.Tensor,
         cos: torch.Tensor,
-        query_out: torch.Tensor = None,
-        key_out: torch.Tensor = None,
     ):
-        if query_out is None:
-            query_out = query
-        if key_out is None:
-            key_out = key
         if query.shape == key.shape:
             cos = cos.expand(query.shape)
             sin = sin.expand(query.shape)
             torch.ops.torch_ipex.apply_rotary_embedding_half_qk(
-                query, key, sin, cos, query_out, key_out
+                query, key, sin, cos, query, key
             )
         else:
             cos_q = cos.expand(query.shape)
             sin_q = sin.expand(query.shape)
-            torch.ops.torch_ipex.apply_rotary_embedding_half(
-                query, sin_q, cos_q, query_out
-            )
+            torch.ops.torch_ipex.apply_rotary_embedding_half(query, sin_q, cos_q, query)
             cos_k = cos.expand(key.shape)
             sin_k = sin.expand(key.shape)
-            torch.ops.torch_ipex.apply_rotary_embedding_half(key, sin_k, cos_k, key_out)
+            torch.ops.torch_ipex.apply_rotary_embedding_half(key, sin_k, cos_k, key)
 
     def apply_rotary_pos_emb_ref(
         self,
@@ -533,19 +525,9 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
         x2 = x[..., x.shape[-1] // 2 :]
         return torch.cat((-x2, x1), dim=-1)
 
-    def forward(
-        self,
-        query,
-        key,
-        position_ids,
-        layer_id,
-        beam_size,
-        kv_seq_len,
-        query_out=None,
-        key_out=None,
-    ):
+    def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
         sin, cos = self.get_sin_cos(position_ids, layer_id, beam_size, kv_seq_len)
-        self.apply_rotary_pos_emb(query, key, sin, cos, query_out, key_out)
+        self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key
 
 

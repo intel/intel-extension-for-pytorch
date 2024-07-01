@@ -138,10 +138,16 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def prepare_qkv_input_2nd2last(self, hidden_states, **kwargs):
         bs_beam, seq_len, embed_dim = self.get_runtime_shape(hidden_states)
         out_shape = [seq_len, bs_beam, self.head_dim * self.num_attn_head]
+        query = torch.empty(
+            out_shape, device=hidden_states.device, dtype=hidden_states.dtype
+        )
+        key = self.runtime_cache.key_cache[
+            self.prev_seq_len : self.seq_len, :, :, :
+        ].view(out_shape)
         value = self.runtime_cache.value_cache[
             self.prev_seq_len : self.seq_len, :, :, :
         ].view(out_shape)
-        return None, None, value
+        return query, key, value
 
     # ################################# compute_qkv #################################################
     def compute_qkv_gemm(self, hidden_states, query, key, value):
@@ -171,13 +177,10 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     def post_qkv(self, query, key, value, position_ids, layer_past, **kwargs):
         bs_beam, seq, _ = self.get_runtime_shape(query)
         seq = seq if layer_past is None else layer_past[0].size(2) + 1
-        key_out = self.runtime_cache.key_cache[
-            self.prev_seq_len : self.seq_len, :, :, :
-        ].view(query.shape)
-        self.position_embed(
-            query, key, position_ids, self.layer_id, self.beam_size, seq, query, key_out
+        query, key = self.position_embed(
+            query, key, position_ids, self.layer_id, self.beam_size, seq
         )
-        query, key, value = self.combine_kv_cache_interface(query, key_out, value)
+        query, key, value = self.combine_kv_cache_interface(query, key, value)
         return query, key, value
 
     # ################################## combine_kv_cache ################################################################
@@ -201,11 +204,11 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         query = query.permute(0, 2, 1, 3)
         return query, self.runtime_cache.key_prompt, self.runtime_cache.value_prompt
 
-    def combine_kv_cache_2nd2last(self, query_in, key_in, value_in, layer_past=None):
+    def combine_kv_cache_2nd2last(self, query, key, value, layer_past=None):
         key = self.runtime_cache.key_cache[: self.seq_len, :, :, :]
         value = self.runtime_cache.value_cache[: self.seq_len, :, :, :]
         # to: [bs_beam, num_heads, seq_len, head_dim]
-        query = query_in.permute(1, 2, 0, 3)
+        query = query.permute(1, 2, 0, 3)
         key = key.permute(1, 2, 0, 3)
         value = value.permute(1, 2, 0, 3)
         # key, value = self.cat_past_kv(key, value, layer_past)
@@ -238,7 +241,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
     def sdp(self, query, key, value, attention_mask, head_mask, alibi):
         # Currently only PVC and MTL (without beam search) have sdp fusion available
-        if False and not xpu_sdpa_support(self.is_beam_search()):
+        if not xpu_sdpa_support(self.is_beam_search()):
             return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
         key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
         (

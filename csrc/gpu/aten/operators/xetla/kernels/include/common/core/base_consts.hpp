@@ -23,8 +23,9 @@
 
 namespace gpu::xetla {
 
-/// @addtogroup xetla_core_base_consts
+/// @addtogroup xetla_core_base_types
 /// @{
-/// @} xetla_core_base_consts
+
+/// @} xetla_core_base_types
 
 } // namespace gpu::xetla

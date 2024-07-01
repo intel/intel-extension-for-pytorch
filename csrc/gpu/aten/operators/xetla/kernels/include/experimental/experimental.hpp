@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <experimental/common/common.hpp>
 #include <experimental/group/group.hpp>
 #include <experimental/kernel/kernel.hpp>
 #include <experimental/subgroup/subgroup.hpp>

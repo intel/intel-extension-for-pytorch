@@ -18,6 +18,7 @@
 #if defined(USE_XETLA)
 #include "../xetla/mha.h"
 using namespace gpu::xetla;
+using namespace torch_ipex::xpu::xetla;
 #endif
 
 using namespace at;

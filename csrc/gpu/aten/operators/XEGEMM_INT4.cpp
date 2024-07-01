@@ -79,7 +79,7 @@ static void mm_qkv_out_wint4(
   TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
   int m = input.sizes()[0];
   int k = input.sizes()[1];
-  int n = weight.sizes()[1];
+  int n = weight.sizes()[2] * 2;
 
   bool has_bias = bias_.has_value();
   if (has_bias) {
@@ -99,7 +99,7 @@ static void mm_qkv_out_wint4(
   TORCH_CHECK(
       input.scalar_type() == kHalf &&
       (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
-       weight.scalar_type() == kChar || weight.scalar_type() == kInt));
+       weight.scalar_type() == kChar));
 
   GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias, GetGpuArchId());
 }
@@ -118,7 +118,7 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
     input_flat = input_flat.to(at::kHalf);
   int m = input_flat.sizes()[0];
   int k = input_flat.sizes()[1];
-  int n = weight.sizes()[1];
+  int n = weight.sizes()[2] * 2;
   auto out0 = at::empty({m, n}, input.options());
   auto out1 = at::empty({m, n}, input.options());
   auto out2 = at::empty({m, n}, input.options());
@@ -154,7 +154,7 @@ static Tensor mm_bias_int4(
 
   int m = input_flat.sizes()[0];
   int k = input_flat.sizes()[1];
-  int n = weight.sizes()[0];
+  int n = weight.sizes()[1] * 2;
   auto bias = bias_.flatten();
   auto output = at::empty({m, n}, input.options());
 
@@ -187,7 +187,7 @@ static Tensor mm_int4(
 
   int m = input_flat.sizes()[0];
   int k = input_flat.sizes()[1];
-  int n = weight.sizes()[0];
+  int n = weight.sizes()[1] * 2;
   auto output = at::empty({m, n}, input.options());
 
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
@@ -256,7 +256,7 @@ static Tensor mm_silu_int4(
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
   auto policy = HGEMMXetla_INT4()
@@ -289,7 +289,7 @@ static Tensor mm_resmul_int4(
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
   auto policy =
@@ -325,7 +325,7 @@ static Tensor mm_bias_gelu_int4(
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
   auto policy =
@@ -367,7 +367,7 @@ static Tensor mm_bias_resadd_resadd_int4(
       input.dim() == 2 && weight.dim() == 2 && bias.dim() == 1 &&
       res0.dim() == 2 && res1.dim() == 2);
   int m = input.sizes()[0];
-  int n = weight.sizes()[0];
+  int n = weight.sizes()[1] * 2;
   int k = input.sizes()[1];
   auto output = at::empty({m, n}, input.options());
   auto policy = HGEMMXetla_INT4()
@@ -419,7 +419,7 @@ static Tensor mm_silu_mul_int4(
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
 
@@ -457,7 +457,7 @@ static Tensor mm_bias_silu_mul_int4(
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
 
@@ -494,7 +494,7 @@ static Tensor mm_add_int4(
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
 
@@ -531,7 +531,7 @@ static Tensor mm_bias_add_int4(
   // a: m x k, b: k x n
   TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
   int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
+  int n = weight_flat.sizes()[1] * 2;
   int k = input_flat.sizes()[1];
   auto output = at::empty({m, n}, input.options());
 
@@ -629,15 +629,18 @@ Tensor _weight_int4pack_mm(
   auto q_zeros = q_scale_and_zeros_vec[1].reshape({-1, N}).contiguous();
   TORCH_CHECK(A.dim() == 2 && b_recast.dim() == 2);
 
-  auto policy = HGEMMXetla_INT4()
-                    .add_matrix_out(C)
-                    .add_matrix_inp(A)
-                    .add_matrix_wei(b_recast)
-                    .add_matrix_scl(q_scale)
-                    .add_matrix_zp(q_zeros)
-                    .add_group_size(qGroupSize)
-                    .add_arch(GetGpuArchId())
-                    .build();
+  auto policy =
+      HGEMMXetla_INT4()
+          .add_matrix_out(C)
+          .add_matrix_inp(A)
+          .add_matrix_wei(b_recast)
+          .add_matrix_scl(q_scale)
+          .add_matrix_zp(q_zeros)
+          .add_group_size(qGroupSize)
+          .add_arch(GetGpuArchId())
+          .add_quant_mode(
+              torch_ipex::xpu::xetla::quant_mode::S4_ASYM_ZERO_NO_DEGRAD)
+          .build();
   TORCH_CHECK(policy.fallback() == false, "mm int4: invalid gemm shape");
   policy.run();
   return resize_as_mat1(A, C);

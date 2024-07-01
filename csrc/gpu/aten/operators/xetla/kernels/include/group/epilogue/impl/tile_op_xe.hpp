@@ -106,6 +106,10 @@ class epilogue_t<
   }
 
  public:
+  static constexpr msg_type msg_type_c =
+      (mem_space_c == mem_space::global ? msg_type::block_2d
+                                        : msg_type::scatter);
+
   /// @brief Default epilogue.
   /// 1) Call tile_op/chained_tile_op 2) Convert dtype_acc to dtype_c
   /// 3) Overwrite/reduce_sum to memory.
@@ -127,9 +131,6 @@ class epilogue_t<
       uint32_t nbarrier_base = 0) {
     using mat_tile_desc = typename matAcc_t::tile_desc;
     using matC_t = subgroup::tile_t<dtype_c, mat_tile_desc>;
-    // static constexpr msg_type msg_type_c = msg_type::block_2d;
-    static constexpr msg_type msg_type_c =
-        subgroup::msg_type_v<mat_tile_desc, mem_desc_c_t>;
     using matC_payload_t = subgroup::
         mem_payload_t<mem_desc_c_t, mat_tile_desc, msg_type_c, arch_tag>;
     update_sg_tile_tdesc(g, mem_desc_c);

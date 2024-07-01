@@ -82,44 +82,15 @@ enum class msg_type : uint8_t {
   // prefetch_1d = 5
 };
 
-/// L1, L2 or L3 cache hints.
+/// L1 or L2 cache hint kinds.
 enum class cache_hint : uint8_t {
   none = 0,
-  /// load/store/atomic: do not cache data to cache;
   uncached = 1,
-
-  // load: cache data to cache;
   cached = 2,
-
-  /// store: write data into cache level and mark the cache line as "dirty".
-  /// Upon eviction, the "dirty" data will be written into the furthest
-  /// subsequent cache;
   write_back = 3,
-
-  /// store: immediately write data to the subsequent furthest cache, marking
-  /// the cache line in the current cache as "not dirty";
   write_through = 4,
-
-  /// load: cache data to cache using the evict-first policy to minimize cache
-  /// pollution caused by temporary streaming data that may only be accessed
-  /// once or twice;
-  /// store/atomic: same as write-through, but use the evict-first policy
-  /// to limit cache pollution by streaming;
   streaming = 5,
-
-  /// load: asserts that the cache line containing the data will not be read
-  /// again until it’s overwritten, therefore the load operation can invalidate
-  /// the cache line and discard "dirty" data. If the assertion is violated
-  /// (the cache line is read again) then behavior is undefined.
-  read_invalidate = 6,
-
-  // TODO: Implement the verification of this enum in check_cache_hint().
-  /// load, L2 cache only, next gen GPU after Xe required: asserts that
-  /// the L2 cache line containing the data will not be written until all
-  /// invocations of the shader or kernel execution are finished.
-  /// If the assertion is violated (the cache line is written), the behavior
-  /// is undefined.
-  const_cached = 7
+  read_invalidate = 6
 };
 
 /// Data size or format to read or store

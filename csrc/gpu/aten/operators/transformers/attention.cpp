@@ -110,8 +110,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
        use_dropout,
        seed_t.has_value() ? (uint64_t)*seed_t.value().data_ptr<int64_t>() : -1,
        offset_t.has_value() ? (uint64_t)*offset_t.value().data_ptr<int64_t>()
-                            : -1,
-       query.stride(2)});
+                            : -1});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 
   return output;
@@ -812,8 +811,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
        false, // is_training
        false, // use_dropout
        (int)0,
-       (int)0,
-       query.stride(2)});
+       (int)0});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 #else
   AT_ERROR("SDP: xetla library not found in compilation");
