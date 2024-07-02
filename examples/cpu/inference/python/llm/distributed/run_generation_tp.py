@@ -537,20 +537,20 @@ if args.benchmark:
                     total_list.append(output[1])
 
     print("\n", "-" * 10, "Summary:", "-" * 10)
-    latency = total_time / (num_iter - num_warmup)
-    print("Inference latency: %.3f sec." % latency)
+    latency = total_time / (num_iter - num_warmup) * 1000
+    print("Inference latency: %.2f ms." % latency)
 
     if args.token_latency:
         import numpy as np
         from itertools import chain
 
-        first_latency = np.mean([x[0] for x in total_list])
+        first_latency = np.mean([x[0] for x in total_list]) * 1000
         average_2n = list(chain(*[x[1:] for x in total_list]))
         average_2n.sort()
-        average_2n_latency = np.mean(average_2n)
-        p90_latency = average_2n[int(len(average_2n) * 0.9)]
-        p99_latency = average_2n[int(len(average_2n) * 0.99)]
-        print("First token average latency: %.3f sec." % first_latency)
-        print("Average 2... latency: %.3f sec." % average_2n_latency)
-        print("P90 2... latency: %.3f sec." % p90_latency)
-        print("P99 2... latency: %.3f sec." % p99_latency)
+        average_2n_latency = np.mean(average_2n) * 1000
+        p90_latency = average_2n[int(len(average_2n) * 0.9)] * 1000
+        p99_latency = average_2n[int(len(average_2n) * 0.99)] * 1000
+        print("First token average latency: %.2f ms." % first_latency)
+        print("Average 2... latency: %.2f ms." % average_2n_latency)
+        print("P90 2... latency: %.2f ms." % p90_latency)
+        print("P99 2... latency: %.2f ms." % p99_latency)

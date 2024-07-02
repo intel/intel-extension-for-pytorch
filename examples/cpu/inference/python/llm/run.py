@@ -279,6 +279,16 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument(
         "--local_rank", required=False, type=int, help="used by dist launchers"
     )
+    parser.add_argument(
+        "--lm-head-generation",
+        action="store_true",
+        help="Compute lm-head only for the last token in the sequence to speed up first token inference."
+        " This argument is only needed for non-TP quantization cases. And note that in such cases,"
+        " this feature is not compatible with lambada_openai accuracy test. If you want to run"
+        " lambada_openai accuracy test with the quantized model afterwards, don't turn this feature on."
+        " In other cases, this feature is always turned on regardless of this argument and it does not"
+        " conflict with the accuracy test.",
+    )
     args = parser.parse_args(args_in)
 
     parent_path = Path(__file__).parent.absolute()
@@ -433,6 +443,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--benchmark"])
             if args.token_latency:
                 infer_cmd.extend(["--token-latency"])
+            if args.lm_head_generation:
+                infer_cmd.extend(["--lm-head-generation"])
 
             if args.prompt is not None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
@@ -473,6 +485,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     quant_cmd.extend(["--cache-weight-for-large-batch"])
                 if args.audio is not None:
                     quant_cmd.extend(["--audio", str(args.audio)])
+                if args.lm_head_generation:
+                    print(
+                        "LLM RUNTIME WARNING: `--lm-head-generation` is set. You cannot use the "
+                        "quantized model for lamababa_openai accuracy test"
+                    )
+                    quant_cmd.extend(["--lm-head-generation"])
                 if args.ipex_weight_only_quantization:
                     quant_cmd.extend(["--ipex-weight-only-quantization"])
                     quant_cmd.extend(["--weight-dtype", str(args.weight_dtype)])
