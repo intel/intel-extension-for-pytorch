@@ -11,10 +11,6 @@
 namespace torch_ipex {
 namespace cpu {
 
-at::Tensor woq_linear_forward(
-    const at::Tensor& input,
-    const at::Tensor& op_context);
-
 void linear_kernel_output(
     const at::Tensor& self,
     const ideep::tensor& mkldnn_weight,
@@ -84,6 +80,41 @@ at::Tensor ipex_linear_eltwise(
 
 #ifdef USE_LIBXSMM
 // WOQ linear ops
+at::Tensor woq_linear_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context);
+
+at::Tensor woq_linear_gelu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context);
+
+at::Tensor woq_linear_new_gelu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context);
+
+at::Tensor woq_linear_relu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context);
+
+at::Tensor woq_linear_silu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context);
+
+at::Tensor woq_linear_add_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context,
+    const std::vector<at::Tensor>& others);
+
+at::Tensor woq_linear_add_add_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context,
+    const std::vector<at::Tensor>& others);
+
+at::Tensor woq_linear_mul_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context,
+    const std::vector<at::Tensor>& others);
+
 at::Tensor woq_linear_pack_weight(
     const at::Tensor& weight,
     int64_t weight_dtype,
