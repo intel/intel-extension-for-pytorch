@@ -121,8 +121,8 @@ at::Tensor mixtral_moe_woq_kernl_impl(
   auto curr_state = hidden_states.index({top_x}).unsqueeze(0);
   auto routing_w = routing_weights.index({top_x, idx}).unsqueeze(-1);
   curr_state = woq_linear_forward(
-      at::silu(woq_linear_forward(curr_state, gate_wei)) *
-          woq_linear_forward(curr_state, up_wei),
+      woq_linear_mul_forward(
+          curr_state, up_wei, {woq_linear_silu_forward(curr_state, gate_wei)}),
       down_wei);
 
   if (is_distributed) {
