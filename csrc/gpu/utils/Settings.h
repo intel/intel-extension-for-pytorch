@@ -119,7 +119,6 @@ class IPEX_API Settings final {
   bool is_onemkl_enabled() const;
 
   bool is_channels_last_1d_enabled() const;
-  bool is_jit_quantization_save_enabled() const;
   bool is_xetla_enabled() const;
 
   bool is_simple_trace_enabled() const;
