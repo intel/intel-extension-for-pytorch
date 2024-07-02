@@ -180,6 +180,7 @@ if [ ! -z ${COMMIT_TORCH} ]; then
 fi
 git submodule sync
 git submodule update --init --recursive
+git apply ../intel-extension-for-pytorch/torch_patches/*.patch
 cd ..
 if [ $((${MODE} & 0x04)) -ne 0 ]; then
     cd vision
@@ -239,7 +240,6 @@ source ${MPI_ENV}
 
 #  PyTorch
 cd pytorch
-git apply ../intel-extension-for-pytorch/torch_patches/*.patch
 python -m pip install -r requirements.txt
 conda install --force-reinstall intel::mkl-static intel::mkl-include -y
 export PYTORCH_BUILD_VERSION=${VERSION_TORCH}

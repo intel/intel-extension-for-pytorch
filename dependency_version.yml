@@ -5,7 +5,7 @@ llvm:
   version: 16.0.6
 pytorch:
   version: 2.3.0+cxx11.abi
-  commit: v2.3.0
+  commit: b4f90aae1b375bfe06d3c4a099240e06f93c81c4
 torchaudio:
   version: 2.3.0+cxx11.abi
   commit: v2.3.0
