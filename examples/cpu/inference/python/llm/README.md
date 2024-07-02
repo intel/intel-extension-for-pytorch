@@ -41,6 +41,10 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 |GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |    |
 |Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |    |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 
 ## 2.2 Verified for distributed inference mode via DeepSpeed
 
@@ -65,10 +69,16 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 |
 |T5| google/flan-t5-xl | 🟩 | 🟩 |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 |
+|Mistral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 |
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |
 |Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |
 |GIT| microsoft/git-base | 🟩 | 🟩 |
+|Phi| microsoft/phi-2 | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 |
 
 - 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
 
@@ -82,7 +92,7 @@ We are working in progress to better support the models in the tables with vario
 # 3. Environment Setup
 
 *Note*: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. 
-If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.3.0%2Bcpu/examples/cpu/inference/python/llm/README.md#3-environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
+If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.3.100%2Bcpu/examples/cpu/inference/python/llm/README.md#3-environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
 
 ## 3.1 [Recommended] Docker-based environment setup with compilation from source
 

@@ -242,3 +242,4 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     fi
     ln -s ../prompt.json
 fi
+python -m pip install numpy==1.26.4 --force-reinstall

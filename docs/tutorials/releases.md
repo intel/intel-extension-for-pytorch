@@ -1,6 +1,22 @@
 Releases
 =============
 
+## 2.3.100
+
+### Highlights 
+
+- Added the optimization for Phi-3: [#2883](https://github.com/intel/intel-extension-for-pytorch/commit/5fde074252d9b61dd0d410832724cbbec882cb96) 
+
+- Fixed the `state_dict` method patched by `ipex.optimize` to support DistributedDataParallel [#2910](https://github.com/intel/intel-extension-for-pytorch/commit/9a192efa4cf9a9a2dabac19e57ec5d81f9f5d22c) 
+
+- Fixed the linking issue in CPPSDK [#2911](https://github.com/intel/intel-extension-for-pytorch/commit/38573f2938061620f072346d2b3345b69454acbc) 
+
+- Fixed the ROPE kernel for cases where the batch size is larger than one [#2928](https://github.com/intel/intel-extension-for-pytorch/commit/2d02768af957011244dd9ca89186cc1318466d6c) 
+
+- Upgraded deepspeed to v0.14.3 to include the support for Phi-3 [#2985](https://github.com/intel/intel-extension-for-pytorch/commit/73105990e551656f79104dd93adc4a8020978947) 
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.3.0+cpu...v2.3.100+cpu
+
 ## 2.3.0
 
 We are excited to announce the release of Intel® Extension for PyTorch* 2.3.0+cpu which accompanies PyTorch 2.3. This release mainly brings you the new feature on Large Language Model (LLM) called module level LLM optimization API, which provides module level optimizations for commonly used LLM modules and functionalities, and targets to optimize customized LLM modeling for scenarios like private models, self-customized models, LLM serving frameworks, etc. This release also extends the list of optimized LLM models to a broader level and includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.

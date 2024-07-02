@@ -33,7 +33,7 @@ Please refer to [best practices for x86 CPU backend](https://pytorch.org/docs/st
 ```bash
 # Clone the repository and access to the inference examples folder
 git clone https://github.com/intel/intel-extension-for-pytorch.git
-cd intel-extension-for-pytorch/examples/cpu/inference/python
+cd intel-extension-for-pytorch/examples/cpu/inference/python/python-scripts
 ```
 
 ### Float32

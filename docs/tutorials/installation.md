@@ -1,7 +1,7 @@
 Installation
 ============
 
-Select your preferences and follow the installation instructions provided on the [Installation page](../../../index.html#installation?platform=cpu&version=v2.3.0%2Bcpu).
+Select your preferences and follow the installation instructions provided on the [Installation page](../../../index.html#installation?platform=cpu&version=v2.3.100%2Bcpu).
 
 After successful installation, refer to the [Quick Start](getting_started.md) and [Examples](examples.md) sections to start using the extension in your code.
 
