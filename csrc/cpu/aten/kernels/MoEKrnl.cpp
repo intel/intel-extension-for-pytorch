@@ -118,12 +118,22 @@ at::Tensor mixtral_moe_woq_kernl_impl(
     const at::Tensor& routing_weights,
     at::Tensor& output,
     bool is_distributed) {
+  auto topx_s0 = top_x.size(0);
   auto curr_state = hidden_states.index({top_x}).unsqueeze(0);
   auto routing_w = routing_weights.index({top_x, idx}).unsqueeze(-1);
-  curr_state = woq_linear_forward(
-      woq_linear_mul_forward(
-          curr_state, up_wei, {woq_linear_silu_forward(curr_state, gate_wei)}),
-      down_wei);
+  auto split_size = 64;
+  auto total_splits = std::floor((topx_s0 + split_size - 1) / split_size);
+  std::vector<torch::Tensor> res;
+  for (auto i = 0; i < total_splits; i++) {
+    auto idx_end = (i + 1) * split_size;
+    if (idx_end > topx_s0) {
+      idx_end = topx_s0;
+    }
+    auto input_i = curr_state.slice(1, i * split_size, idx_end);
+    res.push_back(woq_linear_mul_forward(
+        input_i, up_wei, {woq_linear_silu_forward(input_i, gate_wei)}));
+  }
+  curr_state = woq_linear_forward(at::cat(res, 1), down_wei);
 
   if (is_distributed) {
     call_AllReduce(curr_state);
