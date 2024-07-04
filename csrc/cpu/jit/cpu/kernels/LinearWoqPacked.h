@@ -22,7 +22,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    bool cache_weight_for_large_batch);
+    bool cache_weight_for_large_batch = false);
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     at::Tensor&& weight,
@@ -34,7 +34,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    bool cache_weight_for_large_batch);
+    bool cache_weight_for_large_batch = false);
 
 at::Tensor woq_linear_run(
     const at::Tensor& input,
