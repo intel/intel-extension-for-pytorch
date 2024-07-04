@@ -222,7 +222,8 @@ class TestOp(JitLlgaTestCase):
         m = M()
         x = torch.rand(8, 12, 12, 12)
         graph, _ = self.checkTrace(m, [x])
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        # One partition for softmax & another for TypeCast
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
     def _gen_binary_inputs(self, gen_permute=True):
         for xshape, yshape in [
@@ -507,8 +508,8 @@ class TestOp(JitLlgaTestCase):
             m = M(dst_dtype)
 
             graph, _ = self.checkTrace(m, [x])
-            # we do not rewrite single to
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+            # Even a single TypeCast is mapped to oneDNN Graph
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
     def test_typecheck(self):

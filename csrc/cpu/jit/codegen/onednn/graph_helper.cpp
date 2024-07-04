@@ -739,6 +739,20 @@ bool LlgaGraphHelper::isSingleQuantDequantTo(Node* n) {
       n->kind() != Symbol::aten("quantize_per_channel") &&
       n->kind() != Symbol::aten("dequantize") && n->kind() != aten::to)
     return false;
+  // Check if aten::to is used for non-quantized case
+  if (n->kind() == aten::to) {
+    auto input_dtype = n->input(0)->type()->expect<TensorType>()->scalarType();
+    auto output_dtype =
+        n->outputs()[0]->type()->expect<TensorType>()->scalarType();
+    if (input_dtype.has_value() && output_dtype.has_value()) {
+      if ((input_dtype.value() == at::ScalarType::Float ||
+           input_dtype.value() == at::ScalarType::BFloat16) &&
+          (output_dtype.value() == at::ScalarType::Float ||
+           output_dtype.value() == at::ScalarType::BFloat16)) {
+        return false;
+      }
+    }
+  }
   if (!opToOwningPartition_.has(n))
     return false;
 

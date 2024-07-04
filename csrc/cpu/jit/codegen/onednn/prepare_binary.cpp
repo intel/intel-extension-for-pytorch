@@ -90,6 +90,28 @@ void handleBinaryOpInputs(Node* node, int first_input, int second_input) {
   }
 }
 
+static void ReplaceTypeAsWithTo(Block* block) {
+  for (auto node : block->nodes()) {
+    for (auto sub : node->blocks()) {
+      ReplaceTypeAsWithTo(sub);
+    }
+
+    if (node->kind() == aten::type_as) {
+      auto nodeOutputTypePtr = node->output()->type()->expect<TensorType>();
+      c10::optional<at::ScalarType> outputDtype =
+          nodeOutputTypePtr->scalarType();
+      if (outputDtype.has_value()) {
+        auto g = node->prev()->owningGraph();
+        auto replacementNodeOutput =
+            g->insert(aten::to, {node->input(0), outputDtype.value()});
+        replacementNodeOutput->setType(
+            nodeOutputTypePtr->withScalarType(outputDtype.value()));
+        node->outputs()[0]->replaceAllUsesWith(replacementNodeOutput);
+      }
+    }
+  }
+}
+
 static void ConvertScalarToTensor(Block* block) {
   for (auto node : block->nodes()) {
     for (auto sub : node->blocks()) {
@@ -246,6 +268,8 @@ void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
   EliminateDeadCode(graph);
   // ConvertScalarToTensor must be placed after EliminateIdentityMulAddDiv
   replaceWithSelectOp(graph->block());
+  ReplaceTypeAsWithTo(graph->block());
+  EliminateDeadCode(graph);
   ConvertScalarToTensor(graph->block());
   // TODO: after conv-bn folding, bias will become bias? (Optional) after this
   // pass and will lose it when using mustNotBeNone to check Optional Bias
