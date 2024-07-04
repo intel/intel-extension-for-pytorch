@@ -1619,6 +1619,10 @@ class DequantGemmTPP<
       Dequantize<int8_t, ldb, N_GROUP_SIZE, /*qw_type*/ QINT4>::call(
           qB, K, N, zps, B[0][0], compensation);
       (*pgemm)((int8_t*)qA[0], B[0][0], qC[0], 1, no_tile_cfg);
+      if constexpr (PREFETCH_K_DIST > 0) {
+        _mm_prefetch(qB + K * N, _MM_HINT_T0);
+        _mm_prefetch(A + K * M, _MM_HINT_T0);
+      }
       // post-op and convert back to C
       for (long m = 0; m < M; ++m) {
 #pragma omp simd
@@ -2513,7 +2517,11 @@ void qlinear_woq_affine_impl(
               auto y_private_ptr = GetVLAPtr<TGemmOut>(y_private, {M, Nc, Nb});
               auto y_private_valid_ptr =
                   GetVLAPtr<bool>(y_private_valid, {M / BLOCK_M, Nc});
-              auto loop_scheme = M >= PARALLEL_M_THRESHOLD ? "CAB" : "ABc";
+              const char* SCHEME_LARGE_M = getenv("IPEX_WOQ_GEMM_LOOP_SCHEME")
+                  ? getenv("IPEX_WOQ_GEMM_LOOP_SCHEME")
+                  : "CAB";
+              auto loop_scheme =
+                  M >= PARALLEL_M_THRESHOLD ? SCHEME_LARGE_M : "ABc";
               auto gemm_loop = ThreadedLoop<3>(
                   {{Nc}, {0, Kc, Kc / k_splits, true}, {0, M, BLOCK_M, false}},
                   loop_scheme);
