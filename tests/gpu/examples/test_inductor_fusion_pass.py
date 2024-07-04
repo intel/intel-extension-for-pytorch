@@ -89,7 +89,7 @@ class TestTorchMethod(TestCase):
                 model.eval()
                 with torch.no_grad():
                     # with torch.xpu.onednn_verbose(2):
-                    run = torch.compile(model, backend="inductor", dynamic=dynam)
+                    run = torch.compile(model, backend="ipex", dynamic=dynam)
                     torch.manual_seed(0)
                     example_input = torch.randn(1, 3, 72, 72).to(device)
 
@@ -111,7 +111,7 @@ class TestTorchMethod(TestCase):
             model.eval()
             with torch.no_grad():
                 # with torch.xpu.onednn_verbose(2):
-                run = torch.compile(model, backend="inductor")
+                run = torch.compile(model, backend="ipex")
                 torch.manual_seed(0)
                 example_input = torch.randn(3, 3).to(device)
                 actual = run(example_input)
@@ -145,7 +145,7 @@ class TestTorchMethod(TestCase):
             for binary_fn in binary_list:
                 model = M(binary_fn, False).to("xpu")
                 x = torch.rand([2, 3, 10, 10]).to("xpu")
-                run = torch.compile(model, backend="inductor")
+                run = torch.compile(model, backend="ipex")
                 print("Run compiled fn")
                 actual = run(x)
                 print("Run imperative fn")
@@ -175,7 +175,7 @@ class TestTorchMethod(TestCase):
         ]
         model = M().to("xpu")
         with torch.no_grad():
-            run = torch.compile(model, backend="inductor")
+            run = torch.compile(model, backend="ipex")
             actual = run(inputs[0], inputs[1])
             ref = model(inputs[0], inputs[1])
             self.assertEqual(actual, ref)
@@ -203,7 +203,7 @@ class TestTorchMethod(TestCase):
             for unary_fn in unary_list:
                 model = M(unary_fn).to("xpu")
                 x = torch.rand([2, 9, 10, 10]).to("xpu")
-                run = torch.compile(model, backend="inductor")
+                run = torch.compile(model, backend="ipex")
                 print("Run compiled fn")
                 actual = run(x)
                 print("Run imperative fn")
@@ -237,6 +237,6 @@ class TestTorchMethod(TestCase):
                 input = torch.randn((3, in_feature)).xpu()
                 other = torch.randn((3, out_feature)).xpu()
                 ref = model(input, other)
-                model_compiled = torch.compile(model, backend="inductor")
+                model_compiled = torch.compile(model, backend="ipex")
                 actual = model_compiled(input, other)
                 self.assertEqual(actual, ref)

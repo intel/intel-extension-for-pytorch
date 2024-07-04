@@ -172,22 +172,6 @@ if has_xpu():
 
     DefaultDeviceType.set_device_type("xpu")
 
-    from .._dynamo.xpu import register_xpu_interface_to_dynamo
-
-    _lazy_call(register_xpu_interface_to_dynamo)
-
-    from .._inductor.xpu import (
-        register_xpu_backend_to_inductor,
-        register_xpu_fusion_to_inductor,
-    )
-
-    _lazy_call(register_xpu_backend_to_inductor)
-    _lazy_call(register_xpu_fusion_to_inductor)
-
-    from .._inductor.xpu.codecache import warm_xpu_async_compile_pool
-
-    _lazy_call(warm_xpu_async_compile_pool)
-
 
 # FIXME: this is a temporary work-around to replace torch's _prepare_profiler method
 #     inside IPEX because the extension need to prepare its profiler as a path.

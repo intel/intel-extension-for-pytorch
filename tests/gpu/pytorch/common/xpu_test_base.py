@@ -306,12 +306,12 @@ except KeyError as e_key:
 try:
     import torch.testing._internal.inductor_utils
     mod = sys.modules['torch.testing._internal.inductor_utils']
-    from intel_extension_for_pytorch._inductor.xpu import utils
-    mod.HAS_CUDA = utils.has_triton()
+    from torch.utils._triton import has_triton
+    mod.HAS_CUDA = has_triton()
     print("[INFO] Pre-load torch.testing._internal.inductor_utils to bypass some global check")
     import torch._inductor.utils
     mod = sys.modules['torch._inductor.utils']
-    mod.has_triton = utils.has_triton
+    mod.has_triton = has_triton
     print("[INFO] Pre-load torch._inductor.utils to bypass some global check")
 except KeyError as e_key:
     print(e_key, file=sys.stderr)
