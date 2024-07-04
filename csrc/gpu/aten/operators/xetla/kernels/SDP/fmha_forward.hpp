@@ -6,12 +6,14 @@ Fused Multi-Head Attention Forward
 This is an implementation of the Flash Attention algorithm
 (see: Dao et al., https://arxiv.org/pdf/2205.14135v2.pdf)
 */
+#include <sys/types.h>
 #include <limits>
 #include "fmha_forward_policy.h"
 #include "fmha_utils.h"
 
 namespace gpu::xetla {
 namespace fmha {
+
 template <
     typename fmha_policy,
     typename scalar_t,
@@ -21,7 +23,8 @@ template <
     bool kIsCausal,
     bool kSeqLast,
     bool kIsTraining,
-    bool kIsDropout>
+    bool kIsDropout,
+    bool kVarlen>
 class fmha_forward_t {
  public:
   using accum_t = float;
@@ -47,6 +50,9 @@ class fmha_forward_t {
     uint32_t bias_strideB;
     uint32_t bias_strideN;
     uint32_t bias_strideF;
+    // Sequence length info
+    int32_t* cu_seqlen_q;
+    int32_t* cu_seqlen_k;
     // Softmax scale is the reciprocal square root of head size by default
     accum_t sm_scale;
     // Dropout scale is computed from dropout prob
@@ -77,6 +83,8 @@ class fmha_forward_t {
         uint32_t bias_strideB,
         uint32_t bias_strideN,
         uint32_t bias_strideF,
+        int32_t* cu_seqlen_q,
+        int32_t* cu_seqlen_k,
         accum_t sm_scale,
         accum_t dropout_prob,
         uint32_t alibi_padded_block_size,
@@ -100,6 +108,8 @@ class fmha_forward_t {
           bias_strideB(bias_strideB),
           bias_strideN(bias_strideN),
           bias_strideF(bias_strideF),
+          cu_seqlen_q(cu_seqlen_q),
+          cu_seqlen_k(cu_seqlen_k),
           sm_scale(sm_scale),
           dp_prob(dropout_prob),
           dp_scale(1.f / (1.f - dropout_prob)),
@@ -262,6 +272,25 @@ class fmha_forward_t {
             args.O_ptr,
             {end_x, end_y, b_stride * args.uB},
             {start_acc, start_y});
+      } else if constexpr (kVarlen) {
+        int32_t start_y = args.cu_seqlen_q[batch_id] + item.get_group(1) * kBr;
+        int32_t end_y = start_y + kBr;
+        int32_t limit_y = args.cu_seqlen_q[batch_id + 1];
+        end_y = end_y < limit_y ? end_y : limit_y;
+
+        int32_t start_acc = head_id * args.uH;
+        int32_t end_x = start_acc + args.uH;
+        const uint32_t ld_qo = args.uH * args.uN;
+
+        mem_desc_Qi.init(
+            args.Q_ptr,
+            {args.uN * args.uH, end_y, ld_qo},
+            {start_acc, start_y});
+
+        mem_desc_Oi.init(
+            args.O_ptr,
+            {args.uN * args.uH, end_y, ld_qo},
+            {start_acc, start_y});
       } else { // 2d mem: [BxF, NxH]
         // startF
         int32_t start_y = batch_id * args.uF + item.get_group(1) * kBr;
@@ -322,6 +351,24 @@ class fmha_forward_t {
             args.V_ptr,
             {end_y, end_x, b_stride * args.uB},
             {start_acc, start_x});
+      } else if (kVarlen) {
+        int32_t start_x = startT + args.cu_seqlen_k[batch_id];
+        int32_t end_x = start_x + kBc;
+        int32_t limit_x = args.cu_seqlen_k[batch_id + 1];
+        end_x = end_x < limit_x ? end_x : limit_x;
+
+        int32_t start_acc = head_id * args.uNkv / args.uN * args.uH;
+        int32_t end_y = start_acc + args.uH;
+        mem_desc_Kj_T.init(
+            args.K_ptr,
+            {end_x, args.uNkv * args.uH, args.uNkv * args.uH},
+            {start_x, start_acc});
+
+        mem_desc_Vj.init(
+            args.V_ptr,
+            {args.uNkv * args.uH, end_x, args.uNkv * args.uH},
+            {start_acc, start_x});
+
       } else {
         int32_t start_x = batch_id * args.uT + startT;
         uint32_t end_x = start_x + kBc;
@@ -343,7 +390,7 @@ class fmha_forward_t {
 
       // B, N, 1, T
       // gid * T + startT
-      if constexpr (kUseAlibi) {
+      if constexpr (kUseAlibi && !kVarlen) {
         int32_t batch_start = gid * args.uAT;
         int32_t start_x = batch_start + startT;
         uint32_t end_x = startT + kBc;
@@ -353,6 +400,15 @@ class fmha_forward_t {
 
         mem_desc_Ai.init(
             args.A_ptr, {end_x, 1, args.uAT * args.uN * args.uB}, {start_x, 0});
+      }
+
+      // B, N or N
+      if constexpr (kUseAlibi && kVarlen) {
+        // assume uAt in varlen equals N or 0
+        int32_t start_x = batch_id * args.uAT + head_id;
+        int32_t end_x = start_x + 1;
+        end_x = end_x >= args.uN ? end_x : args.uN;
+        mem_desc_Ai.init(args.A_ptr, {end_x, 1, 1}, {start_x, 0});
       }
 
       if constexpr (kUseBias && !kIsCausal) {
@@ -434,13 +490,23 @@ class fmha_forward_t {
     matAccSij.reg *= args.sm_scale;
 
     // + beta * alibi
-    if constexpr (kUseAlibi) {
+    if constexpr (kUseAlibi && !kVarlen) {
       using alibi_op_t = bias_add_op_t<scalar_t, arch_tag>;
       using alibi_args_t = typename alibi_op_t::arguments_t;
 
       int32_t tile_offset_x = ctx.sg_idx * kSgBc;
       int32_t tile_offset_y = 0;
       ctx.mem_desc_Ai.update_coord(tile_offset_x, tile_offset_y);
+
+      alibi_op_t alibi_op;
+      alibi_args_t alibi_args(ctx.mem_desc_Ai.base, ctx.mem_desc_Ai.shape);
+      alibi_op(matAccSij, ctx.mem_desc_Ai.coord, alibi_args);
+    }
+
+    if constexpr (kUseAlibi && kVarlen) {
+      using alibi_op_t =
+          bias_add_op_t<scalar_t, arch_tag, add_type::single_element>;
+      using alibi_args_t = typename alibi_op_t::arguments_t;
 
       alibi_op_t alibi_op;
       alibi_args_t alibi_args(ctx.mem_desc_Ai.base, ctx.mem_desc_Ai.shape);
@@ -525,6 +591,7 @@ class fmha_forward_t {
 
   /// @brief apply mask to matAccSij.
   inline void apply_mask(
+      nd_item<3>& item,
       matAccSij_t& matAccSij,
       arguments_t& args,
       uint32_t startF,
@@ -532,7 +599,14 @@ class fmha_forward_t {
     using tile_mask = tile_mask_t<matAccSij_t>;
 
     uint32_t sg_startT = startT + ctx.sg_idx * kSgBc;
-    uint32_t remainT = std::max(int(args.uT) - int(sg_startT), 0);
+    uint32_t real_T;
+    if constexpr (kVarlen) {
+      int32_t batch_id = item.get_group(0) / args.uN;
+      real_T = args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
+    } else {
+      real_T = args.uT;
+    }
+    uint32_t remainT = std::max(int(real_T) - int(sg_startT), 0);
     if (remainT < kSgBc) {
       tile_mask::padding_mask(matAccSij, remainT);
     }
@@ -843,6 +917,20 @@ class fmha_forward_t {
 
     // initialize context for flash mha loops
     ctx.init_context(item, args);
+    uint32_t gid = item.get_group(0);
+    uint32_t batch_id = gid / args.uN; // get batch idx
+    uint32_t head_id = gid % args.uN; // get head idx
+    // Early exit when current thread access data exceed actual seqlen in varlen
+    // fwd
+    if constexpr (kVarlen) {
+      int32_t actual_seqlen_q =
+          args.cu_seqlen_q[batch_id + 1] - args.cu_seqlen_q[batch_id];
+      int32_t seqlen_q = item.get_group(1) * kBr;
+
+      if (seqlen_q >= actual_seqlen_q) {
+        return;
+      }
+    }
     // preload Qi to local memory
     preload_Qi(args);
     // initialize matAccOi for accumulate the output
@@ -853,6 +941,15 @@ class fmha_forward_t {
 
     // iterate through the keys
     for (uint32_t startT = 0; startT < args.uT; startT += kBc) {
+      // Early leave for varlen_fwd if we found current seqlen exceed the actual
+      // seqlen.
+      if constexpr (kVarlen) {
+        int32_t actual_seqlen =
+            args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
+        if (startT >= actual_seqlen) {
+          break;
+        }
+      }
       if constexpr (kIsCausal) {
         if (startT >= endF)
           break;
@@ -863,7 +960,7 @@ class fmha_forward_t {
       matAccSij_t matAccSij(0);
       gemm_Sij(matAccSij, args);
       // apply mask
-      apply_mask(matAccSij, args, startF, startT);
+      apply_mask(item, matAccSij, args, startF, startT);
       // softmax
       dp_mask_tile_t mask_in;
       softmax_fwd(matAccSij, matAccOi, mask_in, args);

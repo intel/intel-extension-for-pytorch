@@ -25,6 +25,8 @@ struct dispatch_fmha_forward_args_t {
   void* log_sumexp;
   float softmax_scale;
   float dropout_prob;
+  int32_t* cu_seqlen_q;
+  int32_t* cu_seqlen_k;
   uint32_t num_batches;
   uint32_t num_heads;
   uint32_t num_kv_heads;
@@ -49,6 +51,8 @@ struct dispatch_fmha_forward_args_t {
         log_sumexp(args.log_sumexp),
         softmax_scale(args.alpha),
         dropout_prob(args.dropout_prob),
+        cu_seqlen_q(args.cu_seqlen_q),
+        cu_seqlen_k(args.cu_seqlen_k),
         num_batches(args.num_batches),
         num_heads(args.num_heads),
         num_kv_heads(args.num_kv_heads),
@@ -88,6 +92,8 @@ struct FmhaForwardKernelFunctor {
         args.bias_strideB,
         args.bias_strideN,
         args.bias_strideF,
+        args.cu_seqlen_q,
+        args.cu_seqlen_k,
         (accscalar_t)args.softmax_scale,
         (accscalar_t)args.dropout_prob,
         args.alibi_padded_block_size,
@@ -115,7 +121,8 @@ template <
     bool kIsCausal,
     bool kSeqLast,
     bool kIsTraining,
-    bool kIsDropout>
+    bool kIsDropout,
+    bool kIsVarlen>
 cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args);
 
 } // namespace fmha

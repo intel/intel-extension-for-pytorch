@@ -22,7 +22,8 @@ template <
     bool kIsCausal = false,
     bool kSeqLast = false,
     bool kIsTraining = false,
-    bool kIsDropout = false>
+    bool kIsDropout = false,
+    bool kIsVarlen = false>
 class fmha_forward_kernel_policy {
   template <typename fmha_policy, typename... Args>
   static cgfs_t policy(Args&&... args) {
@@ -36,7 +37,8 @@ class fmha_forward_kernel_policy {
         kIsCausal,
         kSeqLast,
         kIsTraining,
-        kIsDropout>(std::forward<Args>(args)...);
+        kIsDropout,
+        kIsVarlen>(std::forward<Args>(args)...);
   }
 
  public:
@@ -163,7 +165,8 @@ cgfs_t _fmha_forward_kernel(
         args.is_causal,
         args.seq_last,
         args.is_training,
-        args.is_dropout);
+        args.is_dropout,
+        args.is_varlen);
   } else if constexpr (arch_tag != gpu_arch::XeLpg) {
     return dispatch_fmha_forward<bf16, arch_tag>(
         fmha::dispatch_fmha_forward_args_t<bf16>(args),
@@ -172,7 +175,8 @@ cgfs_t _fmha_forward_kernel(
         args.is_causal,
         args.seq_last,
         args.is_training,
-        args.is_dropout);
+        args.is_dropout,
+        args.is_varlen);
   } else {
     printf("bfloat16 is not supported on the XeLpg platform\n");
     return {};

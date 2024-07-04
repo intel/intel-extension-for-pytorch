@@ -93,6 +93,8 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
        softmax_scale,
        /* beta */ 1.0f,
        dropout_p,
+       nullptr,
+       nullptr,
        query.size(0),
        query.size(1),
        key.size(1),
@@ -108,6 +110,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
        false,
        is_training,
        use_dropout,
+       false, // use varlen
        seed_t.has_value() ? (uint64_t)*seed_t.value().data_ptr<int64_t>() : -1,
        offset_t.has_value() ? (uint64_t)*offset_t.value().data_ptr<int64_t>()
                             : -1});
@@ -709,6 +712,390 @@ inline void validate_sdpa_input(
   return;
 }
 
+bool check_if_xetla_valid_for_varlen(const at::Tensor& query, int head_dim) {
+  if (query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16)
+    return head_dim * 2 % 128 == 0;
+  return false;
+}
+
+std::tuple<Tensor, Tensor> _scaled_dot_product_attention_varlen_math(
+    const Tensor& query_,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<Tensor>& attn_mask_,
+    double dropout_p,
+    bool is_causal,
+    const c10::optional<Tensor>& dropout_mask,
+    c10::optional<double> scale) {
+  C10_LOG_API_USAGE_ONCE("torch.sdpa.math_fallback");
+  if (query_.is_nested() || key.is_nested() || value.is_nested()) {
+    TORCH_CHECK(
+        query_.is_contiguous() && key.is_contiguous() && value.is_contiguous(),
+        "scaled_dot_product_attention: If inputs are nested tensors they must be contiguous");
+  }
+  auto attn_mask = attn_mask_;
+  // Naive, composite implementation defined here.
+
+  // Scale q, k before matmul for stability see https://tinyurl.com/sudb9s96 for
+  // math
+  bool is_negative_scaling = scale.has_value() && scale.value() < 0.0;
+  const auto scaling_factor =
+      sdp::calculate_scale(
+          query_, is_negative_scaling ? std::abs(scale.value()) : scale)
+          .sqrt();
+
+  const auto query = query_ *
+      (is_negative_scaling ? c10::SymFloat(0.0) - scaling_factor
+                           : scaling_factor);
+  at::Tensor causal_mask;
+  if (is_causal) {
+    TORCH_CHECK(
+        !query.is_nested() && !key.is_nested(),
+        "_scaled_dot_product_attention: Nested tensors for query / key are not supported when is_causal=True");
+
+    // Replace attn_mask with causal mask; lower triangular elements take part
+    // in attention.
+    const auto L = query.sym_size(-2), S = key.sym_size(-2);
+    causal_mask =
+        at::ones_symint({L, S}, query.options().dtype(at::kBool)).tril();
+    causal_mask =
+        sdp::convert_boolean_attn_mask(causal_mask, query.dtype()).value();
+  }
+  auto attn = at::matmul(query, key.transpose(-2, -1) * scaling_factor);
+  if (attn_mask.has_value() && !is_causal) {
+    if (at::areAnyTensorSubclassLike({attn, *attn_mask})) {
+      attn = attn.add(*attn_mask);
+    } else {
+      attn.add_(*attn_mask);
+    }
+  }
+  if (causal_mask.defined() && !attn_mask.has_value()) {
+    if (at::areAnyTensorSubclassLike({attn, causal_mask})) {
+      attn = attn.add(causal_mask);
+    } else {
+      attn.add_(causal_mask);
+    }
+  }
+  attn = at::softmax(attn, -1);
+  if (dropout_p > 0.0) {
+    if (dropout_mask.has_value()) {
+      // In order to validate the correctness of the fused kernels, we need to
+      // use the same dropout mask in order to compare the results.
+      TORCH_WARN_ONCE("Dropout mask should only be used for testing purposes.");
+      attn = attn.masked_fill(dropout_mask->logical_not(), 0.0);
+      auto dropout_scaling = 1.0 / (1 - dropout_p);
+      return std::make_tuple(at::matmul(attn, value * dropout_scaling), attn);
+    } else {
+      attn = at::dropout(attn, dropout_p, true);
+    }
+  }
+
+  return std::make_tuple(at::matmul(attn, value), attn);
+}
+
+Tensor varlen_fwd_math_impl(
+    const at::Tensor& query, // [batch, seqlen, query_heads, head_dim]
+    const at::Tensor& key, // [batch, seqlen, key_heads, head_dim]
+    const at::Tensor& value, // [batch, seqlen, key_heads, head_dim]
+    Tensor& out_, // same as query
+    const at::Tensor& cu_seqlens_q, // [batch + 1]
+    const at::Tensor& cu_seqlens_k, // [batch + 1]
+    const c10::optional<at::Tensor>& seqused_k,
+    const c10::optional<at::Tensor>&
+        alibi_slopes_, // [num_heads] | [batch, num_heads]
+    const int32_t num_queries,
+    const int32_t num_keys,
+    const int32_t batch_size,
+    const int32_t num_heads,
+    const int32_t num_heads_kv,
+    const int32_t head_dims,
+    const int64_t max_seqlen_q,
+    const int64_t max_seqlen_k,
+    const double p_dropout,
+    const double softmax_scale,
+    const bool zero_tensors,
+    bool is_causal,
+    const bool return_softmax) {
+  // Get the length of each sequences in query
+  TORCH_CHECK(
+      !alibi_slopes_.has_value(),
+      "IPEX varlen fwd math implementation do not support alibi when head_dim * sizeof(dtype) not 128 byte aligned.");
+  TORCH_CHECK(
+      !is_causal,
+      "IPEX varlen fwd do not support causal when head_dim * sizeof(dtype) not 128 byte aligned.")
+  at::Tensor q_len_1 = cu_seqlens_q.slice(0, 1, cu_seqlens_q.size(0), 1);
+  at::Tensor q_len_2 = cu_seqlens_q.slice(0, 0, cu_seqlens_q.size(0) - 1, 1);
+  at::Tensor seqlen_q = q_len_1 - q_len_2;
+
+  // Get the length of each sequences in key
+  at::Tensor k_len_1 = cu_seqlens_k.slice(0, 1, cu_seqlens_k.size(0), 1);
+  at::Tensor k_len_2 = cu_seqlens_k.slice(0, 0, cu_seqlens_k.size(0) - 1, 1);
+  at::Tensor seqlen_k = k_len_1 - k_len_2;
+
+  // Generate index sequence by max_selqen_q and expand it to [batch_size,
+  // max_seqlen_q] for qkv
+  at::Tensor q_mask =
+      at::arange(0, max_seqlen_q, query.options().device(query.device()))
+          .view({1, max_seqlen_q})
+          .repeat({batch_size, 1});
+  at::Tensor k_mask =
+      at::arange(0, max_seqlen_k, key.options().device(key.device()))
+          .view({1, max_seqlen_k})
+          .repeat({batch_size, 1});
+
+  // Generate bool mask for data select in padding tensor
+  seqlen_q = seqlen_q.view({batch_size, 1}).repeat({1, max_seqlen_q});
+  seqlen_k = seqlen_k.view({batch_size, 1}).repeat({1, max_seqlen_k});
+
+  q_mask = q_mask < seqlen_q;
+  k_mask = k_mask < seqlen_k;
+
+  // construct padding tensors for qkv
+  at::Tensor pad_q = at::zeros(
+      {batch_size, max_seqlen_q, num_heads, head_dims},
+      query.options().dtype(query.scalar_type()).device(query.device()));
+  at::Tensor pad_k = at::zeros(
+      {batch_size, max_seqlen_k, num_heads_kv, head_dims},
+      key.options().dtype(key.scalar_type()).device(key.device()));
+  at::Tensor pad_v = at::zeros(
+      {batch_size, max_seqlen_k, num_heads_kv, head_dims},
+      value.options().dtype(value.scalar_type()).device(value.device()));
+
+  // Put unpad data to padding tensor
+  pad_q.index_put_({q_mask}, query);
+  pad_k.index_put_({k_mask}, key);
+  pad_v.index_put_({k_mask}, value);
+
+  // in case of the difference for kv_head and query_head
+  TORCH_CHECK(
+      num_heads_kv <= num_heads,
+      "Num_heads_kv should be less or equal than num_heads.");
+  if (num_heads_kv < num_heads) {
+    TORCH_CHECK(
+        num_heads % num_heads_kv == 0,
+        "Num_heads_kv should be divisible by num_heads.");
+    int divide_ratio = num_heads / num_heads_kv;
+    pad_k = pad_k.view({batch_size, max_seqlen_k, num_heads_kv, 1, head_dims})
+                .repeat({1, 1, 1, divide_ratio, 1})
+                .view({batch_size, max_seqlen_k, num_heads, head_dims});
+    pad_v = pad_v.view({batch_size, max_seqlen_k, num_heads_kv, 1, head_dims})
+                .repeat({1, 1, 1, divide_ratio, 1})
+                .view({batch_size, max_seqlen_k, num_heads, head_dims});
+  }
+
+  // generate attention mask for softmax
+  at::Tensor attn_mask = at::full(
+      {batch_size, 1, 1, max_seqlen_k},
+      double(-1 * INFINITY),
+      query.options().dtype(query.scalar_type()).device(query.device()));
+  attn_mask.masked_fill_(k_mask.view({batch_size, 1, 1, max_seqlen_k}), 0);
+
+  // convert to [batch, num_heads, seqlen, head_dim]
+  pad_q = pad_q.permute({0, 2, 1, 3});
+  pad_k = pad_k.permute({0, 2, 1, 3});
+  pad_v = pad_v.permute({0, 2, 1, 3});
+
+  at::Tensor out =
+      std::get<0>(AtenIpexTypeXPU::_scaled_dot_product_attention_varlen_math(
+          pad_q,
+          pad_k,
+          pad_v,
+          attn_mask,
+          p_dropout,
+          is_causal,
+          c10::nullopt,
+          softmax_scale));
+
+  // convert back to [batch, seqlen, num_heas, head_dim]
+  out = out.permute({0, 2, 1, 3}).index({q_mask});
+  out_.copy_(out);
+  return out_;
+}
+
+Tensor varlen_fwd(
+    const at::Tensor& query, // [num_tokens_q, query_heads, head_dim]
+    const at::Tensor& key, // [num_tokens_k, key_heads, head_dim]
+    const at::Tensor& value, // [num_tokens_k, seqlen, key_heads, head_dim]
+    Tensor& out_, // same as query
+    const at::Tensor& cu_seqlens_q, // [batch + 1]
+    const at::Tensor& cu_seqlens_k, // [batch + 1]
+    const c10::optional<at::Tensor>& seqused_k, // [batch]
+    const c10::optional<at::Tensor>&
+        alibi_slopes_, // [num_heads] | [batch, num_heads]
+    int64_t max_seqlen_q,
+    const int64_t max_seqlen_k,
+    const double p_dropout,
+    const double softmax_scale,
+    const bool zero_tensors,
+    bool is_causal,
+    const bool return_softmax,
+    c10::optional<at::Generator> gen_) {
+  // Check datatype
+  TORCH_CHECK(
+      !seqused_k.has_value(), "We do not support seqused_k feature currently!");
+  auto q_scalar_type = query.scalar_type();
+  TORCH_CHECK(
+      q_scalar_type == key.scalar_type(),
+      "The datatype of key should be the same as query");
+  TORCH_CHECK(
+      q_scalar_type == value.scalar_type(),
+      "The datatype of value should be the same as query");
+  TORCH_CHECK(
+      cu_seqlens_q.scalar_type() == at::kInt,
+      "The datatype of cu_seqlens_q should be int32");
+  TORCH_CHECK(
+      cu_seqlens_k.scalar_type() == at::kInt,
+      "The datatype of cu_seqlens_k should be int32");
+
+  // Check device
+  TORCH_CHECK(query.is_xpu(), "query must on XPU");
+  TORCH_CHECK(key.is_xpu(), "key must on XPU");
+  TORCH_CHECK(value.is_xpu(), "value must on XPU");
+  TORCH_CHECK(cu_seqlens_q.is_xpu(), "cu_seqlens_q must on XPU");
+  TORCH_CHECK(cu_seqlens_k.is_xpu(), "cu_seqlens_k must on XPU");
+
+  // Check contiguous
+  TORCH_CHECK(query.is_contiguous(), "query must be contiguous");
+  TORCH_CHECK(key.is_contiguous(), "key must be contiguous");
+  TORCH_CHECK(value.is_contiguous(), "value must be contiguous");
+  TORCH_CHECK(cu_seqlens_q.is_contiguous(), "cu_seqlens_q must be contiguous");
+  TORCH_CHECK(cu_seqlens_k.is_contiguous(), "cu_seqlens_k must be contiguous");
+
+  int batch_size = cu_seqlens_q.numel() - 1;
+  int num_heads_q = query.size(1);
+  int head_dim = query.size(2);
+  int num_queries = max_seqlen_q;
+  int num_heads_k = key.size(1);
+  int num_keys = max_seqlen_k;
+
+  Tensor out = out_;
+  TORCH_CHECK(out.is_xpu(), "Output tensor must on XPU");
+  TORCH_CHECK(out.is_contiguous(), "Output tensor must be contiguous");
+
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  char str__[100];
+  sprintf(
+      str__,
+      "varlen_fwd(Nq=%d, Nkv=%d, M=%d, N=%d)",
+      num_heads_q,
+      num_heads_k,
+      num_queries,
+      num_keys);
+  RECORD_FUNCTION(str__, {});
+
+  // check alibi padded
+  uint32_t alibi_padded_block_size = 0;
+  if (alibi_slopes_.has_value()) {
+    int ndim = alibi_slopes_->ndimension();
+    TORCH_CHECK(
+        ndim == 1 || ndim == 2,
+        "XeTLA VarlenAttention: only support 1 dim or 2 dim alibi tensor!");
+    int last_dim = alibi_slopes_->size(-1);
+    if (ndim == 1) {
+      TORCH_CHECK(
+          last_dim == num_heads_q,
+          "XeTLA VarlenAttention: The shape of alibi tensor should equal to [batch_size]");
+      alibi_padded_block_size = 0;
+    }
+    if (ndim == 2) {
+      TORCH_CHECK(
+          last_dim == num_heads_q && alibi_slopes_->size(-2) == batch_size,
+          "XeTLA VarlenAttention: The shape of alibi tensor should equal to [batch_size, num_head]");
+      alibi_padded_block_size = alibi_slopes_.value().size(-1);
+    }
+  }
+
+  auto gen = at::get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
+  std::pair<uint64_t, uint64_t> philox_state;
+  {
+    std::lock_guard<std::mutex> lock(gen->mutex_);
+    philox_state = gen->philox_engine_inputs(batch_size * num_heads_q * 32);
+  }
+  PhiloxState rng_engine_inputs(
+      std::get<0>(philox_state), std::get<1>(philox_state));
+  auto [seed, offset] = philox_unpack(rng_engine_inputs);
+  Tensor seed_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(seed)), at::dtype(at::kLong));
+  Tensor offset_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(offset)), at::dtype(at::kLong));
+
+  auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
+
+  // If head dim < 64, we g
+  if (!check_if_xetla_valid_for_varlen(query, head_dim)) {
+    return varlen_fwd_math_impl(
+        query,
+        key,
+        value,
+        out,
+        cu_seqlens_q,
+        cu_seqlens_k,
+        seqused_k,
+        alibi_slopes_,
+        num_queries,
+        num_keys,
+        batch_size,
+        num_heads_q,
+        num_heads_k,
+        head_dim,
+        max_seqlen_q,
+        max_seqlen_k,
+        p_dropout,
+        softmax_scale,
+        zero_tensors,
+        is_causal,
+        return_softmax);
+  }
+
+#if defined(USE_XETLA)
+  TORCH_CHECK(
+      dpcppGetDeviceHasXMX(),
+      "SDP kernel requires XMX, but the current platform has no XMX ...");
+  XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  gpu_arch xeArch = sdp::aten_to_Xetla_arch();
+  auto cgfs = gpu::xetla::fmha_forward_kernel(
+      xeArch,
+      xeType,
+      {query.data_ptr(),
+       key.data_ptr(),
+       value.data_ptr(),
+       alibi_slopes_.has_value() ? alibi_slopes_.value().data_ptr()
+                                 : (void*)nullptr,
+       /* attn mask */ nullptr,
+       /* dropout */ nullptr,
+       out.data_ptr(),
+       softmax_lse.data_ptr(),
+       softmax_scale,
+       /* bera */ 0,
+       p_dropout,
+       cu_seqlens_q.data_ptr<int32_t>(),
+       cu_seqlens_k.data_ptr<int32_t>(),
+       batch_size,
+       num_heads_q,
+       num_heads_k,
+       head_dim,
+       num_queries,
+       num_keys,
+       /* bias_strideB */ -1,
+       /* bias_strideN */ -1,
+       /* bias_strideF */ -1,
+       alibi_padded_block_size,
+       /* attn_mask_padding_block_size */ 0,
+       is_causal,
+       /* seq_last */ false,
+       /* is_training */ false,
+       /* use dropout */ p_dropout > 0.0 ? true : false,
+       /* use varlen */ true,
+       (uint64_t)*seed_t.data_ptr<int64_t>(),
+       (uint64_t)*offset_t.data_ptr<int64_t>()});
+  DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
+#else
+  AT_ERROR("XETLA VarlenAttention: xetla library not found in compilation");
+#endif
+  return out;
+}
+
 Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
     const Tensor& query,
     const Tensor& key,
@@ -777,7 +1164,6 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
         "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");
   }
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
-
 #if defined(USE_XETLA)
   auto xeType = sdp::aten_to_Xetla_dtype(query);
   gpu_arch xeArch = sdp::aten_to_Xetla_arch();
@@ -795,6 +1181,8 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
        alpha,
        beta,
        dropout_p,
+       nullptr,
+       nullptr,
        B,
        num_heads_q,
        num_heads_k,
@@ -810,6 +1198,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
        seq_last,
        false, // is_training
        false, // use_dropout
+       false, // use_varlen
        (int)0,
        (int)0});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
@@ -1965,5 +2354,8 @@ IPEX_LIBRARY_FRAGMENT() {
       "xetla_sdp_dropout",
       at::AtenIpexTypeXPU::xetla_sdp_dropout,
       c10::DispatchKey::AutogradXPU);
+
+  IPEX_OP_REGISTER_DISPATCH(
+      "varlen_fwd", at::AtenIpexTypeXPU::varlen_fwd, c10::DispatchKey::XPU)
 }
 } // namespace
