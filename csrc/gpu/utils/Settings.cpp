@@ -526,6 +526,14 @@ bool Settings::is_pti_enabled() const {
 #endif
 }
 
+bool Settings::is_ds_kernel_enabled() const {
+#ifdef USE_DS_KERNELS
+  return true;
+#else
+  return false;
+#endif
+}
+
 } // namespace dpcpp
 
 /* FIXME: The backend is not ready for now.

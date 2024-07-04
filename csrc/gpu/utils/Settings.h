@@ -126,6 +126,7 @@ class IPEX_API Settings final {
   void disable_simple_trace();
 
   bool is_pti_enabled() const;
+  bool is_ds_kernel_enabled() const;
 
  private:
   VERBOSE_LEVEL verbose_level;

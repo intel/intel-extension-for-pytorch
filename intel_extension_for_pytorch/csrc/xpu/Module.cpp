@@ -431,6 +431,10 @@ void init_xpu_module(pybind11::module& m) {
 
   m.def("_is_pti_enabled", []() { return Settings::I().is_pti_enabled(); });
 
+  m.def("_is_ds_kernel_enabled", []() {
+    return Settings::I().is_ds_kernel_enabled();
+  });
+
   m.def("_prepare_profiler", torch_ipex::xpu::dpcpp::profiler::prepareProfiler);
 
   auto module = m.ptr();

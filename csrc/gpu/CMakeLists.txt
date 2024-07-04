@@ -46,6 +46,11 @@ if(USE_XETLA)
   add_subdirectory(${IPEX_GPU_XETLA_DIR})
 endif()
 
+if(USE_DS_KERNELS)
+  set(IPEX_GPU_DEEPSPEED_SRC_DIR "${IPEX_GPU_ROOT_DIR}/deepspeed")
+  add_subdirectory(${IPEX_GPU_DEEPSPEED_SRC_DIR})
+endif()
+
 if(NOT DEFINED SYCL_INCLUDE_DIR)
   message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
@@ -108,6 +113,10 @@ else()
   list(APPEND IPEX_GPU_CORE_SRC ${IPEX_ATEN_OPS_SRCS})
 endif()
 
+if(USE_DS_KERNELS)
+  target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${TORCH_INCLUDE_DIRS})
+endif()
+
 add_library(intel-ext-pt-gpu SHARED ${IPEX_GPU_CORE_SRC})
 
 target_include_directories(intel-ext-pt-gpu PUBLIC ${IPEX_INCLUDE_DIRS})
@@ -142,6 +151,10 @@ endif()
 
 if(USE_XETLA)
   target_link_libraries(intel-ext-pt-gpu PUBLIC xetla_kernels)
+endif()
+
+if(USE_DS_KERNELS)
+  target_link_libraries(intel-ext-pt-gpu PUBLIC intel-ext-pt-gpu-deepspeed)
 endif()
 
 set(IPEX_COMPILE_DEFINITIONS)
@@ -179,6 +192,10 @@ if (USE_SPLIT_FP64_LOOPS)
   list(APPEND IPEX_COMPILE_DEFINITIONS "USE_SPLIT_FP64_LOOPS")
 endif()
 
+if (USE_DS_KERNELS)
+  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_DS_KERNELS")
+endif()
+
 list(APPEND IPEX_COMPILE_DEFINITIONS "BUILD_IPEX_MAIN_LIB")
 
 if (USE_ONEMKL)
@@ -195,6 +212,10 @@ if (USE_ONEMKL)
         endif()
         set_target_properties(intel-ext-pt-gpu PROPERTIES USE_ONEMKL ON)
         set_target_properties(intel-ext-pt-gpu PROPERTIES ONEMKL_INCLUDE_DIR "${ONEMKL_INCLUDE_DIR}")
+        if(USE_DS_KERNELS)
+          target_link_libraries(intel-ext-pt-gpu-deepspeed PUBLIC ${ONEMKL_GPU_LIBS})
+          target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${ONEMKL_INCLUDE_DIR})
+        endif()
     else()
         message(FATAL_ERROR "Cannot find oneMKL!")
     endif()
@@ -206,10 +227,14 @@ endif()
 
 find_package(spdlog QUIET)
 
-if(SPDLOG_FOUND) 
+if(SPDLOG_FOUND)
 if(USE_XETLA)
   target_link_libraries(xetla_kernels PUBLIC spdlog::spdlog_header_only)
   target_include_directories(xetla_kernels PUBLIC ${SPDLOG_INCLUDE_DIRS})
+endif()
+if(USE_DS_KERNELS)
+  target_link_libraries(intel-ext-pt-gpu-deepspeed PUBLIC spdlog::spdlog_header_only)
+  target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${SPDLOG_INCLUDE_DIRS})
 endif()
   target_link_libraries(intel-ext-pt-gpu PUBLIC spdlog::spdlog_header_only)
   target_include_directories(intel-ext-pt-gpu PUBLIC ${SPDLOG_INCLUDE_DIRS})
@@ -257,6 +282,9 @@ if(ONEDNN_FOUND)
   else()
     set_target_properties(intel-ext-pt-gpu PROPERTIES ONEDNN_LIBRARY "${ONEDNN_LIBRARY}")
   endif()
+  if(USE_DS_KERNELS)
+    target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${ONEDNN_INCLUDE_DIR})
+  endif()
   if(BUILD_SEPARATE_OPS)
     # Use same lib path with op libs to avoid link errors
     set(ONEDNN_LIB_DIR "${CMAKE_BINARY_DIR}/csrc/gpu")
@@ -284,12 +312,20 @@ if(BUILD_SEPARATE_OPS)
   endforeach()
 endif()
 
+if(USE_DS_KERNELS)
+  target_compile_definitions(intel-ext-pt-gpu-deepspeed PUBLIC ${IPEX_COMPILE_DEFINITIONS})
+endif()
+
 if(BUILD_STRIPPED_BIN)
   set_target_properties(intel-ext-pt-gpu PROPERTIES LINK_FLAGS_RELEASE -s)
   if(BUILD_SEPARATE_OPS)
     foreach(op_lib ${IPEX_GPU_OP_LIBRARIES})
         set_target_properties(${op_lib} PROPERTIES LINK_FLAGS_RELEASE -s)
     endforeach()
+  endif()
+
+  if(USE_DS_KERNELS)
+    set_target_properties(intel-ext-pt-gpu-deepspeed PROPERTIES LINK_FLAGS_RELEASE -s)
   endif()
 endif()
 
@@ -322,6 +358,14 @@ if(USE_XETLA)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
   list(APPEND LIBRARIES_INSTALL xetla_kernels)
+endif()
+
+if(USE_DS_KERNELS)
+  install(TARGETS intel-ext-pt-gpu-deepspeed
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  list(APPEND LIBRARIES_INSTALL intel-ext-pt-gpu-deepspeed)
 endif()
 
 install(TARGETS intel-ext-pt-gpu
