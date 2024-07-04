@@ -28,8 +28,8 @@ namespace dpcpp {
  *      Default = 0 | Set verbose level with synchronization execution mode, will be removed
  *   IPEX_XPU_SYNC_MODE:
  *      Default = 0 | Set 1 to enforce synchronization execution mode
- *   IPEX_LOG_LEVEL:
- *      Default = -1 | Set IPEX_LOG_LEVEL = Disabled
+ *   IPEX_LOGGING_LEVEL:
+ *      Default = -1 | Set IPEX_LOGGING_LEVEL = Disabled
  *   IPEX_LOG_COMPONENT:
  *      Default = "ALL" | Set IPEX_LOG_COMPONENT = ALL, it will log all component message.
  *      If you would like to log several components pls use ';' as sepreator, 
