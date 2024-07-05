@@ -72,3 +72,19 @@ loss.backward()
 optimizer.step()
 ```
 
+
+## `ipex` backend for `torch.compile`
+
+In addition to the default `inductor` backends, Intel® Extension for PyTorch\* offers an `ipex` backend for `torch.compile`.
+
+To enable the `ipex` backend, set the `backend` parameter to `ipex` when using the `torch.compile` function:
+
+```Python
+compiled_model = torch.compile(model, backend='ipex')
+```
+
+The `ipex` backend serves as an unified wrapper of the compile backend for both Intel® CPU and GPU. It adds some advanced optimization features for `torch.compile`.
+
+The `ipex` backend automatically selects the appropriate strategy based on the model device:
+- If the model is executed on a CPU, please refer to the [CPU documentation](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/features.html#torch-compile-beta-new-feature-from-2-0-0) for more details.
+- If the model is executed on a GPU, it adds oneDNN fusion passes to the inductor. This enhances the performance of oneDNN kernels. The resulting fused kernel usually has a name prefix of "torch_ipex".
