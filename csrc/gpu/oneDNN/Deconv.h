@@ -359,7 +359,7 @@ static void deconvolution(
   attr.extract_post_ops(po, dst);
   pattr.set_post_ops(po);
   if (globalContext().deterministicAlgorithms() ||
-      Settings::I().is_onednn_deterministic_enabled())
+      at::globalContext().deterministicMkldnn())
     pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE
@@ -484,6 +484,11 @@ static void deconvolution_backward_data(
   if (dst_usr_md.get_data_type() == memory::data_type::f32) {
     pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
   }
+
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    pattr.set_deterministic(true);
+
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
@@ -621,7 +626,7 @@ static void deconvolution_backward_weights(
   }
 
   if (globalContext().deterministicAlgorithms() ||
-      Settings::I().is_onednn_deterministic_enabled())
+      at::globalContext().deterministicMkldnn())
     pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE

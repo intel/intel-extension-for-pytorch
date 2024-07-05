@@ -76,7 +76,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
   if (globalContext().deterministicAlgorithms() ||
-      Settings::I().is_onednn_deterministic_enabled())
+      at::globalContext().deterministicMkldnn())
     pattr.set_deterministic(true);
 
   auto ln_fwd_pd = training
@@ -207,7 +207,7 @@ static std::tuple<Tensor, Tensor, Tensor> layer_norm_backward(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
   if (globalContext().deterministicAlgorithms() ||
-      Settings::I().is_onednn_deterministic_enabled())
+      at::globalContext().deterministicMkldnn())
     pattr.set_deterministic(true);
 
   auto ln_fwd_pd = layer_normalization_forward::primitive_desc(

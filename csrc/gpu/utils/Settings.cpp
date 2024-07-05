@@ -433,22 +433,6 @@ void Settings::disable_onednn_layout() {
   onednn_layout_enabled = ENV_VAL::OFF;
 }
 
-// TODO: To follow `torch.backends.cudnn.deterministic` as fully support. Native
-// usage will be like, `at::globalContext()::detereministicOneDNN()`.
-void Settings::enable_onednn_deterministic() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  onednn_deterministic = ENV_VAL::ON;
-}
-
-void Settings::disable_onednn_deterministic() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  onednn_deterministic = ENV_VAL::OFF;
-}
-
-bool Settings::is_onednn_deterministic_enabled() const {
-  return onednn_deterministic == ENV_VAL::ON;
-}
-
 FP32_MATH_MODE Settings::get_fp32_math_mode() const {
   std::lock_guard<std::mutex> lock(s_mutex);
   return fp32_math_mode;

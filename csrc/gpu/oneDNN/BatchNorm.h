@@ -100,7 +100,7 @@ static std::tuple<at::Tensor&, at::Tensor&, at::Tensor&> batch_normalization(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
   if (globalContext().deterministicAlgorithms() ||
-      Settings::I().is_onednn_deterministic_enabled())
+      at::globalContext().deterministicMkldnn())
     pattr.set_deterministic(true);
 
   auto bn_fwd_pd = batch_normalization_forward::primitive_desc(
@@ -249,7 +249,7 @@ batch_normalization_backward(
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
   if (globalContext().deterministicAlgorithms() ||
-      Settings::I().is_onednn_deterministic_enabled())
+      at::globalContext().deterministicMkldnn())
     pattr.set_deterministic(true);
   auto bn_fwd_pd = batch_normalization_forward::primitive_desc(
       engine,

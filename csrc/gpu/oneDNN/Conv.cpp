@@ -252,8 +252,7 @@ sycl::event convolution(
   lru_key_t key_primitive;
 
   bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
-  bool onednn_deterministic_enabled =
-      Settings::I().is_onednn_deterministic_enabled();
+  bool onednn_deterministic_enabled = at::globalContext().deterministicMkldnn();
 
 #ifdef USE_PRIMITIVE_CACHE
   create_key(
@@ -449,8 +448,7 @@ sycl::event convolution_backward_weights(
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
 
   bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
-  bool onednn_deterministic_enabled =
-      Settings::I().is_onednn_deterministic_enabled();
+  bool onednn_deterministic_enabled = at::globalContext().deterministicMkldnn();
 
   lru_key_t key_primitive;
 
@@ -657,8 +655,7 @@ sycl::event convolution_backward_data(
       : memory::desc();
 
   bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
-  bool onednn_deterministic_enabled =
-      Settings::I().is_onednn_deterministic_enabled();
+  bool onednn_deterministic_enabled = at::globalContext().deterministicMkldnn();
 
   memory::dims _stride = stride.vec();
   memory::dims _dilation = compatible_dilation(dilation);

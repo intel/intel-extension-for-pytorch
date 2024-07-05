@@ -106,10 +106,6 @@ class IPEX_API Settings final {
   void enable_onednn_layout();
   void disable_onednn_layout();
 
-  bool is_onednn_deterministic_enabled() const;
-  void enable_onednn_deterministic();
-  void disable_onednn_deterministic();
-
   FP32_MATH_MODE get_fp32_math_mode() const;
   bool set_fp32_math_mode(FP32_MATH_MODE mode);
 

@@ -201,7 +201,7 @@ sycl::event matmul(
 
   auto is_onednn_layout_suggested = using_onednn_layout_for_matmul(m1);
   auto use_deterministic = globalContext().deterministicAlgorithms() ||
-      Settings::I().is_onednn_deterministic_enabled();
+      at::globalContext().deterministicMkldnn();
 
   post_ops po;
   attr.extract_post_ops(po, dst);
@@ -261,7 +261,7 @@ sycl::event matmul(
     primitive_attr pattr;
     pattr.set_post_ops(po);
     if (globalContext().deterministicAlgorithms() ||
-        Settings::I().is_onednn_deterministic_enabled())
+        at::globalContext().deterministicMkldnn())
       pattr.set_deterministic(true);
 
 #ifdef USE_SCRATCHPAD_MODE
