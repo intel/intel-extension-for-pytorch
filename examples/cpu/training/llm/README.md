@@ -7,7 +7,7 @@ This document has instructions for running [LLaMA2 7B](https://huggingface.co/me
 ## Bare Metal
 ### General setup
 
-Follow [link](https://github.com/intel/intel-extension-for-pytorch/tree/release/2.3/examples/cpu/inference/python/llm#3-environment-setup) to setup PyTorch/IPEX and some other dependency.
+Follow [link](https://github.com/intel/intel-extension-for-pytorch/tree/release/2.4/examples/cpu/inference/python/llm#3-environment-setup) to setup PyTorch/IPEX and some other dependency.
 
 ### Prepare dependency
 ```

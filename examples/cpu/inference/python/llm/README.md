@@ -90,27 +90,23 @@ We are working in progress to better support the models in the tables with vario
 <br>
 
 # 3. Environment Setup
+There are several environment setup methodologies provided. You can choose either of them according to your usage scenario. The Docker-based ones are recommended.
 
-*Note*: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. 
-If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.3.100%2Bcpu/examples/cpu/inference/python/llm/README.md#3-environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
-
-## 3.1 [Recommended] Docker-based environment setup with compilation from source
+## 3.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
+git checkout v2.4.0+cpu
 git submodule sync
 git submodule update --init --recursive
 
-# Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
-# To have a custom ssh server port for multi-nodes run, please add --build-arg PORT_SSH=<CUSTOM_PORT> ex: 2345, otherwise use the default 22 SSH port
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON --build-arg PORT_SSH=2345 -t ipex-llm:main .
-
-
+# Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.4.0 .
 
 # Run the container with command below
-docker run --rm -it --privileged ipex-llm:main bash
+docker run --rm -it --privileged ipex-llm:2.4.0 bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -119,12 +115,60 @@ cd llm
 source ./tools/env_activate.sh
 ```
 
-## 3.2 Conda-based environment setup with compilation from source
+## 3.2 Conda-based environment setup with pre-built wheels
 
 ```bash
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
+git checkout v2.4.0+cpu
+git submodule sync
+git submodule update --init --recursive
+
+# GCC 12.3 is required. Installation can be taken care of by the environment configuration script.
+# Create a conda environment
+conda create -n llm python=3.10 -y
+conda activate llm
+
+# Setup the environment with the provided script
+# A sample "prompt.json" file for benchmarking is also downloaded
+cd examples/cpu/inference/python/llm
+bash ./tools/env_setup.sh 7
+
+# Activate environment variables
+source ./tools/env_activate.sh
+```
+
+## 3.3 Docker-based environment setup with compilation from source
+
+```bash
+# Get the Intel® Extension for PyTorch\* source code
+git clone https://github.com/intel/intel-extension-for-pytorch.git
+cd intel-extension-for-pytorch
+git checkout v2.4.0+cpu
+git submodule sync
+git submodule update --init --recursive
+
+# Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile --build-arg COMPILE=ON -t ipex-llm:2.4.0 .
+
+# Run the container with command below
+docker run --rm -it --privileged ipex-llm:2.4.0 bash
+
+# When the command prompt shows inside the docker container, enter llm examples directory
+cd llm
+
+# Activate environment variables
+source ./tools/env_activate.sh
+```
+
+## 3.4 Conda-based environment setup with compilation from source
+
+```bash
+# Get the Intel® Extension for PyTorch\* source code
+git clone https://github.com/intel/intel-extension-for-pytorch.git
+cd intel-extension-for-pytorch
+git checkout v2.4.0+cpu
 git submodule sync
 git submodule update --init --recursive
 
@@ -141,8 +185,6 @@ bash ./tools/env_setup.sh
 # Activate environment variables
 source ./tools/env_activate.sh
 ```
-
-<br>
 
 *Note*: In `env_setup.sh` script a `prompt.json` file is downloaded, which provides prompt samples with pre-defined input token lengths for benchmarking.
 For **Llama-3 models** benchmarking, the users need to download a specific `prompt.json` file, overwriting the original one.
