@@ -185,10 +185,10 @@ TORCH_LIBRARY(ipex_prepack, m) {
       "-> __torch__.torch.classes.ipex_prepack.ConvTransposeOpContext");
 #ifdef USE_LIBXSMM
   m.def(
-      "weight_only_qlinear_prepack(Tensor W, int W_dtype, int[] W_shape, Tensor scales, Tensor? zero_points, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int act_quant_mode, bool cache_weight_for_large_batch) "
+      "weight_only_qlinear_prepack(Tensor W, int W_dtype, int[] W_shape, Tensor scales, Tensor? zero_points, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int act_quant_mode, bool cache_weight_for_large_batch = False) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
   m.def(
-      "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int act_quant_mode, bool cache_weight_for_large_batch) "
+      "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor zero_points, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int act_quant_mode, bool cache_weight_for_large_batch = False) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
 #endif
 }
