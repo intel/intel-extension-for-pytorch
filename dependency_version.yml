@@ -30,9 +30,9 @@ protobuf:
 pytorch:
   version: 2.5.0.dev20240704+cpu
 torch-ccl:
-  commit: ccl_torch_dev_0131
+  commit: v2.4.0+cpu+rc0
   repo: https://github.com/intel/torch-ccl.git
-  version: 2.3.0+cpu
+  version: 2.4.0+cpu
 torchaudio:
   version: 2.4.0.dev20240704+cpu
 torchvision:
