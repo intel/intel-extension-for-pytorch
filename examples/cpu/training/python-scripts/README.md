@@ -20,7 +20,7 @@ For more details, please check [installation guide](https://intel.github.io/inte
 ```bash
 # Clone the repository and access to the training examples folder
 git clone https://github.com/intel/intel-extension-for-pytorch.git
-cd intel-extension-for-pytorch/examples/cpu/training
+cd intel-extension-for-pytorch/examples/cpu/training/python-scripts
 ```
 
 Running ResNet50 distributed training example:
