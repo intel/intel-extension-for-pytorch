@@ -249,93 +249,49 @@ sycl::event convolution(
   memory::dims _padding_front_top_left = padding_front_top_left.vec();
   memory::dims _padding_back_bottom_right = padding_back_bottom_right.vec();
 
-  lru_key_t key_primitive;
-
   bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
   bool onednn_deterministic_enabled =
       Settings::I().is_onednn_deterministic_enabled();
 
-#ifdef USE_PRIMITIVE_CACHE
-  create_key(
-      key_primitive,
-      engine_index,
-      src_dims,
-      wgh_dims,
-      bia_dims,
-      dst_dims,
-      src_data_t,
-      wgh_data_t,
-      bia_data_t,
-      dst_data_t,
-      groups,
+  convolution_forward::primitive_desc conv_fwd_pd;
+  convolution_forward conv_fwd;
+
+  // extract post ops
+  primitive_attr pattr;
+  post_ops po;
+  attr.extract_post_ops(po, dst);
+  pattr.set_post_ops(po);
+
+  if (use_deterministic_algorithm || onednn_deterministic_enabled)
+    pattr.set_deterministic(true);
+
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+
+  if (src_data_t == memory::data_type::f32) {
+    pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
+  }
+
+  memory::desc src_md, wgh_md, dst_md;
+  std::tie(src_md, wgh_md, dst_md) =
+      conv_get_md(src_usr_md, wgh_usr_md, dst_usr_md, memory_layout_for_conv);
+
+  conv_fwd_pd = convolution_forward::primitive_desc(
+      engine,
+      prop_kind::forward,
+      algorithm::convolution_direct,
+      src_md,
+      wgh_md,
+      bia_md,
+      dst_md,
       _stride,
       _dilation,
       _padding_front_top_left,
       _padding_back_bottom_right,
-      is_onednn_layout_suggested,
-      memory_layout_for_conv,
-      use_deterministic_algorithm,
-      onednn_deterministic_enabled,
-      attr);
-#endif
+      pattr);
 
-  convolution_forward::primitive_desc conv_fwd_pd;
-  convolution_forward conv_fwd;
-
-#ifdef USE_PRIMITIVE_CACHE
-  bool load_from_cache = find_key<convolution_forward>(key_primitive);
-#else
-  bool load_from_cache = false;
-#endif
-
-  if (load_from_cache) {
-    conv_fwd = fetch_m<convolution_forward>(key_primitive);
-    auto conv_fwd_pd_t = conv_fwd.get_primitive_desc();
-    conv_fwd_pd = convolution_forward::primitive_desc(
-        const_cast<dnnl_primitive_desc_t>(conv_fwd_pd_t));
-  } else {
-    // extract post ops
-    primitive_attr pattr;
-    post_ops po;
-    attr.extract_post_ops(po, dst);
-    pattr.set_post_ops(po);
-
-    if (use_deterministic_algorithm || onednn_deterministic_enabled)
-      pattr.set_deterministic(true);
-
-#ifdef USE_SCRATCHPAD_MODE
-    pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
-
-    if (src_data_t == memory::data_type::f32) {
-      pattr.set_fpmath_mode(xpu::oneDNN::get_onednn_fpmath_mode());
-    }
-
-    memory::desc src_md, wgh_md, dst_md;
-    std::tie(src_md, wgh_md, dst_md) =
-        conv_get_md(src_usr_md, wgh_usr_md, dst_usr_md, memory_layout_for_conv);
-
-    conv_fwd_pd = convolution_forward::primitive_desc(
-        engine,
-        prop_kind::forward,
-        algorithm::convolution_direct,
-        src_md,
-        wgh_md,
-        bia_md,
-        dst_md,
-        _stride,
-        _dilation,
-        _padding_front_top_left,
-        _padding_back_bottom_right,
-        pattr);
-
-#ifdef USE_PRIMITIVE_CACHE
-    conv_fwd =
-        create_and_fetch_m<convolution_forward>(key_primitive, conv_fwd_pd);
-#else
-    conv_fwd = convolution_forward(conv_fwd_pd);
-#endif
-  }
+  conv_fwd = convolution_forward(conv_fwd_pd);
 
   auto weight_cache_optimization = [&]() {
     return memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::Blocked &&
