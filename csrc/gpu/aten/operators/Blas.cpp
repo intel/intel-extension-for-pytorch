@@ -74,14 +74,14 @@ Tensor& addmm_out(
     return result;
   }
 
-  // complex/double case
-  if (mat1.is_complex() || mat1.scalar_type() == ScalarType::Double) {
+  // complex case
+  if (mat1.is_complex()) {
 #ifdef USE_ONEMKL
     impl::mkl_matmul(result, self, mat1, mat2, beta, alpha);
     return result;
 #else
     AT_ERROR(
-        "Double and complex datatype matmul is not supported. Include oneMKL library in compilation");
+        "Complex datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   }
 
@@ -203,13 +203,13 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
     return result;
   }
 
-  if (self.is_complex() || self.scalar_type() == ScalarType::Double) {
+  if (self.is_complex()) {
 #ifdef USE_ONEMKL
     impl::mkl_matmul(result, result, self, mat2, Scalar(0), Scalar(1));
     return result;
 #else
     AT_ERROR(
-        "Double and complex datatype matmul is not supported. Include oneMKL library in compilation");
+        "Complex datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   }
 
@@ -287,14 +287,14 @@ Tensor& baddbmm_out(
     return result;
   }
 
-  // complex and double case
-  if (batch1.is_complex() || batch2.scalar_type() == ScalarType::Double) {
+  // complex case
+  if (batch1.is_complex()) {
 #ifdef USE_ONEMKL
     impl::mkl_baddbmm(result, input, batch1, batch2, beta, alpha);
     return result;
 #else
     AT_ERROR(
-        "Double and complex datatype matmul is not supported. Include oneMKL library in compilation");
+        "Complex datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   }
 
@@ -417,13 +417,13 @@ Tensor& bmm_out(const Tensor& self, const Tensor& batch2, Tensor& result) {
     return result;
   }
 
-  if (self.is_complex() || self.scalar_type() == ScalarType::Double) {
+  if (self.is_complex()) {
 #ifdef USE_ONEMKL
     return at::AtenIpexTypeXPU::baddbmm_out(
         result, self, batch2, Scalar(0), Scalar(1), result);
 #else
     AT_ERROR(
-        "Double and complex datatype matmul is not supported. Include oneMKL library in compilation");
+        "Complex datatype matmul is not supported. Include oneMKL library in compilation");
 #endif
   }
   torch_ipex::xpu::oneDNN::matmul(

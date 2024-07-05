@@ -178,8 +178,7 @@ static inline memory::data_type get_onednn_dtype_include_double(
 }
 
 static bool is_supported_onednn_dtype(const at::Tensor& tensor) {
-  return get_onednn_dtype(tensor, /*allow_undef*/ true) ==
-          memory::data_type::undef
+  return get_onednn_dtype_include_double(tensor) == memory::data_type::undef
       ? false
       : true;
 }
@@ -245,7 +244,7 @@ static inline memory::dims get_onednn_strides(const at::Tensor& tensor) {
 static inline memory::desc get_onednn_md(const at::Tensor& tensor) {
   return {
       get_onednn_dims(tensor),
-      get_onednn_dtype(tensor),
+      get_onednn_dtype_include_double(tensor),
       get_onednn_strides(tensor)};
 }
 

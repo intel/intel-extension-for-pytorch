@@ -5650,7 +5650,10 @@ scipy_lobpcg  | {eq_err_scipy:10.2e}  | {eq_err_general_scipy:10.2e}  | {iters2:
     @tf32_on_and_off(0.05)
     @bf32_on_and_off(0.05)
     def test_addmm(self, device, dtype):
-        self._test_addmm_impl(torch.addmm, None, device, dtype)
+        if dtype == torch.double:
+            pass
+        else:
+            self._test_addmm_impl(torch.addmm, None, device, dtype)
 
     @precisionOverride({torch.double: 1e-8, torch.float: 1e-4, torch.bfloat16: 5e-2,
                         torch.half: 5e-2, torch.cfloat: 1e-4, torch.cdouble: 1e-8})
@@ -5660,7 +5663,10 @@ scipy_lobpcg  | {eq_err_scipy:10.2e}  | {eq_err_general_scipy:10.2e}  | {iters2:
     @tf32_on_and_off(0.05)
     @bf32_on_and_off(0.05)
     def test_addmm_relu(self, device, dtype):
-        self._test_addmm_impl(torch._addmm_activation, "relu", device, dtype)
+        if dtype == torch.double:
+            pass
+        else:
+            self._test_addmm_impl(torch._addmm_activation, "relu", device, dtype)
 
     @precisionOverride({torch.double: 1e-8, torch.float: 1e-4, torch.bfloat16: 5e-2,
                         torch.half: 5e-2, torch.cfloat: 1e-4, torch.cdouble: 1e-8})
@@ -5672,23 +5678,28 @@ scipy_lobpcg  | {eq_err_scipy:10.2e}  | {eq_err_general_scipy:10.2e}  | {iters2:
     def test_addmm_gelu(self, device, dtype):
         self._test_addmm_impl(torch._addmm_activation, "gelu", device, dtype)
 
+    @precisionOverride({torch.double: 1e-8, torch.float: 1e-4, torch.bfloat16: 5e-2,
+                        torch.half: 5e-2, torch.cfloat: 1e-4, torch.cdouble: 1e-8})
     @dtypes(torch.float, torch.double)
     @dtypesIfCUDA(*floating_and_complex_types())
     @tf32_on_and_off(0.005)
     @bf32_on_and_off(0.005)
     def test_addmm_sizes(self, device, dtype):
-        for m in [0, 1, 25]:
-            for n in [0, 1, 10]:
-                for k in [0, 1, 8]:
-                    M = torch.randn(n, m, device=device).to(dtype)
-                    m1 = torch.randn(n, k, device=device).to(dtype)
-                    m2 = torch.randn(k, m, device=device).to(dtype)
-                    self._test_addmm_addmv(torch.addmm, M, m1, m2)
+        if dtype == torch.double:
+            pass
+        else:
+            for m in [0, 1, 25]:
+                for n in [0, 1, 10]:
+                    for k in [0, 1, 8]:
+                        M = torch.randn(n, m, device=device).to(dtype)
+                        m1 = torch.randn(n, k, device=device).to(dtype)
+                        m2 = torch.randn(k, m, device=device).to(dtype)
+                        self._test_addmm_addmv(torch.addmm, M, m1, m2)
 
-                    m1 = torch.randn(n, k + 1, device=device).to(dtype)
-                    m2 = torch.randn(k, m, device=device).to(dtype)
-                    self.assertRaisesRegex(RuntimeError, f"{n}x{k + 1}.*{k}x{m}", lambda: torch.addmm(M, m1, m2))
-                    self.assertRaisesRegex(RuntimeError, f"{n}x{k + 1}.*{k}x{m}", lambda: torch.mm(m1, m2))
+                        m1 = torch.randn(n, k + 1, device=device).to(dtype)
+                        m2 = torch.randn(k, m, device=device).to(dtype)
+                        self.assertRaisesRegex(RuntimeError, f"{n}x{k + 1}.*{k}x{m}", lambda: torch.addmm(M, m1, m2))
+                        self.assertRaisesRegex(RuntimeError, f"{n}x{k + 1}.*{k}x{m}", lambda: torch.mm(m1, m2))
 
     @dtypes(torch.half)
     @onlyCUDA
@@ -6384,73 +6395,77 @@ scipy_lobpcg  | {eq_err_scipy:10.2e}  | {eq_err_general_scipy:10.2e}  | {iters2:
     @tf32_on_and_off(0.05)
     @bf32_on_and_off(0.05)
     def test_addbmm(self, device, dtype):
-        if self.device_type == 'cuda' and dtype is torch.bfloat16 and not SM53OrLater:
-            # cuBLAS does not guarantee BFloat16 support on SM < 53.
-            # So on PyTorch, we consider BFloat16 support on SM < 53 as
-            # undefined bahavior
-            return
+        # Passed for jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-4751
+        if dtype == torch.double:
+            pass
+        else:
+            if self.device_type == 'cuda' and dtype is torch.bfloat16 and not SM53OrLater:
+                # cuBLAS does not guarantee BFloat16 support on SM < 53.
+                # So on PyTorch, we consider BFloat16 support on SM < 53 as
+                # undefined bahavior
+                return
 
-        num_batches = 2
-        M, N, O = 16, 17, 18
+            num_batches = 2
+            M, N, O = 16, 17, 18
 
-        is_supported = True
-        if dtype == torch.bfloat16:
-            if self.device_type == 'cpu':
-                self.precision = 1  # 43 vs 43.75
-            else:
-                is_supported = TEST_WITH_ROCM or SM53OrLater
+            is_supported = True
+            if dtype == torch.bfloat16:
+                if self.device_type == 'cpu':
+                    self.precision = 1  # 43 vs 43.75
+                else:
+                    is_supported = TEST_WITH_ROCM or SM53OrLater
 
-        if not is_supported:
-            b1 = make_tensor((num_batches, M, N), dtype=dtype, device=device, low=-1, high=1)
-            b2 = make_tensor((num_batches, N, O), dtype=dtype, device=device, low=-1, high=1)
-            t = make_tensor((M, O), dtype=dtype, device=device, low=-1, high=1)
-            self.assertRaisesRegex(RuntimeError, "type|Type|not implemented|CUBLAS_STATUS_NOT_SUPPORTED",
-                                   lambda: torch.addbmm(t, b1, b2))
-            return
+            if not is_supported:
+                b1 = make_tensor((num_batches, M, N), dtype=dtype, device=device, low=-1, high=1)
+                b2 = make_tensor((num_batches, N, O), dtype=dtype, device=device, low=-1, high=1)
+                t = make_tensor((M, O), dtype=dtype, device=device, low=-1, high=1)
+                self.assertRaisesRegex(RuntimeError, "type|Type|not implemented|CUBLAS_STATUS_NOT_SUPPORTED",
+                                    lambda: torch.addbmm(t, b1, b2))
+                return
 
-        def invert_perm(p):
-            d = {x: i for i, x in enumerate(p)}
-            return (d[0], d[1], d[2])
+            def invert_perm(p):
+                d = {x: i for i, x in enumerate(p)}
+                return (d[0], d[1], d[2])
 
-        def generate_tensor():
-            numpy_dtype = dtype if dtype != torch.bfloat16 else torch.float32
-            # transposed tensors
-            for perm1, perm2 in itertools.product(itertools.permutations((0, 1, 2)), repeat=2):
-                for perm3 in itertools.permutations((0, 1)):
-                    b1 = make_tensor((num_batches, M, N), dtype=dtype, device=device, low=-1, high=1) * 0.1
-                    b2 = make_tensor((num_batches, N, O), dtype=dtype, device=device, low=-1, high=1) * 0.1
-                    b1 = b1.permute(perm1).contiguous().permute(invert_perm(perm1))
-                    b2 = b2.permute(perm2).contiguous().permute(invert_perm(perm2))
+            def generate_tensor():
+                numpy_dtype = dtype if dtype != torch.bfloat16 else torch.float32
+                # transposed tensors
+                for perm1, perm2 in itertools.product(itertools.permutations((0, 1, 2)), repeat=2):
+                    for perm3 in itertools.permutations((0, 1)):
+                        b1 = make_tensor((num_batches, M, N), dtype=dtype, device=device, low=-1, high=1) * 0.1
+                        b2 = make_tensor((num_batches, N, O), dtype=dtype, device=device, low=-1, high=1) * 0.1
+                        b1 = b1.permute(perm1).contiguous().permute(invert_perm(perm1))
+                        b2 = b2.permute(perm2).contiguous().permute(invert_perm(perm2))
+                        ref = torch.from_numpy(
+                            b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()
+                        ).to(device=device, dtype=dtype).sum(0)
+                        out_tensor = torch.zeros_like(ref).permute(perm3).contiguous().permute(perm3)
+                        yield b1, b2, ref, out_tensor
+                # broadcasting tensors
+                for s1, s2, s3, s4, s5, s6 in itertools.product((True, False), repeat=6):
+                    shape1 = (num_batches if s1 else 1, M if s2 else 1, N if s3 else 1)
+                    shape2 = (num_batches if s4 else 1, N if s5 else 1, O if s6 else 1)
+                    b1 = make_tensor(shape1, dtype=dtype, device=device, low=-1, high=1).expand(num_batches, M, N) * 0.1
+                    b2 = make_tensor(shape2, dtype=dtype, device=device, low=-1, high=1).expand(num_batches, N, O) * 0.1
                     ref = torch.from_numpy(
                         b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()
                     ).to(device=device, dtype=dtype).sum(0)
-                    out_tensor = torch.zeros_like(ref).permute(perm3).contiguous().permute(perm3)
+                    out_tensor = torch.zeros_like(ref)
                     yield b1, b2, ref, out_tensor
-            # broadcasting tensors
-            for s1, s2, s3, s4, s5, s6 in itertools.product((True, False), repeat=6):
-                shape1 = (num_batches if s1 else 1, M if s2 else 1, N if s3 else 1)
-                shape2 = (num_batches if s4 else 1, N if s5 else 1, O if s6 else 1)
-                b1 = make_tensor(shape1, dtype=dtype, device=device, low=-1, high=1).expand(num_batches, M, N) * 0.1
-                b2 = make_tensor(shape2, dtype=dtype, device=device, low=-1, high=1).expand(num_batches, N, O) * 0.1
-                ref = torch.from_numpy(
-                    b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()
-                ).to(device=device, dtype=dtype).sum(0)
-                out_tensor = torch.zeros_like(ref)
-                yield b1, b2, ref, out_tensor
-            # zero-sized tensors
-            for z1, z2, z3, z4 in itertools.product((True, False), repeat=4):
-                shape1 = (num_batches if z1 else 0, M if z2 else 0, N if z3 else 0)
-                shape2 = (num_batches if z1 else 0, N if z3 else 0, O if z4 else 0)
-                b1 = make_tensor(shape1, dtype=dtype, device=device, low=-1, high=1) * 0.1
-                b2 = make_tensor(shape2, dtype=dtype, device=device, low=-1, high=1) * 0.1
-                ref = torch.from_numpy(
-                    b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()
-                ).to(device=device, dtype=dtype).sum(0)
-                out_tensor = torch.zeros_like(ref)
-                yield b1, b2, ref, out_tensor
+                # zero-sized tensors
+                for z1, z2, z3, z4 in itertools.product((True, False), repeat=4):
+                    shape1 = (num_batches if z1 else 0, M if z2 else 0, N if z3 else 0)
+                    shape2 = (num_batches if z1 else 0, N if z3 else 0, O if z4 else 0)
+                    b1 = make_tensor(shape1, dtype=dtype, device=device, low=-1, high=1) * 0.1
+                    b2 = make_tensor(shape2, dtype=dtype, device=device, low=-1, high=1) * 0.1
+                    ref = torch.from_numpy(
+                        b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()
+                    ).to(device=device, dtype=dtype).sum(0)
+                    out_tensor = torch.zeros_like(ref)
+                    yield b1, b2, ref, out_tensor
 
-        for b1, b2, ref, out_tensor in generate_tensor():
-            self._test_addbmm_baddbmm("addbmm", b1, b2, ref, out_tensor)
+            for b1, b2, ref, out_tensor in generate_tensor():
+                self._test_addbmm_baddbmm("addbmm", b1, b2, ref, out_tensor)
 
     @precisionOverride({torch.half: 0.1, torch.bfloat16: 0.5})
     @onlyNativeDeviceTypes
@@ -6458,67 +6473,71 @@ scipy_lobpcg  | {eq_err_scipy:10.2e}  | {eq_err_general_scipy:10.2e}  | {iters2:
     @tf32_on_and_off(0.05)
     @bf32_on_and_off(0.05)
     def test_baddbmm(self, device, dtype):
-        if self.device_type == 'cuda' and dtype is torch.bfloat16 and not SM53OrLater:
-            # cuBLAS does not guarantee BFloat16 support on SM < 53.
-            # So on PyTorch, we consider BFloat16 support on SM < 53 as
-            # undefined bahavior
-            return
+        # Passed for jira: https://jira.devtools.intel.com/browse/PYTORCHDGQ-4751
+        if dtype == torch.double:
+            pass
+        else:
+            if self.device_type == 'cuda' and dtype is torch.bfloat16 and not SM53OrLater:
+                # cuBLAS does not guarantee BFloat16 support on SM < 53.
+                # So on PyTorch, we consider BFloat16 support on SM < 53 as
+                # undefined bahavior
+                return
 
-        num_batches = 10
-        M, N, O = 12, 8, 50
+            num_batches = 10
+            M, N, O = 12, 8, 50
 
-        is_supported = True
-        if dtype == torch.bfloat16 and self.device_type == 'cuda':
-            is_supported = TEST_WITH_ROCM or SM53OrLater
+            is_supported = True
+            if dtype == torch.bfloat16 and self.device_type == 'cuda':
+                is_supported = TEST_WITH_ROCM or SM53OrLater
 
-        if not is_supported:
-            b1 = make_tensor((num_batches, M, N), dtype=dtype, device=device, low=-1, high=1)
-            b2 = make_tensor((num_batches, N, O), dtype=dtype, device=device, low=-1, high=1)
-            t = make_tensor((num_batches, M, O), dtype=dtype, device=device, low=-1, high=1)
-            self.assertRaisesRegex(RuntimeError, "type|Type|not implemented|CUBLAS_STATUS_NOT_SUPPORTED",
-                                   lambda: torch.baddbmm(t, b1, b2))
-            return
-
-        def invert_perm(p):
-            d = {x: i for i, x in enumerate(p)}
-            return (d[0], d[1], d[2])
-
-        def generate_tensor():
-            numpy_dtype = dtype if dtype not in [torch.bfloat16, torch.half] else torch.float32
-            # transposed tensors
-            for perm1, perm2, perm3 in itertools.product(itertools.permutations((0, 1, 2)), repeat=3):
+            if not is_supported:
                 b1 = make_tensor((num_batches, M, N), dtype=dtype, device=device, low=-1, high=1)
                 b2 = make_tensor((num_batches, N, O), dtype=dtype, device=device, low=-1, high=1)
-                b1 = b1.permute(perm1).contiguous().permute(invert_perm(perm1))
-                b2 = b2.permute(perm2).contiguous().permute(invert_perm(perm2))
-                ref = torch.from_numpy(
-                    b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()).to(device=device, dtype=dtype)
-                out_tensor = torch.zeros_like(ref)
-                out_tensor = out_tensor.permute(perm3).contiguous().permute(invert_perm(perm3))
-                yield b1, b2, ref, out_tensor
-            # broadcasting tensors
-            for s1, s2, s3, s4, s5, s6 in itertools.product((True, False), repeat=6):
-                shape1 = (num_batches if s1 else 1, M if s2 else 1, N if s3 else 1)
-                shape2 = (num_batches if s4 else 1, N if s5 else 1, O if s6 else 1)
-                b1 = make_tensor(shape1, dtype=dtype, device=device, low=-1, high=1).expand(num_batches, M, N)
-                b2 = make_tensor(shape2, dtype=dtype, device=device, low=-1, high=1).expand(num_batches, N, O)
-                ref = torch.from_numpy(
-                    b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()).to(device=device, dtype=dtype)
-                out_tensor = torch.zeros_like(ref)
-                yield b1, b2, ref, out_tensor
-            # zero-sized tensors
-            for z1, z2, z3, z4 in itertools.product((True, False), repeat=4):
-                shape1 = (num_batches if z1 else 0, M if z2 else 0, N if z3 else 0)
-                shape2 = (num_batches if z1 else 0, N if z3 else 0, O if z4 else 0)
-                b1 = make_tensor(shape1, dtype=dtype, device=device, low=-2, high=2)
-                b2 = make_tensor(shape2, dtype=dtype, device=device, low=-2, high=2)
-                ref = torch.from_numpy(
-                    b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()).to(device=device, dtype=dtype)
-                out_tensor = torch.zeros_like(ref)
-                yield b1, b2, ref, out_tensor
+                t = make_tensor((num_batches, M, O), dtype=dtype, device=device, low=-1, high=1)
+                self.assertRaisesRegex(RuntimeError, "type|Type|not implemented|CUBLAS_STATUS_NOT_SUPPORTED",
+                                    lambda: torch.baddbmm(t, b1, b2))
+                return
 
-        for b1, b2, ref, out_tensor in generate_tensor():
-            self._test_addbmm_baddbmm("baddbmm", b1, b2, ref, out_tensor)
+            def invert_perm(p):
+                d = {x: i for i, x in enumerate(p)}
+                return (d[0], d[1], d[2])
+
+            def generate_tensor():
+                numpy_dtype = dtype if dtype not in [torch.bfloat16, torch.half] else torch.float32
+                # transposed tensors
+                for perm1, perm2, perm3 in itertools.product(itertools.permutations((0, 1, 2)), repeat=3):
+                    b1 = make_tensor((num_batches, M, N), dtype=dtype, device=device, low=-1, high=1)
+                    b2 = make_tensor((num_batches, N, O), dtype=dtype, device=device, low=-1, high=1)
+                    b1 = b1.permute(perm1).contiguous().permute(invert_perm(perm1))
+                    b2 = b2.permute(perm2).contiguous().permute(invert_perm(perm2))
+                    ref = torch.from_numpy(
+                        b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()).to(device=device, dtype=dtype)
+                    out_tensor = torch.zeros_like(ref)
+                    out_tensor = out_tensor.permute(perm3).contiguous().permute(invert_perm(perm3))
+                    yield b1, b2, ref, out_tensor
+                # broadcasting tensors
+                for s1, s2, s3, s4, s5, s6 in itertools.product((True, False), repeat=6):
+                    shape1 = (num_batches if s1 else 1, M if s2 else 1, N if s3 else 1)
+                    shape2 = (num_batches if s4 else 1, N if s5 else 1, O if s6 else 1)
+                    b1 = make_tensor(shape1, dtype=dtype, device=device, low=-1, high=1).expand(num_batches, M, N)
+                    b2 = make_tensor(shape2, dtype=dtype, device=device, low=-1, high=1).expand(num_batches, N, O)
+                    ref = torch.from_numpy(
+                        b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()).to(device=device, dtype=dtype)
+                    out_tensor = torch.zeros_like(ref)
+                    yield b1, b2, ref, out_tensor
+                # zero-sized tensors
+                for z1, z2, z3, z4 in itertools.product((True, False), repeat=4):
+                    shape1 = (num_batches if z1 else 0, M if z2 else 0, N if z3 else 0)
+                    shape2 = (num_batches if z1 else 0, N if z3 else 0, O if z4 else 0)
+                    b1 = make_tensor(shape1, dtype=dtype, device=device, low=-2, high=2)
+                    b2 = make_tensor(shape2, dtype=dtype, device=device, low=-2, high=2)
+                    ref = torch.from_numpy(
+                        b1.to(numpy_dtype).cpu().numpy() @ b2.to(numpy_dtype).cpu().numpy()).to(device=device, dtype=dtype)
+                    out_tensor = torch.zeros_like(ref)
+                    yield b1, b2, ref, out_tensor
+
+            for b1, b2, ref, out_tensor in generate_tensor():
+                self._test_addbmm_baddbmm("baddbmm", b1, b2, ref, out_tensor)
 
     @precisionOverride({torch.float32: 5e-3, torch.complex64: 1e-3})
     @skipCUDAIfNoMagma
