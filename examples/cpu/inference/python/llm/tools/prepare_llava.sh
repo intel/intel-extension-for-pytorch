@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -e
+pip install --upgrade pip
+pip install --user --upgrade setuptools
 llava_patch=`pwd`/llava.patch
 if ! [ -f $llava_patch ]; then
     llava_patch=`pwd`/tools/llava.patch
@@ -15,4 +17,3 @@ git apply ${llava_patch}
 pip install -e . --no-deps
 
 pip install tenacity hf_transfer lmms-eval evaluate sqlitedict pycocoevalcap pycocotools --no-deps
-conda install -y openjdk=8
