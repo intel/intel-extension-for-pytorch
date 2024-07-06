@@ -82,13 +82,12 @@ git submodule update --init --recursive
 # Create a conda environment
 conda create -n llm python=3.10 -y
 conda activate llm
-conda install pkg-config
 # Setup the environment with the provided script
 cd examples/gpu/inference/python/llm
 # If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
 bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <AOT>
-export LD_PRELOAD=$(bash ../../../../../scripts/tools/compilation_helper/get_libstdcpp_lib.sh)
-export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+conda deactivate
+conda activate llm
 source ./tools/env_activate.sh
 
 ```

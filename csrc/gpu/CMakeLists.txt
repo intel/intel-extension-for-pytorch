@@ -91,6 +91,13 @@ set(IPEX_GPU_CORE_SRC
         ${IPEX_UTILS_SRCS}
         ${IPEX_PROFILER_SRCS})
 
+if(NOT WINDOWS)
+  foreach(RPATH ${RPATHS_LIST})
+    set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} ${RPATH})
+  endforeach()
+  set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} "-Wl,--disable-new-dtags")
+endif()
+
 if(BUILD_SEPARATE_OPS)
   set(IPEX_GPU_OP_LIBRARIES)
   foreach(op_src ${IPEX_ATEN_OPS_SRCS})

@@ -43,11 +43,10 @@ RUN cp ./intel-extension-for-pytorch/scripts/compile_bundle.sh ./ && \
 RUN . ./miniforge3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
     bash compile_bundle.sh /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest pvc,ats-m150,acm-g11 && \
-    mkdir wheels && cp pytorch/dist/*.whl vision/dist/*.whl audio/dist/*.whl intel-extension-for-pytorch/dist/*.whl intel-extension-for-pytorch/ecological_libs/deepspeed/dist/*.whl ./wheels
+    mkdir wheels && cp pytorch/dist/*.whl vision/dist/*.whl audio/dist/*.whl intel-extension-for-pytorch/dist/*.whl torch-ccl/dist/*.whl ./wheels
 
 FROM base AS deploy
-RUN bash /basekit_driver_install_helper.sh runtime && \
-    apt clean && \
+RUN apt clean && \
     rm -rf /var/lib/apt/lists/* && \
     if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi && \
     rm /basekit_driver_install_helper.sh
@@ -55,10 +54,12 @@ COPY --from=dev /root/wheels ./wheels
 COPY --from=dev /root/intel-extension-for-pytorch/scripts/tools/compilation_helper/get_libstdcpp_lib.sh .
 RUN . ./miniforge3/bin/activate && \
     conda create -y -n py310 python=3.10 && conda activate py310 && \
-    conda install -y libpng libjpeg-turbo -c conda-forge && \
+    conda install -y libstdcxx-ng libpng libjpeg-turbo && \
     python -m pip install ./wheels/*.whl && \
     python -m pip cache purge && \
     conda clean -a -y && \
     rm -rf ./wheels && \
     echo "conda activate py310" >> ./.bashrc && \
+    echo "export OCL_ICD_VENDORS=/etc/OpenCL/vendors" >> ./.bashrc && \
+    echo "export CCL_ROOT=${CONDA_PREFIX}" >> ./.bashrc && \
     ldpreload=$(bash get_libstdcpp_lib.sh) && echo "export LD_PRELOAD=${ldpreload}" >> ./.bashrc && rm get_libstdcpp_lib.sh

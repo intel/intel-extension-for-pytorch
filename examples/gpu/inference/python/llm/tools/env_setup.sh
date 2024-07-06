@@ -87,7 +87,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
     python -m pip install pyyaml
     VER_DS=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d deepspeed -k version)
-    VER_IDEX=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d intel-extension-for-deepspeed -k version)
     VER_TORCHCCL=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torch-ccl -k version)
     VER_GCC=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
     VER_TORCH=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
@@ -118,8 +117,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch-deepspeed==${VER_IDEX} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${AUX_INSTALL_SCRIPT}
-        python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch-deepspeed==${VER_IDEX} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${AUX_INSTALL_SCRIPT}
+        python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
     else
         if [ ! -f ${ONECCL_ROOT}/env/vars.sh ]; then
             echo "oneCCL environment ${ONECCL_ROOT} doesn't seem to exist."
@@ -137,7 +136,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         bash compile_bundle.sh ${DPCPP_ROOT} ${ONEMKL_ROOT} ${ONECCL_ROOT}  ${MPI_ROOT} ${AOT} 1
         cp pytorch/dist/*.whl ${WHEELFOLDER}
         cp intel-extension-for-pytorch/dist/*.whl ${WHEELFOLDER}
-        cp intel-extension-for-pytorch/ecological_libs/deepspeed/dist/*.whl ${WHEELFOLDER}
         cp torch-ccl/dist/*.whl ${WHEELFOLDER}
         rm -rf compile_bundle.sh llvm-project llvm-release pytorch torch-ccl
         export LD_PRELOAD=$(bash intel-extension-for-pytorch/scripts/tools/compilation_helper/get_libstdcpp_lib.sh)
@@ -162,10 +160,12 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    source ${ONECCL_ROOT}/env/vars.sh
-    source ${MPI_ROOT}/env/vars.sh
+    python -m pip install py-cpuinfo
+    export LIBRARY_PATH=${CONDA_PREFIX}/lib
+    export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib
     python -m pip install ${WHEELFOLDER}/*.whl
     bash ${AUX_INSTALL_SCRIPT}
+    unset LD_LIBRARY_PATH
+    unset LIBRARY_PATH
     rm -rf ${WHEELFOLDER}
 fi
-

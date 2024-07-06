@@ -1,0 +1,60 @@
+diff --git a/c10/xpu/CMakeLists.txt b/c10/xpu/CMakeLists.txt
+index 634ebf6c146..495ab6a31bf 100644
+--- a/c10/xpu/CMakeLists.txt
++++ b/c10/xpu/CMakeLists.txt
+@@ -34,6 +34,11 @@ endif()
+ 
+ # ---[ Dependency of c10_xpu
+ target_link_libraries(c10_xpu PUBLIC c10 torch::xpurt)
++if(LINUX)
++  target_link_options(c10_xpu PRIVATE "-Wl,-rpath,$ORIGIN")
++  target_link_options(c10_xpu PRIVATE "-Wl,-rpath,$ORIGIN/../../../../")
++  target_link_options(c10_xpu PRIVATE "-Wl,--disable-new-dtags")
++endif()
+ target_include_directories(
+     c10_xpu PUBLIC
+     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
+diff --git a/caffe2/CMakeLists.txt b/caffe2/CMakeLists.txt
+index e653c1e2563..d7995181b1b 100644
+--- a/caffe2/CMakeLists.txt
++++ b/caffe2/CMakeLists.txt
+@@ -1589,6 +1589,11 @@ endif()
+ 
+ if(USE_XPU)
+   target_link_libraries(torch PUBLIC torch_xpu_library)
++  if(LINUX)
++    target_link_options(torch PRIVATE "-Wl,-rpath,$ORIGIN")
++    target_link_options(torch PRIVATE "-Wl,-rpath,$ORIGIN/../../../../")
++    target_link_options(torch PRIVATE "-Wl,--disable-new-dtags")
++  endif()
+ endif()
+ 
+ if(PRINT_CMAKE_DEBUG_INFO)
+@@ -1634,6 +1639,11 @@ endif()
+ if(USE_XPU)
+   target_link_libraries(torch_xpu INTERFACE torch::xpurt)
+   target_link_libraries(torch_xpu PUBLIC c10_xpu)
++  if(LINUX)
++    target_link_options(torch_xpu PRIVATE "-Wl,-rpath,$ORIGIN")
++    target_link_options(torch_xpu PRIVATE "-Wl,-rpath,$ORIGIN/../../../../")
++    target_link_options(torch_xpu PRIVATE "-Wl,--disable-new-dtags")
++  endif()
+ 
+   target_include_directories(
+       torch_xpu INTERFACE $<INSTALL_INTERFACE:include>)
+diff --git a/torch/CMakeLists.txt b/torch/CMakeLists.txt
+index 97a72eed55b..0c445ba5bce 100644
+--- a/torch/CMakeLists.txt
++++ b/torch/CMakeLists.txt
+@@ -344,6 +344,11 @@ endif()
+ target_compile_definitions(torch_python PRIVATE "-DTHP_BUILD_MAIN_LIB")
+ 
+ target_link_libraries(torch_python PRIVATE torch_library ${TORCH_PYTHON_LINK_LIBRARIES})
++if(USE_XPU AND LINUX)
++  target_link_options(torch_python PRIVATE "-Wl,-rpath,$ORIGIN")
++  target_link_options(torch_python PRIVATE "-Wl,-rpath,$ORIGIN/../../../../")
++  target_link_options(torch_python PRIVATE "-Wl,--disable-new-dtags")
++endif()
+ 
+ target_compile_definitions(torch_python PRIVATE ${TORCH_PYTHON_COMPILE_DEFINITIONS})
+ 

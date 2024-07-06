@@ -1,16 +1,7 @@
 #!/bin/bash
 
-ONEAPI_ROOT=${ONEAPI_ROOT:-/opt/intel/oneapi}
-if test -f ${ONEAPI_ROOT}/setvars.sh ; then
-	source ${ONEAPI_ROOT}/setvars.sh
-else
-    export LD_LIBRARY_PATH=/opt/intel/oneapi/redist/opt/mpi/libfabric/lib:$LD_LIBRARY_PATH
-    export PATH=/opt/intel/oneapi/redist/bin:$PATH
-    export I_MPI_ROOT=/opt/intel/oneapi/redist/lib
-    export CCL_ROOT=/opt/intel/oneapi/redist
-    export FI_PROVIDER_PATH=/opt/intel/oneapi/redist/opt/mpi/libfabric/lib/prov
-fi
-
+BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+export LD_PRELOAD=$(bash ${BASEFOLDER}/get_libstdcpp_lib.sh)
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
+export CCL_ROOT=${CONDA_PREFIX}
 export TORCH_LLM_ALLREDUCE=1
-
-

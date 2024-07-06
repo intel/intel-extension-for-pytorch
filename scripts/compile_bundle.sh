@@ -227,7 +227,7 @@ python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pyto
 python -m pip install cmake make ninja
 if [ $((${MODE} & 0x04)) -ne 0 ]; then
     python -m pip install Pillow
-    conda install -y libpng libjpeg-turbo -c conda-forge
+    conda install -y conda-forge::libpng conda-forge::libjpeg-turbo
 fi
 
 ABI=1
@@ -241,7 +241,7 @@ source ${MPI_ENV}
 #  PyTorch
 cd pytorch
 python -m pip install -r requirements.txt
-conda install --force-reinstall intel::mkl-static intel::mkl-include -y
+python -m pip install --force-reinstall mkl-static mkl-include
 export PYTORCH_BUILD_VERSION=${VERSION_TORCH}
 export PYTORCH_BUILD_NUMBER=0
 # Ensure cmake can find python packages when using conda or virtualenv
@@ -254,11 +254,13 @@ export USE_STATIC_MKL=1
 export _GLIBCXX_USE_CXX11_ABI=${ABI}
 export USE_NUMA=0
 export USE_CUDA=0
+export USE_MPI=0
 python setup.py clean
 if [ -d dist ]; then
     rm -rf dist
 fi
 python setup.py bdist_wheel 2>&1 | tee build.log
+unset USE_MPI
 unset USE_CUDA
 unset USE_NUMA
 unset _GLIBCXX_USE_CXX11_ABI
@@ -266,7 +268,7 @@ unset USE_STATIC_MKL
 unset CMAKE_PREFIX_PATH
 unset PYTORCH_BUILD_NUMBER
 unset PYTORCH_BUILD_VERSION
-conda remove mkl-static mkl-include -y
+python -m pip uninstall -y mkl-static mkl-include
 python -m pip install dist/*.whl
 cd ..
 #  TorchVision
@@ -304,31 +306,25 @@ python setup.py clean
 if [ -d dist ]; then
     rm -rf dist
 fi
-python setup.py install 2>&1 | tee build_install.log
+export ENABLE_ONEAPI_INTEGRATION=1
+python setup.py bdist_wheel 2>&1 | tee build_whl.log
+unset ENABLE_ONEAPI_INTEGRATION
+unset BUILD_WITH_CPU
 if [[ ! ${AOT} == "" ]]; then
     unset USE_AOT_DEVLIST
 fi
-cd ecological_libs/deepspeed
-python setup.py clean
-if [ -d dist ]; then
-    rm -rf dist
-fi
-export USE_AOT_DEVLIST=pvc
-python setup.py bdist_wheel 2>&1 | tee build.log
-unset USE_AOT_DEVLIST
 python -m pip install dist/*.whl
-cd ../..
-python setup.py bdist_wheel 2>&1 | tee build_whl.log
-unset BUILD_WITH_CPU
 cd ..
 
 #  Torch-CCL
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     cd torch-ccl
     python setup.py clean
+    export USE_SYSTEM_ONECCL=1
     export INTELONEAPIROOT=${ONEAPIROOT}
     COMPUTE_BACKEND=dpcpp python setup.py bdist_wheel 2>&1 | tee build.log
     unset INTELONEAPIROOT
+    unset USE_SYSTEM_ONECCL
     python -m pip install dist/*.whl
     cd ..
 fi
@@ -353,4 +349,3 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     CMD="${CMD} import oneccl_bindings_for_pytorch as torch_ccl; print(f'torchccl_version:    {torch_ccl.__version__}');"
 fi
 python -c "${CMD}"
-

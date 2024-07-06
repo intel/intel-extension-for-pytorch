@@ -14,15 +14,15 @@ torchvision:
   commit: v0.18.0
 torch-ccl:
   repo: https://github.com/intel/torch-ccl.git
-  commit: N/A
+  commit: master
   version: 2.1.300+xpu
 deepspeed:
   version: 0.14.0
 intel-extension-for-deepspeed:
   version: 2.3.10
 transformers:
-  version: 4.31.0
-  commit: v4.31.0
+  version: 4.38.1
+  commit: v4.38.1
 protobuf:
   version: 3.20.3
 lm_eval:
@@ -32,3 +32,7 @@ basekit:
     version: 2024.1.0
   mkl-dpcpp:
     version: 2024.1.0
+  oneccl-devel:
+    version: 2021.12.0
+  impi-devel:
+    version: 2021.12.0

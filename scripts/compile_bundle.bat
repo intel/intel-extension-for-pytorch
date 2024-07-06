@@ -149,9 +149,8 @@ python -m pip install cmake==3.26.4 make ninja==1.10.2
 rem PyTorch
 cd pytorch
 python -m pip install -r requirements.txt
-call conda install --force-reinstall intel::mkl-static intel::mkl-include -y
-call conda install conda-forge::libuv -y
-call conda uninstall -y pthreads-win32
+python -m pip install --force-reinstall mkl-static mkl-include
+call conda install -y conda-forge::libuv
 rem Ensure cmake can find python packages when using conda or virtualenv
 if defined CONDA_PREFIX (
     set "CMAKE_PREFIX_PATH=%CONDA_PREFIX%"
@@ -170,13 +169,13 @@ set "USE_NUMA="
 set "LIB=%LIB_BK%"
 set "CMAKE_INCLUDE_PATH="
 set "CMAKE_PREFIX_PATH="
-call conda remove mkl-static mkl-include -y
+python -m pip uninstall -y mkl-static mkl-include
 for %%f in ("dist\*.whl") do python -m pip install "%%f"
 cd ..
 
 rem TorchVision 
 cd vision
-call conda install -y --force-reinstall libpng libjpeg-turbo -c conda-forge
+call conda install -y --force-reinstall conda-forge::libpng conda-forge::libjpeg-turbo
 set "DISTUTILS_USE_SDK=1"
 python setup.py clean
 python setup.py bdist_wheel
@@ -203,8 +202,10 @@ if NOT "%AOT%"=="" (
 set "BUILD_WITH_CPU=0"
 set "USE_MULTI_CONTEXT=1"
 set "DISTUTILS_USE_SDK=1"
+set "ENABLE_ONEAPI_INTEGRATION=1"
 python setup.py clean
 python setup.py bdist_wheel
+set "ENABLE_ONEAPI_INTEGRATION="
 set "DISTUTILS_USE_SDK="
 set "USE_MULTI_CONTEXT="
 set "BUILD_WITH_CPU="

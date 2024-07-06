@@ -42,20 +42,17 @@ RUN . ./miniforge3/bin/activate && \
     bash tools/env_setup.sh ${MODE} /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest pvc,ats-m150,acm-g11
 
 FROM base AS deploy
-
 COPY --from=dev /root/intel-extension-for-pytorch/examples/gpu/inference/python/llm ./llm
-COPY --from=dev /root/intel-extension-for-pytorch/scripts/tools/compilation_helper/get_libstdcpp_lib.sh .
-COPY --from=dev /root/intel-extension-for-pytorch/scripts/tools/compilation_helper/basekit_driver_install_helper.sh .
-RUN bash ./basekit_driver_install_helper.sh runtime
-RUN . ./miniforge3/bin/activate && \
-    conda create -y -n py310 python=3.10 && conda activate py310 && \
-    echo "conda activate py310" >> ./.bashrc && \
-    ldpreload=$(bash get_libstdcpp_lib.sh) && echo "export LD_PRELOAD=${ldpreload}" >> ./.bashrc && rm get_libstdcpp_lib.sh && \
-    cd ./llm && \
-    bash tools/env_setup.sh 1 /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest pvc,ats-m150,acm-g11 && \
-    python -m pip cache purge && \
-    conda clean -a -y
+RUN rm ./llm/tools/get_libstdcpp_lib.sh
+COPY --from=dev /root/intel-extension-for-pytorch/scripts/tools/compilation_helper/get_libstdcpp_lib.sh ./llm/tools
 RUN apt clean && \
     rm -rf /var/lib/apt/lists/* && \
     if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi && \
     rm /basekit_driver_install_helper.sh
+RUN . ./miniforge3/bin/activate && \
+    conda create -y -n py310 python=3.10 && conda activate py310 && conda install -y libstdcxx-ng && \
+    echo "conda activate py310" >> ./.bashrc && \
+    cd ./llm && \
+    bash tools/env_setup.sh 1 && \
+    python -m pip cache purge && \
+    conda clean -a -y

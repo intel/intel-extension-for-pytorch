@@ -100,6 +100,7 @@ import shutil
 import subprocess
 import sys
 import re
+import yaml
 import errno
 
 
@@ -224,6 +225,12 @@ def get_pytorch_install_dir():
 pytorch_install_dir = get_pytorch_install_dir()
 
 
+def _get_basekit_rt():
+    with open("dependency_version.yml", "r") as f:
+        result = yaml.load(f.read(), Loader=yaml.FullLoader)
+        return result["basekit"]
+
+
 def _build_installation_dependency():
     install_requires = []
     install_requires.append("psutil")
@@ -231,11 +238,16 @@ def _build_installation_dependency():
     install_requires.append("packaging")
     install_requires.append("pydantic")
     install_requires.append("ruamel.yaml")
+    if _check_env_flag("ENABLE_ONEAPI_INTEGRATION", default="OFF"):
+        for key, value in _get_basekit_rt().items():
+            if (key == "oneccl-devel" or key == "impi-devel") and not IS_LINUX:
+                continue
+            install_requires.append(f"{key}=={value['version']}")
     return install_requires
 
 
 def get_cmake_command():
-    if platform.system() == "Windows":
+    if IS_WINDOWS:
         return "cmake"
     if shutil.which("cmake3") is not None:
         return "cmake3"
@@ -669,6 +681,7 @@ class IPEXCPPLibBuild(build_clib, object):
             "IPEX_PROJ_NAME": PACKAGE_NAME,
             "LIBIPEX_GITREV": ipex_git_sha,
             "LIBIPEX_VERSION": ipex_build_version,
+            "RPATHS_LIST": ";".join(make_relative_rpath(lvl_relative_oneapi_lib=4)),
         }
 
         build_with_cpu = False if IS_WINDOWS else True  # Default ON
@@ -972,13 +985,25 @@ class IPEXPythonPackageBuild(build_py, object):
         super(IPEXPythonPackageBuild, self).finalize_options()
 
 
-def make_relative_rpath(path):
+def make_relative_rpath(path=".", lvl_relative_oneapi_lib=0):
+    rpaths = []
+    dir_lib_oneapi = ""
+    if lvl_relative_oneapi_lib > 0:
+        dir_lib_oneapi_list = [".."] * lvl_relative_oneapi_lib
+        dir_lib_oneapi = os.path.join(*dir_lib_oneapi_list)
     if IS_DARWIN:
-        return "-Wl,-rpath,@loader_path/" + path
+        if not dir_lib_oneapi == "":
+            rpaths.append(f"-Wl,-rpath,@loader_path/{dir_lib_oneapi}")
+        rpaths.append(f"-Wl,-rpath,@loader_path/{path}")
     elif IS_WINDOWS:
-        return path
+        if not dir_lib_oneapi == "":
+            rpaths.append(dir_lib_oneapi)
+        rpaths.append(path)
     else:
-        return "-Wl,-rpath,$ORIGIN/" + path
+        if not dir_lib_oneapi == "":
+            rpaths.append(f"-Wl,-rpath,$ORIGIN/{dir_lib_oneapi}")
+        rpaths.append(f"-Wl,-rpath,$ORIGIN/{path}")
+    return rpaths
 
 
 def pyi_module():
@@ -1023,7 +1048,7 @@ def pyi_module():
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
             library_dirs=library_dirs,
-            extra_link_args=[make_relative_rpath("lib")],
+            extra_link_args=make_relative_rpath("lib", lvl_relative_oneapi_lib=3),
         )
     else:
         library_dirs = ["bin", os.path.join(pytorch_install_dir, "lib")]
@@ -1109,7 +1134,7 @@ def pyi_isa_help_module():
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
             library_dirs=library_dirs,
-            extra_link_args=[make_relative_rpath("lib")],
+            extra_link_args=make_relative_rpath("lib", lvl_relative_oneapi_lib=3),
         )
     else:
         library_dirs = ["bin", os.path.join(pytorch_install_dir, "lib")]

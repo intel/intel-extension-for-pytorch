@@ -22,6 +22,14 @@ if (USE_AOT_DEVLIST)
   set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
 endif()
 
+# set RPATH
+if(NOT WINDOWS)
+  foreach(RPATH ${RPATHS_LIST})
+    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} ${RPATH})
+  endforeach()
+  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-Wl,--disable-new-dtags")
+endif()
+
 # For large registers mode, enable 256 registers for kernels
 set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
