@@ -98,6 +98,20 @@ Run_benchmark_llama2-70b() {
 }
 
 
+## Llama3-70b
+Run_benchmark_llama3-70b() {
+    model=meta-llama/Meta-Llama-3-70B
+    sub_model_name=llama3-70b
+    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}_ranknum4
+    mkdir -p ${dir}
+    mpirun -np 4 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
+    mv log_e2e_ds ${dir}
+    PROFILE=1 mpirun -np 4 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
+
 ## OPT-6.7b
 Run_benchmark_opt-6.7b() {
     model=facebook/opt-6.7b
@@ -162,6 +176,7 @@ main() {
     Run_benchmark_llama2-7b
     Run_benchmark_llama2-13b
     Run_benchmark_llama2-70b
+    Run_benchmark_llama3-70b
     Run_benchmark_opt-6.7b
     Run_benchmark_opt-30b
     Run_benchmark_bloom-7b

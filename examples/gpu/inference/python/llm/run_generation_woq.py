@@ -23,7 +23,7 @@ from intel_extension_for_transformers.transformers import RtnConfig
 MODEL_CLASSES = {
     "auto": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, LlamaTokenizer),
+    "llama": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
 }
 
