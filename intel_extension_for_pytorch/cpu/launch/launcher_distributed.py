@@ -148,11 +148,11 @@ class DistributedTrainingLauncher(Launcher):
             args.logical_cores_for_ccl and args.use_logical_cores
         ), "Can't use --logical-cores-for-ccl and --use-logical-cores at the same time."
         if args.nnodes > 1:
-            assert os.path.exists(
-                args.hostfile
-            ), "A hostfile is required when you perform multi-node distributed training. "
-            +"Please create the hostfile which includes ip addresses of nodes that you will "
-            +"use for the distributed computation workload."
+            assert os.path.exists(args.hostfile), (
+                "A hostfile is required when you perform multi-node distributed training. "
+                + "Please create the hostfile which includes ip addresses of nodes that you will "
+                + "use for the distributed computation workload."
+            )
             ipv4_addr_pattern = r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
             ip_list = []
             with open(args.hostfile) as f:
@@ -175,10 +175,10 @@ class DistributedTrainingLauncher(Launcher):
                 for snic in snicList:
                     if snic.address == ip_list[0]:
                         master_check = True
-            assert (
-                master_check
-            ), f"MASTER_ADDR is incorrect. Please make sure the first line ({ip_list[0]}) of the hostfile "
-            +"is the ip address of the current node."
+            assert master_check, (
+                f"MASTER_ADDR is incorrect. Please make sure the first line ({ip_list[0]}) of the hostfile "
+                + "is the ip address of the current node."
+            )
 
             self.verbose("info", "Begin to validate SSH connections")
             args.master_addr = ip_list[0]
