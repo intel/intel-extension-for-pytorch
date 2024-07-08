@@ -54,9 +54,30 @@ typedef at::Half half;
   rvalue of type X'. Keep the original code as backup:
 */
 #ifdef __clang__
+
+#ifdef __INTEL_LLVM_COMPILER
 #define DECL_VLA_PTR_PT(type, name, dims, t) \
   auto name = (type(*) dims)(t.data_ptr<type>())
 #else
+/*
+  Workaround for Clang crash https://github.com/llvm/llvm-project/issues/75428.
+  This generates 2 statements, which is unsafe for
+  `if (...) DECL_VLA_PTR_PT(...)` blocks.
+  However, due to first line it will be a compile error
+  (unknown type name 'vla_type_42'), not a runtime error.
+*/
+#define DECL_VLA_PTR_PT_MERGE_(a, b, type, name, dims, t) \
+  using a##b = type(*) dims;                              \
+  a##b name = reinterpret_cast<a##b>(t.data_ptr<type>())
+
+#define DECL_VLA_PTR_PT_LABEL_(cnt, type, name, dims, t) \
+  DECL_VLA_PTR_PT_MERGE_(vla_type_, cnt, type, name, dims, t)
+
+#define DECL_VLA_PTR_PT(type, name, dims, t) \
+  DECL_VLA_PTR_PT_LABEL_(__COUNTER__, type, name, dims, t)
+#endif
+
+#else // not clang
 #define DECL_VLA_PTR_PT(type, name, dims, t) \
   type(*name) dims = (type(*) dims)(t.data_ptr<type>())
 #endif
