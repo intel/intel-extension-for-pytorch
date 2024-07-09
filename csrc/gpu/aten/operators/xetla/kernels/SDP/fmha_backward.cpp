@@ -415,12 +415,14 @@ class fmha_backward_t {
         mem_desc_Bij.init(
             args.B_ptr, {end_x, end_y, args.uMT}, {start_x, start_y});
 
-        start_y = gid * args.uF + startF;
-        end_y = start_y + kBr;
-        boundary_y = (gid + 1) * args.uF;
-        end_y = end_y > boundary_y ? boundary_y : end_y;
-        mem_desc_dBij.init(
-            args.dB_ptr, {end_x, end_y, args.uMT}, {start_x, start_y});
+        if (args.dB_ptr) {
+          start_y = gid * args.uF + startF;
+          end_y = start_y + kBr;
+          boundary_y = (gid + 1) * args.uF;
+          end_y = end_y > boundary_y ? boundary_y : end_y;
+          mem_desc_dBij.init(
+              args.dB_ptr, {end_x, end_y, args.uMT}, {start_x, start_y});
+        }
       }
     }
 
@@ -709,12 +711,14 @@ class fmha_backward_t {
     // Add bias if needed
     if constexpr (kUseBias) {
       // dSij = dBij
-      using epilogue_t = group::epilogue_write_back_t<
-          group::epilogue_policy_default<gpu_arch::XeHpc>,
-          tile_shape_BrBc,
-          mem_desc_dBij_t>;
-      epilogue_t epilogue;
-      epilogue(ctx.g_brbc, *matAcc_dSij, ctx.mem_desc_dBij);
+      if (args.dB_ptr) {
+        using epilogue_t = group::epilogue_write_back_t<
+            group::epilogue_policy_default<gpu_arch::XeHpc>,
+            tile_shape_BrBc,
+            mem_desc_dBij_t>;
+        epilogue_t epilogue;
+        epilogue(ctx.g_brbc, *matAcc_dSij, ctx.mem_desc_dBij);
+      }
     }
   }
 
