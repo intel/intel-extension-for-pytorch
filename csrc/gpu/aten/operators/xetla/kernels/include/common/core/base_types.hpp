@@ -55,6 +55,54 @@ using fp16 = sycl::half;
 ///
 using tf32 = sycl::ext::intel::experimental::esimd::tfloat32;
 
+/// @brief xetla 4bits data packed as 8bits data type.
+/// 2 4bit data pack to one byte
+struct int4x2 {
+  uint8_t data;
+
+  operator uint8_t() const {
+    return data;
+  }
+  int4x2(uint8_t val) {
+    data = val;
+  }
+};
+
+/// @brief xetla 4bits data packed as 32bits data type.
+/// 8 4bit data pack to 4 bytes
+struct int4x8 {
+  uint32_t data;
+
+  operator uint32_t() const {
+    return data;
+  }
+  int4x8(uint32_t val) {
+    data = val;
+  }
+};
+
+/// @brief mx_fp4(E2M1) data packed as 8bits data type.
+struct mx_fp4 {
+  uint8_t data;
+  operator uint8_t() const {
+    return data;
+  }
+  mx_fp4() = default;
+  mx_fp4(uint8_t val) {
+    data = val;
+  }
+};
+
+template <typename T>
+struct get_packed_num {
+  static constexpr uint32_t value = 1;
+};
+
+template <>
+struct get_packed_num<mx_fp4> {
+  static constexpr uint32_t value = 2;
+};
+
 template <typename T, typename = void>
 struct is_host_callable : std::false_type {};
 template <typename T>
@@ -66,7 +114,10 @@ struct is_host_callable<T, std::enable_if_t<T::host_callable == true>>
 template <typename T>
 struct is_internal_type {
   static constexpr bool value = std::is_same<remove_const_t<T>, bf16>::value ||
-      std::is_same<remove_const_t<T>, tf32>::value;
+      std::is_same<remove_const_t<T>, tf32>::value ||
+      std::is_same<remove_const_t<T>, int4x2>::value ||
+      std::is_same<remove_const_t<T>, int4x8>::value ||
+      std::is_same<remove_const_t<T>, mx_fp4>::value;
 };
 template <typename T>
 inline constexpr bool is_internal_type_v = is_internal_type<T>::value;
@@ -106,6 +157,24 @@ inline constexpr bool is_integral_v = is_integral<T>::value;
 template <typename T>
 struct native_type {
   using type = T;
+};
+
+/// @brief Set uint8_t as the native data type of mx_fp4.
+template <>
+struct native_type<mx_fp4> {
+  using type = uint8_t;
+};
+
+/// @brief Set uint8_t as the native data type of int4x2.
+template <>
+struct native_type<int4x2> {
+  using type = uint8_t;
+};
+
+/// @brief Set uint8_t as the native data type of int4x8.
+template <>
+struct native_type<int4x8> {
+  using type = uint32_t;
 };
 
 /// @brief Return the native data type of T

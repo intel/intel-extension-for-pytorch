@@ -686,8 +686,12 @@ class fmha_forward_t {
                 mem_desc_Dp_Mask_t::layout,
                 mem_desc_Dp_Mask_t::space>,
             dp_mask_tile_desc_t,
-            subgroup::
-                msg_type_v<dp_mask_tile_desc_t, mem_desc_Dp_Mask_t::space>,
+            subgroup::msg_type_v<
+                dp_mask_tile_desc_t,
+                mem_desc_t<
+                    uint8_t,
+                    mem_desc_Dp_Mask_t::layout,
+                    mem_desc_Dp_Mask_t::space>>,
             gpu_arch::XeHpc>;
         load_payload_mask_t load_payload_mask(ctx.mem_desc_Dpij);
         subgroup::tile_load(mask_in, load_payload_mask);
@@ -788,7 +792,12 @@ class fmha_forward_t {
       using matOi_store_t = subgroup::mem_payload_t<
           mem_desc_t<scalar_t, mem_desc_Oi_t::layout, mem_desc_Oi_t::space>,
           matOi_tile_desc_t,
-          subgroup::msg_type_v<matOi_tile_desc_t, mem_desc_Oi_t::space>,
+          subgroup::msg_type_v<
+              matOi_tile_desc_t,
+              mem_desc_t<
+                  scalar_t,
+                  mem_desc_Oi_t::layout,
+                  mem_desc_Oi_t::space>>,
           arch_tag>;
       matOi_store_t matOi_store(mem_desc_Oi);
       subgroup::tile_store<cache_hint::write_back, cache_hint::write_back>(
@@ -828,12 +837,19 @@ class fmha_forward_t {
     using matQi_load_t = subgroup::mem_payload_t<
         mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
         matQi_tile_desc_t,
-        subgroup::msg_type_v<matQi_tile_desc_t, mem_desc_Qi_t::space>,
+        subgroup::msg_type_v<
+            matQi_tile_desc_t,
+            mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>>,
         arch_tag>;
     using matQi_store_t = subgroup::mem_payload_t<
         mem_desc_t<scalar_t, mem_desc_Qi_L_t::layout, mem_desc_Qi_L_t::space>,
         matQi_tile_desc_t,
-        subgroup::msg_type_v<matQi_tile_desc_t, mem_desc_Qi_L_t::space>,
+        subgroup::msg_type_v<
+            matQi_tile_desc_t,
+            mem_desc_t<
+                scalar_t,
+                mem_desc_Qi_L_t::layout,
+                mem_desc_Qi_L_t::space>>,
         arch_tag>;
 
     int32_t tile_offset_x = ctx.sg_idx * kSgHm;

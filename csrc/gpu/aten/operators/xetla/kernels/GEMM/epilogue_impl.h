@@ -57,7 +57,9 @@ struct alpha_beta_op_t {
     using mat_in_payload_t = mem_payload_t<
         mem_desc_t<dtype_in, mem_desc_in_t::layout, mem_desc_in_t::space>,
         mat_in_tile_desc_t,
-        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
+        msg_type_v<
+            mat_in_tile_desc_t,
+            mem_desc_t<dtype_in, mem_desc_in_t::layout, mem_desc_in_t::space>>,
         gpu_arch::XeHpc>;
     using mat_in_tile_acc_t = tile_t<dtype_acc, mat_in_tile_desc_t>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
@@ -140,7 +142,9 @@ struct res_op_t {
     using mat_in_payload_t = mem_payload_t<
         mem_desc_t<dtype_in, mem_desc_in_t::layout, mem_desc_in_t::space>,
         mat_in_tile_desc_t,
-        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
+        msg_type_v<
+            mat_in_tile_desc_t,
+            mem_desc_t<dtype_in, mem_desc_in_t::layout, mem_desc_in_t::space>>,
         gpu_arch::XeHpc>;
     using mat_in_tile_acc_t = tile_t<dtype_acc, mat_in_tile_desc_t>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
@@ -219,7 +223,12 @@ struct bias_op_t {
     using bias_payload_t = mem_payload_t<
         mem_desc_t<dtype_bias, mem_desc_bias_t::layout, mem_desc_bias_t::space>,
         bias_tile_desc_t,
-        msg_type_v<bias_tile_desc_t, mem_desc_bias_t::space>,
+        msg_type_v<
+            bias_tile_desc_t,
+            mem_desc_t<
+                dtype_bias,
+                mem_desc_bias_t::layout,
+                mem_desc_bias_t::space>>,
         gpu_arch::XeHpc>;
     coord_t bias_coord(coord.x, 0);
     mem_desc_bias_t mem_desc_bias(args.base, args.shape, bias_coord);

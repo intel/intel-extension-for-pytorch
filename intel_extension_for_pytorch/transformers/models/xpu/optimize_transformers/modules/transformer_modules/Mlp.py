@@ -38,6 +38,12 @@ class IPEXTransformerBaseMLP(nn.Module):
         raise NotImplementedError
 
     def forward(self, hidden_states, residual=None):
+        if hidden_states.shape[0] != 1 and not torch.xpu.has_xmx():
+            # There is a problem of IPEX memory management on iGPU which is exposed during llama3 enabling.
+            # We must GC manually almost randomly
+            # TODO: we only check XMX for iGPU now, should be replaced by the formal device detection
+            torch.xpu.synchronize()
+            torch.xpu.empty_cache()
         inter_output = self.inter_mm(hidden_states)
         output = self.out_mm(inter_output, residual)
         return output

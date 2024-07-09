@@ -13,19 +13,19 @@
 #define SYNC_FREQ ${SYNC_FREQ}
 #define STAGES ${STAGES}
 #define ARCH static_cast<int>(gpu_arch::${ARCH})
-#define QUANT_MODE quant_mode::${QUANT_MODE}
+// #define QUANT_MODE quant_mode::${QUANT_MODE}
 // clang-format on
 
 namespace torch_ipex::xpu::xetla {
 using fp16 = gpu::xetla::fp16;
 using bf16 = gpu::xetla::bf16;
 
-#define HGEMM_WINT4_ASTR_IMPL_FUNC(scalar_t, ...)                              \
+#define HGEMM_WINT4_ASTR_IMPL_FUNC(scalar_t, ...)                             \
   template cgfs_t XETLA_KERNEL_API hgemm_wint4<scalar_t, ##__VA_ARGS__>(      \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       float* acc_ptr,                                                         \
       uint32_t* cnt_ptr,                                                      \
@@ -35,8 +35,8 @@ using bf16 = gpu::xetla::bf16;
   template cgfs_t XETLA_KERNEL_API hgemm_bias_wint4<scalar_t, ##__VA_ARGS__>( \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       const scalar_t* bias,                                                   \
       float* acc_ptr,                                                         \
@@ -48,8 +48,8 @@ using bf16 = gpu::xetla::bf16;
   hgemm_bias_gelu_wint4<scalar_t, ##__VA_ARGS__>(                             \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       const scalar_t* bias,                                                   \
       float* acc_ptr,                                                         \
@@ -60,8 +60,8 @@ using bf16 = gpu::xetla::bf16;
   template cgfs_t XETLA_KERNEL_API hgemm_silu_wint4<scalar_t, ##__VA_ARGS__>( \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       float* acc_ptr,                                                         \
       uint32_t* cnt_ptr,                                                      \
@@ -71,8 +71,8 @@ using bf16 = gpu::xetla::bf16;
   template cgfs_t XETLA_KERNEL_API hgemm_res_wint4<scalar_t, ##__VA_ARGS__>(  \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       const scalar_t* res,                                                    \
       float* acc_ptr,                                                         \
@@ -83,8 +83,8 @@ using bf16 = gpu::xetla::bf16;
   template cgfs_t XETLA_KERNEL_API hgemm_mul_wint4<scalar_t, ##__VA_ARGS__>(  \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       const scalar_t* mul,                                                    \
       float* acc_ptr,                                                         \
@@ -96,8 +96,8 @@ using bf16 = gpu::xetla::bf16;
   hgemm_bias_res_res_wint4<scalar_t, ##__VA_ARGS__>(                          \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       const scalar_t* bias,                                                   \
       const scalar_t* res0,                                                   \
@@ -112,8 +112,8 @@ using bf16 = gpu::xetla::bf16;
       scalar_t * out1,                                                        \
       scalar_t * out2,                                                        \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       float* acc_ptr,                                                         \
       uint32_t* cnt_ptr,                                                      \
@@ -124,8 +124,8 @@ using bf16 = gpu::xetla::bf16;
   hgemm_silu_mul_wint4<scalar_t, ##__VA_ARGS__>(                              \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       const scalar_t* mul,                                                    \
       float* acc_ptr,                                                         \
@@ -137,8 +137,8 @@ using bf16 = gpu::xetla::bf16;
   hgemm_bias_silu_mul_wint4<scalar_t, ##__VA_ARGS__>(                         \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       const scalar_t* bias,                                                   \
       const scalar_t* mul,                                                    \
@@ -151,8 +151,8 @@ using bf16 = gpu::xetla::bf16;
   hgemm_bias_add_wint4<scalar_t, ##__VA_ARGS__>(                              \
       scalar_t * out,                                                         \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       const scalar_t* bias,                                                   \
       const scalar_t* res,                                                    \
@@ -167,8 +167,8 @@ using bf16 = gpu::xetla::bf16;
       scalar_t * out1,                                                        \
       scalar_t * out2,                                                        \
       const scalar_t* a,                                                      \
-      const uint8_t* b,                                                       \
-      void* b_zp,                                                             \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
       const scalar_t* b_scale,                                                \
       const scalar_t* bias,                                                   \
       float* acc_ptr,                                                         \
@@ -179,19 +179,18 @@ using bf16 = gpu::xetla::bf16;
 
 #define HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(DEQUANT_S) \
   HGEMM_WINT4_ASTR_IMPL_FUNC(                    \
-      SCALAR_T,                                 \
-      WG_M,                                     \
-      WG_N,                                     \
-      SG_M,                                     \
-      SG_N,                                     \
-      SG_K,                                     \
-      DEQUANT_S,                                \
-      SLM_KS,                                   \
-      L3_KS,                                    \
-      SYNC_FREQ,                                \
-      STAGES,                                   \
-      ARCH,                                     \
-      QUANT_MODE)
+      SCALAR_T,                                  \
+      WG_M,                                      \
+      WG_N,                                      \
+      SG_M,                                      \
+      SG_N,                                      \
+      SG_K,                                      \
+      DEQUANT_S,                                 \
+      SLM_KS,                                    \
+      L3_KS,                                     \
+      SYNC_FREQ,                                 \
+      STAGES,                                    \
+      ARCH)
 
 // per channel
 HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(0)

@@ -91,7 +91,8 @@ class block_2d {
     ret = ((block_width * block_height * element_size) <= (32 * bytes_per_grf));
     XETLA_ASSERT(
         ret,
-        "2D Block Loads upto 32 GRFs are can be read but is %u:%u",
+        "2D Block Loads upto 32 * %u bytes are can be read but is %u:%u",
+        bytes_per_grf,
         block_width,
         block_height);
     if (!ret) {
@@ -318,7 +319,7 @@ class block_2d {
   static constexpr auto element_size = sizeof(T);
   static constexpr uint32_t max_24bit = 16 * 1024 * 1024; // 2 ^ 24
   static constexpr auto bytes_per_grf =
-      register_attr_t<grf_mode::double_grf, gpu_arch::XeHpc>::reg_in_bytes;
+      register_attr_t<grf_mode::double_grf, arch_tag>::reg_in_bytes;
 
   static inline bool check_base_address(uint64_t base) {
     bool ret = ((base % 64) == 0);
@@ -746,11 +747,8 @@ struct check_store {
 } // namespace subgroup
 
 namespace group {
-template <gpu_arch arch = gpu_arch::XeHpc, class enable = void>
-struct gemm {};
-
-template <gpu_arch arch>
-struct gemm<arch, std::enable_if_t<(arch <= gpu_arch::XeHpc)>> {
+template <gpu_arch arch = gpu_arch::XeHpc>
+struct gemm {
   struct default_fpu {
     template <
         typename dtype_a,
@@ -802,7 +800,7 @@ struct gemm<arch, std::enable_if_t<(arch <= gpu_arch::XeHpc)>> {
         int block_size_y_b>
     struct check_tile_size_default {
       static constexpr uint32_t reg_in_bytes =
-          register_attr_t<grf_mode::double_grf, gpu_arch::XeHpc>::reg_in_bytes;
+          register_attr_t<grf_mode::double_grf, arch>::reg_in_bytes;
       static constexpr uint32_t simd_len = reg_in_bytes / sizeof(dtype_mma);
 
       static_assert(
@@ -878,7 +876,7 @@ struct gemm<arch, std::enable_if_t<(arch <= gpu_arch::XeHpc)>> {
         int block_size_x_b,
         int block_size_y_b>
     struct check_tile_size_default {
-      using mma_attr = mma_attr_t<gpu_arch::XeHpc>;
+      using mma_attr = mma_attr_t<arch, block_size_y_a>;
       static constexpr int32_t mma_m = mma_attr::mma_m_in_elem;
       static constexpr int32_t mma_n = mma_attr::mma_n_in_elem;
       static constexpr int32_t mma_k =

@@ -31,16 +31,17 @@ namespace gpu::xetla::kernel {
 ///
 /// @tparam gemm_t_ Is the gemm functor to compose a GEMM_UNIVERSAL.
 /// @tparam epilogue_t_ Is the epilogue functor to compose a GEMM_UNIVERSAL.
-template <typename gemm_t_, typename epilogue_t_>
+template <gpu_arch arch_tag_, typename gemm_t_, typename epilogue_t_>
 class gemm_universal_t<
-    dispatch_policy_stream_k<gpu_arch::XeHpc>,
+    dispatch_policy_stream_k<arch_tag_>,
     gemm_t_,
     epilogue_t_> {
+  static constexpr gpu_arch arch_tag = arch_tag_;
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using gemm_args_t = typename gemm_t::arguments_t;
   using epilogue_args_t = typename epilogue_t::arguments_t;
-  using dispatch_stream_k = dispatch_policy_stream_k<gpu_arch::XeHpc>;
+  using dispatch_stream_k = dispatch_policy_stream_k<arch_tag>;
 
   // Scratchspace to accumulate partials
   using mem_desc_d_t =
@@ -63,8 +64,10 @@ class gemm_universal_t<
 
   using work_group_t = typename gemm_t::work_group_t;
 
-  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   static_assert(arch_tag == gemm_t::arch_tag, "arch_tag should be the same");
+  static_assert(
+      arch_tag == epilogue_t::arch_tag,
+      "arch_tag should be the same");
 
   using mem_desc_a_t = typename gemm_t::mem_desc_a_t;
   using mem_desc_b_t = typename gemm_t::mem_desc_b_t;
@@ -82,7 +85,8 @@ class gemm_universal_t<
       tile_shape,
       epilogue_t,
       mem_desc_d_t,
-      mem_desc_atomic_sync_t>;
+      mem_desc_atomic_sync_t,
+      arch_tag>;
 
  public:
   /// @brief GEMM arguments.
@@ -325,18 +329,19 @@ class gemm_universal_t<
             args.matB_base.base, args.matB_ld);
       }
     }
-    if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
-      if (epilogue_t::msg_type_c == msg_type::block_2d) {
-        implementable &= kernel::block_2d<arch_tag, dtype_c>::check_tensor(
-            (uint64_t)(args.matC_base.base),
-            args.matrix_n,
-            args.matrix_m,
-            args.matC_ld);
-      } else {
-        implementable &= kernel::general_1d<arch_tag, dtype_c>::check_alignment(
-            args.matC_base.base, args.matC_ld);
-      }
-    }
+    // if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
+    //   if (epilogue_t::msg_type_c == msg_type::block_2d) {
+    //     implementable &= kernel::block_2d<arch_tag, dtype_c>::check_tensor(
+    //         (uint64_t)(args.matC_base.base),
+    //         args.matrix_n,
+    //         args.matrix_m,
+    //         args.matC_ld);
+    //   } else {
+    //     implementable &= kernel::general_1d<arch_tag,
+    //     dtype_c>::check_alignment(
+    //         args.matC_base.base, args.matC_ld);
+    //   }
+    // }
 
     return implementable;
   }
@@ -435,7 +440,7 @@ class gemm_universal_t<
       sycl::nd_item<3>& item,
       const arguments_t& args,
       uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
+      uint32_t nbarrier_base = 0) const {
     const dispatch_stream_k& workgroup_mapping = args.stream_k_args;
     int group_idx = item.get_group(2);
 
@@ -625,6 +630,7 @@ class gemm_universal_t<
     }
   }
 };
+
 /// @} xetla_gemm_universal
 
 } // namespace gpu::xetla::kernel

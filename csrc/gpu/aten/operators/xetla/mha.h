@@ -7,6 +7,11 @@
 namespace gpu::xetla {
 using namespace torch_ipex::xpu::xetla;
 
+enum class XetlaType {
+  fp16,
+  bf16,
+};
+
 struct fmha_forward_kernel_args_t {
   void* query;
   void* key;

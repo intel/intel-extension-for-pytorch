@@ -95,7 +95,7 @@ class cooperative_reduce_t<
   static constexpr uint32_t block_size_x =
       gpu::xetla::subgroup::detail::gcd<tile_size_x, src_block_size_x>::value;
   static constexpr uint32_t block_size_y =
-      (tile_size_y > src_block_size_y) ? src_block_size_y : tile_size_y;
+      std::min(src_block_size_y, tile_size_y);
 
   using local_st_tile_desc_t = subgroup::tile_desc_t<
       sg_tile_n,
@@ -104,10 +104,12 @@ class cooperative_reduce_t<
       src_block_size_y,
       reg_layout::tiled>;
   using local_st_tile_t = subgroup::tile_t<dtype, local_st_tile_desc_t>;
+  using mem_desc_st_t =
+      mem_desc_t<dtype, mem_layout::row_major, mem_space::local>;
   using local_st_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
+      mem_desc_st_t,
       local_st_tile_desc_t,
-      subgroup::msg_type_v<local_st_tile_desc_t, mem_space::local>,
+      subgroup::msg_type_v<local_st_tile_desc_t, mem_desc_st_t>,
       arch_tag>;
   using local_ld_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x,
@@ -116,10 +118,12 @@ class cooperative_reduce_t<
       block_size_y,
       reg_layout::tiled>;
   using local_ld_tile_t = subgroup::tile_t<dtype, local_ld_tile_desc_t>;
+  using mem_desc_ld_t =
+      mem_desc_t<dtype, mem_layout::row_major, mem_space::local>;
   using local_ld_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
       local_ld_tile_desc_t,
-      subgroup::msg_type_v<local_ld_tile_desc_t, mem_space::local>,
+      subgroup::msg_type_v<local_ld_tile_desc_t, mem_desc_ld_t>,
       arch_tag>;
 
  public:

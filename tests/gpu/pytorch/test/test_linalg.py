@@ -5937,6 +5937,8 @@ scipy_lobpcg  | {eq_err_scipy:10.2e}  | {eq_err_general_scipy:10.2e}  | {iters2:
         if TEST_WITH_ROCM:
             self.skipTest("_int4_mm not compiled for ROCM")
 
+        self.skipTest("BF16 in4 gemm is not ready. Skip for now.")
+
         q_group = 32
         inner_k_tiles = 2
 

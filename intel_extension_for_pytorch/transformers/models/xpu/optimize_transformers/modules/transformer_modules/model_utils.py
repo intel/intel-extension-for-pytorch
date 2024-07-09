@@ -50,21 +50,15 @@ def qwen_load_attn_params_int4(self, qkv_layer, out_layer):
 
 def qwen_transpose_attn_params_int4(self):
     self.qkv_proj_quant.qweight.data = (
-        self.qkv_proj_quant.qweight.reshape(3, -1, self.embed_dim)
-        .permute(0, 2, 1)
-        .contiguous()
+        self.qkv_proj_quant.qweight.t().reshape(3, self.embed_dim, -1).contiguous()
     )
     self.qkv_proj_quant.scales.data = (
-        self.qkv_proj_quant.scales.reshape(3, self.embed_dim, -1)
-        .permute(0, 2, 1)
-        .contiguous()
-        .view(3, -1, self.embed_dim // 2)
+        self.qkv_proj_quant.scales.t().reshape(3, self.embed_dim, -1).contiguous()
     )
-    self.qkv_proj_quant.qzeros.data = (
-        self.qkv_proj_quant.qzeros.reshape(3, self.embed_dim // 2, -1)
-        .permute(0, 2, 1)
-        .contiguous()
-    )
+    if self.qkv_proj_quant.qzeros is not None:
+        self.qkv_proj_quant.qzeros.data = (
+            self.qkv_proj_quant.qzeros.t().reshape(3, self.embed_dim, -1).contiguous()
+        )
 
     self.out_proj_quant.qweight.data = self.out_proj_quant.qweight.transpose(
         0, 1
@@ -72,9 +66,10 @@ def qwen_transpose_attn_params_int4(self):
     self.out_proj_quant.scales.data = self.out_proj_quant.scales.transpose(
         0, 1
     ).contiguous()
-    self.out_proj_quant.qzeros.data = self.out_proj_quant.qzeros.transpose(
-        0, 1
-    ).contiguous()
+    if self.out_proj_quant.qzeros is not None:
+        self.out_proj_quant.qzeros.data = self.out_proj_quant.qzeros.transpose(
+            0, 1
+        ).contiguous()
     torch.xpu.synchronize()
 
 
@@ -102,9 +97,13 @@ def qwen_post_qkv(self, query, key, value, position_ids, layer_past, **kwargs):
                     self.prev_seq_len : self.seq_len, :, :, :
                 ] = key
     else:
-        query, key = self.position_embed(
-            query, key, position_ids, self.layer_id, self.beam_size, seq
+        key_out = self.runtime_cache.key_cache[
+            self.prev_seq_len : self.seq_len, :, :, :
+        ].view(query.shape)
+        self.position_embed(
+            query, key, position_ids, self.layer_id, self.beam_size, seq, query, key_out
         )
+        key = key_out
     query, key, value = self.combine_kv_cache_interface(query, key, value)
     return query, key, value
 
@@ -133,14 +132,7 @@ def qwen_sdp(self, query, key, value, attention_mask, head_mask, alibi):
                 attention_mask.logical_not(), torch.finfo(query.dtype).min
             )
     # Currently only PVC and MTL (without beam search) have sdp fusion available
-    if not (
-        torch.xpu.has_2d_block_array()
-        or (  # MTL greedy search
-            torch.xpu.has_xetla()
-            and not torch.xpu.has_xmx()
-            and not self.is_beam_search()
-        )
-    ):
+    if not xpu_sdpa_support(self.is_beam_search()):
         return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
     key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
     (

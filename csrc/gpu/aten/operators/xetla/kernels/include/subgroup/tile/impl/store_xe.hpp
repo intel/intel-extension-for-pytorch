@@ -28,45 +28,38 @@ namespace gpu::xetla::subgroup {
 namespace detail {
 template <typename tile_t, typename payload_t>
 struct check_store_type {
+  static constexpr bool is_lsc_scatter = true;
   static constexpr bool is_global_block_2d =
       (payload_t::memory_space == mem_space::global &&
-       (payload_t::message_type == msg_type::block_2d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::block_2d));
 
   static constexpr bool is_global_block_1d_xe =
-      ((payload_t::memory_space == mem_space::global) &&
-       (tile_t::tile_size_y == 1) && (tile_t::block_size_y == 1) &&
-       (payload_t::message_type == msg_type::block_1d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+      (payload_t::memory_space == mem_space::global &&
+       payload_t::message_type == msg_type::block_1d);
 
   static constexpr bool is_global_unaligned_2d_xe =
       (payload_t::memory_space == mem_space::global &&
-       (payload_t::message_type == msg_type::unaligned_2d) &&
-       (payload_t::arch_tag == gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::unaligned_2d));
 
   static constexpr bool is_global_atomic_xe =
       ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::message_type == msg_type::atomic_add) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::atomic_add));
 
   static constexpr bool is_local_scatter_xe =
       ((payload_t::memory_space == mem_space::local) &&
        (payload_t::message_type == msg_type::scatter) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc) &&
        (payload_t::tile_desc::register_layout == reg_layout::tiled ||
         payload_t::tile_desc::register_layout == reg_layout::vnni_tiled));
 
   static constexpr bool is_local_scatter_vnni_col_xe =
       ((payload_t::memory_space == mem_space::local) &&
        (payload_t::message_type == msg_type::scatter) &&
-       (payload_t::arch_tag == gpu_arch::XeHpc) &&
        (payload_t::tile_desc::register_layout ==
         reg_layout::vnni_tiled_col_major));
 
   static constexpr bool is_local_block_1d_xe =
       ((payload_t::memory_space == mem_space::local) &&
        (payload_t::message_type == msg_type::block_1d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc) &&
        (payload_t::tile_desc::register_layout == reg_layout::tiled));
 };
 
@@ -91,7 +84,7 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_store_type<tile_t, payload_t>::is_global_block_2d &&
-    arch_has_2d_load_store(payload_t::arch_tag)>
+    arch_has_2d_load_store<payload_t::arch_tag>>
 tile_store(tile_t& tile, payload_t& payload) {
   using dtype = typename tile_t::dtype;
   using tile_desc = typename tile_t::tile_desc;
@@ -123,10 +116,16 @@ tile_store(tile_t& tile, payload_t& payload) {
       block_size_y > max_store_block_height ? max_store_block_height
                                             : block_size_y;
   // to make sure full CL store
-  static constexpr uint32_t st_block_x =
-      (((tile_size_x % elems_per_CL) == 0) ? elems_per_CL : block_size_x);
+  static constexpr uint32_t st_block_x = ((tile_size_x % elems_per_CL) == 0)
+      ? elems_per_CL
+      : (((elems_per_CL % tile_size_x) == 0) ? tile_size_x : block_size_x);
 
-  static constexpr uint8_t arr_len = st_block_x / block_size_x;
+  static constexpr uint8_t arr_len_candidate = st_block_x / block_size_x;
+  static constexpr bool is_valid_arr_len_candidate = (arr_len_candidate == 1) ||
+      (arr_len_candidate == 2) || (arr_len_candidate == 4);
+
+  static constexpr uint8_t arr_len =
+      is_valid_arr_len_candidate ? arr_len_candidate : 1;
 
   auto payload_2d = payload.payloads.xetla_format<uint32_t, num_block, 16>();
 #pragma unroll
@@ -280,47 +279,42 @@ template <
 __XETLA_API typename std::enable_if_t<
     detail::check_store_type<tile_t, payload_t>::is_global_block_1d_xe>
 tile_store(tile_t& tile, payload_t& payload) {
-  using dtype = typename tile_t::dtype;
-  using store_dtype = typename payload_t::mem_dtype;
-
-  static constexpr uint32_t tile_size_x = tile_t::tile_size_x;
-  static constexpr uint32_t scale_factor = payload_t::scale_factor;
-
-  static constexpr uint32_t store_len = tile_size_x / scale_factor;
-
+  using dtype = typename payload_t::dtype;
+  static constexpr uint32_t store_len = tile_t::tile_elems;
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
-  using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_store_vec_len =
-      load_store_attr::max_store_vec_len;
+  if (payload.base_offset + store_len * sizeof(dtype) <=
+      payload.payload_bytes) {
+    using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
+    static constexpr uint32_t max_store_vec_len =
+        load_store_attr::max_store_vec_len;
+    static constexpr uint32_t max_store_vec_elems =
+        max_store_vec_len / sizeof(dtype);
+    static constexpr uint32_t store_iter_steps =
+        store_len / max_store_vec_elems;
 
-  static constexpr uint32_t store_iter_steps = store_len / max_store_vec_len;
-  if constexpr (store_len >= max_store_vec_len) {
+    if constexpr (store_len >= max_store_vec_elems) {
 #pragma unroll
-    for (uint32_t i = 0; i < store_iter_steps; i++) {
-      uint32_t offset_x = i * max_store_vec_len * scale_factor;
-      auto reg_sub =
-          tile.reg.xetla_select<max_store_vec_len * scale_factor, 1>(offset_x);
-      uint32_t address_offset = offset_x * sizeof(dtype);
+      for (uint32_t i = 0; i < store_iter_steps; i++) {
+        uint32_t offset = i * max_store_vec_elems;
+        auto reg_sub = tile.reg.xetla_select<max_store_vec_elems, 1>(offset);
+        uint32_t address_offset = offset * sizeof(dtype);
 
-      xetla_store_global<
-          store_dtype,
-          max_store_vec_len,
-          data_size::default_size,
-          L1,
-          L2>(
-          payload.base_ptr,
-          payload.base_offset + address_offset,
-          reg_sub.xetla_format<store_dtype>());
+        xetla_store_global<dtype, max_store_vec_elems, L1, L2>(
+            payload.base_ptr,
+            payload.base_offset + address_offset,
+            reg_sub.xetla_format<dtype>());
+      }
     }
+    constexpr uint32_t tail_len =
+        store_len % max_store_vec_elems * sizeof(dtype);
+    uint32_t tail_offset = store_iter_steps * max_store_vec_len;
+    detail::process_1d_tail<
+        tail_len,
+        (max_store_vec_len >> 1),
+        detail::process_flag::store,
+        L1,
+        L2>(tile, payload, tail_offset);
   }
-  constexpr uint32_t tail_len = store_len % max_store_vec_len;
-  uint32_t tail_offset = store_iter_steps * max_store_vec_len * scale_factor;
-  detail::process_1d_tail<
-      tail_len,
-      (max_store_vec_len >> 1),
-      detail::process_flag::store,
-      L1,
-      L2>(tile, payload, tail_offset);
 }
 
 /// @brief Is the func storing data from register file to unaligned global
@@ -354,10 +348,10 @@ tile_store(
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
   using store_dtype = typename payload_t::mem_dtype;
-  constexpr uint32_t num_channel_y = payload_t::num_channel_y;
-  constexpr uint32_t load_elems = num_channel_y * payload_t::num_channel_x;
-  constexpr uint32_t scale_factor = payload_t::scale_factor;
 
+  constexpr uint32_t num_channel_y = payload_t::num_channel_y;
+  constexpr uint32_t store_elems = num_channel_y * payload_t::num_channel_x;
+  constexpr uint32_t scale_factor = payload_t::scale_factor;
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
        i++) {
@@ -367,13 +361,13 @@ tile_store(
       uint32_t offset_x = j * tile_desc::block_size_x;
       auto reg_sub = tile.reg.xetla_select<tile_desc::block_elems, 1>(
           (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
-      xetla_mask<load_elems> pred_x = oob_check
+      xetla_mask<store_elems> pred_x = oob_check
           ? payload.step_x + payload.base_x + offset_x < payload.width_in_elems
           : 1;
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
            sub_block_y += num_channel_y) {
-        xetla_mask<load_elems> pred_y = oob_check
+        xetla_mask<store_elems> pred_y = oob_check
             ? payload.step_y + payload.base_y + offset_y + sub_block_y <
                 payload.height_in_elems
             : 1;
@@ -386,11 +380,11 @@ tile_store(
             data_size::default_size,
             L1,
             L3,
-            load_elems>(
+            store_elems>(
             payload.base_ptr,
             (payload.base_offset + address_offset + payload.channel_offset),
             reg_sub
-                .xetla_select<load_elems * scale_factor, 1>(
+                .xetla_select<store_elems * scale_factor, 1>(
                     sub_block_y * tile_desc::block_size_x)
                 .xetla_format<store_dtype>(),
             (pred_x && pred_y));
@@ -409,13 +403,13 @@ tile_store(
       uint32_t offset_x = j * tile_desc::block_size_x;
       auto reg_sub = tile.reg.xetla_select<remain_block_elems, 1>(
           processed_elems + j * remain_block_elems);
-      xetla_mask<load_elems> pred_x = oob_check
+      xetla_mask<store_elems> pred_x = oob_check
           ? payload.step_x + payload.base_x + offset_x < payload.width_in_elems
           : 1;
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < remained_size_y;
            sub_block_y += num_channel_y) {
-        xetla_mask<load_elems> pred_y = oob_check
+        xetla_mask<store_elems> pred_y = oob_check
             ? payload.step_y + payload.base_y + offset_y + sub_block_y <
                 payload.height_in_elems
             : 1;
@@ -428,11 +422,11 @@ tile_store(
             data_size::default_size,
             L1,
             L3,
-            load_elems>(
+            store_elems>(
             payload.base_ptr,
             (payload.base_offset + address_offset + payload.channel_offset),
             reg_sub
-                .xetla_select<load_elems * scale_factor, 1>(
+                .xetla_select<store_elems * scale_factor, 1>(
                     sub_block_y * tile_desc::block_size_x)
                 .xetla_format<store_dtype>(),
             (pred_x && pred_y));
@@ -440,7 +434,6 @@ tile_store(
     }
   }
 }
-
 /// @brief Is the func storing data from register file to unaligned global
 /// memory surface. store a rectangular region (X,Y)..(X+W,Y+H) into memory from
 /// registers.
@@ -462,14 +455,15 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_store_type<tile_t, payload_t>::is_global_block_2d &&
-    payload_t::arch_tag <= gpu_arch::XeHpg>
+    detail::check_store_type<tile_t, payload_t>::is_lsc_scatter &&
+    !arch_has_2d_load_store<payload_t::arch_tag>>
 tile_store(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
   using store_dtype = typename payload_t::mem_dtype;
 
   constexpr uint32_t num_channel = payload_t::num_channel;
-  constexpr uint32_t load_elems = num_channel * payload_t::simd_exec_size;
+  constexpr uint32_t store_elems = num_channel * payload_t::simd_exec_size;
   constexpr uint32_t pack_factor = payload_t::pack_factor;
 
 #pragma unroll
@@ -487,12 +481,12 @@ tile_store(tile_t& tile, payload_t& payload) {
         uint32_t address_offset = offset_x * sizeof(dtype) +
             (offset_y + sub_block_y) * payload.pitch_in_bytes;
 
-        xetla_vector<store_dtype, load_elems> reg_tmp;
+        xetla_vector<store_dtype, store_elems> reg_tmp;
 
         if constexpr (payload_t::simd_exec_size > 1) {
-          xetla_vector<store_dtype, load_elems> reg_sub_before_trans =
+          xetla_vector<store_dtype, store_elems> reg_sub_before_trans =
               reg_sub
-                  .xetla_select<load_elems * pack_factor, 1>(
+                  .xetla_select<store_elems * pack_factor, 1>(
                       sub_block_y * tile_desc::block_size_x)
                   .xetla_format<store_dtype>();
 #pragma unroll
@@ -505,7 +499,7 @@ tile_store(tile_t& tile, payload_t& payload) {
           }
         } else {
           reg_tmp = reg_sub
-                        .xetla_select<load_elems * pack_factor, 1>(
+                        .xetla_select<store_elems * pack_factor, 1>(
                             sub_block_y * tile_desc::block_size_x)
                         .xetla_format<store_dtype>();
         }
@@ -519,7 +513,6 @@ tile_store(tile_t& tile, payload_t& payload) {
 
           xetla_mask<num_channel> pred_y =
               channel_index < payload.height_in_elems;
-
           xetla_store_global<
               store_dtype,
               payload_t::simd_exec_size,
@@ -546,6 +539,61 @@ tile_store(tile_t& tile, payload_t& payload) {
         } else {
           break;
         }
+      }
+    }
+  }
+}
+
+/// @brief Is the func storing data from register file to unaligned global
+/// memory surface. store a rectangular region (X,Y)..(X+W,Y+H) into memory from
+/// registers.
+/// @tparam tile_t Is the tile_t struct contains registers
+/// These registers will be the source of store operation.
+/// @tparam payload_t Is the mem_payload_t struct describing the memory info
+/// payload indicates the destination of store operation.
+/// @tparam L1 Is the cache hint for L1 cache.
+/// @tparam L3 Is the cache hint for L3 cache.
+/// @param tile Is the tile object with type tile_t, contains the data to be
+/// stored.
+/// @param payload Is the payload object with type payload_t. Contains all the
+/// information for stores.
+/// @return No return, update in place.
+template <
+    cache_hint L1 = cache_hint::write_back,
+    cache_hint L2 = cache_hint::write_back,
+    typename tile_t,
+    typename payload_t>
+__XETLA_API typename std::enable_if_t<
+    detail::check_store_type<tile_t, payload_t>::is_global_block_2d &&
+    !detail::check_store_type<tile_t, payload_t>::is_lsc_scatter &&
+    !arch_has_2d_load_store<payload_t::arch_tag>>
+tile_store(tile_t& tile, payload_t& payload) {
+  using dtype = typename payload_t::dtype;
+  using tile_desc = typename payload_t::tile_desc;
+  constexpr uint32_t store_elems = tile_desc::block_size_x;
+
+#pragma unroll
+  for (uint32_t i = 0; i < tile_desc::num_block_y; i++) {
+    uint32_t offset_y = i * tile_desc::block_size_y;
+#pragma unroll
+    for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
+      uint32_t offset_x = j * tile_desc::block_size_x;
+      auto reg_sub = tile.reg.xetla_select<tile_desc::block_elems, 1>(
+          (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
+#pragma unroll
+      for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
+           sub_block_y += 1) {
+        uint32_t address_offset = offset_x * sizeof(dtype) +
+            (offset_y + sub_block_y) * payload.pitch_in_bytes;
+
+        xetla_vector<dtype, store_elems> reg_tmp;
+        reg_tmp = reg_sub.xetla_select<store_elems, 1>(
+            sub_block_y * tile_desc::block_size_x);
+
+        xetla_store_global<dtype, store_elems, L1, L2>(
+            (dtype*)payload.base_ptr,
+            (payload.base_offset + address_offset),
+            reg_tmp);
       }
     }
   }
@@ -615,14 +663,15 @@ tile_store(
             : 1;
         uint64_t address_offset = offset_x * sizeof(dtype) +
             (sub_block_y + offset_y) * payload.pitch_in_bytes;
-        if constexpr (payload_t::arch_tag >= gpu_arch::XeHpc) {
+        if constexpr (arch_has_2d_load_store<payload_t::arch_tag>) {
           xetla_tatomic_store_global<
               dtype,
               payload_t::num_channel,
               L1,
               L2,
               op_kind,
-              payload_t::arch_tag>(
+              payload_t::arch_tag,
+              typename payload_t::Toffset>(
               payload.base_pointer + address_offset,
               payload.channel_offset,
               reg_sub.xetla_select<payload_t::store_elems, 1>(
@@ -676,7 +725,8 @@ tile_store(
             L1,
             L2,
             op_kind,
-            payload_t::arch_tag>(
+            payload_t::arch_tag,
+            typename payload_t::Toffset>(
             (uint64_t)payload.base_pointer + address_offset,
             payload.channel_offset,
             reg_sub.xetla_select<payload_t::store_elems, 1>(
@@ -792,7 +842,6 @@ tile_store(tile_t& tile, payload_t& payload) {
 
   constexpr uint32_t vnni_scale_factor = payload_t::vnni_scale_factor;
   constexpr uint32_t num_vector_size = payload_t::num_vector_size;
-  constexpr uint32_t num_channel_y = payload_t::num_channel_y;
   constexpr uint32_t store_elems = payload_t::store_elems;
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
@@ -805,11 +854,12 @@ tile_store(tile_t& tile, payload_t& payload) {
           (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
-           sub_block_y += num_channel_y * num_vector_size * vnni_scale_factor) {
-        uint32_t address_offset = offset_x * payload.pitch_in_bytes +
+           sub_block_y += num_vector_size * vnni_scale_factor) {
+        uint32_t address_offset = payload.base_address +
+            offset_x * payload.pitch_in_bytes +
             (sub_block_y + offset_y) * sizeof(dtype);
         xetla_store_local<store_dtype, num_vector_size>(
-            payload.address + address_offset,
+            payload.channel_address + address_offset,
             reg_sub
                 .xetla_select<store_elems, 1>(
                     sub_block_y * tile_desc::block_size_x)
@@ -831,11 +881,12 @@ tile_store(tile_t& tile, payload_t& payload) {
           processed_elems + j * remain_block_elems);
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < remained_size_y;
-           sub_block_y += num_channel_y * num_vector_size * vnni_scale_factor) {
-        uint32_t address_offset = offset_x * payload.pitch_in_bytes +
+           sub_block_y += num_vector_size * vnni_scale_factor) {
+        uint32_t address_offset = payload.base_address +
+            offset_x * payload.pitch_in_bytes +
             (sub_block_y + offset_y) * sizeof(dtype);
         xetla_store_local<store_dtype, num_vector_size>(
-            payload.address + address_offset,
+            payload.channel_address + address_offset,
             reg_sub
                 .xetla_select<store_elems, 1>(
                     sub_block_y * tile_desc::block_size_x)
@@ -892,7 +943,8 @@ tile_store(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t row_i = 0; row_i < tile_desc::block_size_y; row_i++) {
         xetla_store_local<store_dtype, vector_size>(
-            payload.address + address_offset + row_i * payload.pitch_in_bytes,
+            payload.base_address + payload.address + address_offset +
+                row_i * payload.pitch_in_bytes,
             reg_sub_2d.row(row_i).xetla_format<store_dtype>());
       }
     }
@@ -917,7 +969,8 @@ tile_store(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t row_i = 0; row_i < remained_size_y; row_i++) {
         xetla_store_local<store_dtype, vector_size>(
-            payload.address + address_offset + row_i * payload.pitch_in_bytes,
+            payload.base_address + payload.address + address_offset +
+                row_i * payload.pitch_in_bytes,
             reg_sub_2d.row(row_i).xetla_format<store_dtype>());
       }
     }
@@ -947,36 +1000,36 @@ __XETLA_API typename std::enable_if_t<
     tile_t::tile_size_y == 1 && tile_t::block_size_y == 1>
 tile_store(tile_t& tile, payload_t& payload) {
   using dtype = typename tile_t::dtype;
-  using tile_desc = typename payload_t::tile_desc;
-  using store_dtype = typename payload_t::mem_dtype;
-
-  constexpr uint32_t scale_factor = payload_t::scale_factor;
-  static constexpr uint32_t store_len = tile_desc::tile_size_x / scale_factor;
-
+  static constexpr uint32_t store_len = tile_t::tile_elems;
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
+
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
   static constexpr uint32_t max_store_vec_len =
       load_store_attr::max_store_vec_len;
+  static constexpr uint32_t max_store_vec_elems =
+      max_store_vec_len / sizeof(dtype);
 
-  static constexpr uint32_t store_iter_steps = store_len / max_store_vec_len;
+  static constexpr uint32_t store_iter_steps = store_len / max_store_vec_elems;
 
-  if constexpr (store_len >= max_store_vec_len) {
+  if constexpr (store_len >= max_store_vec_elems) {
 #pragma unroll
-    for (uint32_t j = 0; j < store_iter_steps; j++) {
-      uint32_t offset_x = j * max_store_vec_len * scale_factor;
-      auto reg_sub = tile.reg.xetla_select<64 * scale_factor, 1>(offset_x);
+    for (uint32_t i = 0; i < store_iter_steps; i++) {
+      uint32_t offset_x = i * max_store_vec_elems;
+      auto reg_sub = tile.reg.xetla_select<max_store_vec_elems, 1>(offset_x);
       uint32_t address_offset = offset_x * sizeof(dtype);
-      xetla_store_local<store_dtype, max_store_vec_len>(
-          payload.address + address_offset,
-          reg_sub.xetla_format<store_dtype>());
+      xetla_store_local<dtype, max_store_vec_elems>(
+          payload.base_address + payload.address + address_offset,
+          reg_sub.xetla_format<dtype>());
     }
   }
+  constexpr uint32_t tail_len = store_len % max_store_vec_elems * sizeof(dtype);
+  uint32_t tail_offset = store_iter_steps * max_store_vec_len;
   detail::process_1d_tail<
-      store_len % max_store_vec_len,
+      tail_len,
       (max_store_vec_len >> 1),
       detail::process_flag::store,
       L1,
-      L2>(tile, payload, store_iter_steps * max_store_vec_len * scale_factor);
+      L2>(tile, payload, tail_offset);
 }
 
 } // namespace gpu::xetla::subgroup

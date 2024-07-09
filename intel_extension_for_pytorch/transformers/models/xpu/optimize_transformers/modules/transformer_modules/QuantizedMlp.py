@@ -50,12 +50,13 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
             0, 1
         ).contiguous()
 
-        self.fc_in_quant.qzeros.data = self.fc_in_quant.qzeros.transpose(
-            0, 1
-        ).contiguous()
-        self.fc_out_quant.qzeros.data = self.fc_out_quant.qzeros.transpose(
-            0, 1
-        ).contiguous()
+        if self.fc_in_quant.qzeros:
+            self.fc_in_quant.qzeros.data = self.fc_in_quant.qzeros.transpose(
+                0, 1
+            ).contiguous()
+            self.fc_out_quant.qzeros.data = self.fc_out_quant.qzeros.transpose(
+                0, 1
+            ).contiguous()
 
         torch.xpu.synchronize()
 
@@ -189,9 +190,10 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4Sil
         self.c_proj_quant.scales.data = self.c_proj_quant.scales.transpose(
             0, 1
         ).contiguous()
-        self.c_proj_quant.qzeros.data = self.c_proj_quant.qzeros.transpose(
-            0, 1
-        ).contiguous()
+        if self.c_proj_quant.qzeros:
+            self.c_proj_quant.qzeros.data = self.c_proj_quant.qzeros.transpose(
+                0, 1
+            ).contiguous()
         torch.xpu.synchronize()
 
     def inter_mm(self, hidden_states):

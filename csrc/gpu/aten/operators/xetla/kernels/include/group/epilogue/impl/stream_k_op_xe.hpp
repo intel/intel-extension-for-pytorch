@@ -33,9 +33,10 @@ template <
     typename tile_shape_,
     typename epilogue_t_,
     typename mem_desc_d_t_,
-    typename mem_desc_atomic_sync_t_>
+    typename mem_desc_atomic_sync_t_,
+    gpu_arch arch_tag_ = gpu_arch::XeHpc>
 struct epilogue_stream_k_t {
-  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
+  static constexpr gpu_arch arch_tag = arch_tag_;
   using epilogue_t = epilogue_t_;
   using mem_desc_d_t = mem_desc_d_t_;
   using mem_desc_c_t = typename epilogue_t::mem_desc_c_t;
@@ -65,8 +66,8 @@ struct epilogue_stream_k_t {
 
   // Use special residual op for finishing SK groups to read from scratchspace
   // buffer and reduce in GRF; They also store zeros in scratchspace buffer
-  using residual_op_t =
-      subgroup::elemwise_reduce_op_stream_k_t<reduce_op::sum, dtype_d>;
+  using residual_op_t = subgroup::
+      elemwise_reduce_op_stream_k_t<reduce_op::sum, dtype_d, arch_tag>;
   using residual_op_args_t = typename residual_op_t::arguments_t;
 
   static constexpr mem_layout mem_layout_d = mem_desc_d_t::layout;
@@ -171,8 +172,8 @@ struct epilogue_stream_k_t {
             16,
             cache_hint::uncached,
             cache_hint::write_back,
-            atomic_op::iadd>(
-            (uint64_t)flag_pointer, flag_offsets, signal_val, pred);
+            atomic_op::iadd,
+            arch_tag>((uint64_t)flag_pointer, flag_offsets, signal_val, pred);
       }
 
     } else {
