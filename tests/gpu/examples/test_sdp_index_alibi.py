@@ -32,7 +32,10 @@ head_mask = None
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="ipex build without xetla")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="ipex build without xetla"
+    )
     def test_fsdp_index_alibi(self, dtype=torch.float16):
         q = torch.randn([b, f, n, h], dtype=dtype, device=torch.device("xpu"))
         k_in_proj = torch.randn(

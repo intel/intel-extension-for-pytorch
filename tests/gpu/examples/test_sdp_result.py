@@ -7,7 +7,10 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="ipex build without xetla")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="ipex build without xetla"
+    )
     def test_sdp_result(self, dtype=torch.float16):
         torch.manual_seed(42)
 

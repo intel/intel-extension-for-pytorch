@@ -5,7 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from ._transformer_configuration import IPEXDiffusersTransformerConfig
-from .transformer_modules.Decoderblock import IPEXTransformerBlock
+from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.DiffusersAttention import DiffusersAttention
 from .transformer_modules.lora import LoRACompatibleLinear
 

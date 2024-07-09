@@ -6,7 +6,7 @@ from .QuantizedAttention import IPEXTransformerAttnOptimizedInt4
 
 from .Linear import IPEXTransformerLinear
 
-from .model_utils import xpu_1st_token_sdpa_support_gqa, xpu_next_token_sdpa_support_gqa
+from .model_utils import xpu_sdpa_support
 
 
 class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
@@ -368,7 +368,7 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
     def sdp_kv_preprocess_1st_token_beam_search(self, key, value):
         if self.num_kv_group <= 1:
             return super().sdp_kv_preprocess_1st_token_beam_search(key, value)
-        if xpu_1st_token_sdpa_support_gqa():
+        if xpu_sdpa_support(self.is_beam_search(), self.head_dim):
             return key, value, key, value
         else:
             key = self.repeat_kv(key, self.num_kv_group)
@@ -379,7 +379,7 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
     def sdp_kv_preprocess_2nd2last(self, key, value):
         if self.num_kv_group <= 1:
             return super().sdp_kv_preprocess_2nd2last(key, value)
-        if xpu_next_token_sdpa_support_gqa(self.is_beam_search()):
+        if xpu_sdpa_support(self.is_beam_search(), self.head_dim):
             return (
                 key,
                 value,

@@ -13,7 +13,10 @@ attn_head_size = 64
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_sdp_backward_dropout_no_dropout(self, dtype=torch.bfloat16):
         query_states = torch.randn((b, n, n_heads, attn_head_size))
         key_states = torch.randn((b, n, n_heads, attn_head_size))
@@ -65,7 +68,10 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(bias.grad, bias_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-1)
 
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_sdp_backward_dropout(self, dtype=torch.bfloat16):
         query_states = torch.randn((b, n, n_heads, attn_head_size))
         key_states = torch.randn((b, n, n_heads, attn_head_size))

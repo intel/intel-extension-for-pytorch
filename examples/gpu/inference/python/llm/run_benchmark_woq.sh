@@ -68,14 +68,26 @@ Run_benchmark_llama2-70b_int4() {
     mv trace.json ${dir}
 }
 
-main() {
+## Phi3-mini
+Run_benchmark_Phi3-mini() {
+    model=microsoft/Phi-3-mini-4k-instruct
+    sub_model_name=phi3-mini
+    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
 
-    export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
+main() {
 
     Run_benchmark_qwen-7b_int4
     Run_benchmark_gpt-j-6b_int4
     Run_benchmark_llama2-7b_int4
     Run_benchmark_llama2-70b_int4
+    Run_benchmark_Phi3-mini
 }
 
 main

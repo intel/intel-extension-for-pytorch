@@ -30,6 +30,7 @@ MODEL_CLASSES = {
     "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm3": (AutoModelForCausalLM, AutoTokenizer),
+    "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

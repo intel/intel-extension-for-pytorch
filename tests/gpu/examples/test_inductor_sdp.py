@@ -27,7 +27,10 @@ h = 256
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="ipex build without xetla")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="ipex build without xetla"
+    )
     def test_llama_sdp_fusion(self, dtype=torch.float16):
         query_states = torch.randn(
             (b, q, n, h), device=torch.device("xpu"), dtype=dtype, requires_grad=False

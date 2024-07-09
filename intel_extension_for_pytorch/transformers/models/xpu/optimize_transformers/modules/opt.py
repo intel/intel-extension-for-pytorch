@@ -19,9 +19,8 @@ from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
 from .transformer_modules.CrossedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Crossed,
 )  # noqa
-from .transformer_modules.Decoderblock import IPEXTransformerBlock
+from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
-import sys
 
 
 class NewIPEXOPTBlock(IPEXTransformerBlock):
@@ -41,8 +40,8 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        self.attn = self.build_attention_from_config()
-        self.mlp = self.build_mlp_from_config()
+        self.attn = self.build_attention_from_config("crossed")
+        self.mlp = self.build_mlp_from_config("Opt")
         self.do_layer_norm_before = self.ipex_config.do_norm_before
         self.self_attn_layer_norm = nn.LayerNorm(
             self.ipex_config.embedding_dim,
@@ -54,29 +53,6 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
         )
         self.dropout_p = self.ipex_config.residual_pdrop
         self.port_all_parameters_to_new_module()
-
-    def build_attention_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        attn_type = IPEXTransformerAttn
-        attn_type_str = "IPEXTransformerAttn"
-        for elem in [impl.name, dtype, "crossed"]:
-            attn_type_str = attn_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], attn_type_str):
-                attn_type = getattr(sys.modules[__name__], attn_type_str)
-        return attn_type(self.ipex_config)
-
-    def build_mlp_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        activation = self.ipex_config.ipex_act
-        mlp_type = IPEXTransformerMLP
-        mlp_type_str = "IPEXTransformerMLP"
-        for elem in [impl.name, dtype, activation.name, "Opt"]:
-            mlp_type_str = mlp_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], mlp_type_str):
-                mlp_type = getattr(sys.modules[__name__], mlp_type_str)
-        return mlp_type(self.ipex_config)
 
     def build_ipex_transformer_config(
         self, config, device, dtype, impl_mode, tp_size, tp_group

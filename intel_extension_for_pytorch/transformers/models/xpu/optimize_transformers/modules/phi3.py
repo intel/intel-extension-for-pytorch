@@ -1,55 +1,66 @@
 import torch
-from typing import Optional, Tuple
-from .transformer_modules.RoPE import LlamaRotaryEmbedding
+import torch.nn as nn
+from typing import Optional, Tuple, Union
+from functools import partial
+
+from .transformer_modules.RoPE import Phi3RotaryEmbedding
 from .transformer_modules.Norm import LlamaRMSNorm
 
+Phi3RMSNorm = LlamaRMSNorm
 
-from ._transformers import MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
-from .transformer_modules.BaseAttention import IPEXTransformerAttn
-from .transformer_modules.Attention import (  # noqa F401
-    IPEXTransformerAttnOptimizedFp16Baichuan,
-)
-from .transformer_modules.Mlp import (  # noqa F401
-    IPEXTransformerBaseMLP,
-    IPEXTransformerMLPOptimizedFp16,
-)
-from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
+from ._transformers import MAX_OUT_SEQ_LEN
 from .transformer_modules.QuantizedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16,
     IPEXTransformerAttnOptimizedInt4,
 )  # noqa
 from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
-from .transformer_modules.GroupedAttention import (  # noqa F401
-    IPEXTransformerAttnOptimizedFp16Grouped,
-)
-from .transformer_modules.DecoderBlock import IPEXTransformerBlock
+from .transformer_modules.BaseAttention import IPEXTransformerAttn
 from .transformer_modules.Mlp import *  # noqa
+from .transformer_modules.QuantizedMlp import *  # noqa
+from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
+from .transformer_modules.DecoderBlock import IPEXTransformerBlock
+from .transformer_modules.model_utils import (
+    qwen_load_attn_params_fp16,
+    qwen_transpose_attn_params_fp16,
+    qwen_load_attn_params_int4,
+    qwen_transpose_attn_params_int4,
+)
 
 
-class NewIPEXBaichuanBlock(IPEXTransformerBlock):
+class NewIPEXPhi3DecoderLayer(IPEXTransformerBlock):
     def __init__(
         self,
         module,
         config,
+        layer_idx,
         dtype="fp16",
         device="xpu",
         module_name="",
         impl_mode=None,
         tp_size=1,
         tp_group=None,
-        **kwargs,
     ):
         super().__init__(module, config, dtype, device, module_name)
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        self.attn = self.build_attention_from_config("Baichuan")
-        self.mlp = self.build_mlp_from_config("Baichuan")
-        self.input_layernorm = LlamaRMSNorm(
-            self.ipex_config.embedding_dim, self.ipex_config.norm_eps
+        self.layer_idx = layer_idx
+        grouped = False
+        if self.ipex_config.num_attention_head > self.ipex_config.num_key_value_head:
+            grouped = True
+        self.attn = self.build_attention_from_config(grouped=grouped)
+        # self.attn.post_qkv = partial(phi3_post_qkv, self.attn)
+        self.attn.position_embed = self.ipex_config.rotary_embedding_class(
+            self.ipex_config, torch.float16
         )
-        self.post_attn_layernorm = LlamaRMSNorm(
-            self.ipex_config.embedding_dim, self.ipex_config.norm_eps
+        self.mlp = self.build_mlp_from_config("phi3")
+        self.resid_attn_dropout = nn.Dropout(self.ipex_config.resid_pdrop)
+        self.resid_mlp_dropout = nn.Dropout(self.ipex_config.resid_pdrop)
+        self.input_layernorm = Phi3RMSNorm(
+            self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps
+        )
+        self.post_attention_layernorm = Phi3RMSNorm(
+            self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps
         )
         self.port_all_parameters_to_new_module()
 
@@ -78,35 +89,18 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
             embedding_dim=self.config.hidden_size,
             intermediate_dim=self.config.intermediate_size,
             num_attention_head=self.config.num_attention_heads,
-            # transformers==4.31.0
-            num_key_value_head=self.config.num_attention_heads,
-            max_positions=max(
-                (
-                    self.config.max_position_embeddings
-                    if hasattr(self.config, "max_position_embeddings")
-                    else self.config.model_max_length
-                ),
-                MAX_SEQ_LEN,
-            ),
+            num_key_value_head=self.config.num_key_value_heads,
+            max_positions=self.config.max_position_embeddings,
             max_out_positions=MAX_OUT_SEQ_LEN,
-            rotary_embedding_class=LlamaRotaryEmbedding,
-            rotary_dim=None,
-            rotary_half=True,
-            rotate_every_two=False,
+            rotary_embedding_class=Phi3RotaryEmbedding,
+            # rotary_dim=self.config.rotary_dim,
             use_casual_mask=False,
-            activation_function=self.config.hidden_act,
+            activation_function=activation_function,
             ipex_act=ipex_activation,
             norm_eps=self.config.rms_norm_eps,
-            residual_dropout=None,
-            attn_dropout=None,
-            enable_bias=False,
-            residual_pdrop=None,
+            resid_pdrop=self.config.resid_pdrop,
+            attn_dropout=self.config.attention_dropout,
             scale_attention=True,
-            is_decoder=False,
-            do_norm_before=None,
-            ln_elementwise_affine=None,
-            positional_embedding_base=10000,
-            device=self.device,
             dtype=dtype,
             impl=impl_mode,
             tp_size=tp_size,
@@ -114,45 +108,63 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
         )
 
     def port_attn_parameter(self):
-        # IPEXTransformerAttnOptimizedFp16Baichuan
         self.attn.load_parameter(
-            self.module.self_attn.W_pack,
-            self.module.self_attn.o_proj,
+            self.module.self_attn.qkv_proj, self.module.self_attn.o_proj
         )
 
     def port_mlp_parameter(self):
-        # IPEXTransformerMLPOptimizedFp16SiluBaichuan
-        self.mlp.load_parameter(
-            self.module.mlp.gate_proj,
-            self.module.mlp.down_proj,
-            self.module.mlp.up_proj,
-        )
+        self.mlp.load_parameter(self.module.mlp.gate_up_proj, self.module.mlp.down_proj)
 
     def port_norm_parameter(self):
         self.input_layernorm.weight = self.module.input_layernorm.weight
-        self.post_attn_layernorm.weight = self.module.post_attention_layernorm.weight
+        # self.input_layernorm.bias = self.module.input_layernorm.bias
+        self.post_attention_layernorm.weight = (
+            self.module.post_attention_layernorm.weight
+        )
+        # self.post_attention_layernorm.bias = self.module.post_attention_layernorm.bias
+
+    def port_dropout_parameter(self):
+        self.resid_attn_dropout.p = self.module.resid_attn_dropout.p
+        self.resid_attn_dropout.inplace = self.module.resid_attn_dropout.inplace
+        self.resid_mlp_dropout.p = self.module.resid_mlp_dropout.p
+        self.resid_mlp_dropout.inplace = self.module.resid_mlp_dropout.inplace
 
     def transpose_parameter(self):
         self.attn.transpose_parameter()
         self.mlp.transpose_parameter()
 
     def port_all_parameters_to_new_module(self):
+        dtype = self.ipex_config.dtype
+        if dtype == "fp16":
+            self.attn.load_parameter = partial(qwen_load_attn_params_fp16, self.attn)
+            self.attn.transpose_parameter = partial(
+                qwen_transpose_attn_params_fp16, self.attn
+            )
+        elif dtype == "int4":
+            self.attn.load_parameter = partial(qwen_load_attn_params_int4, self.attn)
+            self.attn.transpose_parameter = partial(
+                qwen_transpose_attn_params_int4, self.attn
+            )
         super().port_all_parameters_to_new_module()
+        self.port_dropout_parameter()
         if self.ipex_config.transpose:
             self.transpose_parameter()
-        self.attn.cat_qkv()
+        # self.attn.cat_qkv()
 
     def forward(
         self,
-        hidden_states: torch.Tensor,
+        hidden_states: Optional[torch.Tensor],
+        past_key_value: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Tuple[torch.Tensor]] = None,
-        output_attentions: Optional[bool] = False,
+        head_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = False,
-    ) -> Tuple[
-        torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]
+        output_attentions: Optional[bool] = False,
+    ) -> Union[
+        Tuple[torch.Tensor],
+        Optional[Tuple[torch.Tensor, Tuple[torch.FloatTensor, ...]]],
     ]:
+        # print("hidden_states.shape: ", hidden_states.shape)
         # hidden_states:  [bs*beam, seq, hidden_size]
         # position_ids:   [bs*beam, seq]
         # attention_mask: [bs*beam, head, q_seq, kv_seq]
@@ -167,10 +179,9 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
         else:
             print("Unsupported input shape")
             return
-
         IPEXTransformerAttn.beam_size = beam
-        first_token = True if past_key_value is None else False
-
+        IPEXTransformerMLP.beam_size = beam
+        first_token = True if seq > 1 else False
         hidden_size = hidden_states.shape[-1]
         hidden_shape = [bs, beam, seq, hidden_size]
         if first_token and beam > 1:
@@ -205,25 +216,44 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
+        if self.layer_idx < len(past_key_value):
+            layer_past = (
+                past_key_value.key_cache[self.layer_idx],
+                past_key_value.value_cache[self.layer_idx],
+            )
+        else:
+            layer_past = None
+
         hidden_states, present_key_value, self_attn_weights = self.attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
-            layer_past=past_key_value,
+            layer_past=layer_past,
             output_attentions=output_attentions,
             use_cache=use_cache,
-            residual=residual,
-            first_token=first_token,
         )
+        if self.layer_idx >= len(past_key_value.key_cache):
+            past_key_value.update(
+                present_key_value[0], present_key_value[1], self.layer_idx
+            )
+        else:
+            past_key_value.update(
+                present_key_value[0][:, :, -1, :].unsqueeze(-2),
+                present_key_value[1][:, :, -1, :].unsqueeze(-2),
+                self.layer_idx,
+            )
+
+        hidden_states = residual + self.resid_attn_dropout(hidden_states)
 
         residual = hidden_states
-        hidden_states = self.post_attn_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states, residual)
+        hidden_states = self.post_attention_layernorm(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        hidden_states = residual + self.resid_mlp_dropout(hidden_states)
+
         if first_token and beam > 1:
             # for 1st token, expand the result with beam
-            hidden_states = hidden_states.view(bs, 1, seq, hidden_size).expand(
-                [bs, beam, seq, hidden_size]
-            )
+            hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
+            hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
         else:
             # for 2nd to last token, we convert the layout back
             # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
@@ -231,7 +261,6 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
         outputs = (hidden_states,)
         if output_attentions:
             outputs += (self_attn_weights,)
-
         if use_cache:
-            outputs += (present_key_value,)
+            outputs += (past_key_value,)
         return outputs

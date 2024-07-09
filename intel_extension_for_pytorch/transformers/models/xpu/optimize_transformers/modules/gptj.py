@@ -13,8 +13,7 @@ from .transformer_modules.BaseAttention import IPEXTransformerAttn
 from .transformer_modules.Mlp import *  # noqa
 from .transformer_modules.QuantizedMlp import *  # noqa
 from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
-from .transformer_modules.Decoderblock import IPEXTransformerBlock
-import sys
+from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 import os
 
 enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in [
@@ -44,35 +43,12 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
             config, device, dtype, impl_mode, tp_size, tp_group
         )
         self.attn = self.build_attention_from_config()
-        self.mlp = self.build_mlp_from_config()
+        self.mlp = self.build_mlp_from_config("gptj")
         self.ln = nn.LayerNorm(
             self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps
         )
         self.port_all_parameters_to_new_module()
         # self.mlp = IPEXGPTJMLP(config)
-
-    def build_attention_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        attn_type = IPEXTransformerAttn
-        attn_type_str = "IPEXTransformerAttn"
-        for elem in [impl.name, dtype]:
-            attn_type_str = attn_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], attn_type_str):
-                attn_type = getattr(sys.modules[__name__], attn_type_str)
-        return attn_type(self.ipex_config)
-
-    def build_mlp_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        activation = self.ipex_config.ipex_act
-        mlp_type = IPEXTransformerMLP
-        mlp_type_str = "IPEXTransformerMLP"
-        for elem in [impl.name, dtype, activation.name, "gptj"]:
-            mlp_type_str = mlp_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], mlp_type_str):
-                mlp_type = getattr(sys.modules[__name__], mlp_type_str)
-        return mlp_type(self.ipex_config)
 
     def build_ipex_transformer_config(
         self, config, device, dtype, impl_mode, tp_size, tp_group

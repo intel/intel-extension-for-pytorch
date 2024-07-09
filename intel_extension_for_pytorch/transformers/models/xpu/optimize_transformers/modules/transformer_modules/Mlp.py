@@ -261,3 +261,18 @@ class IPEXTransformerMLPOptimizedFp16SiluQwen(IPEXTransformerMLPOptimizedFp16Sil
             return torch.ops.torch_ipex.mm_bias_resadd(
                 hidden_states, self.c_proj.weight, self.c_proj.bias, 1.0, residual, 1.0
             )
+
+
+class IPEXTransformerMLPOptimizedFp16SiluPhi3(IPEXTransformerMLP):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def forward(self, hidden_states, residual=None):
+        # fc_in ==> gate_up_proj
+        # fc_out ==> down_proj
+        up_states = self.fc_in(hidden_states)
+
+        gate, up_states = up_states.chunk(2, dim=-1)
+        up_states = up_states * self.act(gate)
+
+        return self.fc_out(up_states)

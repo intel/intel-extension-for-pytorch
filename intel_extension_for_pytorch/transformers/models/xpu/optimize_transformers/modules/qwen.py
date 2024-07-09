@@ -20,7 +20,7 @@ from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
 from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
 )
-from .transformer_modules.Decoderblock import IPEXTransformerBlock
+from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
 from .transformer_modules.QuantizedMlp import *  # noqa
 from .transformer_modules.model_utils import (
@@ -31,7 +31,6 @@ from .transformer_modules.model_utils import (
     qwen_load_attn_params_int4,
     qwen_transpose_attn_params_int4,
 )
-import sys
 
 
 class NewIPEXQWENBlock(IPEXTransformerBlock):
@@ -54,7 +53,7 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
         self.attn = self.build_attention_from_config()
         self.attn.post_qkv = partial(qwen_post_qkv, self.attn)
         self.attn.sdp = partial(qwen_sdp, self.attn)
-        self.mlp = self.build_mlp_from_config()
+        self.mlp = self.build_mlp_from_config("Qwen")
         self.input_layernorm = QWenRMSNorm(
             self.ipex_config.embedding_dim, self.ipex_config.norm_eps
         )
@@ -62,29 +61,6 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
             self.ipex_config.embedding_dim, self.ipex_config.norm_eps
         )
         self.port_all_parameters_to_new_module()
-
-    def build_attention_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        attn_type = IPEXTransformerAttn
-        attn_type_str = "IPEXTransformerAttn"
-        for elem in [impl.name, dtype]:
-            attn_type_str = attn_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], attn_type_str):
-                attn_type = getattr(sys.modules[__name__], attn_type_str)
-        return attn_type(self.ipex_config)
-
-    def build_mlp_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        activation = self.ipex_config.ipex_act
-        mlp_type = IPEXTransformerMLP
-        mlp_type_str = "IPEXTransformerMLP"
-        for elem in [impl.name, dtype, activation.name, "Qwen"]:
-            mlp_type_str = mlp_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], mlp_type_str):
-                mlp_type = getattr(sys.modules[__name__], mlp_type_str)
-        return mlp_type(self.ipex_config)
 
     def build_ipex_transformer_config(
         self, config, device, dtype, impl_mode, tp_size, tp_group

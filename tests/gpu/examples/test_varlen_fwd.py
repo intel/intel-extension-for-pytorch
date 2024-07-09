@@ -137,7 +137,8 @@ def varlen_fwd_reference(
         out.copy_(selected_out.to("xpu"))
 
 
-@pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+# not support on DG2 yet
+@pytest.mark.skipif(not torch.xpu.has_2d_block_array(), reason="fallback is required")
 @pytest.mark.parametrize("head_dim", HEAD_DIM)
 @pytest.mark.parametrize("num_heads", NUM_HEADS)
 @pytest.mark.parametrize("batch_size", BATCH_SIZE)

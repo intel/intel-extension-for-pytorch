@@ -88,10 +88,7 @@ parser.add_argument("--token-latency", action="store_true")
 parser.add_argument("--accuracy-only", action="store_true")
 parser.add_argument(
     "--acc-tasks",
-    nargs="+",
-    default=[
-        "lambada_standard",
-    ],
+    default="lambada_standard",
     type=str,
     help="tasks list for accuracy validation, only enabled lambada_standard and lambada_standard at present",
 )
@@ -293,130 +290,32 @@ if args.num_beams is None:
 ######################## run lm eval accuracy check ########################
 
 def run_accuracy():
-    import lm_eval
     from lm_eval import evaluator
-    from lm_eval.base import BaseLM
-    from typing import Union, List, Optional
-    from transformers import BatchEncoding
+    from lm_eval.models.huggingface import HFLM
+    from lm_eval.utils import make_table
 
-    TokenSequence = Union[List[int], torch.LongTensor, torch.Tensor, BatchEncoding]
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    class HuggingFaceModel(BaseLM):
-        _DEFAULT_MAX_LENGTH = 2048
-
-        def __init__(
-            self,
-            config=None,
-            model=None,
-            tokenizer=None,
-            device="xpu",
-            num_beams=1,
-            batch_size=1,
-            max_length=None,
-            dtype: Optional[Union[str, torch.dtype]] = "auto",
-            tp_number=1,
-        ):
-            super().__init__()
-
-            self._device = device
-            self._batch_size = batch_size
-            self._max_length = max_length
-            self._num_beams = num_beams
-            self._dtype = dtype
-            self._tp_number = tp_number
-
-            self.config = config
-            self.model = model
-            self.base_model = model
-            self.tokenizer = tokenizer
-
-        def _model_call(
-            self, inputs: TokenSequence, labels: Optional[TokenSequence] = None
-        ) -> TokenSequence:
-            with torch.inference_mode():
-                output = self.base_model(inputs)
-
-            if isinstance(output, tuple):
-                return output[0]
-
-            return output["logits"]
-
-        @property
-        def eot_token_id(self):
-            # we use EOT because end of *text* is more accurate for what we're doing than end of *sentence*
-            return self.tokenizer.eos_token_id
-
-        @property
-        def max_length(self):
-            if self._max_length:  # if max length manually set, return it
-                return self._max_length
-            seqlen_config_attrs = (
-                "n_positions", "max_position_embeddings", "n_ctx")
-            for attr in seqlen_config_attrs:
-                if hasattr(self.config, attr):
-                    return getattr(self.config, attr)
-            if hasattr(self.tokenizer, "model_max_length"):
-                if self.tokenizer.model_max_length == 1000000000000000019884624838656:
-                    return self._DEFAULT_MAX_LENGTH
-                return self.tokenizer.model_max_length
-
-            return self._DEFAULT_MAX_LENGTH
-
-        @property
-        def max_gen_toks(self):
-            return 256
-
-        @property
-        def batch_size(self):
-            # TODO: fix multi-gpu
-            return self._batch_size  # * gpus
-
-        @property
-        def device(self):
-            # TODO: fix multi-gpu
-            return self._device
-
-        def tok_encode(self, string: str):
-            return self.tokenizer.encode(string, add_special_tokens=False)
-
-        def tok_decode(self, tokens):
-            return self.tokenizer.decode(tokens)
-
-        def _model_generate(self, context, max_length, eos_token_id):
-            generation_kwargs = {"do_sample": False, "max_length": max_length, "num_beams": self._num_beams}
-            if eos_token_id is not None:
-                generation_kwargs["eos_token_id"] = eos_token_id
-                generation_kwargs[
-                    "pad_token_id"
-                ] = eos_token_id  # setting eos_token_id as pad token
-            return self.model.generate(context, **generation_kwargs)
-
-    task_dict = lm_eval.tasks.get_task_dict(args.acc_tasks)
-    hfmodel = HuggingFaceModel(
-        config=config,
-        model=model,
+    hfmodel = HFLM(
+        pretrained=model,
         tokenizer=tokenizer,
-        device="xpu",
-        num_beams=args.num_beams,
         batch_size=args.batch_size,
-        dtype=args.dtype,
-        tp_number=world_size,
+        device=args.device,
     )
 
     if args.acc_iter == -1:
-        results = evaluator.evaluate(
-            hfmodel,
-            task_dict,
+        results = evaluator.simple_evaluate(
+            model=hfmodel,
+            tasks=args.acc_tasks,
         )
     else:
-        results = evaluator.evaluate(
-            hfmodel,
-            task_dict,
+        results = evaluator.simple_evaluate(
+            model=hfmodel,
+            tasks=args.acc_tasks,
             limit=args.acc_iter
         )
 
-    print(evaluator.make_table(results))
+    print(make_table(results))
 
 
 if args.accuracy_only:

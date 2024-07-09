@@ -10,7 +10,10 @@ checking_rtol = 1e-3
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_fsdp_base(self, dtype=torch.float16):
         head_dim = 256
         seq_lenth = 1
@@ -31,7 +34,10 @@ class TestTorchMethod(TestCase):
             out_cpu, out_xpu.cpu().float(), atol=checking_atol, rtol=checking_rtol
         )
 
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_fsdp_strided(self, dtype=torch.float16):
         query = torch.permute(
             torch.reshape(torch.rand(1, 1, 4096), (1, 1, 16, 256)), (0, 2, 1, 3)
@@ -54,7 +60,10 @@ class TestTorchMethod(TestCase):
             out_cpu, out_xpu.cpu().float(), atol=checking_atol, rtol=checking_rtol
         )
 
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_fsdp_causal(self, dtype=torch.float16):
         head_dim = 256
         seq_lenth = 1
@@ -75,7 +84,10 @@ class TestTorchMethod(TestCase):
             out_cpu, out_xpu.cpu().float(), atol=checking_atol, rtol=checking_rtol
         )
 
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_fsdp_causal_stride(self, dtype=torch.float16):
         query = torch.permute(
             torch.reshape(torch.rand(1, 1, 4096), (1, 1, 16, 256)), (0, 2, 1, 3)

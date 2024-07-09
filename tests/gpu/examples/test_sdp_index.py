@@ -59,7 +59,10 @@ print(alpha)
 
 class TestTorchMethod(TestCase):
     # Layout: SequenceLast
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="ipex build without xetla")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="ipex build without xetla"
+    )
     def test_fsdp_index_select(self, dtype=torch.float16):
         q = torch.randn([f, b, n, h], dtype=dtype, device=torch.device("xpu"))
         k_in_proj = torch.randn(

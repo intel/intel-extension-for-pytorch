@@ -57,7 +57,10 @@ class TestTorchMethod(TestCase):
             value_states.grad, value_states_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-2
         )
 
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_sdp_backward_with_bias(self, dtype=torch.bfloat16):
         query_states = torch.randn((b, n, seq_len, head_size))
         key_states = torch.randn((b, n, seq_len, head_size))
@@ -101,7 +104,10 @@ class TestTorchMethod(TestCase):
         )
         self.assertEqual(bias.grad, bias_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-1)
 
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_sdp_backward_with_bias_no_grad(self, dtype=torch.bfloat16):
         query_states = torch.randn((b, n, seq_len, head_size))
         key_states = torch.randn((b, n, seq_len, head_size))
@@ -144,7 +150,10 @@ class TestTorchMethod(TestCase):
             value_states.grad, value_states_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-2
         )
 
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_sdp_backward_with_bias_512(self, dtype=torch.bfloat16):
         head_size = 512
         query_states = torch.randn((b, n, seq_len, head_size))
@@ -182,7 +191,10 @@ class TestTorchMethod(TestCase):
 
         # grad has a bit of elements mismatch (less than 1%), so we don't check here
 
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="fallback is required"
+    )
     def test_sdp_backward_causal(self, dtype=torch.bfloat16):
         query_states = torch.randn((b, n, seq_len, head_size))
         key_states = torch.randn((b, n, seq_len, head_size))

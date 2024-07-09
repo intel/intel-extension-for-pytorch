@@ -42,6 +42,7 @@ class IPEXTransformerConfig:
     attn_dropout: bool = False
     enable_bias: bool = False
     residual_pdrop: bool = False
+    resid_pdrop: float = 0.0
     scale_attention: bool = False
     is_decoder: bool = False
     do_norm_before: bool = False
@@ -55,6 +56,7 @@ class IPEXTransformerConfig:
     tp_group: object = None
     transpose: bool = True
     dynamic_cache_stride: int = 16
+    sliding_window: int = 2047
 
 
 @dataclass

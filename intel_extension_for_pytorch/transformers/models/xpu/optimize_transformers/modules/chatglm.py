@@ -26,9 +26,8 @@ from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
     IPEXTransformerAttnOptimizedFp16GroupedChatGLM,
 )
-from .transformer_modules.Decoderblock import IPEXTransformerBlock
+from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
-import sys
 
 
 # return repeat_interleave of cache compared to original
@@ -134,8 +133,11 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        self.attn = self.build_attention_from_config()
-        self.mlp = self.build_mlp_from_config()
+        grouped = False
+        if self.ipex_config.multi_query_attention:
+            grouped = True
+        self.attn = self.build_attention_from_config("ChatGLM", grouped=grouped)
+        self.mlp = self.build_mlp_from_config("ChatGLM")
 
         self.input_layernorm = LlamaRMSNorm(
             config.hidden_size,
@@ -147,34 +149,6 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         )
 
         self.port_all_parameters_to_new_module()
-
-    def build_attention_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        attn_type = IPEXTransformerAttn
-        attn_type_str = "IPEXTransformerAttn"
-        attn_list = [impl.name, dtype]
-        if self.ipex_config.multi_query_attention:
-            attn_list.append("Grouped")
-        attn_list.append("ChatGLM")
-
-        for elem in attn_list:
-            attn_type_str = attn_type_str + elem.capitalize()[0] + elem[1:]
-            if hasattr(sys.modules[__name__], attn_type_str):
-                attn_type = getattr(sys.modules[__name__], attn_type_str)
-        return attn_type(self.ipex_config)
-
-    def build_mlp_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        activation = self.ipex_config.ipex_act
-        mlp_type = IPEXTransformerMLP
-        mlp_type_str = "IPEXTransformerMLP"
-        for elem in [impl.name, dtype, activation.name, "ChatGLM"]:
-            mlp_type_str = mlp_type_str + elem.capitalize()[0] + elem[1:]
-            if hasattr(sys.modules[__name__], mlp_type_str):
-                mlp_type = getattr(sys.modules[__name__], mlp_type_str)
-        return mlp_type(self.ipex_config)
 
     def build_ipex_transformer_config(
         self, config, device, dtype, impl_mode, tp_size, tp_group

@@ -18,6 +18,7 @@ from transformers import (
 )
 from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
 from intel_extension_for_transformers.transformers import RtnConfig
+from intel_extension_for_transformers.transformers.llm.utils.generation import _beam_search, _greedy_search
 
 # supported models
 MODEL_CLASSES = {
@@ -25,6 +26,7 @@ MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
+    "phi-3": (AutoModelForCausalLM, AutoTokenizer),
 }
 
 # args
@@ -165,6 +167,7 @@ else:
 model = model.eval().to(device)
 model = model.to(memory_format=torch.channels_last)
 
+print(model)
 # to ipex
 model = ipex.optimize_transformers(model.eval(), device="xpu", inplace=True, quantization_config=woq_quantization_config)
 get_memory_usage("Ipex", args)
@@ -211,7 +214,7 @@ if args.accuracy_only:
 
 ######################## run generation benchmark ########################
 current_path = pathlib.Path(__file__).parent.resolve()
-with open(str(current_path) + "/prompt.json") as f:
+with open(str(current_path) + "/prompt.json", encoding="utf8") as f:
     prompt_pool = json.load(f)
 
 def run_generate(num_tokens, num_input_tokens, num_beams):
@@ -237,7 +240,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         generate_kwargs["token_latency"] = True
 
     # Accuracy check, take the ref_prompt as reference for check
-    f1 = open(os.path.join(os.path.dirname(__file__), "ref_prompt.json"))
+    f1 = open(os.path.join(os.path.dirname(__file__), "ref_prompt.json"), encoding="utf8")
     prompt_json = json.load(f1)
     f1.close()
     ref_prompt=None
@@ -256,6 +259,11 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     num_iter = args.num_iter
     num_warmup = args.num_warmup
     prompt = [prompt] * args.batch_size
+    if args.token_latency:
+        ipex.transformers.optimize.convert_function(model, "_greedy_search", _greedy_search)
+        if args.disable_optimize_transformers:
+            ipex.transformers.optimize.convert_function(model, "_beam_search", _beam_search)
+        model.config.token_latency = True
     total_list = []
     with torch.inference_mode(), torch.no_grad(), torch.autocast(
         device_type=args.device,

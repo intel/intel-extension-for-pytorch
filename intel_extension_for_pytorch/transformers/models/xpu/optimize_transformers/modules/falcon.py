@@ -1,4 +1,3 @@
-import sys
 from typing import Optional, Tuple
 
 import torch
@@ -7,7 +6,7 @@ import torch.nn as nn
 from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
 from ._transformers import MAX_OUT_SEQ_LEN, MAX_SEQ_LEN
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
-from .transformer_modules.Decoderblock import IPEXTransformerBlock
+from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
 )
@@ -37,8 +36,9 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        self.attn = self.build_attention_from_config()
-        self.mlp = self.build_mlp_from_config()
+        self.attn = self.build_attention_from_config(grouped=True)
+        self.attn.module = [self.module.self_attention]
+        self.mlp = self.build_mlp_from_config("Falcon")
         self.ln_attn = nn.LayerNorm(
             self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps
         )
@@ -46,32 +46,6 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
             self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps
         )
         self.port_all_parameters_to_new_module()
-
-    def build_attention_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        attn_type = IPEXTransformerAttn
-        attn_type_str = "IPEXTransformerAttn"
-        for elem in [impl.name, dtype, "Grouped"]:
-            attn_type_str = attn_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], attn_type_str):
-                attn_type = getattr(sys.modules[__name__], attn_type_str)
-        attn = attn_type(self.ipex_config)
-        attn.module = [self.module.self_attention]
-        return attn
-
-    def build_mlp_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        activation = self.ipex_config.ipex_act
-        mlp_type = IPEXTransformerMLP
-        mlp_type_str = "IPEXTransformerMLP"
-        for elem in [impl.name, dtype, activation.name, "Falcon"]:
-            mlp_type_str = mlp_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], mlp_type_str):
-                mlp_type = getattr(sys.modules[__name__], mlp_type_str)
-        mlp = mlp_type(self.ipex_config)
-        return mlp
 
     def build_ipex_transformer_config(
         self, config, device, dtype, impl_mode, tp_size, tp_group

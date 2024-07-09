@@ -8,6 +8,7 @@ from .BaseAttention import IPEXTransformerAttn, IPEXRuntimeAttnCache
 from .Linear import matmul_add_add
 import intel_extension_for_pytorch as ipex  # noqa F401
 from .model_utils import xpu_sdpa_support
+from einops import rearrange
 
 
 class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
@@ -241,7 +242,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
     def sdp(self, query, key, value, attention_mask, head_mask, alibi):
         # Currently only PVC and MTL (without beam search) have sdp fusion available
-        if not xpu_sdpa_support(self.is_beam_search()):
+        if not xpu_sdpa_support(self.is_beam_search(), self.head_dim):
             return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
         key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
         (
@@ -305,10 +306,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 first_token=self.is_1st_token(),
             )
             # IpexSDP will modify the layout to minimize copying, so naive_sdp here aligns with IpexSDP.
-            if torch.xpu.has_2d_block_array() or self.is_1st_token_beam_search():
-                attn_output = attn_output.permute(0, 2, 1, 3)
-            else:
-                attn_output = attn_output.permute(2, 0, 1, 3)
+            attn_output = attn_output.permute(2, 0, 1, 3)
             attn_output = attn_output.reshape(
                 attn_output.size()[:-2] + (self.embed_dim // self.tp_size,)
             )
@@ -425,6 +423,38 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
 
         return attn_output, attn_weights
 
+    def construct_local_mask(
+        self,
+        seqlen_q,
+        seqlen_k,
+        window_size=(-1, -1),  # -1 means infinite window size
+        query_padding_mask=None,
+        key_padding_mask=None,
+        device=None,
+    ):
+        row_idx = rearrange(
+            torch.arange(seqlen_q, device=device, dtype=torch.long), "s -> s 1"
+        )
+        col_idx = torch.arange(seqlen_k, device=device, dtype=torch.long)
+        sk = (
+            seqlen_k
+            if key_padding_mask is None
+            else rearrange(key_padding_mask.sum(-1), "b -> b 1 1 1")
+        )
+        sq = (
+            seqlen_q
+            if query_padding_mask is None
+            else rearrange(query_padding_mask.sum(-1), "b -> b 1 1 1")
+        )
+        if window_size[0] < 0:
+            return col_idx > row_idx + sk - sq + window_size[1]
+        else:
+            sk = torch.full_like(col_idx, seqlen_k) if key_padding_mask is None else sk
+            return torch.logical_or(
+                col_idx > torch.minimum(row_idx + sk - sq + window_size[1], sk),
+                col_idx < row_idx + sk - sq - window_size[0],
+            )
+
     def prepare_sdp_input(self, query, key, value, attention_mask, alibi):
         dropout = 0.0
         alpha = 1.0 / math.sqrt(self.head_dim)
@@ -438,7 +468,35 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         else:
             seq_len = key.size(2) + self.prompt_len
         if attention_mask is not None:
-            attention_mask = attention_mask[:, :, :, :seq_len]
+            seqlen_q = query.size(2)
+            seqlen_k = seq_len
+            dtype = attention_mask.dtype
+
+            if (
+                getattr(self.config, "sliding_window", None) is not None
+                and seq_len > self.config.sliding_window
+            ):
+                window_size = (self.config.sliding_window, self.config.sliding_window)
+                if self.use_casual_mask:
+                    window_size = (self.config.sliding_window, 0)
+
+                local_mask = self.construct_local_mask(
+                    seqlen_q,
+                    seqlen_k,
+                    window_size,
+                    query_padding_mask=None,
+                    key_padding_mask=None,
+                    device=query.device,
+                )
+
+                attention_mask = local_mask.half().masked_fill(
+                    local_mask == 1.0, torch.finfo(dtype).min
+                )
+                # expand the dim of bs_beam and head
+                attention_mask = attention_mask.expand(
+                    query.size(0), query.size(1), -1, -1
+                )
+                attention_mask = attention_mask[:, :, :, :seq_len]
             if attention_mask.dtype == torch.bool:
                 blocked_attn_mask = None
                 if query.shape[2] != 1:

@@ -52,7 +52,10 @@ attention_mask[0, 0, 0, kv_len - 3 : kv_len] = -float("inf")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="ipex build without xetla")
+    # not support on DG2 yet
+    @pytest.mark.skipif(
+        not torch.xpu.has_2d_block_array(), reason="ipex build without xetla"
+    )
     def test_fsdp_index_select(self):
         ref_out, _ = naive_sdp(
             query_layer.permute(1, 2, 0, 3),

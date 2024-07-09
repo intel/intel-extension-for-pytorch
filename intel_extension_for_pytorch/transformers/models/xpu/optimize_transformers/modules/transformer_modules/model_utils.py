@@ -132,7 +132,7 @@ def qwen_sdp(self, query, key, value, attention_mask, head_mask, alibi):
                 attention_mask.logical_not(), torch.finfo(query.dtype).min
             )
     # Currently only PVC and MTL (without beam search) have sdp fusion available
-    if not xpu_sdpa_support(self.is_beam_search()):
+    if not xpu_sdpa_support(self.is_beam_search(), self.head_dim):
         return self.naive_sdp(query, key, value, attention_mask, head_mask, alibi)
     key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
     (
@@ -164,24 +164,14 @@ def qwen_sdp(self, query, key, value, attention_mask, head_mask, alibi):
     return attention_output, attn_weight
 
 
-# Currently, only machines that have both 2D load instructions and XMX support,
-# or machines with 2D load instructions, no XMX but with XETLA, and not running beam_search,
-# support next token SDPA fusion fusion.
-def xpu_sdpa_support(is_beam_search):
+# Use SDPA if XETLA support is available and head_dim is smaller than 128,
+# and it's not a beam search when 2D load instruction is not available.
+# Use SDPA if XETLA support is available when 2D block array is available.
+def xpu_sdpa_support(is_beam_search, head_dim):
     has_2d_block = torch.xpu.has_2d_block_array()
-    has_xmx = torch.xpu.has_xmx()
     has_xetla = torch.xpu.has_xetla()
 
-    return has_2d_block and (has_xmx or (has_xetla and not is_beam_search))
-
-
-# Currently, only machines that have both 2D load instructions and XMX support
-# can enable first token SDPA GQA fusion.
-def xpu_1st_token_sdpa_support_gqa():
-    return torch.xpu.has_2d_block_array() and torch.xpu.has_xmx()
-
-
-# Currently, only machines that have both 2D load instructions and XMX support,
-# and not running beam_search, support next token SDPA GQA fusion.
-def xpu_next_token_sdpa_support_gqa(is_beam_search):
-    return torch.xpu.has_2d_block_array() and torch.xpu.has_xmx() and not is_beam_search
+    if not has_2d_block:
+        return has_xetla and head_dim <= 128 and not is_beam_search
+    else:
+        return has_xetla

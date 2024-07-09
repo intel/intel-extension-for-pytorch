@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from typing import Optional, Tuple
-import sys
 from ._transformers import MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
 from .transformer_modules.RoPE import PositionalEmbedding
@@ -14,7 +13,7 @@ from .transformer_modules.QuantizedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedInt4,
 )  # noqa
 from .transformer_modules.Mlp import *  # noqa
-from .transformer_modules.Decoderblock import IPEXTransformerBlock
+from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.Linear import (  # noqa F401
     IPEXTransformerLinear,
 )  # noqa
@@ -92,29 +91,6 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
             tp_size=tp_size,
             tp_group=tp_group,
         )
-
-    def build_attention_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        attn_type = IPEXTransformerAttn
-        attn_type_str = "IPEXTransformerAttn"
-        for elem in [impl.name, dtype]:
-            attn_type_str = attn_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], attn_type_str):
-                attn_type = getattr(sys.modules[__name__], attn_type_str)
-        return attn_type(self.ipex_config)
-
-    def build_mlp_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        activation = self.ipex_config.ipex_act
-        mlp_type = IPEXTransformerMLP
-        mlp_type_str = "IPEXTransformerMLP"
-        for elem in [impl.name, dtype, activation.name]:
-            mlp_type_str = mlp_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], mlp_type_str):
-                mlp_type = getattr(sys.modules[__name__], mlp_type_str)
-        return mlp_type(self.ipex_config)
 
     def port_attn_parameter(self):
         embed_dim = self.ipex_config.embedding_dim

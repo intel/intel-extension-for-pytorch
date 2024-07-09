@@ -1,5 +1,4 @@
 import torch
-import intel_extension_for_pytorch as ipex
 from typing import Optional, Tuple, Dict, Any
 from .transformer_modules.RoPE import LlamaRotaryEmbedding
 from .transformer_modules.Norm import LlamaRMSNorm
@@ -17,11 +16,10 @@ from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
     IPEXTransformerAttnOptimizedInt4Grouped,
 )
-from .transformer_modules.Decoderblock import IPEXTransformerBlock
+from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
 from .transformer_modules.QuantizedMlp import *  # noqa
 from transformers.cache_utils import StaticCache
-import sys
 
 import os
 
@@ -236,8 +234,11 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        self.self_attn = self.build_attention_from_config()
-        self.mlp = self.build_mlp_from_config()
+        grouped = False
+        if self.ipex_config.num_attention_head > self.ipex_config.num_key_value_head:
+            grouped = True
+        self.self_attn = self.build_attention_from_config(grouped=grouped)
+        self.mlp = self.build_mlp_from_config("llama")
         self.input_layernorm = LlamaRMSNorm(
             self.ipex_config.embedding_dim, self.ipex_config.norm_eps
         )
@@ -246,33 +247,6 @@ class NewIPEXLLAMABlock(IPEXTransformerBlock):
         )
         self.port_all_parameters_to_new_module()
         self.layer_idx = kwargs.get("layer_idx", None)
-
-    def build_attention_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        attn_type = IPEXTransformerAttn
-        attn_type_str = "IPEXTransformerAttn"
-        attn_list = [impl.name, dtype]
-        if self.ipex_config.num_attention_head > self.ipex_config.num_key_value_head:
-            attn_list.append("Grouped")
-
-        for elem in attn_list:
-            attn_type_str = attn_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], attn_type_str):
-                attn_type = getattr(sys.modules[__name__], attn_type_str)
-        return attn_type(self.ipex_config)
-
-    def build_mlp_from_config(self):
-        dtype = self.ipex_config.dtype
-        impl = self.ipex_config.impl
-        activation = self.ipex_config.ipex_act
-        mlp_type = IPEXTransformerMLP
-        mlp_type_str = "IPEXTransformerMLP"
-        for elem in [impl.name, dtype, activation.name, "llama"]:
-            mlp_type_str = mlp_type_str + elem.capitalize()
-            if hasattr(sys.modules[__name__], mlp_type_str):
-                mlp_type = getattr(sys.modules[__name__], mlp_type_str)
-        return mlp_type(self.ipex_config)
 
     def build_ipex_transformer_config(
         self, config, device, dtype, impl_mode, tp_size, tp_group

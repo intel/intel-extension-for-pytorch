@@ -265,3 +265,51 @@ class IPEXTransformerMLPOptimizedInt4SiluLlama(IPEXTransformerMLPOptimizedInt4Si
     def load_parameter(self, fc_in, fc_out, c_proj):
         # gate_proj, down_proj, up_proj
         return super().load_parameter(c_proj, fc_in, fc_out)
+
+
+class IPEXTransformerMLPOptimizedInt4SiluPhi3(IPEXTransformerMLPOptimizedInt4):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def forward(self, hidden_states, residual=None):
+        # fc_in ==> gate_up_proj
+        # fc_out ==> down_proj
+        if self.fc_in_quant.bias is None:
+            up_states = torch.ops.torch_ipex.mm_int4(
+                hidden_states,
+                self.fc_in_quant.qweight,
+                self.fc_in_quant.scales,
+                self.fc_in_quant.qzeros,
+                self.fc_in_quant.blocksize,
+            )
+        else:
+            up_states = torch.ops.torch_ipex.mm_bias_int4(
+                hidden_states,
+                self.fc_in_quant.qweight,
+                self.fc_in_quant.bias,
+                self.fc_in_quant.scales,
+                self.fc_in_quant.qzeros,
+                self.fc_in_quant.blocksize,
+            )
+
+        gate, up_states = up_states.chunk(2, dim=-1)
+        up_states = up_states * self.act(gate)
+
+        if self.fc_out_quant.bias is None:
+            output = torch.ops.torch_ipex.mm_int4(
+                up_states,
+                self.fc_out_quant.qweight,
+                self.fc_out_quant.scales,
+                self.fc_out_quant.qzeros,
+                self.fc_out_quant.blocksize,
+            )
+        else:
+            output = torch.ops.torch_ipex.mm_bias_int4(
+                up_states,
+                self.fc_out_quant.qweight,
+                self.fc_out_quant.bias,
+                self.fc_out_quant.scales,
+                self.fc_out_quant.qzeros,
+                self.fc_out_quant.blocksize,
+            )
+        return output

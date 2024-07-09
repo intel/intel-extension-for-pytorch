@@ -371,9 +371,7 @@ class sync_mode(OnOff):
 
 
 def has_xetla():
-    return _C._is_xetla_enabled() and (
-        has_2d_block_array() == has_xmx()  # dg2 is not ready
-    )
+    return _C._is_xetla_enabled()
 
 
 # oneDNN Layout

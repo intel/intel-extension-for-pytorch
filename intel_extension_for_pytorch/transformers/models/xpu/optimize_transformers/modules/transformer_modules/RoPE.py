@@ -699,3 +699,91 @@ class ChatGLMRotaryEmbedding(PositionalEmbedding):
             query[..., :rot_dim], key[..., :rot_dim], rotary_pos_emb
         )
         return query, key
+
+
+class Phi3RotaryEmbedding(LlamaRotaryEmbedding):
+    def __init__(self, config: IPEXTransformerConfig, dtype):
+        super().__init__(config, dtype)
+
+
+class Phi3RotaryEmbeddingRef(nn.Module):
+    def __init__(self, config: IPEXTransformerConfig, dtype):
+        super().__init__()
+        self.dim = config.embedding_dim // config.num_attention_head
+        self.max_position_embeddings = config.max_positions
+        self.base = config.rotary_emb_base
+        self.register_buffer("inv_freq", None, persistent=False)
+
+    # Copied from transformers.models.llama.modeling_llama.rotate_half
+    def rotate_half(self, x):
+        """Rotates half the hidden dims of the input."""
+        x1 = x[..., : x.shape[-1] // 2]
+        x2 = x[..., x.shape[-1] // 2 :]
+        return torch.cat((-x2, x1), dim=-1)
+
+    # Copied from transformers.models.llama.modeling_llama.apply_rotary_pos_emb
+    def apply_rotary_pos_emb(
+        self, query, key, cos, sin, position_ids=None, unsqueeze_dim=1
+    ):
+        cos = cos.unsqueeze(unsqueeze_dim)
+        sin = sin.unsqueeze(unsqueeze_dim)
+        if query.shape == key.shape:
+            cos = cos.expand(query.shape)
+            sin = sin.expand(query.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_half_qk(
+                query, key, sin, cos, query, key
+            )
+        else:
+            cos_q = cos.expand(query.shape)
+            sin_q = sin.expand(query.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_half(query, sin_q, cos_q, query)
+            cos_k = cos.expand(key.shape)
+            sin_k = sin.expand(key.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_half(key, sin_k, cos_k, key)
+
+        # q_embed = (q * cos) + (self.rotate_half(q) * sin)
+        # k_embed = (k * cos) + (self.rotate_half(k) * sin)
+        # return q_embed, k_embed
+
+    @torch.no_grad()
+    def get_cos_sin(self, x, position_ids, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if self.inv_freq is None:
+            self.inv_freq = 1.0 / (
+                self.base
+                ** (
+                    torch.arange(
+                        0, self.dim, 2, dtype=torch.int64, device=x.device
+                    ).float()
+                    / self.dim
+                )
+            )
+        inv_freq_expanded = (
+            self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1)
+        )
+        position_ids_expanded = position_ids[:, None, :].float()
+        # Force float32 since bfloat16 loses precision on long contexts
+        # See https://github.com/huggingface/transformers/pull/29285
+        device_type = x.device.type
+        device_type = (
+            device_type
+            if isinstance(device_type, str) and device_type != "mps"
+            else "cpu"
+        )
+        with torch.autocast(device_type=device_type, enabled=False):
+            freqs = (
+                inv_freq_expanded.float() @ position_ids_expanded.float()
+            ).transpose(1, 2)
+            emb = torch.cat((freqs, freqs), dim=-1)
+            cos = emb.cos()
+            sin = emb.sin()
+        return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
+
+    def forward(self, query, key, value, position_ids, layer_id, beam_size, kv_seq_len):
+        cos, sin = self.get_cos_sin(value, position_ids, seq_len=kv_seq_len)
+        query = query.permute(1, 2, 0, 3)
+        key = key.permute(1, 2, 0, 3)
+        self.apply_rotary_pos_emb(query, key, cos, sin, position_ids)
+        query = query.permute(2, 0, 1, 3)
+        key = key.permute(2, 0, 1, 3)
+        return query, key
