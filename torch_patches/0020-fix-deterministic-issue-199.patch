@@ -1,7 +1,7 @@
 From 5f22c2c503d7e424f2d2953fec333e0e8e901d4d Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Wed, 29 Nov 2023 18:08:57 +0800
-Subject: [PATCH 20/30] fix deterministic issue (#199)
+Subject: [PATCH 20/31] fix deterministic issue (#199)
 
 ---
  benchmarks/dynamo/common.py | 2 ++

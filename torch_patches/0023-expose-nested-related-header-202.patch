@@ -1,7 +1,7 @@
 From 2f3017f60aa8b9363acb62c180b6d362c836b5d0 Mon Sep 17 00:00:00 2001
 From: Lei Zhenyuan <zhenyuan.lei@intel.com>
 Date: Fri, 26 Jan 2024 09:46:01 +0800
-Subject: [PATCH 23/30] expose nested related header (#202)
+Subject: [PATCH 23/31] expose nested related header (#202)
 
 ---
  aten/src/ATen/CMakeLists.txt | 3 ++-

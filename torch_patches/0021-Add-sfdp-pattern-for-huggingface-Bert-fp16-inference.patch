@@ -1,7 +1,7 @@
 From 44d1ed87a2675d0764e32b8839936371da8ea3a8 Mon Sep 17 00:00:00 2001
 From: xingyuan li <108672484+hoshibara@users.noreply.github.com>
 Date: Fri, 8 Dec 2023 14:48:45 +0800
-Subject: [PATCH 21/30] Add sfdp pattern for huggingface Bert fp16 inference
+Subject: [PATCH 21/31] Add sfdp pattern for huggingface Bert fp16 inference
  model (#195)
 
 * Add sfdp pattern for huggingface Bert fp16 inference model (to half version & xpu optimized version)

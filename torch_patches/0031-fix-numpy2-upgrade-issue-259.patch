@@ -1,0 +1,28 @@
+From 1c5e54207b1a8bf359d31fd9cfb157a8207d3b5f Mon Sep 17 00:00:00 2001
+From: Jing Xu <jing.xu@intel.com>
+Date: Tue, 18 Jun 2024 23:46:46 +0900
+Subject: [PATCH 31/31] fix numpy2 upgrade issue (#259)
+
+---
+ torch/csrc/utils/tensor_numpy.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/torch/csrc/utils/tensor_numpy.cpp b/torch/csrc/utils/tensor_numpy.cpp
+index 46c347c9049..14bcb29a51d 100644
+--- a/torch/csrc/utils/tensor_numpy.cpp
++++ b/torch/csrc/utils/tensor_numpy.cpp
+@@ -401,7 +401,11 @@ at::Tensor tensor_from_cuda_array_interface(PyObject* obj) {
+       throw ValueError("cannot parse `typestr`");
+     }
+     dtype = numpy_dtype_to_aten(descr->type_num);
++#if NPY_ABI_VERSION >= 0x02000000
++    dtype_size_in_bytes = PyDataType_ELSIZE(descr);
++#else
+     dtype_size_in_bytes = descr->elsize;
++#endif
+     TORCH_INTERNAL_ASSERT(dtype_size_in_bytes > 0);
+   }
+ 
+-- 
+2.34.1
+

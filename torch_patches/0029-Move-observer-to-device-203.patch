@@ -1,7 +1,7 @@
 From c61d29a68eaa4af9a5941e102a8ba59f989cf0d6 Mon Sep 17 00:00:00 2001
 From: Zhiwei <zhiwei.yan@intel.com>
 Date: Fri, 15 Mar 2024 15:18:03 +0800
-Subject: [PATCH 29/30] Move observer to device (#203)
+Subject: [PATCH 29/31] Move observer to device (#203)
 
 ---
  torch/ao/quantization/observer.py | 2 ++
