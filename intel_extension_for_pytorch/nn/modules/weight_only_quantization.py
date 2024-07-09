@@ -132,7 +132,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         if not hasattr(mod, "out_features"):
             mod.out_features = mod.weight.size()[0]
         cache_weight_for_large_batch = (
-            qconfig.cache_weight_for_large_batch and lowp_mode == 2
+            qconfig.cache_weight_for_large_batch and lowp_mode in (2, 3)
         )
 
         qlinear = cls._init_cls(
@@ -192,7 +192,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
                 act_quant_mode = mod.qconfig.act_quant_mode
             if hasattr(mod.qconfig, "cache_weight_for_large_batch"):
                 cache_weight_for_large_batch = (
-                    mod.qconfig.cache_weight_for_large_batch and lowp_mode == 2
+                    mod.qconfig.cache_weight_for_large_batch and lowp_mode in (2, 3)
                 )
 
         w_dtype = qweight.dtype

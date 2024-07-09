@@ -255,14 +255,25 @@ class OptimizeTransformersTester(TestCase):
         )
         model = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
 
-        for weight_dtype in [
+        weight_dtype_list = [
             ipex.quantization.WoqWeightDtype.INT8,
             ipex.quantization.WoqWeightDtype.INT4,
             ipex.quantization.WoqWeightDtype.NF4,
-        ]:
+        ]
+        lowp_mode_list = [
+            ipex.quantization.WoqLowpMode.BF16,
+            ipex.quantization.WoqLowpMode.INT8,
+        ]
+        cases = itertools.product(weight_dtype_list, lowp_mode_list)
+        for weight_dtype, lowp_mode in cases:
+            if (
+                weight_dtype != ipex.quantization.WoqWeightDtype.INT4
+                and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+            ):
+                continue
             qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                 weight_dtype=weight_dtype,
-                lowp_mode=ipex.quantization.WoqLowpMode.BF16,
+                lowp_mode=lowp_mode,
             )
             model_ref = ipex.llm.optimize(
                 copy.deepcopy(model),
