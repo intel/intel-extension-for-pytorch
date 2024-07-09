@@ -102,6 +102,49 @@ class TestTorchMethod(TestCase):
         self.assertEqual(bias.grad, bias_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-1)
 
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    def test_sdp_backward_with_bias_no_grad(self, dtype=torch.bfloat16):
+        query_states = torch.randn((b, n, seq_len, head_size))
+        key_states = torch.randn((b, n, seq_len, head_size))
+        value_states = torch.randn((b, n, seq_len, head_size))
+        bias = torch.randn((b, 1, seq_len, seq_len))
+
+        grad = torch.randn((b, n, seq_len, head_size))
+
+        query_states_xpu = query_states.bfloat16().xpu()
+        key_states_xpu = key_states.bfloat16().xpu()
+        value_states_xpu = value_states.bfloat16().xpu()
+        bias_xpu = bias.bfloat16().xpu()
+        grad_xpu = grad.bfloat16().xpu()
+
+        query_states.requires_grad_(True)
+        key_states.requires_grad_(True)
+        value_states.requires_grad_(True)
+        bias.requires_grad_(False)
+
+        query_states_xpu.requires_grad_(True)
+        key_states_xpu.requires_grad_(True)
+        value_states_xpu.requires_grad_(True)
+        bias_xpu.requires_grad_(False)
+        r_cpu = torch.nn.functional.scaled_dot_product_attention(
+            query_states, key_states, value_states, bias
+        )
+        r_xpu = torch.nn.functional.scaled_dot_product_attention(
+            query_states_xpu, key_states_xpu, value_states_xpu, bias_xpu
+        )
+        r_cpu.backward(grad)
+        r_xpu.backward(grad_xpu)
+
+        self.assertEqual(
+            query_states.grad, query_states_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-2
+        )
+        self.assertEqual(
+            key_states.grad, key_states_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-2
+        )
+        self.assertEqual(
+            value_states.grad, value_states_xpu.grad.cpu().float(), atol=1e-2, rtol=1e-2
+        )
+
+    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_sdp_backward_with_bias_512(self, dtype=torch.bfloat16):
         head_size = 512
         query_states = torch.randn((b, n, seq_len, head_size))
