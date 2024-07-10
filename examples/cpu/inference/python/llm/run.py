@@ -259,6 +259,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--prompt", default=None, type=str)
     parser.add_argument("--num-iter", default=100, type=int, help="num iter")
     parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
+    parser.add_argument("--num-samples", default=1, type=int, help="num samples")
     parser.add_argument("--batch-size", default=1, type=int, help="batch size")
     parser.add_argument("--token-latency", action="store_true")
     parser.add_argument("--greedy", action="store_true")
@@ -605,7 +606,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 infer_cmd.extend(["--image-url", str(args.image_url)])
             if args.audio is not None:
                 infer_cmd.extend(["--audio", str(args.audio)])
-
+            if args.dataset:
+                infer_cmd.extend(["--dataset", str(args.dataset)])
+                infer_cmd.extend(["--num-samples", str(args.num_samples)])
             if args.prompt is not None:
                 infer_cmd.extend(["--prompt", str(args.prompt)])
             if args.config_file is not None:

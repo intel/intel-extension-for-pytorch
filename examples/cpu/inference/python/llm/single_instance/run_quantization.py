@@ -41,6 +41,8 @@ from llm.utils.model_class.phi import Phi3Config
 from llm.utils.model_class.yuan import YuanConfig
 from llm.utils.model_class.whisper import WhisperConfig
 
+from dataset import Dataset
+
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
     "-m", "--model-id", default=None, type=str, required=True, help="your llm model"
@@ -89,6 +91,7 @@ parser.add_argument("--input-tokens", default="32", type=str)
 parser.add_argument("--prompt", default=None, type=str)
 parser.add_argument("--num-iter", default=100, type=int, help="num iter")
 parser.add_argument("--num-warmup", default=10, type=int, help="num warmup")
+parser.add_argument("--num-samples", default=1, type=int, help="num samples")
 parser.add_argument("--batch-size", default=1, type=int, help="batch size")
 parser.add_argument(
     "--calib-len",
@@ -1140,78 +1143,28 @@ if args.benchmark:
         if not hasattr(user_model.config, "token_latency"):
             user_model.config.token_latency = True
 
-    # start
-    total_time = 0.0
-    num_iter = args.num_iter
-    num_warmup = args.num_warmup
-    prompt = [prompt] * args.batch_size
-    total_list = []
-    with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
-        enabled=amp_enabled
-    ):
-        for i in range(num_iter):
-            tic = time.time()
-            if model.name == "llava":
-                input_ids = torch.stack(
-                    [
-                        tokenizer_image_token(
-                            pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
-                        )
-                        for pmt in prompt
-                    ]
-                )
-                image_tensor = [
-                    image_processor.preprocess(img, return_tensors="pt")[
-                        "pixel_values"
-                    ].to(amp_dtype)
-                    for img in image
-                ]
-                output = user_model.generate(
-                    input_ids, images=image_tensor, **generate_kwargs
-                )
-            elif model.name == "git":
-                input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
-                output = user_model.generate(pixel_values=input_ids, **generate_kwargs)
-            elif model.name == "whisper":
-                input_ids = tokenizer(
-                    prompt, sampling_rate=16000, return_tensors="pt"
-                ).input_features
-                output = user_model.generate(input_ids, **generate_kwargs)
-            else:
-                input_ids = tokenizer(prompt, return_tensors="pt").input_ids
-                output = user_model.generate(input_ids, **generate_kwargs)
-            gen_ids = output[0] if args.token_latency else output
-            gen_text = tokenizer.batch_decode(
-                gen_ids[:, input_ids.shape[1] :] if model.name == "llava" else gen_ids,
-                skip_special_tokens=True,
-            )
-            toc = time.time()
-            input_tokens_lengths = [x.shape[0] for x in input_ids]
-            output_tokens_lengths = [x.shape[0] for x in gen_ids]
-            total_new_tokens = [
-                o if user_model.config.model_type in ["t5", "whisper"] else o - i
-                for i, o in zip(input_tokens_lengths, output_tokens_lengths)
-            ]
-            print(gen_text, total_new_tokens, flush=True)
-            print("Iteration: %d, Time: %.6f sec" % (i, toc - tic), flush=True)
-            if i >= num_warmup:
-                total_time += toc - tic
-                if args.token_latency:
-                    total_list.append(output[1])
-
-    if args.profile:
-
-        def trace_handler(prof):
-            print(
-                prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1)
-            )
-
-        with torch.profiler.profile(
-            activities=[torch.profiler.ProfilerActivity.CPU],
-            schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
-            on_trace_ready=trace_handler,
-        ) as prof, torch.no_grad(), torch.cpu.amp.autocast(enabled=amp_enabled):
-            for i in range(5):
+    num_samples = args.num_samples
+    data_obj = None
+    if args.dataset:
+        try:
+            data_obj = Dataset(args.model_id, dataset_path=args.dataset, total_sample_count=15000)
+        except:
+            pass
+    for i in range(num_samples):
+        if data_obj is not None:
+            item = data_obj.input_ids[i]
+            print("Current prompt size:", item.size(dim=1))
+        # start
+        total_time = 0.0
+        num_iter = args.num_iter
+        num_warmup = args.num_warmup
+        prompt = [prompt] * args.batch_size
+        total_list = []
+        with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+            enabled=amp_enabled
+        ):
+            for i in range(num_iter):
+                tic = time.time()
                 if model.name == "llava":
                     input_ids = torch.stack(
                         [
@@ -1231,45 +1184,112 @@ if args.benchmark:
                         input_ids, images=image_tensor, **generate_kwargs
                     )
                 elif model.name == "git":
-                    input_ids = tokenizer(
-                        images=prompt, return_tensors="pt"
-                    ).pixel_values
-                    output = user_model.generate(
-                        pixel_values=input_ids, **generate_kwargs
-                    )
+                    input_ids = tokenizer(images=prompt, return_tensors="pt").pixel_values
+                    output = user_model.generate(pixel_values=input_ids, **generate_kwargs)
                 elif model.name == "whisper":
                     input_ids = tokenizer(
                         prompt, sampling_rate=16000, return_tensors="pt"
                     ).input_features
+                    output = user_model.generate(input_ids, **generate_kwargs)
+                elif data_obj is not None:
+                    input_ids = item
                     output = user_model.generate(input_ids, **generate_kwargs)
                 else:
                     input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                     output = user_model.generate(input_ids, **generate_kwargs)
                 gen_ids = output[0] if args.token_latency else output
                 gen_text = tokenizer.batch_decode(
-                    (
-                        gen_ids[:, input_ids.shape[1] :]
-                        if model.name == "llava"
-                        else gen_ids
-                    ),
+                    gen_ids[:, input_ids.shape[1] :] if model.name == "llava" else gen_ids,
                     skip_special_tokens=True,
                 )
-                prof.step()
+                toc = time.time()
+                input_tokens_lengths = [x.shape[0] for x in input_ids]
+                output_tokens_lengths = [x.shape[0] for x in gen_ids]
+                total_new_tokens = [
+                    o if user_model.config.model_type in ["t5", "whisper"] else o - i
+                    for i, o in zip(input_tokens_lengths, output_tokens_lengths)
+                ]
+                print(gen_text, total_new_tokens, flush=True)
+                print("Iteration: %d, Time: %.6f sec" % (i, toc - tic), flush=True)
+                if i >= num_warmup:
+                    total_time += toc - tic
+                    if args.token_latency:
+                        total_list.append(output[1])
 
-    print("\n", "-" * 10, "Summary:", "-" * 10)
-    latency = total_time / (num_iter - num_warmup)
-    print("Inference latency: %.3f sec." % latency)
-    if args.token_latency:
-        import numpy as np
-        from itertools import chain
+        if args.profile:
 
-        first_latency = np.mean([x[0] for x in total_list])
-        average_2n = list(chain(*[x[1:] for x in total_list]))
-        average_2n.sort()
-        average_2n_latency = np.mean(average_2n)
-        p90_latency = average_2n[int(len(average_2n) * 0.9)]
-        p99_latency = average_2n[int(len(average_2n) * 0.99)]
-        print("First token average latency: %.3f sec." % first_latency)
-        print("Average 2... latency: %.3f sec." % average_2n_latency)
-        print("P90 2... latency: %.3f sec." % p90_latency)
-        print("P99 2... latency: %.3f sec." % p99_latency)
+            def trace_handler(prof):
+                print(
+                    prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=-1)
+                )
+
+            with torch.profiler.profile(
+                activities=[torch.profiler.ProfilerActivity.CPU],
+                schedule=torch.profiler.schedule(wait=1, warmup=3, active=1),
+                on_trace_ready=trace_handler,
+            ) as prof, torch.no_grad(), torch.cpu.amp.autocast(enabled=amp_enabled):
+                for i in range(5):
+                    if model.name == "llava":
+                        input_ids = torch.stack(
+                            [
+                                tokenizer_image_token(
+                                    pmt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+                                )
+                                for pmt in prompt
+                            ]
+                        )
+                        image_tensor = [
+                            image_processor.preprocess(img, return_tensors="pt")[
+                                "pixel_values"
+                            ].to(amp_dtype)
+                            for img in image
+                        ]
+                        output = user_model.generate(
+                            input_ids, images=image_tensor, **generate_kwargs
+                        )
+                    elif model.name == "git":
+                        input_ids = tokenizer(
+                            images=prompt, return_tensors="pt"
+                        ).pixel_values
+                        output = user_model.generate(
+                            pixel_values=input_ids, **generate_kwargs
+                        )
+                    elif model.name == "whisper":
+                        input_ids = tokenizer(
+                            prompt, sampling_rate=16000, return_tensors="pt"
+                        ).input_features
+                        output = user_model.generate(input_ids, **generate_kwargs)
+                    elif data_obj is not None:
+                        input_ids = item
+                        output = user_model.generate(input_ids, **generate_kwargs)
+                    else:
+                        input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+                        output = user_model.generate(input_ids, **generate_kwargs)
+                    gen_ids = output[0] if args.token_latency else output
+                    gen_text = tokenizer.batch_decode(
+                        (
+                            gen_ids[:, input_ids.shape[1] :]
+                            if model.name == "llava"
+                            else gen_ids
+                        ),
+                        skip_special_tokens=True,
+                    )
+                    prof.step()
+
+        print("\n", "-" * 10, "Summary:", "-" * 10)
+        latency = total_time / (num_iter - num_warmup) * 1000
+        print("Inference latency: %.2f ms." % latency)
+        if args.token_latency:
+            import numpy as np
+            from itertools import chain
+
+            first_latency = np.mean([x[0] for x in total_list]) * 1000
+            average_2n = list(chain(*[x[1:] for x in total_list]))
+            average_2n.sort()
+            average_2n_latency = np.mean(average_2n) * 1000
+            p90_latency = average_2n[int(len(average_2n) * 0.9)] * 1000
+            p99_latency = average_2n[int(len(average_2n) * 0.99)] * 1000
+            print("First token average latency: %.2f ms." % first_latency)
+            print("Average 2... latency: %.2f ms." % average_2n_latency)
+            print("P90 2... latency: %.2f ms." % p90_latency)
+            print("P99 2... latency: %.2f ms." % p99_latency)
