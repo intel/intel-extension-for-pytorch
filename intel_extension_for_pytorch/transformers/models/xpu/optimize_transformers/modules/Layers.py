@@ -127,13 +127,11 @@ class IPEXLmHeadLinearAllreduceWithPadding(IPEXOpForInference):
     def port_data(self):
         self.n_dim = self.module.weight.shape[0]
         self.bias = self.module.bias
+        self.weight = self.module.weight.transpose(-1, -2).contiguous()
         if dist.is_initialized():
-            self.weight = self.module.weight.transpose(-1, -2).contiguous()
             self.mp_group = self.module.mp_group
             self.rank = self.module.rank
             self.world_size = self.module.world_size
-        else:
-            self.weight = self.module.weight
 
     def forward(self, input):
         if input.dim() > 3:
@@ -164,9 +162,11 @@ class IPEXLmHeadLinearAllreduceWithPadding(IPEXOpForInference):
             output = output[:, :, : self.n_dim]
             return output
         else:
-            return torch.nn.functional.linear(input, self.weight, bias=self.bias)[
-                :, :, : self.n_dim
-            ]
+            output = torch.matmul(input, self.weight)
+            if self.bias is not None:
+                output += self.bias
+            output = output[:, :, : self.n_dim]
+            return output
 
 
 class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
