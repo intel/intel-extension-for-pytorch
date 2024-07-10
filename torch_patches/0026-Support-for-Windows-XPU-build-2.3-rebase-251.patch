@@ -1,7 +1,7 @@
-From 2e83c03ee98f63120ba31e75978bc67ab822674a Mon Sep 17 00:00:00 2001
+From 8fafe3b068b725a4eea9a735feca1675856c49c2 Mon Sep 17 00:00:00 2001
 From: Ratnam Parikh <114774508+ratnampa@users.noreply.github.com>
 Date: Fri, 31 May 2024 07:00:04 -0700
-Subject: [PATCH 25/32] Support for Windows XPU build 2.3 rebase (#251)
+Subject: [PATCH 26/37] Support for Windows XPU build 2.3 rebase (#251)
 
 ---
  CMakeLists.txt                        |  4 +---

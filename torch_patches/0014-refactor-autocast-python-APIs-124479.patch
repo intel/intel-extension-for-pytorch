@@ -1,7 +1,7 @@
-From dc92270d8feca8db9935dea36b7883dcbf4c38fa Mon Sep 17 00:00:00 2001
+From 5d9bc43e2d4e387786b9cd95540baa3928438ea1 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Tue, 23 Apr 2024 09:34:46 +0000
-Subject: [PATCH 13/32] refactor autocast python APIs (#124479)
+Subject: [PATCH 14/37] refactor autocast python APIs (#124479)
 
 Refactor autocast usage scenario in `torch/amp/autocast_mode.py` and `torch/utils/checkpoint.py` to fix the bug - convention conflict between `torch.xxx.get_autocast_xxx_dtype` defined in `autocast_mode.py` and `torch.xxx.get_autocast_dtype` defined in `checkpoint.py`.
 
@@ -236,7 +236,7 @@ index 30c6aefcf1b..87ff709fcfb 100644
          return False
  
 diff --git a/torch/csrc/autograd/init.cpp b/torch/csrc/autograd/init.cpp
-index 123af0922ab..6a7230a7025 100644
+index 57b632965b6..b4e21016715 100644
 --- a/torch/csrc/autograd/init.cpp
 +++ b/torch/csrc/autograd/init.cpp
 @@ -568,6 +568,24 @@ static PyObject* is_any_autocast_enabled(PyObject* _unused, PyObject* arg) {
@@ -264,7 +264,7 @@ index 123af0922ab..6a7230a7025 100644
  static PyObject* set_autocast_cpu_enabled(PyObject* _unused, PyObject* arg) {
    HANDLE_TH_ERRORS
    TORCH_CHECK_TYPE(
-@@ -1225,6 +1243,10 @@ static PyMethodDef methods[] = { // NOLINT
+@@ -1217,6 +1235,10 @@ static PyMethodDef methods[] = { // NOLINT
       METH_VARARGS | METH_KEYWORDS,
       nullptr},
      {"_is_any_autocast_enabled", is_any_autocast_enabled, METH_NOARGS, nullptr},

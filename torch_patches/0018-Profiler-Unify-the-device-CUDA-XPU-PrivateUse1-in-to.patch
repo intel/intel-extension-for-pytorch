@@ -1,7 +1,7 @@
-From 5a0f20e122226f0c403ec24fb2dd4b3d8d39c357 Mon Sep 17 00:00:00 2001
+From b66ccd3b24e25c8154aed06a349699d3352b80a3 Mon Sep 17 00:00:00 2001
 From: "Chen, Zejun" <zejun.chen@intel.com>
 Date: Mon, 22 Apr 2024 01:26:55 +0000
-Subject: [PATCH 17/32] [Profiler] Unify the device(CUDA, XPU, PrivateUse1) in
+Subject: [PATCH 18/37] [Profiler] Unify the device(CUDA, XPU, PrivateUse1) in
  torch profiler post processing (#123247)
 
 This PR unifies the CUDA, XPU and PrivateUse1 in the torch profiler. Now CUDA, XPU and PrivateUse1 can together use string object `use_device` to distinguish each other and share one device path for calculating kineto time durations and memory statistics for post processing.
@@ -54,7 +54,7 @@ index f36278919d9..7913924568f 100644
      @unittest.skipIf(IS_JETSON, "Jetson has a guard against OOM since host and gpu memory are shared")
      def test_oom_tracing(self):
 diff --git a/test/test_autograd.py b/test/test_autograd.py
-index 90aa883dbd9..783fd2df4ca 100644
+index 791510e4cc4..85f930fb9ae 100644
 --- a/test/test_autograd.py
 +++ b/test/test_autograd.py
 @@ -4434,11 +4434,11 @@ Done""")

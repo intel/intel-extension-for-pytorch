@@ -1,7 +1,8 @@
-From 91dcdfc462e095694b3615ff0468d042e9817b16 Mon Sep 17 00:00:00 2001
+From 28cf030d1ad5dcde5aae86a3546fd2ede47ed7f3 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 21 Jun 2024 15:12:14 +0800
-Subject: [PATCH 31/32] Enable deterministic support for oneDNN (#127277) (#264)
+Subject: [PATCH 31/37] Enable deterministic support for oneDNN (#127277)
+ (#264)
 
 This PR is a part of RFC https://github.com/pytorch/pytorch/issues/114848.
 For the request for Torchbenchmark models, this PR enables the deterministic attribute for the oneDNN operators for XPU backends, like convolution, deconvolution and matmult.
@@ -138,7 +139,7 @@ index 9cdee1cbd56..1dd87020661 100644
 -# https://stackoverflow.com/questions/2447353/getattr-on-a-module/7668273#7668273
  sys.modules[__name__] = MkldnnModule(sys.modules[__name__], __name__)
 diff --git a/torch/csrc/Module.cpp b/torch/csrc/Module.cpp
-index 3dbcde13073..10997b12960 100644
+index 267cfcea27b..a7175c9c7b1 100644
 --- a/torch/csrc/Module.cpp
 +++ b/torch/csrc/Module.cpp
 @@ -807,6 +807,25 @@ PyObject* THPModule_deterministicCuDNN(PyObject* _unused, PyObject* noargs) {
@@ -167,7 +168,7 @@ index 3dbcde13073..10997b12960 100644
  PyObject* THPModule_setDeterministicAlgorithms(
      PyObject* _unused,
      PyObject* args,
-@@ -1341,6 +1360,14 @@ static PyMethodDef TorchMethods[] = { // NOLINT
+@@ -1339,6 +1358,14 @@ static PyMethodDef TorchMethods[] = { // NOLINT
       THPModule_setDeterministicCuDNN,
       METH_O,
       nullptr},

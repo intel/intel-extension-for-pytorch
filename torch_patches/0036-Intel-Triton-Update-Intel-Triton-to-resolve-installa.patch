@@ -1,0 +1,26 @@
+From b0ea97cadbe5f9af9b0d60a7b778b10fdb6386a8 Mon Sep 17 00:00:00 2001
+From: Stonepia <tong.su@intel.com>
+Date: Thu, 4 Jul 2024 14:05:21 +0800
+Subject: [PATCH 36/37] [Intel Triton] Update Intel Triton to resolve
+ installation issue on manylinux. (#129847) (#268)
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/129847
+Approved by: https://github.com/Skylion007, https://github.com/gujinghui, https://github.com/atalman
+ghstack dependencies: #129782
+
+Co-authored-by: xinan.lin <xinan.lin@intel.com>
+(cherry picked from commit bf8e2034a08150fc4511940e73ee0f0fcddf80dc)
+---
+ .ci/docker/ci_commit_pins/triton-xpu.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/.ci/docker/ci_commit_pins/triton-xpu.txt b/.ci/docker/ci_commit_pins/triton-xpu.txt
+index 10cf35c79d5..3e47e877deb 100644
+--- a/.ci/docker/ci_commit_pins/triton-xpu.txt
++++ b/.ci/docker/ci_commit_pins/triton-xpu.txt
+@@ -1 +1 @@
+-d72e1e65c78b7b79405023e684338697579ea391
++1b2f15840e0d70eec50d84c7a0575cb835524def
+-- 
+2.34.1
+

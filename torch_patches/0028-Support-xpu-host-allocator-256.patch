@@ -1,7 +1,7 @@
-From b4bd35dc4d4cda1cf81870f9e069cc596530b5fa Mon Sep 17 00:00:00 2001
+From 2f8a975034c9d002ad39390908fdd8fec783c34e Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Thu, 13 Jun 2024 11:18:06 +0800
-Subject: [PATCH 27/32] Support xpu host allocator (#256)
+Subject: [PATCH 28/37] Support xpu host allocator (#256)
 
 * Generalize host allocator to be device-agnostic (#123079)
 

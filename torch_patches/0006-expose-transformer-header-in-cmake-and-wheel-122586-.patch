@@ -1,7 +1,7 @@
-From bd0cbc4849346a063d2a8c4d93119b209fc3b5fe Mon Sep 17 00:00:00 2001
+From 9512309676e888a2b9ca7e4754bf5dbc5c37b0af Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Wed, 3 Apr 2024 15:44:34 +0800
-Subject: [PATCH 05/32] expose transformer header in cmake and wheel (#122586)
+Subject: [PATCH 06/37] expose transformer header in cmake and wheel (#122586)
  (#222)
 
 expose transformer header in cmake and wheel, some utils functions are used in nested transformer development on IPEX side
@@ -38,10 +38,10 @@ index bf425af5fa9..66d6116eb93 100644
    list(APPEND INSTALL_HEADERS ${native_h} ${native_cpu_h} ${native_ao_sparse_h} ${native_quantized_h} ${cuda_h} ${native_cuda_h} ${native_hip_h} ${cudnn_h} ${hip_h} ${xpu_h} ${mps_h} ${native_mps_h} ${native_utils_h} ${miopen_h})
    # Metal
 diff --git a/setup.py b/setup.py
-index 81159acbd31..0383f0c80a4 100644
+index 6b0860a9ee1..db39677cb10 100644
 --- a/setup.py
 +++ b/setup.py
-@@ -1191,6 +1191,7 @@ def main():
+@@ -1207,6 +1207,7 @@ def main():
          "include/ATen/native/nested/*.h",
          "include/ATen/native/quantized/*.h",
          "include/ATen/native/quantized/cpu/*.h",

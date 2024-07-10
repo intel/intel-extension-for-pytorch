@@ -1,7 +1,7 @@
-From 93afdf9604b56e5c1bf420380f775c72431a8a81 Mon Sep 17 00:00:00 2001
+From 3c851428f6da3be44a84261cd69c44444629856f Mon Sep 17 00:00:00 2001
 From: xingyuan li <108672484+hoshibara@users.noreply.github.com>
 Date: Thu, 28 Mar 2024 14:04:24 +0800
-Subject: [PATCH 04/32] Fix Windows Build (#214) (#220)
+Subject: [PATCH 05/37] Fix Windows Build (#214) (#220)
 
 Co-authored-by: Cui, Yifeng <yifeng.cui@intel.com>
 ---

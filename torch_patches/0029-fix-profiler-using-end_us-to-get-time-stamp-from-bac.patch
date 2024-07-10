@@ -1,7 +1,7 @@
-From d8a8fa976d2683eae790b10ae07de00e688e1828 Mon Sep 17 00:00:00 2001
+From cdcfc15e095f5112d97a7a84e8b4c95c319b3a09 Mon Sep 17 00:00:00 2001
 From: zejun <zejun.chen@intel.com>
 Date: Wed, 19 Jun 2024 16:09:50 +0800
-Subject: [PATCH 29/32] [fix][profiler] using end_us to get time stamp from
+Subject: [PATCH 29/37] [fix][profiler] using end_us to get time stamp from
  backend kineto (#261)
 
 to avoid the missing carry when ns2us for negative cpu time issue
@@ -30,7 +30,7 @@ index 16ee88fdb13..96764daa9e4 100644
              cpu_memory_usage = 0
              device_memory_usage = 0
 diff --git a/torch/csrc/autograd/init.cpp b/torch/csrc/autograd/init.cpp
-index 6a7230a7025..ce6d062031e 100644
+index b4e21016715..67b8cad342d 100644
 --- a/torch/csrc/autograd/init.cpp
 +++ b/torch/csrc/autograd/init.cpp
 @@ -203,6 +203,8 @@ PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject* unused) {

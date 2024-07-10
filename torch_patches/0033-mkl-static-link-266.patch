@@ -1,3 +1,33 @@
+From b417985634eeb3060c1f6fe648969f311a6cf18d Mon Sep 17 00:00:00 2001
+From: Jing Xu <jing.xu@intel.com>
+Date: Thu, 27 Jun 2024 18:25:23 +0900
+Subject: [PATCH 33/37] mkl static link (#266)
+
+* Fix mkl cmake not support static mkl on Windows. (#124925)
+
+Fixes #124869
+
+Fix mkl not support static library on Windows.
+![image](https://github.com/pytorch/pytorch/assets/8433590/9c6ee5f8-9844-4383-acbd-6b22aff06daa)
+MKL backend check:
+<img width="724" alt="Image" src="https://github.com/pytorch/pytorch/assets/8433590/e45e12a5-2dfc-47a1-ad94-32a667bd4799">
+
+![image](https://github.com/pytorch/pytorch/assets/8433590/27a822c7-c4ab-4e5f-bbdb-8c4b085140e5)
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/124925
+Approved by: https://github.com/jgong5, https://github.com/ezyang
+
+* remove mkl shared library dependency.
+
+---------
+
+Co-authored-by: Xu Han <xu.han@intel.com>
+Co-authored-by: Xu Han <xu.han@outlook.com>
+---
+ cmake/Modules/FindMKL.cmake | 5 ++++-
+ setup.py                    | 1 -
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
 diff --git a/cmake/Modules/FindMKL.cmake b/cmake/Modules/FindMKL.cmake
 index 52aa9908a55..ecb59dafa31 100644
 --- a/cmake/Modules/FindMKL.cmake
@@ -18,10 +48,10 @@ index 52aa9908a55..ecb59dafa31 100644
        MARK_AS_ADVANCED(${_prefix}_${_library}_LIBRARY)
        IF(NOT (${_library} STREQUAL "tbb"))
 diff --git a/setup.py b/setup.py
-index 0383f0c80a4..aec336158b7 100644
+index db39677cb10..d379a429f03 100644
 --- a/setup.py
 +++ b/setup.py
-@@ -1095,7 +1095,6 @@ def main():
+@@ -1111,7 +1111,6 @@ def main():
          "networkx",
          "jinja2",
          "fsspec",
@@ -29,3 +59,6 @@ index 0383f0c80a4..aec336158b7 100644
      ]
  
      # Parse the command line and check the arguments before we proceed with
+-- 
+2.34.1
+

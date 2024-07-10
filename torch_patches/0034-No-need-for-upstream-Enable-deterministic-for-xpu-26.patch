@@ -1,0 +1,40 @@
+From fe7e3e6164a6576daf9f9c8bd07ce7eaac352263 Mon Sep 17 00:00:00 2001
+From: Stonepia <tong.su@intel.com>
+Date: Fri, 28 Jun 2024 13:49:31 +0800
+Subject: [PATCH 34/37] [No need for upstream] Enable deterministic for xpu
+ (#265)
+
+This PR explicitly enables global deterministic for XPU accuracy tests.
+
+Note that we won't upstream this commit, because we wish in the stock pytorch, we are aligning with CUDA behavior.
+---
+ benchmarks/dynamo/common.py | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/benchmarks/dynamo/common.py b/benchmarks/dynamo/common.py
+index 18c1bca7165..48601968e58 100644
+--- a/benchmarks/dynamo/common.py
++++ b/benchmarks/dynamo/common.py
+@@ -96,7 +96,7 @@ except ImportError:
+ 
+ # As an out-of-tree backend, we have to register Inductor XpuInterface.
+ if torch.xpu._is_compiled():
+-    import intel_extension_for_pytorch
++    import intel_extension_for_pytorch  # noqa: F401
+ 
+ log = logging.getLogger(__name__)
+ 
+@@ -3525,6 +3525,10 @@ def run(runner, args, original_dir=None):
+ 
+         torch.backends.mkldnn.deterministic = True
+ 
++        if args.devices == ["xpu"] and args.accuracy:
++            # Always use deterministic for XPU, since there may have sycl kernels
++            torch.use_deterministic_algorithms(True)
++
+         # Remove randomeness when torch manual seed is called
+         patch_torch_manual_seed()
+ 
+-- 
+2.34.1
+

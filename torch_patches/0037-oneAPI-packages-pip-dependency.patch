@@ -1,3 +1,5 @@
+Subject: [PATCH 37/37] [No Need Upstreaming] oneAPI packages pip dependency
+
 diff --git a/c10/xpu/CMakeLists.txt b/c10/xpu/CMakeLists.txt
 index 634ebf6c146..495ab6a31bf 100644
 --- a/c10/xpu/CMakeLists.txt
