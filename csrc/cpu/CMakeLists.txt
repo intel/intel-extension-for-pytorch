@@ -20,6 +20,10 @@ if(BUILD_CPU_WITH_ONECCL)
   find_package(oneCCL REQUIRED)
   list(APPEND DEPENDS_LIB oneCCL)
   list(APPEND DEPENDS_LIB mpi)
+  set(RPATH_VALUE)
+  list(APPEND RPATH_VALUE "$ORIGIN")
+  list(APPEND RPATH_VALUE "$ORIGIN/../opt/mpi/lib")
+  set(CMAKE_INSTALL_RPATH "${RPATH_VALUE}")
 endif()   
 
 # TODO: Once llga is merged into oneDNN, use oneDNN directly as the third_party of IPEX

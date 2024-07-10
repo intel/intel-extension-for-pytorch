@@ -1503,7 +1503,7 @@ masked_multihead_self_attention_kernel_impl(
               key_cache,
               value_cache,
               beam_idx,
-              offset,
+              offset + i,
               scale_attn,
               attention_mask_v);
       tokens_outs[i] = std::get<0>(next_outs);
