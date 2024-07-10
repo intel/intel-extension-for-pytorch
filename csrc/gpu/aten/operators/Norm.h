@@ -331,6 +331,12 @@ class NormConfig {
   void get_workgroup_size() {
     auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
     int max_workgroup_size = dpcppMaxWorkGroupSize(dev_id);
+    if constexpr (SIMD == 16) {
+      // WA for BMG. The actual max work group size on BMG is 1024 (64 HW thread
+      // * 16 SIMD per SS), which conflicts with 2048 returned from SYCL
+      // runtime.
+      max_workgroup_size = std::min(max_workgroup_size, 1024);
+    }
     int total_resource = dpcppMaxWorkItemsPerTile(dev_id);
     workgroup_num = total_resource / max_workgroup_size;
     int max_workgroup_num_foreach = 1;
