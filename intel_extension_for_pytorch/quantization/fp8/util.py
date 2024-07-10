@@ -75,10 +75,7 @@ def convert(model, device="xpu"):
 
     for k, v in model.__dict__.items():
         if k == "_parameters":
-            print(k)
-            print(v)
             for p in list(v):
-                print(p)
                 setattr(new_m, p, getattr(model, p))
         else:
             new_m.__dict__[k] = v
