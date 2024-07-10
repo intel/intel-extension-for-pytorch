@@ -189,6 +189,13 @@ if(USE_AOT_DEVLIST)
   set(IPEX_OFFLINE_OPTIONS "-device ${USE_AOT_DEVLIST} ${IPEX_OFFLINE_OPTIONS}")
 endif()
 
+# TODO: remove once fixed in OCLOC
+if(USE_AOT_DEVLIST AND WINDOWS)
+  if(${USE_AOT_DEVLIST} STREQUAL "mtl-p")
+    set(IPEX_OFFLINE_OPTIONS "-exclude_ir ${IPEX_OFFLINE_OPTIONS}")
+  endif()
+endif()
+
 # WARNING: No more offline options after this line
 if(NOT WINDOWS)
   set(IPEX_OFFLINE_OPTIONS -Xs ${IPEX_OFFLINE_OPTIONS})
