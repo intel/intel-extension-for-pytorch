@@ -1,7 +1,7 @@
 From a4d0435231c54a926f8761055b1906eac4bfa405 Mon Sep 17 00:00:00 2001
 From: xingyuan li <108672484+hoshibara@users.noreply.github.com>
 Date: Wed, 27 Mar 2024 11:36:19 +0800
-Subject: [PATCH 02/37] Add attributes to xpu device prop (#217)
+Subject: [PATCH 02/38] Add attributes to xpu device prop (#217)
 
 (cherry picked from commit b21b73051599eba6b91f38a2b4bed9181c4a7069)
 

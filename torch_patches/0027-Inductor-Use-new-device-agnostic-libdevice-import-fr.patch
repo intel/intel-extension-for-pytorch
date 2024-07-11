@@ -1,7 +1,7 @@
 From 8d8e8e56926996d3fdabd7dcd536236614a57458 Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Fri, 7 Jun 2024 16:25:52 +0800
-Subject: [PATCH 27/37] [Inductor]: Use new device-agnostic libdevice import
+Subject: [PATCH 27/38] [Inductor]: Use new device-agnostic libdevice import
  from triton.language (#255)
 
 Modified from pytorch/pytorch#127348.

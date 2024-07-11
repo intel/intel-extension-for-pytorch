@@ -1,7 +1,7 @@
 From fe7e3e6164a6576daf9f9c8bd07ce7eaac352263 Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Fri, 28 Jun 2024 13:49:31 +0800
-Subject: [PATCH 34/37] [No need for upstream] Enable deterministic for xpu
+Subject: [PATCH 34/38] [No need for upstream] Enable deterministic for xpu
  (#265)
 
 This PR explicitly enables global deterministic for XPU accuracy tests.

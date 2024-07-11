@@ -1,7 +1,7 @@
 From a9b29327af2ce2091ca4cbf5e408fc5548c29dbf Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Wed, 10 Apr 2024 11:01:04 +0800
-Subject: [PATCH 08/37] Add XPU backend check on NamedTensor (#123081) (#227)
+Subject: [PATCH 08/38] Add XPU backend check on NamedTensor (#123081) (#227)
 
 # Motivation
 Support `NamedTensor` on XPU backend.

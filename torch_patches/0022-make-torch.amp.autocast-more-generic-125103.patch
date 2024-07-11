@@ -1,7 +1,7 @@
 From b5aa752ebd07122ae3b09157773a2db93e09db00 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Wed, 8 May 2024 11:39:10 +0000
-Subject: [PATCH 22/37] make torch.amp.autocast more generic (#125103)
+Subject: [PATCH 22/38] make torch.amp.autocast more generic (#125103)
 
 As discussed in [#124479](https://github.com/pytorch/pytorch/pull/124479), `torch.amp.autocast` can NOT be completely equivalent to `torch.cuda.amp.autocast` and `torch.cpu.amp.autocast` since `torch.amp.autocast` has NOT the default `dtype` for CPU (`torch.bfloat16` by default) and CUDA (`torch.float16` by default) respectively. We would like `torch.amp.autocast` to be more generic to help the developer/customer write the device-agnostic code. Because there are not enough reasons to add device-specific autocast `torch.xxx.amp.autocast` for each device backend.
 

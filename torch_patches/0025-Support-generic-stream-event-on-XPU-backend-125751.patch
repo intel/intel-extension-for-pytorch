@@ -1,7 +1,7 @@
 From d34428cbfebfff8c5d9c02c7eec766ede3581914 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Thu, 9 May 2024 00:48:10 +0000
-Subject: [PATCH 25/37] Support generic stream/event on XPU backend (#125751)
+Subject: [PATCH 25/38] Support generic stream/event on XPU backend (#125751)
 
 According to [#123611](https://github.com/pytorch/pytorch/pull/123611), we support generic stream/event on XPU backend.
 

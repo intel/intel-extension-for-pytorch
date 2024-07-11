@@ -1,4 +1,13 @@
-Subject: [PATCH 37/37] [No Need Upstreaming] oneAPI packages pip dependency
+From 57b21137c943251d8c8a5edf9901b0144fff258c Mon Sep 17 00:00:00 2001
+From: Jing Xu <jing.xu@intel.com>
+Date: Thu, 11 Jul 2024 11:00:27 +0900
+Subject: [PATCH 38/38] patch rpath for basekit package pip installation (#273)
+
+---
+ c10/xpu/CMakeLists.txt |  5 +++++
+ caffe2/CMakeLists.txt  | 10 ++++++++++
+ torch/CMakeLists.txt   |  5 +++++
+ 3 files changed, 20 insertions(+)
 
 diff --git a/c10/xpu/CMakeLists.txt b/c10/xpu/CMakeLists.txt
 index 634ebf6c146..495ab6a31bf 100644
@@ -60,3 +69,6 @@ index 97a72eed55b..0c445ba5bce 100644
  
  target_compile_definitions(torch_python PRIVATE ${TORCH_PYTHON_COMPILE_DEFINITIONS})
  
+-- 
+2.34.1
+

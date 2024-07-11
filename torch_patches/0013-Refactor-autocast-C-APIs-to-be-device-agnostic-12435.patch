@@ -1,7 +1,7 @@
 From 528c75fb72dcdcb168a659a1fe1f06a069d5b4bd Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Tue, 23 Apr 2024 09:34:45 +0000
-Subject: [PATCH 13/37] Refactor autocast C++ APIs to be device-agnostic
+Subject: [PATCH 13/38] Refactor autocast C++ APIs to be device-agnostic
  (#124359)
 
 This PR aims to refactor autocast **C++** APIs to be device-agnostic and deprecate the device-specific autocast  **C++** APIs.
