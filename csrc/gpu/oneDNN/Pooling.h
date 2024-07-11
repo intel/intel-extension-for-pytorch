@@ -138,6 +138,10 @@ static at::Tensor pooling(
       ? memory::desc({dst_tz}, data_t, memory::format_tag::any)
       : dst_usr_md;
 
+  primitive_attr pattr;
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    pattr.set_deterministic(true);
   auto pooling_fwd_pd = pooling_forward::primitive_desc(
       engine,
       prop_kind,
@@ -148,7 +152,8 @@ static at::Tensor pooling(
       kernel_vec,
       dilation_vec,
       padding_l_vec,
-      padding_r_vec);
+      padding_r_vec,
+      pattr);
 
   memory src_m, dst_m;
   if (!is_onednn_layout_suggested) {
@@ -281,6 +286,10 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
       ? memory::desc(dst_tz, data_t, memory::format_tag::any)
       : dst_usr_md;
 
+  primitive_attr pattr;
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    pattr.set_deterministic(true);
   auto pooling_fwd_pd = pooling_forward::primitive_desc(
       engine,
       prop_kind,
@@ -291,7 +300,8 @@ static std::tuple<at::Tensor, at::Tensor> pooling(
       kernel_vec,
       dilation_vec,
       padding_l_vec,
-      padding_r_vec);
+      padding_r_vec,
+      pattr);
 
   auto expected_dst_md = pooling_fwd_pd.dst_desc();
 
@@ -475,6 +485,10 @@ static at::Tensor pooling_backward(
       ? memory::desc({diff_src_tz}, data_t, memory::format_tag::any)
       : diff_src_usr_md;
 
+  primitive_attr pattr;
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    pattr.set_deterministic(true);
   auto pooling_fwd_pd = pooling_forward::primitive_desc(
       engine,
       prop_kind,
@@ -485,7 +499,8 @@ static at::Tensor pooling_backward(
       kernel_vec,
       dilation_vec,
       padding_l_vec,
-      padding_r_vec);
+      padding_r_vec,
+      pattr);
 
   auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(
       engine,
@@ -642,6 +657,10 @@ static at::Tensor pooling_backward(
       ? memory::desc({diff_src_tz}, data_t, memory::format_tag::any)
       : diff_src_usr_md;
 
+  primitive_attr pattr;
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    pattr.set_deterministic(true);
   auto pooling_fwd_pd = pooling_forward::primitive_desc(
       engine,
       prop_kind,
@@ -652,7 +671,8 @@ static at::Tensor pooling_backward(
       kernel_vec,
       dilation_vec,
       padding_l_vec,
-      padding_r_vec);
+      padding_r_vec,
+      pattr);
 
   auto pooling_bwd_pd = dnnl::pooling_backward::primitive_desc(
       engine,
@@ -664,7 +684,8 @@ static at::Tensor pooling_backward(
       dilation_vec,
       padding_l_vec,
       padding_r_vec,
-      pooling_fwd_pd);
+      pooling_fwd_pd,
+      pattr);
 
   auto expected_diff_src_md = pooling_bwd_pd.diff_src_desc();
   memory diff_src_usr_m, diff_dst_usr_m, idx_usr_m;

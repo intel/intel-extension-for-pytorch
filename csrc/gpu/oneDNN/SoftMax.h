@@ -74,6 +74,11 @@ static Tensor softmax(
 
   auto axis = dim < 0 ? dim + input.dim() : dim;
 
+  primitive_attr pattr;
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    pattr.set_deterministic(true);
+
   // Create primitive descriptor.
   auto softmax_forward_pd = dnnl::softmax_forward::primitive_desc(
       engine,
@@ -81,7 +86,8 @@ static Tensor softmax(
       dnnl::algorithm::softmax_accurate,
       input_md,
       input_md,
-      axis);
+      axis,
+      pattr);
 
   if (!output.defined()) {
     if (input_ctx.is_plain()) {
@@ -149,13 +155,18 @@ static Tensor softmax_backward(
       : grad_ctx.meta();
   auto grad_usr_memory = dpcpp_onednn_memory(grad_md, engine, grad.data_ptr());
 
+  primitive_attr pattr;
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    pattr.set_deterministic(true);
   auto softmax_forward_pd = softmax_forward::primitive_desc(
       engine,
       prop_kind::forward,
       dnnl::algorithm::softmax_accurate,
       output_md,
       output_md,
-      axis);
+      axis,
+      pattr);
 
   Tensor grad_opt;
   auto grad_memory = grad_usr_memory;
@@ -175,7 +186,8 @@ static Tensor softmax_backward(
       grad_md,
       output_md,
       axis,
-      softmax_forward_pd);
+      softmax_forward_pd,
+      pattr);
 
   auto plain_gi_md = memory::desc({grad_tz, grad_t, grad_dnnl_format});
   auto expected_gi_md = softmax_backward_pd.diff_src_desc();

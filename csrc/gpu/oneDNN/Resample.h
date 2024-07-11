@@ -137,6 +137,10 @@ static void resample(
       : src_ctx.meta();
 
   resampling_forward::primitive_desc resampling_pd;
+  primitive_attr pattr;
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    pattr.set_deterministic(true);
   if (!is_customer_scales)
     resampling_pd = resampling_forward::primitive_desc(
         eng,
@@ -144,10 +148,11 @@ static void resample(
         resampling_algorithm,
         factors,
         src_md,
-        *dst_md);
+        *dst_md,
+        pattr);
   else
     resampling_pd = resampling_forward::primitive_desc(
-        eng, prop_kind::forward, resampling_algorithm, factors, src_md);
+        eng, prop_kind::forward, resampling_algorithm, factors, src_md, pattr);
 
   auto resample_forward = resampling_forward(resampling_pd);
 
@@ -232,8 +237,18 @@ static void resample_backward(
   if (!is_customer_scales)
     dst_md.reset(new memory::desc(dst_dims, data_type, data_format));
 
+  primitive_attr pattr;
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    pattr.set_deterministic(true);
   auto resampling_pd = resampling_forward::primitive_desc(
-      eng, prop_kind::forward, resampling_algorithm, factors, src_md, *dst_md);
+      eng,
+      prop_kind::forward,
+      resampling_algorithm,
+      factors,
+      src_md,
+      *dst_md,
+      pattr);
 
   auto diff_dst_ctx =
       at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(diff_dst);
@@ -246,7 +261,8 @@ static void resample_backward(
       factors,
       diff_src_md,
       diff_dst_md,
-      resampling_pd);
+      resampling_pd,
+      pattr);
 
   auto resampling_bwd = resampling_backward(resampling_bwd_pd);
 

@@ -492,6 +492,10 @@ static void deconvolution_backward_data(
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
+  bool onednn_deterministic_enabled = at::globalContext().deterministicMkldnn();
+  if (use_deterministic_algorithm || onednn_deterministic_enabled)
+    pattr.set_deterministic(true);
 
   memory::dims _stride = stride.vec();
   memory::dims _padding = padding.vec();

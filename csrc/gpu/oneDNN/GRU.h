@@ -79,6 +79,10 @@ static inline Tensor gru_forward(
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
+  bool onednn_deterministic_enabled = at::globalContext().deterministicMkldnn();
+  if (use_deterministic_algorithm || onednn_deterministic_enabled)
+    pattr.set_deterministic(true);
 
   if (data_t == memory::data_type::f32) {
     pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());
@@ -337,6 +341,10 @@ static inline std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor> gru_backward(
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
+  bool onednn_deterministic_enabled = at::globalContext().deterministicMkldnn();
+  if (use_deterministic_algorithm || onednn_deterministic_enabled)
+    pattr.set_deterministic(true);
 
   if (data_dt == memory::data_type::f32) {
     pattr.set_fpmath_mode(torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode());

@@ -56,6 +56,9 @@ static inline void eltwise(
 #ifdef USE_SCRATCHPAD_MODE
   attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    attr.set_deterministic(true);
   auto eltwise_forward_pd = eltwise_forward::primitive_desc(
       engine, prop_kind::forward, alg_kind, src_md, src_md, alpha, beta, attr);
 
@@ -195,6 +198,9 @@ static inline void eltwise_backward(
 #ifdef USE_SCRATCHPAD_MODE
   attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
 #endif
+  if (globalContext().deterministicAlgorithms() ||
+      at::globalContext().deterministicMkldnn())
+    attr.set_deterministic(true);
 
   auto eltwise_forward_pd = eltwise_forward::primitive_desc(
       engine,

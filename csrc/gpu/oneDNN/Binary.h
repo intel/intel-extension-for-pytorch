@@ -54,6 +54,10 @@ static inline Tensor bin(
   auto m2_usr = dpcpp_onednn_memory(md2, engine, t2.data_ptr());
 
   primitive_attr attr;
+  bool use_deterministic_algorithm = globalContext().deterministicAlgorithms();
+  bool onednn_deterministic_enabled = at::globalContext().deterministicMkldnn();
+  if (use_deterministic_algorithm || onednn_deterministic_enabled)
+    attr.set_deterministic(true);
 
   post_ops post;
   memory::desc md3;

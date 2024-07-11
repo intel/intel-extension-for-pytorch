@@ -137,7 +137,6 @@ class IPEX_API Settings final {
 
   ENV_VAL sync_mode_enabled;
   ENV_VAL onednn_layout_enabled;
-  ENV_VAL onednn_deterministic;
 
 #ifdef BUILD_SIMPLE_TRACE
   ENV_VAL simple_trace_enabled;
