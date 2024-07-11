@@ -100,7 +100,11 @@ static void ReplaceTypeAsWithTo(Block* block) {
       auto nodeOutputTypePtr = node->output()->type()->expect<TensorType>();
       c10::optional<at::ScalarType> outputDtype =
           nodeOutputTypePtr->scalarType();
-      if (outputDtype.has_value()) {
+      // Sometimes, JIT IR may not have input dtype
+      auto nodeInputTypePtr = node->input(0)->type()->expect<TensorType>();
+      c10::optional<at::ScalarType> inputDtype =
+          nodeInputTypePtr->scalarType();
+      if (outputDtype.has_value() && inputDtype.has_value()) {
         auto g = node->prev()->owningGraph();
         auto replacementNodeOutput =
             g->insert(aten::to, {node->input(0), outputDtype.value()});
