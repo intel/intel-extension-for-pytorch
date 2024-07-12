@@ -171,7 +171,8 @@ endif()
 
 #TODO: Remove once fixed in OCLOC
 if(USE_AOT_DEVLIST AND WINDOWS)
-  if(${USE_AOT_DEVLIST} STREQUAL "mtl-p")
+  string(FIND ${USE_AOT_DEVLIST} "mtl" pos)
+  if(${pos} GREATER -1)
     set(IPEX_OFFLINE_OPTIONS "-exclude_ir ${IPEX_OFFLINE_OPTIONS}")
   endif()
 endif()
