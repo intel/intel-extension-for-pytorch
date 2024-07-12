@@ -69,7 +69,7 @@ if (USE_AOT_DEVLIST)
   endfunction()
   disable_architecture_by_aot(XE_HPC "(pvc|xe-hpc)")
   disable_architecture_by_aot(XE_HPG "(ats-m150|acm-g10|acm-g11|acm-g12|xe-hpg)")
-  disable_architecture_by_aot(XE_LPG "(mtl-m|mtl-s|mtl-p|xe-lpg|0x7d55|0x7dd5|0x7d57|0x7dd7)")
+  disable_architecture_by_aot(XE_LPG "(mtl-m|mtl-s|mtl-p|mtl-h|mtl-u|xe-lpg|0x7d55|0x7dd5|0x7d57|0x7dd7)")
 
   set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST}")
   if (USE_XETLA_XE_HPC)  # Temporary fix as AOT fails of try to compile XE_HPC kernels for ats-m150 etc
