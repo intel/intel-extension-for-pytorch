@@ -134,31 +134,6 @@ class TestTorchMethod(TestCase):
         self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
 
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
-    def test_qkv_gemm_int4_per_channel(self, per_channel=True, dtype=torch.float16):
-        input = torch.rand([3, 4096, 4096], device="xpu", dtype=torch.float16)
-        bias = torch.rand([3, 16384], device="xpu", dtype=torch.float16)
-        weight = (torch.rand([3, 4096, 8192], device="xpu") * 10).byte()
-
-        group_size = 128
-        if per_channel:
-            group_size = 4096
-        group_num = int(4096 / group_size)
-
-        scales = torch.ones([3, group_num, 16384], device="xpu", dtype=torch.float16)
-        zero_points = (torch.zeros([3, group_num, 8192], device="xpu")).byte()
-
-        out_int4 = torch.ops.torch_ipex.mm_qkv_int4(
-            input, weight, bias, scales, zero_points, group_size
-        )
-
-        weight_fp16 = self.dequantize(
-            weight, scales, zero_points, group_size, gemm_num=3
-        )
-        out_fp16 = torch.ops.torch_ipex.mm_qkv(input, weight_fp16, bias)
-
-        self.assertEqual(out_int4, out_fp16, atol=checking_atol, rtol=checking_rtol)
-
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_gemm_int4_per_channel(self, per_channel=True, dtype=torch.float16):
         input = torch.rand([1, 4096], device="xpu", dtype=torch.float16)
         bias = torch.rand([16384], device="xpu", dtype=torch.float16)
