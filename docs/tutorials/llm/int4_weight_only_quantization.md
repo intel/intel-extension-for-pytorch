@@ -119,7 +119,7 @@ After the policy is selected, Intel® Extension for PyTorch\* will use `HGEMM_IN
 Intel® Extension for PyTorch\* implements Weight-Only Quantization for Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics with Intel® Extension for Transformers\*. Below section uses Qwen-7B to demonstrate the detailed usage.
 
 ### Environment Setup
-Please refer to the [instructions](https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.30%2Bxpu/examples/gpu/inference/python/llm/README.md#environment-setup).
+Please refer to the [instructions](https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.40%2Bxpu/examples/gpu/inference/python/llm/README.md#environment-setup).
 
 ### Run Weight-Only Quantization LLM on Intel® GPU
 #### Install Intel-extension-for-transformers and Neural-compressor
@@ -177,7 +177,7 @@ output = loaded_model.generate(inputs)
 
 ```
 
-#### Execute [WOQ benchmark script](https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.30%2Bxpu/examples/gpu/inference/python/llm/run_benchmark_woq.sh)
+#### Execute [WOQ benchmark script](https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.40%2Bxpu/examples/gpu/inference/python/llm/run_benchmark_woq.sh)
 
 ```python
 bash run_benchmark_woq.sh
@@ -186,3 +186,4 @@ bash run_benchmark_woq.sh
 >Note:
 > * Do save quantized model before call `optimize_transformers` function.
 > * The optimize_transformers function is designed to optimize transformer-based models within frontend python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. Please refer to [Transformers Optimization Frontend API](../../tutorials/llm/llm_optimize_transformers.md) for the detail of `optimize_transformers`.
+

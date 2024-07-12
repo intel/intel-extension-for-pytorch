@@ -70,8 +70,6 @@ Run_benchmark_llama2-70b_int4() {
 
 main() {
 
-    export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
-
     Run_benchmark_qwen-7b_int4
     Run_benchmark_gpt-j-6b_int4
     Run_benchmark_llama2-7b_int4

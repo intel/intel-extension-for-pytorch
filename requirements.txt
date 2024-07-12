@@ -1,12 +1,12 @@
 # Python dependencies required for development
 expecttest==0.1.6
 hypothesis
-numpy
+numpy==1.26.4
 psutil
 pytest
 pyyaml
 scipy>=1.8.0
-setuptools
+setuptools==69.5.1
 types-dataclasses
 typing_extensions
 pydantic

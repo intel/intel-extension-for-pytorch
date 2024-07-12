@@ -16,7 +16,7 @@ Once you implement and test your feature or bug-fix, submit a Pull Request to ht
 
 ## Developing Intel® Extension for PyTorch\* on XPU
 
-A full set of instructions on installing Intel® Extension for PyTorch\* from source is in the [Installation document](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.30%2bxpu).
+A full set of instructions on installing Intel® Extension for PyTorch\* from source is in the [Installation document](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.40%2bxpu).
 
 To develop on your machine, here are some tips:
 
@@ -126,4 +126,5 @@ To build the documentation:
 #### Tips
 
 The `.rst` source files live in `docs/tutorials` folder. Some of the `.rst` files pull in docstrings from Intel® Extension for PyTorch\* Python code (for example, via the `autofunction` or `autoclass` directives). To shorten doc build times, it is helpful to remove the files you are not working on, only keeping the base `index.rst` file and the files you are editing. The Sphinx build will produce missing file warnings but will still complete.
+
 

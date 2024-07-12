@@ -154,11 +154,8 @@ Run_benchmark_bloom-176b() {
 }
 
 main() {
-    export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
     
     Run_benchmark_gpt-j-6b
-    Run_benchmark_llama-7b
-    Run_benchmark_llama-13b
     Run_benchmark_llama2-7b
     Run_benchmark_llama2-13b
     Run_benchmark_llama2-70b

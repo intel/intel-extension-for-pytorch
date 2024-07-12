@@ -5,7 +5,7 @@
 #
 set -eo pipefail
 
-VER_IPEX=v2.1.30+xpu
+VER_IPEX=v2.1.40+xpu
 
 if [[ $# -lt 5 ]]; then
     echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> <CCLROOT> <MPIROOT> <AOT>"
@@ -226,7 +226,7 @@ ABI=1
 cd pytorch
 git apply ../intel-extension-for-pytorch/torch_patches/*.patch
 python -m pip install -r requirements.txt
-conda install --force-reinstall intel::mkl-static intel::mkl-include -y
+python -m pip install --force-reinstall mkl-static mkl-include
 export PYTORCH_BUILD_VERSION=${VERSION_TORCH}
 export PYTORCH_BUILD_NUMBER=0
 # Ensure cmake can find python packages when using conda or virtualenv
@@ -251,7 +251,7 @@ unset USE_STATIC_MKL
 unset CMAKE_PREFIX_PATH
 unset PYTORCH_BUILD_NUMBER
 unset PYTORCH_BUILD_VERSION
-conda remove mkl-static mkl-include -y
+python -m pip uninstall -y mkl-static mkl-include
 python -m pip install dist/*.whl
 cd ..
 #  TorchVision
@@ -342,3 +342,4 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     CMD="${CMD} import oneccl_bindings_for_pytorch as torch_ccl; print(f'torchccl_version:    {torch_ccl.__version__}');"
 fi
 python -c "${CMD}"
+

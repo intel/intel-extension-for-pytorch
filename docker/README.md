@@ -19,10 +19,10 @@ Run the following commands to build a docker image by compiling from source.
 ```
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout release/xpu/2.1.30
+git checkout release/xpu/2.1.40
 git submodule sync
 git submodule update --init --recursive
-docker build -f docker/Dockerfile.compile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t intel/intel-extension-for-pytorch:2.1.30-xpu .
+docker build -f docker/Dockerfile.compile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t intel/intel-extension-for-pytorch:2.1.40-xpu .
 ```
 
 Alternatively, `./build.sh` script has docker build command to install prebuilt wheel files, update all the relevant build arguments and execute the script. Run the command below in current directory.
@@ -34,7 +34,7 @@ export IMAGE_TYPE="xpu"
 To pull docker images use the following command:
 
 ```bash
-docker pull intel/intel-extension-for-pytorch:2.1.30-xpu
+docker pull intel/intel-extension-for-pytorch:2.1.40-xpu
 ```
 ### Running container:
 
@@ -43,7 +43,7 @@ local directory into the container. The `-v` argument can be omitted if you do n
 access to a local directory in the container. 
 
 ```
-IMAGE_NAME=intel/intel-extension-for-pytorch:2.1.30-xpu
+IMAGE_NAME=intel/intel-extension-for-pytorch:2.1.40-xpu
 ```
 ```bash
 docker run --rm \
@@ -89,7 +89,7 @@ python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch
 Sample output looks like below:
 ```bash
 2.1.0.post2+cxx11.abi
-2.1.30+xpu
+2.1.40+xpu
 [0]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu', driver_version='1.3.27642', has_fp64=1, total_memory=65536MB, max_compute_units=448, gpu_eu_count=448)
 [1]: _DeviceProperties(name='Intel(R) Data Center GPU Max 1550', platform_name='Intel(R) Level-Zero', dev_type='gpu', driver_version='1.3.27642', has_fp64=1, total_memory=65536MB, max_compute_units=448, gpu_eu_count=448)
 ```
@@ -98,4 +98,5 @@ Sample output looks like below:
 
 Now you are inside container with Python 3.10, PyTorch, and Intel® Extension for PyTorch\* preinstalled. You can run your own script
 to run on Intel GPU.
+
 

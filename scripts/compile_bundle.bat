@@ -3,7 +3,7 @@
 set "VER_PYTORCH=v2.1.0"
 set "VER_TORCHVISION=v0.16.0"
 set "VER_TORCHAUDIO=v2.1.0"
-set "VER_IPEX=v2.1.30+xpu"
+set "VER_IPEX=v2.1.40+xpu"
 
 if "%~2"=="" (
     echo Usage: %~nx0 ^<DPCPPROOT^> ^<MKLROOT^> [AOT]
@@ -117,7 +117,7 @@ rem PyTorch
 cd ..\pytorch
 for %%f in ("..\intel-extension-for-pytorch\torch_patches\*.patch") do git apply "%%f"
 python -m pip install -r requirements.txt
-call conda install --force-reinstall intel::mkl-static intel::mkl-include -y
+python -m pip install mkl-static mkl-include
 call conda install conda-forge::libuv -y
 rem Ensure cmake can find python packages when using conda or virtualenv
 if defined CONDA_PREFIX (
@@ -137,7 +137,7 @@ set "USE_NUMA="
 set "LIB="
 set "CMAKE_INCLUDE_PATH="
 set "CMAKE_PREFIX_PATH="
-call conda remove mkl-static mkl-include -y
+python -m pip uninstall mkl-static mkl-include
 for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "%%f"
 
 call "%DPCPP_ENV%"
@@ -184,3 +184,4 @@ for %%f in ("dist\*.whl") do python -m pip install --force-reinstall --no-deps "
 rem Sanity Test
 cd ..
 python -c "import torch; import torchvision; import torchaudio; import intel_extension_for_pytorch as ipex; print(f'torch_version:       {torch.__version__}'); print(f'torchvision_version: {torchvision.__version__}'); print(f'torchaudio_version:  {torchaudio.__version__}'); print(f'ipex_version:        {ipex.__version__}');"
+

@@ -50,7 +50,7 @@ python -m pip install oneccl_bind_pt --extra-index-url <REPO_URL>
 
 #### Install from source
 
-Refer to [Installation Guide](https://github.com/intel/torch-ccl/tree/ccl_torch2.1.300+xpu?tab=readme-ov-file#install-from-source) to install Intel® oneCCL Bindings for Pytorch\* from source.
+Refer to [Installation Guide](https://github.com/intel/torch-ccl/tree/ccl_torch2.1.400+xpu?tab=readme-ov-file#install-from-source) to install Intel® oneCCL Bindings for Pytorch\* from source.
 
 ### Runtime Dynamic Linking
 
@@ -246,4 +246,5 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_
     num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 ```
 Then you can start your model training on multiple GPU devices of one card.
+
 

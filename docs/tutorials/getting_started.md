@@ -1,6 +1,6 @@
 # Quick Start
 
-The following instructions assume you have installed the Intel® Extension for PyTorch\*. For installation instructions, refer to [Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.30%2bxpu).
+The following instructions assume you have installed the Intel® Extension for PyTorch\*. For installation instructions, refer to [Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.40%2bxpu).
 
 To start using the Intel® Extension for PyTorch\* in your code, you need to make the following changes:
 
@@ -58,4 +58,5 @@ source /opt/intel/oneapi/compiler/latest/env/vars.sh
 source /opt/intel/oneapi/mkl/latest/env/vars.sh
 python <script>
 ```
+
 

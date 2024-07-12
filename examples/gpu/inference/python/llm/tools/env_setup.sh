@@ -94,6 +94,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     COMMIT_TRANSFORMERS=$(python tools/yaml_utils.py -f dependency_version.yml -d transformers -k commit)
     VER_PROTOBUF=$(python tools/yaml_utils.py -f dependency_version.yml -d protobuf -k version)
     VER_LM_EVAL=$(python tools/yaml_utils.py -f dependency_version.yml -d lm_eval -k version)
+    VER_NUMPY=$(python tools/yaml_utils.py -f dependency_version.yml -d numpy -k version)
+    VER_SETUPTOOLS=$(python tools/yaml_utils.py -f dependency_version.yml -d setuptools -k version)
     VER_IPEX_MAJOR=$(grep "VERSION_MAJOR" version.txt | cut -d " " -f 2)
     VER_IPEX_MINOR=$(grep "VERSION_MINOR" version.txt | cut -d " " -f 2)
     VER_IPEX_PATCH=$(grep "VERSION_PATCH" version.txt | cut -d " " -f 2)
@@ -114,7 +116,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     mkdir ${WHEELFOLDER}
 
     # Install deps
-    python -m pip install cmake ninja
+    python -m pip install cmake ninja numpy==${VER_NUMPY} setuptools==${VER_SETUPTOOLS}
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
@@ -144,8 +146,10 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     #echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install numpy==${VER_NUMPY} setuptools==${VER_SETUPTOOLS}" >> ${AUX_INSTALL_SCRIPT}
     echo "python -m pip install cpuid accelerate datasets sentencepiece diffusers mpi4py protobuf==${VER_PROTOBUF} lm_eval==${VER_LM_EVAL} huggingface_hub py-cpuinfo " >> ${AUX_INSTALL_SCRIPT}
     echo "python -m pip install deepspeed==${VER_DS}" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install bitsandbytes transformers_stream_generator einops" >> ${AUX_INSTALL_SCRIPT}
 
     # Install Transformers
     if [ -d transformers ]; then

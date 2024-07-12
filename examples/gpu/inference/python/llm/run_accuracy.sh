@@ -81,11 +81,7 @@ Accuracy_lmeval_bloom-7b() {
 
 main() {
 
-    export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
-
     Accuracy_lmeval_gpt-j-6b
-    Accuracy_lmeval_llama-7b
-    Accuracy_lmeval_llama-13b
     Accuracy_lmeval_llama2-7b
     Accuracy_lmeval_llama2-13b
     Accuracy_lmeval_opt-6.7b

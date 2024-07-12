@@ -14,7 +14,7 @@ Intel® Extension for PyTorch\* now empowers users to seamlessly harness graph c
 - `intel_extension_for_pytorch` : > v2.1.10
 - `triton` : [v2.1.0](https://github.com/intel/intel-xpu-backend-for-triton/releases/tag/v2.1.0) with Intel® XPU Backend for Triton* backend enabled.
 
-Follow [Intel® Extension for PyTorch\* Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.30%2bxpu) to install `torch` and `intel_extension_for_pytorch` firstly.
+Follow [Intel® Extension for PyTorch\* Installation](https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.1.40%2bxpu) to install `torch` and `intel_extension_for_pytorch` firstly.
 
 Then install [Intel® XPU Backend for Triton\* backend](https://github.com/intel/intel-xpu-backend-for-triton) for `triton` package. You may install it via prebuilt wheel package or build it from the source. We recommend installing via prebuilt package:
 
@@ -71,4 +71,5 @@ optimizer.zero_grad()
 loss.backward()
 optimizer.step()
 ```
+
 

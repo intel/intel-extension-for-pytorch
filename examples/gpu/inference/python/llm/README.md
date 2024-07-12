@@ -39,17 +39,17 @@ Currently, only support Transformers 4.31.0. Support for newer versions of Trans
 # Get the Intel® Extension for PyTorch* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout release/xpu/2.1.30
+git checkout release/xpu/2.1.40
 git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch* prebuilt wheel files
-docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t ipex-llm:2.1.30 .
+docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t ipex-llm:2.1.40 .
 
 # Run the container with command below
 docker run --privileged -it --rm --device /dev/dri:/dev/dri -v /dev/dri/by-path:/dev/dri/by-path \
 --ipc=host --net=host --cap-add=ALL -v /lib/modules:/lib/modules --workdir /workspace  \
---volume `pwd`/examples/gpu/inference/python/llm/:/workspace/llm ipex-llm:2.1.30 /bin/bash
+--volume `pwd`/examples/gpu/inference/python/llm/:/workspace/llm ipex-llm:2.1.40 /bin/bash
 
 
 # When the command prompt shows inside the docker container, enter llm examples directory
@@ -66,17 +66,17 @@ source ./tools/env_activate.sh
 # Get the Intel® Extension for PyTorch* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout release/xpu/2.1.30
+git checkout release/xpu/2.1.40
 git submodule sync
 git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch* from source
-docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') --build-arg COMPILE=ON -t ipex-llm:2.1.30 .
+docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') --build-arg COMPILE=ON -t ipex-llm:2.1.40 .
 
 # Run the container with command below
 docker run --privileged -it --rm --device /dev/dri:/dev/dri -v /dev/dri/by-path:/dev/dri/by-path \
 --ipc=host --net=host --cap-add=ALL -v /lib/modules:/lib/modules --workdir /workspace  \
---volume `pwd`/examples/gpu/inference/python/llm/:/workspace/llm ipex-llm:2.1.30 /bin/bash
+--volume `pwd`/examples/gpu/inference/python/llm/:/workspace/llm ipex-llm:2.1.40 /bin/bash
 
 
 # When the command prompt shows inside the docker container, enter llm examples directory
@@ -89,7 +89,7 @@ source ./tools/env_activate.sh
 
 ### Conda-based environment setup with compilation from source
 
-Make sure the driver and Base Toolkit are installed without using a docker container. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.1.30%2Bxpu&os=linux%2Fwsl2&package=source).
+Make sure the driver and Base Toolkit are installed without using a docker container. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.1.40%2Bxpu&os=linux%2Fwsl2&package=source).
 
 
 
@@ -98,7 +98,7 @@ Make sure the driver and Base Toolkit are installed without using a docker conta
 # Get the Intel® Extension for PyTorch* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout release/xpu/2.1.30
+git checkout release/xpu/2.1.40
 git submodule sync
 git submodule update --init --recursive
 
