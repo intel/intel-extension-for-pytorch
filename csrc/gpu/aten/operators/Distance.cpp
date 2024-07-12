@@ -218,17 +218,29 @@ static inline scalar_t reduce_agg(
   const int local_id = item.get_local_id(0);
   const int lane_id = local_id % sg_size;
   const int sg_id = local_id / sg_size;
+  int reduce_num;
   agg = subgroup_reduce_agg<scalar_t, F, nd_item>(item, agg, sg_size);
   item.barrier(dpcpp_local_fence);
   if (0 == lane_id) {
     local_shared_mem[sg_id] = agg;
   }
   item.barrier(dpcpp_local_fence);
-  agg = (local_id < sg_num) ? local_shared_mem[lane_id] : (scalar_t)0.0f;
+
+  for (reduce_num = sg_num; reduce_num > sg_size;
+       reduce_num = (reduce_num + sg_size - 1) / sg_size) {
+    agg = (local_id < reduce_num) ? local_shared_mem[local_id] : (scalar_t)0.0f;
+    agg = subgroup_reduce_agg<scalar_t, F, nd_item>(item, agg, sg_size);
+    item.barrier(dpcpp_local_fence);
+    if (0 == lane_id && local_id < reduce_num) {
+      local_shared_mem[sg_id] = agg;
+    }
+    item.barrier(dpcpp_local_fence);
+  }
+
+  agg = (local_id < reduce_num) ? local_shared_mem[lane_id] : (scalar_t)0.0f;
   if (0 == sg_id) {
     agg = subgroup_reduce_agg<scalar_t, F, nd_item>(item, agg, sg_size);
   }
-
   return agg;
 }
 
@@ -332,6 +344,7 @@ static void pdist_kernel_impl(
   const auto ngroups = result.numel();
   auto& dpcpp_queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  auto min_sg_size = dpcppMinSubGroupSize(dev_id);
   auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
   while (wgroup_size >> 1 >= m && wgroup_size >> 1 >= 32 /* sg_size */) {
     wgroup_size >>= 1;
@@ -345,7 +358,7 @@ static void pdist_kernel_impl(
     auto out_data = result.data_ptr<scalar_t>();
     auto in_data = self.data_ptr<scalar_t>();
     // Create the local shared memory for reducing
-    dpcpp_local_acc_t<scalar_t, 1> shared(wgroup_size, __cgh);
+    dpcpp_local_acc_t<scalar_t, 1> shared(wgroup_size / min_sg_size, __cgh);
 
     PdistKernelImplFunctor<scalar_t, F, p_tpye, accscalar_t> kfn(
         n, m, p_val, n2_val, n2_squared_minus_1_val, out_data, in_data, shared);
