@@ -18,6 +18,13 @@ class EXAMPLE_INPUTS_MODE(IntEnum):
     KV_ENC = 8
 
 
+# The latest model is not compatible with the current transformers/tokenizers, so we specify the revision of the model
+pin_model_revision = {
+    "mistralai/Mistral-7B-v0.1": "26bca36bde8333b5d7f72e9ed20ccda6a618af24",
+    "mistralai/Mixtral-8x7B-Instruct-v0.1": "a60832cb6c88d5cb6e507680d0e9996fbad77050",
+}
+
+
 class LLMConfig(ABC):
     @abstractmethod
     def __init__(self, model_id):
@@ -59,8 +66,13 @@ class LLMConfig(ABC):
                 config=config,
                 low_cpu_mem_usage=True,
                 trust_remote_code=True,
+                revision=pin_model_revision.get(self.model_id, None),
             )
         return self.model
 
     def get_tokenizer(self):
-        return AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=True)
+        return AutoTokenizer.from_pretrained(
+            self.model_id,
+            trust_remote_code=True,
+            revision=pin_model_revision.get(self.model_id, None),
+        )

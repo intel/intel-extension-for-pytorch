@@ -45,6 +45,11 @@ MODEL_CLASSES = {
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
+# The latest model is not compatible with the current transformers/tokenizers, so we specify the revision of the model
+pin_model_revision = {
+    "mistralai/Mistral-7B-v0.1": "26bca36bde8333b5d7f72e9ed20ccda6a618af24",
+    "mistralai/Mixtral-8x7B-Instruct-v0.1": "a60832cb6c88d5cb6e507680d0e9996fbad77050",
+}
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", nargs="?", default="EleutherAI/gpt-j-6b")
 parser.add_argument("--output_dir", nargs="?", default="./saved_results")
@@ -196,7 +201,9 @@ class HuggingFaceModel(BaseLM):
         )
         model_class = MODEL_CLASSES[model_type]
         self.tokenizer = model_class[1].from_pretrained(
-            model_id, trust_remote_code=True
+            model_id,
+            trust_remote_code=True,
+            revision=pin_model_revision.get(model_id, None),
         )
         if model_type == "chatglm":
             # chatglm modeling is from remote hub and its torch_dtype in config.json need to be overrided
@@ -211,6 +218,7 @@ class HuggingFaceModel(BaseLM):
                 model_id if config is None else config,
                 torchscript=with_jit,
                 trust_remote_code=True,
+                revision=pin_model_revision.get(model_id, None),
             )
         if self._dtype in ("int8", "int4", "nf4") and not re.search(
             "yuan", self.config.architectures[0], re.IGNORECASE
@@ -236,6 +244,7 @@ class HuggingFaceModel(BaseLM):
                 config=self.config,
                 torch_dtype=load_dtype,
                 trust_remote_code=True,
+                revision=pin_model_revision.get(model_id, None),
             )
 
         self.model = self.model.eval()

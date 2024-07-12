@@ -530,6 +530,8 @@ There are some model-specific requirements to be aware of, as follows:
 
 - For Llava models from remote hub, additional setup is required, i.e., `bash ./tools/prepare_llava.sh`.
 
+- For mistralai/Mistral-7B-v0.1 and mistralai/Mixtral-8x7B-Instruct-v0.1, we use a fixed model version because the latest version is not compatible with transformers 4.38.1 and tokenizers 0.15.2.
+
 ## 4.3 Instructions for Running LLM with Intel® Xeon® CPU Max Series
 
 Intel® Xeon® CPU Max Series are equipped with high bandwidth memory (HBM), which further accelerates LLM inference. For the common case that HBM and DDR are both installed in a Xeon® CPU Max Series server, the memory mode can be configured to Flat Mode or Cache Mode. Details about memory modes can be found at Section 3.1 in [the Xeon® CPU Max Series Configuration Guide](https://cdrdv2-public.intel.com/769060/354227-intel-xeon-cpu-max-series-configuration-and-tuning-guide.pdf).
