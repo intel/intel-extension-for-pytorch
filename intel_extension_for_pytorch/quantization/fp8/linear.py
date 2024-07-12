@@ -153,7 +153,10 @@ class _FP8Linear(torch.autograd.Function):
             * ctx.fp8_meta["scaling_fwd"].scale_inv[0]
             * ctx.fp8_meta["scaling_bwd"].scale_inv[0]
         )
-        grad_bias = grad_bias * ctx.fp8_meta["scaling_bwd"].scale_inv[0]
+
+        if ctx.use_bias:
+            grad_bias = grad_bias * ctx.fp8_meta["scaling_bwd"].scale_inv[0]
+
         return (grad_input, grad_weight, grad_bias, None, None, None, None, None)
 
 
