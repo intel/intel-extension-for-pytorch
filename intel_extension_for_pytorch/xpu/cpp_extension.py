@@ -830,15 +830,14 @@ def get_compiler_abi_compatibility_and_version(compiler) -> Tuple[bool, TorchVer
             versionstr = subprocess.check_output(
                 [compiler, "-dumpfullversion", "-dumpversion"]
             )
-            version = versionstr.decode(*SUBPROCESS_DECODE_ARGS).strip().split(".")
         else:
             minimum_required_version = MINIMUM_MSVC_VERSION
-            compiler_info = subprocess.check_output(compiler, stderr=subprocess.STDOUT)
-            match = re.search(
-                r"(\d+)\.(\d+)\.(\d+)",
-                compiler_info.decode(*SUBPROCESS_DECODE_ARGS).strip(),
-            )
-            version = ["0", "0", "0"] if match is None else list(match.groups())
+            versionstr = subprocess.check_output(compiler, stderr=subprocess.STDOUT)
+        match = re.search(
+            r"(\d+)\.(\d+)\.(\d+)",
+            versionstr.decode(*SUBPROCESS_DECODE_ARGS).strip(),
+        )
+        version = ["0", "0", "0"] if match is None else list(match.groups())
     except Exception:
         _, error, _ = sys.exc_info()
         logger.warning(
