@@ -10,42 +10,6 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-#define GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias, arch)                         \
-  if (!has_bias) {                                                            \
-    auto policy =                                                             \
-        HGEMMXetla_INT4()                                                     \
-            .add_matrix_out(out0)                                             \
-            .add_matrix_out(out1)                                             \
-            .add_matrix_out(out2)                                             \
-            .add_matrix_inp(input)                                            \
-            .add_matrix_wei(weight)                                           \
-            .add_matrix_scl(weight_scl)                                       \
-            .add_matrix_zp(weight_zp)                                         \
-            .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SPLIT3)    \
-            .add_group_size(group_size)                                       \
-            .add_arch(arch)                                                   \
-            .build();                                                         \
-    TORCH_CHECK(policy.fallback() == false, "qkv: invalid gemm shape");       \
-    policy.run();                                                             \
-  } else {                                                                    \
-    auto policy =                                                             \
-        HGEMMXetla_INT4()                                                     \
-            .add_matrix_out(out0)                                             \
-            .add_matrix_out(out1)                                             \
-            .add_matrix_out(out2)                                             \
-            .add_matrix_inp(input)                                            \
-            .add_matrix_wei(weight)                                           \
-            .add_matrix_scl(weight_scl)                                       \
-            .add_matrix_zp(weight_zp)                                         \
-            .add_epilogue(bias_.value(), HGEMMXetla_INT4::EpilogueType::BIAS) \
-            .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SPLIT3)    \
-            .add_group_size(group_size)                                       \
-            .add_arch(arch)                                                   \
-            .build();                                                         \
-    TORCH_CHECK(policy.fallback() == false, "qkv bias: invalid gemm shape");  \
-    policy.run();                                                             \
-  }
-
 int8_t GetGpuArchId() noexcept {
   DeviceId curDevID = at::xpu::current_device();
   bool is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
@@ -101,10 +65,26 @@ static void mm_qkv_out_wint4(
       (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
        weight.scalar_type() == kChar || weight.scalar_type() == kInt));
 
-  GEMM_QKV_WINT4_XETLA_DISPATCH(has_bias, GetGpuArchId());
+  auto policy = HGEMMXetla_INT4()
+                    .add_matrix_out(out0)
+                    .add_matrix_out(out1)
+                    .add_matrix_out(out2)
+                    .add_matrix_inp(input)
+                    .add_matrix_wei(weight)
+                    .add_matrix_scl(weight_scl)
+                    .add_matrix_zp(weight_zp);
+  if (has_bias)
+    policy.add_epilogue(bias_.value(), HGEMMXetla_INT4::EpilogueType::BIAS);
+  policy.add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SPLIT3)
+      .add_group_size(group_size)
+      .add_arch(GetGpuArchId())
+      .build();
+  TORCH_CHECK(
+      policy.fallback() == false,
+      has_bias ? "qkv bias: " : "qkv: ",
+      "invalid gemm shape");
+  policy.run();
 }
-
-#undef GEMM_QKV_WINT4_XETLA_DISPATCH
 
 static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
     const Tensor& input,
@@ -140,6 +120,41 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
       out2.view_symint(sizes));
 }
 
+static inline HGEMMXetla_INT4 mm_int4_dispatch(
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& weight_scl,
+    const Tensor& weight_zp,
+    int64_t group_size,
+    const std::vector<std::tuple<const Tensor&, HGEMMXetla_INT4::EpilogueType>>&
+        epilogues,
+    Tensor* const output) {
+  auto input_flat = input.flatten(0, -2);
+  auto weight_flat = weight.flatten(0, -2);
+  if (input_flat.scalar_type() == ScalarType::Float)
+    input_flat = input_flat.to(at::kHalf);
+  int m = input_flat.sizes()[0];
+  int k = input_flat.sizes()[1];
+  int n = weight_flat.sizes()[0];
+  *output = output->defined() ? output->flatten(0, -2)
+                              : at::empty({m, n}, input.options());
+  auto dispatcher = HGEMMXetla_INT4()
+                        .add_matrix_out(*output)
+                        .add_matrix_inp(input_flat)
+                        .add_matrix_wei(weight_flat)
+                        .add_matrix_scl(weight_scl)
+                        .add_matrix_zp(weight_zp)
+                        .add_group_size(group_size)
+                        .add_arch(GetGpuArchId());
+  for (auto& [epilogue_, epilogue_type] : epilogues) {
+    dispatcher.add_epilogue(epilogue_, epilogue_type);
+  }
+  dispatcher.build();
+  TORCH_CHECK(dispatcher.fallback() == false, "mm int4: invalid gemm shape");
+  dispatcher.run();
+  return dispatcher;
+}
+
 static Tensor mm_bias_int4(
     const Tensor& input,
     const Tensor& weight,
@@ -147,31 +162,17 @@ static Tensor mm_bias_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size) {
-  auto input_flat = input.flatten(0, -2);
-  auto weight_flat = weight.flatten(0, -2);
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
-
-  int m = input_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  int n = weight.sizes()[0];
   auto bias = bias_.flatten();
-  auto output = at::empty({m, n}, input.options());
-
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  auto policy = HGEMMXetla_INT4()
-                    .add_matrix_out(output)
-                    .add_matrix_inp(input_flat)
-                    .add_matrix_wei(weight_flat)
-                    .add_matrix_scl(weight_scl)
-                    .add_matrix_zp(weight_zp)
-                    .add_epilogue(bias, HGEMMXetla_INT4::EpilogueType::BIAS)
-                    .add_group_size(group_size)
-                    .add_arch(GetGpuArchId())
-                    .build();
-  TORCH_CHECK(policy.fallback() == false, "mm bias int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input, output);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input,
+      weight,
+      weight_scl,
+      weight_zp,
+      group_size,
+      {{bias, HGEMMXetla_INT4::EpilogueType::BIAS}},
+      &out);
+  return resize_as_mat1(input, out);
 }
 
 static Tensor mm_int4(
@@ -180,30 +181,10 @@ static Tensor mm_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size) {
-  auto input_flat = input.flatten(0, -2);
-  auto weight_flat = weight.flatten(0, -2);
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
-
-  int m = input_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  int n = weight.sizes()[0];
-  auto output = at::empty({m, n}, input.options());
-
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-
-  auto policy = HGEMMXetla_INT4()
-                    .add_matrix_out(output)
-                    .add_matrix_inp(input_flat)
-                    .add_matrix_wei(weight_flat)
-                    .add_matrix_scl(weight_scl)
-                    .add_matrix_zp(weight_zp)
-                    .add_group_size(group_size)
-                    .add_arch(GetGpuArchId())
-                    .build();
-  TORCH_CHECK(policy.fallback() == false, "mm int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input, output);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input, weight, weight_scl, weight_zp, group_size, {}, &out);
+  return resize_as_mat1(input, out);
 }
 
 static void mm_int4_out(
@@ -213,33 +194,8 @@ static void mm_int4_out(
     const Tensor& weight_zp,
     Tensor& out,
     int64_t group_size) {
-  auto input_flat = input.flatten(0, -2);
-  auto weight_flat = weight.flatten(0, -2);
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
-
-  int m = input_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  int n = weight.sizes()[1] * 2;
-  if (out.defined())
-    out = out.flatten(0, -2);
-  else
-    out = at::empty({m, n}, input.options());
-
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-
-  auto policy = HGEMMXetla_INT4()
-                    .add_matrix_out(out)
-                    .add_matrix_inp(input_flat)
-                    .add_matrix_wei(weight_flat)
-                    .add_matrix_scl(weight_scl)
-                    .add_matrix_zp(weight_zp)
-                    .add_group_size(group_size)
-                    .add_arch(GetGpuArchId())
-                    .build();
-  TORCH_CHECK(policy.fallback() == false, "mm int4: invalid gemm shape");
-  policy.run();
-  out = resize_as_mat1(input, out);
+  auto dispatcher = mm_int4_dispatch(
+      input, weight, weight_scl, weight_zp, group_size, {}, &out);
   return;
 }
 
@@ -249,29 +205,16 @@ static Tensor mm_silu_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size) {
-  auto input_flat = input.flatten(0, -2);
-  auto weight_flat = weight.flatten(0, -2);
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
-  // a: m x k, b: k x n
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  auto output = at::empty({m, n}, input.options());
-  auto policy = HGEMMXetla_INT4()
-                    .add_matrix_out(output)
-                    .add_matrix_inp(input_flat)
-                    .add_matrix_wei(weight_flat)
-                    .add_matrix_scl(weight_scl)
-                    .add_matrix_zp(weight_zp)
-                    .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
-                    .add_group_size(group_size)
-                    .add_arch(GetGpuArchId())
-                    .build();
-  TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input, output);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input,
+      weight,
+      weight_scl,
+      weight_zp,
+      group_size,
+      {{Tensor(), HGEMMXetla_INT4::EpilogueType::SILU}},
+      &out);
+  return resize_as_mat1(input, out);
 }
 
 static Tensor mm_resmul_int4(
@@ -281,31 +224,17 @@ static Tensor mm_resmul_int4(
     const Tensor& weight_zp,
     const Tensor& res,
     int64_t group_size) {
-  auto input_flat = input.flatten(0, -2);
-  auto weight_flat = weight.flatten(0, -2);
   auto res_flat = res.flatten(0, -2);
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
-  // a: m x k, b: k x n
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  auto output = at::empty({m, n}, input.options());
-  auto policy =
-      HGEMMXetla_INT4()
-          .add_matrix_out(output)
-          .add_matrix_inp(input_flat)
-          .add_matrix_wei(weight_flat)
-          .add_matrix_scl(weight_scl)
-          .add_matrix_zp(weight_zp)
-          .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
-          .add_group_size(group_size)
-          .add_arch(GetGpuArchId())
-          .build();
-  TORCH_CHECK(policy.fallback() == false, "mm resmul int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input, output);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input,
+      weight,
+      weight_scl,
+      weight_zp,
+      group_size,
+      {{res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
+      &out);
+  return resize_as_mat1(input, out);
 }
 
 static Tensor mm_bias_gelu_int4(
@@ -316,77 +245,45 @@ static Tensor mm_bias_gelu_int4(
     const Tensor& bias,
     int64_t group_size,
     c10::string_view approximate) {
-  auto input_flat = input.flatten(0, -2);
-  auto weight_flat = weight.flatten(0, -2);
   auto bias_flat = bias.flatten();
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
   TORCH_CHECK(approximate == "tanh");
-  // a: m x k, b: k x n
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  auto output = at::empty({m, n}, input.options());
-  auto policy =
-      HGEMMXetla_INT4()
-          .add_matrix_out(output)
-          .add_matrix_inp(input_flat)
-          .add_matrix_wei(weight_flat)
-          .add_matrix_scl(weight_scl)
-          .add_matrix_zp(weight_zp)
-          .add_epilogue(bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS)
-          .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::GELU)
-          .add_group_size(group_size)
-          .add_arch(GetGpuArchId())
-          .build();
-  TORCH_CHECK(
-      policy.fallback() == false, "mm bias gelu int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input, output);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input,
+      weight,
+      weight_scl,
+      weight_zp,
+      group_size,
+      {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
+       {Tensor(), HGEMMXetla_INT4::EpilogueType::GELU}},
+      &out);
+  return resize_as_mat1(input, out);
 }
 
 static Tensor mm_bias_resadd_resadd_int4(
-    const Tensor& input_,
-    const Tensor& weight_,
-    const Tensor& bias_,
-    const Tensor& res0_,
-    const Tensor& res1_,
+    const Tensor& input,
+    const Tensor& weight,
+    const Tensor& bias,
+    const Tensor& res0,
+    const Tensor& res1,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size) {
-  auto input = input_.flatten(0, -2);
-  auto weight = weight_.flatten(0, -2);
-  auto bias = bias_.flatten();
-  auto res0 = res0_.flatten(0, -2);
-  auto res1 = res1_.flatten(0, -2);
-  if (input.scalar_type() == ScalarType::Float)
-    input = input.to(at::kHalf);
-  // a: m x k, b: k x n, bias: n, res0/1: m x n
-  TORCH_CHECK(
-      input.dim() == 2 && weight.dim() == 2 && bias.dim() == 1 &&
-      res0.dim() == 2 && res1.dim() == 2);
-  int m = input.sizes()[0];
-  int n = weight.sizes()[0];
-  int k = input.sizes()[1];
-  auto output = at::empty({m, n}, input.options());
-  auto policy = HGEMMXetla_INT4()
-                    .add_matrix_out(output)
-                    .add_matrix_inp(input)
-                    .add_matrix_wei(weight)
-                    .add_matrix_scl(weight_scl)
-                    .add_matrix_zp(weight_zp)
-                    .add_epilogue(bias, HGEMMXetla_INT4::EpilogueType::BIAS)
-                    .add_epilogue(res0, HGEMMXetla_INT4::EpilogueType::RES_ADD)
-                    .add_epilogue(res1, HGEMMXetla_INT4::EpilogueType::RES_ADD)
-                    .add_group_size(group_size)
-                    .add_arch(GetGpuArchId())
-                    .build();
-  TORCH_CHECK(
-      policy.fallback() == false,
-      "mm bias resadd resadd int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input_, output);
+  auto bias_flat = bias.flatten();
+  auto res0_flat = res0.flatten(0, -2);
+  auto res1_flat = res1.flatten(0, -2);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input,
+      weight,
+      weight_scl,
+      weight_zp,
+      group_size,
+      {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
+       {res0_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD},
+       {res1_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
+      &out);
+  return resize_as_mat1(input, out);
 }
 
 static Tensor mm_low_bits(
@@ -411,33 +308,18 @@ static Tensor mm_silu_mul_int4(
     const Tensor& weight_zp,
     int64_t group_size,
     const Tensor& res) {
-  auto input_flat = input.flatten(0, -2);
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
-  auto weight_flat = weight.flatten(0, -2);
   auto res_flat = res.flatten(0, -2);
-  // a: m x k, b: k x n
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  auto output = at::empty({m, n}, input.options());
-
-  auto policy =
-      HGEMMXetla_INT4()
-          .add_matrix_out(output)
-          .add_matrix_inp(input_flat)
-          .add_matrix_wei(weight_flat)
-          .add_matrix_scl(weight_scl)
-          .add_matrix_zp(weight_zp)
-          .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
-          .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
-          .add_group_size(group_size)
-          .add_arch(GetGpuArchId())
-          .build();
-  TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input, output);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input,
+      weight,
+      weight_scl,
+      weight_zp,
+      group_size,
+      {{Tensor(), HGEMMXetla_INT4::EpilogueType::SILU},
+       {res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
+      &out);
+  return resize_as_mat1(input, out);
 }
 
 static Tensor mm_bias_silu_mul_int4(
@@ -448,35 +330,20 @@ static Tensor mm_bias_silu_mul_int4(
     const Tensor& weight_zp,
     int64_t group_size,
     const Tensor& res) {
-  auto input_flat = input.flatten(0, -2);
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
-  auto weight_flat = weight.flatten(0, -2);
   auto res_flat = res.flatten(0, -2);
   auto bias_flat = bias.flatten();
-  // a: m x k, b: k x n
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  auto output = at::empty({m, n}, input.options());
-
-  auto policy =
-      HGEMMXetla_INT4()
-          .add_matrix_out(output)
-          .add_matrix_inp(input_flat)
-          .add_matrix_wei(weight_flat)
-          .add_matrix_scl(weight_scl)
-          .add_matrix_zp(weight_zp)
-          .add_epilogue(bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS)
-          .add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SILU)
-          .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL)
-          .add_group_size(group_size)
-          .add_arch(GetGpuArchId())
-          .build();
-  TORCH_CHECK(policy.fallback() == false, "mm silu int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input, output);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input,
+      weight,
+      weight_scl,
+      weight_zp,
+      group_size,
+      {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
+       {Tensor(), HGEMMXetla_INT4::EpilogueType::SILU},
+       {res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
+      &out);
+  return resize_as_mat1(input, out);
 }
 
 static Tensor mm_add_int4(
@@ -486,32 +353,17 @@ static Tensor mm_add_int4(
     const Tensor& weight_zp,
     int64_t group_size,
     const Tensor& res) {
-  auto input_flat = input.flatten(0, -2);
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
-  auto weight_flat = weight.flatten(0, -2);
   auto res_flat = res.flatten(0, -2);
-  // a: m x k, b: k x n
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  auto output = at::empty({m, n}, input.options());
-
-  auto policy =
-      HGEMMXetla_INT4()
-          .add_matrix_out(output)
-          .add_matrix_inp(input_flat)
-          .add_matrix_wei(weight_flat)
-          .add_matrix_scl(weight_scl)
-          .add_matrix_zp(weight_zp)
-          .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD)
-          .add_group_size(group_size)
-          .add_arch(GetGpuArchId())
-          .build();
-  TORCH_CHECK(policy.fallback() == false, "mm add int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input, output);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input,
+      weight,
+      weight_scl,
+      weight_zp,
+      group_size,
+      {{res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
+      &out);
+  return resize_as_mat1(input, out);
 }
 
 static Tensor mm_bias_add_int4(
@@ -522,35 +374,19 @@ static Tensor mm_bias_add_int4(
     const Tensor& weight_zp,
     int64_t group_size,
     const Tensor& res) {
-  auto input_flat = input.flatten(0, -2);
-  if (input_flat.scalar_type() == ScalarType::Float)
-    input_flat = input_flat.to(at::kHalf);
-  auto weight_flat = weight.flatten(0, -2);
   auto res_flat = res.flatten(0, -2);
   auto bias_flat = bias.flatten();
-  // a: m x k, b: k x n
-  TORCH_CHECK(input_flat.dim() == 2 && weight_flat.dim() == 2);
-  int m = input_flat.sizes()[0];
-  int n = weight_flat.sizes()[0];
-  int k = input_flat.sizes()[1];
-  auto output = at::empty({m, n}, input.options());
-
-  auto policy =
-      HGEMMXetla_INT4()
-          .add_matrix_out(output)
-          .add_matrix_inp(input_flat)
-          .add_matrix_wei(weight_flat)
-          .add_matrix_scl(weight_scl)
-          .add_matrix_zp(weight_zp)
-          .add_epilogue(bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS)
-          .add_epilogue(res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD)
-          .add_group_size(group_size)
-          .add_arch(GetGpuArchId())
-          .build();
-  TORCH_CHECK(
-      policy.fallback() == false, "mm bias add int4: invalid gemm shape");
-  policy.run();
-  return resize_as_mat1(input, output);
+  Tensor out;
+  auto dispatcher = mm_int4_dispatch(
+      input,
+      weight,
+      weight_scl,
+      weight_zp,
+      group_size,
+      {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
+       {res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
+      &out);
+  return resize_as_mat1(input, out);
 }
 
 bool is_match_total_mem(
