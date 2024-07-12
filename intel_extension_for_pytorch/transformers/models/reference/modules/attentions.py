@@ -2170,7 +2170,8 @@ def _WhisperAttention_forward(
             else src_len
         )
         attention_mask = torch.zeros(
-            [bsz, 1, tgt_len, seq_len], dtype=hidden_states.dtype
+            [bsz, 1, tgt_len, src_len if is_cross_attention else seq_len],
+            dtype=hidden_states.dtype,
         )
     if key_value_states is None and self.is_decoder:
         decoded_tokens = (
