@@ -98,11 +98,13 @@ struct MaxPool3dWithIndicesOutFrameImplKernelFunctor {
       int64_t out_index;
       if constexpr (!channels_last) {
         out_index = (int64_t)slice * out_cf_c_stride +
-            oDepth * out_cf_d_stride + oRow * OutputSizeW + oColumn;
+            (int64_t)oDepth * out_cf_d_stride + (int64_t)oRow * OutputSizeW +
+            oColumn;
       } else {
         out_index = (int64_t)batch * out_batch_stride +
-            oDepth * out_cl_d_stride + oRow * out_cl_h_stride +
-            oColumn * numChannels + channel;
+            (int64_t)oDepth * out_cl_d_stride +
+            (int64_t)oRow * out_cl_h_stride + (int64_t)oColumn * numChannels +
+            channel;
       }
       outputData[out_index] = max;
       indicesData[out_index] = maxIndex;
