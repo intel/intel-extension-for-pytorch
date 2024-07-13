@@ -12,7 +12,7 @@ from intel_extension_for_pytorch.quantization import (
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
 )
-
+from torch.nn.utils import skip_init
 
 class _IPEXlinearFusionCPU(nn.Module):
     def __init__(self, linear, tpp=False, woq=False):
@@ -566,17 +566,20 @@ class _IPEXlinearMOECPU(nn.Module):
                 else:
                     _W1 = W13[i][0 : self.intermediate_size, :]
                     _W3 = W13[i][self.intermediate_size : 2 * self.intermediate_size, :]
-                linear1 = nn.Linear(
-                    self.intermediate_size, self.hidden_size, bias=False
-                )
+                linear1 = skip_init(torch.nn.Linear, self.intermediate_size, self.hidden_size, bias=False)
+                # linear1 = nn.Linear(
+                #     self.intermediate_size, self.hidden_size, bias=False
+                # )
                 linear1.weight = nn.Parameter(_W1)
-                linear2 = nn.Linear(
-                    self.hidden_size, self.intermediate_size, bias=False
-                )
+                linear2 = skip_init(torch.nn.Linear, self.hidden_size, self.intermediate_size, bias=False)
+                # linear2 = nn.Linear(
+                #     self.hidden_size, self.intermediate_size, bias=False
+                # )
                 linear2.weight = nn.Parameter(W2[i])
-                linear3 = nn.Linear(
-                    self.intermediate_size, self.hidden_size, bias=False
-                )
+                linear3 = skip_init(torch.nn.Linear, self.intermediate_size, self.hidden_size, bias=False)
+                # linear3 = nn.Linear(
+                #     self.intermediate_size, self.hidden_size, bias=False
+                # )
                 linear3.weight = nn.Parameter(_W3)
                 linear_per_expert = nn.ModuleList([linear1, linear2, linear3])
                 linear_list.append(linear_per_expert)
@@ -598,6 +601,7 @@ class _IPEXlinearMOECPU(nn.Module):
         batch_size, head_dim = hidden_states.shape
         routing_weights = torch.nn.functional.softmax(score, dim=1, dtype=torch.float32)
         routing_weights, selected_experts = torch.topk(routing_weights, topk, dim=-1)
+        routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
         routing_weights = routing_weights.to(hidden_states.dtype)
         final_hidden_states = torch.zeros(
             (batch_size, head_dim),
