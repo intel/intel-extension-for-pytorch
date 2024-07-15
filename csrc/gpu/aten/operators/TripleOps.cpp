@@ -1,5 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/Context.h>
+#include <ATen/OpMathType.h>
 #include <ATen/autocast_mode.h>
 #include <ATen/native/Activation.h>
 #include <ATen/native/BinaryOps.h>
@@ -8,9 +9,12 @@
 #include <ATen/record_function.h>
 #include <core/detail/ListUtils.h>
 #include <gpu/aten/tensor/Tensor.h>
+#include <math.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
+#include <sys/types.h>
 #include <utils/DPCPP.h>
+#include <cstdint>
 #include "comm/Numerics.h"
 
 #include "Loops.h"
@@ -59,7 +63,7 @@ struct silu_mul_dpcpp_functor {
 };
 
 template <typename scalar_t, typename accscalar_t>
-struct gelu_erf_mul_dpcpp_funcor {
+struct gelu_erf_mul_dpcpp_functor {
   scalar_t operator()(scalar_t a, scalar_t b) const {
     return (accscalar_t(a) * accscalar_t(0.5) *
             (accscalar_t(1) + ::erf(accscalar_t(a) * accscalar_t(M_SQRT1_2)))) *
@@ -68,7 +72,7 @@ struct gelu_erf_mul_dpcpp_funcor {
 };
 
 template <typename scalar_t, typename accscalar_t>
-struct gelu_tanh_mul_dpcpp_funcor {
+struct gelu_tanh_mul_dpcpp_functor {
   scalar_t operator()(scalar_t a, scalar_t b) const {
     constexpr accscalar_t kBeta = M_SQRT2 * M_2_SQRTPI * accscalar_t(0.5);
     constexpr accscalar_t kKappa = 0.044715;
@@ -78,6 +82,37 @@ struct gelu_tanh_mul_dpcpp_funcor {
             (accscalar_t(1) + Numerics<accscalar_t>::tanh(inner))) *
         accscalar_t(b);
   }
+};
+
+template <typename scalar_t, typename func_t, int N>
+struct op_and_mul_functor {
+  void operator()(sycl::nd_item<1> item) const {
+    using accscalar_t = at::opmath_type<scalar_t>;
+    int64_t offset = item.get_local_linear_id();
+    int64_t step = item.get_local_range(0);
+    int64_t token_id = item.get_group(0);
+    func_t fn;
+    int64_t bound = dim / N;
+    for (int64_t i = offset; i < bound; i += step) {
+      auto unary_val =
+          reinterpret_cast<Memory::aligned_vector_loop<scalar_t, N>*>(
+              input_ptr)[token_id * bound * 2 + i];
+      auto mul_val =
+          reinterpret_cast<Memory::aligned_vector_loop<scalar_t, N>*>(
+              input_ptr)[token_id * bound * 2 + i + bound];
+#pragma unroll
+      for (int i = 0; i < N; ++i) {
+        unary_val[i] = fn(unary_val[i], mul_val[i]);
+      }
+      reinterpret_cast<Memory::aligned_vector_loop<scalar_t, N>*>(
+          output_ptr)[token_id * bound + i] = unary_val;
+    }
+  }
+
+  scalar_t* input_ptr;
+  scalar_t* output_ptr;
+  int64_t num_;
+  int64_t dim;
 };
 
 static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
@@ -241,7 +276,7 @@ Tensor gelu_mul(
           "gelu_mul_tanh",
           [&]() {
             using accscalar_t = acc_type<scalar_t>;
-            typename impl::gelu_tanh_mul_dpcpp_funcor<scalar_t, accscalar_t> f;
+            typename impl::gelu_tanh_mul_dpcpp_functor<scalar_t, accscalar_t> f;
             dpcpp_kernel_for_tensor_iter(iter, f);
           });
     } else {
@@ -252,11 +287,88 @@ Tensor gelu_mul(
           "gelu_mul_erf",
           [&]() {
             using accscalar_t = acc_type<scalar_t>;
-            typename impl::gelu_erf_mul_dpcpp_funcor<scalar_t, accscalar_t> f;
+            typename impl::gelu_erf_mul_dpcpp_functor<scalar_t, accscalar_t> f;
             dpcpp_kernel_for_tensor_iter(iter, f);
           });
     }
   }
+  return out;
+}
+
+#define VEC_LAUNCH(KERNEL, N)                                              \
+  case N: {                                                                \
+    auto cgf = DPCPP_Q_CGF(cgh) {                                          \
+      using accscalar_t = at::opmath_type<scalar_t>;                       \
+      impl::op_and_mul_functor<scalar_t, KERNEL<scalar_t, accscalar_t>, N> \
+          kfn = {                                                          \
+              .input_ptr = self.data_ptr<scalar_t>(),                      \
+              .output_ptr = out.data_ptr<scalar_t>(),                      \
+              .num_ = numel,                                               \
+              .dim = dim};                                                 \
+      cgh.parallel_for<decltype(kfn)>(                                     \
+          sycl::nd_range<1>(num_group * wg_size, wg_size), kfn);           \
+    };                                                                     \
+    DPCPP_Q_SUBMIT(queue, cgf);                                            \
+    break;                                                                 \
+  }
+
+#define OP_AND_MUL_FUSION(KERNEL, KERNEL_NAME)                         \
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(                                   \
+      at::ScalarType::Half,                                            \
+      at::ScalarType::BFloat16,                                        \
+      self.scalar_type(),                                              \
+      KERNEL_NAME,                                                     \
+      [=]() {                                                          \
+        auto queue = dpcppGetCurrentQueue();                           \
+        auto dev_id = dpcppGetDeviceIdOfCurrentQueue();                \
+        int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);           \
+        int64_t max_group_num =                                        \
+            dpcppMaxWorkItemsPerTile(dev_id) / max_wg_size;            \
+        int64_t numel = out.numel();                                   \
+        int64_t dim = out.size(-1);                                    \
+        int64_t tokens = numel / dim;                                  \
+        int64_t wg_size = std::min(dim, max_wg_size);                  \
+        int64_t num_group = tokens;                                    \
+        int vec_size = sizeof(float) * 4 / sizeof(scalar_t);           \
+        while ((vec_size >> 1) * wg_size >= dim) {                     \
+          vec_size = vec_size >> 1;                                    \
+        }                                                              \
+        if (dim % vec_size != 0)                                       \
+          vec_size = 1;                                                \
+        switch (vec_size) {                                            \
+          VEC_LAUNCH(KERNEL, 1);                                       \
+          VEC_LAUNCH(KERNEL, 2);                                       \
+          VEC_LAUNCH(KERNEL, 4);                                       \
+          VEC_LAUNCH(KERNEL, 8);                                       \
+          VEC_LAUNCH(KERNEL, 16);                                      \
+          default:                                                     \
+            TORCH_CHECK(false, "Unsupported vector size: ", vec_size); \
+        }                                                              \
+      });
+
+Tensor gelu_and_mul(Tensor& self, Tensor& out, c10::string_view approximate) {
+  auto _approximate = at::native::get_gelutype_enum(approximate);
+  TORCH_CHECK(
+      self.size(-1) / 2 == out.size(-1),
+      "input tensor's last dim shoule be the 2 time larger than the output tensor's last dim");
+  self = self.contiguous();
+  out = out.contiguous();
+  if (_approximate == at::native::GeluType::Tanh) {
+    OP_AND_MUL_FUSION(impl::gelu_tanh_mul_dpcpp_functor, "gelu_and_mul_tanh");
+  } else {
+    OP_AND_MUL_FUSION(impl::gelu_erf_mul_dpcpp_functor, "gelu_and_mul_erf");
+  }
+  return out;
+}
+
+Tensor silu_and_mul(Tensor& self, Tensor& out) {
+  // auto _approximate = at::native::get_gelutype_enum(approximate);
+  TORCH_CHECK(
+      self.size(-1) / 2 == out.size(-1),
+      "input tensor's last dim shoule be the 2 time larger than the output tensor's last dim");
+  self = self.contiguous();
+  out = out.contiguous();
+  OP_AND_MUL_FUSION(impl::silu_mul_dpcpp_functor, "silu_and_mul");
   return out;
 }
 
@@ -789,5 +901,9 @@ IPEX_LIBRARY_FRAGMENT() {
       "silu_mul", at::AtenIpexTypeXPU::silu_mul, c10::DispatchKey::XPU)
   IPEX_OP_REGISTER_DISPATCH(
       "gelu_mul", at::AtenIpexTypeXPU::gelu_mul, c10::DispatchKey::XPU)
+  IPEX_OP_REGISTER_DISPATCH(
+      "silu_and_mul", at::AtenIpexTypeXPU::silu_and_mul, c10::DispatchKey::XPU)
+  IPEX_OP_REGISTER_DISPATCH(
+      "gelu_and_mul", at::AtenIpexTypeXPU::gelu_and_mul, c10::DispatchKey::XPU)
 }
 } // namespace

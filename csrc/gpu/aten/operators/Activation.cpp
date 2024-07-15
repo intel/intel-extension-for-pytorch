@@ -20,6 +20,7 @@
 #include "Loops.h"
 #include "LoopsTemplates.h"
 #include "RandomEngine.h"
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace torch_ipex::xpu::dpcpp::detail;
 using namespace torch_ipex::xpu::dpcpp;
@@ -348,6 +349,12 @@ inline scalar_t gelu_tanh_forward(scalar_t x) {
   auto inner = kBeta * (static_cast<opmath_t>(x) + kKappa * x_cube);
   return opmath_t(0.5) * static_cast<opmath_t>(x) *
       (opmath_t(1) + Numerics<opmath_t>::tanh(inner));
+}
+
+template <typename scalar_t>
+inline scalar_t gelu_quick_forward(scalar_t x) {
+  using opmath_t = at::opmath_type<scalar_t>;
+  return (scalar_t)(((opmath_t)x) / (1.0f + expf(-1.702f * (opmath_t)x)));
 }
 
 template <typename scalar_t>
@@ -780,6 +787,12 @@ struct GeluTanhOutFunctor {
 };
 
 template <typename scalar_t>
+struct GeluQuickOutFunctor {
+  scalar_t operator()(scalar_t self) const {
+    return impl::gelu_quick_forward<scalar_t>(self);
+  }
+};
+template <typename scalar_t>
 struct GeluErfOutFunctor {
   scalar_t operator()(scalar_t self) const {
     return impl::gelu_erf_forward<scalar_t>(self);
@@ -823,6 +836,31 @@ Tensor& gelu_out(
 Tensor gelu(const Tensor& self, c10::string_view approximate) {
   Tensor result;
   return gelu_out(self, approximate, result);
+}
+
+Tensor gelu_quick_out(const Tensor& self, Tensor& result) {
+  bool out_defined = result.defined();
+  auto iter = TensorIterator::unary_op(result, self);
+  auto kernel_fn = [=](TensorIteratorBase& iter) {
+    IPEX_DISPATCH_FLOATING_TYPES_AND2(
+        at::ScalarType::BFloat16,
+        at::ScalarType::Half,
+        iter.dtype(),
+        "gelu_quick",
+        [&]() {
+          GeluQuickOutFunctor<scalar_t> f;
+          dpcpp_kernel_for_tensor_iter(iter, f);
+        });
+  };
+  kernel_fn(iter);
+  if (!out_defined)
+    return iter.output();
+  return result;
+}
+
+Tensor gelu_quick(const Tensor& self) {
+  Tensor result;
+  return gelu_quick_out(self, result);
 }
 
 template <typename scalar_t>
@@ -995,6 +1033,13 @@ TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl("silu_backward", TORCH_FN(silu_backward));
   m.impl("mish_backward", TORCH_FN(mish_backward));
 }
-
+namespace {
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "gelu_quick", AtenIpexTypeXPU::gelu_quick, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "gelu_quick_out", AtenIpexTypeXPU::gelu_quick_out, c10::DispatchKey::XPU);
+}
+} // namespace
 } // namespace AtenIpexTypeXPU
 } // namespace at

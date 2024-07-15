@@ -1,10 +1,12 @@
 #include <ATen/ATen.h>
 #include <ATen/core/Array.h>
 
+#include <ATen/OpMathType.h>
 #include <core/MemoryFormat.h>
 #include <core/detail/IndexUtils.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include <cstdint>
 
 #include "Reduce.h"
 #include "comm/ATDispatch.h"
@@ -373,6 +375,229 @@ void apply_rotary_embedding(
       });
 }
 
+template <
+    typename scalar_t,
+    EmbeddingAlgorithm algo = EmbeddingAlgorithm::RotateHalf,
+    bool has_cache_offset = true>
+struct RotaryEmbeddingBatched {
+  void operator()(sycl::nd_item<1> item) const {
+    using accscalar = at::opmath_type<scalar_t>;
+    int32_t token_id = item.get_group(0);
+    int32_t start_idx = item.get_local_id(0);
+    int64_t pos = positions_[token_id];
+    int64_t cos_sin_offset = 0;
+    if constexpr (has_cache_offset)
+      int64_t cos_sin_offset = cos_sin_cache_offsets_[token_id];
+    scalar_t* cos_cache = cos_sin_cache_ + (pos + cos_sin_offset) * rot_dim_;
+    int32_t embed_dim = rot_dim_ / 2;
+    scalar_t* sin_cache = cos_cache + embed_dim;
+    scalar_t* query_base = query_ + token_id * query_stride_;
+    scalar_t* key_base = key_ + token_id * key_stride_;
+    int32_t q_num = num_heads_ * embed_dim;
+    int32_t k_num = num_kv_heads_ * embed_dim;
+    int32_t local_range = item.get_local_range(0);
+    for (int i = start_idx; i < q_num; i += local_range) {
+      int32_t head_id = i / embed_dim;
+      int32_t rot_offset = i % embed_dim;
+      scalar_t* query_st = query_base + head_id * head_size_;
+      int x_idx, y_idx;
+      accscalar cos_val, sin_val;
+      if constexpr (algo == EmbeddingAlgorithm::RotateHalf) {
+        x_idx = rot_offset;
+        y_idx = rot_offset + embed_dim;
+        cos_val = cos_cache[x_idx];
+        sin_val = sin_cache[x_idx];
+      } else {
+        x_idx = 2 * rot_offset;
+        y_idx = 2 * rot_offset + 1;
+        cos_val = cos_cache[x_idx / 2];
+        sin_val = sin_cache[x_idx / 2];
+      }
+      accscalar x = query_st[x_idx];
+      accscalar y = query_st[y_idx];
+      query_st[x_idx] = x * cos_val - y * sin_val;
+      query_st[y_idx] = x * sin_val + y * cos_val;
+      if (i < k_num) {
+        scalar_t* key_st = key_base + head_id * head_size_;
+        x = key_st[x_idx];
+        y = key_st[y_idx];
+        key_st[x_idx] = x * cos_val - y * sin_val;
+        key_st[y_idx] = x * sin_val + y * cos_val;
+      }
+    }
+  }
+
+  int64_t* positions_;
+  scalar_t* cos_sin_cache_;
+  int64_t* cos_sin_cache_offsets_;
+  scalar_t* query_;
+  scalar_t* key_;
+  int num_heads_;
+  int num_kv_heads_;
+  int query_stride_;
+  int key_stride_;
+  int64_t head_size_;
+  int64_t rot_dim_;
+};
+
+void rotary_embedding_batched(
+    const Tensor& positions, //[batch_size, seqlen] or [num_tokens]
+    const Tensor& query, // [(bs, seq)/num_tokens, num_head * head_dim]
+    const Tensor& key, // [(bs, seq)/num_tokens, num_kv_head * head_dim]
+    int64_t head_size,
+    const Tensor& cos_sin_cache, // [max_position, rot_dim]
+    bool is_neox,
+    int64_t rot_dim,
+    Tensor& cos_sin_cache_offsets // [num_tokens]
+) {
+  int64_t num_tokens = positions.view(-1).size(0);
+  int64_t num_heads = query.size(-1) / head_size;
+  int64_t num_kv_heads = key.size(-1) / head_size;
+  int64_t query_stride = query.stride(-2);
+  int64_t key_stride = key.stride(-2);
+  auto queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
+  int64_t max_group_num = dpcppMaxWorkItemsPerTile(dev_id) / max_wg_size;
+  int64_t num_groups = num_tokens;
+  int64_t group_size = std::min(num_heads * rot_dim / 2, max_wg_size);
+
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      query.scalar_type(),
+      "rotary_embedding_batched",
+      [=]() {
+        auto cgf = DPCPP_Q_CGF(cgh) {
+          if (is_neox) {
+            RotaryEmbeddingBatched<scalar_t, EmbeddingAlgorithm::RotateHalf>
+                kernel = {
+                    .positions_ = positions.data_ptr<int64_t>(),
+                    .cos_sin_cache_ = cos_sin_cache.data_ptr<scalar_t>(),
+                    .cos_sin_cache_offsets_ =
+                        cos_sin_cache_offsets.data_ptr<int64_t>(),
+                    .query_ = query.data_ptr<scalar_t>(),
+                    .key_ = key.data_ptr<scalar_t>(),
+                    .num_heads_ = num_heads,
+                    .num_kv_heads_ = num_kv_heads,
+                    .query_stride_ = query_stride,
+                    .key_stride_ = key_stride,
+                    .head_size_ = head_size,
+                    .rot_dim_ = rot_dim,
+                };
+            cgh.parallel_for<decltype(kernel)>(
+                sycl::nd_range<1>(
+                    sycl::range<1>(num_groups * group_size),
+                    sycl::range<1>(group_size)),
+                kernel);
+          } else {
+            RotaryEmbeddingBatched<
+                scalar_t,
+                EmbeddingAlgorithm::RotateInterleave>
+                kernel = {
+                    .positions_ = positions.data_ptr<int64_t>(),
+                    .cos_sin_cache_ = cos_sin_cache.data_ptr<scalar_t>(),
+                    .cos_sin_cache_offsets_ =
+                        cos_sin_cache_offsets.data_ptr<int64_t>(),
+                    .query_ = query.data_ptr<scalar_t>(),
+                    .key_ = key.data_ptr<scalar_t>(),
+                    .num_heads_ = num_heads,
+                    .num_kv_heads_ = num_kv_heads,
+                    .query_stride_ = query_stride,
+                    .key_stride_ = key_stride,
+                    .head_size_ = head_size,
+                    .rot_dim_ = rot_dim,
+                };
+            cgh.parallel_for<decltype(kernel)>(
+                sycl::nd_range<1>(
+                    sycl::range<1>(num_groups * group_size),
+                    sycl::range<1>(group_size)),
+                kernel);
+          }
+        };
+        DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
+      });
+}
+
+void rotary_embedding(
+    const Tensor& positions, //[batch_size, seqlen] or [num_tokens]
+    const Tensor& query, // [(bs, seq)/num_tokens, num_head * head_dim]
+    const Tensor& key, // [(bs, seq)/num_tokens, num_kv_head * head_dim]
+    int64_t head_size,
+    const Tensor& cos_sin_cache, // [max_position, rot_dim]
+    bool is_neox,
+    int64_t rot_dim) {
+  int64_t num_tokens = positions.view(-1).size(0);
+  int64_t num_heads = query.size(-1) / head_size;
+  int64_t num_kv_heads = key.size(-1) / head_size;
+  int64_t query_stride = query.stride(-2);
+  int64_t key_stride = key.stride(-2);
+  auto queue = dpcppGetCurrentQueue();
+  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
+  int64_t max_wg_size = dpcppMaxWorkGroupSize(dev_id);
+  int64_t max_group_num = dpcppMaxWorkItemsPerTile(dev_id) / max_wg_size;
+  int64_t num_groups = num_tokens;
+  int64_t group_size = std::min(max_wg_size, query.size(-1));
+
+  IPEX_DISPATCH_FLOATING_TYPES_AND2(
+      at::ScalarType::Half,
+      at::ScalarType::BFloat16,
+      query.scalar_type(),
+      "rotary_embedding",
+      [=]() {
+        auto cgf = DPCPP_Q_CGF(cgh) {
+          if (is_neox) {
+            RotaryEmbeddingBatched<
+                scalar_t,
+                EmbeddingAlgorithm::RotateHalf,
+                false>
+                kernel = {
+                    .positions_ = positions.data_ptr<int64_t>(),
+                    .cos_sin_cache_ = cos_sin_cache.data_ptr<scalar_t>(),
+                    .cos_sin_cache_offsets_ = nullptr,
+                    .query_ = query.data_ptr<scalar_t>(),
+                    .key_ = key.data_ptr<scalar_t>(),
+                    .num_heads_ = num_heads,
+                    .num_kv_heads_ = num_kv_heads,
+                    .query_stride_ = query_stride,
+                    .key_stride_ = key_stride,
+                    .head_size_ = head_size,
+                    .rot_dim_ = rot_dim,
+                };
+            cgh.parallel_for<decltype(kernel)>(
+                sycl::nd_range<1>(
+                    sycl::range<1>(num_groups * group_size),
+                    sycl::range<1>(group_size)),
+                kernel);
+          } else {
+            RotaryEmbeddingBatched<
+                scalar_t,
+                EmbeddingAlgorithm::RotateInterleave,
+                false>
+                kernel = {
+                    .positions_ = positions.data_ptr<int64_t>(),
+                    .cos_sin_cache_ = cos_sin_cache.data_ptr<scalar_t>(),
+                    .cos_sin_cache_offsets_ = nullptr,
+                    .query_ = query.data_ptr<scalar_t>(),
+                    .key_ = key.data_ptr<scalar_t>(),
+                    .num_heads_ = num_heads,
+                    .num_kv_heads_ = num_kv_heads,
+                    .query_stride_ = query_stride,
+                    .key_stride_ = key_stride,
+                    .head_size_ = head_size,
+                    .rot_dim_ = rot_dim,
+                };
+            cgh.parallel_for<decltype(kernel)>(
+                sycl::nd_range<1>(
+                    sycl::range<1>(num_groups * group_size),
+                    sycl::range<1>(group_size)),
+                kernel);
+          }
+        };
+        DPCPP_Q_SUBMIT(dpcppGetCurrentQueue(), cgf);
+      });
+}
+
 void apply_rotary_embedding_two(
     const Tensor& query,
     const Tensor& sin,
@@ -419,24 +644,29 @@ IPEX_LIBRARY_FRAGMENT() {
       "apply_rotary_embedding_two_qk",
       apply_rotary_embedding_two_qk,
       c10::DispatchKey::XPU);
-}
-IPEX_LIBRARY_FRAGMENT() {
+
   IPEX_OP_REGISTER_DISPATCH(
       "apply_rotary_embedding_two",
       apply_rotary_embedding_two,
       c10::DispatchKey::XPU);
-}
-IPEX_LIBRARY_FRAGMENT() {
+
   IPEX_OP_REGISTER_DISPATCH(
       "apply_rotary_embedding_half",
       apply_rotary_embedding_half,
       c10::DispatchKey::XPU);
-}
-IPEX_LIBRARY_FRAGMENT() {
+
   IPEX_OP_REGISTER_DISPATCH(
       "apply_rotary_embedding_half_qk",
       apply_rotary_embedding_half_qk,
       c10::DispatchKey::XPU);
+
+  IPEX_OP_REGISTER_DISPATCH(
+      "rotary_embedding_batched",
+      rotary_embedding_batched,
+      c10::DispatchKey::XPU);
+
+  IPEX_OP_REGISTER_DISPATCH(
+      "rotary_embedding", rotary_embedding, c10::DispatchKey::XPU);
 }
 } // namespace
 
