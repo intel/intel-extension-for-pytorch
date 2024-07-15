@@ -268,6 +268,152 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                                 \
       k_);
 
+#define HGEMM_INT4_MLP_SILU_MUL_DISPATCH(                               \
+    F,                                                                  \
+    WG_M,                                                               \
+    WG_N,                                                               \
+    SG_M,                                                               \
+    SG_N,                                                               \
+    SG_K,                                                               \
+    GZ,                                                                 \
+    SLM_KS,                                                             \
+    L3_KS,                                                              \
+    SYNC_FREQ,                                                          \
+    STAGES,                                                             \
+    ARCH)                                                               \
+  F<sycl::half,                                                         \
+    WG_M,                                                               \
+    WG_N,                                                               \
+    SG_M,                                                               \
+    SG_N,                                                               \
+    SG_K,                                                               \
+    GZ,                                                                 \
+    SLM_KS,                                                             \
+    L3_KS,                                                              \
+    SYNC_FREQ,                                                          \
+    STAGES,                                                             \
+    ARCH>(                                                              \
+      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                 \
+      weight_zp_ptr_,                                                   \
+      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()), \
+      acc_tensor_->data_ptr<float>(),                                   \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),             \
+      m_,                                                               \
+      n_,                                                               \
+      k_);
+
+#define HGEMM_INT4_MLP_BIAS_SILU_MUL_DISPATCH(                            \
+    F,                                                                    \
+    WG_M,                                                                 \
+    WG_N,                                                                 \
+    SG_M,                                                                 \
+    SG_N,                                                                 \
+    SG_K,                                                                 \
+    GZ,                                                                   \
+    SLM_KS,                                                               \
+    L3_KS,                                                                \
+    SYNC_FREQ,                                                            \
+    STAGES,                                                               \
+    ARCH)                                                                 \
+  F<sycl::half,                                                           \
+    WG_M,                                                                 \
+    WG_N,                                                                 \
+    SG_M,                                                                 \
+    SG_N,                                                                 \
+    SG_K,                                                                 \
+    GZ,                                                                   \
+    SLM_KS,                                                               \
+    L3_KS,                                                                \
+    SYNC_FREQ,                                                            \
+    STAGES,                                                               \
+    ARCH>(                                                                \
+      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
+      weight_zp_ptr_,                                                     \
+      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      acc_tensor_->data_ptr<float>(),                                     \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);
+#define HGEMM_INT4_MLP_SILU_MUL_BIAS_DISPATCH(                            \
+    F,                                                                    \
+    WG_M,                                                                 \
+    WG_N,                                                                 \
+    SG_M,                                                                 \
+    SG_N,                                                                 \
+    SG_K,                                                                 \
+    GZ,                                                                   \
+    SLM_KS,                                                               \
+    L3_KS,                                                                \
+    SYNC_FREQ,                                                            \
+    STAGES,                                                               \
+    ARCH)                                                                 \
+  F<sycl::half,                                                           \
+    WG_M,                                                                 \
+    WG_N,                                                                 \
+    SG_M,                                                                 \
+    SG_N,                                                                 \
+    SG_K,                                                                 \
+    GZ,                                                                   \
+    SLM_KS,                                                               \
+    L3_KS,                                                                \
+    SYNC_FREQ,                                                            \
+    STAGES,                                                               \
+    ARCH>(                                                                \
+      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
+      weight_zp_ptr_,                                                     \
+      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+      reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()), \
+      acc_tensor_->data_ptr<float>(),                                     \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);
+#define HGEMM_INT4_MLP_BIAS_SILU_MUL_BIAS_DISPATCH(                       \
+    F,                                                                    \
+    WG_M,                                                                 \
+    WG_N,                                                                 \
+    SG_M,                                                                 \
+    SG_N,                                                                 \
+    SG_K,                                                                 \
+    GZ,                                                                   \
+    SLM_KS,                                                               \
+    L3_KS,                                                                \
+    SYNC_FREQ,                                                            \
+    STAGES,                                                               \
+    ARCH)                                                                 \
+  F<sycl::half,                                                           \
+    WG_M,                                                                 \
+    WG_N,                                                                 \
+    SG_M,                                                                 \
+    SG_N,                                                                 \
+    SG_K,                                                                 \
+    GZ,                                                                   \
+    SLM_KS,                                                               \
+    L3_KS,                                                                \
+    SYNC_FREQ,                                                            \
+    STAGES,                                                               \
+    ARCH>(                                                                \
+      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
+      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
+      weight_zp_ptr_,                                                     \
+      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
+      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
+      reinterpret_cast<sycl::half*>(epilogues_[3]->data_ptr<scalar_t>()), \
+      acc_tensor_->data_ptr<float>(),                                     \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
+      m_,                                                                 \
+      n_,                                                                 \
+      k_);
+
 #define HGEMM_INT4_QKV_DISPATCH(                                        \
     F,                                                                  \
     WG_M,                                                               \
@@ -696,6 +842,84 @@ using namespace torch_ipex::xpu::xetla;
           SYNC_FREQ,                                                          \
           STAGES,                                                             \
           ARCH)                                                               \
+    else if (std::any_of(                                                     \
+                 epilogue_type_,                                              \
+                 epilogue_type_ + num_epilogues_,                             \
+                 [](EpilogueType epi_type) {                                  \
+                   return epi_type == GATE_UP_MUL;                            \
+                 })) {                                                        \
+      if (num_epilogues_ == 2 && epilogue_type_[0] == SILU &&                 \
+          epilogue_type_[1] == GATE_UP_MUL)                                   \
+        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                      \
+            HGEMM_INT4_MLP_SILU_MUL_DISPATCH,                                 \
+            hgemm_mlp_silu_mul_wint4,                                         \
+            WG_M,                                                             \
+            WG_N,                                                             \
+            SG_M,                                                             \
+            SG_N,                                                             \
+            SG_K,                                                             \
+            GZ,                                                               \
+            SLM_KS,                                                           \
+            L3_KS,                                                            \
+            SYNC_FREQ,                                                        \
+            STAGES,                                                           \
+            ARCH)                                                             \
+      else if (                                                               \
+          num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                 \
+          epilogue_type_[1] == SILU && epilogue_type_[2] == GATE_UP_MUL)      \
+        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                      \
+            HGEMM_INT4_MLP_BIAS_SILU_MUL_DISPATCH,                            \
+            hgemm_mlp_bias_silu_mul_wint4,                                    \
+            WG_M,                                                             \
+            WG_N,                                                             \
+            SG_M,                                                             \
+            SG_N,                                                             \
+            SG_K,                                                             \
+            GZ,                                                               \
+            SLM_KS,                                                           \
+            L3_KS,                                                            \
+            SYNC_FREQ,                                                        \
+            STAGES,                                                           \
+            ARCH)                                                             \
+      else if (                                                               \
+          num_epilogues_ == 3 && epilogue_type_[0] == SILU &&                 \
+          epilogue_type_[1] == GATE_UP_MUL && epilogue_type_[2] == BIAS)      \
+        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                      \
+            HGEMM_INT4_MLP_SILU_MUL_BIAS_DISPATCH,                            \
+            hgemm_mlp_silu_mul_bias_wint4,                                    \
+            WG_M,                                                             \
+            WG_N,                                                             \
+            SG_M,                                                             \
+            SG_N,                                                             \
+            SG_K,                                                             \
+            GZ,                                                               \
+            SLM_KS,                                                           \
+            L3_KS,                                                            \
+            SYNC_FREQ,                                                        \
+            STAGES,                                                           \
+            ARCH)                                                             \
+      else if (                                                               \
+          num_epilogues_ == 4 && epilogue_type_[0] == BIAS &&                 \
+          epilogue_type_[1] == SILU && epilogue_type_[2] == GATE_UP_MUL &&    \
+          epilogue_type_[3] == BIAS)                                          \
+        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                      \
+            HGEMM_INT4_MLP_BIAS_SILU_MUL_BIAS_DISPATCH,                       \
+            hgemm_mlp_bias_silu_mul_bias_wint4,                               \
+            WG_M,                                                             \
+            WG_N,                                                             \
+            SG_M,                                                             \
+            SG_N,                                                             \
+            SG_K,                                                             \
+            GZ,                                                               \
+            SLM_KS,                                                           \
+            L3_KS,                                                            \
+            SYNC_FREQ,                                                        \
+            STAGES,                                                           \
+            ARCH)                                                             \
+      else                                                                    \
+        TORCH_CHECK(false, "Unsupported gate_up epilogue type");              \
+    } else                                                                    \
+      TORCH_CHECK(false, "Unsupported epilogue type");                        \
   }
 
 struct GemmWint4Config {
@@ -759,6 +983,7 @@ class HGEMMXetla_INT4 final {
     SILU,
     SCALED_RES_ADD,
     SPLIT3,
+    GATE_UP_MUL,
   };
 
  private:
@@ -894,13 +1119,23 @@ class HGEMMXetla_INT4 final {
     bool has_split3 =
         (epilogue_type_[0] == SPLIT3 ||
          (epilogue_type_[0] == BIAS && epilogue_type_[1] == SPLIT3));
-    if (!(input_->dim() == 2 &&
-          ((!has_split3 && weight_->dim() == 2) ||
-           (has_split3 && weight_->dim() == 3)) &&
-          std::all_of(outputs_.begin(), outputs_.end(), [](Tensor* out) {
-            return out->dim() == 2;
-          }))) {
-      std::cout << "dim check fail!" << std::endl;
+    bool has_gate_up = std::any_of(
+        epilogue_type_,
+        epilogue_type_ + num_epilogues_,
+        [](EpilogueType epi_type) { return epi_type == GATE_UP_MUL; });
+    if (input_->dim() != 2) {
+      std::cout << "input dim check fail!" << std::endl;
+      return *this;
+    }
+    if (std::any_of(outputs_.begin(), outputs_.end(), [](Tensor* out) {
+          return out->dim() != 2;
+        })) {
+      std::cout << "output dim check fail!" << std::endl;
+      return *this;
+    }
+    if ((has_split3 || has_gate_up) ? weight_->dim() != 3
+                                    : weight_->dim() != 2) {
+      std::cout << "weight dim check fail!" << std::endl;
       return *this;
     }
     is_a_row_major_ = input_->is_contiguous();
@@ -915,22 +1150,28 @@ class HGEMMXetla_INT4 final {
     if (group_size_ == -1 || group_size_ == k_)
       group_size_ = 0;
     // Set correct n dim.
-    if (has_split3)
+    if (has_split3 || has_gate_up)
       n_ = b_sizes[1];
     else
       n_ = b_sizes[0];
     for (int i = 0; i < num_epilogues_; i++) {
       switch (epilogue_type_[i]) {
         case BIAS: {
-          bool ck = ((!has_split3 && epilogues_[i]->dim() == 1) ||
-                     (has_split3 && epilogues_[i]->dim() == 2)) &&
-              epilogues_[i]->is_contiguous();
-          ck = ck &&
-              ((!has_split3 && epilogues_[i]->sizes()[0] == n_) ||
-               (has_split3 && epilogues_[i]->sizes()[1] == n_));
-          ck = ck && epilogues_[i]->scalar_type() == kHalf;
-          if (!ck) {
-            std::cout << "bias ck check fail!" << std::endl;
+          if (has_split3 ? (epilogues_[i]->dim() != 2)
+                         : (epilogues_[i]->dim() != 1)) {
+            std::cout << "bias dim check fail!" << std::endl;
+            return *this;
+          }
+          if (!epilogues_[i]->is_contiguous()) {
+            std::cout << "bias contiguity check fail!" << std::endl;
+            return *this;
+          }
+          if (epilogues_[i]->sizes()[has_split3 ? 1 : 0] != n_) {
+            std::cout << "bias size check fail!" << std::endl;
+            return *this;
+          }
+          if (epilogues_[i]->scalar_type() != kHalf) {
+            std::cout << "bias dtype check fail!" << std::endl;
             return *this;
           }
         } break;
@@ -977,15 +1218,26 @@ class HGEMMXetla_INT4 final {
       static constexpr int sync_freq = CurrConfig.sync_freq;
       static constexpr int stages = CurrConfig.stages;
       // allocate temp buffers for global split
-      size_t acc_size = get_acc_size(m_, n_);
-      size_t cnt_size = get_cnt_size<wg_m, wg_n, sg_m, sg_n, slm_ks>(m_, n_);
-      Tensor acc_tensor = at::AtenIpexTypeXPU::empty(
-          {acc_size}, input_->options().dtype(at::kFloat), c10::nullopt);
-      Tensor cnt_tensor = at::AtenIpexTypeXPU::empty(
-          {cnt_size}, input_->options().dtype(at::kByte), c10::nullopt);
-      acc_tensor_ = const_cast<Tensor*>(&acc_tensor);
-      cnt_tensor_ = const_cast<Tensor*>(&cnt_tensor);
-
+      Tensor acc_tensor, cnt_tensor;
+      if constexpr (l3_ks > 1) {
+        size_t acc_size = get_acc_size(m_, n_);
+        size_t cnt_size = get_cnt_size<wg_m, wg_n, sg_m, sg_n, slm_ks>(m_, n_);
+        if (epilogue_type_[0] == GATE_UP_MUL)
+          acc_size *= 2;
+        acc_tensor = at::AtenIpexTypeXPU::empty(
+            {acc_size}, input_->options().dtype(at::kFloat), c10::nullopt);
+        acc_tensor = at::AtenIpexTypeXPU::empty(
+            {cnt_size}, input_->options().dtype(at::kByte), c10::nullopt);
+        acc_tensor_ = const_cast<Tensor*>(&acc_tensor);
+        cnt_tensor_ = const_cast<Tensor*>(&cnt_tensor);
+      } else {
+        static auto null_tensor_float = at::AtenIpexTypeXPU::empty(
+            {0}, input_->options().dtype(at::kFloat), c10::nullopt);
+        static auto null_tensor_byte = at::AtenIpexTypeXPU::empty(
+            {0}, input_->options().dtype(at::kByte), c10::nullopt);
+        acc_tensor_ = const_cast<Tensor*>(&null_tensor_float);
+        cnt_tensor_ = const_cast<Tensor*>(&null_tensor_byte);
+      }
       HGEMM_INT4_COMMON_DISPATCH(
           wg_m,
           wg_n,

@@ -107,6 +107,58 @@ using bf16 = gpu::xetla::bf16;
       const uint32_t m,                                                       \
       const uint32_t n,                                                       \
       const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_mlp_silu_mul_wint4<scalar_t, ##__VA_ARGS__>(                          \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
+      const scalar_t* b_scale,                                                \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_mlp_bias_silu_mul_wint4<scalar_t, ##__VA_ARGS__>(                     \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* bias_gate,                                              \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_mlp_silu_mul_bias_wint4<scalar_t, ##__VA_ARGS__>(                     \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* bias_up,                                                \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
+  template cgfs_t XETLA_KERNEL_API                                            \
+  hgemm_mlp_bias_silu_mul_bias_wint4<scalar_t, ##__VA_ARGS__>(                \
+      scalar_t * out,                                                         \
+      const scalar_t* a,                                                      \
+      const uint32_t* b,                                                      \
+      const uint32_t* b_zp,                                                   \
+      const scalar_t* b_scale,                                                \
+      const scalar_t* bias_gate,                                              \
+      const scalar_t* bias_up,                                                \
+      float* acc_ptr,                                                         \
+      uint32_t* cnt_ptr,                                                      \
+      const uint32_t m,                                                       \
+      const uint32_t n,                                                       \
+      const uint32_t k);                                                      \
   template cgfs_t XETLA_KERNEL_API hgemm_qkv_wint4<scalar_t, ##__VA_ARGS__>(  \
       scalar_t * out0,                                                        \
       scalar_t * out1,                                                        \
