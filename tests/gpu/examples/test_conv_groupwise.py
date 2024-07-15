@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from torch.testing._internal.common_utils import dtype2prec_DONTUSE
-from torch.testing._internal.common_nn import NNTestCase
+from torch.testing._internal.common_utils import TestCase
 from torch.testing._internal.common_device_type import dtypes
 
 import intel_extension_for_pytorch  # noqa
@@ -15,7 +15,7 @@ dtype_origin = torch.get_default_dtype()
 # the number of groups == number of input channels
 
 
-class TestNN(NNTestCase):
+class TestNN(TestCase):
     _do_xpu_memory_leak_check = True
     _do_xpu_non_default_stream = True
 

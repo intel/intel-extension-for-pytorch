@@ -77,6 +77,7 @@ def is_all_nan(tensor):
 
 #  Register all distributions for generic tests.
 Example = namedtuple("Example", ["Dist", "params"])
+state = torch.get_rng_state()
 EXAMPLES = [
     Example(
         Bernoulli,
@@ -99,6 +100,7 @@ EXAMPLES = [
         ],
     ),
 ]
+torch.set_rng_state(state)
 
 BAD_EXAMPLES = [
     Example(

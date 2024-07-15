@@ -1,5 +1,4 @@
 import torch
-import pytest
 from torch.testing._internal.common_utils import TestCase
 import copy
 import intel_extension_for_pytorch  # noqa
@@ -295,7 +294,7 @@ class TestTorchMethod(TestCase):
 
     def test_silu_bwd(self):
         self.unary_bwd_case(torch.nn.functional.silu)
-        # self.unary_bwd_case(torch.nn.functional.silu, torch.bfloat16)
+        self.unary_bwd_case(torch.nn.functional.silu, torch.bfloat16)
         self.unary_bwd_case(torch.nn.functional.silu, torch.float, True)
 
     def test_tanh_bwd(self):
@@ -303,14 +302,6 @@ class TestTorchMethod(TestCase):
         # self.unary_bwd_case(torch.nn.functional.tanh, torch.bfloat16)
         self.unary_bwd_case(torch.nn.functional.tanh, torch.float, True)
 
-    # Consumer-grade machines used for Arc produce divergent baseline output for this UT when
-    # it is run for BF16. It doesn't fail when run individually, so we're skipping it due to
-    # this strange behavior, in order to unblock release in Nov '23.
-    # Device name strings differ across platforms. We'll only use names we encounter for A770
-    @pytest.mark.skipif(
-        "56a0" in torch.xpu.get_device_name(0) or "Arc" in torch.xpu.get_device_name(0),
-        reason="Temporarily skip this UT on Arc to unblock release",  # noqa
-    )
     def test_elu_bwd_bfloat16(self):
         self.unary_bwd_case(torch.nn.functional.elu, torch.bfloat16)
 
