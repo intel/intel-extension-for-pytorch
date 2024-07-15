@@ -550,6 +550,16 @@ def find_ipex_experts_module(experts_module, linear_per_expert):
             linear_per_expert.append(sub_m)
         find_ipex_experts_module(sub_m, linear_per_expert)
 
+def find_ipex_experts_module_(experts_module, linear_per_expert):
+    if experts_module is None:
+        linear_per_expert.append(experts_module)
+        return
+    for _, sub_m in experts_module.named_children():
+        if isinstance(sub_m, WeightOnlyQuantizedLinear) or isinstance(
+            sub_m, _IPEXLinear
+        ):
+            linear_per_expert.append(sub_m)
+        find_ipex_experts_module_(sub_m, linear_per_expert)
 
 class _IPEXlinearMOECPU(nn.Module):
     def __init__(self, W13=None, W2=None, W3=None, experts_module=None):
@@ -612,6 +622,146 @@ class _IPEXlinearMOECPU(nn.Module):
             selected_experts, num_classes=self.num_experts
         ).permute(2, 1, 0)
         for expert_idx in range(self.num_experts):
+            idx, top_x = torch.where(expert_mask[expert_idx])
+            if isinstance(
+                self.linear_module_list[expert_idx][0], WeightOnlyQuantizedLinear
+            ):
+                final_hidden_states = torch.ops.torch_ipex.mixtral_moe_woq(
+                    hidden_states,
+                    top_x,
+                    idx,
+                    self.linear_module_list[expert_idx][
+                        0
+                    ]._op_context.get_data_handle(),
+                    self.linear_module_list[expert_idx][
+                        2
+                    ]._op_context.get_data_handle(),
+                    self.linear_module_list[expert_idx][
+                        1
+                    ]._op_context.get_data_handle(),
+                    routing_weights,
+                    final_hidden_states,
+                    False,
+                )
+            elif isinstance(self.linear_module_list[expert_idx][0], _IPEXLinear):
+                if (
+                    hasattr(self.linear_module_list[expert_idx][0], "use_dnnl")
+                    and self.linear_module_list[expert_idx][0].use_dnnl
+                ):
+                    final_hidden_states = torch.ops.torch_ipex.mixtral_moe(
+                        hidden_states,
+                        top_x,
+                        idx,
+                        self.linear_module_list[expert_idx][0]._get_forward_weight(),
+                        self.linear_module_list[expert_idx][0].ctx.get_data_handle(),
+                        self.linear_module_list[expert_idx][2]._get_forward_weight(),
+                        self.linear_module_list[expert_idx][2].ctx.get_data_handle(),
+                        self.linear_module_list[expert_idx][1]._get_forward_weight(),
+                        self.linear_module_list[expert_idx][1].ctx.get_data_handle(),
+                        hasattr(self.linear_module_list[expert_idx][0], "use_dnnl")
+                        and self.linear_module_list[expert_idx][0].use_dnnl,
+                        routing_weights,
+                        final_hidden_states,
+                        False,
+                    )
+                else:
+                    final_hidden_states = torch.ops.torch_ipex.mixtral_moe_tpp(
+                        hidden_states,
+                        top_x,
+                        idx,
+                        self.linear_module_list[expert_idx][0].weight.detach(),
+                        self.linear_module_list[expert_idx][2].weight.detach(),
+                        self.linear_module_list[expert_idx][1].weight.detach(),
+                        (
+                            self.linear_module_list[expert_idx][0].tpp_fallback
+                            if hasattr(
+                                self.linear_module_list[expert_idx][0], "tpp_fallback"
+                            )
+                            else True
+                        ),
+                        routing_weights,
+                        final_hidden_states,
+                        False,
+                    )
+            else:
+                # nn.Linear
+                final_hidden_states = torch.ops.torch_ipex.mixtral_moe_tpp(
+                    hidden_states,
+                    top_x,
+                    idx,
+                    self.linear_module_list[expert_idx][0].weight.detach(),
+                    self.linear_module_list[expert_idx][2].weight.detach(),
+                    self.linear_module_list[expert_idx][1].weight.detach(),
+                    True,
+                    routing_weights,
+                    final_hidden_states,
+                    False,
+                )
+
+        return final_hidden_states.view(-1, head_dim)
+
+class _IPEXlinearMOECPU_TP(nn.Module):
+    def __init__(self, W13=None, W2=None, W3=None, experts_module=None, expert_indicies=None):
+        super().__init__()
+        if experts_module is None:
+            self.num_experts = W2.shape[0]
+            self.hidden_size = W2.shape[1]
+            self.intermediate_size = W2.shape[2]
+
+            linear_list = []
+            for i in range(W2.shape[0]):
+                if W3 is not None:
+                    _W1 = W13[i]
+                else:
+                    _W1 = W13[i][0 : self.intermediate_size, :]
+                    _W3 = W13[i][self.intermediate_size : 2 * self.intermediate_size, :]
+                linear1 = skip_init(torch.nn.Linear, self.intermediate_size, self.hidden_size, bias=False)
+                # linear1 = nn.Linear(
+                #     self.intermediate_size, self.hidden_size, bias=False
+                # )
+                linear1.weight = nn.Parameter(_W1)
+                linear2 = skip_init(torch.nn.Linear, self.hidden_size, self.intermediate_size, bias=False)
+                # linear2 = nn.Linear(
+                #     self.hidden_size, self.intermediate_size, bias=False
+                # )
+                linear2.weight = nn.Parameter(W2[i])
+                linear3 = skip_init(torch.nn.Linear, self.intermediate_size, self.hidden_size, bias=False)
+                # linear3 = nn.Linear(
+                #     self.intermediate_size, self.hidden_size, bias=False
+                # )
+                linear3.weight = nn.Parameter(_W3)
+                linear_per_expert = nn.ModuleList([linear1, linear2, linear3])
+                linear_list.append(linear_per_expert)
+            self.linear_module_list = nn.ModuleList(
+                [linear_list[i] for i in range(W2.shape[0])]
+            )
+        else:
+            self.num_experts = len(experts_module)
+            self.expert_indicies = expert_indicies
+            linear_list = []
+            for i in range(self.num_experts):
+                linear_per_expert = nn.ModuleList([])
+                find_ipex_experts_module_(experts_module[i], linear_per_expert)
+                linear_list.append(linear_per_expert)
+            self.linear_module_list = nn.ModuleList(
+                [linear_list[i] for i in range(self.num_experts)]
+            )
+
+    def forward(self, hidden_states, score, topk):
+        batch_size, head_dim = hidden_states.shape
+        routing_weights = torch.nn.functional.softmax(score, dim=1, dtype=torch.float32)
+        routing_weights, selected_experts = torch.topk(routing_weights, topk, dim=-1)
+        routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
+        routing_weights = routing_weights.to(hidden_states.dtype)
+        final_hidden_states = torch.zeros(
+            (batch_size, head_dim),
+            dtype=hidden_states.dtype,
+            device=hidden_states.device,
+        )
+        expert_mask = torch.nn.functional.one_hot(
+            selected_experts, num_classes=self.num_experts
+        ).permute(2, 1, 0)
+        for expert_idx in self.expert_indicies:
             idx, top_x = torch.where(expert_mask[expert_idx])
             if isinstance(
                 self.linear_module_list[expert_idx][0], WeightOnlyQuantizedLinear

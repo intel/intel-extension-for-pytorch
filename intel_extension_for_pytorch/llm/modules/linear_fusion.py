@@ -54,10 +54,9 @@ class IPEXLinear2Fusion(nn.Module):
         )
 
 
-LinearMOE = (
-    intel_extension_for_pytorch.transformers.models.cpu.fusions.linear_fusion._IPEXlinearMOECPU
-)
+LinearMOE = intel_extension_for_pytorch.transformers.models.cpu.fusions.linear_fusion._IPEXlinearMOECPU
 
+LinearMOETP = intel_extension_for_pytorch.transformers.models.cpu.fusions.linear_fusion._IPEXlinearMOECPU_TP
 
 class LinearSilu(IPEXLinearFusion):
     r"""
