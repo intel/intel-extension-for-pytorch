@@ -1,10 +1,14 @@
 import sys
 
 from intel_extension_for_pytorch.transformers.models.xpu.fusions.activation_fusion import (  # noqa F401
+    gelu_quick_xpu,
     silu_mul_xpu,
+    silu_and_mul_xpu,
     gelu_mul_xpu,
+    gelu_and_mul_xpu,
     add_rms_norm_xpu,
     add_layer_norm_xpu,
+    rotary_embedding_batched_xpu,
 )
 from intel_extension_for_pytorch.transformers.models.cpu.fusions.mha_fusion import (  # noqa F401
     silu_mul_cpu,

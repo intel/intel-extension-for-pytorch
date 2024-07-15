@@ -52,6 +52,55 @@ def rotary_embedding(
     )
 
 
+def rotary_embedding_batched(
+    positions: torch.Tensor,
+    query: torch.Tensor,
+    key: torch.Tensor,
+    head_dim: int,
+    cos_sin_cache: torch.Tensor,
+    is_nexo_style: bool,
+    rotary_dim: int,
+    offsets: Optional[torch.Tensor] = None,
+):
+    r"""
+    Applies RotaryEmbedding (see https://huggingface.co/papers/2104.09864)
+    on the `query ` or `key` before their multi-head attention computation.
+
+    Args:
+
+        position_ids (torch.Tensor): The according position_ids for the input.
+        The shape should be [batch size, sequence length] or [num_tokens].
+        query, key (torch.Tensor) : inputs to be applied with position embeddings,
+            taking shape of [batch size, sequence length, num_head/num_kv_head, head_dim]
+            or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).
+        head_dim (int) : head dim from the input shape.
+        cos_sin_cache (torch.Tensor): [max_position, rotary_dim] the sin/cos value tensor
+            generated to be applied on query/key.
+        is_neox (bool) : if False. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,
+            so the offset is 1.
+            if True, e.g., for llama, cos/sin is applied to the neighboring rotary_dim elements,
+            so the offset is rotary_dim/2.
+        rotary_dim (int): the rotary dimension. e.g., 64 for GPTJ. head size for LLama.
+        offset(Optional[torch.Tensor]): offset of cos_sin_cache for each token, the size of this tensor
+            should be [num_tokens]
+
+    Return
+        query, key (torch.Tensor): [batch size, sequence length, num_head/num_kv_head, head_dim]
+        or [num_tokens, num_head/num_kv_head, head_dim].
+    """
+    f = _get_function_from_device(query.device.type, rotary_embedding_batched)
+    return f(
+        positions,
+        query,
+        key,
+        head_dim,
+        cos_sin_cache,
+        is_nexo_style,
+        rotary_dim,
+        offsets,
+    )
+
+
 def rms_norm(hidden_states: torch.Tensor, weight: torch.Tensor, eps: float):
     r"""
     Applies RMSnorm on the input (hidden states).
@@ -247,6 +296,20 @@ def varlen_attention(
     )
 
 
+def gelu_quick(x: torch.Tensor, out: torch.Tensor = None):
+    r"""
+    Applies gelu quick:
+    out = x * sigmoid(1.702 * x)
+
+    Args:
+        x (torch.Tensor): input to apply gelu_quick.
+        out (torch.Tensor): buffer to get the results.
+
+    """
+    f = _get_function_from_device(x.device.type, gelu_quick)
+    return f(x, out)
+
+
 def silu_mul(x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None):
     r"""
     Applies PyTorch silu on input x, and them mul input y:
@@ -260,6 +323,21 @@ def silu_mul(x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None):
     """
     f = _get_function_from_device(x.device.type, silu_mul)
     return f(x, y, out)
+
+
+def silu_and_mul(x: torch.Tensor, out: torch.Tensor = None):
+    r"""
+    Applies PyTorch silu on input x, and them mul input x:
+    d = x.size(-1) / 2
+    out = silu(x[..., :d])*x[..., d:]
+
+    Args:
+        x (torch.Tensor): input to apply silu and multiplicand.
+        out (torch.Tensor): buffer to get the results.
+
+    """
+    f = _get_function_from_device(x.device.type, silu_and_mul)
+    return f(x, out)
 
 
 def gelu_mul(
@@ -278,6 +356,21 @@ def gelu_mul(
     """
     f = _get_function_from_device(x.device.type, gelu_mul)
     return f(x, y, out, approximate)
+
+
+def gelu_and_mul(x: torch.Tensor, out: torch.Tensor = None, approximate="none"):
+    r"""
+    Applies PyTorch gelu on input x, and them mul input x:
+    d = x.size(-1) / 2
+    out = gelu(x[..., :d], approximate)*x[..., d:]
+
+    Args:
+        x (torch.Tensor): input to apply gelu and multiplicand.
+        out (torch.Tensor): buffer to get the results.
+
+    """
+    f = _get_function_from_device(x.device.type, gelu_and_mul)
+    return f(x, out, approximate)
 
 
 def add_rms_norm(

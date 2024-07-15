@@ -6,6 +6,10 @@ from .fusions import (
     varlen_attention,
     add_layer_norm,
     add_rms_norm,
+    gelu_quick,
     silu_mul,
     gelu_mul,
+    silu_and_mul,
+    gelu_and_mul,
+    rotary_embedding_batched,
 )
