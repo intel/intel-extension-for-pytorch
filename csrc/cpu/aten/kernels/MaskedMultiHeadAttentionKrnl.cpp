@@ -4,8 +4,8 @@
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
 #include <limits>
-#include "vec/vec.h"
 #include "../../utils/isa_utils.h"
+#include "vec/vec.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -1346,7 +1346,8 @@ first_token_masked_mha(
   auto attn_outputs = at::Tensor();
   auto attn_weights = at::Tensor();
   if ((key.scalar_type() == at::kFloat || key.scalar_type() == at::kBFloat16 ||
-       (key.scalar_type() == at::kHalf && utils::isa_has_avx512_fp16_support())) &&
+       (key.scalar_type() == at::kHalf &&
+        utils::isa_has_avx512_fp16_support())) &&
       attention_mask.stride(-1) == 1) {
     query = query.transpose(1, 2);
     key = key.transpose(1, 2);
@@ -1447,17 +1448,17 @@ masked_multihead_self_attention_kernel_impl(
         query.size(0); // record the promt bs info
 
   } else if (offset > 0 && offset + cur_len > cache_size) {
-    auto new_cache_size = cache_size * 2 + 2;
+    auto new_cache_size = cache_size * 2;
     auto new_key_cache = at::empty(
         {new_cache_size, beam_batch, key.size(2), key.size(3)}, key.options());
     auto new_value_cache = at::empty(
         {new_cache_size, beam_batch, value.size(2), value.size(3)},
         value.options());
     auto new_beam_idx =
-        at::zeros({new_cache_size, beam_batch}, beam_idx.options());
+        at::zeros({new_cache_size + 2, beam_batch}, beam_idx.options());
     new_key_cache.slice(0, 0, cache_size).copy_(key_cache);
     new_value_cache.slice(0, 0, cache_size).copy_(value_cache);
-    new_beam_idx.slice(0, 0, cache_size).copy_(beam_idx);
+    new_beam_idx.slice(0, 0, cache_size + 2).copy_(beam_idx);
     auto new_beam_idx_access = new_beam_idx.accessor<long, 2>();
     auto beam_idx_access = beam_idx.accessor<long, 2>();
     for (auto i = offset; i < new_cache_size; i++) {
@@ -1465,9 +1466,8 @@ masked_multihead_self_attention_kernel_impl(
         new_beam_idx_access[i][j] = beam_idx_access[0][j];
       }
     }
-    new_beam_idx_access[new_cache_size - 2][0] =
-        beam_idx_access[cache_size - 2][0];
-    new_beam_idx_access[new_cache_size - 1][0] =
+    new_beam_idx_access[new_cache_size][0] = beam_idx_access[cache_size - 2][0];
+    new_beam_idx_access[new_cache_size + 1][0] =
         beam_idx_access[cache_size - 1][0];
     key_cache = new_key_cache;
     value_cache = new_value_cache;
