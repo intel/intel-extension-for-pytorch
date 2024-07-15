@@ -28,14 +28,14 @@ oneCCL:
 protobuf:
   version: 3.20.3
 pytorch:
-  version: 2.5.0.dev20240711+cpu
+  version: 2.5.0.dev20240714+cpu
 torch-ccl:
   commit: v2.4.0+cpu+rc0
   repo: https://github.com/intel/torch-ccl.git
   version: 2.4.0+cpu
 torchaudio:
-  version: 2.4.0.dev20240711+cpu
+  version: 2.4.0.dev20240714+cpu
 torchvision:
-  version: 0.20.0.dev20240711+cpu
+  version: 0.20.0.dev20240714+cpu
 transformers:
   version: 4.38.1
