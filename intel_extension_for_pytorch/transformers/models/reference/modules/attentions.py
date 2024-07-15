@@ -2280,6 +2280,13 @@ class _IPEXAttentionRef(nn.Module):
             if k.startswith("__") or k.startswith("forward"):
                 continue
             setattr(self.__class__, k, getattr(module.__class__, k))
+        for base_class in module.__class__.__bases__:
+            if base_class.__class__ == nn.Module:
+                continue
+            for k, v in base_class.__dict__.items():
+                if k.startswith("__") or k.startswith("forward"):
+                    continue
+                setattr(self.__class__, k, getattr(base_class, k))
 
         self.model_backbone = config.architectures[0]
         self.distributed = distributed

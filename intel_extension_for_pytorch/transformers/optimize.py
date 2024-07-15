@@ -91,7 +91,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.38.2"
+    validated_version = "4.42.4"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(

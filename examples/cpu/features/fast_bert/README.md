@@ -5,7 +5,7 @@
 Currently `ipex.fast_bert` API is only well optimized for training. For inference, it ensures functionality, while to get peak perf, please use `ipex.optimize` API + torchscript.
 
 # Prerequisite:
-Transformers 4.6.0 ~ 4.38.1
+Transformers 4.6.0 ~ 4.42.4
 
 # Usage Example:
 Training:
