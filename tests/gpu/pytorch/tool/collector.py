@@ -8,7 +8,7 @@ def collect_fatal_error(issued_cases, logfile):
     data = read_file(logfile)
     pytorch_result = re.search("Command.+?died with.+?(?=\n)", data, re_flags)
     pytest_result = re.search("fatal python error.+?(?=\n\n)", data, re_flags | re.I)
-    timout_result = re.search("Command.+?timed out.+?(?=\n)", data, re_flags)
+    timeout_result = re.search("Command.+?timed out.+?(?=\n)", data, re_flags)
     if pytorch_result:
         return pytorch_result.group(0)
     if pytest_result:

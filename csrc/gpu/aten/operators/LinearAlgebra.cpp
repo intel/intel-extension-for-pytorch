@@ -553,6 +553,11 @@ inline void dot_check(const Tensor& self, const Tensor& other) {
 Tensor dot(const Tensor& self, const Tensor& other) {
   // if self and other are both complex,
   // dot computes self*other, without conjugating.
+  if (self.numel() == 0 && other.numel() == 0) {
+    auto tmp = at::empty({}, self.options());
+    tmp.fill_(0.0);
+    return tmp;
+  }
   if (self.is_complex()) {
     if (self.is_conj()) {
       if (other.is_conj()) {
