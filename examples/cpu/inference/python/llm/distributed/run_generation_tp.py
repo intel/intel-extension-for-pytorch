@@ -7,14 +7,9 @@ import re
 
 from transformers import (
     AutoConfig,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    LlamaTokenizer,
-    T5ForConditionalGeneration,
-    AutoProcessor,
+    TextStreamer,
 )
 
-from transformers import TextStreamer
 
 import sys
 
@@ -24,34 +19,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# supported models
-MODEL_CLASSES = {
-    "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
-    "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, LlamaTokenizer),
-    "opt": (AutoModelForCausalLM, AutoTokenizer),
-    "falcon": (AutoModelForCausalLM, AutoTokenizer),
-    "bloom": (AutoModelForCausalLM, AutoTokenizer),
-    "codegen": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan2": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
-    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
-    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
-    "t5": (T5ForConditionalGeneration, AutoTokenizer),
-    "mistral": (AutoModelForCausalLM, AutoTokenizer),
-    "mixtral": (AutoModelForCausalLM, AutoTokenizer),
-    "mpt": (AutoModelForCausalLM, AutoTokenizer),
-    "stablelm": (AutoModelForCausalLM, AutoTokenizer),
-    "qwen": (AutoModelForCausalLM, AutoTokenizer),
-    "git": (AutoModelForCausalLM, AutoProcessor),
-    "yuan": (AutoModelForCausalLM, AutoTokenizer),
-    "phi-3": (AutoModelForCausalLM, AutoTokenizer),
-    "phi": (AutoModelForCausalLM, AutoTokenizer),
-    "auto": (AutoModelForCausalLM, AutoTokenizer),
-}
+from llm.utils.supported_models import MODEL_CLASSES
 
 try:
-    from llava.model.language_model.llava_llama import LlavaLlamaForCausalLM
     from llava.model.builder import load_pretrained_model
     from llava.conversation import conv_templates
     from llava.mm_utils import get_model_name_from_path, tokenizer_image_token
@@ -62,7 +32,6 @@ try:
         DEFAULT_IM_END_TOKEN,
     )
 
-    MODEL_CLASSES["llava"] = (LlavaLlamaForCausalLM, AutoTokenizer)
 except ImportError:
     pass
 

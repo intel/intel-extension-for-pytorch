@@ -17,16 +17,13 @@ from transformers.utils import is_offline_mode
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
-    AutoTokenizer,
-    T5ForConditionalGeneration,
-    WhisperForConditionalGeneration,
-    AutoProcessor,
 )
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 import sys
 
 sys.path.append(sys.path[0] + "/../../")
+from llm.utils import MODEL_CLASSES
 
 try:
     import lmms_eval
@@ -65,31 +62,6 @@ except ImportError:
 
     Instance = None
     pass
-
-MODEL_CLASSES = {
-    "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
-    "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
-    "opt": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, AutoTokenizer),
-    "falcon": (AutoModelForCausalLM, AutoTokenizer),
-    "bloom": (AutoModelForCausalLM, AutoTokenizer),
-    "codegen": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
-    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
-    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
-    "t5": (T5ForConditionalGeneration, AutoTokenizer),
-    "mistral": (AutoModelForCausalLM, AutoTokenizer),
-    "mixtral": (AutoModelForCausalLM, AutoTokenizer),
-    "mpt": (AutoModelForCausalLM, AutoTokenizer),
-    "stablelm": (AutoModelForCausalLM, AutoTokenizer),
-    "qwen": (AutoModelForCausalLM, AutoTokenizer),
-    "git": (AutoModelForCausalLM, AutoProcessor),
-    "yuan": (AutoModelForCausalLM, AutoTokenizer),
-    "phi-3": (AutoModelForCausalLM, AutoTokenizer),
-    "phi": (AutoModelForCausalLM, AutoTokenizer),
-    "whisper": (WhisperForConditionalGeneration, AutoProcessor),
-    "auto": (AutoModelForCausalLM, AutoTokenizer),
-}
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", nargs="?", default="EleutherAI/gpt-j-6b")

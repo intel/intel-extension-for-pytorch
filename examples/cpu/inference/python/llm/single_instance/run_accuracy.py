@@ -11,39 +11,8 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 sys.path.append(sys.path[0] + "/../../")
-from transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    T5ForConditionalGeneration,
-    WhisperForConditionalGeneration,
-    AutoProcessor,
-)
-
-MODEL_CLASSES = {
-    "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
-    "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
-    "opt": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, AutoTokenizer),
-    "falcon": (AutoModelForCausalLM, AutoTokenizer),
-    "bloom": (AutoModelForCausalLM, AutoTokenizer),
-    "codegen": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
-    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
-    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
-    "t5": (T5ForConditionalGeneration, AutoTokenizer),
-    "mistral": (AutoModelForCausalLM, AutoTokenizer),
-    "mixtral": (AutoModelForCausalLM, AutoTokenizer),
-    "mpt": (AutoModelForCausalLM, AutoTokenizer),
-    "stablelm": (AutoModelForCausalLM, AutoTokenizer),
-    "qwen": (AutoModelForCausalLM, AutoTokenizer),
-    "git": (AutoModelForCausalLM, AutoProcessor),
-    "yuan": (AutoModelForCausalLM, AutoTokenizer),
-    "phi-3": (AutoModelForCausalLM, AutoTokenizer),
-    "phi": (AutoModelForCausalLM, AutoTokenizer),
-    "whisper": (WhisperForConditionalGeneration, AutoProcessor),
-    "auto": (AutoModelForCausalLM, AutoTokenizer),
-}
+from transformers import AutoConfig
+from llm.utils.supported_models import MODEL_CLASSES
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", nargs="?", default="EleutherAI/gpt-j-6b")
@@ -119,9 +88,6 @@ try:
     from lmms_eval import utils as lmms_utils
     from lmms_eval.api.registry import ALL_TASKS
     from lmms_eval.tasks import initialize_tasks
-    from llava.model.language_model.llava_llama import (  # noqa F401
-        LlavaLlamaForCausalLM,
-    )
     from llava.model.builder import load_pretrained_model
     from llava.conversation import conv_templates
     from llava.mm_utils import (

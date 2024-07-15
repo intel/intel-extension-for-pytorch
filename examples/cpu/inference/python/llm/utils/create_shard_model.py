@@ -1,48 +1,12 @@
 import torch
 import argparse
 
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    T5ForConditionalGeneration,
-    WhisperForConditionalGeneration,
-    AutoProcessor,
-)
-
 # Here import ipex for Baichuan loading compatibility, for other models we can ignore this import
 import intel_extension_for_pytorch  # noqa F401
-
-# supported models
-MODEL_CLASSES = {
-    "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
-    "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, AutoTokenizer),
-    "opt": (AutoModelForCausalLM, AutoTokenizer),
-    "falcon": (AutoModelForCausalLM, AutoTokenizer),
-    "bloom": (AutoModelForCausalLM, AutoTokenizer),
-    "codegen": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
-    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
-    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
-    "t5": (T5ForConditionalGeneration, AutoTokenizer),
-    "mistral": (AutoModelForCausalLM, AutoTokenizer),
-    "mixtral": (AutoModelForCausalLM, AutoTokenizer),
-    "mpt": (AutoModelForCausalLM, AutoTokenizer),
-    "stablelm": (AutoModelForCausalLM, AutoTokenizer),
-    "qwen": (AutoModelForCausalLM, AutoTokenizer),
-    "git": (AutoModelForCausalLM, AutoProcessor),
-    "yuan": (AutoModelForCausalLM, AutoTokenizer),
-    "phi-3": (AutoModelForCausalLM, AutoTokenizer),
-    "phi": (AutoModelForCausalLM, AutoTokenizer),
-    "whisper": (WhisperForConditionalGeneration, AutoProcessor),
-    "auto": (AutoModelForCausalLM, AutoTokenizer),
-}
+from supported_models import MODEL_CLASSES
 
 try:
-    from llava.model.language_model.llava_llama import LlavaLlamaForCausalLM
     from llava.model.builder import load_pretrained_model
-
-    MODEL_CLASSES["llava"] = (LlavaLlamaForCausalLM, AutoTokenizer)
 except ImportError:
     pass
 
