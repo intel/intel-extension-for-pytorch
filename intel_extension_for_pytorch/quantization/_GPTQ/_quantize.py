@@ -53,12 +53,10 @@ def gptq(
 
     model_path = None
     weight_config = {}
-    excluded_op = ["lm_head", "embed_out"]
     for name, module in model.named_modules():
-        if (
-            isinstance(module, torch.nn.modules.linear.Linear)
-            and name not in excluded_op
-        ):
+        if "lm_head" in name or "output_layer" in name or "embed_out" in name:
+            continue
+        if isinstance(module, torch.nn.modules.linear.Linear):
             weight_config[name] = {
                 "wbits": wbits,
                 "group_size": group_size,
