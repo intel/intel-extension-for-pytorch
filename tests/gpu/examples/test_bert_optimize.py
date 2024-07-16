@@ -27,7 +27,10 @@ class TestBertOptimize(TestCase):
         hidden_states = torch.randn([16, 512, 1024], dtype=dtype)
         attention_mask = torch.zeros([16, 1, 1, 512], dtype=dtype)
 
-        raw_model = AutoModelForPreTraining.from_config(config).to(dtype)
+        raw_model = AutoModelForPreTraining.from_config(
+            config,
+            attn_implementation="eager",
+        ).to(dtype)
         raw_model.train()
         expect_output = raw_model.bert.encoder.layer[0].attention.self(
             hidden_states=hidden_states,
