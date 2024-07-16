@@ -34,10 +34,6 @@ class TestTorchMethod(TestCase):
             out_cpu, out_xpu.cpu().float(), atol=checking_atol, rtol=checking_rtol
         )
 
-    # not support on DG2 yet
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(), reason="fallback is required"
-    )
     def test_fsdp_autocast(self, dtype=torch.bfloat16):
         head_dim = 256
         seq_lenth = 32
