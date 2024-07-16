@@ -219,13 +219,11 @@ class IPEXLmHeadLinearAllreduceWithPaddingBaichuan(
     def port_data(self):
         self.n_dim = self.module.weight.shape[0]
         self.bias = self.module.bias if hasattr(self.module, "bias") else None
+        self.weight = self.module.weight.transpose(-1, -2).contiguous()
         if dist.is_initialized():
-            self.weight = self.module.weight.transpose(-1, -2).contiguous()
             self.mp_group = self.module.mp_group
             self.rank = self.module.rank
             self.world_size = self.module.world_size
-        else:
-            self.weight = self.module.weight
 
     def forward(self, input):
         if self.first_flag:
