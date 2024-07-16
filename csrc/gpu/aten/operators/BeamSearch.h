@@ -445,13 +445,8 @@ struct BatchTopkKernelFunctor {
             int beam_idx = num_beam;
             // the candidate pool is full
             if (num_beam == beam_size) {
-              if (normed_score <
+              if (normed_score >=
                   beam_hyps_min_normed_scores[global_batch_idx]) {
-                // if the current score is less than the min score in
-                // candidate list, exit
-                selected_beams = beam_size;
-                break;
-              } else {
                 // replace the min score in candidate with new score
                 for (int j = 0; j < beam_size; j++) {
                   // find the min score, replace with current score, and sort
@@ -477,6 +472,11 @@ struct BatchTopkKernelFunctor {
                     break;
                   }
                 }
+              } else {
+                // if the current score is less than the min score in
+                // candidate list, exit
+                selected_beams = beam_size;
+                break;
               }
             }
             // when the list is full, update the one to be replaced
