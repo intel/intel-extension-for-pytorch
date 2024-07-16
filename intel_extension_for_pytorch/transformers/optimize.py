@@ -210,6 +210,10 @@ def model_convert_reference(_model):
     convert_function(_model, "greedy_search", _greedy_search)
     convert_function(_model, "sample", _sample)
     convert_function(_model, "beam_sample", _beam_sample)
+    convert_function(_model, "_beam_search", _beam_search)
+    convert_function(_model, "_greedy_search", _greedy_search)
+    convert_function(_model, "_sample", _sample)
+    convert_function(_model, "_beam_sample", _beam_sample)
     convert_function(
         _model,
         "_extract_past_from_model_output",
@@ -580,6 +584,11 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
     elif _model.config.architectures[0] == "MptForCausalLM":
         convert_function(_model, "forward", MptForCausalLM_forward)
         convert_class(
@@ -599,6 +608,11 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "MixtralForCausalLM":
         convert_function(_model, "forward", MixtralForCausalLM_forward)
         convert_function(_model.model, "forward", MixtralModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
         convert_class(
             _model,
             transformers.models.mixtral.modeling_mixtral.MixtralAttention,
@@ -616,6 +630,11 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "StableLmForCausalLM":
         convert_function(_model, "forward", StableLMEpochForCausalLM_forward)
         convert_function(_model.model, "forward", StableLMEpochModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
         convert_class(
             _model,
             type(_model.model.layers[0].self_attn),

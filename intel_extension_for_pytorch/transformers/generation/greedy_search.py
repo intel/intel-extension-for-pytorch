@@ -147,6 +147,10 @@ def _greedy_search(
             if this_peer_finished_flag.item() == 0.0:
                 break
 
+        if "past_key_values" in model_kwargs and not isinstance(
+            model_kwargs["past_key_values"], tuple
+        ):
+            model_kwargs["past_key_values"] = None
         # prepare model inputs
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 

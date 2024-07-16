@@ -2873,6 +2873,8 @@ class _IPEXAttentionRef(nn.Module):
 def _reorder_cache(
     self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
 ) -> Tuple[Tuple[torch.Tensor]]:
+    if isinstance(past_key_values[0], str):
+        past_key_values = past_key_values[1]
     if (
         len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1
     ):  # discrete kv_cache
