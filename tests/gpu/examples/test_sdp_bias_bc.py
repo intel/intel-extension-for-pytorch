@@ -13,7 +13,7 @@ class TestTorchMethod(TestCase):
         b = 2
         n = 2
         attn_head_size = 64
-        for seq_lenth in [77, 80]:
+        for seq_lenth in [77, 80, 199]:
             q_len = seq_lenth
             kv_len = seq_lenth
             for bias_size in (
