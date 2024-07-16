@@ -355,9 +355,13 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
       __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
       __ESIMD_NS::alignment<alignment>};
-  if constexpr (sizeof(T) * N < sizeof(uint32_t)) {
-    xetla_vector<uint32_t, N> offsets(byte_offset, sizeof(T));
-    return __ESIMD_NS::gather<T, N, uint32_t>(ptr, offsets);
+  if constexpr (sizeof(T) * N < sizeof(uint32_t) || N == 1) {
+    xetla_vector<T, N> ret;
+#pragma unroll
+    for (uint32_t i = 0; i < N; i++) {
+      ret[i] = ptr[i + byte_offset / sizeof(T)];
+    }
+    return ret;
   } else {
     return __ESIMD_NS::block_load<T, N>(ptr, byte_offset, props);
   }
@@ -501,9 +505,11 @@ __XETLA_API void xetla_store_global(
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
       __ESIMD_NS::alignment<alignment>};
 
-  if constexpr (sizeof(T) * N < sizeof(uint32_t)) {
-    xetla_vector<uint32_t, N> offsets(byte_offset, sizeof(T));
-    return __ESIMD_NS::scatter<T, N, uint32_t>(ptr, offsets, vals);
+  if constexpr (sizeof(T) * N < sizeof(uint32_t) || N == 1) {
+#pragma unroll
+    for (uint32_t i = 0; i < N; i++) {
+      ptr[i + byte_offset / sizeof(T)] = vals[i];
+    }
   } else {
     __ESIMD_NS::block_store<T, N>(ptr, byte_offset, vals, props);
   }
