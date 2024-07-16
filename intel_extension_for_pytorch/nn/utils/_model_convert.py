@@ -147,6 +147,45 @@ def unpack_awq_weight(
     return weight.contiguous(), zeros.contiguous()
 
 
+def unpack_gptq_weight(
+    gptq_qweight: torch.Tensor,
+    gptq_qzeros: torch.Tensor,
+    gptq_scales: torch.Tensor,
+    bits: int,
+    group_size: int,
+):
+    assert bits == 4
+
+    qzeros = gptq_qzeros
+    qweight = gptq_qweight
+    scales = gptq_scales
+    scales = scales.reshape(-1, 1, scales.shape[-1])
+
+    wf = torch.tensor(
+        list(range(0, 32, bits)), dtype=torch.int32, device=qzeros.device
+    ).unsqueeze(0)
+    zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2), wf.unsqueeze(0)).to(
+        torch.int16 if bits == 8 else torch.int8
+    )
+
+    zeros = zeros + 1
+
+    torch.bitwise_and(zeros, (2**bits) - 1, out=zeros)
+
+    zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
+
+    weight = torch.bitwise_right_shift(
+        torch.unsqueeze(qweight, 1), wf.unsqueeze(-1)
+    ).to(torch.int16 if bits == 8 else torch.int8)
+
+    torch.bitwise_and(weight, (2**bits) - 1, out=weight)
+
+    weight = weight.view(weight.shape[0] * weight.shape[1], weight.shape[2])
+    zeros = zeros.view(-1, zeros.shape[-1])
+
+    return weight.contiguous(), zeros.contiguous()
+
+
 def prepack_awq_weight(
     awq_qweight: torch.Tensor,
     awq_qzeros: torch.Tensor,
@@ -155,6 +194,23 @@ def prepack_awq_weight(
     group_size: int,
 ):
     t, zp = unpack_awq_weight(awq_qweight, awq_qzeros, awq_scales, bits, group_size)
+    # # transpose -> [N, K]
+    t = t.T.contiguous()
+    qweight_ = t[:, 1::2].bitwise_left_shift(4).bitwise_or_(t[:, ::2]).to(torch.uint8)
+    scales_ = awq_scales.t().contiguous()
+    zp_ = zp.t_().contiguous()
+
+    return qweight_, scales_, zp_
+
+
+def prepack_gptq_weight(
+    awq_qweight: torch.Tensor,
+    awq_qzeros: torch.Tensor,
+    awq_scales: torch.Tensor,
+    bits: int,
+    group_size: int,
+):
+    t, zp = unpack_gptq_weight(awq_qweight, awq_qzeros, awq_scales, bits, group_size)
     # # transpose -> [N, K]
     t = t.T.contiguous()
     qweight_ = t[:, 1::2].bitwise_left_shift(4).bitwise_or_(t[:, ::2]).to(torch.uint8)

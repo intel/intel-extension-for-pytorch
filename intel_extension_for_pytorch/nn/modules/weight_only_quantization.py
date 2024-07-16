@@ -17,7 +17,10 @@ from intel_extension_for_pytorch.quantization._qconfig import (
     WOQ_DTYPE_TO_STR,
 )
 from ...utils._logger import logger, WarningType
-from intel_extension_for_pytorch.nn.utils._model_convert import prepack_awq_weight
+from intel_extension_for_pytorch.nn.utils._model_convert import (
+    prepack_awq_weight,
+    prepack_gptq_weight,
+)
 
 
 class WeightOnlyQuantizedLinear(nn.Module):
@@ -251,6 +254,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         bias=None,
         group_size=-1,
         g_idx=None,
+        is_gptq=False,
     ):
         r"""Create a weight-only quantized module from int4 weight including autoAWQ format
 
@@ -278,7 +282,8 @@ class WeightOnlyQuantizedLinear(nn.Module):
                 act_quant_mode = qconfig.global_qconfig.act_quant_mode
             if hasattr(qconfig.global_qconfig, "cache_weight_for_large_batch"):
                 cache_weight_for_large_batch = (
-                    qconfig.global_qconfig.cache_weight_for_large_batch and lowp_mode in (2, 3)
+                    qconfig.global_qconfig.cache_weight_for_large_batch
+                    and lowp_mode in (2, 3)
                 )
         w_dtype = qweight.dtype
         supported_qw_dtype = [
@@ -293,9 +298,15 @@ class WeightOnlyQuantizedLinear(nn.Module):
         )
 
         qlinear = cls(in_features, out_features, dtype=WoqWeightDtype.INT4)
-        qweight, scales, zero_points = prepack_awq_weight(
-            qweight, zero_points, scales, 4, group_size
-        )
+
+        if g_idx is not None or is_gptq:
+            qweight, scales, zero_points = prepack_gptq_weight(
+                qweight, zero_points, scales, 4, group_size
+            )
+        else:
+            qweight, scales, zero_points = prepack_awq_weight(
+                qweight, zero_points, scales, 4, group_size
+            )
         if bias is not None and torch.count_nonzero(bias) == 0:
             bias = None
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
