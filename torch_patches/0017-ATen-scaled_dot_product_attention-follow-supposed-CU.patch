@@ -1,7 +1,7 @@
 From f0ec952ba4a64f9010be457e7b4ddcddf9118a18 Mon Sep 17 00:00:00 2001
 From: majing <jing1.ma@intel.com>
 Date: Tue, 7 May 2024 13:52:26 +0800
-Subject: [PATCH 17/38] ATen scaled_dot_product_attention: follow supposed
+Subject: [PATCH 17/39] ATen scaled_dot_product_attention: follow supposed
  (CUDA/CPU) operators registration strategy (#236)
 
 Signed-off-by: lei,zhenyuan <zhenyuan.lei@intel.com>
