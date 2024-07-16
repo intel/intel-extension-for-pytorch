@@ -3,16 +3,12 @@ import torch.nn as nn
 
 import sys
 
-from .BaseAttention import IPEXTransformerAttn
-from .QuantizedAttention import (  # noqa F401
-    IPEXTransformerAttnOptimizedFp16,
-    IPEXTransformerAttnOptimizedInt4,
-)  # noqa
+from .BaseAttention import IPEXTransformerAttn  # noqa
+from .QuantizedAttention import IPEXTransformerAttnOptimizedInt4  # noqa
 from .NaiveAttention import IPEXTransformerAttnNaive  # noqa
-from .GroupedAttention import (  # noqa F401
-    IPEXTransformerAttnOptimizedFp16Grouped,
-    IPEXTransformerAttnOptimizedInt4Grouped,
-)
+from .GroupedAttention import *  # noqa
+from .Attention import *  # noqa
+from .CrossedAttention import *  # noqa
 from .Mlp import *  # noqa
 from .QuantizedMlp import *  # noqa
 
