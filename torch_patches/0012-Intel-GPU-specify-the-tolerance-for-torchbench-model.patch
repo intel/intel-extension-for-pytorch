@@ -1,7 +1,7 @@
 From a51b0d4e0e98ad77cff5b66d684de50908c12a7a Mon Sep 17 00:00:00 2001
 From: Deng Weishi <weishi.deng@intel.com>
 Date: Wed, 1 May 2024 17:45:11 +0000
-Subject: [PATCH 12/38] Intel GPU: specify the tolerance for torchbench models
+Subject: [PATCH 12/39] Intel GPU: specify the tolerance for torchbench models
  (#125213)
 
 We encountered some model accuracy failures as the tolerance is critical. In general, we align with CUDA practice. This PR intends to adjust the tolerance for Torchbench models for training mode on Intel GPU devices and aligns with CUDA.

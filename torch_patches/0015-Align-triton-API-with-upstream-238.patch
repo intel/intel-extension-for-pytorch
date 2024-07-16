@@ -1,7 +1,7 @@
 From e48fa8f30910af14652f7e85dc5c66202b17b946 Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Mon, 6 May 2024 14:03:11 +0800
-Subject: [PATCH 15/38] Align triton API with upstream (#238)
+Subject: [PATCH 15/39] Align triton API with upstream (#238)
 
 * [inductor] make inductor work with new triton kernel launch API (#123076)
 

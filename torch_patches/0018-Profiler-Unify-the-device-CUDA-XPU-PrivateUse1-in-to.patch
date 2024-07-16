@@ -1,7 +1,7 @@
 From b66ccd3b24e25c8154aed06a349699d3352b80a3 Mon Sep 17 00:00:00 2001
 From: "Chen, Zejun" <zejun.chen@intel.com>
 Date: Mon, 22 Apr 2024 01:26:55 +0000
-Subject: [PATCH 18/38] [Profiler] Unify the device(CUDA, XPU, PrivateUse1) in
+Subject: [PATCH 18/39] [Profiler] Unify the device(CUDA, XPU, PrivateUse1) in
  torch profiler post processing (#123247)
 
 This PR unifies the CUDA, XPU and PrivateUse1 in the torch profiler. Now CUDA, XPU and PrivateUse1 can together use string object `use_device` to distinguish each other and share one device path for calculating kineto time durations and memory statistics for post processing.

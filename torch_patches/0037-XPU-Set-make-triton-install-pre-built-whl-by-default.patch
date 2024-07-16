@@ -1,7 +1,7 @@
 From 13b0f064f82aa7eabe2e6401f924462bc5c6945b Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Wed, 10 Jul 2024 08:48:14 +0800
-Subject: [PATCH 37/38] [XPU] Set make triton install pre-built whl by default
+Subject: [PATCH 37/39] [XPU] Set make triton install pre-built whl by default
  (#271)
 
 Now the user could install the pre-built `triton` for xpu by calling the following:

@@ -1,7 +1,7 @@
 From b749f1a31f4720b47cd399126cb160db9b19a1f7 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <guangye.yu@intel.com>
 Date: Wed, 3 Jul 2024 18:55:00 +0000
-Subject: [PATCH 01/38] Revert "necessary change to make torch2.3 work with
+Subject: [PATCH 01/39] Revert "necessary change to make torch2.3 work with
  triton2.2 (#122139)"
 
 This reverts commit c4e5434423e052ddb81a15eba796de5b6c9ee599.

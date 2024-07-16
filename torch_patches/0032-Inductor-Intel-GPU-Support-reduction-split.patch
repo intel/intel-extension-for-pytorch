@@ -1,7 +1,7 @@
 From aa62f43cd1864c90c389cfcb0ebc34770dbb5700 Mon Sep 17 00:00:00 2001
 From: "Xiao, Wang" <109140002+xiaowangintel@users.noreply.github.com>
 Date: Fri, 21 Jun 2024 15:37:45 +0800
-Subject: [PATCH 32/38] [Inductor][Intel GPU] Support reduction split.
+Subject: [PATCH 32/39] [Inductor][Intel GPU] Support reduction split.
 
 cherry-picked from https://github.com/pytorch/pytorch/pull/129120
 

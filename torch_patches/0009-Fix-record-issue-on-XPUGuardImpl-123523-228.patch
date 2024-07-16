@@ -1,7 +1,7 @@
 From 13e6c4c2250ab9fd41759091e79aa72deab6c6ca Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Wed, 10 Apr 2024 11:07:32 +0800
-Subject: [PATCH 09/38] Fix record issue on XPUGuardImpl (#123523) (#228)
+Subject: [PATCH 09/39] Fix record issue on XPUGuardImpl (#123523) (#228)
 
 Previously,  `xpu_event` became a dangling pointer because the variable on the stack is destroyed when the scope ends. It results in these event-related functions (`destroyEvent`, `record`, `block`, and `queryEvent`)  used in `c10/core/impl/InlineEvent.h`, which serves `c10::Event`, do not work correctly.
 

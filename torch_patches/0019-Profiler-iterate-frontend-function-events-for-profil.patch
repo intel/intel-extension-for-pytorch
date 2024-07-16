@@ -1,7 +1,7 @@
 From 032021315c580aa10ca1de580234c1fa4f384a40 Mon Sep 17 00:00:00 2001
 From: "Chen, Zejun" <zejun.chen@intel.com>
 Date: Tue, 23 Apr 2024 17:40:29 +0000
-Subject: [PATCH 19/38] [Profiler] iterate frontend function events for
+Subject: [PATCH 19/39] [Profiler] iterate frontend function events for
  profiler post processing (#124596)
 
 The `function_events` in `_parse_kineto_results` is used to contain all function events from the result. It contains 2 kinds of events. One is frontend function events whose correlation id is 0, for example, `aten::add`, `aten::mul`. They are on the top level of the profile results. The other is the backend events, which are associated with the frontend events and its correlation id is > 0, for example, `at::native::vectorized_elementwise_kernel`, it should be the backend event of a frontend element-wise op. They have the device execution duration for the related frontend op.
