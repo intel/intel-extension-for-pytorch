@@ -161,6 +161,59 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_res_res_wint4(
     const uint32_t n,
     const uint32_t k);
 
+template <typename scalar_t, int... CONFIG_ARGS>
+XETLA_KERNEL_API cgfs_t hgemm_mlp_silu_mul_wint4(
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k);
+template <typename scalar_t, int... CONFIG_ARGS>
+XETLA_KERNEL_API cgfs_t hgemm_mlp_bias_silu_mul_wint4(
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias_gate,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k);
+template <typename scalar_t, int... CONFIG_ARGS>
+XETLA_KERNEL_API cgfs_t hgemm_mlp_silu_mul_bias_wint4(
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias_up,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k);
+template <typename scalar_t, int... CONFIG_ARGS>
+XETLA_KERNEL_API cgfs_t hgemm_mlp_bias_silu_mul_bias_wint4(
+    scalar_t* out,
+    const scalar_t* a,
+    const uint32_t* b,
+    const uint32_t* b_zp,
+    const scalar_t* b_scale,
+    const scalar_t* bias_gate,
+    const scalar_t* bias_up,
+    float* acc_ptr,
+    uint32_t* cnt_ptr,
+    const uint32_t m,
+    const uint32_t n,
+    const uint32_t k);
+
 template <
     typename scalar_t,
     int WG_M = 8,

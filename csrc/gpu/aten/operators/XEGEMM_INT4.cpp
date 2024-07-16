@@ -120,6 +120,222 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
       out2.view_symint(sizes));
 }
 
+// mlp operators naming convention:
+// mlp_[<gate_postop>]..._<binary_op>_[<up_postop>]...[_out]_int4
+static inline HGEMMXetla_INT4 mlp_mul_dispatch(
+    const Tensor& input_,
+    const Tensor& gate_up_wei,
+    const Tensor& gate_up_wei_scl,
+    const Tensor& gate_up_wei_zp,
+    int64_t group_size,
+    const std::vector<std::tuple<const Tensor&, HGEMMXetla_INT4::EpilogueType>>&
+        gate_post_ops,
+    const std::vector<std::tuple<const Tensor&, HGEMMXetla_INT4::EpilogueType>>&
+        up_post_ops,
+    Tensor* const output) {
+  auto input = input_.flatten(0, -2);
+  if (input.scalar_type() == ScalarType::Float)
+    input = input.to(at::kHalf);
+  // input: m,k; gate_up_wei: 2,n,k; gate_proj: n,k
+  int m = input.sizes()[0];
+  int k = input.sizes()[1];
+  int n = gate_up_wei.sizes()[1];
+  *output = output->defined() ? output->flatten(0, -2)
+                              : at::empty({m, n}, input.options());
+  TORCH_CHECK(input.is_contiguous() && gate_up_wei.is_contiguous());
+  TORCH_CHECK(
+      input.scalar_type() == kHalf &&
+      (gate_up_wei.scalar_type() == kQUInt8 ||
+       gate_up_wei.scalar_type() == kByte ||
+       gate_up_wei.scalar_type() == kChar ||
+       gate_up_wei.scalar_type() == kInt));
+
+  auto dispatcher = HGEMMXetla_INT4()
+                        .add_matrix_out(*output)
+                        .add_matrix_inp(input)
+                        .add_matrix_wei(gate_up_wei)
+                        .add_matrix_scl(gate_up_wei_scl)
+                        .add_matrix_zp(gate_up_wei_zp);
+  for (auto& [epilogue_, epilogue_type] : gate_post_ops) {
+    dispatcher.add_epilogue(epilogue_, epilogue_type);
+  }
+  dispatcher.add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::GATE_UP_MUL);
+  for (auto& [epilogue_, epilogue_type] : up_post_ops) {
+    dispatcher.add_epilogue(epilogue_, epilogue_type);
+  }
+  dispatcher //
+      .add_group_size(group_size)
+      .add_arch(GetGpuArchId())
+      .build();
+  TORCH_CHECK(dispatcher.fallback() == false, "mlp_mul: invalid gemm config");
+  dispatcher.run();
+  return dispatcher;
+}
+// silu(linear(input, gate_wei)) * linear(input, up_wei)
+static Tensor mlp_silu_mul_int4(
+    const Tensor& input,
+    const Tensor& gate_up_wei,
+    const Tensor& gate_up_wei_scl,
+    const Tensor& gate_up_wei_zp,
+    int64_t group_size) {
+  Tensor out;
+  mlp_mul_dispatch(
+      input,
+      gate_up_wei,
+      gate_up_wei_scl,
+      gate_up_wei_zp,
+      group_size,
+      {{{}, HGEMMXetla_INT4::EpilogueType::SILU}},
+      {},
+      &out);
+  return resize_as_mat1(input, out);
+}
+// silu(linear(input, gate_wei)) * linear(input, up_wei)
+static void mlp_silu_mul_out_int4(
+    const Tensor& input,
+    const Tensor& gate_up_wei,
+    const Tensor& gate_up_wei_scl,
+    const Tensor& gate_up_wei_zp,
+    Tensor& out,
+    int64_t group_size) {
+  mlp_mul_dispatch(
+      input,
+      gate_up_wei,
+      gate_up_wei_scl,
+      gate_up_wei_zp,
+      group_size,
+      {{{}, HGEMMXetla_INT4::EpilogueType::SILU}},
+      {},
+      &out);
+  return;
+}
+// silu(linear(input, gate_wei) + gate_bias) * linear(input, up_wei)
+static Tensor mlp_bias_silu_mul_int4(
+    const Tensor& input,
+    const Tensor& gate_up_wei,
+    const Tensor& gate_up_wei_scl,
+    const Tensor& gate_up_wei_zp,
+    const Tensor& gate_bias,
+    int64_t group_size) {
+  Tensor out;
+  mlp_mul_dispatch(
+      input,
+      gate_up_wei,
+      gate_up_wei_scl,
+      gate_up_wei_zp,
+      group_size,
+      {{gate_bias.flatten(), HGEMMXetla_INT4::EpilogueType::BIAS},
+       {{}, HGEMMXetla_INT4::EpilogueType::SILU}},
+      {},
+      &out);
+  return resize_as_mat1(input, out);
+}
+// silu(linear(input, gate_wei) + gate_bias) * linear(input, up_wei)
+static void mlp_bias_silu_mul_out_int4(
+    const Tensor& input,
+    const Tensor& gate_up_wei,
+    const Tensor& gate_up_wei_scl,
+    const Tensor& gate_up_wei_zp,
+    Tensor& out,
+    const Tensor& gate_bias,
+    int64_t group_size) {
+  mlp_mul_dispatch(
+      input,
+      gate_up_wei,
+      gate_up_wei_scl,
+      gate_up_wei_zp,
+      group_size,
+      {{gate_bias.flatten(), HGEMMXetla_INT4::EpilogueType::BIAS},
+       {{}, HGEMMXetla_INT4::EpilogueType::SILU}},
+      {},
+      &out);
+  return;
+}
+// silu(linear(input, gate_wei)) * (linear(input, up_wei) + up_bias)
+static Tensor mlp_silu_mul_bias_int4(
+    const Tensor& input,
+    const Tensor& gate_up_wei,
+    const Tensor& gate_up_wei_scl,
+    const Tensor& gate_up_wei_zp,
+    const Tensor& up_bias,
+    int64_t group_size) {
+  Tensor out;
+  mlp_mul_dispatch(
+      input,
+      gate_up_wei,
+      gate_up_wei_scl,
+      gate_up_wei_zp,
+      group_size,
+      {{{}, HGEMMXetla_INT4::EpilogueType::SILU}},
+      {{up_bias.flatten(), HGEMMXetla_INT4::EpilogueType::BIAS}},
+      &out);
+  return resize_as_mat1(input, out);
+}
+// silu(linear(input, gate_wei)) * (linear(input, up_wei) + up_bias)
+static void mlp_silu_mul_bias_out_int4(
+    const Tensor& input,
+    const Tensor& gate_up_wei,
+    const Tensor& gate_up_wei_scl,
+    const Tensor& gate_up_wei_zp,
+    Tensor& out,
+    const Tensor& up_bias,
+    int64_t group_size) {
+  mlp_mul_dispatch(
+      input,
+      gate_up_wei,
+      gate_up_wei_scl,
+      gate_up_wei_zp,
+      group_size,
+      {{{}, HGEMMXetla_INT4::EpilogueType::SILU}},
+      {{up_bias.flatten(), HGEMMXetla_INT4::EpilogueType::BIAS}},
+      &out);
+  return;
+}
+// silu(linear(input, gate_wei) + gate_bias) * (linear(input, up_wei) + up_bias)
+static Tensor mlp_bias_silu_mul_bias_int4(
+    const Tensor& input,
+    const Tensor& gate_up_wei,
+    const Tensor& gate_up_wei_scl,
+    const Tensor& gate_up_wei_zp,
+    const Tensor& gate_bias,
+    const Tensor& up_bias,
+    int64_t group_size) {
+  Tensor out;
+  mlp_mul_dispatch(
+      input,
+      gate_up_wei,
+      gate_up_wei_scl,
+      gate_up_wei_zp,
+      group_size,
+      {{gate_bias.flatten(), HGEMMXetla_INT4::EpilogueType::BIAS},
+       {{}, HGEMMXetla_INT4::EpilogueType::SILU}},
+      {{up_bias.flatten(), HGEMMXetla_INT4::EpilogueType::BIAS}},
+      &out);
+  return resize_as_mat1(input, out);
+}
+// silu(linear(input, gate_wei) + gate_bias) * (linear(input, up_wei) + up_bias)
+static void mlp_bias_silu_mul_bias_out_int4(
+    const Tensor& input,
+    const Tensor& gate_up_wei,
+    const Tensor& gate_up_wei_scl,
+    const Tensor& gate_up_wei_zp,
+    const Tensor& up_bias,
+    Tensor& out,
+    const Tensor& gate_bias,
+    int64_t group_size) {
+  mlp_mul_dispatch(
+      input,
+      gate_up_wei,
+      gate_up_wei_scl,
+      gate_up_wei_zp,
+      group_size,
+      {{gate_bias.flatten(), HGEMMXetla_INT4::EpilogueType::BIAS},
+       {{}, HGEMMXetla_INT4::EpilogueType::SILU}},
+      {{up_bias.flatten(), HGEMMXetla_INT4::EpilogueType::BIAS}},
+      &out);
+  return;
+}
+
 static inline HGEMMXetla_INT4 mm_int4_dispatch(
     const Tensor& input,
     const Tensor& weight,
@@ -487,6 +703,28 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER(
       "mm_qkv_out_int4.xpu", at::AtenIpexTypeXPU::mm_qkv_out_wint4);
   IPEX_OP_REGISTER("mm_qkv_int4.xpu", at::AtenIpexTypeXPU::mm_qkv_wint4);
+  IPEX_OP_REGISTER(
+      "mlp_silu_mul_out_int4.xpu", at::AtenIpexTypeXPU::mlp_silu_mul_out_int4);
+  IPEX_OP_REGISTER(
+      "mlp_silu_mul_int4.xpu", at::AtenIpexTypeXPU::mlp_silu_mul_int4);
+  IPEX_OP_REGISTER(
+      "mlp_bias_silu_mul_out_int4.xpu",
+      at::AtenIpexTypeXPU::mlp_bias_silu_mul_out_int4);
+  IPEX_OP_REGISTER(
+      "mlp_bias_silu_mul_int4.xpu",
+      at::AtenIpexTypeXPU::mlp_bias_silu_mul_int4);
+  IPEX_OP_REGISTER(
+      "mlp_silu_mul_bias_out_int4.xpu",
+      at::AtenIpexTypeXPU::mlp_silu_mul_bias_out_int4);
+  IPEX_OP_REGISTER(
+      "mlp_silu_mul_bias_int4.xpu",
+      at::AtenIpexTypeXPU::mlp_silu_mul_bias_int4);
+  IPEX_OP_REGISTER(
+      "mlp_bias_silu_mul_bias_out_int4.xpu",
+      at::AtenIpexTypeXPU::mlp_bias_silu_mul_bias_out_int4);
+  IPEX_OP_REGISTER(
+      "mlp_bias_silu_mul_bias_int4.xpu",
+      at::AtenIpexTypeXPU::mlp_bias_silu_mul_bias_int4);
   IPEX_OP_REGISTER("mm_int4.xpu", at::AtenIpexTypeXPU::mm_int4);
   IPEX_OP_REGISTER("mm_int4_out.xpu", at::AtenIpexTypeXPU::mm_int4_out);
   IPEX_OP_REGISTER("mm_bias_int4.xpu", at::AtenIpexTypeXPU::mm_bias_int4);

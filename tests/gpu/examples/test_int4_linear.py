@@ -60,6 +60,11 @@ class TestInt4Linear(TestCase):
         weight = weight.to(torch.float16)
         return weight
 
+    @staticmethod
+    def rand_int4(size, dtype=torch.int32, device="xpu"):
+        rand = torch.randint(-128, 128, [size // 2], device=device).to(torch.int8)
+        return rand.view(dtype=dtype)
+
     # qkv per-channel not used && TODO: Mismatched elements: 1 / 9216
     @parametrize("per_channel", [False], lambda k: "per_channel" * k)
     @parametrize("m,n,k", [(1, 3072, 3072)])
@@ -121,24 +126,20 @@ class TestInt4Linear(TestCase):
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_gemm_int4(self, m, n, k, per_channel, dtype=torch.float16):
         input = torch.rand([m, k], device="xpu", dtype=dtype)
-        input_torch = input.cpu().float()
-        weight = (torch.randint(0, 11111111, [k // 8, n], device="xpu")).to(
-            torch.int32
-        ) * (-1)
+        input_torch = input.cpu()
+        weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
 
         group_size = min(128, k)
         if per_channel:
             group_size = k
         group_num = int(k / group_size)
 
-        scales = torch.rand([group_num, n], device="xpu", dtype=torch.float16)
-        zero_points = torch.randint(0, 11111, [group_num, n // 8], device="xpu").to(
-            torch.int32
+        scales = -torch.rand([group_num, n], device="xpu", dtype=torch.float16)
+        zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
+            group_num, n // 8
         )
 
-        weight_fp16 = (
-            self.dequantize(weight, scales, zero_points, group_size).cpu().float()
-        )
+        weight_fp16 = self.dequantize(weight, scales, zero_points, group_size).cpu()
         # check gemm
         out_xetla = torch.ops.torch_ipex.mm_int4(
             input, weight.t().contiguous(), scales.t().contiguous(), None, group_size
@@ -261,6 +262,108 @@ class TestInt4Linear(TestCase):
             out_torch_bias_add.float(),
             atol=checking_atol,
             rtol=checking_rtol,
+        )
+
+    @parametrize("per_channel", [False], lambda k: "per_channel" * k)
+    @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
+    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    def test_mlp_int4(self, m, n, k, per_channel, dtype=torch.float16):
+        input = torch.rand([m, k], device="xpu", dtype=dtype)
+        input_torch = input.cpu()
+        weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
+
+        group_size = min(128, k)
+        if per_channel:
+            group_size = k
+        group_num = int(k / group_size)
+
+        scales = -torch.rand([group_num, n], device="xpu", dtype=torch.float16)
+        zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
+            group_num, n // 8
+        )
+        bias = torch.rand([1, n], device="xpu", dtype=torch.float16)
+
+        weight_fp16 = self.dequantize(weight, scales, zero_points, group_size).cpu()
+        out_torch = torch.matmul(input_torch, weight_fp16)
+        out_torch_bias = out_torch + bias.cpu().float()
+
+        # mlp silu mul
+        weight_up = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
+        scales_up = torch.rand([group_num, n], device="xpu", dtype=torch.float16) / (
+            k / 8
+        )
+        zero_points_up = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
+            group_num, n // 8
+        )
+        weight_up_fp16 = self.dequantize(
+            weight_up, scales_up, zero_points_up, group_size
+        ).cpu()
+        out_torch_silu = torch.nn.SiLU()(out_torch)
+        out_torch_up = torch.matmul(input_torch, weight_up_fp16)
+        out_torch_mlp_silu_mul = out_torch_silu * out_torch_up
+        xetla_mlp_args_common = (
+            input,
+            torch.stack((weight.t(), weight_up.t())).contiguous(),
+            torch.stack((scales.t(), scales_up.t())).contiguous(),
+            None,
+        )
+        out_xetla_mlp_silu_mul = torch.ops.torch_ipex.mlp_silu_mul_int4(
+            *xetla_mlp_args_common,
+            group_size,
+        )
+        self.assertEqual(
+            out_xetla_mlp_silu_mul.cpu().float(),
+            out_torch_mlp_silu_mul.float(),
+            atol=checking_atol * 3,  # elt mul will introduce more error
+            rtol=checking_rtol * 5,
+        )
+
+        # mlp bias silu mul
+        out_torch_bias_silu = torch.nn.SiLU()(out_torch_bias)
+        out_torch_mlp_bias_silu_mul = out_torch_bias_silu * out_torch_up
+        out_xetla_mlp_bias_silu_mul = torch.ops.torch_ipex.mlp_bias_silu_mul_int4(
+            *xetla_mlp_args_common,
+            bias,
+            group_size,
+        )
+        self.assertEqual(
+            out_xetla_mlp_bias_silu_mul.cpu().float(),
+            out_torch_mlp_bias_silu_mul.float(),
+            atol=checking_atol * 3,  # elt mul will introduce more error
+            rtol=checking_rtol * 5,
+        )
+
+        # mlp silu mul bias
+        bias_up = -torch.rand([1, n], device="xpu", dtype=torch.float16)
+        out_torch_bias_up = out_torch_up + bias_up.cpu().float()
+        out_torch_mlp_silu_mul_bias = out_torch_silu * out_torch_bias_up
+        out_xetla_mlp_silu_mul_bias = torch.ops.torch_ipex.mlp_silu_mul_bias_int4(
+            *xetla_mlp_args_common,
+            bias_up,
+            group_size,
+        )
+        self.assertEqual(
+            out_xetla_mlp_silu_mul_bias.cpu().float(),
+            out_torch_mlp_silu_mul_bias.float(),
+            atol=checking_atol * 3,  # elt mul will introduce more error
+            rtol=checking_rtol * 5,
+        )
+
+        # mlp bias silu mul bias
+        out_torch_mlp_bias_silu_mul_bias = out_torch_bias_silu * out_torch_bias_up
+        out_xetla_mlp_bias_silu_mul_bias = (
+            torch.ops.torch_ipex.mlp_bias_silu_mul_bias_int4(
+                *xetla_mlp_args_common,
+                bias,
+                bias_up,
+                group_size,
+            )
+        )
+        self.assertEqual(
+            out_xetla_mlp_bias_silu_mul_bias.cpu().float(),
+            out_torch_mlp_bias_silu_mul_bias.float(),
+            atol=checking_atol * 3,  # elt mul will introduce more error
+            rtol=checking_rtol * 5,
         )
 
 
