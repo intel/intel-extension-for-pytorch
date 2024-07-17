@@ -307,8 +307,10 @@ Tensor& baddbmm_out(
           1.f, alpha.to<float>(), 0.f, attr.kind_with_linear);
     }
   } else {
-    Tensor binary = binary.dim() < 3 ? input.unsqueeze(0) : input;
-    binary = binary.dim() < 3 ? binary.unsqueeze_(0) : binary;
+    Tensor binary = input;
+    while (binary.dim() < 3) {
+      binary.unsqueeze_(0);
+    }
     float alpha_ = alpha.to<float>() / beta_;
     if (alpha_ != 1.f)
       attr.append_post_eltwise(1.f, alpha_, 0.f, attr.kind_with_linear);
