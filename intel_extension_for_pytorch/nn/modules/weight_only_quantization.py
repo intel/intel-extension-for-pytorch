@@ -255,6 +255,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         group_size=-1,
         g_idx=None,
         is_gptq=False,
+        is_intel_autoround=False,
     ):
         r"""Create a weight-only quantized module from int4 weight including autoAWQ format
 
@@ -299,9 +300,9 @@ class WeightOnlyQuantizedLinear(nn.Module):
 
         qlinear = cls(in_features, out_features, dtype=WoqWeightDtype.INT4)
 
-        if g_idx is not None or is_gptq:
+        if g_idx is not None or is_gptq or is_intel_autoround:
             qweight, scales, zero_points = prepack_gptq_weight(
-                qweight, zero_points, scales, 4, group_size
+                qweight, zero_points, scales, 4, group_size, zp_need_add_one=not is_intel_autoround
             )
         else:
             qweight, scales, zero_points = prepack_awq_weight(

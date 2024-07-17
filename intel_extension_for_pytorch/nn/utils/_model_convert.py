@@ -153,6 +153,7 @@ def unpack_gptq_weight(
     gptq_scales: torch.Tensor,
     bits: int,
     group_size: int,
+    zp_need_add_one = False
 ):
     assert bits == 4
 
@@ -167,8 +168,8 @@ def unpack_gptq_weight(
     zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2), wf.unsqueeze(0)).to(
         torch.int16 if bits == 8 else torch.int8
     )
-
-    zeros = zeros + 1
+    if zp_need_add_one:
+        zeros = zeros + 1
 
     torch.bitwise_and(zeros, (2**bits) - 1, out=zeros)
 
@@ -209,8 +210,9 @@ def prepack_gptq_weight(
     awq_scales: torch.Tensor,
     bits: int,
     group_size: int,
+    zp_need_add_one = False
 ):
-    t, zp = unpack_gptq_weight(awq_qweight, awq_qzeros, awq_scales, bits, group_size)
+    t, zp = unpack_gptq_weight(awq_qweight, awq_qzeros, awq_scales, bits, group_size, zp_need_add_one)
     # # transpose -> [N, K]
     t = t.T.contiguous()
     qweight_ = t[:, 1::2].bitwise_left_shift(4).bitwise_or_(t[:, ::2]).to(torch.uint8)
