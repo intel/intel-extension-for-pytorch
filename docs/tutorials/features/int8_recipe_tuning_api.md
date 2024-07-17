@@ -10,7 +10,7 @@ Users need to provide a fp32 model and some parameters required for tuning. The 
 Please refer to [static_quant example](../../../examples/cpu/features/int8_recipe_tuning/imagenet_autotune.py).
 
 - Smooth Quantization
-Please refer to [llm sq example](../../../examples/cpu/inference/python/llm/single_instance/run_generation.py).
+Please refer to [LLM SmoothQuant example](../../../examples/cpu/llm/inference/single_instance/run_generation.py).
 
 ## Smooth Quantization Autotune
 ### Algorithm: Auto-tuning of $\alpha$.

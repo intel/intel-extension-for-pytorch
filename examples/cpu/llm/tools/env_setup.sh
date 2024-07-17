@@ -38,7 +38,7 @@ done
 
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
     # Enter IPEX root dir
-    cd ../../../../..
+    cd ../../..
 
     if [ ! -f dependency_version.yml ]; then
         echo "Please check if `pwd` is a valid Intel® Extension for PyTorch* source code directory."
@@ -139,7 +139,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
                 echo "[Error] Command \"conda\" is not available."
                 exit 5
             else
-                conda install -y sysroot_linux-64
+                conda install -y sysroot_linux-64 -c conda-forge
                 conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
                 if [ -z ${CONDA_BUILD_SYSROOT} ]; then
                     source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gcc_linux-64.sh
@@ -212,7 +212,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd ../..
     cp -r oneCCL/build/_install ${CCLFOLDER}
     rm -rf oneCCL
-    cd intel-extension-for-pytorch/examples/cpu/inference/python/llm
+    cd intel-extension-for-pytorch/examples/cpu/llm
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     set +e
@@ -227,19 +227,4 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     bash ${AUX_INSTALL_SCRIPT}
     python -m pip install ${WHEELFOLDER}/*.whl
     rm -rf ${WHEELFOLDER}
-    if [ -f prompt.json ]; then
-        rm -f prompt.json
-    fi
-    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
-    cd single_instance
-    if [ -f prompt.json ]; then
-        rm -f prompt.json
-    fi
-    ln -s ../prompt.json
-    cd ../distributed
-    if [ -f prompt.json ]; then
-        rm -f prompt.json
-    fi
-    ln -s ../prompt.json
 fi
-python -m pip install numpy==1.26.4 --force-reinstall

@@ -1,7 +1,8 @@
 Smooth Quant Recipe Tuning API (Prototype)
 =============================================
 
-Smooth Quantization is a popular method to improve the accuracy of int8 quantization. The [autotune API](../api_doc.html#ipex.quantization.autotune) allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best INT8 accuracy.
+Smooth Quantization is a popular method to improve the accuracy of int8 quantization.
+The [autotune API](../api_doc.html#ipex.quantization.autotune) allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best INT8 accuracy.
 
 SmoothQuant will introduce alpha to calculate the ratio of input and weight updates to reduce quantization error. SmoothQuant arguments are as below:
 
@@ -15,6 +16,6 @@ SmoothQuant will introduce alpha to calculate the ratio of input and weight upda
 | shared_criterion |     "mean"    | ["min", "mean","max"] |   criterion for input LayerNorm op of a transformer block.  |
 |   enable_blockwise_loss   |     False     |     [True, False]     |          whether to enable block-wise auto-tuning          |
 
-For LLM examples, please refer to [example](https://github.com/intel/intel-extension-for-pytorch/tree/v2.4.0%2Bcpu/examples/cpu/inference/python/llm).
+Please refer to the [LLM examples](https://github.com/intel/intel-extension-for-pytorch/tree/v2.4.0%2Bcpu/examples/cpu/llm) for complete examples.
 
 **Note**: When defining dataloaders for calibration, please follow INC's dataloader [format](https://github.com/intel/neural-compressor/blob/master/docs/source/dataloader.md).

@@ -13,7 +13,7 @@ These LLM-specific optimizations can be automatically applied with a single fron
 
    llm/llm_optimize
 
-`ipex.llm` Optimized Model List
+`ipex.llm` Optimized Model List for Inference
 -------------------------------
 
 Verified for single instance mode
@@ -30,7 +30,7 @@ Verified for distributed inference mode via DeepSpeed
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16). We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
-Please check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts.
+Please check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm>`_ for instructions to install/setup environment and example scripts.
 
 Module Level Optimization API for customized LLM (Prototype)
 ------------------------------------------------------------

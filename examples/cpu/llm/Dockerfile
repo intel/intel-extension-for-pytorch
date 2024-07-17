@@ -39,7 +39,7 @@ ENV PATH=/root/.local/bin:${PATH}
 FROM base AS dev
 ARG COMPILE
 COPY . ./intel-extension-for-pytorch
-RUN cd intel-extension-for-pytorch/examples/cpu/inference/python/llm && \
+RUN cd intel-extension-for-pytorch/examples/cpu/llm && \
     export CC=gcc && export CXX=g++ && \
     if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 6; else bash tools/env_setup.sh 2; fi && \
     unset CC && unset CXX
@@ -53,7 +53,7 @@ RUN apt update && \
     apt clean && \
     rm -rf /var/lib/apt/lists/* && \
     if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi
-COPY --from=dev /root/intel-extension-for-pytorch/examples/cpu/inference/python/llm ./llm
+COPY --from=dev /root/intel-extension-for-pytorch/examples/cpu/llm ./llm
 COPY --from=dev /root/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh ./llm/tools
 RUN cd /usr/lib/x86_64-linux-gnu/ && ln -s libtcmalloc.so.4 libtcmalloc.so && cd && \
     echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc && \
@@ -62,8 +62,7 @@ RUN cd /usr/lib/x86_64-linux-gnu/ && ln -s libtcmalloc.so.4 libtcmalloc.so && cd
     python -m pip cache purge && \
     mv ./oneCCL_release /opt/oneCCL && \
     chown -R root:root /opt/oneCCL && \
-    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ./tools/env_activate.sh && \
-    LN=$(grep "Conda environment is not available." -n ./tools/env_activate.sh | cut -d ":" -f 1) && sed -i "${LN}s|.*|    export LD_PRELOAD=\${LD_PRELOAD}:/usr/lib/x86_64-linux-gnu/libtcmalloc.so:/usr/local/lib/libiomp5.so|" ./tools/env_activate.sh
+    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ./tools/env_activate.sh
 ARG PORT_SSH=22
 RUN mkdir /var/run/sshd && \
     sed -i "s/#Port.*/Port ${PORT_SSH}/" /etc/ssh/sshd_config && \

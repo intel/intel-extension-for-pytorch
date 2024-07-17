@@ -157,4 +157,4 @@ with torch.inference_mode(), torch.cpu.amp.autocast(enabled=amp_enabled):
     print(gen_text, total_new_tokens, flush=True)
 ```
 
-More LLM examples, including usage of low precision data types are available in the [LLM Examples](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/inference/python/llm) section.
+More LLM examples, including usage of low precision data types are available in the [LLM Examples](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm) section.

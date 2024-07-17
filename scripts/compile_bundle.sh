@@ -220,8 +220,8 @@ if [ ${GCC_CONDA} -eq 1 ]; then
         echo "Command \"conda\" not found. Exit."
         exit 2
     fi
-    conda install -y sysroot_linux-64
-    conda install -y gcc==12.3 gxx==12.3 cxx-compiler -c conda-forge
+    conda install -y sysroot_linux-64 -c conda-forge
+    conda install -y gcc==12.3 gxx==12.3 cxx-compiler zstd -c conda-forge
 fi
 if [ ${GCC_CONDA} -ge 1 ]; then
     if [ -z ${CONDA_BUILD_SYSROOT} ]; then

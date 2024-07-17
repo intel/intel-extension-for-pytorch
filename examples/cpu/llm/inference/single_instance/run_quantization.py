@@ -13,33 +13,33 @@ import intel_extension_for_pytorch as ipex
 from ast import literal_eval
 import sys
 
-sys.path.append(sys.path[0] + "/../../")
+sys.path.append(sys.path[0] + "/../../../")
 
 
-from llm.utils.model_class.llm import EXAMPLE_INPUTS_MODE
-from llm.utils.model_class.llama import LLAMAConfig
-from llm.utils.model_class.gptj import GPTJConfig
-from llm.utils.model_class.gptneox import GPTNEOXConfig
-from llm.utils.model_class.falcon import FALCONConfig
-from llm.utils.model_class.opt import OPTConfig
-from llm.utils.model_class.bloom import BloomConfig
-from llm.utils.model_class.codegen import CodeGenConfig
-from llm.utils.model_class.baichuan import BaichuanConfig
-from llm.utils.model_class.chatglm import ChatGLMConfig
-from llm.utils.model_class.gptbigcode import GPTJBigCodeConfig
-from llm.utils.model_class.t5 import T5Config
-from llm.utils.model_class.mistral import MistralConfig
-from llm.utils.model_class.mixtral import MixtralConfig
-from llm.utils.model_class.mpt import MPTConfig
-from llm.utils.model_class.stablelm import StableLMConfig
-from llm.utils.model_class.qwen import QwenConfig
-from llm.utils.model_class.qwen2 import Qwen2Config
-from llm.utils.model_class.git import GitConfig
-from llm.utils.model_class.llava import LlavaConfig
-from llm.utils.model_class.phi import PhiConfig
-from llm.utils.model_class.phi import Phi3Config
-from llm.utils.model_class.yuan import YuanConfig
-from llm.utils.model_class.whisper import WhisperConfig
+from llm.inference.utils.model_class.llm import EXAMPLE_INPUTS_MODE
+from llm.inference.utils.model_class.llama import LLAMAConfig
+from llm.inference.utils.model_class.gptj import GPTJConfig
+from llm.inference.utils.model_class.gptneox import GPTNEOXConfig
+from llm.inference.utils.model_class.falcon import FALCONConfig
+from llm.inference.utils.model_class.opt import OPTConfig
+from llm.inference.utils.model_class.bloom import BloomConfig
+from llm.inference.utils.model_class.codegen import CodeGenConfig
+from llm.inference.utils.model_class.baichuan import BaichuanConfig
+from llm.inference.utils.model_class.chatglm import ChatGLMConfig
+from llm.inference.utils.model_class.gptbigcode import GPTJBigCodeConfig
+from llm.inference.utils.model_class.t5 import T5Config
+from llm.inference.utils.model_class.mistral import MistralConfig
+from llm.inference.utils.model_class.mixtral import MixtralConfig
+from llm.inference.utils.model_class.mpt import MPTConfig
+from llm.inference.utils.model_class.stablelm import StableLMConfig
+from llm.inference.utils.model_class.qwen import QwenConfig
+from llm.inference.utils.model_class.qwen2 import Qwen2Config
+from llm.inference.utils.model_class.git import GitConfig
+from llm.inference.utils.model_class.llava import LlavaConfig
+from llm.inference.utils.model_class.phi import PhiConfig
+from llm.inference.utils.model_class.phi import Phi3Config
+from llm.inference.utils.model_class.yuan import YuanConfig
+from llm.inference.utils.model_class.whisper import WhisperConfig
 
 
 # The latest model is not compatible with the current transformers/tokenizers, so we specify the revision of the model
