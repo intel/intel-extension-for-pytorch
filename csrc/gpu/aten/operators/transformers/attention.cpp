@@ -58,7 +58,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
   if (attn_mask.has_value()) {
     std::vector<int64_t> sz = attn_mask->sizes().vec();
     int64_t lastDim = sz[sz.size() - 1];
-    int64_t alignTo = 16;
+    int64_t alignTo = 8;
     attn_mask_padded_block_size = alignTo * ((lastDim + alignTo - 1) / alignTo);
   }
 

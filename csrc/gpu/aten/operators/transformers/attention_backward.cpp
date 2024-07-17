@@ -49,7 +49,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
   if (bias.has_value()) {
     std::vector<int64_t> sz = bias->sizes().vec();
     int64_t lastDim = sz[sz.size() - 1];
-    int64_t alignTo = 16;
+    int64_t alignTo = 8;
     attn_mask_padded_block_size = alignTo * ((lastDim + alignTo - 1) / alignTo);
   }
 
@@ -57,7 +57,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> _efficient_attention_backward_impl(
     // force alignment for the last dim
     std::vector<int64_t> sz = bias->sizes().vec();
     int64_t lastDim = sz[sz.size() - 1];
-    int64_t alignTo = 16;
+    int64_t alignTo = 8;
     sz[sz.size() - 1] = alignTo * ((lastDim + alignTo - 1) / alignTo);
     // grad_bias shape [batchsize, head_size, q_len, k_len]
     //          layout [batchsize, head_size, q_len, padding_size]
