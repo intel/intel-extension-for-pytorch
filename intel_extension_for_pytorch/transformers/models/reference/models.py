@@ -165,7 +165,15 @@ def LlamaModel_forward(
     if inputs_embeds is None:
         inputs_embeds = self.embed_tokens(input_ids)
 
-    if hasattr(self, "_prepare_decoder_attention_mask"):
+    if attention_mask is not None and len(attention_mask.shape) == 2:
+        attention_mask = torch.ops.torch_ipex.prepare_4d_causal_attention_mask(
+            attention_mask,
+            inputs_embeds,
+            torch.tensor(past_key_values_length).contiguous(),
+            torch.tensor(torch.finfo(inputs_embeds.dtype).min).contiguous(),
+            self.config.max_position_embeddings,
+        )
+    elif hasattr(self, "_prepare_decoder_attention_mask"):
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask,
             (batch_size, seq_length),
