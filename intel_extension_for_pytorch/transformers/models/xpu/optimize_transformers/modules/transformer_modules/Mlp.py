@@ -4,6 +4,7 @@ import torch.distributed as dist
 
 from .Activation import ACT2FN
 from .Linear import IPEXTransformerLinear, matmul_add_add
+from .model_utils import xpu_gemm_use_xetla
 
 
 class IPEXTransformerBaseMLP(nn.Module):
@@ -64,8 +65,12 @@ class IPEXTransformerMLP(IPEXTransformerBaseMLP):
         self.fc_out.bias = fc_out.bias
 
     def transpose_parameter(self):
-        self.fc_in.weight.data = self.fc_in.weight.transpose(0, 1).contiguous()
-        self.fc_out.weight.data = self.fc_out.weight.transpose(0, 1).contiguous()
+        if xpu_gemm_use_xetla():
+            self.fc_in.weight.data = self.fc_in.weight.transpose(0, 1).contiguous()
+            self.fc_out.weight.data = self.fc_out.weight.transpose(0, 1).contiguous()
+        else:
+            self.fc_in.weight.data = self.fc_in.weight.transpose(0, 1)
+            self.fc_out.weight.data = self.fc_out.weight.transpose(0, 1)
 
     def inter_mm(self, hidden_states):
         hidden_states = self.fc_in(hidden_states)
@@ -188,9 +193,12 @@ class IPEXTransformerMLPOptimizedFp16SiluLlama(IPEXTransformerMLPOptimizedFp16Si
 
     def transpose_parameter(self):
         super().transpose_parameter()
-        self.up_proj.weight.data = self.up_proj.weight.transpose(0, 1).contiguous()
-        # Note: synchronize to ensure the completion of contiguous
-        torch.xpu.synchronize()
+        if xpu_gemm_use_xetla():
+            self.up_proj.weight.data = self.up_proj.weight.transpose(0, 1).contiguous()
+            # Note: synchronize to ensure the completion of contiguous
+            torch.xpu.synchronize()
+        else:
+            self.up_proj.weight.data = self.up_proj.weight.transpose(0, 1)
 
     def inter_mm(self, hidden_states):
         hidden_states1 = torch.ops.torch_ipex.mm_silu(hidden_states, self.fc_in.weight)
@@ -241,9 +249,12 @@ class IPEXTransformerMLPOptimizedFp16SiluQwen(IPEXTransformerMLPOptimizedFp16Sil
 
     def transpose_parameter(self):
         super().transpose_parameter()
-        self.c_proj.weight.data = self.c_proj.weight.transpose(0, 1).contiguous()
-        # Note: synchronize to ensure the completion of contiguous
-        torch.xpu.synchronize()
+        if xpu_gemm_use_xetla():
+            self.c_proj.weight.data = self.c_proj.weight.transpose(0, 1).contiguous()
+            # Note: synchronize to ensure the completion of contiguous
+            torch.xpu.synchronize()
+        else:
+            self.c_proj.weight.data = self.c_proj.weight.transpose(0, 1)
 
     def inter_mm(self, hidden_states):
         # hidden_states = self.fc_in(hidden_states) * self.act(self.fc_out(hidden_states))

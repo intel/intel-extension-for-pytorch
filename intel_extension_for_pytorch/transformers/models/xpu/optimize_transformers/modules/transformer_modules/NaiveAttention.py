@@ -6,6 +6,7 @@ import torch.distributed as dist
 from .._transformer_configuration import IPEXTransformerConfig
 from .Linear import IPEXTransformerLinear  # noqa
 from .BaseAttention import IPEXTransformerAttn, IPEXRuntimeAttnCache
+from .model_utils import xpu_gemm_use_xetla
 import os
 
 enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in [
@@ -93,12 +94,20 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         )
 
     def transpose_parameter(self):
-        self.q_proj.weight.data = self.q_proj.weight.transpose(0, 1).contiguous()
-        self.k_proj.weight.data = self.k_proj.weight.transpose(0, 1).contiguous()
-        self.v_proj.weight.data = self.v_proj.weight.transpose(0, 1).contiguous()
-        self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
-        # Note: synchronize to ensure the completion of contiguous
-        torch.xpu.synchronize()
+        if xpu_gemm_use_xetla():
+            self.q_proj.weight.data = self.q_proj.weight.transpose(0, 1).contiguous()
+            self.k_proj.weight.data = self.k_proj.weight.transpose(0, 1).contiguous()
+            self.v_proj.weight.data = self.v_proj.weight.transpose(0, 1).contiguous()
+            self.out_proj.weight.data = self.out_proj.weight.transpose(
+                0, 1
+            ).contiguous()
+            # Note: synchronize to ensure the completion of contiguous
+            torch.xpu.synchronize()
+        else:
+            self.q_proj.weight.data = self.q_proj.weight.transpose(0, 1)
+            self.k_proj.weight.data = self.k_proj.weight.transpose(0, 1)
+            self.v_proj.weight.data = self.v_proj.weight.transpose(0, 1)
+            self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1)
 
     def cat_qkv(self):
         shape = [3, -1, self.q_proj.weight.shape[-1]]

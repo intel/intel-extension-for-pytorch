@@ -175,3 +175,15 @@ def xpu_sdpa_support(is_beam_search, head_dim):
         return has_xetla and head_dim <= 128 and not is_beam_search
     else:
         return has_xetla
+
+
+# Determine gemm backend usage with has_xetla() and compute_eng_valid (last 2 lines) in kernel implementation
+def xpu_gemm_use_xetla():
+    return (
+        torch.xpu.has_xetla()
+        and (not torch.xpu.using_onednn_layout())
+        and (
+            torch.xpu.get_compute_eng()
+            in (torch.xpu.XPUComputeEng.RECOMMEND, torch.xpu.XPUComputeEng.XETLA)
+        )
+    )
