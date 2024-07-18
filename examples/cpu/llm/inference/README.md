@@ -13,31 +13,34 @@
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 |   |
+|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 |   |   |   |
 |FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Bloom| bigscience/bloom-1b7 | 🟩 | 🟨 | 🟩 | 🟩  | 🟨 |
 |CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |    |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |    |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 |    |
-|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |   |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 |   |
+|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 |   |
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 |   | 🟩 |    |
+|T5| google/flan-t5-xl | 🟩 | 🟩 |   | 🟩 |   |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  |  🟩 | 🟨 |
+|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  | 🟩 | 🟨 |
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 |  🟩 |  |
+|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 |    |
-|GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |    |
-|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |    |
+|GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |   |
+|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |   |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 |   |   |   |
 
 ## 1.2 Verified for distributed inference mode via DeepSpeed
 
@@ -48,9 +51,10 @@
 |LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 |
-|GPT-J| EleutherAI/gpt-j-6b | 🟨 | 🟩 |
+|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟨 | 🟩 |
 |DOLLY| databricks/dolly-v2-12b | 🟨 | 🟩 |
+|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 |
 |FALCON| tiiuae/falcon-40b | 🟩 | 🟩 |
 |OPT| facebook/opt-30b | 🟨 | 🟩 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 |
@@ -66,12 +70,14 @@
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 |
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |
 |Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |
+|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 |
 |GIT| microsoft/git-base | 🟩 | 🟩 |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 |
+|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 |
 
 - 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
 
@@ -484,7 +490,7 @@ Here is how to use it:
 python utils/run_gptq.py --model <MODEL_ID> --output-dir ./saved_results
 ```
 
-The dataset for calibration is `NeelNanda/pile-10k` by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify. Group size is specified by `--group-size <group_size>` (default is 128). You can specify calibration sample size by modifying `--nsamples <int>` (default is 128); you can also choose whether or not to align calibration data to a fixed length by modifying `--use_max_length <bool>` and `--pad_max_length <int>`. For details please refer to [GPTQ](../../../../../intel_extension_for_pytorch/quantization/_GPTQ/README.md)
+The dataset for calibration is `NeelNanda/pile-10k` by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify. Group size is specified by `--group-size <group_size>` (default is 128). You can specify calibration sample size by modifying `--nsamples <int>` (default is 128); you can also choose whether or not to align calibration data to a fixed length by modifying `--use_max_length <bool>` and `--pad_max_length <int>`. For details please refer to [GPTQ](../../../../intel_extension_for_pytorch/quantization/_GPTQ/README.md)
 
 It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default. Group size controls the granularity of quantization of weight along input channel. 
 Then generate model for weight only quantization with INT4 weights and run tasks.

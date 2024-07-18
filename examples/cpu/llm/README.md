@@ -9,6 +9,26 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 
 There are several environment setup methodologies provided. You can choose either of them according to your usage scenario. The Docker-based ones are recommended.
 
+*Note*: For distributed inference of `microsoft/Phi-3-mini-128k-instruct` model, we need a source code build of DeepSpeed library which includes a recent bug fix for phi-3-mini-128k enabling.
+This is realized through **adding the argument value by 8** for `env_setup.sh` execution.
+For example, please change the command to
+
+```bash
+bash ./tools/env_setup.sh 15
+```
+
+for [setting up environment with pre-build package wheels](#22-conda-based-environment-setup-with-pre-built-wheels),
+or change the command to 
+
+```bash
+bash ./tools/env_setup.sh 8
+```
+
+for [setting up environment with compilation from source](#24-conda-based-environment-setup-with-compilation-from-source).
+
+If you are setting up a docker-based environment with the provided `Dockerfile`,
+please do the corresponding changes in the `Dockerfile`.
+
 ## 2.1 [RECOMMENDED] Docker-based environment setup with pre-built wheels
 
 ```bash

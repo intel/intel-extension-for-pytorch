@@ -10,7 +10,8 @@ import re
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
-sys.path.append(sys.path[0] + "/../../")
+sys.path.append(sys.path[0] + "/../../../")
+
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
