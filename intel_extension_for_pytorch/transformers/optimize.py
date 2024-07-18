@@ -352,8 +352,8 @@ def model_convert_reference(_model):
         from ..cpu import comm as ipex_comm
 
         if ipex_comm.has_ccl():
-            world_size = ipex_comm.get_world_size()
-            rank = ipex_comm.get_rank()
+            world_size = ipex_comm.get_world_size() if ipex_comm.has_ccl() else 1
+            rank = ipex_comm.get_rank() if ipex_comm.has_ccl else 0
             if world_size > 1:
                 global distributed
                 if distributed:
@@ -963,7 +963,7 @@ def get_dummy_input(_model, return_dict=False):
         if _model.device.type == "cpu":
             from ..cpu import comm as ipex_comm
 
-            world_size = ipex_comm.get_world_size()
+            world_size = ipex_comm.get_world_size() if ipex_comm.has_ccl() else 1
             hidden_size = hidden_size * world_size
         past_key_values = tuple(
             [
