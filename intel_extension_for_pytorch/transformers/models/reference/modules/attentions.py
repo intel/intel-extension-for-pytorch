@@ -189,6 +189,7 @@ def _LlamaAttention_forward(
             past_key_value,
             None,
             attention_mask,
+            add_casual_mask=False,
         )
     else:
         value_states = value.transpose(1, 2)

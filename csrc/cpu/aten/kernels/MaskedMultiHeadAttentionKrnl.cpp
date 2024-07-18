@@ -1355,7 +1355,7 @@ first_token_masked_mha(
         key,
         value,
         /* dropout */ 0.0,
-        /* is_causal*/ false,
+        /* is_causal*/ true,
         attention_mask,
         1. / scale_attn));
   } else {
