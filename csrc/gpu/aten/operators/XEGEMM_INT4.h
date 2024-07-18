@@ -949,19 +949,19 @@ static inline constexpr std::array<GemmWint4Config, 0> ordered_config_set{};
 // clang-format off
 template <>
 static inline constexpr std::array ordered_config_set<gpu::xetla::gpu_arch::XeHpc>{
-  GemmWint4Config{1, 1, 1, 1, 1024, 1, MAX_INT, MAX_INT, 4096,    1, 1, 3},
-  GemmWint4Config{1, 1, 1, 1, 256,  1, MAX_INT, MAX_INT, MAX_INT, 1, 1, 3},
+  GemmWint4Config{1, 1, 1, 1, 512, 1, MAX_INT, MAX_INT, 4096,    1, 1, 3},
+  GemmWint4Config{1, 1, 1, 1, 256, 1, MAX_INT, MAX_INT, MAX_INT, 1, 1, 3},
 };
 template <>
 static inline constexpr std::array ordered_config_set<gpu::xetla::gpu_arch::XeHpg>{
-  GemmWint4Config{1, 1, 1, 1, 1024, 1, MAX_INT, MAX_INT, 4096,    1, 0, 0},
-  GemmWint4Config{1, 1, 1, 1, 256,  1, MAX_INT, MAX_INT, MAX_INT, 1, 0, 0},
+  GemmWint4Config{1, 1, 1, 1, 512, 1, MAX_INT, MAX_INT, 4096,    1, 0, 0},
+  GemmWint4Config{1, 1, 1, 1, 256, 1, MAX_INT, MAX_INT, MAX_INT, 1, 0, 0},
 };
 template <>
 static inline constexpr std::array ordered_config_set<gpu::xetla::gpu_arch::XeLpg>{
-  GemmWint4Config{1, 1, 1, 1, 1024, 1, 8,       MAX_INT, 4096,    1, 0, 0},
-  GemmWint4Config{1, 1, 1, 1, 256,  1, 8,       MAX_INT, MAX_INT, 1, 0, 0},
-  GemmWint4Config{4, 1, 4, 1, 256,  1, MAX_INT, MAX_INT, MAX_INT, 1, 0, 0},
+  GemmWint4Config{1, 1, 1, 1, 512, 1, 8,       MAX_INT, 4096,    1, 0, 0},
+  GemmWint4Config{1, 1, 1, 1, 256, 1, 8,       MAX_INT, MAX_INT, 1, 0, 0},
+  GemmWint4Config{4, 1, 4, 1, 128, 1, MAX_INT, MAX_INT, MAX_INT, 1, 0, 0},
 };
 // clang-format on
 

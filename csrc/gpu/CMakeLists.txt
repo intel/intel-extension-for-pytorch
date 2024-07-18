@@ -236,8 +236,8 @@ find_package(spdlog QUIET)
 
 if(SPDLOG_FOUND)
 if(USE_XETLA)
-  target_link_libraries(xetla_kernels PUBLIC spdlog::spdlog_header_only)
-  target_include_directories(xetla_kernels PUBLIC ${SPDLOG_INCLUDE_DIRS})
+  target_link_libraries(xetla_kernels INTERFACE spdlog::spdlog_header_only)
+  target_include_directories(xetla_kernels INTERFACE ${SPDLOG_INCLUDE_DIRS})
 endif()
 if(USE_DS_KERNELS)
   target_link_libraries(intel-ext-pt-gpu-deepspeed PUBLIC spdlog::spdlog_header_only)
@@ -360,11 +360,14 @@ if(BUILD_SEPARATE_OPS)
 endif()
 
 if(USE_XETLA)
-  install(TARGETS xetla_kernels
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  list(APPEND LIBRARIES_INSTALL xetla_kernels)
+  message(STATUS "XETLA_LIBS: ${XETLA_LIBS}")
+  foreach(LIB ${XETLA_LIBS})
+    install(TARGETS ${LIB}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    list(APPEND LIBRARIES_INSTALL ${LIB})
+  endforeach()
 endif()
 
 if(USE_DS_KERNELS)

@@ -53,3 +53,4 @@ FILE(GLOB xetla_ops_src
   "operators/XeGemm.cpp"
 )
 set(IPEX_ATEN_XETLA_OPS_SRCS "${xetla_ops_src}" PARENT_SCOPE)
+set(XETLA_LIBS ${XETLA_LIBS} PARENT_SCOPE)
