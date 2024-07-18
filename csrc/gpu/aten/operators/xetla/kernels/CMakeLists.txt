@@ -1,46 +1,17 @@
 set(TARGET xetla_kernels)
 
+# ------------------------------------------------------------------------------------------------
+# Configure GPU architecture
 set(XETLA_AVAILABLE_ARCHS xe_hpc xe_hpg xe_lpg)
 string(REPLACE "," ";" USE_XETLA ${USE_XETLA})
 # set true value to all available archs ; set false value to empty list
 if("${USE_XETLA}")  # A quoted string always evaluates to false unless: The string's value is one of the true constants
   # Note: CMake < 3.20 will evaluate `("${USE_XETLA}")` to True if USE_XETLA is mtl-p, and then be replaced by the whole
-  # XETLA_AVAILABLE_ARCHS. Therefore cmake >= 3.20 should be used to partially enable xetla kernels for development. 
+  # XETLA_AVAILABLE_ARCHS. Therefore cmake >= 3.20 should be used to partially enable xetla kernels for development.
   set(USE_XETLA ${XETLA_AVAILABLE_ARCHS})
 elseif(NOT USE_XETLA) # if(<variable>): True if given a variable that is defined to a value that is not a false constant
   set(USE_XETLA "")
 endif()
-
-# link openblas
-set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS}
-  -fsycl
-  -fsycl-device-code-split=per_kernel
-  -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS}
-)
-
-if (USE_AOT_DEVLIST)
-  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
-endif()
-
-# set RPATH
-if(NOT WINDOWS)
-  foreach(RPATH ${RPATHS_LIST})
-    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} ${RPATH})
-  endforeach()
-  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-Wl,--disable-new-dtags")
-endif()
-
-set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
-set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
-set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-codegen")
-# For registers usage verbose at AOT
-set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -printregusage")
-# Enable bank conflict reduction.
-set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -enableBCR")
-# Optimization to reduce the tokens used for DPAS instruction.
-set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -DPASTokenReduction")
-
-set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs )
 
 foreach(used_arch IN LISTS USE_XETLA)
   foreach(available_arch IN LISTS XETLA_AVAILABLE_ARCHS)
@@ -103,42 +74,35 @@ foreach(available_arch IN LISTS XETLA_AVAILABLE_ARCHS)
   endif()
 endforeach()
 
-# Generate cpp source files contains template instantiations for kernels with
-# different configs so that they can be compiled as parallel jobs.
+
+include(compile_library.cmake)
+
+# ------------------------------------------------------------------------------------------------
+# compile GEMM libraries of FMHA and HGEMM
+FILE(GLOB_RECURSE kernels_src *.cpp)
 include(SDP/fmha_forward_configure.cmake)
 fmha_forward_configure("${XETLA_USED_ARCHS}")
-include(GEMM/GEMM_int4_configure.cmake)
-GEMM_int4_configure("${XETLA_USED_ARCHS}")
 
 # Xetla kernel apply different offline compiler options than framework.
 # If framework link XeTLA as static lib, link options would conflict now.
 # Temporarily adopting shared lib, will fix it soon.
-FILE(GLOB_RECURSE kernels_src *.cpp)
-add_library(${TARGET} SHARED ${kernels_src} ${FMHA_FORWARD_KERNEL_SRCS} ${GEMM_INT4_SRCS})
+add_library_with_options(xetla_gemm TRUE ${kernels_src} ${FMHA_FORWARD_KERNEL_SRCS})
 
-target_include_directories(${TARGET} PRIVATE .)
-target_include_directories(${TARGET} PUBLIC ${XETLA_INCLUDE_DIR})
-target_include_directories(${TARGET} PUBLIC ${TORCH_INCLUDE_DIRS})
-target_link_libraries(${TARGET} PUBLIC ${GPU_TORCH_LIBS})
+# ------------------------------------------------------------------------------------------------
+# compile libraries for INT4, one library for one configuration
+include(GEMM/GEMM_int4_configure.cmake)
+GEMM_int4_configure("${XETLA_USED_ARCHS}")
 
-# Set visibility to hidden to close the differences of Windows & Linux
-set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden)
-target_compile_definitions(${TARGET} PRIVATE BUILD_XETLA_KERNEL_LIB)
-
-# Feature flag macros should be public for uses in its dependent libraries
-target_compile_definitions(${TARGET} PUBLIC USE_XETLA)
-foreach(available_arch IN LISTS XETLA_AVAILABLE_ARCHS)
-  string(TOUPPER ${available_arch} ARCH)
-  if(USE_XETLA_${ARCH})
-    message(STATUS "XeTLA: USE_XETLA_${ARCH} enabled.")
-    target_compile_definitions(${TARGET} PUBLIC "USE_XETLA_${ARCH}")
-  else()
-    message(STATUS "XeTLA: USE_XETLA_${ARCH} disabled.")
-  endif()
+# ------------------------------------------------------------------------------------------------
+# link the libraries to the interface library\
+add_library(${TARGET} INTERFACE)
+message(STATUS "XETLA_LIBS: ${XETLA_LIBS}")
+set(XETLA_LIBS ${GEMM_INT4_LIBS})
+message(STATUS "XETLA_LIBS: ${XETLA_LIBS}")
+list(APPEND XETLA_LIBS xetla_gemm)
+message(STATUS "XETLA_LIBS: ${XETLA_LIBS}")
+foreach(LIB ${XETLA_LIBS})
+  target_link_libraries(${TARGET} INTERFACE ${LIB})
 endforeach()
 
-target_link_options(${TARGET} PRIVATE ${XETLA_KERNEL_FLAGS})
-target_compile_options(${TARGET} PRIVATE -fsycl)
-if (USE_AOT_DEVLIST)
-  target_compile_options(${TARGET} PRIVATE -fsycl-targets=spir64_gen)
-endif()
+set(XETLA_LIBS ${XETLA_LIBS} PARENT_SCOPE)

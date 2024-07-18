@@ -140,6 +140,11 @@ struct fpu_attr_t {
 template <gpu_arch arch_tag>
 inline constexpr bool arch_has_fpu = fpu_attr_t<arch_tag>::has_fpu;
 
+#define GRF grf_mode::double_grf
+#ifdef NORMAL_GRF
+#define GRF grf_mode::normal_grf
+#endif
+
 template <grf_mode grf_num_mode>
 struct register_nums_t {
   static constexpr uint32_t register_nums =
