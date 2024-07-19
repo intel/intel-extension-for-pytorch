@@ -94,7 +94,7 @@ class NewIPEXPhi3DecoderLayer(IPEXTransformerBlock):
             max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=Phi3RotaryEmbedding,
             # rotary_dim=self.config.rotary_dim,
-            use_casual_mask=False,
+            use_causal_mask=False,
             activation_function=activation_function,
             ipex_act=ipex_activation,
             norm_eps=self.config.rms_norm_eps,

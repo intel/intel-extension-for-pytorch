@@ -14,7 +14,7 @@ from einops import rearrange
 class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
     blocked_alibi = None
     blocked_attn_mask = None
-    casual_attention_mask = None
+    causal_attention_mask = None
 
     def __init__(self, config: IPEXTransformerConfig) -> None:
         super().__init__(config)
@@ -249,7 +249,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             dropout,
             alpha,
             beta,
-            is_casual,
+            is_causal,
             blocked_attn_mask,
             blocked_alibi,
         ) = self.prepare_sdp_input(query, key, value, attention_mask, alibi)
@@ -266,7 +266,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             alpha,
             beta,
             dropout,
-            is_casual,
+            is_causal,
         )
 
         attention_output = self.process_sdp_output(attention_output)
@@ -360,12 +360,12 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
             # matmul: [bs_beam * num_heads, q_length, head_dim]
             attn_output = torch.matmul(attention_probs, value)
         else:
-            if self.use_casual_mask:
+            if self.use_causal_mask:
                 query_length, key_length = query.size(-2), key.size(-2)
-                casual_mask = IPEXTransformerAttnNaive.attention_mask[
+                causal_mask = IPEXTransformerAttnNaive.attention_mask[
                     :, :, key_length - query_length : key_length, :key_length
                 ]
-                casual_mask = casual_mask.contiguous()
+                causal_mask = causal_mask.contiguous()
                 if self.scale_attn is not None:
                     if attention_mask is not None:
                         attn_weights = torch.ops.torch_ipex.trans_matmul_add_div_add(
@@ -374,23 +374,23 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                             0,
                             query,
                             self.scale_attn_scalar,
-                            casual_mask,
+                            causal_mask,
                             1.0,
                             attention_mask,
                             1.0,
                         )
                     else:
                         attn_weights = torch.ops.torch_ipex.trans_matmul_add_div(
-                            key, 0, 0, query, self.scale_attn_scalar, casual_mask, 1.0
+                            key, 0, 0, query, self.scale_attn_scalar, causal_mask, 1.0
                         )
                 else:
                     if attention_mask is not None:
                         attn_weights = torch.ops.torch_ipex.t_matmul_add_add(
-                            key, query, casual_mask, 1.0, attention_mask, 1.0
+                            key, query, causal_mask, 1.0, attention_mask, 1.0
                         )
                     else:
                         attn_weights = torch.ops.torch_ipex.t_matmul_add(
-                            key, query, casual_mask, 1.0
+                            key, query, causal_mask, 1.0
                         )
             else:
                 if self.scale_attn is not None:
@@ -460,7 +460,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
         alpha = 1.0 / math.sqrt(self.head_dim)
         beta = 1.0
         is_causal = False
-        if self.use_casual_mask is True and query.shape[2] != 1:
+        if self.use_causal_mask is True and query.shape[2] != 1:
             is_causal = True
         blocked_attn_mask = None
         if self.is_1st_token() or not self.is_beam_search():
@@ -477,7 +477,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 and seq_len > self.config.sliding_window
             ):
                 window_size = (self.config.sliding_window, self.config.sliding_window)
-                if self.use_casual_mask:
+                if self.use_causal_mask:
                     window_size = (self.config.sliding_window, 0)
 
                 local_mask = self.construct_local_mask(
@@ -841,7 +841,7 @@ class IPEXTransformerAttnOptimizedFp16Baichuan(IPEXTransformerAttnOptimizedFp16)
             dropout,
             alpha,
             beta,
-            is_casual,
+            is_causal,
             blocked_attn_mask,
             blocked_alibi,
         ) = self.prepare_sdp_input(query, key, value, attention_mask, alibi)
@@ -858,7 +858,7 @@ class IPEXTransformerAttnOptimizedFp16Baichuan(IPEXTransformerAttnOptimizedFp16)
             alpha,
             beta,
             dropout,
-            is_casual,
+            is_causal,
         )
 
         attention_output = self.process_sdp_output(attention_output)
@@ -928,7 +928,7 @@ class IPEXTransformerAttnOptimizedFp16ChatGLM(IPEXTransformerAttnOptimizedFp16):
             dropout,
             alpha,
             beta,
-            is_casual,
+            is_causal,
             blocked_attn_mask,
             blocked_alibi,
         ) = super().prepare_sdp_input(query, key, value, attention_mask, alibi)

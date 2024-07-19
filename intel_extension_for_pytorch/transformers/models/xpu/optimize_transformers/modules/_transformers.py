@@ -95,7 +95,7 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
 
 class IPEXTransformerAtten(nn.Module):
     layer_id_static = 0
-    casual_attention_mask = None
+    causal_attention_mask = None
     blocked_alibi = None
     blocked_attn_mask = None
     beam_index = None
@@ -111,7 +111,7 @@ class IPEXTransformerAtten(nn.Module):
         self.layer_id = IPEXTransformerAtten.layer_id_static
         self.max_positions = self.config.max_positions
         self.max_out_positions = self.config.max_out_positions
-        self.use_casual_mask = self.config.use_casual_mask
+        self.use_causal_mask = self.config.use_causal_mask
         self.layer_id = IPEXTransformerAtten.layer_id_static
         self.embed_dim = self.config.embed_dim
         self.num_attn_head = self.config.num_attention_heads
@@ -208,7 +208,7 @@ class IPEXTransformerAtten(nn.Module):
             if self.config.attn_dropout is not None
             else nn.Identity()
         )
-        if self.use_casual_mask:
+        if self.use_causal_mask:
             mask = torch.ones(
                 (self.max_positions, self.max_positions), dtype=torch.float
             )
@@ -229,7 +229,7 @@ class IPEXTransformerAtten(nn.Module):
 
     @staticmethod
     def release_all_static_cached_resources():
-        IPEXTransformerAtten.casual_attention_mask = None
+        IPEXTransformerAtten.causal_attention_mask = None
         IPEXTransformerAtten.blocked_alibi = None
         IPEXTransformerAtten.blocked_attn_mask = None
         IPEXTransformerAtten.beam_index = None
@@ -826,17 +826,17 @@ class IPEXTransformerAtten(nn.Module):
         else:
             attn_weights = torch.matmul(query, key.transpose(-1, -2))
 
-            if self.use_casual_mask:
-                # convert the casual mask dtype to target dtype, this should only happen once
+            if self.use_causal_mask:
+                # convert the causal mask dtype to target dtype, this should only happen once
                 IPEXTransformerAtten.attention_mask.to(attn_weights.dtype)
                 query_length, key_length = query.size(-2), key.size(-2)
-                casual_mask = IPEXTransformerAtten.attention_mask[
+                causal_mask = IPEXTransformerAtten.attention_mask[
                     :, :, key_length - query_length : key_length, :key_length
                 ]
                 # # TODO: Maybe we can move this line to the initializer
-                # casual_mask *= -66504.0
+                # causal_mask *= -66504.0
                 # replace torch.where as torch.add might helps with the host overhead
-                attn_weights += casual_mask
+                attn_weights += causal_mask
             if self.scale_attn:
                 attn_weights /= self.scale_attn
             if attention_mask is not None:
@@ -890,12 +890,12 @@ class IPEXTransformerAtten(nn.Module):
             alpha = 1.0 / math.sqrt(self.head_dim)
             beta = 1.0  # TODO: ignored by native
             is_causal = False
-            if self.use_casual_mask is True and query.shape[2] != 1:
+            if self.use_causal_mask is True and query.shape[2] != 1:
                 is_causal = True
 
             blocked_attn_mask = None
             if attention_mask is not None:
-                # transform the attention_mask to casual mask if the attention_mask is in bool
+                # transform the attention_mask to causal mask if the attention_mask is in bool
                 if attention_mask.dtype == torch.bool:
                     blocked_attn_mask = None
                     if query.shape[2] != 1:

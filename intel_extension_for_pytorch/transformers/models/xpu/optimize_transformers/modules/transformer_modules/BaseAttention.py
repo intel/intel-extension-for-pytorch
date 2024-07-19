@@ -51,6 +51,9 @@ class IPEXTransformerAttn(nn.Module):
         first_token=False,
         **kwargs,
     ):
+        if first_token:
+            self.reset_timestamp()
+
         self.pre_qkv(
             hidden_states=hidden_states,
             key_value_states=key_value_states,

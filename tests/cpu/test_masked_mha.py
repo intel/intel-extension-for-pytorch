@@ -178,13 +178,13 @@ class MaskedMHATest(TestCase):
                     attention_mask = torch.zeros(
                         batch_size, 1, first_seq_len, first_seq_len, dtype=torch.float32
                     )
-                    casual_mask = torch.full(
+                    causal_mask = torch.full(
                         (first_seq_len, first_seq_len), -1e6, dtype=input_t.dtype
                     )
-                    casual_mask = casual_mask.triu(1)
-                    casual_mask = casual_mask.unsqueeze(0).unsqueeze(0)
+                    causal_mask = causal_mask.triu(1)
+                    causal_mask = causal_mask.unsqueeze(0).unsqueeze(0)
                     attention_mask = (
-                        attention_mask + casual_mask
+                        attention_mask + causal_mask
                     )  # combine the attention mask and causal mask
                     # UT for first token with fp32
                     with torch.inference_mode(), torch.no_grad():
@@ -564,13 +564,13 @@ class MaskedMHATest(TestCase):
                     attention_mask = torch.zeros(
                         batch_size, 1, first_seq_len, first_seq_len, dtype=torch.float32
                     )
-                    casual_mask = torch.full(
+                    causal_mask = torch.full(
                         (first_seq_len, first_seq_len), -1e6, dtype=input_t.dtype
                     )
-                    casual_mask = casual_mask.triu(1)
-                    casual_mask = casual_mask.unsqueeze(0).unsqueeze(0)
+                    causal_mask = causal_mask.triu(1)
+                    causal_mask = causal_mask.unsqueeze(0).unsqueeze(0)
                     attention_mask = (
-                        attention_mask + casual_mask
+                        attention_mask + causal_mask
                     )  # combine the attention mask and causal mask
                     if beam_size == 4:
                         beam_idx_t = torch.zeros(

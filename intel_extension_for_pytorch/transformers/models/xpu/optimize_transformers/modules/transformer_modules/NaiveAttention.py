@@ -38,7 +38,7 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         self.seq_len = 0
         self.prev_seq_len = 0
         self.is_decoder = config.is_decoder
-        self.use_casual_mask = config.use_casual_mask
+        self.use_causal_mask = config.use_causal_mask
 
         if self.config.scale_attention:
             self.scale_attn = torch.sqrt(
@@ -48,7 +48,7 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         else:
             self.scale_attn = None
 
-        if self.use_casual_mask:
+        if self.use_causal_mask:
             mask = torch.ones((self.max_position, self.max_position), dtype=torch.float)
             mask = (
                 1 - torch.tril(mask).view(1, 1, self.max_position, self.max_position)
@@ -522,17 +522,17 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         else:
             attn_weights = torch.matmul(query, key.transpose(-1, -2))
 
-            if self.use_casual_mask:
-                # convert the casual mask dtype to target dtype, this should only happen once
+            if self.use_causal_mask:
+                # convert the causal mask dtype to target dtype, this should only happen once
                 IPEXTransformerAttnNaive.attention_mask.to(attn_weights.dtype)
                 query_length, key_length = query.size(-2), key.size(-2)
-                casual_mask = IPEXTransformerAttnNaive.attention_mask[
+                causal_mask = IPEXTransformerAttnNaive.attention_mask[
                     :, :, key_length - query_length : key_length, :key_length
                 ]
                 # # TODO: Maybe we can move this line to the initializer
-                # casual_mask *= -66504.0
+                # causal_mask *= -66504.0
                 # replace torch.where as torch.add might helps with the host overhead
-                attn_weights += casual_mask
+                attn_weights += causal_mask
             if self.scale_attn:
                 attn_weights /= self.scale_attn
             if attention_mask is not None:

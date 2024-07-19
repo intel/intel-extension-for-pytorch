@@ -93,7 +93,7 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
             rotary_dim=None,
             rotary_half=True,
             rotate_every_two=False,
-            use_casual_mask=False,
+            use_causal_mask=False,
             activation_function=self.config.hidden_act,
             ipex_act=ipex_activation,
             norm_eps=self.config.rms_norm_eps,

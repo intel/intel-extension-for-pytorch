@@ -506,7 +506,7 @@ void copy_key_value(
  *@param  offset  The length of decoded(past) token.
  *@param  scale_factor the sqrt(head_dim).
  *@param  head_mask Which is not used by our kernel now.
- *@param  attention_mask Which is combined mask for padding mask and casual
+ *@param  attention_mask Which is combined mask for padding mask and causal
  *mask.
  *@return attn_outs, None, key_cache, value_cache, beam_idx
  */
@@ -1292,7 +1292,7 @@ first_token_masked_mha(
     const int64_t beam_batch,
     const double scale_attn,
     at::Tensor attention_mask,
-    bool add_casual_mask = true) {
+    bool add_causal_mask = true) {
   auto origin_type = query.scalar_type();
   auto bs = query.size(0);
   auto query_length = query.size(1);
@@ -1306,12 +1306,12 @@ first_token_masked_mha(
     key_cache = key_cache.to(at::kFloat);
     value_cache = value_cache.to(at::kFloat);
   }
-  if (add_casual_mask) {
-    auto casual_mask =
+  if (add_causal_mask) {
+    auto causal_mask =
         at::full({query_length, key_lenght}, -1e6, query.options());
-    casual_mask = at::triu(casual_mask, 1);
-    casual_mask = casual_mask.unsqueeze(0).unsqueeze(0);
-    attention_mask = attention_mask + casual_mask;
+    causal_mask = at::triu(causal_mask, 1);
+    causal_mask = causal_mask.unsqueeze(0).unsqueeze(0);
+    attention_mask = attention_mask + causal_mask;
   }
   if (key.scalar_type() != at::kBFloat16 && key.scalar_type() != at::kFloat) {
     TORCH_CHECK(
@@ -1383,7 +1383,7 @@ masked_multihead_self_attention_kernel_impl(
     int64_t max_positions,
     const c10::optional<at::Tensor>& head_mask /* optional */,
     const c10::optional<at::Tensor>& attention_mask /* optional */,
-    c10::optional<bool> add_casual_mask /* optional */) {
+    c10::optional<bool> add_causal_mask /* optional */) {
   TORCH_CHECK(
       attention_mask.has_value(),
       "Attention mask is necessary for ipex::masked_multihead_self_attention_kernel_impl");
@@ -1474,7 +1474,7 @@ masked_multihead_self_attention_kernel_impl(
         beam_batch,
         scale_attn,
         attention_mask_v,
-        add_casual_mask.value_or(true));
+        add_causal_mask.value_or(true));
   }
 }
 

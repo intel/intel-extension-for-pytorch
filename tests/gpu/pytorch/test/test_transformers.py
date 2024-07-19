@@ -2801,7 +2801,7 @@ class TestSDPACudaOnly(NNTestCase):
         if isSM8XDevice and head_dim in range(193, 256 + 1):
             self.skipTest("Flash attention on sm86, sm87, and sm89 for headdim > 192 currently disabled")
         if is_causal and seq_len_q != seq_len_k:
-            self.skipTest("Flash V2 does not accept is_casual when seq_len_q != seq_len_k")
+            self.skipTest("Flash V2 does not accept is_causal when seq_len_q != seq_len_k")
 
         scale = scale if scale is None else (1 / head_dim)
         n_heads = 4
@@ -2945,7 +2945,7 @@ class TestSDPACudaOnly(NNTestCase):
                 return dropout_mask
 
         if fused_kernel == SDPBackend.FLASH_ATTENTION and is_causal and seq_len_q != seq_len_k:
-            self.skipTest("Flash V2 does not accept is_casual when seq_len_q != seq_len_k")
+            self.skipTest("Flash V2 does not accept is_causal when seq_len_q != seq_len_k")
 
         seed = 42
         scale = scale if scale is None else (1 / head_dim)
