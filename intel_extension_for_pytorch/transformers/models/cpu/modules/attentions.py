@@ -43,8 +43,8 @@ class _IPEXAttentionCPU(nn.Module):
                 extra_inputs["original_max_position_embeddings"] = (
                     config.original_max_position_embeddings
                 )
-            if hasattr(config, "use_scaled"):
-                extra_inputs["use_scaled"] = config.use_scaled
+            if self.model_backbone in ["LlamaForCausalLM"]:
+                extra_inputs["use_scaled"] = True
             self._IPEXROPE = _IPEXRopeCPU(
                 self.max_position_embeddings,
                 self.pos_embd_dim,
