@@ -1887,10 +1887,8 @@ struct prefetch_payload_t<
     arch_tag_,
     std::enable_if_t<
         (arch_tag_ == gpu_arch::XeHpc) &&
-        (((block_size_y_ != 1 || tile_size_y_ != 1) &&
-          mem_layout_ == mem_layout::row_major) ||
-         ((block_size_x_ != 1 || tile_size_x_ != 1) &&
-          mem_layout_ == mem_layout::col_major))>> {
+        (((tile_size_y_ != 1) && mem_layout_ == mem_layout::row_major) ||
+         ((tile_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -2180,10 +2178,8 @@ struct prefetch_payload_t<
     num_coop_sg_,
     arch_tag_,
     std::enable_if_t<
-        ((block_size_y_ == 1 && tile_size_y_ == 1) &&
-         mem_layout_ == mem_layout::row_major) ||
-        ((block_size_x_ == 1 && tile_size_x_ == 1) &&
-         mem_layout_ == mem_layout::col_major)>> {
+        ((tile_size_y_ == 1) && mem_layout_ == mem_layout::row_major) ||
+        ((tile_size_x_ == 1) && mem_layout_ == mem_layout::col_major)>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
