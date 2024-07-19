@@ -34,7 +34,7 @@ class IPEXTransformerConfig:
     rotary_half: bool = False
     rotate_every_two: bool = True
     rope_scaling = None
-    use_casual_mask: bool = False
+    use_causal_mask: bool = False
     activation_function: str = None
     ipex_act: SupportedActivation = SupportedActivation.gelu
     norm_eps: float = 0.001

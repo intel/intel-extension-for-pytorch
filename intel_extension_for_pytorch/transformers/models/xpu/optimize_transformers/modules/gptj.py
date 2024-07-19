@@ -79,7 +79,7 @@ class NewIPEXGPTJBlock(IPEXTransformerBlock):
             max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=GPTJRotaryEmbedding,
             rotary_dim=self.config.rotary_dim,
-            use_casual_mask=True,
+            use_causal_mask=True,
             activation_function=activation_function,
             ipex_act=ipex_activation,
             norm_eps=self.config.layer_norm_epsilon,

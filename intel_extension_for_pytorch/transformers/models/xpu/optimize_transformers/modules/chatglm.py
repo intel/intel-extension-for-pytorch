@@ -187,7 +187,7 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
             rotary_dim=None,
             rotary_half=True,
             rotate_every_two=False,
-            use_casual_mask=False,
+            use_causal_mask=False,
             activation_function="silu",
             ipex_act=ipex_activation,
             residual_dropout=None,

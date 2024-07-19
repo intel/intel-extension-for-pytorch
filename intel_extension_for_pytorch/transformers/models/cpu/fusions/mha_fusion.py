@@ -159,7 +159,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
-        add_casual_mask: Optional[bool] = True,
+        add_causal_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
         text_max_length: Optional[int] = 0,
         cutoff: Optional[torch.Tensor] = None,
@@ -253,7 +253,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
             text_max_length,
             head_mask,
             attention_mask,
-            add_casual_mask,
+            add_causal_mask,
         )
 
         present = (
@@ -280,7 +280,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
-        add_casual_mask: Optional[bool] = True,
+        add_causal_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
         cutoff: Optional[torch.Tensor] = None,
         vision: Optional[torch.Tensor] = False,
@@ -294,7 +294,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
             head_mask,
             attention_mask,
             alibi,
-            add_casual_mask,
+            add_causal_mask,
             seq_info,
             self.text_max_length,
             cutoff,

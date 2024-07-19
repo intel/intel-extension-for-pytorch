@@ -139,7 +139,7 @@ def qwen_sdp(self, query, key, value, attention_mask, head_mask, alibi):
         dropout,
         alpha,
         beta,
-        is_casual,
+        is_causal,
         blocked_attn_mask,
         blocked_alibi,
     ) = self.prepare_sdp_input(query, key, value, attention_mask, alibi)
@@ -155,7 +155,7 @@ def qwen_sdp(self, query, key, value, attention_mask, head_mask, alibi):
         alpha,
         beta,
         dropout,
-        is_casual,
+        is_causal,
     )
     attention_output = self.process_sdp_output(attention_output)
     attention_output = attention_output.reshape(

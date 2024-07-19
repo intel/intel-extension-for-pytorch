@@ -600,7 +600,7 @@ def meta_masked_multihead_self_attention(
     max_positions,
     head_mask,
     attention_mask,
-    add_casual_mask=None,
+    add_causal_mask=None,
 ):
     attn_output = query.new_empty(
         (query.shape[0], query.shape[2], query.shape[1], query.shape[3])

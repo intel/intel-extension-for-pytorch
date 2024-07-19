@@ -224,7 +224,7 @@ class IPEXTransformerAttnOptimizedFp16GroupedChatGLM(
             dropout,
             alpha,
             beta,
-            is_casual,
+            is_causal,
             blocked_attn_mask,
             blocked_alibi,
         ) = super().prepare_sdp_input(query, key, value, attention_mask, alibi)

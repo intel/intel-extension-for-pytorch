@@ -645,7 +645,7 @@ class IndirectAccessKVCacheAttention(nn.Module):
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
-        add_casual_mask: Optional[bool] = True,
+        add_causal_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
         text_max_length: Optional[int] = 0,
     ):
@@ -660,7 +660,7 @@ class IndirectAccessKVCacheAttention(nn.Module):
             head_mask,
             attention_mask,
             alibi,
-            add_casual_mask,
+            add_causal_mask,
             seq_info,
             text_max_length,
         )
@@ -675,7 +675,7 @@ class IndirectAccessKVCacheAttention(nn.Module):
         head_mask: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[Tuple[torch.Tensor]] = None,
         alibi: Optional[torch.Tensor] = None,
-        add_casual_mask: Optional[bool] = True,
+        add_causal_mask: Optional[bool] = True,
         seq_info: Optional[torch.Tensor] = None,
     ):
         # query: Tensor [batch, seq_len, num_head, head_dim]
@@ -709,6 +709,6 @@ class IndirectAccessKVCacheAttention(nn.Module):
             head_mask,
             attention_mask,
             alibi,
-            add_casual_mask,
+            add_causal_mask,
             seq_info,
         )
