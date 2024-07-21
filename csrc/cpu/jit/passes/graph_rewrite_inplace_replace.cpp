@@ -165,10 +165,10 @@ void replaceAtenOpsWithIpexInplaceOps(std::shared_ptr<Graph>& graph) {
 
   SubgraphRewriter rewriter_aten_inplace;
   SubgraphRewriter rewriter_ipex_inplace;
-  rewriter_aten_inplace.RegisterRewritePattern(aten_softmax, ipex_softmax_);
-  rewriter_ipex_inplace.RegisterRewritePattern(ipex_softmax, ipex_softmax_);
-  rewriter_aten_inplace.runOnGraph(graph, filter_inplace_for_softmax);
-  rewriter_ipex_inplace.runOnGraph(graph, filter_inplace_for_softmax);
+  // rewriter_aten_inplace.RegisterRewritePattern(aten_softmax, ipex_softmax_);
+  // rewriter_ipex_inplace.RegisterRewritePattern(ipex_softmax, ipex_softmax_);
+  // rewriter_aten_inplace.runOnGraph(graph, filter_inplace_for_softmax);
+  // rewriter_ipex_inplace.runOnGraph(graph, filter_inplace_for_softmax);
 }
 
 // based on the aten inplace op list:

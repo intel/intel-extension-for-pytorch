@@ -658,8 +658,8 @@ void replaceAtenSoftmaxWithIpexSoftmax(std::shared_ptr<Graph>& graph) {
       };
 
   SubgraphRewriter rewriter_aten;
-  rewriter_aten.RegisterRewritePattern(aten_softmax, ipex_softmax);
-  rewriter_aten.runOnGraph(graph, filter_outplace);
+  // rewriter_aten.RegisterRewritePattern(aten_softmax, ipex_softmax);
+  // rewriter_aten.runOnGraph(graph, filter_outplace);
 }
 
 void replaceAtenBatchNormWithIpexBatchNorm(std::shared_ptr<Graph>& graph) {
