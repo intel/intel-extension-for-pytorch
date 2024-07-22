@@ -181,15 +181,7 @@ if python -c "import torch; print(torch.__version__)" &> /dev/null; then
 fi
 
 python -m pip uninstall -y torch torchvision torchaudio intel-extension-for-pytorch oneccl_bind_pt
-set +e
-echo ${VER_TORCH} | grep "dev" > /dev/null
-TORCH_DEV=$?
-set -e
-URL_NIGHTLY=""
-if [ ${TORCH_DEV} -eq 0 ]; then
-    URL_NIGHTLY="nightly/"
-fi
-python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu
+python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.4.0.dev20240522%2Bcpu-cp310-cp310-linux_x86_64.whl
 if [ $((${MODE} & 0x04)) -ne 0 ]; then
     python -m pip install torchvision==${VER_TORCHVISION} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu
 fi
