@@ -1,3 +1,4 @@
+import os
 import argparse
 import time
 import json
@@ -1023,6 +1024,35 @@ elif args.ipex_weight_only_quantization:
                 exit(1)
             low_precision_checkpoint = safetensors.torch.load_file(
                 args.low_precision_checkpoint
+            )
+        elif os.path.isdir(args.low_precision_checkpoint):
+            low_precision_checkpoint = {}
+            for pattern in ["*.pt", "*.pth"]:
+                files = list(pathlib.Path(args.low_precision_checkpoint).glob(pattern))
+                if files:
+                    for f in files:
+                        data_f = torch.load(f)
+                        low_precision_checkpoint.update(data_f)
+                    break
+            if not low_precision_checkpoint:
+                try:
+                    import safetensors
+                except ImportError:
+                    print(
+                        "Please install safetensors package to load safetensors checkpoint."
+                    )
+                    exit(1)
+                files = list(pathlib.Path(args.low_precision_checkpoint).glob("*.safetensors"))
+                if files:
+                    for f in files:
+                        data_f = safetensors.torch.load_file(f)
+                        low_precision_checkpoint.update(data_f)
+            if not low_precision_checkpoint:
+                print("No checkpoint files (.pt, .pth, .safetensors) found. Exit.")
+                exit(1)
+        else:
+            print(
+                "Invalid low-precision-checkpoint. Should be .pt, .pth or .safetensors files, or a directory containing them."
             )
         if args.gptq_legacy_format:
             config_dict = (
