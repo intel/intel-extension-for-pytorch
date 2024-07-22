@@ -429,7 +429,8 @@ def _greedy_search(
 
         # stop when each sentence is finished, or if we exceed the maximum length
         latency_list.append(time.time() - tic)
-        if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
+        unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids, scores)
+        if unfinished_sequences.max() == 0:
             if not synced_gpus:
                 break
             else:
