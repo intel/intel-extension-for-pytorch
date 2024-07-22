@@ -23,7 +23,7 @@ from torch.utils.data import DataLoader
 import sys
 
 sys.path.append(sys.path[0] + "/../../")
-from llm.utils import MODEL_CLASSES
+from llm.utils.supported_models import MODEL_CLASSES
 
 try:
     import lmms_eval
