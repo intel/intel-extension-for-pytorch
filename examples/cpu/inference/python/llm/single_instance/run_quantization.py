@@ -393,7 +393,13 @@ else:
 
 num_beams = 1 if args.greedy else 4
 if not hasattr(config, "text_max_length") and args.prompt is None:
-    config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
+    if not args.benchmark:
+        if hasattr(config, "max_position_embeddings"):
+            config.text_max_length = config.max_position_embeddings
+        else:
+            config.text_max_length = 2048
+    else:
+        config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model.name == "mpt" and not hasattr(config, "max_seq_len") and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
 if model.name in ["git", "llava"]:
