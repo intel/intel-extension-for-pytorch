@@ -1,7 +1,6 @@
 wheel
 sphinx
 sphinx_rtd_theme
-sphinxcontrib.jquery
 sphinx-markdown-tables
 sphinx_md
 sphinxemoji

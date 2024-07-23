@@ -85,20 +85,10 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        set +e
-        echo "${VER_TORCH}" | grep "dev" > /dev/null
-        TORCH_DEV=$?
-        set -e
-        if [ ${TORCH_DEV} -eq 0 ]; then
-            echo ""
-            echo "Error: Detected dependent PyTorch is a nightly built version. Installation from prebuilt wheel files is not supported. Run again to compile from source."
-            exit 4
-        else
-            echo "python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.4.0.dev20240522%2Bcpu-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
-            echo "python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.4.0+git8a46fdb-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
-            python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.4.0.dev20240522%2Bcpu-cp310-cp310-linux_x86_64.whl
-            python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.4.0+git8a46fdb-cp310-cp310-linux_x86_64.whl
-        fi
+        echo "python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.4.0.dev20240522%2Bcpu-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.4.0%2Bgit910bbf9-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
+        python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.4.0.dev20240522%2Bcpu-cp310-cp310-linux_x86_64.whl
+        python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.4.0%2Bgit910bbf9-cp310-cp310-linux_x86_64.whl
     else
         function ver_compare() {
             VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
@@ -222,7 +212,7 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
     if [ -f prompt.json ]; then
         rm -f prompt.json
     fi
-    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+    wget -O prompt.json https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt-llama31.json
     cd single_instance
     if [ -f prompt.json ]; then
         rm -f prompt.json
