@@ -108,6 +108,11 @@ class Evaluator:
 def get_user_model():
     from transformers import AutoModelForCausalLM, AutoModel, AutoTokenizer
 
+    # The latest model is not compatible with the current transformers/tokenizers, so we specify the revision of the model
+    pin_model_revision = {
+        "mistralai/Mistral-7B-v0.1": "26bca36bde8333b5d7f72e9ed20ccda6a618af24",
+        "mistralai/Mixtral-8x7B-Instruct-v0.1": "a60832cb6c88d5cb6e507680d0e9996fbad77050",
+    }
     torchscript = False
     if re.search("llama", args.model.lower()):
         from transformers import LlamaForCausalLM
@@ -149,8 +154,13 @@ def get_user_model():
             args.model,
             torchscript=torchscript,  # torchscript will force `return_dict=False` to avoid jit errors
             trust_remote_code=True,
+            revision=pin_model_revision.get(args.model, None),
         )
-        tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model,
+            trust_remote_code=True,
+            revision=pin_model_revision.get(args.model, None),
+        )
 
     # Set model's seq_len when GPTQ calibration is enabled.
     user_model.seqlen = 2048
