@@ -1325,7 +1325,6 @@ Tensor xetla_fsdp_index_forward(
   return output;
 }
 
-template <typename scalar_t>
 void xetla_paged_attention_impl_v1(
     Tensor& out,
     const Tensor& query,
@@ -1350,23 +1349,30 @@ void xetla_paged_attention_impl_v1(
       : nullptr;
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
-#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
+#if defined(USE_XETLA)
+  gpu_arch arch_tag = sdp::aten_to_Xetla_arch();
+  XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   auto cgfs = gpu::xetla::paged_attention_v1(
-      reinterpret_cast<scalar_t*>(out.data_ptr()),
-      reinterpret_cast<scalar_t*>(query.data_ptr()),
-      reinterpret_cast<scalar_t*>(key_cache.data_ptr()),
-      reinterpret_cast<scalar_t*>(value_cache.data_ptr()),
-      head_mapping.data_ptr<int32_t>(),
-      block_tables.data_ptr<int32_t>(),
-      context_lens.data_ptr<int32_t>(),
-      head_scale,
-      num_seqs,
-      num_heads,
-      num_kv_heads,
-      head_size,
-      block_size,
-      max_num_blocks_per_seq,
-      max_context_len);
+      arch_tag,
+      xeType,
+      {nullptr,
+       nullptr,
+       nullptr,
+       reinterpret_cast<void*>(out.data_ptr()),
+       reinterpret_cast<void*>(query.data_ptr()),
+       reinterpret_cast<void*>(key_cache.data_ptr()),
+       reinterpret_cast<void*>(value_cache.data_ptr()),
+       reinterpret_cast<void*>(head_mapping.data_ptr()),
+       reinterpret_cast<void*>(block_tables.data_ptr()),
+       reinterpret_cast<void*>(context_lens.data_ptr()),
+       head_scale,
+       num_seqs,
+       num_heads,
+       num_kv_heads,
+       head_size,
+       block_size,
+       max_num_blocks_per_seq,
+       max_context_len});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 
 #else
@@ -1388,25 +1394,20 @@ void xetla_paged_attention_v1(
     const c10::optional<Tensor>& alibi_slopes) {
   RECORD_FUNCTION("xetla_paged_attention_v1", {});
 
-  if (out.scalar_type() == at::kHalf) {
-    xetla_paged_attention_impl_v1<sycl::half>(
-        out,
-        query,
-        key_cache,
-        value_cache,
-        head_mapping,
-        block_tables,
-        context_lens,
-        head_scale,
-        block_size,
-        max_context_len,
-        alibi_slopes);
-  } else {
-    AT_ERROR("PagedAttention: only support half");
-  }
+  xetla_paged_attention_impl_v1(
+      out,
+      query,
+      key_cache,
+      value_cache,
+      head_mapping,
+      block_tables,
+      context_lens,
+      head_scale,
+      block_size,
+      max_context_len,
+      alibi_slopes);
 }
 
-template <typename scalar_t>
 void xetla_paged_attention_impl_v2(
     Tensor& max_logits,
     Tensor& exp_sums,
@@ -1434,26 +1435,30 @@ void xetla_paged_attention_impl_v2(
       : nullptr;
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
-#if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
+#if defined(USE_XETLA)
+  gpu_arch arch_tag = sdp::aten_to_Xetla_arch();
+  XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   auto cgfs = gpu::xetla::paged_attention_v2(
-      max_logits.data_ptr<float>(),
-      exp_sums.data_ptr<float>(),
-      reinterpret_cast<scalar_t*>(tmp_out.data_ptr()),
-      reinterpret_cast<scalar_t*>(out.data_ptr()),
-      reinterpret_cast<scalar_t*>(query.data_ptr()),
-      reinterpret_cast<scalar_t*>(key_cache.data_ptr()),
-      reinterpret_cast<scalar_t*>(value_cache.data_ptr()),
-      head_mapping.data_ptr<int32_t>(),
-      block_tables.data_ptr<int32_t>(),
-      context_lens.data_ptr<int32_t>(),
-      head_scale,
-      num_seqs,
-      num_heads,
-      num_kv_heads,
-      head_size,
-      block_size,
-      max_num_blocks_per_seq,
-      max_context_len);
+      arch_tag,
+      xeType,
+      {max_logits.data_ptr<float>(),
+       exp_sums.data_ptr<float>(),
+       reinterpret_cast<void*>(tmp_out.data_ptr()),
+       reinterpret_cast<void*>(out.data_ptr()),
+       reinterpret_cast<void*>(query.data_ptr()),
+       reinterpret_cast<void*>(key_cache.data_ptr()),
+       reinterpret_cast<void*>(value_cache.data_ptr()),
+       reinterpret_cast<void*>(head_mapping.data_ptr()),
+       reinterpret_cast<void*>(block_tables.data_ptr()),
+       reinterpret_cast<void*>(context_lens.data_ptr()),
+       head_scale,
+       num_seqs,
+       num_heads,
+       num_kv_heads,
+       head_size,
+       block_size,
+       max_num_blocks_per_seq,
+       max_context_len});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 #else
   AT_ERROR("PagedAttention: xetla library not found in compilation");
@@ -1477,25 +1482,21 @@ void xetla_paged_attention_v2(
     const c10::optional<Tensor>& alibi_slopes) {
   RECORD_FUNCTION("xetla_paged_attention_v2", {});
 
-  if (out.scalar_type() == at::kHalf) {
-    xetla_paged_attention_impl_v2<sycl::half>(
-        max_logits,
-        exp_sums,
-        tmp_out,
-        out,
-        query,
-        key_cache,
-        value_cache,
-        head_mapping,
-        block_tables,
-        context_lens,
-        head_scale,
-        block_size,
-        max_context_len,
-        alibi_slopes);
-  } else {
-    AT_ERROR("PagedAttention: only support half");
-  }
+  xetla_paged_attention_impl_v2(
+      max_logits,
+      exp_sums,
+      tmp_out,
+      out,
+      query,
+      key_cache,
+      value_cache,
+      head_mapping,
+      block_tables,
+      context_lens,
+      head_scale,
+      block_size,
+      max_context_len,
+      alibi_slopes);
 }
 
 } // namespace AtenIpexTypeXPU

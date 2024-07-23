@@ -192,7 +192,11 @@ mat_vec_mul(xetla_vector<dtype, N> vec, mat_t& mat) {
   return res;
 }
 
-template <typename mat_t, uint32_t wg_size, reduce_op reduce_kind>
+template <
+    typename mat_t,
+    uint32_t wg_size,
+    reduce_op reduce_kind,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct group_reduce_t {
   using dtype = typename mat_t::dtype;
   static constexpr uint32_t tile_size_x = mat_t::tile_size_x;
@@ -205,7 +209,7 @@ struct group_reduce_t {
       mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
       local_st_tile_desc,
       msg_type::block_1d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   // load all subgroup results together
   using local_ld_tile_desc =
       subgroup::tile_desc_t<wg_size, 1, wg_size, 1, reg_layout::tiled>;
@@ -214,9 +218,9 @@ struct group_reduce_t {
       mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
       local_ld_tile_desc,
       msg_type::block_1d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   // local variables
-  xetla_nbarrier_t<wg_size, wg_size> nbarrier;
+  xetla_nbarrier_t<wg_size, wg_size, arch_tag> nbarrier;
   uint32_t slm_base;
   uint32_t sg_id;
   uint32_t num_rows;

@@ -14,10 +14,10 @@
  * limitations under the License.
  ******************************************************************************/
 
-#ifdef USE_XETLA_XE_HPC
 #include <c10/util/Exception.h>
 #include <limits>
 #include "../../mha.h"
+#include "common/core/common_types.hpp"
 #include "paged_attention_kernel.hpp"
 #include "paged_attention_policy.hpp"
 #include "xetla.hpp"
@@ -26,51 +26,42 @@ namespace gpu::xetla {
 
 namespace attention {
 
-template <typename Policy, typename T, typename U>
-cgfs_t launch_paged_attention_v1(
-    T* out,
-    T* query,
-    T* key_cache,
-    T* value_cache,
-    U* head_mapping,
-    U* block_tables,
-    U* context_lens,
-    float sm_scale,
-    uint32_t num_seqs,
-    uint32_t num_heads,
-    uint32_t num_kv_heads,
-    uint32_t head_size,
-    uint32_t max_blocks_per_seq,
-    uint32_t max_context_len) {
-  using kernel = paged_attention_kernel<Policy, T, U>;
+template <
+    typename Policy,
+    typename T,
+    typename U,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
+cgfs_t launch_paged_attention_v1(paged_attention_fwd_kernel_args_t fwd_args) {
+  using kernel = paged_attention_kernel<Policy, T, U, arch_tag>;
 
   constexpr uint32_t max_computation =
       Policy::block_size * Policy::max_blocks_per_sg * Policy::wg_size;
   TORCH_CHECK(
-      max_context_len <= max_computation,
+      fwd_args.max_context_len <= max_computation,
       "max_context_len is too large to compute for paged attention V1");
 
-  sycl::nd_range<3> nd_range = kernel::get_nd_range(num_seqs, num_heads, 1);
+  sycl::nd_range<3> nd_range =
+      kernel::get_nd_range(fwd_args.num_seqs, fwd_args.num_heads, 1);
   return {[=](sycl::handler& cgh) {
-    cgh.parallel_for<paged_attention_kernel<Policy, T, U>>(
+    cgh.parallel_for<paged_attention_kernel<Policy, T, U, arch_tag>>(
         nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
           kernel kernel_fn;
           typename kernel::arguments_t args(
-              /* max_logits */ nullptr,
-              /* exp_sums */ nullptr,
-              out,
-              query,
-              key_cache,
-              value_cache,
-              head_mapping,
-              block_tables,
-              context_lens,
-              sm_scale,
-              num_seqs,
-              num_heads,
-              num_kv_heads,
-              head_size,
-              max_blocks_per_seq);
+              nullptr,
+              nullptr,
+              reinterpret_cast<T*>(fwd_args.out),
+              reinterpret_cast<T*>(fwd_args.query),
+              reinterpret_cast<T*>(fwd_args.key_cache),
+              reinterpret_cast<T*>(fwd_args.value_cache),
+              reinterpret_cast<U*>(fwd_args.head_mapping),
+              reinterpret_cast<U*>(fwd_args.block_tables),
+              reinterpret_cast<U*>(fwd_args.context_lens),
+              fwd_args.sm_scale,
+              fwd_args.num_seqs,
+              fwd_args.num_heads,
+              fwd_args.num_kv_heads,
+              fwd_args.head_size,
+              fwd_args.max_blocks_per_seq);
 
           kernel_fn(item, args);
         });
@@ -87,49 +78,37 @@ cgfs_t launch_paged_attention_v1(
           WG_SIZE,                                          \
           BLOCK_NUM_PER_SG>,                                \
       T,                                                    \
-      U>(                                                   \
-      out,                                                  \
-      query,                                                \
-      key_cache,                                            \
-      value_cache,                                          \
-      head_mapping,                                         \
-      block_tables,                                         \
-      context_lens,                                         \
-      sm_scale,                                             \
-      num_seqs,                                             \
-      num_heads,                                            \
-      num_kv_heads,                                         \
-      head_size,                                            \
-      max_blocks_per_seq,                                   \
-      max_context_len);
+      U,                                                    \
+      arch_tag>(args);
 
-#define CALL_V1_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE, WG_SIZE)      \
-  int min_blocks_per_sg =                                                      \
-      (max_context_len + (WG_SIZE * BLOCK_SIZE) - 1) / (WG_SIZE * BLOCK_SIZE); \
-  if (min_blocks_per_sg <= 2)                                                  \
-    CALL_V1_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, WG_SIZE, 2)                  \
-  else if (min_blocks_per_sg <= 4)                                             \
-    CALL_V1_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, WG_SIZE, 4)                  \
-  else if (min_blocks_per_sg <= 8)                                             \
-    CALL_V1_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, WG_SIZE, 8)                  \
-  else {                                                                       \
-    TORCH_CHECK(0, "max_context_len is too large to compute");                 \
-    return {};                                                                 \
+#define CALL_V1_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE, WG_SIZE) \
+  int min_blocks_per_sg =                                                 \
+      (args.max_context_len + (WG_SIZE * BLOCK_SIZE) - 1) /               \
+      (WG_SIZE * BLOCK_SIZE);                                             \
+  if (min_blocks_per_sg <= 2)                                             \
+    CALL_V1_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, WG_SIZE, 2)             \
+  else if (min_blocks_per_sg <= 4)                                        \
+    CALL_V1_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, WG_SIZE, 4)             \
+  else if (min_blocks_per_sg <= 8)                                        \
+    CALL_V1_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE, WG_SIZE, 8)             \
+  else {                                                                  \
+    TORCH_CHECK(0, "max_context_len is too large to compute");            \
+    return {};                                                            \
   }
 
-#define CALL_V1_LAUNCHER_WG_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE)       \
-  int min_num_wg = (max_context_len + BLOCK_SIZE - 1) / BLOCK_SIZE; \
-  if (min_num_wg <= 16) {                                           \
-    CALL_V1_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE, 8)     \
-  } else if (min_num_wg <= 32) {                                    \
-    CALL_V1_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE, 16)    \
-  } else {                                                          \
-    CALL_V1_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE, 32)    \
+#define CALL_V1_LAUNCHER_WG_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE)            \
+  int min_num_wg = (args.max_context_len + BLOCK_SIZE - 1) / BLOCK_SIZE; \
+  if (min_num_wg <= 16) {                                                \
+    CALL_V1_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE, 8)          \
+  } else if (min_num_wg <= 32) {                                         \
+    CALL_V1_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE, 16)         \
+  } else {                                                               \
+    CALL_V1_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE, BLOCK_SIZE, 32)         \
   }
 
 // Note: only support block_size = 16/32, to reduce compiliation time
 #define CALL_V1_LAUNCHER_HEAD_SIZE(T, U, HEAD_SIZE)  \
-  switch (block_size) {                              \
+  switch (args.block_size) {                         \
     case 16: {                                       \
       CALL_V1_LAUNCHER_WG_SIZE(T, U, HEAD_SIZE, 16); \
     }                                                \
@@ -142,29 +121,14 @@ cgfs_t launch_paged_attention_v1(
     }                                                \
   }
 
-XETLA_KERNEL_API cgfs_t paged_attention_v1(
-    sycl::half* out,
-    sycl::half* query,
-    sycl::half* key_cache,
-    sycl::half* value_cache,
-    int32_t* head_mapping,
-    int32_t* block_tables,
-    int32_t* context_lens,
-    float sm_scale,
-    uint32_t num_seqs,
-    uint32_t num_heads,
-    uint32_t num_kv_heads,
-    uint32_t head_size,
-    uint32_t block_size,
-    uint32_t max_blocks_per_seq,
-    uint32_t max_context_len) {
-  using T = sycl::half;
+template <gpu_arch arch_tag, typename T>
+cgfs_t paged_attention_v1_dispatch(paged_attention_fwd_kernel_args_t args) {
   using U = int32_t;
-  if (head_size <= 64) {
+  if (args.head_size <= 64) {
     CALL_V1_LAUNCHER_HEAD_SIZE(T, U, 64);
-  } else if (head_size <= 128) {
+  } else if (args.head_size <= 128) {
     CALL_V1_LAUNCHER_HEAD_SIZE(T, U, 128);
-  } else if (head_size <= 256) {
+  } else if (args.head_size <= 256) {
     CALL_V1_LAUNCHER_HEAD_SIZE(T, U, 256);
   } else {
     TORCH_CHECK(0, "Unsupported head size");
@@ -172,8 +136,55 @@ XETLA_KERNEL_API cgfs_t paged_attention_v1(
   }
 }
 
+template <gpu_arch arch_tag>
+cgfs_t _paged_attention_v1(
+    XetlaType xeType,
+    paged_attention_fwd_kernel_args_t args) {
+  if (xeType == XetlaType::fp16) {
+    return paged_attention_v1_dispatch<arch_tag, fp16>(args);
+  }
+  // only XeHpc can have right result on bf16 datatype, accuracy test will
+  // fail at other archs might needs fix from xetla to enable bf16 on other
+  // archs
+  // TODO(ganyi): enable other archs' implementation on bf16 when xetla fix its
+  // bf16 path.
+#if __INTEL_LLVM_COMPILER >= 20240200
+  else if constexpr (arch_tag == gpu_arch::XeHpc) {
+    return paged_attention_v1_dispatch<arch_tag, bf16>(args);
+  }
+#endif
+  else {
+    printf("paged_attention: No bf16 support for current arch!!\n\n");
+    return {};
+  }
+}
+
+XETLA_KERNEL_API cgfs_t paged_attention_v1(
+    gpu_arch arch_tag,
+    XetlaType xeType,
+    paged_attention_fwd_kernel_args_t args) {
+  switch (arch_tag) {
+#if __INTEL_LLVM_COMPILER >= 20240200
+#ifdef USE_XETLA_XE_LPG
+    case gpu_arch::XeLpg:
+      return _paged_attention_v1<gpu_arch::XeLpg>(xeType, args);
+#endif
+#ifdef USE_XETLA_XE_HPG
+    case gpu_arch::XeHpg:
+      return _paged_attention_v1<gpu_arch::XeHpg>(xeType, args);
+#endif
+#endif // __INTEL_LLVM_COMPILER >= 20240200
+#ifdef USE_XETLA_XE_HPC
+    case gpu_arch::XeHpc:
+      return _paged_attention_v1<gpu_arch::XeHpc>(xeType, args);
+#endif
+    default:
+      printf("Unsupported gpu_arch of paged_attention_v1!!\n\n");
+      return {};
+  }
+}
+
 #undef CALL_V1_LAUNCHER_BLOCK_SIZE
 #undef CALL_V1_LAUNCHER
 
 } // namespace gpu::xetla
-#endif
