@@ -52,6 +52,15 @@ class LLMConfig(ABC):
                 self.model = AutoModelForCausalLM.from_config(
                     config, trust_remote_code=True
                 )
+            except Exception:
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    self.model_id,
+                    torch_dtype=torch.float,
+                    config=config,
+                    low_cpu_mem_usage=True,
+                    trust_remote_code=True,
+                    revision=pin_model_revision.get(self.model_id, None),
+                )
         else:
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_id,

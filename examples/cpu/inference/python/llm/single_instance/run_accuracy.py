@@ -229,6 +229,15 @@ class HuggingFaceModel(BaseLM):
                     torch_dtype=load_dtype,
                     trust_remote_code=True,
                 )
+            except Exception:
+                self.model = model_class[0].from_pretrained(
+                    model_id,
+                    low_cpu_mem_usage=True,
+                    config=self.config,
+                    torch_dtype=load_dtype,
+                    trust_remote_code=True,
+                    revision=pin_model_revision.get(model_id, None),
+                )
         else:
             self.model = model_class[0].from_pretrained(
                 model_id,
@@ -1432,6 +1441,17 @@ class LibriSpeech:
                 inplace=True,
                 deployment_mode=False,
                 cache_weight_for_large_batch=args.cache_weight_for_large_batch,
+            )
+        elif re.search("whisper", model_id, re.IGNORECASE):
+
+            def convert_function(m, func_name, new_function):
+                bound_method = new_function.__get__(m, m.__class__)
+                setattr(m, func_name, bound_method)
+
+            convert_function(
+                self.model,
+                "detect_language",
+                ipex.transformers.models.reference.models.detect_language,
             )
 
         if args.torch_compile:
