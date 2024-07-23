@@ -159,6 +159,9 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
         if scales.size(-1) != 1:
             # qweight is compressed along the last dim int4 * 8 -> int32
             group_size = qweight.size(-1) * 8 // scales.size(-1)
+            # Ensure group_size is a power of two
+            assert group_size > 0
+            group_size = 2 ** (group_size - 1).bit_length()
     return qweight, scales, qzeros, bias, group_size, g_idx
 
 
