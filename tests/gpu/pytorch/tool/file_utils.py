@@ -1,5 +1,5 @@
 import json
-from ruamel import yaml
+from ruamel.yaml import YAML
 import os
 import sys
 import shutil
@@ -7,7 +7,8 @@ import re
 
 def load_from_yaml(yaml_file):
     with open(yaml_file, "r") as load_f:
-        loaded = yaml.load(load_f.read(), Loader=yaml.RoundTripLoader)
+        yaml = YAML()
+        loaded = yaml.load(load_f.read())
     return loaded
 
 def save_to_yaml(src, target_file):
