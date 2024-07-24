@@ -25,6 +25,7 @@ __all__ = [
     "copy_blocks",
     "swap_blocks",
     "IpexPaged_attention",
+    "IpexRmsNorm",
 ]
 
 
@@ -162,6 +163,10 @@ def IpexSDP_dropout(
     return torch.ops.torch_ipex.xetla_sdp_dropout(
         query, key, value, attn_mask, dropout_p, is_causal, scale
     )
+
+
+def IpexRmsNorm(input, normalized_shape, weight, epsilon) -> Tensor:
+    return torch.ops.torch_ipex.rms_norm_impl(input, normalized_shape, weight, epsilon)
 
 
 def varlen_fwd(
