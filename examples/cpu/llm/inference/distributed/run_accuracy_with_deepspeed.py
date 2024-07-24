@@ -1236,7 +1236,7 @@ class LMMS(lmms):
         self.iter = 0
         self.num_beams = 1 if with_greedy else 4
         if self._with_jit:
-            input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
+            input_ids = torch.ones(1).to(torch.long).unsqueeze(0)
             attention_mask = torch.ones_like(input_ids)
             past_key_values = tuple(
                 [
