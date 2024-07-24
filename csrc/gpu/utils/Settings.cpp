@@ -25,19 +25,20 @@ namespace dpcpp {
  * XPU ONLY optionos:
  * ==========GPU==========
  *   IPEX_VERBOSE:
- *      Default = 0 | Set verbose level with synchronization execution mode, will be removed
+ *      Default = 0 | Set verbose level with synchronization execution mode, will be deprecated 
+ *      very soon. Please use IPEX_LOG_LEVEL instead.
  *   IPEX_XPU_SYNC_MODE:
- *      Default = 0 | Set 1 to enforce synchronization execution mode
- *   IPEX_LOGGING_LEVEL:
- *      Default = -1 | Set IPEX_LOGGING_LEVEL = Disabled
+ *      Default = 0 | Set 1 to enforce synchronization execution mode, will be deprecated very soon.
+ *   IPEX_LOG_LEVEL:
+ *      Default = -1 | Set log level to trace the execution and get log information, pls refer to 'ipex_log.md' for different log level.
  *   IPEX_LOG_COMPONENT:
- *      Default = "ALL" | Set IPEX_LOG_COMPONENT = ALL, it will log all component message.
- *      If you would like to log several components pls use ';' as sepreator, 
- *      such as "OPS;RUNTIME", if you would like to use sub_component, pls use '/' as sepreator
+ *      Default = "ALL" | Set IPEX_LOG_COMPONENT = ALL to log all component message.
+ *      Use ';' as separator to log more than one components, such as "OPS;RUNTIME".
+ *      Use '/' as separator to log subcomponents.
  *   IPEX_LOG_ROTATE_SIZE:
- *      Default = -1 | Set Rotate file size for IPEX_LOG, less than 0 means using SPLIT FILE
+ *      Default = -1 | Set Rotate file size in MB for IPEX_LOG, less than 0 means unuse this setting.
  *   IPEX_LOG_SPLIT_SIZE:
- *      Default = -1 | Set split file size for IPEX_LOG, less than 0 means using ROTATE FILE
+ *      Default = -1 | Set split file size in MB for IPEX_LOG, less than 0 means unuse this setting.
  *   IPEX_LOG_OUTPUT:
  *      Default = "" | Set output file path for IPEX_LOG, default is null
  * ==========GPU==========
@@ -45,7 +46,8 @@ namespace dpcpp {
  * EXPERIMENTAL options:
  * ==========EXP==========
  *   IPEX_SIMPLE_TRACE:
- *      Default = 0 | Set 1 to enable simple trace for all operators*
+ *      Default = 0 | Set 1 to enable simple trace for all operators*, will be deprecated very soon.
+ *      Please use IPEX_LOG_LEVEL instead.
  * ==========EXP==========
  *
  * Internal options:
@@ -121,7 +123,7 @@ Settings::Settings() {
   DPCPP_INIT_ENV_VAL("IPEX_VERBOSE", verbose_level, VERBOSE_LEVEL, show_opt);
 
   log_level = LOG_LEVEL::DISABLED;
-  DPCPP_INIT_ENV_VAL("IPEX_LOGGING_LEVEL", log_level, LOG_LEVEL, show_opt);
+  DPCPP_INIT_ENV_VAL("IPEX_LOG_LEVEL", log_level, LOG_LEVEL, show_opt);
 
   // get IPEX_LOG_ROTATE_SIZE
   auto IPEX_LOG_ROTATE_SIZE_env = std::getenv("IPEX_LOG_ROTATE_SIZE");
