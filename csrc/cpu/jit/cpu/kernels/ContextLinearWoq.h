@@ -27,6 +27,9 @@ struct ContextLinearWoq final {
   int64_t act_quant_mode_;
   bool cache_weight_for_large_batch_ = false;
   c10::optional<at::Tensor> cached_weight_ = c10::nullopt;
+  // Compensation for INT8 GEMM.
+  // Compensation = Σ(k)(W[k][n] - ZP[n]) for each block.
+  c10::optional<at::Tensor> cached_compensation_ = c10::nullopt;
 
   ContextLinearWoq() = delete;
 

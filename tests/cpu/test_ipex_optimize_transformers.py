@@ -251,26 +251,37 @@ class OptimizeTransformersTester(TestCase):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
         )
-        model = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
 
-        for weight_dtype in [
+        weight_dtype_list = [
             ipex.quantization.WoqWeightDtype.INT8,
             ipex.quantization.WoqWeightDtype.INT4,
             ipex.quantization.WoqWeightDtype.NF4,
-        ]:
+        ]
+        lowp_mode_list = [
+            ipex.quantization.WoqLowpMode.BF16,
+            ipex.quantization.WoqLowpMode.INT8,
+        ]
+        cases = itertools.product(weight_dtype_list, lowp_mode_list)
+        for weight_dtype, lowp_mode in cases:
+            if (
+                weight_dtype != ipex.quantization.WoqWeightDtype.INT4
+                and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+            ):
+                continue
             qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                 weight_dtype=weight_dtype,
-                lowp_mode=ipex.quantization.WoqLowpMode.BF16,
+                lowp_mode=lowp_mode,
             )
             model_ref = ipex.llm.optimize(
-                copy.deepcopy(model),
+                copy.deepcopy(m),
                 dtype=torch.bfloat16,
                 quantization_config=qconfig_mapping,
                 deployment_mode=True,
                 cache_weight_for_large_batch=False,
             )
             model = ipex.llm.optimize(
-                model,
+                copy.deepcopy(m),
                 dtype=torch.bfloat16,
                 quantization_config=qconfig_mapping,
                 deployment_mode=True,
@@ -286,10 +297,15 @@ class OptimizeTransformersTester(TestCase):
                 example_inputs = _get_gptj_example_inputs(batch_size=128)
                 y = model(*example_inputs)
                 y_ref = model_ref(*example_inputs)
-                assert all(
-                    l._op_context.get_cached_weight() is not None for l in linear_list
+                for l in linear_list:
+                    if l._op_context.get_weight().ndim == 4:
+                        assert l._op_context.get_cached_weight() is not None
+                tol = (
+                    1.5e-1
+                    if weight_dtype == ipex.quantization.WoqWeightDtype.NF4
+                    else 5e-2
                 )
-                self.assertEqual(y[0], y_ref[0], prec=5e-2)
+                self.assertEqual(y[0], y_ref[0], prec=tol)
 
     def test_static_quant_flow(self):
         config = AutoConfig.from_pretrained(

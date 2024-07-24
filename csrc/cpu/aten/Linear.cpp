@@ -370,8 +370,11 @@ at::Tensor woq_linear_pack_weight(
   // For TPP kernel, we only consider even K
   if (K % 2 == 0) {
     size_t block_n = 32;
-    size_t default_block_k = (weight_dtype == WOQ_DTYPE_INT4 && lowp_mode == 3) ? 128 : 64;
-    size_t block_k = group_size > 0 ? std::min((size_t)group_size, default_block_k) : default_block_k;
+    size_t default_block_k =
+        (weight_dtype == WOQ_DTYPE_INT4 && lowp_mode == 3) ? 128 : 64;
+    size_t block_k = group_size > 0
+        ? std::min((size_t)group_size, default_block_k)
+        : default_block_k;
     while (K % block_k != 0) {
       block_k /= 2;
     }
@@ -428,7 +431,8 @@ at::Tensor woq_linear_kernel(
     const std::vector<at::Tensor>& bias_list,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation) {
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
   return woq_tpp_gemm_kernel_stub(
       kCPU,
@@ -443,7 +447,8 @@ at::Tensor woq_linear_kernel(
       std::vector<at::Tensor>(),
       act_quant_mode,
       quant_w_mode,
-      group_size);
+      group_size,
+      compensation);
 }
 
 at::Tensor woq_linear_forward(
@@ -466,7 +471,8 @@ at::Tensor woq_linear_unary_kernel(
     const c10::optional<c10::string_view>& algorithm,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation) {
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
   if (post_op == "gelu") {
     if (algorithm == "none") {
@@ -493,7 +499,8 @@ at::Tensor woq_linear_unary_kernel(
       std::vector<at::Tensor>(),
       act_quant_mode,
       quant_w_mode,
-      group_size);
+      group_size,
+      compensation);
 }
 
 at::Tensor woq_linear_gelu_forward(
@@ -541,7 +548,8 @@ at::Tensor woq_linear_binary_kernel(
     int64_t lowp_mode,
     const c10::string_view& post_op,
     const std::vector<at::Tensor>& others,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation) {
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
   if (post_op == "add") {
     post_op_fusion_type = WOQ_FUSE_ADD;
@@ -564,7 +572,8 @@ at::Tensor woq_linear_binary_kernel(
       others,
       act_quant_mode,
       quant_w_mode,
-      group_size);
+      group_size,
+      compensation);
 }
 
 at::Tensor woq_linear_add_forward(

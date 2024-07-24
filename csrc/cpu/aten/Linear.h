@@ -136,7 +136,8 @@ at::Tensor woq_linear_kernel(
     const std::vector<at::Tensor>& bias_list,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode);
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation = c10::nullopt);
 
 at::Tensor woq_linear_unary_kernel(
     const at::Tensor& self,
@@ -150,7 +151,8 @@ at::Tensor woq_linear_unary_kernel(
     const c10::optional<c10::string_view>& algorithm,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode);
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation = c10::nullopt);
 
 at::Tensor woq_linear_binary_kernel(
     const at::Tensor& self,
@@ -163,7 +165,8 @@ at::Tensor woq_linear_binary_kernel(
     int64_t lowp_mode,
     const c10::string_view& post_op,
     const std::vector<at::Tensor>& others,
-    int64_t act_quant_mode);
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation = c10::nullopt);
 
 namespace {
 void woq_gemm_kernel_impl(
@@ -239,16 +242,28 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     const std::vector<at::Tensor>&,
     int64_t,
     int64_t,
-    int64_t);
+    int64_t,
+    const c10::optional<at::Tensor>&);
 
 using woq_tpp_gemm_packB_fn =
     at::Tensor (*)(const at::Tensor&, int, size_t, size_t, int64_t);
 
 using woq_tpp_gemm_unpackB_fn = at::Tensor (*)(const at::Tensor&, int, int64_t);
 
+using woq_dequant_int4_to_int8_packed_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const at::Tensor&,
+    int,
+    int64_t,
+    at::Tensor&);
+
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
+IPEX_DECLARE_DISPATCH(
+    woq_dequant_int4_to_int8_packed_fn,
+    woq_dequant_int4_to_int8_packed_stub);
 
 // Fusion types
 #define WOQ_FUSE_NONE 0x0
