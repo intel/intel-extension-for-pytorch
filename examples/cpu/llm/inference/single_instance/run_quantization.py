@@ -1,3 +1,4 @@
+import os
 import argparse
 import time
 import json
@@ -1032,21 +1033,55 @@ elif args.ipex_weight_only_quantization:
         group_size=args.group_size,
     )
     if args.low_precision_checkpoint != "":
-        if args.low_precision_checkpoint.endswith(
-            ".pt"
-        ) or args.low_precision_checkpoint.endswith(".pth"):
-            low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
-        elif args.low_precision_checkpoint.endswith(".safetensors"):
-            try:
-                import safetensors
-            except ImportError:
-                print(
-                    "Please install safetensors package to load safetensors checkpoint."
-                )
-                exit(1)
-            low_precision_checkpoint = safetensors.torch.load_file(
-                args.low_precision_checkpoint
+        pathname = args.low_precision_checkpoint
+        assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
+        if os.path.isfile(pathname):
+            low_precision_checkpoint = None
+            if pathname.endswith(".pt") or pathname.endswith(".pth"):
+                low_precision_checkpoint = torch.load(pathname, weights_only=True)
+            elif pathname.endswith(".safetensors"):
+                try:
+                    import safetensors
+                except ImportError:
+                    print(
+                        "Please install safetensors package to load safetensors checkpoint."
+                    )
+                    exit(1)
+                low_precision_checkpoint = safetensors.torch.load_file(pathname)
+            assert (
+                low_precision_checkpoint is not None
+            ), f"Invalid checkpoint file: {pathname}. Should be a .pt, .pth or .safetensors file."
+        elif os.path.isdir(pathname):
+            low_precision_checkpoint = {}
+            for pattern in ["*.pt", "*.pth"]:
+                files = list(pathlib.Path(pathname).glob(pattern))
+                if files:
+                    for f in files:
+                        data_f = torch.load(f, weights_only=True)
+                        low_precision_checkpoint.update(data_f)
+                    break
+            if not low_precision_checkpoint:
+                files = list(pathlib.Path(pathname).glob("*.safetensors"))
+                if files:
+                    try:
+                        import safetensors
+                    except ImportError:
+                        print(
+                            "Please install safetensors package to load safetensors checkpoint."
+                        )
+                        exit(1)
+                    for f in files:
+                        data_f = safetensors.torch.load_file(f)
+                        low_precision_checkpoint.update(data_f)
+            assert (
+                len(low_precision_checkpoint) > 0
+            ), f"Cannot find checkpoint (.pt/.pth/.safetensors) files in path {pathname}."
+        else:
+            raise AssertionError(
+                f"Invalid low-precision-checkpoint: {pathname}."
+                " Should be a .pt/.pth/.safetensors file or a directory containing them."
             )
+
         if args.gptq_legacy_format:
             config_dict = (
                 ipex.utils.weight_only_quantization._legacy_lowp_checkpoint_config()
