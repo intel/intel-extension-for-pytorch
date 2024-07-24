@@ -63,7 +63,7 @@ IPEX_INFO_EVENT_END("OPS", "", "record_avg_pool", "finish conv", "Here record th
 ## Enviornment settings
 Intel® Extension for PyTorch\* provides five enviornment variables for configuring log output:
 
-- `IPEX_LOGGING_LEVEL`, accept integar or string, default is -1 for `DISABLED`. 
+- `IPEX_LOG_LEVEL`, accept integar or string, default is -1 for `DISABLED`. 
 - `IPEX_LOG_COMPONENT`, accept string, used for specifying the log component and sub log component you would like to log, default is "ALL". The log component and sub log component are separated by `/`. You could also specify several log components, such as "OPS;MEMORY".
 - `IPEX_LOG_OUTPUT`, accept string. If you are using `IPEX_LOG_OUTPUT`, than all the logs will recorded inside a file rather than the console. Example: export IPEX_LOG_OUTPUT="./ipex.log".
 - `IPEX_LOG_ROTATE_SIZE`, accept integar, default is 10. Can be used only with `IPEX_LOG_OUTPUT`, for specifing how large file will be used when rotating this log, size is MB.

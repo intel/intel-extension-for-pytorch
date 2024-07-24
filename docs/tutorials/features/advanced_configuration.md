@@ -38,7 +38,7 @@ Examples to configure the launch options:</br>
 - Set one or more options before running the model
 
 ```bash
-export IPEX_VERBOSE=1
+export IPEX_LOG_LEVEL=1
 export IPEX_FP32_MATH_MODE=TF32
 ...
 python ResNet50.py
@@ -46,11 +46,11 @@ python ResNet50.py
 - Set one option when running the model
 
 ```bash
-IPEX_VERBOSE=1 python ResNet50.py
+IPEX_LOG_LEVEL=1 python ResNet50.py
 ```
 
 - Set more than one options when running the model
 
 ```bash
-IPEX_VERBOSE=1 IPEX_FP32_MATH_MODE=TF32 python ResNet50.py
+IPEX_LOG_LEVEL=1 IPEX_FP32_MATH_MODE=TF32 python ResNet50.py
 ```
