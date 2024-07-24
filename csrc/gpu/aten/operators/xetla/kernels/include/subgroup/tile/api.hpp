@@ -123,10 +123,6 @@ struct tile_t : public tile_desc_ {
 
   // Cannot init value by constructor
   inline tile_t(native_type_t<dtype> val) {
-    static_assert(
-        !is_internal_type<dtype>::value,
-        "compiler currently does NOT support using plained BF16 data "
-        "to initialize a BF16 data");
     this->reg = val;
   }
 

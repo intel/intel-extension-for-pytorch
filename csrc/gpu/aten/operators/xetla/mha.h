@@ -46,6 +46,27 @@ struct fmha_forward_kernel_args_t {
   uint64_t offset_t;
 };
 
+struct paged_attention_fwd_kernel_args_t {
+  float* max_logits;
+  float* exp_sums;
+  void* tmp_out;
+  void* out;
+  void* query;
+  void* key_cache;
+  void* value_cache;
+  void* head_mapping;
+  void* block_tables;
+  void* context_lens;
+  float sm_scale;
+  uint32_t num_seqs;
+  uint32_t num_heads;
+  uint32_t num_kv_heads;
+  uint32_t head_size;
+  uint32_t block_size;
+  uint32_t max_blocks_per_seq;
+  uint32_t max_context_len;
+};
+
 // * General interface kernel for FSDP
 // * causal
 // * permutation t, n, h
@@ -115,39 +136,12 @@ XETLA_KERNEL_API cgfs_t fmha_backward_kernel(
     uint64_t offset_t);
 
 XETLA_KERNEL_API cgfs_t paged_attention_v1(
-    sycl::half* out,
-    sycl::half* query,
-    sycl::half* key_cache,
-    sycl::half* value_cache,
-    int32_t* head_mapping,
-    int32_t* block_tables,
-    int32_t* context_lens,
-    float sm_scale,
-    uint32_t num_seqs,
-    uint32_t num_heads,
-    uint32_t num_kv_heads,
-    uint32_t head_size,
-    uint32_t block_size,
-    uint32_t max_blocks_per_seq,
-    uint32_t max_context_len);
+    gpu_arch arch_tag,
+    XetlaType xeType,
+    paged_attention_fwd_kernel_args_t args);
 
 XETLA_KERNEL_API cgfs_t paged_attention_v2(
-    float* max_logits,
-    float* exp_sums,
-    sycl::half* tmp_out,
-    sycl::half* out,
-    sycl::half* query,
-    sycl::half* key_cache,
-    sycl::half* value_cache,
-    int32_t* head_mapping,
-    int32_t* block_tables,
-    int32_t* context_lens,
-    float sm_scale,
-    uint32_t num_seqs,
-    uint32_t num_heads,
-    uint32_t num_kv_heads,
-    uint32_t head_size,
-    uint32_t block_size,
-    uint32_t max_blocks_per_seq,
-    uint32_t max_context_len);
+    gpu_arch arch_tag,
+    XetlaType xeType,
+    paged_attention_fwd_kernel_args_t args);
 } // namespace gpu::xetla

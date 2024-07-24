@@ -20,9 +20,10 @@
 
 #pragma once
 
-#define TransposeKCacheInLoad 1
 #include <sys/types.h>
+#include <cstdint>
 #include "common/core/common.hpp"
+#include "common/core/common_types.hpp"
 #include "common/core/memory.hpp"
 #include "common/utils/misc.hpp"
 #include "paged_attention_utils.hpp"
@@ -36,7 +37,253 @@ namespace attention {
 
 #define DIVIDE_ROUND_UP(a, b) (((a) + (b)-1) / (b))
 
-template <typename policy, typename scalar_t, typename index_t>
+/// @brief This function loads data from 1d memory surface with boundary check.
+/// The data exceeds the memory boundary will automatically set to 0
+/// @tparam mem_payload_t The type of memory payload
+/// @tparam tile_t The type of tile
+/// @tparam x_contiguous Whether the x axis of the tile is contiguous
+
+template <typename mem_payload_t, typename tile_t, bool x_contiguous = false>
+inline std::enable_if_t<x_contiguous == false> tile_load_1d(
+    tile_t& mat_load,
+    mem_payload_t& mem_payload,
+    int boundary_x,
+    int boundary_y) {
+  using dtype = mem_payload_t::dtype;
+  int pitch = mem_payload.pitch_in_bytes / sizeof(dtype);
+  int64_t base_offset = mem_payload.base_offset / sizeof(dtype);
+  int64_t x_base_offset = base_offset % pitch;
+  int64_t y_base_offset = base_offset / pitch;
+  int64_t dist_to_x = x_base_offset - boundary_x;
+  int64_t dist_to_y = y_base_offset - boundary_y;
+  if (dist_to_y >= 0) {
+    mat_load.reg = 0;
+    return;
+  }
+  if (dist_to_x >= 0) {
+    mat_load.reg = 0;
+    return;
+  }
+  tile_t mask;
+  mask.reg = xetla_vector_gen<dtype, tile_t::tile_desc::tile_elems>(0, 1) <
+      (boundary_x - x_base_offset);
+  subgroup::tile_load(mat_load, mem_payload);
+  mat_load.reg *= mask.reg;
+}
+
+/// @brief This function loads data from 1d memory surface with boundary check.
+/// The data exceeds the memory boundary will automatically set to 0, This
+/// function only apply to the x-axis contiguous and no-padding scenario
+/// @tparam mem_payload_t The type of memory payload
+/// @tparam tile_t The type of tile
+/// @tparam x_contiguous Whether the x axis of the tile is contiguous
+
+template <typename mem_payload_t, typename tile_t, bool x_contiguous = false>
+inline std::enable_if_t<x_contiguous == true> tile_load_1d(
+    tile_t& mat_load,
+    mem_payload_t& mem_payload,
+    int boundary_x,
+    int boundary_y) {
+  using dtype = mem_payload_t::dtype;
+  int pitch = mem_payload.pitch_in_bytes / sizeof(dtype);
+  int64_t base_offset = mem_payload.base_offset / sizeof(dtype);
+  int64_t boundary_1d = boundary_y * pitch + boundary_x;
+  int64_t dist_to_boundary = base_offset - boundary_1d;
+  if (dist_to_boundary >= 0) {
+    mat_load.reg = 0;
+    return;
+  }
+  tile_t mask;
+  mask.reg = xetla_vector_gen<dtype, tile_t::tile_desc::tile_elems>(0, 1) <
+      (boundary_1d - base_offset);
+  subgroup::tile_load(mat_load, mem_payload);
+  mat_load.reg *= mask.reg;
+}
+
+/// @brief This function loads data from 1d memory surface and fill the 2d tile
+/// in place. memory prefetch and the pointer for memory payload will update
+/// automatically. This functional should only be used inside the paged
+/// attention kernel. Cause we assume that the 2d tile's x axis should be
+/// contiguous and the x axis size should equals to the element size of real
+/// data in that dimension.
+/// @tparam tile_type The type of tile
+/// @tparam mem_payload_t The type of memory payload
+/// @tparam prefetch_payload_t The type of prefetch payload
+/// @dir The direction of tile descriptor update
+/// @is_transposed Whether the 2d tile is transposed
+/// @stages The number of stages for prefetch
+
+template <
+    typename tile_type,
+    typename mem_payload_type,
+    typename prefetch_payload_type,
+    tdesc_update_dir dir,
+    bool is_transposed,
+    int stages>
+inline std::enable_if_t<
+    mem_payload_type::message_type == msg_type::block_1d &&
+    dir == tdesc_update_dir::x_dir>
+tile_load_2d(
+    tile_type& mat_load,
+    mem_payload_type& mem_payload,
+    prefetch_payload_type& prefetch_payload,
+    int boundary_x,
+    int boundary_y) {
+  using tile_desc_2d_t = tile_type::tile_desc;
+  using tile_desc_1d_t = mem_payload_type::tile_desc;
+  static_assert(
+      (tile_desc_1d_t::tile_size_x == tile_desc_2d_t::tile_size_x &&
+       !is_transposed) ||
+          (tile_desc_1d_t::tile_size_x == tile_desc_2d_t::tile_size_y &&
+           is_transposed),
+      "2d_tile and 1d_tile should have the same tile size");
+  using dtype = tile_type::dtype;
+  constexpr int loop_cnt =
+      is_transposed ? tile_desc_2d_t::tile_size_x : tile_desc_2d_t::tile_size_y;
+  constexpr int read_cnt =
+      is_transposed ? tile_desc_2d_t::tile_size_y : tile_desc_2d_t::tile_size_x;
+  constexpr int view_stride = is_transposed ? tile_desc_2d_t::tile_size_x : 1;
+  constexpr int view_offset = is_transposed ? 1 : tile_desc_2d_t::tile_size_x;
+
+  using tile_1d_t = subgroup::tile_t<dtype, tile_desc_1d_t>;
+  tile_1d_t mat_1d(0);
+#pragma unroll
+  for (int i = 0; i < loop_cnt; ++i) {
+    auto tile_slice_2d =
+        mat_load.reg.xetla_select<read_cnt, view_stride>(i * view_offset);
+    tile_load_1d(mat_1d, mem_payload, boundary_x, boundary_y);
+    tile_slice_2d = mat_1d.reg;
+    SW_BARRIER();
+    mem_payload.template update_tdesc<tdesc_update_dir::y_dir>(1);
+    if constexpr (stages != 0) {
+      subgroup::tile_prefetch(prefetch_payload);
+      prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(1);
+    }
+  }
+  mem_payload.template update_tdesc<tdesc_update_dir::y_dir>(-loop_cnt);
+  mem_payload.template update_tdesc<tdesc_update_dir::x_dir>(read_cnt);
+  if constexpr (stages != 0) {
+    prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
+        -loop_cnt - stages);
+    prefetch_payload.template update_tdesc<tdesc_update_dir::x_dir>(read_cnt);
+  }
+  SW_BARRIER();
+  if constexpr (stages != 0) {
+#pragma unroll
+    for (int i = 0; i < stages; ++i) {
+      subgroup::tile_prefetch(prefetch_payload);
+      prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(1);
+    }
+  }
+}
+
+/// @brief This function loads data from 1d memory surface and fill the 2d tile
+/// in place. memory prefetch and the pointer for memory payload will update
+/// automatically. This functional should only be used inside the paged
+/// attention kernel. Cause we assume that the 2d tile's x axis should be
+/// contiguous and the x axis size should equals to the element size of real dat
+/// in that dimension.
+/// @tparam tile_type The type of tile
+/// @tparam mem_payload_t The type of memory payload
+/// @tparam prefetch_payload_t The type of prefetch payload
+/// @dir The direction of tile descriptor update
+/// @is_transposed Whether the 2d tile is transposed, it is supposed to be false
+/// in this template function
+/// @stages The number of stages for prefetch
+
+template <
+    typename tile_type,
+    typename mem_payload_type,
+    typename prefetch_payload_type,
+    tdesc_update_dir dir,
+    bool is_transposed,
+    int stages>
+inline std::enable_if_t<
+    mem_payload_type::message_type == msg_type::block_1d &&
+    dir == tdesc_update_dir::y_dir && is_transposed == false>
+tile_load_2d(
+    tile_type& mat_load,
+    mem_payload_type& mem_payload,
+    prefetch_payload_type& prefetch_payload,
+    int boundary_x,
+    int boundary_y) {
+  using tile_desc_1d_t = mem_payload_type::tile_desc;
+  using dtype = tile_type::dtype;
+  using tile_1d_t = subgroup::tile_t<dtype, tile_desc_1d_t>;
+  static_assert(
+      tile_desc_1d_t::tile_size_x % tile_type::tile_desc::tile_size_x == 0,
+      "1d tile's size should be the multiplyer of 2d tile's size at x axis.");
+  static_assert(
+      tile_type::tile_desc::tile_elems % tile_desc_1d_t::tile_size_x == 0,
+      "the elements size in 1d tile should be divisible to 2d tile's element size");
+  constexpr uint32_t loop_cnt =
+      tile_type::tile_desc::tile_elems / tile_desc_1d_t::tile_size_x;
+  tile_1d_t mat_1d;
+  constexpr uint32_t y_stride = tile_type::tile_desc::tile_size_y / loop_cnt;
+#pragma unroll
+  for (int i = 0; i < loop_cnt; ++i) {
+    auto tile_slice_2d =
+        mat_load.reg.xetla_select<tile_desc_1d_t::tile_size_x, 1>(
+            i * tile_desc_1d_t::tile_size_x);
+    tile_load_1d<mem_payload_type, tile_1d_t, true>(
+        mat_1d, mem_payload, boundary_x, boundary_y);
+    tile_slice_2d = mat_1d.reg;
+    if constexpr (stages != 0) {
+      subgroup::tile_prefetch(prefetch_payload);
+    }
+    SW_BARRIER();
+    mem_payload.template update_tdesc<tdesc_update_dir::y_dir>(y_stride);
+    if constexpr (stages != 0) {
+      prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(y_stride);
+    }
+  }
+}
+
+/// @brief This function loads data from 2d memory surface and fill the 2d tile
+/// in place. This function will perform vallina 2d load.
+/// @tparam tile_type The type of tile
+/// @tparam mem_payload_t The type of memory payload
+/// @tparam prefetch_payload_t The type of prefetch payload
+/// @dir The direction of tile descriptor update
+/// @is_transposed Whether the 2d tile is transposed, it is supposed to be false
+/// in this template function
+/// @stages The number of stages for prefetch
+template <
+    typename tile_type,
+    typename mem_payload_type,
+    typename prefetch_payload_type,
+    tdesc_update_dir dir,
+    bool is_transposed,
+    int stages>
+inline std::enable_if_t<mem_payload_type::message_type == msg_type::block_2d>
+tile_load_2d(
+    tile_type& mat_load,
+    mem_payload_type& mem_payload,
+    prefetch_payload_type& prefetch_payload,
+    int boundary_x,
+    int boundary_y) {
+  constexpr int x_stride =
+      is_transposed ? tile_type::tile_size_y : tile_type::tile_size_x;
+  constexpr int y_stride =
+      is_transposed ? tile_type::tile_size_x : tile_type::tile_size_y;
+  constexpr int update_stride =
+      dir == tdesc_update_dir::x_dir ? x_stride : y_stride;
+  subgroup::tile_load(mat_load, mem_payload);
+  if constexpr (stages != 0) {
+    subgroup::tile_prefetch(prefetch_payload);
+  }
+  SW_BARRIER();
+  mem_payload.template update_tdesc<dir>(update_stride);
+  if constexpr (stages != 0) {
+    prefetch_payload.template update_tdesc<dir>(update_stride);
+  }
+}
+
+template <
+    typename policy,
+    typename scalar_t,
+    typename index_t,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 class paged_attention_kernel {
  public:
   using accum_t = float;
@@ -130,6 +377,11 @@ class paged_attention_kernel {
       slm_offset_softmax + slm_size_softmax;
 
   static constexpr uint32_t nbarrier_cnt = (wg_size > 1) ? 1 : 0;
+  // This boolean variable will determine whether the kernel will execute 2d
+  // load path, the original 2d load paged attention path is disabled by default
+  // here to prevent the accuracy issue brought by the surface width limitation
+  // of 2d load.
+  static constexpr bool has_2d_ld_st = false;
 
   // -------------------- // Context // -------------------- //
 
@@ -150,7 +402,7 @@ class paged_attention_kernel {
     int end_block_id;
     int loop_count;
 
-    xetla_nbarrier_t<wg_size, wg_size> nbarrier;
+    xetla_nbarrier_t<wg_size, wg_size, arch_tag> nbarrier;
 
     inline context_t() = default;
 
@@ -200,12 +452,12 @@ class paged_attention_kernel {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     using local_st_payload_t = subgroup::mem_payload_t<
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>,
         tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     uint32_t boundary_x = args.head_size;
     uint32_t boundary_y = args.num_seqs * args.num_heads;
@@ -223,7 +475,6 @@ class paged_attention_kernel {
       subgroup::tile_load(mat_query, ld_payload);
       subgroup::tile_store(mat_query, st_payload);
     }
-
     xetla_fence<memory_kind::shared_local>();
     if constexpr (wg_size > 1)
       ctx.nbarrier.arrive_wait();
@@ -250,18 +501,11 @@ class paged_attention_kernel {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>,
         query_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     constexpr tdesc_update_dir query_update_dir = tdesc_update_dir::x_dir;
-
-#if TransposeKCacheInLoad
-    using key_tile_desc_t = subgroup::tile_desc_t<
-        head_size_stride,
-        block_size,
-        sg_tile_size_head,
-        sg_tile_size_block>;
-    constexpr mem_layout k_mem_layout = mem_layout::col_major;
-    constexpr tdesc_update_dir key_update_dir = tdesc_update_dir::y_dir;
-#else
+    constexpr uint32_t tile_size_1d = arch_tag >= gpu_arch::XeHpc
+        ? block_size * head_size_stride
+        : block_size;
     using key_tile_desc_t = subgroup::tile_desc_t<
         block_size,
         head_size_stride,
@@ -269,19 +513,36 @@ class paged_attention_kernel {
         sg_tile_size_head>;
     constexpr mem_layout k_mem_layout = mem_layout::row_major;
     constexpr tdesc_update_dir key_update_dir = tdesc_update_dir::y_dir;
-#endif
+    using key_1d_tile_desc_t =
+        subgroup::tile_desc_t<tile_size_1d, 1, sg_tile_size_block, 1>;
     using key_tile_t = subgroup::tile_t<scalar_t, key_tile_desc_t>;
+    using key_1d_tile_t = subgroup::tile_t<scalar_t, key_1d_tile_desc_t>;
     using key_acc_tile_t = subgroup::tile_t<accum_t, key_tile_desc_t>;
-    using key_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, k_mem_layout, mem_space::global>,
-        key_tile_desc_t,
-        msg_type::block_2d,
-        gpu_arch::XeHpc>;
-    using key_prefetch_payload_t = subgroup::prefetch_payload_t<
-        mem_desc_t<scalar_t, k_mem_layout, mem_space::global>,
-        key_tile_desc_t,
-        1,
-        gpu_arch::XeHpc>;
+    using key_payload_t = std::conditional_t<
+        has_2d_ld_st,
+        subgroup::mem_payload_t<
+            mem_desc_t<scalar_t, k_mem_layout, mem_space::global>,
+            key_tile_desc_t,
+            msg_type::block_2d,
+            arch_tag>,
+        subgroup::mem_payload_t<
+            mem_desc_t<scalar_t, k_mem_layout, mem_space::global>,
+            key_1d_tile_desc_t,
+            msg_type::block_1d,
+            arch_tag>>;
+
+    using key_prefetch_payload_t = std::conditional_t<
+        has_2d_ld_st,
+        subgroup::prefetch_payload_t<
+            mem_desc_t<scalar_t, k_mem_layout, mem_space::global>,
+            key_tile_desc_t,
+            1,
+            arch_tag>,
+        subgroup::prefetch_payload_t<
+            mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+            key_1d_tile_desc_t,
+            1,
+            arch_tag>>;
 
     query_tile_t mat_query;
     key_tile_t mat_key;
@@ -309,9 +570,10 @@ class paged_attention_kernel {
 
 #pragma unroll
       for (int i = 0; i < stages; i++) {
+        constexpr int key_update_stride = has_2d_ld_st ? head_size_stride : 1;
         subgroup::tile_prefetch(key_prefetch_payload);
         key_prefetch_payload.template update_tdesc<key_update_dir>(
-            head_size_stride);
+            key_update_stride);
       }
 
       auto score_sub =
@@ -319,31 +581,26 @@ class paged_attention_kernel {
 
       for (int i = 0; i < ctx.loop_count; i++) {
         subgroup::tile_load(mat_query, query_payload);
-        subgroup::tile_load(mat_key, key_payload);
-        if constexpr (stages != 0) {
-          subgroup::tile_prefetch(key_prefetch_payload);
-        }
+        constexpr bool is_transposed = k_mem_layout == mem_layout::col_major;
+        tile_load_2d<
+            key_tile_t,
+            key_payload_t,
+            key_prefetch_payload_t,
+            key_update_dir,
+            is_transposed,
+            stages>(
+            mat_key, key_payload, key_prefetch_payload, boundary_x, boundary_y);
 
         SW_BARRIER();
         query_payload.template update_tdesc<query_update_dir>(head_size_stride);
-        key_payload.template update_tdesc<key_update_dir>(head_size_stride);
-        if constexpr (stages != 0) {
-          key_prefetch_payload.template update_tdesc<key_update_dir>(
-              head_size_stride);
-        }
         SW_BARRIER();
         query_acc_tile_t mat_query_acc;
         key_acc_tile_t mat_key_acc;
         subgroup::elemwise_cvt(mat_query_acc, mat_query);
         subgroup::elemwise_cvt(mat_key_acc, mat_key);
         SW_BARRIER();
-#if TransposeKCacheInLoad
-        score_sub += mat_vec_mul<accum_t, head_size_stride, key_acc_tile_t, 1>(
-            mat_query_acc.reg, mat_key_acc);
-#else
         score_sub += mat_vec_mul<accum_t, head_size_stride, key_acc_tile_t, 0>(
             mat_query_acc.reg, mat_key_acc);
-#endif
         SW_BARRIER();
       }
 
@@ -362,9 +619,9 @@ class paged_attention_kernel {
   // Compute softmax of score.
   inline void softmax(score_tile_t& mat_score, arguments_t& args) {
     using wg_reduce_max_t =
-        group_reduce_t<score_tile_t, wg_size, reduce_op::max>;
+        group_reduce_t<score_tile_t, wg_size, reduce_op::max, arch_tag>;
     using wg_reduce_sum_t =
-        group_reduce_t<score_tile_t, wg_size, reduce_op::sum>;
+        group_reduce_t<score_tile_t, wg_size, reduce_op::sum, arch_tag>;
 
     wg_reduce_max_t wg_reduce_max(
         ctx.num_blocks_per_sg, ctx.sg_id, 0, slm_offset_softmax);
@@ -391,7 +648,7 @@ class paged_attention_kernel {
           mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
           tile_desc_t,
           msg_type::block_1d,
-          gpu_arch::XeHpc>;
+          arch_tag>;
 
       uint32_t boundary_y = args.num_seqs * args.num_heads;
       int32_t start_y = ctx.seq_id * args.num_heads + ctx.head_id;
@@ -427,27 +684,52 @@ class paged_attention_kernel {
       score_tile_t& mat_score,
       out_tile_t& mat_out,
       arguments_t& args) {
-    constexpr uint32_t sg_tile_size_x =
-        block_size > 32 / sizeof(scalar_t) ? 32 / sizeof(scalar_t) : block_size;
-    constexpr uint32_t sg_tile_size_y = 16;
+    constexpr uint32_t sg_tile_size_head =
+        std::min(uint32_t(head_size_stride), uint32_t(32 / sizeof(scalar_t)));
+    constexpr uint32_t sg_tile_size_block = std::min(uint32_t(block_size), 32u);
+    constexpr uint32_t sg_tile_size_x = !has_2d_ld_st
+        ? sg_tile_size_block
+        : std::min(uint32_t(block_size), uint32_t(32 / sizeof(scalar_t)));
+    constexpr uint32_t sg_tile_size_y = !has_2d_ld_st ? sg_tile_size_head : 16;
+    constexpr uint32_t tile_size_1d = arch_tag >= gpu_arch::XeHpc
+        ? block_size * head_size_stride
+        : block_size;
 
     using value_tile_desc_t = subgroup::tile_desc_t<
         block_size,
         head_size_stride,
         sg_tile_size_x,
         sg_tile_size_y>;
+    using value_1d_tile_desc_t =
+        subgroup::tile_desc_t<tile_size_1d, 1, sg_tile_size_x, 1>;
     using value_tile_t = subgroup::tile_t<scalar_t, value_tile_desc_t>;
+    using value_1d_tile_t = subgroup::tile_t<scalar_t, value_1d_tile_desc_t>;
     using value_acc_tile_t = subgroup::tile_t<accum_t, value_tile_desc_t>;
-    using value_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
-        value_tile_desc_t,
-        msg_type::block_2d,
-        gpu_arch::XeHpc>;
-    using value_prefetch_payload_t = subgroup::prefetch_payload_t<
-        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
-        value_tile_desc_t,
-        1,
-        gpu_arch::XeHpc>;
+
+    using value_payload_t = std::conditional_t<
+        has_2d_ld_st,
+        subgroup::mem_payload_t<
+            mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+            value_tile_desc_t,
+            msg_type::block_2d,
+            arch_tag>,
+        subgroup::mem_payload_t<
+            mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+            value_1d_tile_desc_t,
+            msg_type::block_1d,
+            arch_tag>>;
+    using value_prefetch_payload_t = std::conditional_t<
+        has_2d_ld_st,
+        subgroup::prefetch_payload_t<
+            mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+            value_tile_desc_t,
+            1,
+            arch_tag>,
+        subgroup::prefetch_payload_t<
+            mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+            value_1d_tile_desc_t,
+            1,
+            arch_tag>>;
     constexpr tdesc_update_dir value_update_dir = tdesc_update_dir::y_dir;
 
     value_tile_t mat_value;
@@ -473,22 +755,31 @@ class paged_attention_kernel {
 
 #pragma unroll
       for (int i = 0; i < stages; i++) {
+        constexpr int prefetch_update_stride =
+            has_2d_ld_st ? head_size_stride : 1;
         subgroup::tile_prefetch(value_prefetch_payload);
-        value_prefetch_payload.template update_tdesc<value_update_dir>(
-            head_size_stride);
+        value_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
+            prefetch_update_stride);
       }
 
       auto score_sub =
           mat_score.reg.xetla_select<block_size, 1>(row_i * block_size);
 
       for (int i = 0; i < ctx.loop_count; i++) {
-        subgroup::tile_load(mat_value, value_payload);
-        if constexpr (stages != 0) {
-          subgroup::tile_prefetch(value_prefetch_payload);
-        }
-        SW_BARRIER();
-        value_payload.template update_tdesc<value_update_dir>(head_size_stride);
-        if constexpr (stages != 0) {
+        tile_load_2d<
+            value_tile_t,
+            value_payload_t,
+            value_prefetch_payload_t,
+            value_update_dir,
+            false,
+            stages>(
+            mat_value,
+            value_payload,
+            value_prefetch_payload,
+            boundary_x,
+            boundary_y);
+
+        if constexpr (stages != 0 && has_2d_ld_st) {
           value_prefetch_payload.template update_tdesc<value_update_dir>(
               head_size_stride);
         }
@@ -508,17 +799,16 @@ class paged_attention_kernel {
   // -------------------- // collect_out // -------------------- //
 
   inline void collect_out(out_tile_t& mat_out, arguments_t& args) {
-    constexpr uint32_t sg_tile_size_x = head_size_per_sg > 32 / sizeof(scalar_t)
-        ? 32 / sizeof(scalar_t)
-        : head_size_per_sg;
-    constexpr uint32_t sg_tile_size_y = wg_size > 16 ? 16 : wg_size;
+    constexpr uint32_t sg_tile_size_x =
+        std::min(uint32_t(head_size_per_sg), uint32_t(32 / sizeof(scalar_t)));
+    constexpr uint32_t sg_tile_size_y = std::min(uint32_t(wg_size), 16u);
 
     // for storing out to slm
     using local_st_payload_t = subgroup::mem_payload_t<
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
         out_tile_desc_t,
-        msg_type::block_1d,
-        gpu_arch::XeHpc>;
+        msg_type::scatter,
+        arch_tag>;
     // for loading out to reg
     using ld_tile_desc_t = subgroup::
         tile_desc_t<head_size_per_sg, wg_size, sg_tile_size_x, sg_tile_size_y>;
@@ -527,7 +817,7 @@ class paged_attention_kernel {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
         ld_tile_desc_t,
         msg_type::scatter,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     // for storing out to global
     using st_tile_desc_t =
         subgroup::tile_desc_t<head_size_per_sg, 1, sg_tile_size_x, 1>;
@@ -536,7 +826,7 @@ class paged_attention_kernel {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         st_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     // store out data of each subgroup to slm
     int32_t start_y = ctx.sg_id;
@@ -632,7 +922,11 @@ class paged_attention_kernel {
 
 // ======================== // Reduce kernel // ======================== //
 
-template <typename policy, typename scalar_t, typename index_t>
+template <
+    typename policy,
+    typename scalar_t,
+    typename index_t,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 class paged_attention_reduce {
  public:
   using accum_t = float;
@@ -698,6 +992,11 @@ class paged_attention_reduce {
       slm_offset_reduce + slm_size_reduce;
 
   static constexpr uint32_t nbarrier_cnt = (wg_size > 1) ? 1 : 0;
+  // This boolean variable will determine whether the kernel will execute 2d
+  // load path, Ideally, the 2d load path always be the default choice for
+  // machine which support 2d load instruction for better performance.
+  static constexpr bool has_2d_ld_st = arch_tag >= gpu_arch::XeHpc;
+  ;
 
   // -------------------- // Context // -------------------- //
 
@@ -712,7 +1011,7 @@ class paged_attention_reduce {
 
     uint32_t num_partition_rows;
 
-    xetla_nbarrier_t<wg_size, wg_size> nbarrier;
+    xetla_nbarrier_t<wg_size, wg_size, arch_tag> nbarrier;
 
     inline context_t() = default;
 
@@ -757,7 +1056,7 @@ class paged_attention_reduce {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         ld_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     static constexpr tdesc_update_dir update_dir = tdesc_update_dir::x_dir;
 
     int32_t start_x = ctx.sg_id * partition_stride;
@@ -794,7 +1093,8 @@ class paged_attention_reduce {
   // -------------------- // rescale_exp_sums // -------------------- //
 
   inline void rescale_exp_sums(tile_t& mat_exp_sums, arguments_t& args) {
-    using wg_reduce_max_t = group_reduce_t<tile_t, wg_size, reduce_op::max>;
+    using wg_reduce_max_t =
+        group_reduce_t<tile_t, wg_size, reduce_op::max, arch_tag>;
 
     tile_t mat_max_logits(neg_infinity);
     load_data(mat_max_logits, args.max_logits, args, neg_infinity);
@@ -831,11 +1131,16 @@ class paged_attention_reduce {
       tile_t& rescaled_exp_sums,
       out_tile_t& mat_out,
       arguments_t& args) {
-    constexpr uint32_t sg_tile_size_x = partition_stride > 32 / sizeof(scalar_t)
-        ? 32 / sizeof(scalar_t)
-        : partition_stride;
+    // constexpr uint32_t sg_tile_size_x = partition_stride > 32 /
+    // sizeof(scalar_t)
+    //     ? 32 / sizeof(scalar_t)
+    //     : partition_stride;
+    constexpr uint32_t sg_tile_size_x =
+        std::min(uint32_t(partition_stride), uint32_t(32 / sizeof(scalar_t)));
+    // constexpr uint32_t sg_tile_size_y =
+    //     head_size_stride > 16 ? 16 : head_size_stride;
     constexpr uint32_t sg_tile_size_y =
-        head_size_stride > 16 ? 16 : head_size_stride;
+        std::min(uint32_t(head_size_stride), 16u);
 
     // for loading tmp out to register
     using tmp_tile_desc_t = subgroup::tile_desc_t<
@@ -843,21 +1148,41 @@ class paged_attention_reduce {
         head_size_stride,
         sg_tile_size_x,
         sg_tile_size_y>;
+    using tmp_1d_tile_desc_t =
+        subgroup::tile_desc_t<head_size_stride, 1, sg_tile_size_y, 1>;
     using tmp_tile_t = subgroup::tile_t<scalar_t, tmp_tile_desc_t>;
+    using tmp_1d_tile_t = subgroup::tile_t<scalar_t, tmp_1d_tile_desc_t>;
     using tmp_acc_tile_t = subgroup::tile_t<accum_t, tmp_tile_desc_t>;
-    using tmp_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>,
-        tmp_tile_desc_t,
-        msg_type::block_2d,
-        gpu_arch::XeHpc>;
-    using tmp_prefetch_payload_t = subgroup::prefetch_payload_t<
-        mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>,
-        tmp_tile_desc_t,
-        1,
-        gpu_arch::XeHpc>;
+
+    using tmp_prefetch_payload_t = std::conditional_t<
+        has_2d_ld_st,
+        subgroup::prefetch_payload_t<
+            mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>,
+            tmp_tile_desc_t,
+            1,
+            arch_tag>,
+        subgroup::prefetch_payload_t<
+            mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+            tmp_1d_tile_desc_t,
+            1,
+            arch_tag>>;
+
+    using tmp_payload_t = std::conditional_t<
+        has_2d_ld_st,
+        subgroup::mem_payload_t<
+            mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>,
+            tmp_tile_desc_t,
+            msg_type::block_2d,
+            arch_tag>,
+        subgroup::mem_payload_t<
+            mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+            tmp_1d_tile_desc_t,
+            msg_type::block_1d,
+            arch_tag>>;
     constexpr tdesc_update_dir tmp_update_dir = tdesc_update_dir::x_dir;
 
-    using wg_reduce_sum_t = group_reduce_t<tile_t, wg_size, reduce_op::sum>;
+    using wg_reduce_sum_t =
+        group_reduce_t<tile_t, wg_size, reduce_op::sum, arch_tag>;
 
     wg_reduce_sum_t wg_reduce_sum(
         ctx.num_partition_rows, ctx.sg_id, 0, slm_offset_reduce);
@@ -890,9 +1215,11 @@ class paged_attention_reduce {
 
 #pragma unroll
       for (int i = 0; i < stages; i++) {
+        constexpr tdesc_update_dir update_dir =
+            has_2d_ld_st ? tmp_update_dir : tdesc_update_dir::y_dir;
+        constexpr int update_stride = has_2d_ld_st ? head_size_stride : 1;
         subgroup::tile_prefetch(tmp_prefetch_payload);
-        tmp_prefetch_payload.template update_tdesc<tmp_update_dir>(
-            head_size_stride);
+        tmp_prefetch_payload.template update_tdesc<update_dir>(update_stride);
       }
 
       auto rescaled_exp_sums_sub =
@@ -901,16 +1228,19 @@ class paged_attention_reduce {
       rescaled_exp_sums_sub = rescaled_exp_sums_sub * inv_global_exp_sum;
 
       for (int j = 0; j < loop_count; j++) {
-        subgroup::tile_load(mat_tmp_out, tmp_payload);
-        if constexpr (stages != 0) {
-          subgroup::tile_prefetch(tmp_prefetch_payload);
-        }
-        SW_BARRIER();
-        tmp_payload.template update_tdesc<tmp_update_dir>(head_size_stride);
-        if constexpr (stages != 0) {
-          tmp_prefetch_payload.template update_tdesc<tmp_update_dir>(
-              head_size_stride);
-        }
+        tile_load_2d<
+            tmp_tile_t,
+            tmp_payload_t,
+            tmp_prefetch_payload_t,
+            tmp_update_dir,
+            true,
+            stages>(
+            mat_tmp_out,
+            tmp_payload,
+            tmp_prefetch_payload,
+            args.head_size,
+            boundary_x);
+
         SW_BARRIER();
         tmp_acc_tile_t mat_tmp_out_acc;
         subgroup::elemwise_cvt(mat_tmp_out_acc, mat_tmp_out);
@@ -936,8 +1266,8 @@ class paged_attention_reduce {
     using local_st_payload_t = subgroup::mem_payload_t<
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
         out_tile_desc_t,
-        msg_type::block_1d,
-        gpu_arch::XeHpc>;
+        msg_type::scatter,
+        arch_tag>;
     // for loading out to reg
     using ld_tile_desc_t = subgroup::
         tile_desc_t<head_size_per_sg, wg_size, sg_tile_size_x, sg_tile_size_y>;
@@ -946,7 +1276,7 @@ class paged_attention_reduce {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
         ld_tile_desc_t,
         msg_type::scatter,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     // for storing out to global
     using st_tile_desc_t =
         subgroup::tile_desc_t<head_size_per_sg, 1, sg_tile_size_x, 1>;
@@ -955,7 +1285,7 @@ class paged_attention_reduce {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         st_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     // store out data of each subgroup to slm
     int32_t start_y = ctx.sg_id;
