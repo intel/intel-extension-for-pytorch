@@ -274,23 +274,19 @@ class fmha_forward_t {
             {start_acc, start_y});
       } else if constexpr (kVarlen) {
         int32_t start_y = args.cu_seqlen_q[batch_id] + item.get_group(1) * kBr;
-        int32_t end_y = start_y + kBr;
+        uint32_t end_y = start_y + kBr;
         int32_t limit_y = args.cu_seqlen_q[batch_id + 1];
         end_y = end_y < limit_y ? end_y : limit_y;
 
         int32_t start_acc = head_id * args.uH;
-        int32_t end_x = start_acc + args.uH;
+        uint32_t end_x = start_acc + args.uH;
         const uint32_t ld_qo = args.uH * args.uN;
 
         mem_desc_Qi.init(
-            args.Q_ptr,
-            {args.uN * args.uH, end_y, ld_qo},
-            {start_acc, start_y});
+            args.Q_ptr, {end_x, end_y, ld_qo}, {start_acc, start_y});
 
         mem_desc_Oi.init(
-            args.O_ptr,
-            {args.uN * args.uH, end_y, ld_qo},
-            {start_acc, start_y});
+            args.O_ptr, {end_x, end_y, ld_qo}, {start_acc, start_y});
       } else { // 2d mem: [BxF, NxH]
         // startF
         int32_t start_y = batch_id * args.uF + item.get_group(1) * kBr;
@@ -353,20 +349,20 @@ class fmha_forward_t {
             {start_acc, start_x});
       } else if (kVarlen) {
         int32_t start_x = startT + args.cu_seqlen_k[batch_id];
-        int32_t end_x = start_x + kBc;
+        uint32_t end_x = start_x + kBc;
         int32_t limit_x = args.cu_seqlen_k[batch_id + 1];
         end_x = end_x < limit_x ? end_x : limit_x;
 
         int32_t start_acc = head_id * args.uNkv / args.uN * args.uH;
-        int32_t end_y = start_acc + args.uH;
+        uint32_t end_y = start_acc + args.uH;
         mem_desc_Kj_T.init(
             args.K_ptr,
-            {end_x, args.uNkv * args.uH, args.uNkv * args.uH},
+            {end_x, end_y, args.uNkv * args.uH},
             {start_x, start_acc});
 
         mem_desc_Vj.init(
             args.V_ptr,
-            {args.uNkv * args.uH, end_x, args.uNkv * args.uH},
+            {end_y, end_x, args.uNkv * args.uH},
             {start_acc, start_x});
 
       } else {
@@ -406,7 +402,7 @@ class fmha_forward_t {
       if constexpr (kUseAlibi && kVarlen) {
         // assume uAt in varlen equals N or 0
         int32_t start_x = batch_id * args.uAT + head_id;
-        int32_t end_x = start_x + 1;
+        uint32_t end_x = start_x + 1;
         end_x = end_x >= args.uN ? end_x : args.uN;
         mem_desc_Ai.init(args.A_ptr, {end_x, 1, 1}, {start_x, 0});
       }
@@ -935,7 +931,6 @@ class fmha_forward_t {
     ctx.init_context(item, args);
     uint32_t gid = item.get_group(0);
     uint32_t batch_id = gid / args.uN; // get batch idx
-    uint32_t head_id = gid % args.uN; // get head idx
     // Early exit when current thread access data exceed actual seqlen in varlen
     // fwd
     if constexpr (kVarlen) {

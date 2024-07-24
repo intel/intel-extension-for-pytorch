@@ -23,7 +23,7 @@ struct tile_mask_t {
       uint32_t start_x,
       uint32_t start_y) {
 #pragma unroll
-    for (int i = 0; i < tile_size_y / block_size_y; i++) {
+    for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
       uint32_t blk_start_y = start_y + i * block_size_y;
 #pragma unroll
       for (int j = 0; j < num_block_x; j++) {
@@ -269,7 +269,7 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_line> {
     tile_load<cache_hint::cached, cache_hint::cached>(bias, bias_payload);
 
 #pragma unroll
-    for (int i = 0; i < tile_size_y / block_size_y; i++) {
+    for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
       for (int j = 0; j < num_block_x; j++) {
         auto dst_reg =
@@ -278,7 +278,7 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_line> {
                     (i * num_block_x + j) * block_elems)
                 .xetla_format<dtype_acc, block_size_y, block_size_x>();
 #pragma unroll
-        for (int row_i = 0; row_i < block_size_y; row_i++) {
+        for (uint32_t row_i = 0; row_i < block_size_y; row_i++) {
           auto src_reg =
               bias.reg.xetla_select<block_size_x, 1>(j * block_size_x);
           dst_reg.row(row_i) =
@@ -301,7 +301,7 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_line> {
                     tail_start_y * tile_size_x + j * tail_block_elems)
                 .xetla_format<dtype_acc, tail_size_y, block_size_x>();
 #pragma unroll
-        for (int row_i = 0; row_i < tail_size_y; row_i++) {
+        for (uint32_t row_i = 0; row_i < tail_size_y; row_i++) {
           auto src_reg =
               bias.reg.xetla_select<block_size_x, 1>(j * block_size_x);
           dst_reg.row(row_i) =
@@ -334,21 +334,15 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_element> {
       matAcc_t& matAcc,
       const coord_t& coord,
       const arguments_t& args,
-      uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
     using dtype_acc = typename matAcc_t::dtype;
     static constexpr uint32_t tile_size_x = matAcc_t::tile_size_x;
     static constexpr uint32_t tile_size_y = matAcc_t::tile_size_y;
     static constexpr uint32_t block_size_x = matAcc_t::block_size_x;
     static constexpr uint32_t block_size_y = matAcc_t::block_size_y;
     static constexpr int32_t num_block_x = matAcc_t::num_block_x;
-    static constexpr int32_t num_block_y = matAcc_t::num_block_y;
-    static constexpr uint32_t tile_elems = matAcc_t::tile_elems;
     static constexpr uint32_t block_elems = matAcc_t::block_elems;
-    static constexpr int32_t bias_tile_size_x = 1;
-    static constexpr int32_t bias_tile_size_y = 1;
-    static constexpr int32_t bias_block_size_x = 1;
-    static constexpr int32_t bias_block_size_y = 1;
 
     dtype_bias* ptr = static_cast<dtype_bias*>(args.base.base);
     int32_t pos_x = coord.x > args.shape.x - 1 ? args.shape.x - 1 : coord.x;
@@ -368,7 +362,7 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_element> {
       auto bias_reg =
           xetla_vector<dtype_acc, block_size_y * block_size_x>(bias_data);
 #pragma unroll
-      for (int i = 0; i < tile_size_y / block_size_y; i++) {
+      for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
         for (int j = 0; j < num_block_x; j++) {
           auto dst_reg =
@@ -468,9 +462,9 @@ class epilogue_transp_t<
       work_group_t& g,
       matAcc_t& matAcc,
       mem_desc_c_t mem_desc_c,
-      arguments_t args = {},
-      uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
+      [[maybe_unused]] arguments_t args = {},
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
     static_assert(
         mem_layout_c == mem_layout::row_major &&
             mem_space_c == mem_space::local,
@@ -554,9 +548,9 @@ class epilogue_write_back_t<
       work_group_t& g,
       matAcc_t& matAcc,
       mem_desc_c_t mem_desc_c,
-      arguments_t args = {},
-      uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
+      [[maybe_unused]] arguments_t args = {},
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
     using mat_tile_desc = typename matAcc_t::tile_desc;
     using matC_t = subgroup::tile_t<dtype_c, mat_tile_desc>;
     using matC_payload_t = subgroup::
