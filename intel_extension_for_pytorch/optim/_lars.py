@@ -1,6 +1,7 @@
 import torch
 from typing import Iterable
 from torch import nn
+from ._functional import lars_step
 
 """
     We recommend using create_optimizer_lars and setting bn_bias_separately=True
@@ -11,7 +12,7 @@ from torch import nn
 
 
 def create_optimizer_lars(
-    model, lr, momentum, weight_decay, bn_bias_separately, epsilon
+    model, lr, momentum, weight_decay, bn_bias_separately, epsilon, fused
 ):
     if bn_bias_separately:
         optimizer = Lars(
@@ -31,6 +32,7 @@ def create_optimizer_lars(
             momentum=momentum,
             weight_decay=weight_decay,
             epsilon=epsilon,
+            fused=fused,
         )
     else:
         optimizer = Lars(
@@ -39,6 +41,7 @@ def create_optimizer_lars(
             momentum=momentum,
             weight_decay=weight_decay,
             epsilon=epsilon,
+            fused=fused,
         )
     return optimizer
 
@@ -63,6 +66,7 @@ class Lars(torch.optim.Optimizer):
         eeta=1e-3,
         weight_decay=0,
         epsilon=0.0,
+        fused=True,
     ) -> None:
         if not isinstance(lr, float) or lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
@@ -82,7 +86,10 @@ class Lars(torch.optim.Optimizer):
             epsilon=epsilon,
             lars=True,
         )
-
+        self.fused = fused
+        if self.fused is not None:
+            if not hasattr(self, "params_attr"):
+                setattr(self, "params_attr", {})  # noqa: B010
         super().__init__(params, defaults)
 
     @torch.no_grad()
@@ -97,7 +104,8 @@ class Lars(torch.optim.Optimizer):
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
-
+        if self.fused is not None:
+            return lars_step(self, closure)
         for group in self.param_groups:
             # print(len(group), group['lars'])
             weight_decay = group["weight_decay"]
