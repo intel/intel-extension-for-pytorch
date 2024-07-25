@@ -53,8 +53,8 @@ def _sample(
     new_generation_config = model_kwargs.pop("generation_config", None)
     if new_generation_config is not None:
         if not new_generation_config.do_sample:
-            pad_token_id = new_generation_config.pad_token_id
-            eos_token_id = new_generation_config.eos_token_id
+            pad_token_id = new_generation_config._pad_token_tensor
+            eos_token_id = new_generation_config._eos_token_tensor
             return self._greedy_search(
                 input_ids,
                 logits_processor,

@@ -91,7 +91,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.42.4"
+    validated_version = "4.43.2"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -123,6 +123,7 @@ def model_convert_reference(_model):
     # generation wise optimization
     from .generation.utils import (
         _extract_past_from_model_output,
+        _update_model_kwargs_for_generation,
     )
     from .generation import (
         _beam_search,
@@ -218,6 +219,11 @@ def model_convert_reference(_model):
         _model,
         "_extract_past_from_model_output",
         _extract_past_from_model_output,
+    )
+    convert_function(
+        _model,
+        "_update_model_kwargs_for_generation",
+        _update_model_kwargs_for_generation,
     )
     convert_functions(
         _model,
