@@ -551,7 +551,7 @@ deepspeed --bind_cores_to_rank run.py --benchmark -m ./local_llama2_7b --dtype b
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The low precision checkpoint is saved as a `state_dict` in a `.pt` file and can be loaded later for weight only quantization. We provide an example here to run GPTQ.
 
-*Note:* The GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, Llama-3, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon, starcoder, condegen, mistral, mixtral, stablelm, phi-2, phi-3. Pleaes note that it's still experimental, please use with care.
+*Note:* The GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, Llama-3, chatglm2, chatglm3, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon, starcoder, condegen, mistral, Qwen, mixtral, stablelm, phi-2, phi-3. Pleaes note that it's still experimental, please use with care.
 
 Here is how to use it:
 
