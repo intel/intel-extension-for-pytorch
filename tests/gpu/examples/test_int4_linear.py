@@ -11,12 +11,13 @@ from torch.testing._internal.common_utils import (
 
 
 checking_atol = 1e-2
-checking_rtol = 1e-2
+checking_rtol = 2e-2
 
 
 class TestInt4Linear(TestCase):
 
-    def unpack_weight(self, qweight, scales, qzeros, q_config):
+    @staticmethod
+    def unpack_weight(qweight, scales, qzeros, q_config):
         group_size = q_config["group_size"]
         bits = q_config["bits"]
         s32_bits = 32
@@ -43,9 +44,10 @@ class TestInt4Linear(TestCase):
 
         return weight, scales, zeros
 
-    def dequantize(self, qweight, scales, qzeros, group_size):
+    @staticmethod
+    def dequantize(qweight, scales, qzeros, group_size):
         q_config = {"group_size": group_size, "bits": 4}
-        weight, gptq_scales, gptq_zeros = self.unpack_weight(
+        weight, gptq_scales, gptq_zeros = TestInt4Linear.unpack_weight(
             qweight, scales, qzeros, q_config
         )
         gptq_zeros = (torch.ones_like(gptq_zeros) * 8).to("xpu")  # TODO: hard code zp
@@ -57,7 +59,6 @@ class TestInt4Linear(TestCase):
         )
         scale_zeros = gptq_zeros * gptq_scales
         weight = gptq_scales[g_idx.long()] * weight - scale_zeros[g_idx.long()]
-        weight = weight.to(torch.float16)
         return weight
 
     @staticmethod
@@ -67,9 +68,10 @@ class TestInt4Linear(TestCase):
 
     # qkv per-channel not used && TODO: Mismatched elements: 1 / 9216
     @parametrize("per_channel", [False], lambda k: "per_channel" * k)
+    @parametrize("dtype", [torch.float16, torch.bfloat16])
     @parametrize("m,n,k", [(1, 3072, 3072)])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
-    def test_qkv_gemm_int4(self, m, n, k, per_channel, dtype=torch.float16):
+    def test_qkv_int4(self, m, n, k, per_channel, dtype):
         group_size = min(32, k)
         if per_channel:
             group_size = k
@@ -98,19 +100,19 @@ class TestInt4Linear(TestCase):
 
         weight_fp16_1 = self.dequantize(
             weight[0], scales[0], zero_points[0], group_size
-        )
+        ).to(dtype)
         out_torch_1 = torch.matmul(input.cpu().float(), weight_fp16_1.cpu().float())
         out_torch_bias_1 = out_torch_1 + bias[0].cpu().float()
 
         weight_fp16_2 = self.dequantize(
             weight[1], scales[1], zero_points[1], group_size
-        )
+        ).to(dtype)
         out_torch_2 = torch.matmul(input.cpu().float(), weight_fp16_2.cpu().float())
         out_torch_bias_2 = out_torch_2 + bias[1].cpu().float()
 
         weight_fp16_3 = self.dequantize(
             weight[2], scales[2], zero_points[2], group_size
-        )
+        ).to(dtype)
         out_torch_3 = torch.matmul(input.cpu().float(), weight_fp16_3.cpu().float())
         out_torch_bias_3 = out_torch_3 + bias[2].cpu().float()
 
@@ -122,9 +124,10 @@ class TestInt4Linear(TestCase):
         )
 
     @parametrize("per_channel", [False], lambda k: "per_channel" * k)
+    @parametrize("dtype", [torch.float16, torch.bfloat16])
     @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
-    def test_gemm_int4(self, m, n, k, per_channel, dtype=torch.float16):
+    def test_gemm_int4(self, m, n, k, per_channel, dtype):
         input = torch.rand([m, k], device="xpu", dtype=dtype)
         input_torch = input.cpu()
         weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
@@ -134,17 +137,17 @@ class TestInt4Linear(TestCase):
             group_size = k
         group_num = int(k / group_size)
 
-        scales = -torch.rand([group_num, n], device="xpu", dtype=torch.float16)
+        scales = -torch.rand([group_num, n], device="xpu", dtype=dtype)
         zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
             group_num, n // 8
         )
 
-        weight_fp16 = self.dequantize(weight, scales, zero_points, group_size).cpu()
+        weight_fp = self.dequantize(weight, scales, zero_points, group_size).cpu()
         # check gemm
         out_xetla = torch.ops.torch_ipex.mm_int4(
             input, weight.t().contiguous(), scales.t().contiguous(), None, group_size
         )
-        out_torch = torch.matmul(input_torch, weight_fp16)
+        out_torch = torch.matmul(input_torch, weight_fp)
         self.assertEqual(
             out_xetla.cpu().float(),
             out_torch.float(),
@@ -153,7 +156,7 @@ class TestInt4Linear(TestCase):
         )
 
         # check gemm + residual
-        res0 = torch.rand([m, n], device="xpu", dtype=torch.float16)
+        res0 = torch.rand([m, n], device="xpu", dtype=dtype)
         out_xetla_res = torch.ops.torch_ipex.mm_add_int4(
             input,
             weight.t().contiguous(),
@@ -171,7 +174,7 @@ class TestInt4Linear(TestCase):
         )
 
         # check gemm + bias
-        bias = torch.rand([1, n], device="xpu", dtype=torch.float16)
+        bias = torch.rand([1, n], device="xpu", dtype=dtype)
         out_xetla_bias = torch.ops.torch_ipex.mm_bias_int4(
             input,
             weight.t().contiguous(),
@@ -207,7 +210,7 @@ class TestInt4Linear(TestCase):
         )
 
         # check gemm + silu + mul
-        res0 = torch.rand([m, n], device="xpu", dtype=torch.float16)
+        res0 = torch.rand([m, n], device="xpu", dtype=dtype)
         out_xetla_silu = torch.ops.torch_ipex.mm_silu_mul_int4(
             input,
             weight.t().contiguous(),
@@ -225,8 +228,8 @@ class TestInt4Linear(TestCase):
         )
 
         # check gemm + bias + residual + residual
-        res0 = torch.rand([m, n], device="xpu", dtype=torch.float16)
-        res1 = torch.rand([m, n], device="xpu", dtype=torch.float16)
+        res0 = torch.rand([m, n], device="xpu", dtype=dtype)
+        res1 = torch.rand([m, n], device="xpu", dtype=dtype)
         out_xetla_bias_2res = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(
             input,
             weight.t().contiguous(),
@@ -246,7 +249,7 @@ class TestInt4Linear(TestCase):
         )
 
         # check gemm + bias + residual
-        res0 = torch.rand([m, n], device="xpu", dtype=torch.float16)
+        res0 = torch.rand([m, n], device="xpu", dtype=dtype)
         out_xetla_bias_add = torch.ops.torch_ipex.mm_bias_add_int4(
             input,
             weight.t().contiguous(),
@@ -266,8 +269,9 @@ class TestInt4Linear(TestCase):
 
     @parametrize("per_channel", [False], lambda k: "per_channel" * k)
     @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
+    @parametrize("dtype", [torch.float16, torch.bfloat16])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
-    def test_mlp_int4(self, m, n, k, per_channel, dtype=torch.float16):
+    def test_mlp_int4(self, m, n, k, per_channel, dtype):
         input = torch.rand([m, k], device="xpu", dtype=dtype)
         input_torch = input.cpu()
         weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
@@ -277,21 +281,19 @@ class TestInt4Linear(TestCase):
             group_size = k
         group_num = int(k / group_size)
 
-        scales = -torch.rand([group_num, n], device="xpu", dtype=torch.float16)
+        scales = -torch.rand([group_num, n], device="xpu", dtype=dtype)
         zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
             group_num, n // 8
         )
-        bias = torch.rand([1, n], device="xpu", dtype=torch.float16)
+        bias = torch.rand([1, n], device="xpu", dtype=dtype)
 
-        weight_fp16 = self.dequantize(weight, scales, zero_points, group_size).cpu()
-        out_torch = torch.matmul(input_torch, weight_fp16)
+        weight_fp = self.dequantize(weight, scales, zero_points, group_size).cpu()
+        out_torch = torch.matmul(input_torch, weight_fp)
         out_torch_bias = out_torch + bias.cpu().float()
 
         # mlp silu mul
         weight_up = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
-        scales_up = torch.rand([group_num, n], device="xpu", dtype=torch.float16) / (
-            k / 8
-        )
+        scales_up = torch.rand([group_num, n], device="xpu", dtype=dtype) / (k / 8)
         zero_points_up = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
             group_num, n // 8
         )
@@ -334,7 +336,7 @@ class TestInt4Linear(TestCase):
         )
 
         # mlp silu mul bias
-        bias_up = -torch.rand([1, n], device="xpu", dtype=torch.float16)
+        bias_up = -torch.rand([1, n], device="xpu", dtype=dtype)
         out_torch_bias_up = out_torch_up + bias_up.cpu().float()
         out_torch_mlp_silu_mul_bias = out_torch_silu * out_torch_bias_up
         out_xetla_mlp_silu_mul_bias = torch.ops.torch_ipex.mlp_silu_mul_bias_int4(

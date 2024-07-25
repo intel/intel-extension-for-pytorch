@@ -45,599 +45,599 @@ using namespace torch_ipex::xpu::xetla;
       k_);                                                          \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
 
-#define HGEMM_INT4_DISPATCH(                                            \
-    F,                                                                  \
-    WG_M,                                                               \
-    WG_N,                                                               \
-    SG_M,                                                               \
-    SG_N,                                                               \
-    SG_K,                                                               \
-    GZ,                                                                 \
-    SLM_KS,                                                             \
-    L3_KS,                                                              \
-    SYNC_FREQ,                                                          \
-    STAGES,                                                             \
-    ARCH)                                                               \
-  F<sycl::half,                                                         \
-    WG_M,                                                               \
-    WG_N,                                                               \
-    SG_M,                                                               \
-    SG_N,                                                               \
-    SG_K,                                                               \
-    GZ,                                                                 \
-    SLM_KS,                                                             \
-    L3_KS,                                                              \
-    SYNC_FREQ,                                                          \
-    STAGES,                                                             \
-    ARCH>(                                                              \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                 \
-      weight_zp_ptr_,                                                   \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                   \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),             \
-      m_,                                                               \
-      n_,                                                               \
+#define HGEMM_INT4_DISPATCH(                                \
+    F,                                                      \
+    WG_M,                                                   \
+    WG_N,                                                   \
+    SG_M,                                                   \
+    SG_N,                                                   \
+    SG_K,                                                   \
+    GZ,                                                     \
+    SLM_KS,                                                 \
+    L3_KS,                                                  \
+    SYNC_FREQ,                                              \
+    STAGES,                                                 \
+    ARCH)                                                   \
+  F<scalar_t,                                               \
+    WG_M,                                                   \
+    WG_N,                                                   \
+    SG_M,                                                   \
+    SG_N,                                                   \
+    SG_K,                                                   \
+    GZ,                                                     \
+    SLM_KS,                                                 \
+    L3_KS,                                                  \
+    SYNC_FREQ,                                              \
+    STAGES,                                                 \
+    ARCH>(                                                  \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),      \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),     \
+      weight_zp_ptr_,                                       \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                       \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()), \
+      m_,                                                   \
+      n_,                                                   \
       k_);
 
-#define HGEMM_INT4_BIAS_DISPATCH(                                         \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_BIAS_DISPATCH(                             \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
 
-#define HGEMM_INT4_BIAS_RES_RES_DISPATCH(                                 \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_BIAS_RES_RES_DISPATCH(                     \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(epilogues_[1]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(epilogues_[2]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
 
-#define HGEMM_INT4_BIAS_GELU_DISPATCH(                                    \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_BIAS_GELU_DISPATCH(                        \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
 
-#define HGEMM_INT4_RES_DISPATCH(                                          \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_RES_DISPATCH(                              \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
 
-#define HGEMM_INT4_RESMUL_DISPATCH(                                       \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_RESMUL_DISPATCH(                           \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
 
-#define HGEMM_INT4_MLP_SILU_MUL_DISPATCH(                               \
-    F,                                                                  \
-    WG_M,                                                               \
-    WG_N,                                                               \
-    SG_M,                                                               \
-    SG_N,                                                               \
-    SG_K,                                                               \
-    GZ,                                                                 \
-    SLM_KS,                                                             \
-    L3_KS,                                                              \
-    SYNC_FREQ,                                                          \
-    STAGES,                                                             \
-    ARCH)                                                               \
-  F<sycl::half,                                                         \
-    WG_M,                                                               \
-    WG_N,                                                               \
-    SG_M,                                                               \
-    SG_N,                                                               \
-    SG_K,                                                               \
-    GZ,                                                                 \
-    SLM_KS,                                                             \
-    L3_KS,                                                              \
-    SYNC_FREQ,                                                          \
-    STAGES,                                                             \
-    ARCH>(                                                              \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                 \
-      weight_zp_ptr_,                                                   \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                   \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),             \
-      m_,                                                               \
-      n_,                                                               \
+#define HGEMM_INT4_MLP_SILU_MUL_DISPATCH(                   \
+    F,                                                      \
+    WG_M,                                                   \
+    WG_N,                                                   \
+    SG_M,                                                   \
+    SG_N,                                                   \
+    SG_K,                                                   \
+    GZ,                                                     \
+    SLM_KS,                                                 \
+    L3_KS,                                                  \
+    SYNC_FREQ,                                              \
+    STAGES,                                                 \
+    ARCH)                                                   \
+  F<scalar_t,                                               \
+    WG_M,                                                   \
+    WG_N,                                                   \
+    SG_M,                                                   \
+    SG_N,                                                   \
+    SG_K,                                                   \
+    GZ,                                                     \
+    SLM_KS,                                                 \
+    L3_KS,                                                  \
+    SYNC_FREQ,                                              \
+    STAGES,                                                 \
+    ARCH>(                                                  \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),      \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),     \
+      weight_zp_ptr_,                                       \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                       \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()), \
+      m_,                                                   \
+      n_,                                                   \
       k_);
 
-#define HGEMM_INT4_MLP_BIAS_SILU_MUL_DISPATCH(                            \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_MLP_BIAS_SILU_MUL_DISPATCH(                \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
-#define HGEMM_INT4_MLP_SILU_MUL_BIAS_DISPATCH(                            \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_MLP_SILU_MUL_BIAS_DISPATCH(                \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[2]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
-#define HGEMM_INT4_MLP_BIAS_SILU_MUL_BIAS_DISPATCH(                       \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(epilogues_[3]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
-      k_);
-
-#define HGEMM_INT4_QKV_DISPATCH(                                        \
-    F,                                                                  \
-    WG_M,                                                               \
-    WG_N,                                                               \
-    SG_M,                                                               \
-    SG_N,                                                               \
-    SG_K,                                                               \
-    GZ,                                                                 \
-    SLM_KS,                                                             \
-    L3_KS,                                                              \
-    SYNC_FREQ,                                                          \
-    STAGES,                                                             \
-    ARCH)                                                               \
-  F<sycl::half,                                                         \
-    WG_M,                                                               \
-    WG_N,                                                               \
-    SG_M,                                                               \
-    SG_N,                                                               \
-    SG_K,                                                               \
-    GZ,                                                                 \
-    SLM_KS,                                                             \
-    L3_KS,                                                              \
-    SYNC_FREQ,                                                          \
-    STAGES,                                                             \
-    ARCH>(                                                              \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(outputs_[1]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(outputs_[2]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                 \
-      weight_zp_ptr_,                                                   \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                   \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),             \
-      m_,                                                               \
-      n_,                                                               \
+#define HGEMM_INT4_MLP_BIAS_SILU_MUL_BIAS_DISPATCH(           \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(epilogues_[3]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
 
-#define HGEMM_INT4_SILU_MUL_DISPATCH(                                     \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_QKV_DISPATCH(                            \
+    F,                                                      \
+    WG_M,                                                   \
+    WG_N,                                                   \
+    SG_M,                                                   \
+    SG_N,                                                   \
+    SG_K,                                                   \
+    GZ,                                                     \
+    SLM_KS,                                                 \
+    L3_KS,                                                  \
+    SYNC_FREQ,                                              \
+    STAGES,                                                 \
+    ARCH)                                                   \
+  F<scalar_t,                                               \
+    WG_M,                                                   \
+    WG_N,                                                   \
+    SG_M,                                                   \
+    SG_N,                                                   \
+    SG_K,                                                   \
+    GZ,                                                     \
+    SLM_KS,                                                 \
+    L3_KS,                                                  \
+    SYNC_FREQ,                                              \
+    STAGES,                                                 \
+    ARCH>(                                                  \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(outputs_[1]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(outputs_[2]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),      \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),     \
+      weight_zp_ptr_,                                       \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                       \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()), \
+      m_,                                                   \
+      n_,                                                   \
       k_);
 
-#define HGEMM_INT4_BIAS_SILU_MUL_DISPATCH(                                \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(epilogues_[2]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_SILU_MUL_DISPATCH(                         \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[1]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
 
-#define HGEMM_INT4_BIAS_ADD_DISPATCH(                                     \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(epilogues_[1]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_BIAS_SILU_MUL_DISPATCH(                    \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(epilogues_[2]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
 
-#define HGEMM_INT4_QKV_BIAS_DISPATCH(                                     \
-    F,                                                                    \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH)                                                                 \
-  F<sycl::half,                                                           \
-    WG_M,                                                                 \
-    WG_N,                                                                 \
-    SG_M,                                                                 \
-    SG_N,                                                                 \
-    SG_K,                                                                 \
-    GZ,                                                                   \
-    SLM_KS,                                                               \
-    L3_KS,                                                                \
-    SYNC_FREQ,                                                            \
-    STAGES,                                                               \
-    ARCH>(                                                                \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(outputs_[1]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(outputs_[2]->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),        \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                   \
-      weight_zp_ptr_,                                                     \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()),   \
-      reinterpret_cast<sycl::half*>(epilogues_[0]->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                     \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),               \
-      m_,                                                                 \
-      n_,                                                                 \
+#define HGEMM_INT4_BIAS_ADD_DISPATCH(                         \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(epilogues_[1]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
       k_);
 
-#define HGEMM_INT4_SILU_DISPATCH(                                       \
-    F,                                                                  \
-    WG_M,                                                               \
-    WG_N,                                                               \
-    SG_M,                                                               \
-    SG_N,                                                               \
-    SG_K,                                                               \
-    GZ,                                                                 \
-    SLM_KS,                                                             \
-    L3_KS,                                                              \
-    SYNC_FREQ,                                                          \
-    STAGES,                                                             \
-    ARCH)                                                               \
-  F<sycl::half,                                                         \
-    WG_M,                                                               \
-    WG_N,                                                               \
-    SG_M,                                                               \
-    SG_N,                                                               \
-    SG_K,                                                               \
-    GZ,                                                                 \
-    SLM_KS,                                                             \
-    L3_KS,                                                              \
-    SYNC_FREQ,                                                          \
-    STAGES,                                                             \
-    ARCH>(                                                              \
-      reinterpret_cast<sycl::half*>(outputs_[0]->data_ptr<scalar_t>()), \
-      reinterpret_cast<sycl::half*>(input_->data_ptr<scalar_t>()),      \
-      reinterpret_cast<uint32_t*>(weight_->data_ptr()),                 \
-      weight_zp_ptr_,                                                   \
-      reinterpret_cast<sycl::half*>(weight_scl_->data_ptr<scalar_t>()), \
-      acc_tensor_->data_ptr<float>(),                                   \
-      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),             \
-      m_,                                                               \
-      n_,                                                               \
+#define HGEMM_INT4_QKV_BIAS_DISPATCH(                         \
+    F,                                                        \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH)                                                     \
+  F<scalar_t,                                                 \
+    WG_M,                                                     \
+    WG_N,                                                     \
+    SG_M,                                                     \
+    SG_N,                                                     \
+    SG_K,                                                     \
+    GZ,                                                       \
+    SLM_KS,                                                   \
+    L3_KS,                                                    \
+    SYNC_FREQ,                                                \
+    STAGES,                                                   \
+    ARCH>(                                                    \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(outputs_[1]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(outputs_[2]->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
+      weight_zp_ptr_,                                         \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()),   \
+      reinterpret_cast<scalar_t*>(epilogues_[0]->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                         \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()),   \
+      m_,                                                     \
+      n_,                                                     \
+      k_);
+
+#define HGEMM_INT4_SILU_DISPATCH(                           \
+    F,                                                      \
+    WG_M,                                                   \
+    WG_N,                                                   \
+    SG_M,                                                   \
+    SG_N,                                                   \
+    SG_K,                                                   \
+    GZ,                                                     \
+    SLM_KS,                                                 \
+    L3_KS,                                                  \
+    SYNC_FREQ,                                              \
+    STAGES,                                                 \
+    ARCH)                                                   \
+  F<scalar_t,                                               \
+    WG_M,                                                   \
+    WG_N,                                                   \
+    SG_M,                                                   \
+    SG_N,                                                   \
+    SG_K,                                                   \
+    GZ,                                                     \
+    SLM_KS,                                                 \
+    L3_KS,                                                  \
+    SYNC_FREQ,                                              \
+    STAGES,                                                 \
+    ARCH>(                                                  \
+      reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()), \
+      reinterpret_cast<scalar_t*>(input_->data_ptr()),      \
+      reinterpret_cast<uint32_t*>(weight_->data_ptr()),     \
+      weight_zp_ptr_,                                       \
+      reinterpret_cast<scalar_t*>(weight_scl_->data_ptr()), \
+      acc_tensor_->data_ptr<float>(),                       \
+      reinterpret_cast<uint32_t*>(cnt_tensor_->data_ptr()), \
+      m_,                                                   \
+      n_,                                                   \
       k_);
 
 #define HGEMM_INT4_COMMON_DISPATCH_IMPL(DISPATCHER, F, ...) \
@@ -1099,9 +1099,9 @@ class HGEMMXetla_INT4 final {
 
   HGEMMXetla_INT4& build() {
     fallback_ = true;
-    if (input_->scalar_type() != kHalf) {
-      std::cout << "input dtype check fail: " << input_->scalar_type()
-                << std::endl;
+    const auto input_dtype = input_->scalar_type();
+    if (input_dtype != kHalf && input_dtype != kBFloat16) {
+      std::cout << "input dtype check fail: " << input_dtype << std::endl;
       return *this;
     }
     if (weight_->scalar_type() != kByte && weight_->scalar_type() != kQUInt8 &&
@@ -1110,8 +1110,8 @@ class HGEMMXetla_INT4 final {
                 << std::endl;
       return *this;
     }
-    if (std::any_of(outputs_.begin(), outputs_.end(), [](Tensor* out) {
-          return out->scalar_type() != kHalf;
+    if (std::any_of(outputs_.begin(), outputs_.end(), [input_dtype](Tensor* o) {
+          return o->scalar_type() != input_dtype;
         })) {
       std::cout << "outputs dtype check fail!" << std::endl;
       return *this;
@@ -1170,7 +1170,7 @@ class HGEMMXetla_INT4 final {
             std::cout << "bias size check fail!" << std::endl;
             return *this;
           }
-          if (epilogues_[i]->scalar_type() != kHalf) {
+          if (epilogues_[i]->scalar_type() != input_dtype) {
             std::cout << "bias dtype check fail!" << std::endl;
             return *this;
           }
@@ -1181,7 +1181,7 @@ class HGEMMXetla_INT4 final {
           ck = ck && epilogues_[i]->sizes()[0] == m_ &&
               epilogues_[i]->sizes()[1] == n_;
           ck = ck && epilogues_[i]->is_contiguous();
-          ck = ck && epilogues_[i]->scalar_type() == kHalf;
+          ck = ck && epilogues_[i]->scalar_type() == input_dtype;
           if (!ck) {
             std::cout << "res_add ck check fail!" << std::endl;
             return *this;
@@ -1202,7 +1202,7 @@ class HGEMMXetla_INT4 final {
   void search_and_run(sycl::queue& q) {
     static constexpr auto ConfigsTuple = ordered_config_set<arch_tag>;
     if constexpr (idx >= ConfigsTuple.size()) {
-      std::cout << "No available config for current shape!" << std::endl;
+      TORCH_CHECK(false, "No available config for current shape!")
       return;
     } else if (ConfigsTuple[idx].fulfill(m_, n_, k_)) {
       static constexpr auto CurrConfig = ConfigsTuple[idx];
@@ -1259,38 +1259,50 @@ class HGEMMXetla_INT4 final {
     static constexpr std::array supported_gzs = {
         0, 32, 64, 128, 256, 512, 1024};
     if constexpr (idx >= supported_gzs.size()) {
-      std::cout << "No available implementation for current gz!" << std::endl;
+      TORCH_CHECK(false, "No available implementation for current gz!")
     } else if (group_size_ == supported_gzs[idx]) {
       search_and_run<scalar_t, arch_tag, supported_gzs[idx]>(q);
     } else {
       dispatch<scalar_t, arch_tag, idx + 1>(q);
     }
   }
+  template <gpu_arch arch_tag>
+  void dispatch(sycl::queue& q) {
+    switch (input_->scalar_type()) {
+      case kHalf:
+        return dispatch<sycl::half, arch_tag>(q);
+      case kBFloat16:
+        if constexpr (arch_tag == gpu_arch::XeLpg) {
+          TORCH_CHECK(false, "XeLpg does not support bfloat16!")
+        } else {
+          return dispatch<sycl::ext::oneapi::bfloat16, arch_tag>(q);
+        }
+      default:
+        TORCH_CHECK(false, "Unexpected input dtype!");
+        break;
+    }
+  }
 
   void run() {
-    using scalar_t =
-        decltype(c10::impl::ScalarTypeToCPPType<ScalarType::Half>::t);
     auto& q = dpcppGetCurrentQueue();
 #ifdef USE_XETLA_XE_HPC
     if (arch_ == static_cast<int>(gpu_arch::XeHpc)) {
-      dispatch<scalar_t, gpu_arch::XeHpc>(q);
+      dispatch<gpu_arch::XeHpc>(q);
       return;
     }
 #endif
 #ifdef USE_XETLA_XE_HPG
     if (arch_ == static_cast<int>(gpu_arch::XeHpg)) {
-      dispatch<scalar_t, gpu_arch::XeHpg>(q);
+      dispatch<gpu_arch::XeHpg>(q);
       return;
     }
 #endif
 #ifdef USE_XETLA_XE_LPG
     if (arch_ == static_cast<int>(gpu_arch::XeLpg)) {
-      dispatch<scalar_t, gpu_arch::XeLpg>(q);
+      dispatch<gpu_arch::XeLpg>(q);
       return;
     }
 #endif
-    std::cout
-        << "XEGEMM_INT4: No available implementation for current architecture!"
-        << std::endl;
+    TORCH_CHECK(false, "No available implementation for current architecture!");
   }
 };

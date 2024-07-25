@@ -584,14 +584,13 @@ class mlp_gate_mul_up_int4_fwd_t {
     uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
 
     gemm_args_t up_proj_args, gate_proj_args;
-    if constexpr (
-        gemm_t::compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+    if constexpr (gemm_t::compute_policy::quant_mode == quant_mode::I4_SYM) {
       ASSIGN_SYM_GEMM_ARG(
           up_proj_args, mem_desc_up_proj, mem_desc_up_proj_scale)
       ASSIGN_SYM_GEMM_ARG(
           gate_proj_args, mem_desc_gate_proj, mem_desc_gate_proj_scale)
     } else if constexpr (
-        gemm_t::compute_policy::quant_mode == quant_mode::S4_ASYM) {
+        gemm_t::compute_policy::quant_mode == quant_mode::I4_ASYM) {
       DEF_ZP_MEM_DESC(mem_desc_up_zero_pt, up_proj_zero_pt_base)
       DEF_ZP_MEM_DESC(mem_desc_gate_zero_pt, gate_proj_zero_pt_base)
       ASSIGN_ASYM_GEMM_ARG(

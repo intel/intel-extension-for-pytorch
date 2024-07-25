@@ -56,7 +56,7 @@ struct hgemm_wint4_func {
       : mma_engine::xmx;
 
   static constexpr quant_info quant_info{
-      quant_mode::S4_FULLRANGE_NO_ZP,
+      quant_mode::I4_SYM,
       dequant_s == 0 ? 131072 : dequant_s,
       mem_layout::col_major};
 
@@ -194,7 +194,7 @@ struct hgemm_mlp_gate_mul_up_wint4_func {
       : mma_engine::xmx;
 
   static constexpr quant_info quant_info{
-      quant_mode::S4_FULLRANGE_NO_ZP,
+      quant_mode::I4_SYM,
       dequant_s == 0 ? 131072 : dequant_s,
       mem_layout::col_major};
 

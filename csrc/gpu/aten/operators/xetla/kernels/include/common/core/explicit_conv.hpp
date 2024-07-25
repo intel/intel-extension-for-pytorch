@@ -62,6 +62,19 @@ xetla_cvt(xetla_vector<T_src, N> src) {
   return dst;
 }
 
+/// @brief xetla explicit data conversion, bf16->fp16.
+/// @tparam T_dst is the float16 data type.
+/// @tparam T_src is the bfloat16 data type.
+/// @tparam N is the element number in xetla_vector.
+template <typename T_dst, typename T_src, int N>
+__XETLA_API typename std::enable_if_t<
+    std::is_same<T_dst, fp16>::value && std::is_same<T_src, bf16>::value,
+    xetla_vector<T_dst, N>>
+xetla_cvt(xetla_vector<T_src, N> src) {
+  xetla_vector<T_dst, N> dst = src;
+  return dst;
+}
+
 /// @brief xetla explicit data conversion, bf16->fp32.
 /// @tparam T_dst is the bfloat16 data type.
 /// @tparam T_src is the float32 data type.

@@ -60,10 +60,10 @@ static void mm_qkv_out_wint4(
   bool is_b_row_major = weight.is_contiguous();
 
   TORCH_CHECK(is_a_contiguous && is_b_row_major);
+  TORCH_CHECK(input.scalar_type() == kHalf || input.scalar_type() == kBFloat16);
   TORCH_CHECK(
-      input.scalar_type() == kHalf &&
-      (weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
-       weight.scalar_type() == kChar || weight.scalar_type() == kInt));
+      weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
+      weight.scalar_type() == kChar || weight.scalar_type() == kInt)
 
   auto policy = HGEMMXetla_INT4()
                     .add_matrix_out(out0)
@@ -143,12 +143,12 @@ static inline HGEMMXetla_INT4 mlp_mul_dispatch(
   *output = output->defined() ? output->flatten(0, -2)
                               : at::empty({m, n}, input.options());
   TORCH_CHECK(input.is_contiguous() && gate_up_wei.is_contiguous());
+  TORCH_CHECK(input.scalar_type() == kHalf || input.scalar_type() == kBFloat16);
   TORCH_CHECK(
-      input.scalar_type() == kHalf &&
-      (gate_up_wei.scalar_type() == kQUInt8 ||
-       gate_up_wei.scalar_type() == kByte ||
-       gate_up_wei.scalar_type() == kChar ||
-       gate_up_wei.scalar_type() == kInt));
+      gate_up_wei.scalar_type() == kChar ||
+      gate_up_wei.scalar_type() == kByte ||
+      gate_up_wei.scalar_type() == kQUInt8 ||
+      gate_up_wei.scalar_type() == kInt);
 
   auto dispatcher = HGEMMXetla_INT4()
                         .add_matrix_out(*output)

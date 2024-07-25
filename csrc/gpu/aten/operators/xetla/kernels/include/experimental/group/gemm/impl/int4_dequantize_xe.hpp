@@ -520,8 +520,7 @@ class gemm_t<
       // TODO 1D prefetch need pack to U32/U64
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
           scale_prefetch_payload);
-      if constexpr (
-          compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
+      if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
         // TODO 1D prefetch need pack to U32/U64
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             zero_pt_prefetch_payload);
@@ -534,8 +533,7 @@ class gemm_t<
       if ((scale_prefetch_addr_i % scale_addr_update_freq) == 0) {
         scale_prefetch_payload.template update_tdesc<update_dir_b>(
             scale_t::tile_size_y);
-        if constexpr (
-            compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
+        if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
           zero_pt_prefetch_payload
               .template update_tdesc<tdesc_update_dir::y_dir>(
                   zero_pt_t::tile_size_y);
@@ -564,8 +562,7 @@ class gemm_t<
       //     matB, matB_payload);
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           scale, scale_payload);
-      if constexpr (
-          compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
+      if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
         subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
             zero_pt, zero_pt_payload);
       }
@@ -579,8 +576,7 @@ class gemm_t<
         // TODO 1D prefetch need pack to U32/U64
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             scale_prefetch_payload);
-        if constexpr (
-            compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
+        if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
           // TODO 1D prefetch need pack to U32/U64
           subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
               zero_pt_prefetch_payload);
@@ -593,8 +589,7 @@ class gemm_t<
       if (tile_k_idx % scale_addr_update_freq == 0) {
         scale_payload.template update_tdesc<update_dir_b>(scale_t::tile_size_y);
       }
-      if constexpr (
-          compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
+      if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
         if (tile_k_idx % zero_pt_addr_update_freq == 0) {
           zero_pt_payload.template update_tdesc<tdesc_update_dir::y_dir>(
               zero_pt_t::tile_size_y);
@@ -608,8 +603,7 @@ class gemm_t<
         if ((scale_prefetch_addr_i % scale_addr_update_freq) == 0) {
           scale_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
               scale_t::tile_size_y);
-          if constexpr (
-              compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
+          if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
             zero_pt_prefetch_payload
                 .template update_tdesc<tdesc_update_dir::y_dir>(
                     zero_pt_t::tile_size_y);
