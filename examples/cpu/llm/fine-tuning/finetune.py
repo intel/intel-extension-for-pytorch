@@ -4,8 +4,6 @@ https://github.com/tloen/alpaca-lora/blob/main/finetune.py
 """
 
 import os
-from typing import tuple
-
 import fire
 import torch
 import transformers

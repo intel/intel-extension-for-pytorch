@@ -101,7 +101,6 @@ source $oneccl_bindings_for_pytorch_path/env/setvars.sh
 
 python -m intel_extension_for_pytorch.cpu.launch \
     --memory-allocator tcmalloc \
-    --distributed \
     --nnodes ${NNODES} \
     --hostfile ${HOSTFILE} \
     --logical-cores-for-ccl --ccl_worker_count 2 \
