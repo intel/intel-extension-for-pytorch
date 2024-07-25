@@ -51,6 +51,19 @@ def gptq(
     logger.info("quantizing with GPTQ algorithm")
     from ._gptq_utils import gptq_quantize, gptq_export
 
+    for model_name in ["model", "transformer"]:
+        if hasattr(model, model_name) and hasattr(
+            getattr(model, model_name), "_use_sdpa"
+        ):
+            getattr(model, model_name)._use_sdpa = False
+        if hasattr(model, model_name):
+            cur_mod = getattr(model, model_name)
+            for submodel_name in ["encoder", "decoder"]:
+                if hasattr(cur_mod, submodel_name) and hasattr(
+                    getattr(cur_mod, submodel_name), "_use_sdpa"
+                ):
+                    getattr(cur_mod, submodel_name)._use_sdpa = False
+
     model_path = None
     weight_config = {}
     for name, module in model.named_modules():
