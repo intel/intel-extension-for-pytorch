@@ -218,6 +218,7 @@ class MultiInstancesLauncher(Launcher):
             args.ninstances = len(set([c.node for c in self.cpuinfo.pool_all]))
             args.ncores_per_instance = 0
             args.use_logical_cores = False
+            args.bind_numa_node = True
 
         cores_list = self.parse_list_argument(args.cores_list)
         nodes_list = self.parse_list_argument(args.nodes_list)

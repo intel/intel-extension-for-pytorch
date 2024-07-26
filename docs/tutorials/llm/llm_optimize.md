@@ -5,8 +5,10 @@ The new API function, `ipex.llm.optimize`, is designed to optimize transformer-b
 It provides optimizations for both model-wise and content-generation-wise.
 You just need to invoke the `ipex.llm.optimize` function instead of the `ipex.optimize` function to apply all optimizations transparently.
 
-This API currently works for inference workloads.
-Currently, this API supports certain models. Supported model list can be found at [this page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/llm.html#ipexllm-optimized-model-list-for-inference).
+This API currently supports for inference workloads of certain models.
+API documentation is available at [API Docs page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/api_doc.html#ipex.llm.optimize),
+and supported model list can be found at [this page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/llm.html#ipexllm-optimized-model-list-for-inference).
+
 For LLM fine-tuning, please check the [LLM fine-tuning tutorial](https://github.com/intel/intel-extension-for-pytorch/tree/v2.4.0%2Bcpu/examples/cpu/llm/fine-tuning).
 
 API documentation is available at [API Docs page](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/api_doc.html#ipex.llm.optimize).

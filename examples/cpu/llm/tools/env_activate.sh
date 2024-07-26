@@ -18,7 +18,7 @@ export KMP_FORKJOIN_BARRIER_PATTERN=dist,dist
 export KMP_PLAIN_BARRIER_PATTERN=dist,dist
 export KMP_REDUCTION_BARRIER_PATTERN=dist,dist
 
-BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}" )" &> /dev/null && pwd )
 export LD_PRELOAD=$(bash ${BASEFOLDER}/get_libstdcpp_lib.sh):${LD_PRELOAD}
 
 function set_ld_preload() {
@@ -52,6 +52,16 @@ if [ ! -d ${ONECCL_PATH} ]; then
 else
     source ${ONECCL_PATH}/env/setvars.sh
 fi
+
+JAVA_PATH=${BASEFOLDER}/../
+cd ${JAVA_PATH}
+if [ ! -d jdk-22.0.2 ]; then
+    wget https://download.java.net/java/GA/jdk22.0.2/c9ecb94cd31b495da20a27d4581645e8/9/GPL/openjdk-22.0.2_linux-x64_bin.tar.gz
+    tar xvf openjdk-22.0.2_linux-x64_bin.tar.gz
+    rm openjdk-22.0.2_linux-x64_bin.tar.gz
+fi
+export JAVA_HOME=`pwd`/jdk-22.0.2
+export PATH=${PATH}:${JAVA_HOME}/bin
 
 cd ${BASEFOLDER}/../${MODE}
 if [ ${MODE} == "inference" ]; then

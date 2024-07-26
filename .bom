@@ -148,3 +148,5 @@ tqdm
 transformers-stream_generator
 typing-extensions
 unidiff
+soundfile
+openjdk

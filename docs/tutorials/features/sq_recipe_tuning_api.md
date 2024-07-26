@@ -16,6 +16,6 @@ SmoothQuant will introduce alpha to calculate the ratio of input and weight upda
 | shared_criterion |     "mean"    | ["min", "mean","max"] |   criterion for input LayerNorm op of a transformer block.  |
 |   enable_blockwise_loss   |     False     |     [True, False]     |          whether to enable block-wise auto-tuning          |
 
-Please refer to the [LLM examples](https://github.com/intel/intel-extension-for-pytorch/tree/v2.4.0%2Bcpu/examples/cpu/llm) for complete examples.
+Please refer to the [LLM examples](https://github.com/intel/intel-extension-for-pytorch/tree/v2.4.0%2Bcpu/examples/cpu/llm/inference) for complete examples.
 
 **Note**: When defining dataloaders for calibration, please follow INC's dataloader [format](https://github.com/intel/neural-compressor/blob/master/docs/source/dataloader.md).

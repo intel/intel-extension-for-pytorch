@@ -16,7 +16,7 @@ if ! [ -f $NODEFILE ]; then
   exit 0
 fi
 
-WORKDIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+WORKDIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}}" )" &> /dev/null && pwd )
 
 function get_hw_info()
 {

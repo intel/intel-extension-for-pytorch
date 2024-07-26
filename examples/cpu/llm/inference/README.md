@@ -19,25 +19,25 @@
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Bloom| bigscience/bloom-1b7 | 🟩 | 🟨 | 🟩 | 🟩  | 🟨 |
 |CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |   |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |   |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 |   |
-|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 |   |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 | 🟨 |
+|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 |   | 🟩 |   |
+|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 | 🟩 |   |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  | 🟩 | 🟨 |
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 |    |
+|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 |   |
 |GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |   |
 |Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |   |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Whisper| openai/whisper-large-v2 | 🟩 | 🟩 |   |   |   |
@@ -349,7 +349,7 @@ unset KMP_AFFINITY
 In the DeepSpeed cases below, we recommend "--shard-model" to shard model weight sizes more even for better memory usage when running with DeepSpeed.
 
 If using "--shard-model", it will save a copy of the shard model weights file in the path of "--output-dir" (default path is "./saved_results" if not provided).
-If you have used "--shard-model" and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove "--shard-model", and replace "-m <MODEL_ID>" with "-m <shard model path>" to skip the repeated shard steps.
+If you have used "--shard-model" and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove "--shard-model", and replace "-m <MODEL_ID>" with "-m \<shard model path\>" to skip the repeated shard steps.
 
 Besides, the standalone shard model function/scripts are also provided in the [Advanced Usage](#33-how-to-shard-model-for-distributed-tests-with-deepspeed-autotp) section, in case you would like to generate the shard model weights files in advance before running distributed inference.
 
@@ -669,8 +669,8 @@ To save memory usage, we could shard the model weights under the local path befo
 ```
 cd ./utils
 # general command:
-python create_shard_model.py -m <MODEL ID>  --save-path <SHARD MODEL NEW PATH>
-# After sharding the model, using -m <SHARD MODEL NEW PATH> in later tests
+python create_shard_model.py -m <MODEL ID>  --save-path <SHARD MODEL PATH>
+# After sharding the model, using -m <SHARD MODEL PATH> in later tests
 
 # An example of llama2 7b:
 python create_shard_model.py -m meta-llama/Llama-2-7b-hf --save-path ./local_llama2_7b

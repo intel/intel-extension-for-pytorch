@@ -33,25 +33,25 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Bloom| bigscience/bloom-1b7 | 🟩 | 🟨 | 🟩 | 🟩  | 🟨 |
 |CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |   |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |   |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 |   |
-|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 |   |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 | 🟨 |
+|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 |   | 🟩 |    |
+|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 | 🟩 |    |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  | 🟩 | 🟨 |
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 |    |
 |GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |    |
 |Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |    |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Whisper| openai/whisper-large-v2 | 🟩 | 🟩 |   |   |   |

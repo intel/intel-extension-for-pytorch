@@ -7,10 +7,10 @@ Users need to provide a fp32 model and some parameters required for tuning. The 
 
 ## Usage Example
 - Static Quantization
-Please refer to [static_quant example](../../../examples/cpu/features/int8_recipe_tuning/imagenet_autotune.py).
+Please refer to [static_quant example](https://github.com/intel/intel-extension-for-pytorch/tree/v2.4.0%2Bcpu/examples/cpu/features/int8_recipe_tuning/imagenet_autotune.py).
 
 - Smooth Quantization
-Please refer to [LLM SmoothQuant example](../../../examples/cpu/llm/inference/single_instance/run_generation.py).
+Please refer to [LLM SmoothQuant example](https://github.com/intel/intel-extension-for-pytorch/tree/v2.4.0%2Bcpu/examples/cpu/llm/inference/single_instance/run_quantization.py).
 
 ## Smooth Quantization Autotune
 ### Algorithm: Auto-tuning of $\alpha$.
