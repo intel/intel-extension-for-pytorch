@@ -431,7 +431,7 @@ class HuggingFaceModel(BaseLM):
             example_dict["past_key_values"] = past_key_values
             if has_position_ids:
                 example_dict["position_ids"] = position_ids_batched
-        if "return_last_logit" in model_inputs:
+        if "return_last_logit" in model_inputs and self._with_ipex:
             example_dict["return_last_logit"] = torch.tensor(True)
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
