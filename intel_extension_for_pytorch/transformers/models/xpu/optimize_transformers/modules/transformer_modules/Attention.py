@@ -487,6 +487,10 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 is_causal,
             )
         elif self.is_beam_search():
+            if attention_mask is not None:
+                attention_mask = attention_mask.repeat(
+                    1, int(query.shape[1] / attention_mask.shape[1]), 1, 1
+                ).contiguous()
             return self.sdp_2nd2last_beam_search(
                 query,
                 key,
