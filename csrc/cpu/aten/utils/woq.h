@@ -201,8 +201,7 @@ static at::Tensor dequantize_woq_weight(
     const at::Tensor& scale,
     const at::Tensor& zp,
     int64_t qw_type, // weight dtype
-    int64_t quant_w_mode // weight quant mode
-) {
+    int64_t group_size) {
   bool sym_quant = qw_type == WOQ_DTYPE_NF4;
   TORCH_CHECK(qw.dim() == 2, "Weight must 2D but got ", qw.dim(), "D");
   auto N = weight_shape[0];
@@ -215,12 +214,26 @@ static at::Tensor dequantize_woq_weight(
     w_int8.index({Slice(), Slice(None, None, 2)}).copy_(qw.bitwise_and(0xf));
     w_int8.index({Slice(), Slice(1, None, 2)}).copy_(qw.bitwise_right_shift(4));
     auto w_ret = map_nf4_tensor_to_float(w_int8);
-    if (quant_w_mode == 0) {
+    if (group_size <= 0) {
       dqw = w_ret * scale;
     } else {
       int64_t num_blocks = scale.size(-2);
-      auto w_int8_view = w_ret.view({N, num_blocks, -1});
-      dqw = w_int8_view * scale;
+      auto rem = K % group_size;
+      if (rem > 0) {
+        using namespace torch::indexing;
+        dqw = at::empty({N, K}, qw.options().dtype(at::kFloat));
+        auto w_com = w_ret.slice(1, 0, K - rem).view({N, -1, group_size});
+        auto w_rem = w_ret.slice(1, K - rem, K).view({N, 1, -1});
+        auto s_com = scale.slice(-2, 0, num_blocks - 1);
+        auto s_rem = scale.slice(-2, num_blocks - 1, num_blocks);
+        auto dqw_com = (w_com * s_com).view({N, -1});
+        auto dqw_rem = (w_rem * s_rem).view({N, -1});
+        dqw.index_put_({Slice(), Slice(None, K - rem)}, dqw_com);
+        dqw.index_put_({Slice(), Slice(K - rem, K)}, dqw_rem);
+      } else {
+        auto w_int8_view = w_ret.view({N, -1, group_size});
+        dqw = w_int8_view * scale;
+      }
       dqw = dqw.view({N, -1});
     }
   } else if (qw_type == WOQ_DTYPE_INT4) {
@@ -229,24 +242,55 @@ static at::Tensor dequantize_woq_weight(
     auto w_int8 = at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
     w_int8.index({Slice(), Slice(None, None, 2)}).copy_(qw.bitwise_and(0xf));
     w_int8.index({Slice(), Slice(1, None, 2)}).copy_(qw.bitwise_right_shift(4));
-    if (quant_w_mode == 0) {
+    if (group_size <= 0) {
       dqw = (w_int8.to(at::kFloat) - zp) * scale;
     } else {
       int64_t num_blocks = scale.size(-2);
-      auto w_int8_view = w_int8.view({N, num_blocks, -1});
-      dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
+      auto rem = K % group_size;
+      if (rem > 0) {
+        dqw = at::empty({N, K}, qw.options().dtype(at::kFloat));
+        auto w_com = w_int8.slice(1, 0, K - rem).view({N, -1, group_size});
+        auto w_rem = w_int8.slice(1, K - rem, K).view({N, 1, -1});
+        auto s_com = scale.slice(-2, 0, num_blocks - 1);
+        auto s_rem = scale.slice(-2, num_blocks - 1, num_blocks);
+        auto z_com = zp.slice(-2, 0, num_blocks - 1);
+        auto z_rem = zp.slice(-2, num_blocks - 1, num_blocks);
+        auto dqw_com = ((w_com.to(at::kFloat) - z_com) * s_com).view({N, -1});
+        auto dqw_rem = ((w_rem.to(at::kFloat) - z_rem) * s_rem).view({N, -1});
+        dqw.index_put_({Slice(), Slice(None, K - rem)}, dqw_com);
+        dqw.index_put_({Slice(), Slice(K - rem, K)}, dqw_rem);
+      } else {
+        auto w_int8_view = w_int8.view({N, num_blocks, -1});
+        dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
+      }
       dqw = dqw.view({N, -1});
     }
   } else {
     TORCH_CHECK(!sym_quant, "Weight must be asymmetrically quantized for INT8");
-    if (quant_w_mode == 0) {
+    if (group_size <= 0) {
       dqw = sym_quant ? qw.to(at::kFloat) * scale
                       : (qw.to(at::kFloat) - zp) * scale;
     } else {
       int64_t num_blocks = scale.size(-2);
-      auto w_int8_view = qw.view({N, num_blocks, -1});
-      dqw = sym_quant ? w_int8_view.to(at::kFloat) * scale
-                      : (w_int8_view.to(at::kFloat) - zp) * scale;
+      auto rem = K % group_size;
+      if (rem > 0) {
+        using namespace torch::indexing;
+        dqw = at::empty({N, K}, qw.options().dtype(at::kFloat));
+        auto w_com = qw.slice(1, 0, K - rem).view({N, -1, group_size});
+        auto w_rem = qw.slice(1, K - rem, K).view({N, 1, -1});
+        auto s_com = scale.slice(-2, 0, num_blocks - 1);
+        auto s_rem = scale.slice(-2, num_blocks - 1, num_blocks);
+        auto z_com = zp.slice(-2, 0, num_blocks - 1);
+        auto z_rem = zp.slice(-2, num_blocks - 1, num_blocks);
+        auto dqw_com = ((w_com.to(at::kFloat) - z_com) * s_com).view({N, -1});
+        auto dqw_rem = ((w_rem.to(at::kFloat) - z_rem) * s_rem).view({N, -1});
+        dqw.index_put_({Slice(), Slice(None, K - rem)}, dqw_com);
+        dqw.index_put_({Slice(), Slice(K - rem, K)}, dqw_rem);
+      } else {
+        auto w_int8_view = qw.view({N, num_blocks, -1});
+        dqw = sym_quant ? w_int8_view.to(at::kFloat) * scale
+                        : (w_int8_view.to(at::kFloat) - zp) * scale;
+      }
       dqw = dqw.view({N, -1});
     }
   }

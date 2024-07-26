@@ -4553,7 +4553,7 @@ at::Tensor qlinear_woq_affine(
       zp = zp_list[fp32_idx].unsqueeze(-1);
     }
     auto w = torch_ipex::cpu::dequantize_woq_weight(
-                 qw, {N, K}, scale, zp, qw_type, quant_w_mode)
+                 qw, {N, K}, scale, zp, qw_type, quant_block_k)
                  .to(compute_dtype);
     auto x_reshape = x.reshape({M, K});
     auto x_fp = x_reshape.to(compute_dtype);
@@ -4635,7 +4635,7 @@ at::Tensor qlinear_woq_affine(
     zp = zp_list[fp32_idx].unsqueeze(-1);
   }
   auto w = torch_ipex::cpu::dequantize_woq_weight(
-               qw, {N, K}, scale, zp, qw_type, quant_w_mode)
+               qw, {N, K}, scale, zp, qw_type, quant_block_k)
                .to(compute_dtype);
   auto x_reshape = x.reshape({M, K});
   auto x_fp = x_reshape.to(compute_dtype);

@@ -322,7 +322,7 @@ static at::Tensor _weight_unpack_dequantize_repack(ContextLinearWoq& context) {
       scale,
       zp,
       context.weight_dtype_,
-      quant_w_mode);
+      context.group_size_);
   if (N % 100 == 0) {
     return block_weight(dequant_weight, 100, 64);
   }

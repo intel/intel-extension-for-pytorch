@@ -1585,7 +1585,7 @@ class WeightOnlyQuantizationTester(TestCase):
                         w, w_dtype, None, None
                     )
                     fake_quant_w = dequantize_per_channel(
-                        qw, w_scales, w_zero_points.int(), w_dtype, w.shape
+                        qw, w_scales, w_zero_points, w_dtype, w.shape
                     )
                 else:
                     qw, w_scales, w_zero_points = quantize_per_block(
@@ -1612,13 +1612,19 @@ class WeightOnlyQuantizationTester(TestCase):
                     y_ref = y_ref.to(dtype)
                     torch.testing.assert_close(y, y_ref, atol=1e-2, rtol=1e-1)
 
-        MNK_list = [(4, 64, 128), (4, 32, 127), (9, 31, 256), (1024, 4096, 4096)]
+        MKN_list = [
+            (4, 64, 128),
+            (4, 32, 127),
+            (9, 31, 256),
+            (4, 144, 64),
+            (16, 256, 256),
+        ]
         has_bias_list = [False, True]
         quant_mode_list = [0, 1, 2, 3]
         group_size_list = [-1, 32, 64, 128]
-        weight_dtype = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
+        weight_dtype = [WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4]
         cases = itertools.product(
-            MNK_list, has_bias_list, quant_mode_list, group_size_list, weight_dtype
+            MKN_list, has_bias_list, quant_mode_list, group_size_list, weight_dtype
         )
         for shape, has_bias, act_quant_mode, group_size, w_dtype in cases:
             test(shape, has_bias, act_quant_mode, group_size, w_dtype)
