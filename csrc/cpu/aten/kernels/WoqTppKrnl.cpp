@@ -54,7 +54,7 @@ constexpr bool is_sym_quant(const int qw_type) {
 #if defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
 
 #define QUANT_A_THRESHOLD 30720
-#define SMALL_BATCH_THRESHOLD 16
+static int SMALL_BATCH_THRESHOLD = env2int("IPEX_WOQ_SMALL_BATCH_THRESHOLD", 5);
 #define DEQUANT_UPFRONT_THRESHOLD 1024
 #define PARALLEL_M_THRESHOLD 128
 constexpr long PREFETCH_K_DIST = 64; // TODO(jgong5): do not hard-code
@@ -2247,8 +2247,13 @@ void qlinear_woq_affine_impl(
   auto BLOCK_M = [&]() -> long {
     if (M < 32) {
       return M;
+    } else if (M < 48) {
+      int64_t block_size = (M + 1) / 2;
+      return block_size % 2 == 0 ? block_size : block_size + 1;
     } else if (M < 64) {
       return 32;
+    } else if (M < 96) {
+      return 48;
     } else {
       return 64;
     }

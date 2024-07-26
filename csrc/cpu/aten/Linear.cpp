@@ -421,6 +421,7 @@ at::Tensor woq_linear_unpack_weight(
   return woq_tpp_gemm_unpackB_stub(kCPU, weight, weight_dtype, lowp_mode);
 }
 
+#define PAD_M_THRESHOLD 32
 IPEX_DEFINE_DISPATCH(woq_tpp_gemm_kernel_stub);
 at::Tensor woq_linear_kernel(
     const at::Tensor& self,
@@ -434,9 +435,19 @@ at::Tensor woq_linear_kernel(
     int64_t act_quant_mode,
     const c10::optional<at::Tensor>& compensation) {
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
-  return woq_tpp_gemm_kernel_stub(
+  auto K = self.size(-1);
+  auto M = self.numel() / K;
+  auto in = self;
+  // Big performance regression is found with some odd M
+  // So, we pad M to the nearest even number
+  bool m_padded = false;
+  if (M >= PAD_M_THRESHOLD && M % 2 == 1) {
+    in = at::pad(in.view({M, K}), {0, 0, 0, 1}, "constant", 0);
+    m_padded = true;
+  }
+  auto y = woq_tpp_gemm_kernel_stub(
       kCPU,
-      self,
+      in,
       weight,
       scales_list,
       zps_list,
@@ -449,6 +460,12 @@ at::Tensor woq_linear_kernel(
       quant_w_mode,
       group_size,
       compensation);
+  if (m_padded) {
+    auto out_size = self.sizes().vec();
+    out_size.back() = y.size(-1);
+    y = y.narrow(0, 0, M).view(out_size);
+  }
+  return y;
 }
 
 at::Tensor woq_linear_forward(
@@ -486,9 +503,19 @@ at::Tensor woq_linear_unary_kernel(
     post_op_fusion_type = WOQ_FUSE_SILU;
   }
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
-  return woq_tpp_gemm_kernel_stub(
+  auto K = self.size(-1);
+  auto M = self.numel() / K;
+  auto in = self;
+  // Big performance regression is found with some odd M
+  // So, we pad M to the nearest even number
+  bool m_padded = false;
+  if (M >= PAD_M_THRESHOLD && M % 2 == 1) {
+    in = at::pad(in.view({M, K}), {0, 0, 0, 1}, "constant", 0);
+    m_padded = true;
+  }
+  auto y = woq_tpp_gemm_kernel_stub(
       kCPU,
-      self,
+      in,
       weight,
       scales_list,
       zps_list,
@@ -501,6 +528,12 @@ at::Tensor woq_linear_unary_kernel(
       quant_w_mode,
       group_size,
       compensation);
+  if (m_padded) {
+    auto out_size = self.sizes().vec();
+    out_size.back() = y.size(-1);
+    y = y.narrow(0, 0, M).view(out_size);
+  }
+  return y;
 }
 
 at::Tensor woq_linear_gelu_forward(
@@ -559,9 +592,19 @@ at::Tensor woq_linear_binary_kernel(
     post_op_fusion_type = WOQ_FUSE_MUL;
   }
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
-  return woq_tpp_gemm_kernel_stub(
+  auto K = self.size(-1);
+  auto M = self.numel() / K;
+  auto in = self;
+  // Big performance regression is found with some odd M
+  // So, we pad M to the nearest even number
+  bool m_padded = false;
+  if (M >= PAD_M_THRESHOLD && M % 2 == 1) {
+    in = at::pad(in.view({M, K}), {0, 0, 0, 1}, "constant", 0);
+    m_padded = true;
+  }
+  auto y = woq_tpp_gemm_kernel_stub(
       kCPU,
-      self,
+      in,
       weight,
       scales_list,
       zps_list,
@@ -574,6 +617,12 @@ at::Tensor woq_linear_binary_kernel(
       quant_w_mode,
       group_size,
       compensation);
+  if (m_padded) {
+    auto out_size = self.sizes().vec();
+    out_size.back() = y.size(-1);
+    y = y.narrow(0, 0, M).view(out_size);
+  }
+  return y;
 }
 
 at::Tensor woq_linear_add_forward(
