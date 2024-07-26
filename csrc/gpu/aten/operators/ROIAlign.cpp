@@ -442,9 +442,9 @@ at::Tensor roi_align_forward_kernel(
       [&] {
         auto spatial_scale_ = static_cast<scalar_t>(spatial_scale);
         auto cgf = DPCPP_Q_CGF(cgh) {
-          auto input_ptr = (scalar_t*)input_.data_ptr();
-          auto rois_ptr = (scalar_t*)rois_.data_ptr();
-          auto output_ptr = (scalar_t*)output.data_ptr();
+          auto input_ptr = input_.data_ptr<scalar_t>();
+          auto rois_ptr = rois_.data_ptr<scalar_t>();
+          auto output_ptr = output.data_ptr<scalar_t>();
           ROIAlignForwardKernelFunctor<scalar_t> kfn(
               output_size,
               input_ptr,
@@ -592,9 +592,9 @@ at::Tensor roi_align_backward_kernel(
       [&] {
         auto spatial_scale_ = static_cast<scalar_t>(spatial_scale);
         auto cgf = DPCPP_Q_CGF(cgh) {
-          auto grad_ptr = (scalar_t*)grad.data_ptr();
-          auto grad_input_ptr = (scalar_t*)grad_input.data_ptr();
-          auto rois_ptr = (scalar_t*)rois_.data_ptr();
+          auto grad_ptr = grad.data_ptr<scalar_t>();
+          auto grad_input_ptr = grad_input.data_ptr<scalar_t>();
+          auto rois_ptr = rois_.data_ptr<scalar_t>();
           auto grad_numel = grad.numel();
           ROIAlignBackwardKernelFunctor<scalar_t> kfn(
               grad_numel,
