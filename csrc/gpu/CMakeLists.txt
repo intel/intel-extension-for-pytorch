@@ -294,7 +294,7 @@ if(ONEDNN_FOUND)
   endif()
   if(BUILD_SEPARATE_OPS)
     # Use same lib path with op libs to avoid link errors
-    set(ONEDNN_LIB_DIR "${CMAKE_BINARY_DIR}/csrc/gpu")
+    set(ONEDNN_LIB_DIR "${CMAKE_BINARY_DIR}")
     # Suppress soname to prevent from creating symbolic link
     set_target_properties(${ONEDNN_LIBRARY} PROPERTIES NO_SONAME ON
       LIBRARY_OUTPUT_DIRECTORY ${ONEDNN_LIB_DIR}

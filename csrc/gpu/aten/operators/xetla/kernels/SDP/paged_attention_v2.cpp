@@ -141,19 +141,16 @@ cgfs_t _paged_attention_v2(
     paged_attention_fwd_kernel_args_t args) {
   if (xeType == gpu::xetla::XetlaType::fp16) {
     return paged_attention_v2_dispatch<arch_tag, fp16>(args);
-  }
-  // only XeHpc can have right result on bf16 datatype, accuracy test will
-  // fail at other archs might needs fix from xetla to enable bf16 on other
-  // archs
-  // TODO(ganyi): enable other archs' implementation on bf16 when xetla fix its
-  // bf16 path.
+  } else if (xeType == XetlaType::bf16) {
+    // 2024.1 and below do not support bf16's operator< etc
 #if __INTEL_LLVM_COMPILER >= 20240200
-  else if constexpr (arch_tag == gpu_arch::XeHpc) {
     return paged_attention_v2_dispatch<arch_tag, bf16>(args);
-  }
-#endif // __INTEL_LLVM_COMPILER >= 20240200
-  else {
+#else
     printf("paged_attention: No bf16 support for current arch!!\n\n");
+    return {};
+#endif
+  } else {
+    printf("paged_attention: Unsupported dtype!\n\n");
     return {};
   }
 }

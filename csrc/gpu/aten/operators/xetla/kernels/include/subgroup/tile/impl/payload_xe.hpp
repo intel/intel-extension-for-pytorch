@@ -467,10 +467,9 @@ struct mem_payload_t<
     uint32_t offset_y = surface_offset_y;
     width_in_elems = surface_width;
     height_in_elems = surface_height;
-    payload_bytes = mem_transpose ? (surface_offset_x - 1) * pitch_in_bytes +
-            surface_offset_y * sizeof(dtype)
-                                  : (surface_offset_y - 1) * pitch_in_bytes +
-            surface_offset_x * sizeof(dtype);
+    payload_bytes = mem_transpose
+        ? (surface_width - 1) * pitch_in_bytes + surface_height * sizeof(dtype)
+        : (surface_height - 1) * pitch_in_bytes + surface_width * sizeof(dtype);
     base_offset = mem_transpose
         ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
         : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);

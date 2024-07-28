@@ -5,7 +5,6 @@ import intel_extension_for_pytorch as ipex  # noqa
 from torch.testing._internal.common_utils import (
     TestCase,
 )
-import pytest
 
 FLOAT32_BYTES = torch.finfo(torch.float).bits // 8
 # This will change depending on the compute capability.
@@ -190,8 +189,8 @@ class TestPagedAttention(TestCase):
             max_num_blocks_per_seq, block_size, 1, num_kv_heads, head_size, dtype, seed
         )
         key_cache, value_cache = key_caches[0], value_caches[0]
-        # Call the paged attention kernel.
-        output = torch.empty_like(query)
+        # Special value to check if the kernels write to output
+        output = torch.full_like(query, 999)
 
         xpu_device = torch.device("xpu")
         output_xpu = output.to(xpu_device)
@@ -205,6 +204,7 @@ class TestPagedAttention(TestCase):
 
         alibi_slopes_xpu = None
 
+        # Call the paged attention kernel
         if version == "v1":
             torch.xpu.paged_attention_v1(
                 output_xpu,
@@ -297,34 +297,18 @@ class TestPagedAttention(TestCase):
             scale,
             alibi_slopes,
         )
-        try:
-            torch.testing.assert_close(
-                actual_output, ref_output.float(), atol=1e-2, rtol=1e-2
-            )
-            torch.testing.assert_close(
-                clone_output, ref_output.float(), atol=1e-3, rtol=1e-2
-            )
-            print(f"attention {version} {dtype} accuracy test passed")
-        except Exception as e:
-            print("accuracy test failed:", e)
-            print("expected output: ", ref_output.flatten()[:64])
-            print("actual output: ", actual_output.flatten()[:64])
+        torch.testing.assert_close(
+            actual_output, ref_output.float(), atol=1e-3, rtol=1e-2
+        )
+        torch.testing.assert_close(
+            clone_output, ref_output.float(), atol=1e-3, rtol=1e-2
+        )
+        print(f"attention {version} {dtype} accuracy test passed")
 
-    @pytest.mark.skipif(
-        not torch.xpu.has_2d_block_array(),
-        reason="have accuracy issue with compiler 2024.1 on ATSM, disable it as a WA for now",
-    )
     def test_fp16(self):
         for version in ["v1", "v2"]:
             self.paged_attention(version, torch.float16)
 
-    # TODO(ganyi): enable bf16 pvc path when ci update compiler version to 2024.2
-    # and other archs' implementation on bf16 will wait for the fix in xetla.
-    # @pytest.mark.skipif(
-    #     not torch.xpu.has_2d_block_array(),
-    #     reason="BF16 now have accuracy issue on other archs, need to
-    # fix xetla if we need relevent arch to support such datatype.",
-    # )
-    # def test_bf16(self):
-    #     for version in ["v1", "v2"]:
-    #         self.paged_attention(version, torch.bfloat16)
+    def test_bf16(self):
+        for version in ["v1", "v2"]:
+            self.paged_attention(version, torch.bfloat16)
