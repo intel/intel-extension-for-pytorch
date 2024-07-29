@@ -185,8 +185,6 @@ def get_weight_only_quant_qconfig_mapping(
                         - BF16(2): Use bfloat16 as the lowest precision for computation.
                         - INT8(3): Use INT8 as the lowest precision for computation.
                                    Activation is quantized to int8 at runtime in this case.
-                        Note that lowp_mode=INT8(3) is only available when weight_dtype=INT4.
-                        In other cases, it will fall back to lowp_mode=BF16(2).
         act_quant_mode: Quantization granularity of activation. It only works for lowp_mode=INT8.
                         It has no effect in other cases. The tensor is divided into groups, and
                         each group is quantized with its own quantization parameters.

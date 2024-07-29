@@ -19,8 +19,6 @@ from intel_extension_for_pytorch.quantization._qconfig import (
     WOQ_DTYPE_TO_STR,
 )
 
-from ...utils._logger import logger, WarningType
-
 
 class WeightOnlyQuantizedLinear(nn.Module):
     r"""
@@ -107,27 +105,20 @@ class WeightOnlyQuantizedLinear(nn.Module):
             return mod
 
         lowp_mode = qconfig.lowp_mode
-        if qconfig.lowp_mode == 3 and qconfig.weight_dtype == WoqWeightDtype.INT8:
-            # lowp_mode=3 (INT8) is not supported for INT8 weight
-            # Fall back to lowp_mode=2 in such case
-            # TODO(Weiwen) Support lowp_mode=3
-            lowp_mode = 2
-            logger.warning(
-                "Warning: lowp_mode=3(INT8) is not supported yet for INT8 weight. "
-                + "Falling back to 2(BF16).",
-                _type=WarningType.NotSupported,
-            )
         act_quant_mode = qconfig.act_quant_mode
         dtype = qconfig.weight_dtype
         group_size = qconfig.group_size
+        # if dtype = int8, lowp-mode = int8, we want zero points to be 0
+        # otherwise, it may overflow when we subtract zero points from int8 weight.
+        sym_quant = dtype == WoqWeightDtype.INT8 and lowp_mode == 3
 
         if group_size == -1:
             qweight, scales, zero_points = quantize_per_channel(
-                mod.weight, dtype, scales, zero_points
+                mod.weight, dtype, scales, zero_points, sym_quant
             )
         else:
             qweight, scales, zero_points = quantize_per_block(
-                mod.weight, dtype, group_size, scales, zero_points
+                mod.weight, dtype, group_size, scales, zero_points, sym_quant
             )
         if not hasattr(mod, "in_features"):
             mod.in_features = mod.weight.size()[1]

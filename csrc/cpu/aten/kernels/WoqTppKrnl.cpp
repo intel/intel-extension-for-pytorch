@@ -1248,9 +1248,7 @@ class DequantGemmTPP {
       long lda,
       long ldc,
       int unroll_hint = 1,
-      long str_a = 1) {
-    TLA_ASSERT(false, "not implemented");
-  }
+      long str_a = 1) {}
 
   void operator()(
       Tin* A,
@@ -2281,7 +2279,9 @@ void qlinear_woq_affine_impl(
   auto Kcb = Kc;
   if (M < PARALLEL_M_THRESHOLD) {
     Kcb = 1;
-  } else if (is_4bit_flag || !std::is_same<T, TComp>()) {
+  } else if (
+      is_4bit_flag || !std::is_same<T, TComp>() ||
+      std::is_same<TComp, uint8_t>()) {
     Kcb = 1;
   } else if (M >= PARALLEL_M_THRESHOLD) {
     Kcb = IPEX_KCB_BLOCK_SIZE;
@@ -2974,9 +2974,13 @@ at::Tensor qlinear_woq_pack(
     });
     return result;
   } else {
-    TLA_ASSERT(
-        lowp_mode != LOWP_MODE_INT8,
-        "lowp mode int8 is not supported yet with int8 weight");
+    if (lowp_mode == LOWP_MODE_INT8) {
+      // pack weight o [Nc, Kc, Kb/4, Nb, 4] but view it as [Nc, Kc, Kb, Nb]
+      auto packed_weight = qw.reshape({Nc, block_n, Kc, block_k / 4, 4})
+                               .permute({0, 2, 3, 1, 4})
+                               .contiguous();
+      return packed_weight.view({Nc, Kc, block_k, block_n});
+    }
     auto result = at::empty({Nc, Kc, block_k, block_n}, qw.options());
     // Pack weight in [N,K] to [N/block_n, K/block_k, block_k, block_n]
     int8_t* src_data = (int8_t*)qw.data_ptr();
@@ -4538,9 +4542,10 @@ at::Tensor qlinear_woq_affine(
               } else {
                 TLA_ASSERT(lowp_mode == LOWP_MODE_INT8, "invalid lowp_mode");
                 TLA_ASSERT(
-                    qw_type == QINT4,
-                    "LOWP_MODE_INT8 only support qw_type = QINT4");
-                TLA_ASSERT(!sym_quant, "qw_type = QINT4 is asymmetric quant");
+                    qw_type == QINT4 || qw_type == QINT8,
+                    "LOWP_MODE_INT8 only support qw_type = QINT4 or QINT8");
+                // TLA_ASSERT(!sym_quant, "qw_type = QINT4 is asymmetric
+                // quant");
                 if (quant_a_mode == QUANT_A_PER_TENSOR) {
                   float scale_a;
                   int32_t zp_a;

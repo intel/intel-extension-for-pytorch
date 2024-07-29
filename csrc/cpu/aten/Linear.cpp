@@ -357,6 +357,23 @@ at::Tensor ipex_linear_eltwise(
 }
 
 #ifdef USE_LIBXSMM
+#define BLOCK_N 32
+static size_t get_block_k(
+    int64_t weight_dtype,
+    int64_t lowp_mode,
+    int64_t group_size,
+    int64_t K) {
+  size_t default_block_k = lowp_mode == 3 ? 128 : 64;
+  size_t block_k = group_size > 0
+      ? std::min((size_t)group_size, default_block_k)
+      : default_block_k;
+  while (K % block_k != 0) {
+    block_k /= 2;
+  }
+  TORCH_CHECK(block_k > 0);
+  return block_k;
+}
+
 IPEX_DEFINE_DISPATCH(woq_tpp_gemm_packB_stub);
 at::Tensor woq_linear_pack_weight(
     const at::Tensor& weight,
@@ -369,16 +386,8 @@ at::Tensor woq_linear_pack_weight(
   auto N = weight_shape[0], K = weight_shape[1];
   // For TPP kernel, we only consider even K
   if (K % 2 == 0) {
-    size_t block_n = 32;
-    size_t default_block_k =
-        (weight_dtype == WOQ_DTYPE_INT4 && lowp_mode == 3) ? 128 : 64;
-    size_t block_k = group_size > 0
-        ? std::min((size_t)group_size, default_block_k)
-        : default_block_k;
-    while (K % block_k != 0) {
-      block_k /= 2;
-    }
-    assert(block_k > 0);
+    size_t block_n = BLOCK_N;
+    size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
     if (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4) {
       if (block_k % 4 && lowp_mode == 3) {
         // This case is not supported by kernel
@@ -413,11 +422,59 @@ at::Tensor woq_linear_pack_weight(
   return weight;
 }
 
+at::Tensor woq_linear_compute_compensation(
+    const at::Tensor& weight,
+    int64_t weight_dtype,
+    int64_t group_size,
+    int64_t lowp_mode) {
+  // Compensation for INT8 GEMM.
+  // Compensation = Σ(k)(W[k][n] - ZP[n]) for each block.
+  // We assume zero points to be zero here (sym quant of weight)
+  TORCH_CHECK(weight.dim() == 2);
+  auto N = weight.size(0), K = weight.size(1);
+  if (N % BLOCK_N == 0 && weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+    size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
+    int64_t Nc = N / BLOCK_N, Kc = K / block_k;
+    auto weight_reshaped = weight.reshape({Nc, BLOCK_N, Kc, block_k});
+    auto compensation = at::sum(
+        weight_reshaped, /*dim*/ -1, /*keepdim*/ false, /*dtype*/ c10::kInt);
+    compensation = compensation.permute({0, 2, 1}).contiguous();
+    return compensation;
+  }
+  return at::Tensor();
+}
+
 IPEX_DEFINE_DISPATCH(woq_tpp_gemm_unpackB_stub);
 at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
     int64_t weight_dtype,
     int64_t lowp_mode) {
+  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+    // Unpack weight for INT8 GEMM.
+    // weight is packed in 5d (Nc, Kc, block_k / 4, block_n, 4)
+    // but viewd as 4d (Nc, Kc, block_k, block_n)
+    // Unpack to 2d (N, K)
+    if (weight.dim() == 2) {
+      return weight;
+    }
+    TORCH_CHECK(
+        weight.dim() == 4,
+        "Unpack WOQ weight: Expect weight to be 4d but got ",
+        weight.dim(),
+        "d");
+    auto weight_5d = weight.view(
+        {weight.size(0),
+         weight.size(1),
+         weight.size(2) / 4,
+         weight.size(3),
+         4});
+    auto Nc = weight.size(0), Kc = weight.size(1), block_k = weight.size(2),
+         block_n = weight.size(3);
+    auto weight_unpacked = weight_5d.permute({0, 3, 1, 2, 4})
+                               .contiguous()
+                               .reshape({Nc * block_n, Kc * block_k});
+    return weight_unpacked;
+  }
   return woq_tpp_gemm_unpackB_stub(kCPU, weight, weight_dtype, lowp_mode);
 }
 

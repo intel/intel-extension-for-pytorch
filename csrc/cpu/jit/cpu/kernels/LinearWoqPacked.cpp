@@ -263,7 +263,7 @@ ContextLinearWoq create(
   if (zero_points.has_value() && zero_points.value().defined()) {
     zero_points_float = c10::make_optional(zero_points.value().to(c10::kFloat));
   }
-  return ContextLinearWoq(
+  auto context = ContextLinearWoq(
       std::move(packed_weight),
       weight_dtype,
       std::move(weight_shape),
@@ -275,6 +275,13 @@ ContextLinearWoq create(
       lowp_mode,
       act_quant_mode,
       cache_weight_for_large_batch);
+  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+    auto compensation = woq_linear_compute_compensation(
+        weight, weight_dtype, group_size, lowp_mode);
+    context.cached_compensation_ =
+        c10::make_optional<at::Tensor>(std::move(compensation));
+  }
+  return context;
 }
 
 static at::Tensor _shuffle_input_channels_if_needed(
@@ -384,6 +391,8 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
       fast_path_lowp_mode_3 = true;
     }
   }
+  bool use_cached_compensation = fast_path_lowp_mode_3 ||
+      (context.weight_dtype_ == WOQ_DTYPE_INT8 && context.lowp_mode_ == 3);
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
@@ -407,7 +416,7 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
       context.group_size_,
       context.lowp_mode_,
       context.act_quant_mode_,
-      fast_path_lowp_mode_3 ? context.cached_compensation_ : c10::nullopt);
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
     return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
@@ -469,6 +478,8 @@ at::Tensor run_unary(
       fast_path_lowp_mode_3 = true;
     }
   }
+  bool use_cached_compensation = fast_path_lowp_mode_3 ||
+      (context.weight_dtype_ == WOQ_DTYPE_INT8 && context.lowp_mode_ == 3);
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
@@ -481,7 +492,7 @@ at::Tensor run_unary(
   auto input_ = input.contiguous();
   // handle GPTQ with act-order
   input_ = _shuffle_input_channels_if_needed(context, input_);
-  return woq_linear_unary_kernel(
+  auto res = woq_linear_unary_kernel(
       input_,
       fast_path_lowp_mode_3 ? context.cached_weight_.value()
                             : context.at_weight_,
@@ -495,7 +506,12 @@ at::Tensor run_unary(
       context.group_size_,
       context.lowp_mode_,
       context.act_quant_mode_,
-      fast_path_lowp_mode_3 ? context.cached_compensation_ : c10::nullopt);
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+  if (res.size(-1) != context.weight_shape_[0]) {
+    int64_t N = context.weight_shape_[0];
+    return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
+  }
+  return res;
 }
 
 // Called by IpexWoqLinearOpContext::run_binary
@@ -548,6 +564,8 @@ at::Tensor run_binary(
       fast_path_lowp_mode_3 = true;
     }
   }
+  bool use_cached_compensation = fast_path_lowp_mode_3 ||
+      (context.weight_dtype_ == WOQ_DTYPE_INT8 && context.lowp_mode_ == 3);
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
@@ -560,7 +578,7 @@ at::Tensor run_binary(
   auto input_ = input.contiguous();
   // handle GPTQ with act-order
   input_ = _shuffle_input_channels_if_needed(context, input_);
-  return woq_linear_binary_kernel(
+  auto res = woq_linear_binary_kernel(
       input_,
       fast_path_lowp_mode_3 ? context.cached_weight_.value()
                             : context.at_weight_,
@@ -573,7 +591,12 @@ at::Tensor run_binary(
       post_op,
       others,
       context.act_quant_mode_,
-      fast_path_lowp_mode_3 ? context.cached_compensation_ : c10::nullopt);
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+  if (res.size(-1) != context.weight_shape_[0]) {
+    int64_t N = context.weight_shape_[0];
+    return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
+  }
+  return res;
 }
 
 at::Tensor pack(ContextLinearWoq& context, const at::Tensor& tensor) {

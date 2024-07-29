@@ -851,7 +851,9 @@ def is_sym_quant(dtype):
     return dtype in (WoqWeightDtype.NF4,)
 
 
-def quantize_per_channel(t: torch.Tensor, dtype, scales=None, zero_points=None):
+def quantize_per_channel(
+    t: torch.Tensor, dtype, scales=None, zero_points=None, sym_quant=False
+):
     r"""
     Quantize a weight tensor of Linear modules per channel.
     Assume the tensor shape is [output channel, input channel],
@@ -878,10 +880,14 @@ def quantize_per_channel(t: torch.Tensor, dtype, scales=None, zero_points=None):
         mins = torch.minimum(t.min(dim=1)[0], zeros)
         maxs = torch.maximum(t.max(dim=1)[0], zeros)
         if dtype == WoqWeightDtype.INT8:
-            scales = (maxs - mins) / 255
-            scales = torch.max(scales, eps)
-            zps = -torch.round(mins / scales)
-            zps -= 128
+            if sym_quant:
+                scales = torch.maximum(torch.abs(maxs), torch.abs(mins)) / 127
+                scales = torch.max(scales, eps)
+            else:
+                scales = (maxs - mins) / 255
+                scales = torch.max(scales, eps)
+                zps = -torch.round(mins / scales)
+                zps -= 128
         elif dtype == WoqWeightDtype.INT4:
             scales = (maxs - mins) / 15
             scales = torch.max(scales, eps)
@@ -896,6 +902,8 @@ def quantize_per_channel(t: torch.Tensor, dtype, scales=None, zero_points=None):
     if dtype == WoqWeightDtype.INT8:
         qmin = -128
         qmax = 127
+        if sym_quant:
+            zps = torch.zeros_like(scales)
         qt = torch.clamp(
             torch.round(t * inv_scales) + zps.unsqueeze(1), min=qmin, max=qmax
         ).to(torch.int8)
@@ -968,7 +976,12 @@ def dequantize_per_channel(
 
 
 def quantize_per_block(
-    input: torch.Tensor, dtype, group_size, scales=None, zero_points=None
+    input: torch.Tensor,
+    dtype,
+    group_size,
+    scales=None,
+    zero_points=None,
+    sym_quant=False,
 ):
     r"""
     Quantize a weight tensor of Linear modules per block.
@@ -1006,9 +1019,15 @@ def quantize_per_block(
         mins = torch.minimum(t_com.min(dim=-1)[0], torch.tensor([0]))
         maxs = torch.maximum(t_com.max(dim=-1)[0], torch.tensor([0]))
         if dtype == WoqWeightDtype.INT8:
-            scales = (maxs - mins) / 255
-            scales = torch.max(scales, eps)
-            zps = -torch.round(mins / scales)
+            if sym_quant:
+                scales = torch.maximum(torch.abs(maxs), torch.abs(mins)) / 127
+                scales = torch.max(scales, eps)
+                zps = torch.zeros_like(scales)
+            else:
+                scales = (maxs - mins) / 255
+                scales = torch.max(scales, eps)
+                zps = -torch.round(mins / scales)
+                zps -= 128
         elif dtype == WoqWeightDtype.INT4:
             scales = (maxs - mins) / 15
             scales = torch.max(scales, eps)
@@ -1021,9 +1040,17 @@ def quantize_per_block(
             mins_rem = torch.minimum(t_rem.min(dim=-1)[0], torch.tensor([0]))
             maxs_rem = torch.maximum(t_rem.max(dim=-1)[0], torch.tensor([0]))
             if dtype == WoqWeightDtype.INT8:
-                scales_rem = (maxs_rem - mins_rem) / 255
-                scales_rem = torch.max(scales_rem, eps)
-                zps_rem = -torch.round(mins_rem / scales_rem)
+                if sym_quant:
+                    scales_rem = (
+                        torch.maximum(torch.abs(maxs_rem), torch.abs(mins_rem)) / 127
+                    )
+                    scales_rem = torch.max(scales_rem, eps)
+                    zps_rem = torch.zeros_like(scales_rem)
+                else:
+                    scales_rem = (maxs_rem - mins_rem) / 255
+                    scales_rem = torch.max(scales_rem, eps)
+                    zps_rem = -torch.round(mins_rem / scales_rem)
+                    zps_rem -= 128
             elif dtype == WoqWeightDtype.INT4:
                 scales_rem = (maxs_rem - mins_rem) / 15
                 scales_rem = torch.max(scales_rem, eps)
@@ -1034,9 +1061,6 @@ def quantize_per_block(
             scales = torch.cat([scales, scales_rem], dim=-1)
             if not is_sym_quant(dtype):
                 zps = torch.cat([zps, zps_rem], dim=-1)
-        if not is_4bit(dtype):
-            assert zps is not None
-            zps -= 128
         return scales, zps
 
     scales, zps = get_qparams(scales, zero_points)

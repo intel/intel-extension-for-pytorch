@@ -122,6 +122,12 @@ at::Tensor woq_linear_pack_weight(
     int64_t group_size,
     int64_t lowp_mode);
 
+at::Tensor woq_linear_compute_compensation(
+    const at::Tensor& weight,
+    int64_t weight_dtype,
+    int64_t group_size,
+    int64_t lowp_mode);
+
 at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
     int64_t weight_dtype,
