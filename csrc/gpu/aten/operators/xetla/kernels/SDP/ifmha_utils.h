@@ -21,7 +21,12 @@
 namespace gpu::xetla::fmha {
 
 /// @brief Memory struct for indexed tile load
-template <typename dtype_, uint32_t N_, uint32_t Beams_, uint32_t LoadSize_>
+template <
+    typename dtype_,
+    uint32_t N_,
+    uint32_t Beams_,
+    uint32_t LoadSize_,
+    gpu_arch arch_tag>
 struct imem_desc_t {
   using dtype = dtype_;
   static constexpr uint32_t N = N_;
@@ -105,7 +110,7 @@ struct imem_desc_t {
         mem_desc_t<dtype, layout, space>,
         lane_tile_desc_t,
         msg_type::block_1d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     lane_tile_t lane_tile;
 
@@ -126,7 +131,7 @@ struct imem_desc_t {
         mem_desc_t<dtype, layout, space>,
         lane_tile_desc_t,
         1,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     if (offset_pre_ < width_ && lane_pre_ < total_) {
       int32_t idx = index_[lane_pre_ * Beams + beam_pre_];
@@ -220,7 +225,11 @@ struct tile_mask_t {
 
 // ==================== // group_row_reduce_t // ================== //
 
-template <typename mat_t, uint32_t kNumSg, reduce_op reduce_kind>
+template <
+    typename mat_t,
+    uint32_t kNumSg,
+    reduce_op reduce_kind,
+    gpu_arch arch_tag>
 struct group_row_reduce_t {
   using T = typename mat_t::dtype;
   static constexpr uint32_t kNum = mat_t::tile_desc::tile_size_y;
@@ -234,7 +243,7 @@ struct group_row_reduce_t {
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       store_tile_desc,
       msg_type::block_1d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   // load all subgroup results together
   using load_tile_desc =
       subgroup::tile_desc_t<kTotal, 1, kTotal, 1, reg_layout::tiled>;
@@ -245,9 +254,9 @@ struct group_row_reduce_t {
       subgroup::msg_type_v<
           load_tile_desc,
           mem_desc_t<T, mem_layout::row_major, mem_space::local>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
-  xetla_nbarrier_t<kNumSg, kNumSg> nbarrier;
+  xetla_nbarrier_t<kNumSg, kNumSg, arch_tag> nbarrier;
   uint32_t slm_base;
   uint32_t sg_id;
   inline group_row_reduce_t() = default;

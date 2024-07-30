@@ -13,7 +13,7 @@ using namespace gpu::xetla::subgroup;
 
 namespace epilogue_impl {
 
-template <typename dtype_in_>
+template <typename dtype_in_, gpu_arch arch_tag>
 struct alpha_beta_op_t {
   using dtype_in = dtype_in_;
   using mem_desc_in_t =
@@ -60,7 +60,7 @@ struct alpha_beta_op_t {
         msg_type_v<
             mat_in_tile_desc_t,
             mem_desc_t<dtype_in, mem_desc_in_t::layout, mem_desc_in_t::space>>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     using mat_in_tile_acc_t = tile_t<dtype_acc, mat_in_tile_desc_t>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
     mat_in_tile_t mat_in;
@@ -98,7 +98,7 @@ struct alpha_beta_op_t {
   }
 };
 
-template <typename dtype_in_>
+template <typename dtype_in_, gpu_arch arch_tag>
 struct res_op_t {
   using dtype_in = dtype_in_;
   using mem_desc_in_t =
@@ -145,7 +145,7 @@ struct res_op_t {
         msg_type_v<
             mat_in_tile_desc_t,
             mem_desc_t<dtype_in, mem_desc_in_t::layout, mem_desc_in_t::space>>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     using mat_in_tile_acc_t = tile_t<dtype_acc, mat_in_tile_desc_t>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
     mat_in_tile_t mat_in;
@@ -183,7 +183,7 @@ struct res_op_t {
   }
 };
 
-template <typename dtype_bias_>
+template <typename dtype_bias_, gpu_arch arch_tag>
 struct bias_op_t {
   using dtype_bias = dtype_bias_;
   using mem_desc_bias_t =
@@ -229,7 +229,7 @@ struct bias_op_t {
                 dtype_bias,
                 mem_desc_bias_t::layout,
                 mem_desc_bias_t::space>>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     coord_t bias_coord(coord.x, 0);
     mem_desc_bias_t mem_desc_bias(args.base, args.shape, bias_coord);
     bias_t bias;

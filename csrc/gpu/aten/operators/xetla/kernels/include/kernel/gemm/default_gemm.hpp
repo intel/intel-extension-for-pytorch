@@ -37,7 +37,7 @@ template <
     mem_layout mem_layout_c,
     uint32_t alignment_c,
     typename dtype_acc,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 struct default_gemm_config_t
     : param_adaptor<
@@ -69,7 +69,7 @@ template <
     mem_layout mem_layout_c,
     uint32_t alignment_c,
     typename dtype_acc,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 using default_gemm_t = typename default_gemm_config_t<
     dtype_a,
@@ -93,11 +93,11 @@ struct param_optimizer<param_optimizer_tag::kernel, dict_t_> {
            tune_key::param_optimizer_type> != dict_t_::impl::key_not_found) &&
       (dict_t_::template find_elem_v<tune_key::param_optimizer_type> ==
        tune_key_value::param_optimizer_decision_tree);
+  static_assert(
+      dict_t_::impl::template find_elem_index<tune_key::gpu_arch> !=
+      dict_t_::impl::key_not_found);
   static constexpr auto arch_tag =
-      (dict_t_::impl::template find_elem_index<tune_key::gpu_arch> !=
-       dict_t_::impl::key_not_found)
-      ? dict_t_::template find_elem_v<tune_key::gpu_arch>
-      : gpu_arch::XeHpc;
+      dict_t_::template find_elem_v<tune_key::gpu_arch>;
   static constexpr auto optimizer_level =
       dict_t_::template find_elem_v<tune_key::param_optimizer_level>;
   using type = typename std::conditional<
@@ -170,7 +170,7 @@ template <
     typename dtype_acc,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 struct default_gemm_selector_config_t
     : param_adaptor<
@@ -204,7 +204,7 @@ template <
     typename dtype_acc,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 using default_gemm_selector_t = typename default_gemm_selector_config_t<
     dtype_a,
@@ -228,7 +228,7 @@ template <
     mem_space mem_space_c,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 struct default_epilogue_selector_config_t
     : param_adaptor<
@@ -252,7 +252,7 @@ template <
     mem_space mem_space_c,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 using default_epilogue_selector_t = typename default_epilogue_selector_config_t<
     dtype_c,
@@ -274,11 +274,11 @@ struct param_optimizer<param_optimizer_tag::work_group, dict_t_> {
        tune_key_value::param_optimizer_decision_tree);
   static constexpr auto optimizer_level =
       dict_t_::template find_elem_v<tune_key::param_optimizer_level>;
+  static_assert(
+      dict_t_::impl::template find_elem_index<tune_key::gpu_arch> !=
+      dict_t_::impl::key_not_found);
   static constexpr auto arch_tag =
-      (dict_t_::impl::template find_elem_index<tune_key::gpu_arch> !=
-       dict_t_::impl::key_not_found)
-      ? dict_t_::template find_elem_v<tune_key::gpu_arch>
-      : gpu_arch::XeHpc;
+      dict_t_::template find_elem_v<tune_key::gpu_arch>;
   using type = typename std::conditional<
       use_rule,
       decision_tree_optimizer<
@@ -314,6 +314,12 @@ struct param_adaptor<param_adaptor_tag::work_group_gemm, dict_t_>
   static constexpr auto mem_alignment_b =
       param::template find_elem_v<tune_key::memory_alignment_b>;
 
+  using ld_align_attr = group::check_block_2d_pitch_alignment<
+      dtype_a,
+      dtype_b,
+      mem_alignment_a,
+      mem_alignment_b,
+      base_t::gpu_arch_tag>;
   using compute_attr =
       group::compute_attr_t<dtype_a, dtype_b, typename base_t::dtype_acc>;
 
@@ -327,12 +333,7 @@ struct param_adaptor<param_adaptor_tag::work_group_gemm, dict_t_>
       elem_t_t<
           mma_engine::xmx,
           typename std::conditional<
-              (group::detail::check_2d_block_pitch_alignment<
-                  dtype_a,
-                  dtype_b,
-                  mem_alignment_a,
-                  mem_alignment_b,
-                  base_t::gpu_arch_tag>::value),
+              (ld_align_attr::value),
               group::compute_policy_default_xmx<
                   compute_attr,
                   perf_tuning_knob,
@@ -344,17 +345,16 @@ struct param_adaptor<param_adaptor_tag::work_group_gemm, dict_t_>
       elem_t_t<
           mma_engine::fpu,
           typename std::conditional<
-              (group::detail::check_2d_block_pitch_alignment<
-                  dtype_a,
-                  dtype_b,
-                  mem_alignment_a,
-                  mem_alignment_b,
-                  base_t::gpu_arch_tag>::value),
+              (ld_align_attr::value),
               group::compute_policy_default_fpu<
                   compute_attr,
                   perf_tuning_knob,
                   base_t::gpu_arch_tag>,
-              void>::type>>::template find_elem_t<base_t::mma_engine_tag>::type;
+              group::compute_policy_unaligned_fpu<
+                  compute_attr,
+                  perf_tuning_knob,
+                  base_t::gpu_arch_tag>>::type>>::
+      template find_elem_t<base_t::mma_engine_tag>::type;
 
   using mem_desc_input_a =
       mem_desc_t<dtype_a, mem_layout_a, mem_space_a, mem_alignment_a>;

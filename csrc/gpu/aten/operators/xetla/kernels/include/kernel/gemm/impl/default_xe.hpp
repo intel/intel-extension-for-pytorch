@@ -37,7 +37,7 @@ class gemm_universal_t<
     dispatch_policy_default<group_swizzle_>,
     gemm_t_,
     epilogue_t_,
-    std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<group_swizzle_::arch_tag>>> {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using gemm_args_t = typename gemm_t::arguments_t;

@@ -32,7 +32,7 @@ template <typename tile_shape_, gpu_arch arch_tag>
 class pre_processing_default_t<
     tile_shape_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using tile_shape = tile_shape_;
   using work_group_t = typename tile_shape::work_group_t;
 
@@ -67,7 +67,7 @@ template <typename tile_shape_, gpu_arch arch_tag>
 class pre_processing_matA_neg_filter_t<
     tile_shape_,
     arch_tag,
-    std::enable_if_t<(arch_tag == gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using tile_shape = tile_shape_;
   using work_group_t = typename tile_shape::work_group_t;
 

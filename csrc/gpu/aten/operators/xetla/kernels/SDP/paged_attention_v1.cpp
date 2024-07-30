@@ -26,11 +26,7 @@ namespace gpu::xetla {
 
 namespace attention {
 
-template <
-    typename Policy,
-    typename T,
-    typename U,
-    gpu_arch arch_tag = gpu_arch::XeHpc>
+template <typename Policy, typename T, typename U, gpu_arch arch_tag>
 cgfs_t launch_paged_attention_v1(paged_attention_fwd_kernel_args_t fwd_args) {
   using kernel = paged_attention_kernel<Policy, T, U, arch_tag>;
 

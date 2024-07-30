@@ -146,7 +146,7 @@ template <
     typename dtype_,
     mem_layout layout_,
     mem_space space_,
-    uint32_t alignment_ = 8,
+    uint32_t alignment_ = 16,
     int dim_ = 2>
 struct mem_desc_t {};
 

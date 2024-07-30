@@ -64,7 +64,7 @@ class global_reduce_t<
     num_group_reduction,
     counter_size,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape_acc = tile_shape_acc_;
@@ -225,7 +225,7 @@ class global_reduce_t<
     1,
     counter_size_,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape_acc = tile_shape_acc_;

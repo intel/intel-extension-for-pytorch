@@ -400,10 +400,6 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_global(
     xetla_vector<Toffset, N> offsets,
     xetla_mask<N> pred = 1) {
   using T = native_type_t<Ty>;
-  DEBUG_INVOKE(
-      dbg_level::core,
-      core::general_1d<gpu_arch::XeHpc, Ty>::
-          template check_restriction<NElts, N>(offsets, (uint64_t)p));
 
   return __ESIMD_ENS::lsc_gather<
       T,
@@ -666,10 +662,6 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_local(
     xetla_vector<uint32_t, N> offsets,
     xetla_mask<N> pred = 1) {
   using T = native_type_t<Ty>;
-  DEBUG_INVOKE(
-      dbg_level::core,
-      core::general_1d<gpu_arch::XeHpc, Ty>::
-          template check_restriction<NElts, N>(offsets));
 
   return __ESIMD_ENS::
       lsc_slm_gather<T, NElts, gpu::xetla::detail::get_data_size(DS), N>(
@@ -694,11 +686,6 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_local(
 template <typename Ty, int NElts = 1, data_size DS = data_size::default_size>
 __XETLA_API xetla_vector<Ty, NElts> xetla_load_local(uint32_t offset) {
   using T = native_type_t<Ty>;
-  // DEBUG_INVOKE(
-  //     dbg_level::core,
-  //     core::general_1d<gpu_arch::XeHpc, Ty>::template
-  //     check_restriction<NElts>(
-  //         (uint64_t)offset));
 
   return __ESIMD_NS::slm_block_load<T, NElts>(offset);
 }
@@ -729,10 +716,6 @@ __XETLA_API void xetla_store_local(
     xetla_vector<Ty, N * NElts> vals,
     xetla_mask<N> pred = 1) {
   using T = native_type_t<Ty>;
-  DEBUG_INVOKE(
-      dbg_level::core,
-      core::general_1d<gpu_arch::XeHpc, Ty>::
-          template check_restriction<NElts, N, uint32_t>(offsets));
 
   __ESIMD_ENS::
       lsc_slm_scatter<T, NElts, gpu::xetla::detail::get_data_size(DS), N>(

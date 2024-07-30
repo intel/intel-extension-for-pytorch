@@ -22,10 +22,38 @@ inline bool fp64_valid() {
   return Settings::I().has_2d_block_array(curDevID);
 }
 
+#ifdef USE_PTI
 #define RECORD_ONEDNN_FUNCTION_IMPL(F)                     \
   char str__[100];                                         \
   sprintf(str__, "onednn_%s(%d, %d, %d)", "" #F, m, n, k); \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+
+#define RECORD_XETLA_FUNCTION_IMPL(F)                     \
+  char str__[100];                                        \
+  sprintf(str__, "xetla_%s(%d, %d, %d)", "" #F, m, n, k); \
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+
+#define RECORD_XETLA_FUNCTION_IMPLG(F)                                 \
+  char str__[100];                                                     \
+  sprintf(str__, "xetla_%s(%d, %d, %d, g=%d)", "" #F, m, n, k, group); \
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+
+#define RECORD_FUNC_IMPL(F)                         \
+  char str__[100];                                  \
+  sprintf(str__, "%s(%d, %d, %d)", "" #F, m, n, k); \
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+
+#define RECORD_FUNC_IMPLG(F)                                     \
+  char str__[100];                                               \
+  sprintf(str__, "%s(%d, %d, %d, g=%d)", "" #F, m, n, k, group); \
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+#else
+#define RECORD_ONEDNN_FUNCTION_IMPL(F)
+#define RECORD_XETLA_FUNCTION_IMPL(F)
+#define RECORD_XETLA_FUNCTION_IMPLG(F)
+#define RECORD_FUNC_IMPL(F)
+#define RECORD_FUNC_IMPLG(F)
+#endif
 
 static Tensor mm_common(const Tensor& a, const Tensor& b) {
   auto af = a.flatten(0, -2);
@@ -610,16 +638,14 @@ static void mm_qkv_out(
 
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (dpcppGetDeviceHasXMX() && xetla_valid) {
-    char str__[100];
     if (!has_bias) {
-      sprintf(str__, "hgemm_qkv(%d, %d, %d)", m, n, k);
-      RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
       Tensor acc_tensor_, cnt_tensor_;
       get_acc_and_cnt_tensor(
           input_, m, n, k, is_b_row_major, acc_tensor_, cnt_tensor_);
 
       int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
       if (policy_id >= 0) {
+        RECORD_XETLA_FUNCTION_IMPL(hgemm_qkv);
         auto cgfs = hgemm_qkv(
             policy_id,
             reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
@@ -637,14 +663,13 @@ static void mm_qkv_out(
         return;
       }
     } else {
-      sprintf(str__, "hgemm_qkv_bias(%d, %d, %d)", m, n, k);
-      RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
       Tensor acc_tensor_, cnt_tensor_;
       get_acc_and_cnt_tensor(
           input_, m, n, k, is_b_row_major, acc_tensor_, cnt_tensor_);
 
       int policy_id = hgemm_qkv_find_policy_id(m, n, k, is_b_row_major);
       if (policy_id >= 0) {
+        RECORD_XETLA_FUNCTION_IMPL(hgemm_qkv_bias);
         auto cgfs = hgemm_qkv_bias(
             policy_id,
             reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
@@ -670,10 +695,12 @@ static void mm_qkv_out(
   auto wk = weight[1];
   auto wv = weight[2];
   if (!has_bias) {
+    RECORD_FUNC_IMPL(hgemm_mm_out);
     at::AtenIpexTypeXPU::mm_out(input, wq, out0);
     at::AtenIpexTypeXPU::mm_out(input, wk, out1);
     at::AtenIpexTypeXPU::mm_out(input, wv, out2);
   } else {
+    RECORD_FUNC_IMPL(hgemm_addmm_out);
     at::AtenIpexTypeXPU::addmm_out(
         bias_.value()[0], input, wq, at::Scalar(1), at::Scalar(1), out0_);
     at::AtenIpexTypeXPU::addmm_out(
@@ -755,16 +782,13 @@ static void mm_qkv_group_out(
 
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
   if (dpcppGetDeviceHasXMX() && xetla_valid) {
-    char str__[100];
     Tensor acc_tensor_, cnt_tensor_;
     get_acc_and_cnt_tensor(
         input_, m, n, k, is_b_row_major, acc_tensor_, cnt_tensor_);
     if (!has_bias) {
-      sprintf(str__, "hgemm_qkv_group(%d, %d, %d, g=%d)", m, n, k, group);
-      RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-
       int policy_id = hgemm_qkv_find_policy_id(m, head_dim, k, is_b_row_major);
       if (policy_id >= 0) {
+        RECORD_XETLA_FUNCTION_IMPLG(hgemm_qkv_group);
         auto cgfs = hgemm_qkv_group(
             policy_id,
             reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
@@ -785,11 +809,9 @@ static void mm_qkv_group_out(
         return;
       }
     } else {
-      sprintf(str__, "hgemm_qkv_group_bias(%d, %d, %d, g=%d)", m, n, k, group);
-      RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-
       int policy_id = hgemm_qkv_find_policy_id(m, head_dim, k, is_b_row_major);
       if (policy_id >= 0) {
+        RECORD_XETLA_FUNCTION_IMPLG(hgemm_qkv_group_bias);
         auto cgfs = hgemm_qkv_group_bias(
             policy_id,
             reinterpret_cast<sycl::half*>(out0.data_ptr<scalar_t>()),
@@ -819,6 +841,7 @@ static void mm_qkv_group_out(
   out1 = out1.view({m, num_kv_head, head_dim});
   out2 = out2.view({m, num_kv_head, head_dim});
   if (!has_bias) {
+    RECORD_FUNC_IMPLG(hgemm_qkv_group_mm_common);
     auto out =
         mm_common(input, weight.view({k, num_kv_head * group * head_dim}));
     out = out.view({m, num_kv_head, group, head_dim});
@@ -828,6 +851,7 @@ static void mm_qkv_group_out(
     out1.index_put_({"..."}, out.index({Slice(), Slice(), group - 2, Slice()}));
     out2.index_put_({"..."}, out.index({Slice(), Slice(), group - 1, Slice()}));
   } else {
+    RECORD_FUNC_IMPLG(hgemm_qkv_group_mm_bias);
     auto out = mm_bias(
         input,
         weight.view({k, num_kv_head * group * head_dim}),
@@ -863,6 +887,10 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv(
 }
 
 #undef RECORD_ONEDNN_FUNCTION_IMPL
+#undef RECORD_XETLA_FUNCTION_IMPL
+#undef RECORD_XETLA_FUNCTION_IMPLG
+#undef RECORD_FUNC_IMPL
+#undef RECORD_FUNC_IMPLG
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

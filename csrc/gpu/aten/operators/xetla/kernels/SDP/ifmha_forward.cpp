@@ -158,6 +158,9 @@ cgfs_t ifmha_forward_impl(
       sm_scale,
       (unsigned long long)alibi);
 #endif
+
+  static constexpr gpu_arch arch_tag =
+      gpu_arch::XeHpc; // Later to be modified for multi-arch
   // ifmha forward kernel
   using ifmha_forward_op_t = ifmha_forward_t<
       ifmha_policy,
@@ -165,7 +168,8 @@ cgfs_t ifmha_forward_impl(
       kUseAlibi,
       kUseBias,
       kIsTraining,
-      kIsBiasBroadcast>;
+      kIsBiasBroadcast,
+      arch_tag>;
 
   sycl::nd_range<2> NdRange =
       ifmha_forward_op_t::get_nd_range(num_batches, beam, num_heads);

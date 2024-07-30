@@ -110,6 +110,7 @@ template <
     uint32_t sg_tile_n_0,
     uint32_t sg_tile_n_1,
     uint32_t sg_tile_k,
+    gpu_arch arch_tag,
     mem_layout layout_grad = mem_layout::row_major,
     mem_layout layout_weight = mem_layout::row_major,
     mem_space mem_loc_grad = mem_space::global,
@@ -120,10 +121,8 @@ struct gru_layer_bpi {
   static constexpr uint32_t prefetch_distance = 3;
   using perf_tuning_knob = perf_tuning_knob_t<sg_tile_k, prefetch_distance>;
   using compute_attr = compute_attr_t<T, T, Act_T>;
-  using compute_policy = compute_policy_default_xmx<
-      compute_attr,
-      perf_tuning_knob,
-      gpu_arch::XeHpc>;
+  using compute_policy =
+      compute_policy_default_xmx<compute_attr, perf_tuning_knob, arch_tag>;
 
   using tile_shape_0 = tile_shape_t<
       wg_tile_n_0, // workgroup size in N dim
@@ -170,7 +169,7 @@ struct gru_layer_bpi {
       mem_desc_t<T, layout_grad, mem_loc_grad>,
       matA_tile_desc_t,
       msg_type_v<matA_tile_desc_t, mem_desc_t<T, layout_grad, mem_loc_grad>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using matA_load_0_t = tile_t<T, matA_tile_desc_t>;
 
@@ -178,7 +177,7 @@ struct gru_layer_bpi {
       mem_desc_t<T, layout_grad, mem_loc_grad>,
       tile_desc_t<matA_load_0_t::tile_size_x, matA_load_0_t::tile_size_y, 1, 1>,
       1, /*tg_size_x*/
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using matA_bpi_t = tile_t<Act_T, matA_tile_desc_t>;
 
@@ -192,21 +191,21 @@ struct gru_layer_bpi {
           1,
           1>,
       1, /*tg_size_x=1*/
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using matC_t0 = tile_t<T, matAcc_tile_desc_t0>;
   using matC_payload_t0 = mem_payload_t<
       mem_desc_t<T, layout_grad, mem_loc_grad>,
       matAcc_tile_desc_t0,
       msg_type_v<matAcc_tile_desc_t0, mem_desc_t<T, layout_grad, mem_loc_grad>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using matC_t1 = tile_t<T, matAcc_tile_desc_t1>;
   using matC_payload_t1 = mem_payload_t<
       mem_desc_t<T, layout_grad, mem_loc_grad>,
       matAcc_tile_desc_t1,
       msg_type_v<matAcc_tile_desc_t1, mem_desc_t<T, layout_grad, mem_loc_grad>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   static constexpr tdesc_update_dir load_update_config =
       tdesc_update_dir::x_dir;
   using mask_in_t = tile_t<float, matAcc_tile_desc_t1>;
@@ -216,7 +215,7 @@ struct gru_layer_bpi {
       msg_type_v<
           matAcc_tile_desc_t1,
           mem_desc_t<float, mem_layout::row_major, mem_space::global>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   static void inline call(nd_item<3>& item, bpi_config_t<T>* args) {
     matA_tile_desc_t matA_tile_desc;
@@ -598,7 +597,8 @@ template <
     uint32_t sg_tile_m_t,
     uint32_t sg_tile_n_0_t,
     uint32_t sg_tile_n_1_t,
-    uint32_t sg_tile_k_t>
+    uint32_t sg_tile_k_t,
+    gpu_arch arch_tag>
 struct kernel_xcoder_gru_bpi {
   /// @brief
   /// @param item
@@ -663,7 +663,8 @@ struct kernel_xcoder_gru_bpi {
         fused_op_sg_m,
         fused_op_sg_n_0,
         fused_op_sg_n_1,
-        fused_op_sg_k>;
+        fused_op_sg_k,
+        arch_tag>;
     using fused_op_1 = gru_layer_bpi<
         input_T,
         Act_T,
@@ -673,7 +674,8 @@ struct kernel_xcoder_gru_bpi {
         fused_op_sg_m,
         fused_op_sg_n_0,
         fused_op_sg_n_0,
-        fused_op_sg_k>;
+        fused_op_sg_k,
+        arch_tag>;
     bpi_config_t<input_T> args;
     int layer_input_size = batch_size * input_size;
     int hidden_io_size = batch_size * hidden_size;
@@ -740,7 +742,7 @@ struct kernel_xcoder_gru_bpi {
   }
 };
 
-template <typename gru_bpi_config_t, typename input>
+template <typename gru_bpi_config_t, typename input, gpu_arch arch_tag>
 struct GruBackwardDataImplKernelFunctor {
   KERNEL_MAIN void operator()(sycl::nd_item<3> item) const {
     using xcoder_gru_bpi_op = kernel_xcoder_gru_bpi<
@@ -752,7 +754,8 @@ struct GruBackwardDataImplKernelFunctor {
         gru_bpi_config_t::sg_tile_m,
         gru_bpi_config_t::sg_tile_n_0,
         gru_bpi_config_t::sg_tile_n_1,
-        gru_bpi_config_t::sg_tile_k>;
+        gru_bpi_config_t::sg_tile_k,
+        arch_tag>;
     xcoder_gru_bpi_op::run(
         item,
         (input*)layer_err_ptr,
@@ -846,7 +849,7 @@ struct GruBackwardDataImplKernelFunctor {
 };
 
 // extern "C"
-template <typename gru_bpi_config_t>
+template <typename gru_bpi_config_t, gpu_arch arch_tag = gpu_arch::XeHpc>
 cgfs_t gru_backward_data_impl(
     void* layer_err_ptr,
     void* y_err_ptr,
@@ -893,7 +896,7 @@ cgfs_t gru_backward_data_impl(
       (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0};
   cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
-  GruBackwardDataImplKernelFunctor<gru_bpi_config_t, input> kfn(
+  GruBackwardDataImplKernelFunctor<gru_bpi_config_t, input, arch_tag> kfn(
       layer_err_ptr,
       y_err_ptr,
       x_grad_ptr,

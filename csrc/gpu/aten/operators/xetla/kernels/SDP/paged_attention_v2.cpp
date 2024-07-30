@@ -30,7 +30,7 @@ template <
     typename U,
     uint32_t HEAD_SIZE,
     uint32_t BLOCK_SIZE,
-    gpu_arch arch_tag = gpu_arch::XeHpc>
+    gpu_arch arch_tag>
 std::vector<std::function<void(sycl::handler&)>> launch_paged_attention_v2(
     paged_attention_fwd_kernel_args_t fwd_args) {
   using policy = paged_attention_policy_v2<HEAD_SIZE, BLOCK_SIZE>;

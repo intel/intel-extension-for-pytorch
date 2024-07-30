@@ -40,8 +40,8 @@ template <
     uint32_t N,
     reduce_op Op,
     uint32_t N_SG,
-    bool is_all_reduce = true,
-    gpu_arch arch_ = gpu_arch::XeHpc>
+    bool is_all_reduce,
+    gpu_arch arch_>
 struct group_reduce_t {};
 
 } // namespace gpu::xetla::group

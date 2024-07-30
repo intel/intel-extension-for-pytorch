@@ -82,8 +82,10 @@ struct tile_desc_t {
   static constexpr uint32_t tile_size_x = tile_size_x_;
   static constexpr uint32_t tile_size_y = tile_size_y_;
 
-  static constexpr uint32_t block_size_x = block_size_x_;
-  static constexpr uint32_t block_size_y = block_size_y_;
+  static constexpr uint32_t block_size_x =
+      (tile_size_x > block_size_x_) ? block_size_x_ : tile_size_x;
+  static constexpr uint32_t block_size_y =
+      (tile_size_y > block_size_y_) ? block_size_y_ : tile_size_y;
   static constexpr uint32_t remained_size_y = tile_size_y % block_size_y;
 
   static constexpr reg_layout register_layout = reg_layout_;

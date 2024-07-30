@@ -336,17 +336,20 @@ template <
     reg_layout reg_layout_ = reg_layout::tiled>
 struct get_load_block_size_auto {};
 
-template <typename dtype, uint32_t tile_size_x, uint32_t tile_size_y>
+template <
+    typename dtype,
+    uint32_t tile_size_x,
+    uint32_t tile_size_y,
+    gpu_arch arch_tag>
 struct get_load_block_size_auto<
     dtype,
     tile_size_x,
     tile_size_y,
-    gpu_arch::XeHpc,
+    arch_tag,
     mem_layout::row_major,
     reg_layout::tiled> {
  private:
-  using load_store_attr = arch_attr_t<
-      gpu_arch::XeHpc>::template load_store_attr<msg_type::block_2d>;
+  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
   static constexpr uint32_t max_load_height_in_elem =
       load_store_attr::max_load_height_in_elem;
   static constexpr uint32_t max_load_width_in_bytes =
@@ -373,17 +376,20 @@ template <
     reg_layout reg_layout_ = reg_layout::tiled>
 struct get_store_block_size_auto {};
 
-template <typename dtype, uint32_t tile_size_x, uint32_t tile_size_y>
+template <
+    typename dtype,
+    uint32_t tile_size_x,
+    uint32_t tile_size_y,
+    gpu_arch arch_tag>
 struct get_store_block_size_auto<
     dtype,
     tile_size_x,
     tile_size_y,
-    gpu_arch::XeHpc,
+    arch_tag,
     mem_layout::row_major,
     reg_layout::tiled> {
  private:
-  using load_store_attr = arch_attr_t<
-      gpu_arch::XeHpc>::template load_store_attr<msg_type::block_2d>;
+  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
   static constexpr uint32_t max_store_height_in_elem =
       load_store_attr::max_store_height_in_elem;
   static constexpr uint32_t max_store_width_in_bytes =

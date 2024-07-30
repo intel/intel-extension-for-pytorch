@@ -196,7 +196,7 @@ template <
     typename mat_t,
     uint32_t wg_size,
     reduce_op reduce_kind,
-    gpu_arch arch_tag = gpu_arch::XeHpc>
+    gpu_arch arch_tag>
 struct group_reduce_t {
   using dtype = typename mat_t::dtype;
   static constexpr uint32_t tile_size_x = mat_t::tile_size_x;

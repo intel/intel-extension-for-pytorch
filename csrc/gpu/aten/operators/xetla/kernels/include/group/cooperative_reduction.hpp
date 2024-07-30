@@ -54,7 +54,7 @@ class cooperative_reduce_t<
     matAcc_t,
     num_cooperative_wg,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape = tile_shape_;
@@ -129,7 +129,8 @@ class cooperative_reduce_t<
  public:
   using mat_slice_t = subgroup::tile_t<dtype, local_ld_tile_desc_t>;
 
-  static constexpr uint32_t barrier_count = work_group_size;
+  static constexpr uint32_t barrier_count =
+      arch_has_named_barrier<arch_tag> ? work_group_size : 0;
   static constexpr uint32_t slm_size = wg_tile_size * num_cooperative_wg;
 
   uint32_t coop_id;
@@ -225,7 +226,7 @@ class cooperative_reduce_t<
     matAcc_t,
     1,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape = tile_shape_;

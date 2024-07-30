@@ -19,5 +19,4 @@
 
 #pragma once
 
-#include <group/reduction/reduction_api.hpp>
 #include <group/reduction/reduction_xe.hpp>

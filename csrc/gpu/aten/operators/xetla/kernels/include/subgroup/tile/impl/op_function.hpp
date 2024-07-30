@@ -197,6 +197,7 @@ __XETLA_API
           native_type_t<dtype>,
           remain_move_rows,
           remain_move_cols>();
+#pragma unroll
       for (int vnni_i = 0; vnni_i < vnni_stride; vnni_i++) {
         reg_dst_2d.xetla_select<remain_move_rows, 1, block_size_x, vnni_stride>(
             0, vnni_i) =

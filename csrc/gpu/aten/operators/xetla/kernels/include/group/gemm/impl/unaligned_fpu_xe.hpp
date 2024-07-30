@@ -38,19 +38,19 @@ template <
     typename pre_processing_t_,
     gpu_arch arch_tag_>
 class gemm_t<
-    compute_policy_unaligned_xmx<compute_attr_, perf_tuning_knob_, arch_tag_>,
+    compute_policy_unaligned_fpu<compute_attr_, perf_tuning_knob_, arch_tag_>,
     tile_shape_, // tile shape of workgroup-level gemm
     mem_desc_a_t_, // memory attribute of matA
     mem_desc_b_t_, // memory attribute of matB
     pre_processing_t_, // pre_processing functor
-    std::enable_if_t<arch_has_xmx<arch_tag_>>> {
+    std::enable_if_t<arch_has_fpu<arch_tag_>>> {
  public:
   using mem_desc_a_t = mem_desc_a_t_;
   using mem_desc_b_t = mem_desc_b_t_;
   using tile_shape = tile_shape_;
   using pre_processing_t = pre_processing_t_;
   using compute_policy =
-      compute_policy_unaligned_xmx<compute_attr_, perf_tuning_knob_, arch_tag_>;
+      compute_policy_unaligned_fpu<compute_attr_, perf_tuning_knob_, arch_tag_>;
 
   static constexpr uint32_t num_cyclic = 2;
 
@@ -87,8 +87,13 @@ class gemm_t<
   using dtype_mma_a = typename compute_policy::dtype_mma_a;
   using dtype_mma_b = typename compute_policy::dtype_mma_b;
 
-  using check_dtype = group::gemm<arch_tag>::default_xmx::
-      template check_dtype_default<dtype_a, dtype_b, dtype_mma_a, dtype_mma_b>;
+  using check_dtype =
+      group::gemm<arch_tag_>::default_fpu::template check_dtype_default<
+          dtype_a,
+          dtype_b,
+          dtype_mma_a,
+          dtype_mma_b,
+          dtype_mma_acc>;
 
   /******** set memory attribute **********/
   static constexpr mem_space mem_space_a = mem_desc_a_t::space;
@@ -102,7 +107,7 @@ class gemm_t<
       is_col_major_b ? tdesc_update_dir::x_dir : tdesc_update_dir::y_dir;
 
   using check_memory =
-      group::gemm<arch_tag>::default_xmx::template check_memory_default<
+      group::gemm<arch_tag>::default_fpu::template check_memory_default<
           mem_layout_a,
           mem_layout_b,
           mem_space_a,
@@ -118,16 +123,26 @@ class gemm_t<
   static constexpr uint32_t tile_size_y_b = k_stride;
   static constexpr uint32_t tile_size_x_c = sg_tile_n;
   static constexpr uint32_t tile_size_y_c = sg_tile_m;
-  static constexpr uint32_t block_size_x_a = compute_policy::block_size_x_a;
+
+  static constexpr uint32_t block_size_x_a =
+      (compute_policy::block_size_x_a > tile_size_x_a)
+      ? tile_size_x_a
+      : compute_policy::block_size_x_a;
   static constexpr uint32_t block_size_y_a =
       (compute_policy::block_size_y_a > tile_size_y_a)
       ? tile_size_y_a
       : compute_policy::block_size_y_a;
-  static constexpr uint32_t block_size_x_b = compute_policy::block_size_x_b;
-  static constexpr uint32_t block_size_y_b = compute_policy::block_size_y_b;
+  static constexpr uint32_t block_size_x_b =
+      (compute_policy::block_size_x_b > tile_size_x_b)
+      ? tile_size_x_b
+      : compute_policy::block_size_x_b;
+  static constexpr uint32_t block_size_y_b =
+      (compute_policy::block_size_y_b > tile_size_y_b)
+      ? tile_size_y_b
+      : compute_policy::block_size_y_b;
 
   using check_tile_size =
-      group::gemm<arch_tag>::default_xmx::template check_tile_size_default<
+      group::gemm<arch_tag>::default_fpu::template check_tile_size_default<
           dtype_mma_a,
           tile_size_x_a,
           tile_size_y_a,
@@ -187,10 +202,9 @@ class gemm_t<
       subgroup::tile_desc_t<tile_size_x_a, tile_size_y_a, 1, 1>,
       wg_size_x,
       arch_tag>;
+  matA_prefetch_payload_t matA_prefetch_payload;
 
-  static constexpr reg_layout reg_layout_b = sizeof(dtype_b) < sizeof(uint32_t)
-      ? reg_layout::vnni_tiled
-      : reg_layout::tiled;
+  static constexpr reg_layout reg_layout_b = reg_layout::tiled;
   using matB_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_b,
       tile_size_y_b,
@@ -234,6 +248,7 @@ class gemm_t<
       subgroup::tile_desc_t<tile_size_x_b, tile_size_y_b, 1, 1>,
       wg_size_y,
       arch_tag>;
+  matB_prefetch_payload_t matB_prefetch_payload;
 
  public:
   using matAcc_tile_desc_t = subgroup::tile_desc_t<
@@ -250,7 +265,7 @@ class gemm_t<
       matAcc_t,
       matB_acc_t,
       matA_acc_t,
-      mma_engine::xmx,
+      mma_engine::fpu,
       arch_tag>;
   // static constexpr bool enable_periodic_sync = (sync_freq != 0);
   static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
@@ -273,15 +288,6 @@ class gemm_t<
 
   static constexpr msg_type msg_type_a = matA_payload_t::message_type;
   static constexpr msg_type msg_type_b = matB_payload_t::message_type;
-
-  matA_payload_t matA_payload;
-  matA_payload_local_st_t matA_local_st_payload;
-  matA_payload_local_ld_t matA_local_ld_payload;
-  matA_prefetch_payload_t matA_prefetch_payload;
-  matB_payload_t matB_payload;
-  matB_payload_local_st_t matB_local_st_payload;
-  matB_payload_local_ld_t matB_local_ld_payload;
-  matB_prefetch_payload_t matB_prefetch_payload;
 
   using pre_processing_arg_t = typename pre_processing_t::arguments_t;
 
@@ -498,62 +504,70 @@ class gemm_t<
     partial_matB_t partial_matB;
     //  >>>>>>>>>>>>>>>>>> pre_processing init
     pre_processing.init(g, args.pre_processing_args);
-
     uint32_t base_A = slm_base + slm_base_a + sg_idy * tile_size_a;
-    matA_payload.init(args.matA_base_desc);
-    matA_local_st_payload.init(
+    uint32_t base_B = slm_base + slm_base_b + sg_idx * tile_size_b;
+
+    uint32_t store_idx = 0;
+    uint32_t load_idx = 0;
+
+    matA_payload_t matA_payload(args.matA_base_desc);
+    matA_payload_local_st_t matA_local_st_payload(
         base_A,
         tile_size_x_a,
         tile_size_y_a,
         tile_size_x_a,
         cooperative_helper_A_t::get_offset_x(sg_idx),
         cooperative_helper_A_t::get_offset_y(sg_idx));
-    matA_local_ld_payload.init(
+    matA_payload_local_ld_t matA_local_ld_payload(
         base_A, tile_size_x_a, tile_size_y_a, tile_size_x_a, 0, 0);
-    matA_prefetch_payload.init(args.matA_base_desc, sg_idx);
 
-    uint32_t base_B = slm_base + slm_base_b + sg_idx * tile_size_b;
-    matB_payload.init(args.matB_base_desc);
-    matB_local_st_payload.init(
+    matB_payload_t matB_payload(args.matB_base_desc);
+    matB_payload_local_st_t matB_local_st_payload(
         base_B,
         tile_size_x_b,
         tile_size_y_b,
         tile_size_x_b,
         cooperative_helper_B_t::get_offset_x(sg_idy),
         cooperative_helper_B_t::get_offset_y(sg_idy));
-    matB_local_ld_payload.init(
+    matB_payload_local_ld_t matB_local_ld_payload(
         base_B, tile_size_x_b, tile_size_y_b, tile_size_x_b, 0, 0);
+
+    matA_prefetch_payload.init(args.matA_base_desc, sg_idx);
     matB_prefetch_payload.init(args.matB_base_desc, sg_idy);
 
     sync_init(sg_idx, sg_idy, nbarrier_base);
 
-    uint32_t store_idx = 0;
-    uint32_t load_idx = 0;
+#pragma unroll
+    for (uint32_t i = 0; i < stages; i++) {
+      prefetch_and_update_ab();
+    }
 
     tile_load(partial_matA, matA_payload);
     tile_load(partial_matB, matB_payload);
-    SW_BARRIER();
     matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
     matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
 
     tile_store(partial_matA, matA_local_st_payload);
     tile_store(partial_matB, matB_local_st_payload);
+    store_idx++;
 
 #pragma unroll
     for (uint32_t i = 1; i < num_cyclic - 1; i++) {
       tile_load(partial_matA, matA_payload);
       tile_load(partial_matB, matB_payload);
-      SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
 
       matA_local_st_payload.template update_tdesc<tdesc_update_dir::y_dir>(
           wg_size_y * matA_t::tile_size_y);
-      SW_BARRIER();
-      tile_store(partial_matA, matA_local_st_payload);
       matB_local_st_payload.template update_tdesc<tdesc_update_dir::y_dir>(
           wg_size_x * matB_t::tile_size_y);
-      SW_BARRIER();
+
+      if constexpr (stages != 0) {
+        prefetch_and_update_ab();
+      }
+
+      tile_store(partial_matA, matA_local_st_payload);
       tile_store(partial_matB, matB_local_st_payload);
       store_idx++;
     }
@@ -561,27 +575,9 @@ class gemm_t<
     xetla_fence<memory_kind::shared_local>();
     sync_arrive_wait();
 
-    matA_prefetch_payload.template update_tdesc<update_dir_a>(
-        (num_cyclic - 1) * matA_t::tile_size_x);
-    matB_prefetch_payload.template update_tdesc<update_dir_b>(
-        (num_cyclic - 1) * matB_t::tile_size_y);
-
-#pragma unroll
-    for (uint32_t i = 0; i < stages; i++) {
-      prefetch_and_update_ab();
-    }
-
     for (uint32_t i = 0; i < args.inner_loop_count - 1; i++) {
       tile_load(matA, matA_local_ld_payload);
       tile_load(matB, matB_local_ld_payload);
-
-      SW_BARRIER();
-      subgroup::elemwise_cvt(matA_acc, matA);
-      subgroup::vnni_transform(matB_acc, matB);
-      pre_processing(matA_acc, matB_acc, matA, matB);
-      SW_BARRIER();
-      tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
-      SW_BARRIER();
 
       load_idx = (load_idx < num_cyclic - 1) ? (load_idx + 1) : 0;
       if (load_idx != 0) {
@@ -596,17 +592,19 @@ class gemm_t<
             (1 - num_cyclic) * wg_size_x * matB_t::tile_size_y);
       }
 
+      SW_BARRIER();
+      subgroup::elemwise_cvt(matA_acc, matA);
+      subgroup::elemwise_cvt(matB_acc, matB);
+      pre_processing(matA_acc, matB_acc, matA, matB);
+      SW_BARRIER();
+      tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
+      SW_BARRIER();
+
       tile_load(partial_matA, matA_payload);
       tile_load(partial_matB, matB_payload);
-      SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
 
-      if constexpr (stages != 0) {
-        prefetch_and_update_ab();
-      }
-
-      store_idx = (store_idx < num_cyclic - 1) ? (store_idx + 1) : 0;
       if (store_idx != 0) {
         matA_local_st_payload.template update_tdesc<tdesc_update_dir::y_dir>(
             wg_size_y * matA_t::tile_size_y);
@@ -618,8 +616,14 @@ class gemm_t<
         matB_local_st_payload.template update_tdesc<tdesc_update_dir::y_dir>(
             (1 - num_cyclic) * wg_size_x * matB_t::tile_size_y);
       }
+
+      if constexpr (stages != 0) {
+        prefetch_and_update_ab();
+      }
+
       tile_store(partial_matA, matA_local_st_payload);
       tile_store(partial_matB, matB_local_st_payload);
+      store_idx = (store_idx < num_cyclic - 1) ? (store_idx + 1) : 0;
 
       xetla_fence<memory_kind::shared_local>();
       sync_arrive_wait();
@@ -630,7 +634,7 @@ class gemm_t<
     tile_load(matB, matB_local_ld_payload);
     SW_BARRIER();
     subgroup::elemwise_cvt(matA_acc, matA);
-    subgroup::vnni_transform(matB_acc, matB);
+    subgroup::elemwise_cvt(matB_acc, matB);
     pre_processing(matA_acc, matB_acc, matA, matB);
     SW_BARRIER();
     tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);

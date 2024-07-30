@@ -41,9 +41,9 @@ enum class nbarrier_role : uint8_t {
 /// as consumer.
 ///
 template <
-    uint8_t num_producers = 1,
-    uint8_t num_consumers = 1,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    uint8_t num_producers,
+    uint8_t num_consumers,
+    gpu_arch arch_tag,
     typename enable = void>
 struct xetla_nbarrier_t;
 
@@ -52,7 +52,7 @@ struct xetla_nbarrier_t<
     num_producers,
     num_consumers,
     arch_tag,
-    std::enable_if_t<arch_tag == gpu_arch::XeHpc>> {
+    std::enable_if_t<arch_has_named_barrier<arch_tag>>> {
   ///
   /// @brief Description of named barrier objection.
   /// Structure is defined in
@@ -105,20 +105,7 @@ struct xetla_nbarrier_t<
     num_producers,
     num_consumers,
     arch_tag,
-    std::enable_if_t<arch_tag != gpu_arch::XeHpc>> {
-  ///
-  /// @brief Description of named barrier objection.
-  /// Structure is defined in
-  /// [here](https://gfxspecs.intel.com/Predator/Home/Index/57499).
-  ///
-  // xetla_vector<uint32_t, 16> nbar;
-  // uint32_t barrier_id;
-
-  /// @param role is the role of subgroup when participating the barrier.
-  /// @param nbarrier_id [in] is the id of the barrier.
-  /// note:  all subgroups participating the barrier should have the same
-  /// barrier_id. Here is the bspec link
-  /// https://gfxspecs.intel.com/Predator/Home/Index/54006
+    std::enable_if_t<!arch_has_named_barrier<arch_tag>>> {
   __XETLA_API void init_nbarrier(uint8_t, nbarrier_role) {}
 
   /// @brief Generic work-group split barrier.
@@ -127,14 +114,10 @@ struct xetla_nbarrier_t<
     __ESIMD_ENS::split_barrier<__ESIMD_ENS::split_barrier_action::signal>();
   }
 
-  /// @brief named barrier wait within subgroup.
-  ///
   __XETLA_API void wait() {
     __ESIMD_ENS::split_barrier<__ESIMD_ENS::split_barrier_action::wait>();
   }
 
-  /// @brief named barrier signal from subgroup.
-  ///
   __XETLA_API void arrive_wait() {
     arrive();
     wait();

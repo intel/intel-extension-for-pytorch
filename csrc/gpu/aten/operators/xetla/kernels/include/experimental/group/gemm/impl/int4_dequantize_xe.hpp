@@ -328,7 +328,9 @@ class gemm_t<
 
  public:
   static constexpr uint32_t barrier_count =
-      enable_periodic_sync ? barrier_count_x + barrier_count_y : 0;
+      enable_periodic_sync && arch_has_named_barrier<arch_tag>
+      ? barrier_count_x + barrier_count_y
+      : 0;
   // current only support matA from slm
   static constexpr uint32_t slm_size =
       is_local_a ? sg_tile_m * wg_size_y * k_stride * sizeof(dtype_a) : 0;
@@ -547,7 +549,7 @@ class gemm_t<
           if constexpr (wg_size_x > 1) {
             nbarrier_a.arrive();
           }
-          if constexpr (arch_tag >= gpu_arch::XeHpc) {
+          if constexpr (arch_has_named_barrier<arch_tag>) {
             if constexpr (wg_size_y > 1) {
               nbarrier_b.arrive();
             }
@@ -640,7 +642,7 @@ class gemm_t<
           if constexpr (wg_size_x > 1) {
             nbarrier_a.wait();
           }
-          if constexpr (arch_tag >= gpu_arch::XeHpc) {
+          if constexpr (arch_has_named_barrier<arch_tag>) {
             if constexpr (wg_size_y > 1) {
               nbarrier_b.wait();
             }

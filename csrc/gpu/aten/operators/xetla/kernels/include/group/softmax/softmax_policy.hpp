@@ -23,13 +23,10 @@
 
 namespace gpu::xetla::group {
 
-template <typename dtype_acc, gpu_arch arch_tag_ = gpu_arch::XeHpc>
+template <typename dtype_acc, gpu_arch arch_tag_>
 struct softmax_policy_fwd {};
 
-template <
-    typename dtype_in,
-    typename dtype_acc,
-    gpu_arch arch_tag_ = gpu_arch::XeHpc>
+template <typename dtype_in, typename dtype_acc, gpu_arch arch_tag_>
 struct softmax_policy_bwd {};
 
 } // namespace gpu::xetla::group

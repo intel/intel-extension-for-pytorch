@@ -54,14 +54,9 @@ template <
     typename dtype_in_,
     typename dtype_out_,
     typename dtype_acc_,
-    typename reduction_attr_>
-struct row_reduction_fused_op_t<
-    fused_op_kind_,
-    dtype_in_,
-    dtype_out_,
-    dtype_acc_,
-    reduction_attr_,
-    gpu_arch::XeHpc> {
+    typename reduction_attr_,
+    gpu_arch arch_tag_ = gpu_arch::XeHpc>
+struct row_reduction_fused_op_t {
   static constexpr reduction_fused_kind fused_op_kind = fused_op_kind_;
   using dtype_in = dtype_in_;
   using dtype_out = dtype_out_;
@@ -83,14 +78,15 @@ template <
     typename dtype_in_,
     typename dtype_out_,
     typename dtype_acc_,
-    typename reduction_attr_>
+    typename reduction_attr_,
+    gpu_arch arch_tag>
 struct row_reduction_fused_op_t<
     reduction_fused_kind::bias_gelu_w_bwd,
     dtype_in_,
     dtype_out_,
     dtype_acc_,
     reduction_attr_,
-    gpu_arch::XeHpc> {
+    arch_tag> {
   static constexpr reduction_fused_kind fused_op_kind =
       reduction_fused_kind::bias_gelu_w_bwd;
   using dtype_in = dtype_in_;
@@ -145,13 +141,13 @@ struct row_reduction_fused_op_t<
         mem_desc_in_t,
         dgelu_tile_desc_t,
         subgroup::msg_type_v<dgelu_tile_desc_t, mem_desc_in_t>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     using dgelu_x_out_t = subgroup::tile_t<dtype_out, dgelu_tile_desc_t>;
     using dgelu_x_out_payload_t = subgroup::mem_payload_t<
         mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>,
         dgelu_tile_desc_t,
         msg_type::block_2d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     dgelu_w_in_t dgelu_w_in;
     dgelu_w_in_payload_t dgelu_w_in_payload(w_load_base_desc);
     subgroup::tile_load(dgelu_w_in, dgelu_w_in_payload);
@@ -180,14 +176,15 @@ template <
     typename dtype_in_,
     typename dtype_out_,
     typename dtype_acc_,
-    typename reduction_attr_>
+    typename reduction_attr_,
+    gpu_arch arch_tag>
 struct row_reduction_fused_op_t<
     reduction_fused_kind::bias_dropout_bwd,
     dtype_in_,
     dtype_out_,
     dtype_acc_,
     reduction_attr_,
-    gpu_arch::XeHpc> {
+    arch_tag> {
   static constexpr reduction_fused_kind fused_op_kind =
       reduction_fused_kind::bias_dropout_bwd;
   using dtype_in = dtype_in_;
@@ -242,7 +239,7 @@ struct row_reduction_fused_op_t<
         mem_desc_mask_t,
         reduction_tile_desc_t,
         subgroup::msg_type_v<reduction_tile_desc_t, mem_desc_mask_t>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     using dropout_bwd_out_t =
         subgroup::tile_t<dtype_out, reduction_tile_desc_t>;
     using mem_desc_out_t =
@@ -251,7 +248,7 @@ struct row_reduction_fused_op_t<
         mem_desc_out_t,
         reduction_tile_desc_t,
         subgroup::msg_type_v<reduction_tile_desc_t, mem_desc_out_t>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     if (dropout_prob != 0) {
       mask_in_t mask_in;
       mask_in_payload_t mask_in_payload(mask_load_base_desc);

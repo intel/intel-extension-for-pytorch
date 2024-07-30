@@ -352,9 +352,10 @@ tile_store(
   constexpr uint32_t num_channel_y = payload_t::num_channel_y;
   constexpr uint32_t store_elems = num_channel_y * payload_t::num_channel_x;
   constexpr uint32_t scale_factor = payload_t::scale_factor;
+
+  auto channel_offset = payload.channel_offset + payload.base_offset;
 #pragma unroll
-  for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
-       i++) {
+  for (uint32_t i = 0; i < tile_desc::num_block_y; i++) {
     uint32_t offset_y = i * tile_desc::block_size_y;
 #pragma unroll
     for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
@@ -382,7 +383,7 @@ tile_store(
             L3,
             store_elems>(
             payload.base_ptr,
-            (payload.base_offset + address_offset + payload.channel_offset),
+            (address_offset + channel_offset),
             reg_sub
                 .xetla_select<store_elems * scale_factor, 1>(
                     sub_block_y * tile_desc::block_size_x)
@@ -392,7 +393,7 @@ tile_store(
     }
   }
   // process the tail
-  if constexpr ((tile_desc::tile_size_y % tile_desc::block_size_y) != 0) {
+  if constexpr (tile_desc::remained_size_y != 0) {
     constexpr uint32_t remained_size_y = tile_desc::remained_size_y;
     constexpr uint32_t offset_y = tile_desc::tile_size_y - remained_size_y;
     constexpr uint32_t processed_elems = offset_y * tile_desc::tile_size_x;
@@ -424,7 +425,7 @@ tile_store(
             L3,
             store_elems>(
             payload.base_ptr,
-            (payload.base_offset + address_offset + payload.channel_offset),
+            (address_offset + channel_offset),
             reg_sub
                 .xetla_select<store_elems * scale_factor, 1>(
                     sub_block_y * tile_desc::block_size_x)
@@ -466,6 +467,7 @@ tile_store(tile_t& tile, payload_t& payload) {
   constexpr uint32_t store_elems = num_channel * payload_t::simd_exec_size;
   constexpr uint32_t pack_factor = payload_t::pack_factor;
 
+  auto channel_offset = payload.channel_offset + payload.base_offset;
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
        i++) {
@@ -521,7 +523,7 @@ tile_store(tile_t& tile, payload_t& payload) {
               L3,
               num_channel>(
               payload.base_ptr,
-              (payload.base_offset + address_offset + payload.channel_offset),
+              (address_offset + channel_offset),
               reg_tmp,
               pred_y);
         } else if (
@@ -533,9 +535,7 @@ tile_store(tile_t& tile, payload_t& payload) {
               L1,
               L3,
               num_channel>(
-              payload.base_ptr,
-              (payload.base_offset + address_offset + payload.channel_offset),
-              reg_tmp);
+              payload.base_ptr, (address_offset + channel_offset), reg_tmp);
         } else {
           break;
         }
@@ -719,19 +719,34 @@ tile_store(
         uint64_t address_offset = offset_x * sizeof(dtype) +
             (sub_block_y + offset_y) * payload.pitch_in_bytes;
 
-        xetla_tatomic_store_global<
-            dtype,
-            payload_t::num_channel,
-            L1,
-            L2,
-            op_kind,
-            payload_t::arch_tag,
-            typename payload_t::Toffset>(
-            (uint64_t)payload.base_pointer + address_offset,
-            payload.channel_offset,
-            reg_sub.xetla_select<payload_t::store_elems, 1>(
-                sub_block_y * block_size_x),
-            pred_x & pred_y);
+        if constexpr (arch_has_2d_load_store<payload_t::arch_tag>) {
+          xetla_tatomic_store_global<
+              dtype,
+              payload_t::num_channel,
+              L1,
+              L2,
+              op_kind,
+              payload_t::arch_tag,
+              typename payload_t::Toffset>(
+              (uint64_t)payload.base_pointer + address_offset,
+              payload.channel_offset,
+              reg_sub.xetla_select<payload_t::store_elems, 1>(
+                  sub_block_y * block_size_x),
+              pred_x & pred_y);
+        } else {
+          xetla_atomic_global<
+              op_kind,
+              dtype,
+              payload_t::num_channel,
+              data_size::default_size,
+              L1,
+              L2>(
+              reinterpret_cast<dtype*>(payload.base_pointer + address_offset),
+              payload.channel_offset,
+              reg_sub.xetla_select<payload_t::store_elems, 1>(
+                  sub_block_y * block_size_x),
+              pred_x & pred_y);
+        }
       }
     }
   }

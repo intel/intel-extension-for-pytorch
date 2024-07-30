@@ -35,15 +35,18 @@ template <
     uint32_t sg_tile_size_x_,
     uint32_t sg_tile_size_y_>
 struct tile_shape_t {
-  static constexpr uint32_t wg_tile_size_x = wg_tile_size_x_;
-  static constexpr uint32_t wg_tile_size_y = wg_tile_size_y_;
   static constexpr uint32_t sg_tile_size_x = sg_tile_size_x_;
   static constexpr uint32_t sg_tile_size_y = sg_tile_size_y_;
-
   static constexpr uint32_t wg_size_x =
-      (wg_tile_size_x + sg_tile_size_x - 1) / sg_tile_size_x;
+      (wg_tile_size_x_ + sg_tile_size_x - 1) / sg_tile_size_x;
   static constexpr uint32_t wg_size_y =
-      (wg_tile_size_y + sg_tile_size_y - 1) / sg_tile_size_y;
+      (wg_tile_size_y_ + sg_tile_size_y - 1) / sg_tile_size_y;
+
+  static constexpr uint32_t wg_tile_size_x = wg_size_x * sg_tile_size_x;
+  static constexpr uint32_t wg_tile_size_y = wg_size_y * sg_tile_size_y;
+
+  static_assert(wg_tile_size_x % sg_tile_size_x == 0);
+  static_assert(wg_tile_size_y % sg_tile_size_y == 0);
   using work_group_t = work_group_t<wg_size_x * wg_size_y>;
 };
 

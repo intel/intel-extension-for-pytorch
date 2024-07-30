@@ -17,7 +17,8 @@ template <
     int SYNC_FREQ,
     int STAGES,
     bool B_ROW_MAJOR,
-    typename tile_op_t>
+    typename tile_op_t,
+    gpu_arch arch_tag>
 struct hgemm_caller {
   using data_type_b = scalar_t;
   using data_type_a = scalar_t;
@@ -25,7 +26,7 @@ struct hgemm_caller {
   using data_type_acc = float;
   using tile_shape = tile_shape_t<WG_N, WG_M, SG_N, SG_M>;
   using epilogue_t = epilogue_t<
-      epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpc>,
+      epilogue_policy_tile_op<tile_op_t, arch_tag>,
       tile_shape,
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
   using args_t = epilogue_t::arguments_t;
@@ -84,13 +85,12 @@ struct hgemm_caller {
         data_type_acc,
         tile_shape,
         SG_K,
-        mma_engine::xmx,
-        gpu_arch::XeHpc,
+        arch_has_xmx<arch_tag> ? mma_engine::xmx : mma_engine::fpu,
+        arch_tag,
         prefetch_distance,
         periodic_sync_interval>::gemm;
 
-    using group_swizzle =
-        gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
+    using group_swizzle = gpu::xetla::kernel::group_swizzle_default<arch_tag>;
     using dispatch_policy =
         dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
     using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
@@ -126,7 +126,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_addmm(
     scalar_t* out,
     const scalar_t* res,
@@ -139,7 +140,8 @@ inline cgfs_t hgemm_addmm(
     const int k,
     const float alpha,
     const float beta) {
-  using tile_op_t = chained_tile_op_t<epilogue_impl::alpha_beta_op_t<scalar_t>>;
+  using tile_op_t =
+      chained_tile_op_t<epilogue_impl::alpha_beta_op_t<scalar_t, arch_tag>>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -152,7 +154,8 @@ inline cgfs_t hgemm_addmm(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(
       out,
       a,
@@ -176,7 +179,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_common(
     scalar_t* out,
     const scalar_t* a,
@@ -199,7 +203,8 @@ inline cgfs_t hgemm_common(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(out, a, b, acc_ptr, cnt_ptr, m, n, k, {{}});
 }
 
@@ -214,7 +219,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_res(
     scalar_t* out,
     const scalar_t* a,
@@ -226,7 +232,8 @@ inline cgfs_t hgemm_res(
     const int n,
     const int k,
     const float res_factor) {
-  using tile_op_t = chained_tile_op_t<epilogue_impl::res_op_t<scalar_t>>;
+  using tile_op_t =
+      chained_tile_op_t<epilogue_impl::res_op_t<scalar_t, arch_tag>>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -239,7 +246,8 @@ inline cgfs_t hgemm_res(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(
       out,
       a,
@@ -263,7 +271,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_res_res(
     scalar_t* out,
     const scalar_t* a,
@@ -278,8 +287,8 @@ inline cgfs_t hgemm_res_res(
     const float res0_factor,
     const float res1_factor) {
   using tile_op_t = chained_tile_op_t<
-      epilogue_impl::res_op_t<scalar_t>,
-      epilogue_impl::res_op_t<scalar_t>>;
+      epilogue_impl::res_op_t<scalar_t, arch_tag>,
+      epilogue_impl::res_op_t<scalar_t, arch_tag>>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -292,7 +301,8 @@ inline cgfs_t hgemm_res_res(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(
       out,
       a,
@@ -317,7 +327,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_bias(
     scalar_t* out,
     const scalar_t* a,
@@ -329,7 +340,8 @@ inline cgfs_t hgemm_bias(
     const int n,
     const int k,
     const float bias_factor) {
-  using tile_op_t = chained_tile_op_t<epilogue_impl::bias_op_t<scalar_t>>;
+  using tile_op_t =
+      chained_tile_op_t<epilogue_impl::bias_op_t<scalar_t, arch_tag>>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -342,7 +354,8 @@ inline cgfs_t hgemm_bias(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(
       out,
       a,
@@ -366,7 +379,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_bias_res(
     scalar_t* out,
     const scalar_t* a,
@@ -381,8 +395,8 @@ inline cgfs_t hgemm_bias_res(
     const float bias_factor,
     const float res_factor) {
   using tile_op_t = chained_tile_op_t<
-      epilogue_impl::bias_op_t<scalar_t>,
-      epilogue_impl::res_op_t<scalar_t>>;
+      epilogue_impl::bias_op_t<scalar_t, arch_tag>,
+      epilogue_impl::res_op_t<scalar_t, arch_tag>>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -395,7 +409,8 @@ inline cgfs_t hgemm_bias_res(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(
       out,
       a,
@@ -420,7 +435,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_bias_res_res(
     scalar_t* out,
     const scalar_t* a,
@@ -437,9 +453,9 @@ inline cgfs_t hgemm_bias_res_res(
     const float res0_factor,
     const float res1_factor) {
   using tile_op_t = chained_tile_op_t<
-      epilogue_impl::bias_op_t<scalar_t>,
-      epilogue_impl::res_op_t<scalar_t>,
-      epilogue_impl::res_op_t<scalar_t>>;
+      epilogue_impl::bias_op_t<scalar_t, arch_tag>,
+      epilogue_impl::res_op_t<scalar_t, arch_tag>,
+      epilogue_impl::res_op_t<scalar_t, arch_tag>>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -452,7 +468,8 @@ inline cgfs_t hgemm_bias_res_res(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(
       out,
       a,
@@ -478,7 +495,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_bias_relu(
     scalar_t* out,
     const scalar_t* a,
@@ -490,8 +508,9 @@ inline cgfs_t hgemm_bias_relu(
     const int n,
     const int k,
     const float bias_factor) {
-  using tile_op_t =
-      chained_tile_op_t<epilogue_impl::bias_op_t<scalar_t>, relu_op_t>;
+  using tile_op_t = chained_tile_op_t<
+      epilogue_impl::bias_op_t<scalar_t, arch_tag>,
+      relu_op_t>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -504,7 +523,8 @@ inline cgfs_t hgemm_bias_relu(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(
       out,
       a,
@@ -528,7 +548,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_bias_gelu(
     scalar_t* out,
     const scalar_t* a,
@@ -540,8 +561,9 @@ inline cgfs_t hgemm_bias_gelu(
     const int n,
     const int k,
     const float bias_factor) {
-  using tile_op_t =
-      chained_tile_op_t<epilogue_impl::bias_op_t<scalar_t>, gelu_fwd_op_t>;
+  using tile_op_t = chained_tile_op_t<
+      epilogue_impl::bias_op_t<scalar_t, arch_tag>,
+      gelu_fwd_op_t>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -554,7 +576,8 @@ inline cgfs_t hgemm_bias_gelu(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(
       out,
       a,
@@ -578,7 +601,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_mul(
     scalar_t* out,
     const scalar_t* a,
@@ -590,7 +614,7 @@ inline cgfs_t hgemm_mul(
     const int n,
     const int k) {
   using tile_op_t = chained_tile_op_t<
-      elemwise_reduce_op_t<reduce_op::prod, scalar_t, gpu_arch::XeHpc>>;
+      elemwise_reduce_op_t<reduce_op::prod, scalar_t, arch_tag>>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,
@@ -603,7 +627,8 @@ inline cgfs_t hgemm_mul(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(
       out,
       a,
@@ -627,7 +652,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_silu(
     scalar_t* out,
     const scalar_t* a,
@@ -650,7 +676,8 @@ inline cgfs_t hgemm_silu(
       SYNC_FREQ,
       STAGES,
       B_ROW_MAJOR,
-      tile_op_t>();
+      tile_op_t,
+      arch_tag>();
   return caller(out, a, b, acc_ptr, cnt_ptr, m, n, k, {{{}}});
 }
 
@@ -667,7 +694,8 @@ template <
     int STAGES,
     bool B_ROW_MAJOR,
     mem_layout layout_a,
-    mem_layout layout_b>
+    mem_layout layout_b,
+    gpu_arch arch_tag>
 struct HgemmQKVKernelFunctor {
   KERNEL_MAIN void operator()(nd_item<3> item) const {
     using data_type_b = scalar_t;
@@ -690,16 +718,15 @@ struct HgemmQKVKernelFunctor {
         data_type_acc,
         tile_shape,
         SG_K,
-        mma_engine::xmx,
-        gpu_arch::XeHpc,
+        arch_has_xmx<arch_tag> ? mma_engine::xmx : mma_engine::fpu,
+        arch_tag,
         prefetch_distance,
         periodic_sync_interval>::gemm;
     using epilogue_t = epilogue_t<
-        epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::XeHpc>,
+        epilogue_policy_tile_op<chained_tile_op_t<>, arch_tag>,
         tile_shape,
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-    using group_swizzle =
-        gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
+    using group_swizzle = gpu::xetla::kernel::group_swizzle_default<arch_tag>;
     using dispatch_policy =
         dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
     using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
@@ -789,7 +816,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_qkv(
 
     scalar_t* out0,
@@ -833,7 +861,8 @@ inline cgfs_t hgemm_qkv(
       STAGES,
       B_ROW_MAJOR,
       layout_a,
-      layout_b>
+      layout_b,
+      arch_tag>
       kfn(out0,
           out1,
           out2,
@@ -868,7 +897,8 @@ template <
     int STAGES,
     bool B_ROW_MAJOR,
     mem_layout layout_a,
-    mem_layout layout_b>
+    mem_layout layout_b,
+    gpu_arch arch_tag>
 struct HgemmQKVBiasKernelFunctor {
   KERNEL_MAIN void operator()(nd_item<3> item) const {
     using data_type_b = scalar_t;
@@ -892,18 +922,18 @@ struct HgemmQKVBiasKernelFunctor {
         data_type_acc,
         tile_shape,
         SG_K,
-        mma_engine::xmx,
-        gpu_arch::XeHpc,
+        arch_has_xmx<arch_tag> ? mma_engine::xmx : mma_engine::fpu,
+        arch_tag,
         prefetch_distance,
         periodic_sync_interval>::gemm;
     using epilogue_t = epilogue_t<
         epilogue_policy_tile_op<
-            chained_tile_op_t<epilogue_impl::bias_op_t<data_type_bias>>,
-            gpu_arch::XeHpc>,
+            chained_tile_op_t<
+                epilogue_impl::bias_op_t<data_type_bias, arch_tag>>,
+            arch_tag>,
         tile_shape,
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-    using group_swizzle =
-        gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
+    using group_swizzle = gpu::xetla::kernel::group_swizzle_default<arch_tag>;
     using dispatch_policy =
         dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
     using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
@@ -1002,7 +1032,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_qkv_bias(
     scalar_t* out0,
     scalar_t* out1,
@@ -1047,7 +1078,8 @@ inline cgfs_t hgemm_qkv_bias(
       STAGES,
       B_ROW_MAJOR,
       layout_a,
-      layout_b>
+      layout_b,
+      arch_tag>
       kfn(out0,
           out1,
           out2,
@@ -1082,7 +1114,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_qkv_group(
     scalar_t* out0,
     scalar_t* out1,
@@ -1134,16 +1167,15 @@ inline cgfs_t hgemm_qkv_group(
       data_type_acc,
       tile_shape,
       SG_K,
-      mma_engine::xmx,
-      gpu_arch::XeHpc,
+      arch_has_xmx<arch_tag> ? mma_engine::xmx : mma_engine::fpu,
+      arch_tag,
       prefetch_distance,
       periodic_sync_interval>::gemm;
   using epilogue_t = epilogue_t<
-      epilogue_policy_tile_op<chained_tile_op_t<>, gpu_arch::XeHpc>,
+      epilogue_policy_tile_op<chained_tile_op_t<>, arch_tag>,
       tile_shape,
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-  using group_swizzle =
-      gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
+  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<arch_tag>;
   using dispatch_policy =
       dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
@@ -1195,7 +1227,8 @@ template <
     int L3_KS,
     int SYNC_FREQ,
     int STAGES,
-    bool B_ROW_MAJOR>
+    bool B_ROW_MAJOR,
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 inline cgfs_t hgemm_qkv_group_bias(
 
     scalar_t* out0,
@@ -1251,18 +1284,17 @@ inline cgfs_t hgemm_qkv_group_bias(
       data_type_acc,
       tile_shape,
       SG_K,
-      mma_engine::xmx,
-      gpu_arch::XeHpc,
+      arch_has_xmx<arch_tag> ? mma_engine::xmx : mma_engine::fpu,
+      arch_tag,
       prefetch_distance,
       periodic_sync_interval>::gemm;
   using epilogue_t = epilogue_t<
       epilogue_policy_tile_op<
-          chained_tile_op_t<epilogue_impl::bias_op_t<data_type_bias>>,
-          gpu_arch::XeHpc>,
+          chained_tile_op_t<epilogue_impl::bias_op_t<data_type_bias, arch_tag>>,
+          arch_tag>,
       tile_shape,
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>>;
-  using group_swizzle =
-      gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
+  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<arch_tag>;
   using dispatch_policy =
       dispatch_policy_kslicing<group_swizzle, L3_KS, SLM_KS>;
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;

@@ -283,7 +283,7 @@ template <
     typename policy,
     typename scalar_t,
     typename index_t,
-    gpu_arch arch_tag = gpu_arch::XeHpc>
+    gpu_arch arch_tag>
 class paged_attention_kernel {
  public:
   using accum_t = float;
@@ -926,7 +926,7 @@ template <
     typename policy,
     typename scalar_t,
     typename index_t,
-    gpu_arch arch_tag = gpu_arch::XeHpc>
+    gpu_arch arch_tag>
 class paged_attention_reduce {
  public:
   using accum_t = float;

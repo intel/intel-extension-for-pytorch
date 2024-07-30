@@ -93,6 +93,7 @@ template <
     uint32_t sg_tile_n_1,
     uint32_t sg_tile_m,
     uint32_t sg_tile_k,
+    gpu_arch arch_tag,
     mem_layout layout_input = mem_layout::row_major,
     mem_layout layout_hidden = mem_layout::row_major,
     mem_layout layout_err = mem_layout::col_major,
@@ -111,10 +112,8 @@ struct gru_layer_bpk {
       perf_tuning_knob_t<16, prefetch_distance, periodic_sync_interval>;
 
   using compute_attr = compute_attr_t<T, T, Act_T>;
-  using compute_policy = compute_policy_default_xmx<
-      compute_attr,
-      perf_tuning_knob,
-      gpu_arch::XeHpc>;
+  using compute_policy =
+      compute_policy_default_xmx<compute_attr, perf_tuning_knob, arch_tag>;
 
   static constexpr uint32_t tg_size_x =
       (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0;
@@ -141,11 +140,11 @@ struct gru_layer_bpk {
   using mem_desc_hidden_t = mem_desc_t<T, layout_hidden, mem_loc_hidden>;
 
   using epilogue0_t = epilogue_t<
-      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, gpu_arch::XeHpc>,
+      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, arch_tag>,
       tile_shape_0,
       mem_desc_weight_t>;
   using epilogue1_t = epilogue_t<
-      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, gpu_arch::XeHpc>,
+      epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, arch_tag>,
       tile_shape_1,
       mem_desc_weight_t>;
   using epilogue_args_0_t = typename epilogue0_t::arguments_t;
@@ -168,7 +167,7 @@ struct gru_layer_bpk {
   using matAcc_desc_t1 = typename brgemm_t_1::matAcc_tile_desc_t;
 
   using block_attr =
-      get_load_block_size_auto<T, sg_tile_m, sg_tile_k, gpu_arch::XeHpc>;
+      get_load_block_size_auto<T, sg_tile_m, sg_tile_k, arch_tag>;
 
   using matA_tile_desc_t = tile_desc_t<
       sg_tile_m,
@@ -183,8 +182,7 @@ struct gru_layer_bpk {
       msg_type_v<
           matA_tile_desc_t,
           mem_desc_t<T, mem_layout::row_major, mem_space::global>>,
-
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using matA_bpi_t = tile_t<Act_T, matA_tile_desc_t>;
 
@@ -192,14 +190,13 @@ struct gru_layer_bpk {
       mem_desc_t<T, layout_weight, mem_loc_weight>,
       matAcc_desc_t0,
       msg_type_v<matAcc_desc_t0, mem_desc_t<T, layout_weight, mem_loc_weight>>,
-
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_t0 = tile_t<T, matAcc_desc_t0>;
   using matC_payload_t1 = mem_payload_t<
       mem_desc_t<T, layout_weight, mem_loc_weight>,
       matAcc_desc_t1,
       msg_type_v<matAcc_desc_t1, mem_desc_t<T, layout_weight, mem_loc_weight>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_t1 = tile_t<T, matAcc_desc_t1>;
 
   using bias_desc_t = tile_desc_t<
@@ -213,13 +210,13 @@ struct gru_layer_bpk {
       mem_desc_t<Act_T, layout_bias, mem_loc_bias>,
       bias_desc_t,
       msg_type_v<bias_desc_t, mem_desc_t<Act_T, layout_bias, mem_loc_bias>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using prefetch_t = prefetch_payload_t<
       mem_desc_t<T, mem_layout::row_major, mem_space::global>,
       tile_desc_t<matA_load_0_t::tile_size_x, matA_load_0_t::tile_size_y, 1, 1>,
       1, /*tg_size_x=1*/
-      gpu_arch::XeHpc>;
+      arch_tag>;
   static constexpr tdesc_update_dir load_update_config =
       tdesc_update_dir::y_dir;
 
@@ -385,7 +382,8 @@ template <
     uint32_t sg_tile_n_0_t,
     uint32_t sg_tile_n_1_t,
     uint32_t sg_tile_m_t,
-    uint32_t sg_tile_k_t>
+    uint32_t sg_tile_k_t,
+    gpu_arch arch_tag>
 struct perf_kernel_xcoder_gru_bpk {
   /// @brief
   /// @param item
@@ -433,7 +431,8 @@ struct perf_kernel_xcoder_gru_bpk {
         fused_op_sg_n_0,
         fused_op_sg_n_1,
         fused_op_sg_m,
-        fused_op_sg_k>;
+        fused_op_sg_k,
+        arch_tag>;
     using fused_op_1 = gru_layer_bpk<
         input_T,
         Act_T,
@@ -443,7 +442,8 @@ struct perf_kernel_xcoder_gru_bpk {
         fused_op_sg_n_0,
         fused_op_sg_n_0,
         fused_op_sg_m,
-        fused_op_sg_k>;
+        fused_op_sg_k,
+        arch_tag>;
     bpk_config_t<input_T, Act_T> args;
 
     int layer_input_size = batch_size * input_size;
@@ -505,7 +505,8 @@ template <
     uint32_t sg_tile_n_0_t,
     uint32_t sg_tile_n_1_t,
     uint32_t sg_tile_m_t,
-    uint32_t sg_tile_k_t>
+    uint32_t sg_tile_k_t,
+    gpu_arch arch_tag>
 struct kernel_xcoder_gru_bpk {
   /// @brief
   /// @param item
@@ -553,7 +554,8 @@ struct kernel_xcoder_gru_bpk {
         fused_op_sg_n_0,
         fused_op_sg_n_1,
         fused_op_sg_m,
-        fused_op_sg_k>;
+        fused_op_sg_k,
+        arch_tag>;
     using fused_op_1 = gru_layer_bpk<
         input_T,
         Act_T,
@@ -563,7 +565,8 @@ struct kernel_xcoder_gru_bpk {
         fused_op_sg_n_0,
         fused_op_sg_n_0,
         fused_op_sg_m,
-        fused_op_sg_k>;
+        fused_op_sg_k,
+        arch_tag>;
     bpk_config_t<input_T, Act_T> args;
     int layer_input_size = batch_size * input_size;
     int hidden_io_size = batch_size * hidden_size;
@@ -611,7 +614,7 @@ struct kernel_xcoder_gru_bpk {
   }
 };
 
-template <typename gru_bpk_config_t, typename input>
+template <typename gru_bpk_config_t, typename input, gpu_arch arch_tag>
 struct GruBackwardWeightImplKernelFunctor {
   KERNEL_MAIN void operator()(nd_item<3> item) const {
     using xcoder_gru_bpk_op = perf_kernel_xcoder_gru_bpk<
@@ -623,7 +626,8 @@ struct GruBackwardWeightImplKernelFunctor {
         gru_bpk_config_t::sg_tile_n_0,
         gru_bpk_config_t::sg_tile_n_1,
         gru_bpk_config_t::sg_tile_m,
-        gru_bpk_config_t::sg_tile_k>;
+        gru_bpk_config_t::sg_tile_k,
+        arch_tag>;
 
     xcoder_gru_bpk_op::run(
         item,
@@ -686,7 +690,7 @@ struct GruBackwardWeightImplKernelFunctor {
 };
 
 // extern "C"
-template <typename gru_bpk_config_t>
+template <typename gru_bpk_config_t, gpu_arch arch_tag = gpu_arch::XeHpc>
 cgfs_t gru_backward_weight_impl(
     void* err0_ptr,
     void* err1_ptr,
@@ -708,7 +712,6 @@ cgfs_t gru_backward_weight_impl(
   size_t sg_tile_n_1 = gru_bpk_config_t::sg_tile_n_1;
   size_t sg_tile_m = gru_bpk_config_t::sg_tile_m;
   size_t sg_tile_k = gru_bpk_config_t::sg_tile_k;
-
   using input = gru_bpk_config_t::input_T;
   using Act = gru_bpk_config_t::Act_T;
 
@@ -725,7 +728,7 @@ cgfs_t gru_backward_weight_impl(
       (wg_tile_n_0 + sg_tile_n_0 - 1) / sg_tile_n_0};
   cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
 
-  GruBackwardWeightImplKernelFunctor<gru_bpk_config_t, input> kfn(
+  GruBackwardWeightImplKernelFunctor<gru_bpk_config_t, input, arch_tag> kfn(
       err0_ptr,
       err1_ptr,
       layer_ptr,

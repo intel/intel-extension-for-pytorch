@@ -79,6 +79,7 @@ template <
     uint32_t sg_tile_n,
     uint32_t sg_tile_k_0,
     uint32_t sg_tile_k_1,
+    gpu_arch arch_tag,
     mem_layout layout_input = mem_layout::row_major,
     mem_layout layout_hidden = mem_layout::row_major,
     mem_layout layout_weight = mem_layout::col_major,
@@ -103,10 +104,8 @@ struct gru_cell {
       periodic_sync_interval>;
 
   using compute_attr = compute_attr_t<T, T, Act_T>;
-  using compute_policy = compute_policy_default_xmx<
-      compute_attr,
-      perf_tuning_knob,
-      gpu_arch::XeHpc>;
+  using compute_policy =
+      compute_policy_default_xmx<compute_attr, perf_tuning_knob, arch_tag>;
   using mem_desc_a_t = mem_desc_t<T, layout_input, mem_loc_input>;
   using mem_desc_b_t = mem_desc_t<T, layout_weight, mem_loc_weight>;
   // Org the compute shape for sub-matrix
@@ -128,10 +127,8 @@ struct gru_cell {
   using mem_desc_mask_t = mem_desc_t<Act_T, layout_out, mem_loc_out>;
   // define arguments for each epilogue_tile_op in chained_tile_op_t<>
 
-  using epilogue_t = epilogue_t<
-      epilogue_policy_default<gpu_arch::XeHpc>,
-      tile_shape,
-      mem_desc_c_t>;
+  using epilogue_t =
+      epilogue_t<epilogue_policy_default<arch_tag>, tile_shape, mem_desc_c_t>;
   using epilogue_args_t = typename epilogue_t::arguments_t;
 
   using mat_tile_desc_t = tile_desc_t<
@@ -146,13 +143,13 @@ struct gru_cell {
       mem_desc_t<T, layout_hidden, mem_loc_hidden>,
       mat_tile_desc_t,
       msg_type_v<mat_tile_desc_t, mem_desc_t<T, layout_hidden, mem_loc_hidden>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using matC_payload_t = mem_payload_t<
       mem_desc_t<T, layout_out, mem_loc_out>,
       mat_tile_desc_t,
       msg_type_v<mat_tile_desc_t, mem_desc_t<T, layout_out, mem_loc_out>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using mask_t = tile_t<Act_T, mat_tile_desc_t>;
 
@@ -160,7 +157,7 @@ struct gru_cell {
       mem_desc_t<Act_T, layout_out, mem_loc_out>,
       mat_tile_desc_t,
       msg_type_v<mat_tile_desc_t, mem_desc_t<Act_T, layout_out, mem_loc_out>>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using sigmoid_t = typename subgroup::sigmoid_op_t;
   using tanh_t = typename subgroup::tanh_op_t;
@@ -376,7 +373,7 @@ struct gru_cell {
         msg_type_v<
             bias_tile_desc_t,
             mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     bias_t bias;
     bias_payload_t bias_payload;
@@ -410,7 +407,7 @@ struct gru_cell {
         msg_type_v<
             bias_tile_desc_t,
             mem_desc_t<Act_T, mem_layout::row_major, mem_space::global>>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     bias_t bias1;
     bias_t bias2;
@@ -436,7 +433,8 @@ template <
     uint32_t sg_tile_m_t,
     uint32_t sg_tile_n_t,
     uint32_t sg_tile_k_0_t,
-    uint32_t sg_tile_k_1_t>
+    uint32_t sg_tile_k_1_t,
+    gpu_arch arch_tag>
 struct kernel_gru_cell_fusion {
   static constexpr uint32_t fused_op_wg_m = wg_tile_m_t;
   static constexpr uint32_t fused_op_wg_n = wg_tile_n_t;
@@ -453,6 +451,7 @@ struct kernel_gru_cell_fusion {
       fused_op_sg_n,
       fused_op_sg_k_0,
       fused_op_sg_k_1,
+      arch_tag,
       mem_layout::row_major,
       mem_layout::row_major,
       mem_layout::col_major,
@@ -725,7 +724,7 @@ hidden*/ (input_T*)i_weights + input_weight_offset, /*weights*/
 /// @param layer_size
 /// @param Queue sycl::queue
 /// @return
-template <typename gru_config_t>
+template <typename gru_config_t, gpu_arch arch_tag = gpu_arch::XeHpc>
 std::vector<std::function<void(sycl::handler&)>> gru_forward_impl(
     void* layer_ptr,
     void* hx_ptr,
@@ -765,7 +764,8 @@ std::vector<std::function<void(sycl::handler&)>> gru_forward_impl(
       sg_tile_m,
       sg_tile_n,
       sg_tile_k_0,
-      sg_tile_k_1>;
+      sg_tile_k_1,
+      arch_tag>;
   const int num_layers = layer_size;
   cl::sycl::range<3> GroupRange = {
       num_layers,

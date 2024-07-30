@@ -29,15 +29,10 @@ template <
     uint32_t row_size,
     uint32_t wg_size_x,
     uint32_t wg_size_y,
-    uint32_t max_simd_len>
-struct group_row_reduce_store_t<
-    dtype_acc,
-    dtype_out,
-    row_size,
-    wg_size_x,
-    wg_size_y,
-    max_simd_len,
-    gpu_arch::XeHpc> {
+    uint32_t max_simd_len,
+    gpu_arch arch_tag_ = gpu_arch::XeHpc>
+struct group_row_reduce_store_t {
+  static constexpr gpu_arch arch_tag = arch_tag_;
   static constexpr uint32_t block_size_x =
       gpu::xetla::subgroup::detail::gcd<row_size, max_simd_len>::value;
   static_assert(
@@ -64,7 +59,7 @@ struct group_row_reduce_store_t<
       mem_desc_acc,
       local_st_tile_desc_t,
       subgroup::msg_type_v<local_st_tile_desc_t, mem_desc_acc>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using local_ld_tile_desc_t = subgroup::tile_desc_t<
       local_tile_size_x,
       wg_size_y,
@@ -78,7 +73,7 @@ struct group_row_reduce_store_t<
       mem_desc_ld_t,
       local_ld_tile_desc_t,
       subgroup::msg_type_v<local_ld_tile_desc_t, mem_desc_ld_t>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   // If the local tile size is small, we still can use 2D block store
   using global_st_tile_desc_t = subgroup::
@@ -89,8 +84,8 @@ struct group_row_reduce_store_t<
       global_st_tile_desc_t,
       (local_tile_size_x * sizeof(dtype_out) > 64) ? msg_type::block_1d
                                                    : msg_type::block_2d,
-      gpu_arch::XeHpc>;
-  xetla_nbarrier_t<wg_size_y, wg_size_y, gpu_arch::XeHpc> nbarrier;
+      arch_tag>;
+  xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier;
   local_st_t local_st;
   local_st_payload_t local_st_payload;
   local_ld_t local_ld;
@@ -160,7 +155,8 @@ template <
     typename dtype_out,
     uint32_t row_size,
     uint32_t wg_size_x,
-    uint32_t max_simd_len>
+    uint32_t max_simd_len,
+    gpu_arch arch_tag_>
 struct group_row_reduce_store_t<
     dtype_acc,
     dtype_out,
@@ -168,7 +164,8 @@ struct group_row_reduce_store_t<
     wg_size_x,
     1,
     max_simd_len,
-    gpu_arch::XeHpc> {
+    arch_tag_> {
+  static constexpr gpu_arch arch_tag = arch_tag_;
   static constexpr uint32_t block_size_x =
       gpu::xetla::subgroup::detail::gcd<row_size, max_simd_len>::value;
 
@@ -180,7 +177,7 @@ struct group_row_reduce_store_t<
       global_st_tile_desc_t,
       (row_size * sizeof(dtype_out) > 64) ? msg_type::block_1d
                                           : msg_type::block_2d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   inline void init(
       [[maybe_unused]] uint32_t sg_idx_ = 0,
       [[maybe_unused]] uint32_t sg_idy_ = 0,

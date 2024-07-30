@@ -40,7 +40,7 @@ template <typename tile_op_t_, gpu_arch arch_tag>
 struct dequant_op_t<
     tile_op_t_,
     arch_tag,
-    std::enable_if_t<(arch_tag == gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   // may need to add some limitations to tile_op used in dequant_op
   using tile_op_t = tile_op_t_;
   struct arguments_t {
@@ -72,7 +72,7 @@ template <typename tile_op_t_, gpu_arch arch_tag>
 struct quant_op_t<
     tile_op_t_,
     arch_tag,
-    std::enable_if_t<(arch_tag == gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   // may need to add some limitations to tile_op used in dequant_op
   using tile_op_t = tile_op_t_;
 

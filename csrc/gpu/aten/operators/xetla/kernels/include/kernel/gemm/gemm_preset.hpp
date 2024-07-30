@@ -46,7 +46,7 @@ using param_performance_default = dict_t<
     elem_v_t<tune_key::prefetch_distance, 3UL, uint32_t>,
     elem_v_t<tune_key::periodic_sync_interval, 8UL, uint32_t>>;
 
-template <gpu_arch arch_tag = gpu_arch::XeHpc>
+template <gpu_arch arch_tag>
 using param_runtime_default = dict_t<
     elem_v_t<tune_key::pre_processing, tune_key_value::pre_processing_default>,
     elem_v_t<tune_key::mma_engine, mma_engine::xmx>,
@@ -61,7 +61,8 @@ using param_runtime_default = dict_t<
         tune_key::group_swizzle_policy,
         kernel::group_swizzle_default<arch_tag>>>;
 } // namespace detail
-template <gpu_arch arch_tag = gpu_arch::XeHpc>
+
+template <gpu_arch arch_tag>
 using default_param_t = dict_t<>::template update_dict_t<
     detail::param_dtype_bf16_bf16_bf16>::
     template update_dict_t<detail::param_memlayout_rrr>::template update_dict_t<
@@ -88,7 +89,7 @@ using default_param_t = dict_t<>::template update_dict_t<
                             param_optimizer_level>>;
 
 namespace kernel {
-template <gpu_arch arch_tag = gpu_arch::XeHpc>
+template <gpu_arch arch_tag>
 using param_kslicing_g1l1_t = default_param_t<arch_tag>::template update_t<
     elem_v_t<tune_key::global_kslicing_ratio, 1UL, uint32_t>,
     elem_v_t<tune_key::local_kslicing_ratio, 1UL, uint32_t>,
@@ -99,7 +100,7 @@ using param_kslicing_g1l1_t = default_param_t<arch_tag>::template update_t<
         tune_key::dispatch_policy,
         tune_key_value::dispatch_policy_kslicing>>;
 
-template <gpu_arch arch_tag = gpu_arch::XeHpc>
+template <gpu_arch arch_tag>
 using param_kslicing_g2l1_t = default_param_t<arch_tag>::template update_t<
     elem_v_t<tune_key::global_kslicing_ratio, 2UL, uint32_t>,
     elem_v_t<tune_key::local_kslicing_ratio, 1UL, uint32_t>,
@@ -110,7 +111,7 @@ using param_kslicing_g2l1_t = default_param_t<arch_tag>::template update_t<
         tune_key::dispatch_policy,
         tune_key_value::dispatch_policy_kslicing>>;
 
-template <gpu_arch arch_tag = gpu_arch::XeHpc>
+template <gpu_arch arch_tag>
 using param_kslicing_g1l2_t = default_param_t<arch_tag>::template update_t<
     elem_v_t<tune_key::global_kslicing_ratio, 1UL, uint32_t>,
     elem_v_t<tune_key::local_kslicing_ratio, 2UL, uint32_t>,
@@ -124,7 +125,7 @@ using param_kslicing_g1l2_t = default_param_t<arch_tag>::template update_t<
 } // namespace kernel
 
 namespace group {
-template <gpu_arch arch_tag = gpu_arch::XeHpc>
+template <gpu_arch arch_tag>
 using param_dict1_wg_t = default_param_t<arch_tag>::template update_t<
     elem_t_t<tune_key::data_type_acc, float>,
     elem_t_t<tune_key::wg_tile_shape, shape<256, 256>>,

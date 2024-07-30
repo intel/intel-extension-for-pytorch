@@ -331,7 +331,7 @@ template <typename dtype_out_, gpu_arch arch_tag>
 struct gelu_fwd_w_op_t<
     dtype_out_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using dtype_out = dtype_out_;
   using mem_desc_w_t =
       mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>;
@@ -463,7 +463,7 @@ template <typename dtype_in_, gpu_arch arch_tag>
 struct gelu_bwd_op_t<
     dtype_in_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using dtype_in = dtype_in_;
   using mem_desc_x_t =
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
@@ -570,7 +570,7 @@ template <typename mem_desc_bias_t_, gpu_arch arch_tag>
 struct bias_add_op_t<
     mem_desc_bias_t_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using mem_desc_bias_t = mem_desc_bias_t_;
   using dtype_bias = typename mem_desc_bias_t::dtype;
   using shape_t = typename mem_desc_bias_t::shape_t;
@@ -674,7 +674,7 @@ struct scale_v_offset_v_op_t<
     scale_dtype_,
     offset_dtype_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using scale_dtype = scale_dtype_;
   using offset_dtype = offset_dtype_;
 
@@ -809,7 +809,7 @@ template <typename scale_dtype_, gpu_arch arch_tag>
 struct scale_v_op_t<
     scale_dtype_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using scale_dtype = scale_dtype_;
 
   using scale_mem_desc_t =
@@ -916,7 +916,7 @@ struct elemwise_reduce_op_t<
     reduce_kind_,
     dtype_in_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using dtype_in = dtype_in_;
   using mem_desc_in_t =
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
@@ -1034,7 +1034,7 @@ struct elemwise_reduce_op_t<
 template <
     reduce_op reduce_kind,
     typename dtype_in,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     class enable = void>
 struct elemwise_reduce_op_stream_k_t {};
 /// @brief Is the element-wise reduce op functor, specialized for Xe
@@ -1044,7 +1044,7 @@ struct elemwise_reduce_op_stream_k_t<
     reduce_kind_,
     dtype_in_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using dtype_in = dtype_in_;
   using mem_desc_in_t =
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
@@ -1156,7 +1156,7 @@ template <typename dtype_mask_, gpu_arch arch_tag>
 struct dropout_op_t<
     dtype_mask_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using dtype_mask = dtype_mask_;
   using mem_desc_mask_t =
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>;
@@ -1243,7 +1243,7 @@ template <typename dtype_mask_, gpu_arch arch_tag>
 struct rng_dropout_op_t<
     dtype_mask_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using dtype_mask = dtype_mask_;
   using mem_desc_mask_t =
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>;
@@ -1357,7 +1357,7 @@ template <typename dtype_in_, gpu_arch arch_tag>
 struct scalar_mul_op_t<
     dtype_in_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using dtype_in = dtype_in_;
   using mem_desc_in_t =
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
@@ -1396,7 +1396,7 @@ template <typename dtype_in_, gpu_arch arch_tag>
 struct linear_op_t<
     dtype_in_,
     arch_tag,
-    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag>>> {
   using dtype_in = dtype_in_;
   using mem_desc_in_t =
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;

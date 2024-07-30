@@ -105,13 +105,11 @@ tile_load(tile_t& tile, payload_t& payload) {
 
   static constexpr bool mem_transform = payload_t::mem_transform;
 
-  using load_store_attr = typename arch_attr_t<
-      arch_tag>::template load_store_attr<msg_type::block_2d>;
+  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
   static constexpr uint32_t elems_per_CL =
       load_store_attr::cache_line_size_in_bytes / sizeof(dtype);
   static constexpr uint32_t elems_per_reg =
-      arch_attr_t<arch_tag>::template register_attr<>::reg_in_bytes /
-      sizeof(dtype);
+      register_bytes_t<arch_tag>::reg_in_bytes / sizeof(dtype);
   static constexpr int32_t max_load_block_height =
       load_store_attr::max_load_height_in_elem;
   static constexpr int32_t max_block_width =
@@ -396,11 +394,12 @@ tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   static constexpr uint32_t load_len = tile_t::tile_elems;
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
+  static constexpr uint32_t power2_block_elems =
+      detail::getNextPowerOf2<uint32_t(tile_t::block_elems * sizeof(dtype))>();
 
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_load_vec_len = std::min(
-      uint32_t(tile_t::block_elems * sizeof(dtype)),
-      load_store_attr::max_load_vec_len);
+  static constexpr uint32_t max_load_vec_len =
+      std::min(power2_block_elems, load_store_attr::max_aligned_load_vec_len);
 
   static constexpr uint32_t max_load_vec_elems =
       max_load_vec_len / sizeof(dtype);
@@ -459,6 +458,7 @@ tile_load(tile_t& tile, payload_t& payload) {
   constexpr uint32_t load_elems = num_channel * payload_t::simd_exec_size;
   constexpr uint32_t pack_factor = payload_t::pack_factor;
 
+  auto channel_offset = payload.channel_offset + payload.base_offset;
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::num_block_y; i++) {
     uint32_t offset_y = i * tile_desc::block_size_y;
@@ -503,9 +503,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             L1,
             L2,
             num_channel>(
-            payload.base_ptr,
-            payload.channel_offset + payload.base_offset + address_offset,
-            pred);
+            payload.base_ptr, channel_offset + address_offset, pred);
 
         if constexpr (
             payload_t::simd_exec_size > 1 && payload_t::num_channel > 1) {
@@ -646,26 +644,32 @@ tile_load(
   constexpr bool oob_check =
       std::is_same<oob_check_tag, global_atomic_oob_check_on_tag>::value;
   using dtype = typename payload_t::dtype;
-  using tile_desc = typename payload_t::tile_desc;
   using load_dtype = typename payload_t::mem_dtype;
   constexpr uint32_t num_channel_y = payload_t::num_channel_y;
   constexpr uint32_t load_elems = num_channel_y * payload_t::num_channel_x;
   constexpr uint32_t scale_factor = payload_t::scale_factor;
 
+  using tile_desc = typename tile_t::tile_desc;
+  static constexpr uint32_t block_elems = tile_desc::block_elems;
+  static constexpr uint32_t block_size_x = tile_desc::block_size_x;
+  static constexpr uint32_t num_block_x = tile_desc::num_block_x;
+  static constexpr uint32_t block_size_y = tile_desc::block_size_y;
+  static constexpr uint32_t num_block_y = tile_desc::num_block_y;
+
+  auto channel_offset = payload.channel_offset + payload.base_offset;
 #pragma unroll
-  for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
-       i++) {
-    uint32_t offset_y = i * tile_desc::block_size_y;
+  for (uint32_t i = 0; i < num_block_y; i++) {
+    uint32_t offset_y = i * block_size_y;
 #pragma unroll
-    for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
-      uint32_t offset_x = j * tile_desc::block_size_x;
-      auto reg_sub = tile.reg.xetla_select<tile_desc::block_elems, 1>(
-          (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
+    for (uint32_t j = 0; j < num_block_x; j++) {
+      uint32_t offset_x = j * block_size_x;
+      auto reg_sub = tile.reg.xetla_select<block_elems, 1>(
+          (i * num_block_x + j) * block_elems);
       xetla_mask<load_elems> pred_x = oob_check
           ? payload.step_x + payload.base_x + offset_x < payload.width_in_elems
           : 1;
 #pragma unroll
-      for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
+      for (uint32_t sub_block_y = 0; sub_block_y < block_size_y;
            sub_block_y += num_channel_y) {
         xetla_vector<load_dtype, load_elems> reg_tmp;
         xetla_mask<load_elems> pred_y = oob_check
@@ -673,7 +677,7 @@ tile_load(
                 payload.height_in_elems
             : 1;
 
-        uint32_t address_offset = payload_t::trans
+        uint32_t address_offset = payload_t::mem_transpose
             ? offset_x * payload.pitch_in_bytes +
                 (offset_y + sub_block_y) * sizeof(dtype)
             : offset_x * sizeof(dtype) +
@@ -687,27 +691,27 @@ tile_load(
             L2,
             load_elems>(
             payload.base_ptr,
-            payload.channel_offset + payload.base_offset + address_offset,
+            channel_offset + address_offset,
             pred_x && pred_y);
         reg_tmp.xetla_merge(reg_tmp, 0, pred_x && pred_y);
 
         reg_sub
             .xetla_select<load_elems * scale_factor, 1>(
-                sub_block_y * tile_desc::block_size_x)
+                sub_block_y * block_size_x)
             .xetla_format<load_dtype>() = reg_tmp;
       }
     }
   }
   // process the tail
-  if constexpr ((tile_desc::tile_size_y % tile_desc::block_size_y) != 0) {
+  if constexpr (tile_desc::remained_size_y != 0) {
     constexpr uint32_t remained_size_y = tile_desc::remained_size_y;
     constexpr uint32_t offset_y = tile_desc::tile_size_y - remained_size_y;
     constexpr uint32_t processed_elems = offset_y * tile_desc::tile_size_x;
     constexpr uint32_t remain_block_elems =
         remained_size_y * tile_desc::block_size_x;
 #pragma unroll
-    for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
-      uint32_t offset_x = j * tile_desc::block_size_x;
+    for (uint32_t j = 0; j < num_block_x; j++) {
+      uint32_t offset_x = j * block_size_x;
       auto reg_sub = tile.reg.xetla_select<remain_block_elems, 1>(
           processed_elems + j * remain_block_elems);
       xetla_mask<load_elems> pred_x = oob_check
@@ -722,7 +726,7 @@ tile_load(
                 payload.height_in_elems
             : 1;
 
-        uint32_t address_offset = payload_t::trans
+        uint32_t address_offset = payload_t::mem_transpose
             ? offset_x * payload.pitch_in_bytes +
                 (offset_y + sub_block_y) * sizeof(dtype)
             : offset_x * sizeof(dtype) +
@@ -736,7 +740,7 @@ tile_load(
             L2,
             load_elems>(
             payload.base_ptr,
-            payload.channel_offset + payload.base_offset + address_offset,
+            channel_offset + address_offset,
             pred_x && pred_y);
 
         reg_tmp.xetla_merge(reg_tmp, 0, pred_x && pred_y);
@@ -747,6 +751,11 @@ tile_load(
             .xetla_format<load_dtype>() = reg_tmp;
       }
     }
+  }
+
+  if constexpr (payload_t::reg_transpose) {
+    SW_BARRIER();
+    tile_transpose(tile);
   }
 
   if constexpr (payload_t::mem_transform) {
@@ -868,7 +877,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
   static constexpr uint32_t max_load_vec_len =
-      load_store_attr::max_load_vec_len;
+      load_store_attr::max_aligned_load_vec_len;
   static constexpr uint32_t max_load_vec_elems =
       max_load_vec_len / sizeof(dtype);
 

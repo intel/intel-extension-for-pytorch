@@ -44,7 +44,7 @@ struct mem_payload_t<
     tile_desc_,
     msg_type::block_2d,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ == gpu_arch::XeHpc)>> {
+    std::enable_if_t<arch_has_2d_load_store<arch_tag_>>> {
   using tile_desc = tile_desc_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -406,7 +406,7 @@ struct mem_payload_t<
     tile_desc_,
     msg_type::block_1d,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
   using mem_desc_t =
       mem_desc_t<dtype_, memory_layout_, mem_space::global, alignment_>;
   using dtype = native_type_t<dtype_>;
@@ -560,7 +560,7 @@ struct mem_payload_t<
     tile_desc_,
     msg_type::atomic_add,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<sizeof(dtype_) >= sizeof(uint16_t)>> {
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout::row_major, mem_space::global, alignment_>;
   using dtype = dtype_;
@@ -742,7 +742,7 @@ struct mem_payload_t<
     tile_desc_,
     msg_type::block_1d,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>;
   using dtype = dtype_;
@@ -873,7 +873,7 @@ struct mem_payload_t<
     tile_desc_,
     msg_type::unaligned_2d,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -960,7 +960,7 @@ struct mem_payload_t<
         xetla_vector_gen<uint32_t, num_channel>(0, 1);
     step_x = channel_index % num_channel_x;
     step_y = channel_index / num_channel_x;
-    channel_offset = trans
+    channel_offset = mem_transpose
         ? step_y * sizeof(mem_dtype) + step_x * pitch_in_bytes
         : step_x * sizeof(mem_dtype) + step_y * pitch_in_bytes;
   }
@@ -986,7 +986,7 @@ struct mem_payload_t<
         xetla_vector_gen<uint32_t, num_channel>(0, 1);
     step_x = channel_index % num_channel_x;
     step_y = channel_index / num_channel_x;
-    channel_offset = trans
+    channel_offset = mem_transpose
         ? step_y * sizeof(mem_dtype) + step_x * pitch_in_bytes
         : step_x * sizeof(mem_dtype) + step_y * pitch_in_bytes;
   }
@@ -1006,7 +1006,7 @@ struct mem_payload_t<
         xetla_vector_gen<uint32_t, num_channel>(0, 1);
     step_x = channel_index % num_channel_x;
     step_y = channel_index / num_channel_x;
-    channel_offset = trans
+    channel_offset = mem_transpose
         ? step_y * sizeof(mem_dtype) + step_x * pitch_in_bytes
         : step_x * sizeof(mem_dtype) + step_y * pitch_in_bytes;
   }
@@ -1032,7 +1032,7 @@ struct mem_payload_t<
         xetla_vector_gen<uint32_t, num_channel>(0, 1);
     step_x = channel_index % num_channel_x;
     step_y = channel_index / num_channel_x;
-    channel_offset = trans
+    channel_offset = mem_transpose
         ? step_y * sizeof(mem_dtype) + step_x * pitch_in_bytes
         : step_x * sizeof(mem_dtype) + step_y * pitch_in_bytes;
   }
@@ -1100,7 +1100,7 @@ struct mem_payload_t<
     tile_desc_,
     msg_type::block_2d,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpg)>> {
+    std::enable_if_t<!arch_has_2d_load_store<arch_tag_>>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -1158,17 +1158,20 @@ struct mem_payload_t<
 
   // for pvc, we can use simd16 or simd32
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_bytes =
-      std::min(load_store_attr::max_load_vec_len, block_bytes);
+  static constexpr uint32_t max_load_vec_len = (alignment_in_bytes == 8)
+      ? load_store_attr::max_aligned_load_vec_len
+      : load_store_attr::max_load_vec_len;
+  static constexpr uint32_t max_bytes = std::min(max_load_vec_len, block_bytes);
 
   static constexpr uint32_t max_channel =
       max_bytes / (simd_exec_size * sizeof(mem_dtype));
 
   static constexpr uint32_t select_channel(const uint32_t channel) {
-    return (channel >= 32 && arch_tag == gpu_arch::XeHpc) ? 32
-        : channel >= 16                                   ? 16
-        : channel >= 8                                    ? 8
-                                                          : 1;
+    return (channel >= load_store_attr::max_channel_num)
+        ? load_store_attr::max_channel_num
+        : channel >= 16 ? 16
+        : channel >= 8  ? 8
+                        : 1;
   }
 
   static constexpr uint32_t num_channel = select_channel(
@@ -1325,7 +1328,7 @@ struct mem_payload_t<
     tile_desc_,
     msg_type::scatter,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>;
   using dtype = dtype_;
@@ -1504,7 +1507,7 @@ struct mem_payload_t<
         reg_layout::vnni_tiled_col_major>,
     msg_type::scatter,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>;
   using dtype = dtype_;
@@ -1656,12 +1659,11 @@ struct prefetch_payload_t<
         reg_layout_>,
     num_coop_sg_,
     arch_tag_,
-    std::enable_if_t<
-        arch_tag_ <= gpu_arch::XeHpg &&
-        (((block_size_y_ != 1 || tile_size_y_ != 1) &&
-          mem_layout_ == mem_layout::row_major) ||
-         ((block_size_x_ != 1 || tile_size_x_ != 1) &&
-          mem_layout_ == mem_layout::col_major))>> {
+    std::enable_if_t<(!arch_has_2d_load_store<arch_tag_>)&&(
+        ((block_size_y_ != 1 || tile_size_y_ != 1) &&
+         mem_layout_ == mem_layout::row_major) ||
+        ((block_size_x_ != 1 || tile_size_x_ != 1) &&
+         mem_layout_ == mem_layout::col_major))>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -1841,6 +1843,26 @@ struct prefetch_payload_t<
         xetla_vector_gen<uint32_t, num_channel>(0, 1);
     channel_offset = channel_index * pitch_in_bytes;
   }
+
+  inline void init(mem_desc_t& mem_desc, uint32_t coop_id = 0) {
+    uint32_t coop_id_x = coop_id % num_coop_sg_w;
+    uint32_t coop_id_y = coop_id / num_coop_sg_w;
+
+    pitch_in_bytes = mem_desc.shape.stride * sizeof(dtype);
+    base_x = mem_desc.coord.x + coop_id_x * tile_size_w;
+    base_y = mem_desc.coord.y + coop_id_y * tile_size_h;
+    width_in_elems = mem_desc.shape.x;
+    height_in_elems = mem_desc.shape.y;
+    base_offset = mem_transpose
+        ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+        : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+    base_ptr = reinterpret_cast<prefetch_dtype*>(mem_desc.base.base);
+
+    xetla_vector<uint32_t, num_channel> channel_index =
+        xetla_vector_gen<uint32_t, num_channel>(0, 1);
+    channel_offset = channel_index * pitch_in_bytes;
+  }
+
   // Be aware of the risks: Rule of three (copy constructor, copy
   // assignment, destructor) Please check if you need to add self-define
   // destructor ~prefetch_payload_t(){}
@@ -1884,10 +1906,9 @@ struct prefetch_payload_t<
         reg_layout_>,
     num_coop_sg_,
     arch_tag_,
-    std::enable_if_t<
-        (arch_tag_ == gpu_arch::XeHpc) &&
-        (((tile_size_y_ != 1) && mem_layout_ == mem_layout::row_major) ||
-         ((tile_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
+    std::enable_if_t<(arch_has_2d_load_store<arch_tag_>)&&(
+        ((tile_size_y_ != 1) && mem_layout_ == mem_layout::row_major) ||
+        ((tile_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -1987,6 +2008,17 @@ struct prefetch_payload_t<
         surface_pitch,
         surface_offset_x + coop_id_x * tile_size_w,
         surface_offset_y + coop_id_y * tile_size_h);
+    prepare_tdesc(base_tdesc);
+  }
+
+  inline void init(mem_desc_t& mem_desc, uint32_t coop_id = 0) {
+    xetla_tdescriptor base_tdesc = mem_desc.get_tdesc();
+    uint32_t coop_id_x = coop_id % num_coop_sg_w;
+    uint32_t coop_id_y = coop_id / num_coop_sg_w;
+    xetla_update_tdesc_offsetx(
+        base_tdesc.xetla_format<uint32_t>(), coop_id_x * tile_size_w);
+    xetla_update_tdesc_offsety(
+        base_tdesc.xetla_format<uint32_t>(), coop_id_y * tile_size_h);
     prepare_tdesc(base_tdesc);
   }
 
@@ -2258,6 +2290,16 @@ struct prefetch_payload_t<
     base_ptr = (prefetch_dtype*)p + (coop_id % num_coop_sg) * mem_tile_size_x;
   }
 
+  inline void init(mem_desc_t& mem_desc, uint32_t coop_id = 0) {
+    pitch_in_bytes = mem_desc.shape.stride * sizeof(dtype);
+    uint32_t offset_x = mem_desc.coord.x;
+    uint32_t offset_y = mem_desc.coord.y;
+    base_offset = offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
+    uint64_t ptr_temp = (uint64_t)mem_desc.base.base;
+    base_ptr =
+        (prefetch_dtype*)ptr_temp + (coop_id % num_coop_sg) * mem_tile_size_x;
+  }
+
   template <tdesc_update_dir update_dir = tdesc_update_dir::x_dir>
   __XETLA_API void update_tdesc(int offset) {
     if constexpr (update_dir == tdesc_update_dir::x_dir) {
@@ -2286,7 +2328,7 @@ struct prefetch_payload_t<
     tile_desc_,
     num_coop_sg_,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::local, alignment_>;
@@ -2294,6 +2336,8 @@ struct prefetch_payload_t<
   static constexpr mem_space memory_space = mem_space::local;
   static constexpr mem_layout memory_layout = mem_layout_;
   static constexpr gpu_arch arch_tag = arch_tag_;
+
+  inline prefetch_payload_t() = default;
 
   inline prefetch_payload_t(
       [[maybe_unused]] mem_desc_t& mem_desc,
@@ -2306,6 +2350,10 @@ struct prefetch_payload_t<
       [[maybe_unused]] int surface_pitch,
       [[maybe_unused]] int surface_offset_x,
       [[maybe_unused]] int surface_offset_y,
+      [[maybe_unused]] uint32_t coop_id = 0) {}
+
+  inline void init(
+      [[maybe_unused]] mem_desc_t& mem_desc,
       [[maybe_unused]] uint32_t coop_id = 0) {}
 
   template <tdesc_update_dir update_dir = tdesc_update_dir::x_dir>

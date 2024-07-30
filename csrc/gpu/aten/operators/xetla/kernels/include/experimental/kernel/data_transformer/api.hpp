@@ -20,26 +20,3 @@
 #pragma once
 
 #include <experimental/kernel/data_transformer/common.hpp>
-
-namespace gpu::xetla::kernel {
-
-/// @brief Is the data_transformer functor.
-///
-/// @tparam dtype_in_ Is the data type of input.
-/// @tparam dtype_out_ Is the data type of output.
-/// @tparam dtype_acc_
-/// @tparam data_transformer_config_
-/// @tparam mem_layout_in_ Indicates the input data col major or row major.
-/// @tparam need_fp8_op
-/// @tparam arch_ Is the HW generation.
-template <
-    typename dtype_in_,
-    typename dtype_out_,
-    typename dtype_acc_,
-    typename data_transformer_config_,
-    mem_layout mem_layout_in_,
-    int need_fp8_op,
-    gpu_arch arch_>
-struct xetla_data_transformer {};
-
-} // namespace gpu::xetla::kernel

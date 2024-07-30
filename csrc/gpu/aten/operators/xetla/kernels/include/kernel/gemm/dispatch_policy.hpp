@@ -148,7 +148,7 @@ struct dispatch_policy_kslicing {
 /// and performs inter-group reduction. Implementation loosely based on this
 /// paper - https://arxiv.org/pdf/2301.03598.pdf
 /// @tparam arch_tag_ Is the HW architecture.
-template <gpu_arch arch_tag_ = gpu_arch::XeHpc>
+template <gpu_arch arch_tag_>
 struct dispatch_policy_stream_k {
   static constexpr gpu_arch arch_tag = arch_tag_;
 

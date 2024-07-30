@@ -39,7 +39,7 @@ class epilogue_t<
     epilogue_policy_tile_op<tile_op_t_, arch_tag_>,
     tile_shape_,
     mem_desc_c_t_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
  public:
   using epilogue_policy = epilogue_policy_tile_op<tile_op_t_, arch_tag_>;
   using tile_op_t = typename epilogue_policy::tile_op_t;

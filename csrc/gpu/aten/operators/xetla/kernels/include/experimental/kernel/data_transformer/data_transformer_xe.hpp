@@ -43,20 +43,15 @@ template <
     typename dtype_compute_,
     typename data_transformer_attr_,
     mem_layout mem_layout_in_,
-    int need_fp8_op>
-struct xetla_data_transformer<
-    dtype_in_,
-    dtype_out_,
-    dtype_compute_,
-    data_transformer_attr_,
-    mem_layout_in_,
-    need_fp8_op,
-    gpu_arch::XeHpc> {
+    int need_fp8_op,
+    gpu_arch arch_tag_ = gpu_arch::XeHpc>
+struct xetla_data_transformer {
   using dtype_in = dtype_in_;
   using dtype_out = dtype_out_;
   using dtype_compute = dtype_compute_;
   using data_transformer_attr = data_transformer_attr_;
 
+  static constexpr gpu_arch arch_tag = arch_tag_;
   static constexpr mem_layout mem_layout_in = mem_layout_in_;
 
   static constexpr bool is_col_major_in =
@@ -73,8 +68,7 @@ struct xetla_data_transformer<
   static constexpr uint32_t wg_size_x = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
   static constexpr uint32_t wg_size_y = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
 
-  using load_store_attr = typename arch_attr_t<
-      gpu_arch::XeHpc>::template load_store_attr<msg_type::block_2d>;
+  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
   static constexpr uint32_t max_load_height_in_elem =
       load_store_attr::max_load_height_in_elem;
   static constexpr uint32_t max_load_width_in_bytes =
@@ -127,7 +121,7 @@ struct xetla_data_transformer<
       mem_desc_ld_t,
       global_ld_tile_desc_t,
       subgroup::msg_type_v<global_ld_tile_desc_t, mem_desc_ld_t>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using global_st_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x,
@@ -140,7 +134,7 @@ struct xetla_data_transformer<
       mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>,
       global_st_tile_desc_t,
       msg_type::block_2d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using global_compute_tile_desc = subgroup::tile_desc_t<
       tile_size_x,
       tile_size_y,
@@ -157,7 +151,7 @@ struct xetla_data_transformer<
       reduce_op::max,
       wg_size_x * wg_size_y,
       true,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   /// @brief Arguments for gemm::run.
   /// User should prepare mat_in_ptr, mat_out_ptr, matrix_m, matrix_n,
@@ -292,7 +286,8 @@ struct xetla_data_transformer<
           simd,
           cache_hint::uncached,
           cache_hint::write_back,
-          atomic_op::fmax>(
+          atomic_op::fmax,
+          arch_tag>(
           (uint64_t)args->amax_ptr,
           offsets * sizeof(dtype_compute),
           local_max,

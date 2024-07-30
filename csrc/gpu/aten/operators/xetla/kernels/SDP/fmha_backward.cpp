@@ -14,7 +14,8 @@ template <
     typename scalar_t,
     bool kUseBias,
     bool kIsCausal,
-    bool kIsDropout>
+    bool kIsDropout,
+    gpu_arch arch_tag>
 class fmha_backward_t {
  public:
   using accum_t = float;
@@ -127,10 +128,8 @@ class fmha_backward_t {
   using compute_attr = group::compute_attr_t<scalar_t, scalar_t, accum_t>;
   using perf_tuning_knob =
       group::perf_tuning_knob_t<accum_step, stages, sync_freq>;
-  using compute_policy = group::compute_policy_default_xmx<
-      compute_attr,
-      perf_tuning_knob,
-      gpu_arch::XeHpc>;
+  using compute_policy = group::
+      compute_policy_default_xmx<compute_attr, perf_tuning_knob, arch_tag>;
 
   // ---------------- // Tile shape and Threads // ---------------- //
   static constexpr uint32_t kBr = fmha_policy::kBr;
@@ -229,8 +228,8 @@ class fmha_backward_t {
     uint32_t sg_idx;
     uint32_t sg_idy;
     // nbarrier
-    xetla_nbarrier_t<wg_size_x, wg_size_x> nbarrier;
-    xetla_nbarrier_t<wg_size_y, wg_size_y> nbarrier_y;
+    xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier;
+    xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier_y;
     // softmax statistics
 
     // mem desc variables
@@ -478,7 +477,7 @@ class fmha_backward_t {
     // Add bias if needed
     if constexpr (kUseBias) {
       if (args.is_bias_add) {
-        using mask_op_t = bias_add_op_t<scalar_t, gpu_arch::XeHpc>;
+        using mask_op_t = bias_add_op_t<scalar_t, arch_tag>;
         using mask_args_t = typename mask_op_t::arguments_t;
         int32_t tile_offset_x = ctx.sg_idx * kSgBc;
         ctx.mem_desc_Bij.update_coord_x(tile_offset_x);
@@ -486,8 +485,8 @@ class fmha_backward_t {
         mask_args_t mask_args(ctx.mem_desc_Bij.base, ctx.mem_desc_Bij.shape);
         mask_op(*matAcc_Sij, ctx.mem_desc_Bij.coord, mask_args);
       } else {
-        using bias_op_t = subgroup::
-            elemwise_reduce_op_t<reduce_op::sum, scalar_t, gpu_arch::XeHpc>;
+        using bias_op_t =
+            subgroup::elemwise_reduce_op_t<reduce_op::sum, scalar_t, arch_tag>;
         using bias_args_t = typename bias_op_t::arguments_t;
 
         int32_t tile_offset_x = ctx.sg_idx * kSgBc;
@@ -540,7 +539,7 @@ class fmha_backward_t {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         load_desc,
         msg_type::block_2d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     load_tile_t matL_load;
     load_payload_t load_payload(ctx.mem_desc_Li);
@@ -572,7 +571,7 @@ class fmha_backward_t {
                     uint8_t,
                     mem_desc_Dp_Mask_t::layout,
                     mem_desc_Dp_Mask_t::space>>,
-            gpu_arch::XeHpc>;
+            arch_tag>;
         load_payload_mask_t load_payload_mask(ctx.mem_desc_Dpij);
         subgroup::tile_load(*mask_in, load_payload_mask);
         matAcc_Sij_drop->reg = matAcc_Sij->reg * mask_in->reg * args.dp_scale;
@@ -586,9 +585,7 @@ class fmha_backward_t {
 
     // store Pij_drop to local memory, transpose it while saving
     using epilogue_p_t = group::epilogue_transp_t<
-        group::epilogue_policy_tile_op<
-            subgroup::chained_tile_op_t<>,
-            gpu_arch::XeHpc>,
+        group::epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, arch_tag>,
         tile_shape_BrBc,
         mem_desc_Pij_L_T_t>;
     epilogue_p_t epilogue;
@@ -681,7 +678,7 @@ class fmha_backward_t {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         load_desc,
         msg_type::block_2d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     load_tile_t matD_load;
     load_payload_t load_payload(ctx.mem_desc_Di);
@@ -700,7 +697,7 @@ class fmha_backward_t {
 
     // store dSij to local
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::XeHpc>,
+        group::epilogue_policy_default<arch_tag>,
         tile_shape_BrBc,
         mem_desc_dSij_L_t>;
     epilogue_t epilogue;
@@ -716,7 +713,7 @@ class fmha_backward_t {
       // dSij = dBij
       if (args.dB_ptr) {
         using epilogue_t = group::epilogue_write_back_t<
-            group::epilogue_policy_default<gpu_arch::XeHpc>,
+            group::epilogue_policy_default<arch_tag>,
             tile_shape_BrBc,
             mem_desc_dBij_t>;
         epilogue_t epilogue;
@@ -775,9 +772,7 @@ class fmha_backward_t {
       uint32_t startF) {
     // store dSij transpose to local
     using epilogue_s_t = group::epilogue_transp_t<
-        group::epilogue_policy_tile_op<
-            subgroup::chained_tile_op_t<>,
-            gpu_arch::XeHpc>,
+        group::epilogue_policy_tile_op<subgroup::chained_tile_op_t<>, arch_tag>,
         tile_shape_BrBc,
         mem_desc_dSij_L_T_t>;
     epilogue_s_t epilogue;
@@ -813,7 +808,7 @@ class fmha_backward_t {
         mem_desc_dQi_acc_t,
         typename matAcc_dQi_t::tile_desc,
         msg_type::atomic_add,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     store_t dQ_store(ctx.mem_desc_dQi_acc);
     subgroup::tile_store(matAcc_dQi, dQ_store);
   }
@@ -821,7 +816,7 @@ class fmha_backward_t {
   /// @brief store raw dKj to global memory.
   inline void store_dKj(matAcc_dKj_t& matAcc_dKj, const arguments_t& args) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::XeHpc>,
+        group::epilogue_policy_default<arch_tag>,
         tile_shape_BcHm,
         mem_desc_dKj_t>;
     epilogue_t epilogue;
@@ -831,7 +826,7 @@ class fmha_backward_t {
   /// @brief store raw dVj to global memory.
   inline void store_dVj(matAcc_dVj_t& matAcc_dVj, const arguments_t& args) {
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::XeHpc>,
+        group::epilogue_policy_default<arch_tag>,
         tile_shape_BcHm,
         mem_desc_dVj_t>;
     epilogue_t epilogue;
@@ -855,7 +850,7 @@ class fmha_backward_t {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         store_desc,
         msg_type::block_2d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     store_tile_t matD_store;
 
@@ -866,7 +861,7 @@ class fmha_backward_t {
         mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         load_desc_O,
         msg_type::block_2d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     load_tile_O_t matO_load;
     load_payload_O_t load_payload_O(ctx.mem_desc_Oi);
@@ -881,7 +876,7 @@ class fmha_backward_t {
     matAcc_D->reg = matAcc_O->reg * matAcc_dO->reg;
 
     using wg_row_sum_t =
-        group_row_reduce_t<matAcc_dQi_t, wg_size_x, reduce_op::sum>;
+        group_row_reduce_t<matAcc_dQi_t, wg_size_x, reduce_op::sum, arch_tag>;
     uint32_t reducer_slm =
         D_slm + ctx.sg_idy * wg_size_x * kSgBr * sizeof(accum_t);
 
@@ -904,7 +899,7 @@ class fmha_backward_t {
         mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         typename gemm_dQi_t::matAcc_tile_desc_t,
         msg_type::block_2d,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     matAcc_dQi_t matdQ_load;
     // mat_dQi_t matdQ;
@@ -917,7 +912,7 @@ class fmha_backward_t {
     // subgroup::elemwise_cvt(matdQ, matdQ_load);
 
     using epilogue_t = group::epilogue_t<
-        group::epilogue_policy_default<gpu_arch::XeHpc>,
+        group::epilogue_policy_default<arch_tag>,
         tile_shape_BrHm,
         mem_desc_dQi_t>;
     epilogue_t epilogue;
@@ -1210,9 +1205,17 @@ cgfs_t xetla_fmha_backward_kernel(
       kIsDropout,
       alpha);
 #endif
+
+  static constexpr gpu_arch arch_tag =
+      gpu_arch::XeHpc; // need to be modified later for multi-arch
   // fmha backward kernel
-  using fmha_backward_op_t =
-      fmha_backward_t<fmha_policy, T, kUseBias, kIsCausal, kIsDropout>;
+  using fmha_backward_op_t = fmha_backward_t<
+      fmha_policy,
+      T,
+      kUseBias,
+      kIsCausal,
+      kIsDropout,
+      arch_tag>;
 
   sycl::nd_range<3> NdRange =
       fmha_backward_op_t::get_nd_range(num_batches * num_heads);

@@ -44,41 +44,4 @@ enum class ln_bwd_fused_kind : uint8_t {
   ln_dropout = 3,
 };
 
-namespace group {
-
-/// @brief
-///
-/// @tparam fused_op_kind_
-/// @tparam dtype_in_
-/// @tparam dtype_out_
-/// @tparam dtype_acc_
-/// @tparam layer_norm_attr_
-/// @tparam arch_
-template <
-    ln_fwd_fused_kind fused_op_kind_,
-    typename dtype_in_,
-    typename dtype_out_,
-    typename dtype_acc_,
-    typename layer_norm_attr_,
-    gpu_arch arch_ = gpu_arch::XeHpc>
-struct ln_fwd_fused_op_t {};
-
-/// @brief
-///
-/// @tparam fused_op_kind_
-/// @tparam dtype_in_
-/// @tparam dtype_out_
-/// @tparam dtype_acc_
-/// @tparam layer_norm_attr_
-/// @tparam arch_
-template <
-    ln_bwd_fused_kind fused_op_kind_,
-    typename dtype_in_,
-    typename dtype_out_,
-    typename dtype_acc_,
-    typename layer_norm_attr_,
-    gpu_arch arch_ = gpu_arch::XeHpc>
-struct ln_bwd_fused_op_t {};
-
-} // namespace group
 } // namespace gpu::xetla

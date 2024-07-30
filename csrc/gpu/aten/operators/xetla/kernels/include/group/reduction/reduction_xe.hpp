@@ -19,8 +19,6 @@
 
 #pragma once
 
-#include <group/reduction/reduction_api.hpp>
-
 namespace gpu::xetla::group {
 
 template <
@@ -29,10 +27,12 @@ template <
     uint32_t N,
     reduce_op Op,
     uint32_t N_SG,
-    bool is_all_reduce>
-struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::XeHpc> {
-  group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::XeHpc> sg_reduce{};
-  xetla_nbarrier_t<N_SG, N_SG, gpu_arch::XeHpc> nbarrier;
+    bool is_all_reduce,
+    gpu_arch arch_tag_>
+struct group_reduce_t {
+  static constexpr gpu_arch arch_tag = arch_tag_;
+  group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, arch_tag> sg_reduce{};
+  xetla_nbarrier_t<N_SG, N_SG, arch_tag> nbarrier;
   uint32_t slm_base;
   uint32_t sg_id;
   using local_st_tile_desc =
@@ -46,14 +46,14 @@ struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::XeHpc> {
       mem_desc_ld_t,
       local_ld_tile_desc,
       subgroup::msg_type_v<local_ld_tile_desc, mem_desc_ld_t>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using mem_desc_st_t = mem_desc_t<T, mem_layout::row_major, mem_space::local>;
   using local_st_payload_t = subgroup::mem_payload_t<
       mem_desc_st_t,
       local_st_tile_desc,
       // subgroup::msg_type_v<local_ld_tile_desc, mem_desc_st_t>,
       msg_type::block_1d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   inline group_reduce_t() = default;
   inline group_reduce_t(
       uint32_t sg_id_,
@@ -105,8 +105,14 @@ struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::XeHpc> {
   }
 };
 
-template <typename T, uint32_t SZ, uint32_t N, reduce_op Op, bool is_all_reduce>
-struct group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::XeHpc> {
+template <
+    typename T,
+    uint32_t SZ,
+    uint32_t N,
+    reduce_op Op,
+    bool is_all_reduce,
+    gpu_arch arch_tag_>
+struct group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, arch_tag_> {
   inline group_reduce_t() = default;
   inline group_reduce_t(
       [[maybe_unused]] uint32_t sg_id_,
@@ -119,6 +125,8 @@ struct group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::XeHpc> {
   inline void set_slm_base([[maybe_unused]] uint32_t slm_base_ = 0) {}
   inline KERNEL_FUNC xetla_vector<T, N> operator()(
       xetla_vector<T, N * SZ> buffer) {
+    if constexpr (SZ == 1)
+      return buffer;
     auto buffer_2d = buffer.xetla_format<T, N, SZ>();
     xetla_vector<T, N> ret;
 #pragma unroll
