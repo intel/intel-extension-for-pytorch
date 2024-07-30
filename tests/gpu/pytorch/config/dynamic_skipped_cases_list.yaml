@@ -66,8 +66,12 @@
   - test_linalg.py::TestLinalgXPU::test_cholesky_errors_and_warnings_xpu_float64
   - test_linalg.py::TestLinalgXPU::test_cholesky_ex_non_pd_xpu_float32
   - test_linalg.py::TestLinalgXPU::test_cholesky_ex_non_pd_xpu_float64
+  - test_linalg.py::TestLinalgXPU::test_cholesky_inverse_xpu_float32
+  - test_linalg.py::TestLinalgXPU::test_cholesky_inverse_xpu_float64
   - test_linalg.py::TestLinalgXPU::test_linalg_matrix_exp_utils_xpu_float32
+  - test_linalg.py::TestLinalgXPU::test_outer_type_promotion_xpu_int32_int8
   - test_meta.py::TestMetaXPU::test_dispatch_meta_outplace_baddbmm_xpu_bfloat16
+  - test_meta.py::TestMetaXPU::test_dispatch_meta_outplace_nn_functional_scaled_dot_product_attention_xpu_float64
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_all_strides_linalg_cholesky_xpu_float32
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_all_strides_nn_functional_linear_xpu_float32
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_all_strides_pca_lowrank_xpu_float32
@@ -79,6 +83,7 @@
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_nn_functional_conv_transpose1d_xpu_bfloat16
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_nn_functional_conv_transpose1d_xpu_float16
   - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_nn_functional_conv_transpose1d_xpu_float64
+  - test_meta.py::TestMetaXPU::test_dispatch_symbolic_meta_outplace_nn_functional_scaled_dot_product_attention_xpu_float64
   - test_meta.py::TestMetaXPU::test_meta_outplace_addmm_xpu_float32
   - test_meta.py::TestMetaXPU::test_meta_outplace_addmv_xpu_bfloat16
   - test_meta.py::TestMetaXPU::test_meta_outplace_addmv_xpu_float16
@@ -144,10 +149,10 @@
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_512_xpu
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_layer_norm_backward_size_513_xpu
   - test_nestedtensor.py::TestNestedTensorDeviceTypeXPU::test_layer_norm_xpu_float32
+  - test_nn.py::TestNN::test_RNN_input_size_zero
   - test_nn.py::TestNN::test_pdist
   - test_nn.py::TestNN::test_pdist_cuda_gradgrad_unimplemented
   - test_nn.py::TestNN::test_pdist_large
-  - test_nn.py::TestNN::test_RNN_input_size_zero
   - test_nn.py::TestNN::test_pdist_zeros
   - test_ops.py::TestCommonXPU::test_dtypes___rmatmul___xpu
   - test_ops.py::TestCommonXPU::test_dtypes__refs_nn_functional_pdist_xpu
@@ -227,11 +232,28 @@
   - test_ops.py::TestCommonXPU::test_noncontiguous_samples_mm_xpu_float32
   - test_ops.py::TestCommonXPU::test_noncontiguous_samples_mv_xpu_float32
   - test_ops.py::TestCommonXPU::test_noncontiguous_samples_nn_functional_pdist_xpu_float32
+  - test_ops.py::TestCommonXPU::test_noncontiguous_samples_sgn_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_index_add_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_index_copy_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_index_put_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_index_reduce_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_index_select_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_inner_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_int_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_integral_dtype__refs_prod_xpu_int16
+  - test_ops.py::TestCommonXPU::test_out_integral_dtype__refs_sum_xpu_int16
+  - test_ops.py::TestCommonXPU::test_out_log_softmax_with_dtype_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_log_softmax_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_softmax_with_dtype_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_softmax_xpu_float32
   - test_ops.py::TestCommonXPU::test_variant_consistency_eager_nn_functional_pdist_xpu_float32
+  - test_ops.py::TestCommonXPU::test_variant_consistency_eager_sgn_xpu_float32
   - test_ops.py::TestCompositeComplianceXPU::test_backward_nn_functional_pdist_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_backward_sgn_xpu_float32
   - test_ops.py::TestFakeTensorXPU::test_fake_crossref_backward_no_amp_nn_functional_pdist_xpu_float32
   - test_ops.py::TestMathBitsXPU::test_neg_view_nn_functional_pdist_xpu_float64
   - test_ops.py::TestMathBitsXPU::test_neg_view_nn_functional_scaled_dot_product_attention_xpu_float64
+  - test_ops.py::TestMathBitsXPU::test_neg_view_sgn_xpu_float64
   - test_ops_gradients.py::TestBwdGradientsXPU::test_fn_grad_nn_functional_pdist_xpu_float64
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_matmul_xpu_float32
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_native_batch_norm_xpu_float32
@@ -249,8 +271,13 @@
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_nn_functional_local_response_norm_xpu_float32
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_nn_functional_pdist_xpu_float32
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_ormqr_xpu_float32
+  - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_sgn_xpu_float32
   - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_tensordot_xpu_float32
-- reason: Skipped due to no implemented for now. Associated ops will be implemented in future.
+  - test_serialization.py::TestOldSerialization::test_load_unicode_error_msg
+  - test_serialization.py::TestOldSerialization::test_serialization_backwards_compat
+  - test_serialization.py::TestOldSerialization::test_serialization_backwards_compat_safe
+- reason: Skipped due to no implemented for now. Associated ops will be implemented
+    in future.
   cases:
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_abs_backward_xpu
   - test_nestedtensor.py::TestNestedTensorAutogradXPU::test_accumulate_grad_different_strides_xpu
@@ -6418,7 +6445,7 @@
   - test_sparse_csr.py::TestSparseCompressedXPU::test_validate_SparseCSR_xpu_int64
   - test_sparse_csr.py::TestSparseCompressedXPU::test_validate_SparseCSR_xpu_int8
   - test_sparse_csr.py::TestSparseCompressedXPU::test_validate_SparseCSR_xpu_uint8
-- reason: Auto skipped due to porting of p2_other_Failed_ no_non-deterministic 
+- reason: Auto skipped due to porting of p2_other_Failed_ no_non-deterministic
   cases:
   - test_torch.py::TestTorchDeviceTypeXPU::test_nondeterministic_alert_AdaptiveAvgPool2d_xpu
   - test_torch.py::TestTorchDeviceTypeXPU::test_nondeterministic_alert_AdaptiveAvgPool3d_xpu
