@@ -1,4 +1,4 @@
-# Text Generation
+# LLM Inference Overview
 
 Here you can find the inference benchmarking scripts for large language models (LLM) text generation. These scripts:
 
@@ -13,13 +13,17 @@ Currently, only support Transformers 4.31.0. Support for newer versions of Trans
 
 | MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Arc™ A-Series Graphics (A770) |
 |---|:---:|:---:|:---:|:---:|:---:|
-|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅|✅ | ✅|
-|GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ |✅ | ✅|
-|Qwen|"Qwen/Qwen-7B"| ✅ | ✅ |✅ | ✅|
-|OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ | ❎ |✅ | ❎ |
-|Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ | ❎ |✅ | ❎ |
-|ChatGLM3-6B|"THUDM/chatglm3-6b"| ✅ | ❎ |✅ | ❎ |
-|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| ✅ | ❎ |✅ | ❎ |
+|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |🟩| 🟩|🟩|🟩|
+|GPT-J| "EleutherAI/gpt-j-6b" | 🟩 | 🟩 |🟩 | 🟩|
+|Qwen|"Qwen/Qwen-7B"|🟩 | 🟩 |🟩 | 🟩|
+|OPT|"facebook/opt-6.7b", "facebook/opt-30b"| 🟩 | 🟥 |🟩 | 🟥 |
+|Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| 🟩 | 🟥 |🟩 | 🟥 |
+|ChatGLM3-6B|"THUDM/chatglm3-6b"| 🟩 | 🟥 |🟩 | 🟥 |
+|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| 🟩 | 🟥 |🟩 | 🟥 |
+
+- 🟩 signifies that it is supported.
+
+- 🟥 signifies that it is not supported yet.
 
 
 **Note**: The verified models mentioned above (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well-supported with all optimizations like indirect access KV cache and fused ROPE. For other LLM families, we are actively working to implement these optimizations, which will be reflected in the expanded model list above. 
@@ -28,82 +32,16 @@ Currently, only support Transformers 4.31.0. Support for newer versions of Trans
 
 \* Intel® Data Center GPU Max Series (1550/1100) and Optimized on Intel® Arc™ A-Series Graphics (A770) : support all the models in the model list above.<br />
 
-
-## Environment Setup
-
-Note: The instructions in this section will setup an environment with a latest source build of IPEX on `xpu-main` branch.
-If you would like to use stable IPEX release versions, please refer to the instructions in [the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.30%2Bxpu/examples/gpu/inference/python/llm/README.md#environment-setup),
-in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
-
-
-### [Recommended] Docker-based environment setup with compilation from source
-
-```bash
-# Get the Intel® Extension for PyTorch* source code
-git clone https://github.com/intel/intel-extension-for-pytorch.git
-cd intel-extension-for-pytorch
-git checkout xpu-main
-git submodule sync
-git submodule update --init --recursive
-
-# Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch* from source
-docker build -f examples/gpu/inference/python/llm/Dockerfile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') --build-arg COMPILE=ON -t ipex-llm:main .
-
-# Run the container with command below
-docker run --privileged -it --rm --device /dev/dri:/dev/dri -v /dev/dri/by-path:/dev/dri/by-path \
---ipc=host --net=host --cap-add=ALL -v /lib/modules:/lib/modules --workdir /workspace  \
---volume `pwd`/examples/gpu/inference/python/llm/:/workspace/llm ipex-llm:main /bin/bash
-
-
-# When the command prompt shows inside the docker container, enter llm examples directory
-cd llm
-
-# Activate environment variables
-source ./tools/env_activate.sh
-```
-
-
-### Conda-based environment setup with compilation from source
-
-Make sure the driver and Base Toolkit are installed without using a docker container. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.1.30%2Bxpu&os=linux%2Fwsl2&package=source).
-
-
-
-```bash
-
-# Get the Intel® Extension for PyTorch* source code
-git clone https://github.com/intel/intel-extension-for-pytorch.git
-cd intel-extension-for-pytorch
-git checkout xpu-main
-git submodule sync
-git submodule update --init --recursive
-
-# Make sure you have GCC >= 11 is installed on your system.
-# Create a conda environment
-conda create -n llm python=3.10 -y
-conda activate llm
-# Setup the environment with the provided script
-cd examples/gpu/inference/python/llm
-# If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
-bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <AOT>
-conda deactivate
-conda activate llm
-source ./tools/env_activate.sh
-
-```
-
-where <br />
-- `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. Check [tutorial](../../../../../docs/tutorials/technical_details/AOT.md) for details.<br />
-
-
- 
 ## Run Models
 
 | Benchmark mode | FP16 | Weight only quantization INT4 |
 |---|:---:|:---:|
-|Single instance | ✅ | ✅ |
-| Distributed (autotp) |  ✅ | ❎ |
+|Single instance | 🟩 | 🟩 |
+| Distributed (autotp) |  🟩 | 🟥 |
 
+- 🟩 signifies that it is supported.
+
+- 🟥 signifies that it is not supported yet.
 
 Note: During the execution, you may need to log in your Hugging Face account to access model files. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
 

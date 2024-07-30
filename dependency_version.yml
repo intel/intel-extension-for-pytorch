@@ -21,12 +21,12 @@ deepspeed:
 intel-extension-for-deepspeed:
   version: 2.3.10
 transformers:
-  version: 4.38.1
+  version: 4.41.2
   commit: v4.38.1
 protobuf:
   version: 3.20.3
 lm_eval:
-  version: 0.3.0
+  version: 0.4.2
 basekit:
   dpcpp-cpp-rt:
     version: 2024.1.0
