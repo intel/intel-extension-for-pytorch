@@ -119,7 +119,6 @@ class global_reduce_t<
         atomic_op::iinc,
         dtype_cnt,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>((dtype_cnt*)address, offsets, pred);
     return ret[0];

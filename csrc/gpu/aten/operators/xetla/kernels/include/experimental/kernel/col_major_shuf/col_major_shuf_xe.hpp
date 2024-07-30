@@ -144,11 +144,10 @@ struct col_major_shuf_t<
             block_x * elt_per_block + row * block_size_x) =
             xetla_load_global<
                 dtype_in,
+                block_size_x,
                 1,
-                data_size::default_size,
                 cache_hint::cached,
-                cache_hint::cached,
-                block_size_x>(
+                cache_hint::cached>(
                 args.mat_in_ptr + (y_dim_offset + row) * args.matrix_x,
                 gidx,
                 1);

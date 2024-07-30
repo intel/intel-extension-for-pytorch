@@ -104,21 +104,7 @@ template <
 __XETLA_API typename std::enable_if_t<base_len == 0> process_1d_tail(
     [[maybe_unused]] tile_t& tile,
     [[maybe_unused]] payload_t& payload,
-    [[maybe_unused]] uint32_t offset) {}
-
-template <
-    uint32_t remained_len,
-    uint32_t base_len,
-    process_flag flag,
-    cache_hint L1,
-    cache_hint L2,
-    typename payload_t,
-    typename tile_t>
-__XETLA_API typename std::enable_if_t<base_len == 0> process_1d_tail(
-    [[maybe_unused]] tile_t& tile,
-    [[maybe_unused]] payload_t& payload,
-    [[maybe_unused]] uint32_t offset,
-    [[maybe_unused]] uint32_t address_offset) {}
+    [[maybe_unused]] uint32_t byte_offset) {}
 
 template <
     uint32_t remained_len,
@@ -130,26 +116,26 @@ template <
     typename tile_t>
 __XETLA_API typename std::enable_if_t<
     base_len != 0 && payload_t::memory_space == mem_space::global>
-process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
+process_1d_tail(tile_t& tile, payload_t& payload, uint32_t byte_offset) {
   using dtype = typename payload_t::dtype;
   if constexpr (remained_len >= base_len) {
-    uint32_t address_offset = offset * sizeof(dtype);
-    auto reg_sub = tile.reg.xetla_select<base_len / sizeof(dtype), 1>(offset);
+    auto reg_sub = tile.reg.xetla_select<base_len / sizeof(dtype), 1>(
+        byte_offset / sizeof(dtype));
     if constexpr (flag == process_flag::load) {
       reg_sub.xetla_format<dtype>() =
           xetla_load_global<dtype, base_len / sizeof(dtype), L1, L2>(
-              payload.base_ptr, payload.base_offset + address_offset);
+              payload.base_ptr, payload.base_offset + byte_offset);
     } else {
       xetla_store_global<dtype, base_len / sizeof(dtype), L1, L2>(
           payload.base_ptr,
-          payload.base_offset + address_offset,
+          payload.base_offset + byte_offset,
           reg_sub.xetla_format<dtype>());
     }
     process_1d_tail<remained_len - base_len, (base_len >> 1), flag, L1, L2>(
-        tile, payload, offset + base_len);
+        tile, payload, byte_offset + base_len);
   } else {
     process_1d_tail<remained_len, (base_len >> 1), flag, L1, L2>(
-        tile, payload, offset);
+        tile, payload, byte_offset);
   }
 }
 
@@ -163,20 +149,20 @@ template <
     typename tile_t>
 __XETLA_API typename std::enable_if_t<
     base_len != 0 && payload_t::memory_space == mem_space::local>
-process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
+process_1d_tail(tile_t& tile, payload_t& payload, uint32_t byte_offset) {
   using dtype = typename payload_t::dtype;
   if constexpr (remained_len >= base_len) {
-    uint32_t address_offset = offset * sizeof(dtype);
-    auto reg_sub = tile.reg.xetla_select<base_len / sizeof(dtype), 1>(offset);
+    auto reg_sub = tile.reg.xetla_select<base_len / sizeof(dtype), 1>(
+        byte_offset / sizeof(dtype));
     if constexpr (flag == process_flag::load) {
       reg_sub.xetla_format<dtype>() = xetla_load_local<
           dtype,
           base_len / sizeof(dtype),
           data_size::default_size>(
-          payload.base_address + payload.address + address_offset);
+          payload.base_address + payload.address + byte_offset);
     } else {
       xetla_store_local<dtype, base_len / sizeof(dtype)>(
-          payload.base_address + payload.address + address_offset,
+          payload.base_address + payload.address + byte_offset,
           reg_sub.xetla_format<dtype>());
     }
     process_1d_tail<
@@ -186,7 +172,7 @@ process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
         L1,
         L2,
         payload_t,
-        tile_t>(tile, payload, offset + base_len);
+        tile_t>(tile, payload, byte_offset + base_len);
   } else {
     process_1d_tail<
         remained_len,
@@ -195,7 +181,7 @@ process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
         L1,
         L2,
         payload_t,
-        tile_t>(tile, payload, offset);
+        tile_t>(tile, payload, byte_offset);
   }
 }
 
@@ -210,18 +196,15 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<(base_len < 8)> process_1d_tail(
     payload_t& payload,
-    uint32_t offset) {
-  using dtype = typename payload_t::dtype;
+    uint32_t byte_offset) {
   using prefetch_dtype = typename payload_t::prefetch_dtype;
-  uint32_t address_offset = offset * sizeof(dtype);
-  constexpr uint32_t prefetch_min_size = 64 / sizeof(prefetch_dtype);
+  constexpr uint32_t prefetch_min_size = 64;
   if constexpr (remained_len > 0) {
     xetla_prefetch_global<
         prefetch_dtype,
-        prefetch_min_size,
-        data_size::default_size,
+        prefetch_min_size / sizeof(prefetch_dtype),
         L1,
-        L2>(payload.base_ptr, payload.base_offset + address_offset);
+        L2>(payload.base_ptr, payload.base_offset + byte_offset);
   }
 }
 
@@ -233,26 +216,23 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<base_len >= 8> process_1d_tail(
     payload_t& payload,
-    uint32_t offset) {
-  using dtype = typename payload_t::dtype;
+    uint32_t byte_offset) {
   using prefetch_dtype = typename payload_t::prefetch_dtype;
   if constexpr (remained_len >= base_len) {
-    uint32_t address_offset = offset * sizeof(dtype);
     xetla_prefetch_global<
         prefetch_dtype,
-        base_len,
-        data_size::default_size,
+        base_len / sizeof(prefetch_dtype),
         L1,
-        L2>(payload.base_ptr, payload.base_offset + address_offset);
+        L2>(payload.base_ptr, payload.base_offset + byte_offset);
     process_1d_tail<
         remained_len - base_len,
         (base_len >> 1),
         L1,
         L2,
-        payload_t>(payload, offset + base_len * payload_t::scale_factor);
+        payload_t>(payload, byte_offset + base_len);
   } else {
     process_1d_tail<remained_len, (base_len >> 1), L1, L2, payload_t>(
-        payload, offset);
+        payload, byte_offset);
   }
 }
 

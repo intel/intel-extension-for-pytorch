@@ -455,7 +455,7 @@ tile_load(tile_t& tile, payload_t& payload) {
   using tile_desc = typename payload_t::tile_desc;
   using load_dtype = typename payload_t::mem_dtype;
   constexpr uint32_t num_channel = payload_t::num_channel;
-  constexpr uint32_t load_elems = num_channel * payload_t::simd_exec_size;
+  constexpr uint32_t load_elems = num_channel * payload_t::vector_size;
   constexpr uint32_t pack_factor = payload_t::pack_factor;
 
   auto channel_offset = payload.channel_offset + payload.base_offset;
@@ -472,14 +472,13 @@ tile_load(tile_t& tile, payload_t& payload) {
            (payload_t::mem_transpose ? tile_desc::block_size_x
                                      : tile_desc::block_size_y);
            sub_block_offset += num_channel) {
-        //   uint32_t sub_block_offset = 0;
         xetla_vector<load_dtype, load_elems> reg_tmp = 0;
         uint32_t address_offset = payload_t::mem_transpose
             ? (offset_x + sub_block_offset) * payload.pitch_in_bytes +
                 offset_y * sizeof(dtype)
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_offset) * payload.pitch_in_bytes;
-        xetla_mask<num_channel> pred = 1;
+        xetla_mask<num_channel> mask = 1;
         if constexpr (num_channel > 1) {
           // For SDP load, need pred
           const uint32_t sub_block_offset_x = payload.base_x + offset_x +
@@ -491,34 +490,35 @@ tile_load(tile_t& tile, payload_t& payload) {
           const auto size_ch_dim = payload_t::trans ? payload.width_in_elems
                                                     : payload.height_in_elems;
 
-          pred = offset_ch_dim + num_channel > size_ch_dim
+          mask = offset_ch_dim + num_channel > size_ch_dim
               ? (xetla_vector_gen<uint32_t, num_channel>(offset_ch_dim, 1) <
                  size_ch_dim)
               : 1;
         }
         reg_tmp = xetla_load_global<
             load_dtype,
-            payload_t::simd_exec_size,
-            data_size::default_size,
+            load_elems,
+            payload_t::vector_size,
             L1,
-            L2,
-            num_channel>(
-            payload.base_ptr, channel_offset + address_offset, pred);
+            L2>(
+            payload.base_ptr,
+            payload.channel_offset + payload.base_offset + address_offset,
+            mask);
 
         if constexpr (
-            payload_t::simd_exec_size > 1 && payload_t::num_channel > 1) {
+            payload_t::vector_size > 1 && payload_t::num_channel > 1) {
           xetla_vector<load_dtype, load_elems> reg_tmp_trans;
 #pragma unroll
           for (uint32_t iii = 0; iii < payload_t::num_channel; iii++) {
-            if ((bool)pred[iii]) // TODO (dingyi): Delete after driver fix
-              reg_tmp_trans.xetla_select<payload_t::simd_exec_size, 1>(
-                  iii * payload_t::simd_exec_size) =
+            if ((bool)mask[iii]) // TODO (dingyi): Delete after driver fix
+              reg_tmp_trans.xetla_select<payload_t::vector_size, 1>(
+                  iii * payload_t::vector_size) =
                   reg_tmp.xetla_select<
-                      payload_t::simd_exec_size,
+                      payload_t::vector_size,
                       payload_t::num_channel>(iii);
             else // TODO (dingyi): Delete after driver fix
-              reg_tmp_trans.xetla_select<payload_t::simd_exec_size, 1>(
-                  iii * payload_t::simd_exec_size) = 0;
+              reg_tmp_trans.xetla_select<payload_t::vector_size, 1>(
+                  iii * payload_t::vector_size) = 0;
           }
           reg_sub
               .xetla_select<load_elems * pack_factor, 1>(
@@ -683,13 +683,7 @@ tile_load(
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_y) * payload.pitch_in_bytes;
 
-        reg_tmp = xetla_load_global<
-            load_dtype,
-            1,
-            data_size::default_size,
-            L1,
-            L2,
-            load_elems>(
+        reg_tmp = xetla_load_global<load_dtype, load_elems, 1, L1, L2>(
             payload.base_ptr,
             channel_offset + address_offset,
             pred_x && pred_y);

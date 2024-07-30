@@ -198,7 +198,6 @@ struct epilogue_stream_k_t {
                 atomic_op::cmpxchg,
                 dtype_flag,
                 16,
-                data_size::default_size,
                 cache_hint::uncached,
                 cache_hint::write_back>(
                 flag_pointer, flag_offsets, old_val, zero_val, pred);

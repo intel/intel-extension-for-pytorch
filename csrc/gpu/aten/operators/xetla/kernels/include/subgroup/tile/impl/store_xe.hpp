@@ -375,13 +375,7 @@ tile_store(
 
         uint32_t address_offset = offset_x * sizeof(dtype) +
             (offset_y + sub_block_y) * payload.pitch_in_bytes;
-        xetla_store_global<
-            store_dtype,
-            1,
-            data_size::default_size,
-            L1,
-            L3,
-            store_elems>(
+        xetla_store_global<store_dtype, store_elems, 1, L1, L3>(
             payload.base_ptr,
             (address_offset + channel_offset),
             reg_sub
@@ -417,13 +411,7 @@ tile_store(
 
         uint32_t address_offset = offset_x * sizeof(dtype) +
             (offset_y + sub_block_y) * payload.pitch_in_bytes;
-        xetla_store_global<
-            store_dtype,
-            1,
-            data_size::default_size,
-            L1,
-            L3,
-            store_elems>(
+        xetla_store_global<store_dtype, store_elems, 1, L1, L3>(
             payload.base_ptr,
             (address_offset + channel_offset),
             reg_sub
@@ -464,7 +452,7 @@ tile_store(tile_t& tile, payload_t& payload) {
   using store_dtype = typename payload_t::mem_dtype;
 
   constexpr uint32_t num_channel = payload_t::num_channel;
-  constexpr uint32_t store_elems = num_channel * payload_t::simd_exec_size;
+  constexpr uint32_t store_elems = num_channel * payload_t::vector_size;
   constexpr uint32_t pack_factor = payload_t::pack_factor;
 
   auto channel_offset = payload.channel_offset + payload.base_offset;
@@ -485,7 +473,7 @@ tile_store(tile_t& tile, payload_t& payload) {
 
         xetla_vector<store_dtype, store_elems> reg_tmp;
 
-        if constexpr (payload_t::simd_exec_size > 1) {
+        if constexpr (payload_t::vector_size > 1) {
           xetla_vector<store_dtype, store_elems> reg_sub_before_trans =
               reg_sub
                   .xetla_select<store_elems * pack_factor, 1>(
@@ -493,11 +481,11 @@ tile_store(tile_t& tile, payload_t& payload) {
                   .xetla_format<store_dtype>();
 #pragma unroll
           for (uint32_t iii = 0; iii < payload_t::num_channel; iii++) {
-            reg_tmp.xetla_select<
-                payload_t::simd_exec_size,
-                payload_t::num_channel>(iii) =
-                reg_sub_before_trans.xetla_select<payload_t::simd_exec_size, 1>(
-                    iii * payload_t::simd_exec_size);
+            reg_tmp
+                .xetla_select<payload_t::vector_size, payload_t::num_channel>(
+                    iii) =
+                reg_sub_before_trans.xetla_select<payload_t::vector_size, 1>(
+                    iii * payload_t::vector_size);
           }
         } else {
           reg_tmp = reg_sub
@@ -513,29 +501,29 @@ tile_store(tile_t& tile, payload_t& payload) {
           xetla_vector<uint32_t, num_channel> channel_index =
               xetla_vector_gen<uint32_t, num_channel>(sub_block_offset_y, 1);
 
-          xetla_mask<num_channel> pred_y =
+          xetla_mask<num_channel> mask =
               channel_index < payload.height_in_elems;
           xetla_store_global<
               store_dtype,
-              payload_t::simd_exec_size,
-              data_size::default_size,
+              store_elems,
+              payload_t::vector_size,
               L1,
-              L3,
-              num_channel>(
+              L3>(
               payload.base_ptr,
               (address_offset + channel_offset),
               reg_tmp,
-              pred_y);
+              mask);
         } else if (
             sub_block_offset_y + num_channel <= payload.height_in_elems) {
           xetla_store_global<
               store_dtype,
-              payload_t::simd_exec_size,
-              data_size::default_size,
+              store_elems,
+              payload_t::vector_size,
               L1,
-              L3,
-              num_channel>(
-              payload.base_ptr, (address_offset + channel_offset), reg_tmp);
+              L3>(
+              payload.base_ptr,
+              (payload.base_offset + address_offset + payload.channel_offset),
+              reg_tmp);
         } else {
           break;
         }
@@ -678,13 +666,7 @@ tile_store(
                   sub_block_y * block_size_x),
               pred_x & pred_y);
         } else {
-          xetla_atomic_global<
-              op_kind,
-              dtype,
-              payload_t::num_channel,
-              data_size::default_size,
-              L1,
-              L2>(
+          xetla_atomic_global<op_kind, dtype, payload_t::num_channel, L1, L2>(
               reinterpret_cast<dtype*>(payload.base_pointer + address_offset),
               payload.channel_offset,
               reg_sub.xetla_select<payload_t::store_elems, 1>(

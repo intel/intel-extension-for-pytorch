@@ -120,14 +120,12 @@ tile_prefetch(payload_t& payload) {
 
       xetla_prefetch_global<
           prefetch_dtype,
-          payload_t::simd_exec_size,
-          data_size::default_size,
+          num_channel * payload_t::vector_size,
+          payload_t::vector_size,
           L1,
-          L2,
-          num_channel>(
+          L2>(
           payload.base_ptr,
-          payload.channel_offset + payload.base_offset + address_offset,
-          1);
+          payload.channel_offset + payload.base_offset + address_offset);
       //   }
     }
   }
@@ -151,32 +149,40 @@ __XETLA_API typename std::enable_if_t<
     detail::check_prefetch_type<payload_t>::is_global_block_1d>
 tile_prefetch(payload_t& payload) {
   using dtype = typename payload_t::dtype;
-  using tile_desc = typename payload_t::tile_desc;
   using prefetch_dtype = typename payload_t::prefetch_dtype;
-  constexpr uint32_t prefetch_len =
-      tile_desc::tile_size_x / payload_t::scale_factor;
+  using tile_desc = typename payload_t::tile_desc;
+  constexpr uint32_t prefetch_len = payload_t::mem_transpose
+      ? tile_desc::tile_size_y
+      : tile_desc::tile_size_x;
   constexpr uint32_t max_prefetch_in_bytes =
       load_store_attr_t<msg_type::block_1d, payload_t::arch_tag>::
           max_prefetch_vec_len;
-  if constexpr (prefetch_len >= max_prefetch_in_bytes) {
+  constexpr uint32_t max_prefetch_in_elems =
+      max_prefetch_in_bytes / sizeof(dtype);
+
+  static constexpr uint32_t prefetch_iter_steps =
+      prefetch_len / max_prefetch_in_elems;
+  if constexpr (prefetch_len >= max_prefetch_in_elems) {
 #pragma unroll
-    for (uint32_t j = 0; j < prefetch_len / max_prefetch_in_bytes; j++) {
-      uint32_t offset_x = j * max_prefetch_in_bytes * payload_t::scale_factor;
-      uint32_t address_offset = offset_x * sizeof(dtype);
+    for (uint32_t i = 0; i < prefetch_iter_steps; i++) {
+      uint32_t byte_offset = i * max_prefetch_in_bytes;
       xetla_prefetch_global<
           prefetch_dtype,
-          max_prefetch_in_bytes,
-          data_size::default_size,
+          max_prefetch_in_bytes / sizeof(prefetch_dtype),
           L1,
-          L2>(payload.base_ptr, payload.base_offset + address_offset);
+          L2>(payload.base_ptr, payload.base_offset + byte_offset);
     }
   }
-  constexpr uint32_t tail_len = prefetch_len % max_prefetch_in_bytes;
-  uint32_t tail_offset = prefetch_len / max_prefetch_in_bytes *
-      max_prefetch_in_bytes * payload_t::scale_factor;
-  detail::
-      process_1d_tail<tail_len, max_prefetch_in_bytes / 2, L1, L2, payload_t>(
-          payload, tail_offset);
+  constexpr uint32_t tail_len =
+      prefetch_len % max_prefetch_in_elems * sizeof(dtype);
+
+  uint32_t tail_offset = prefetch_iter_steps * max_prefetch_in_bytes;
+  detail::process_1d_tail<
+      tail_len,
+      (max_prefetch_in_bytes >> 1),
+      L1,
+      L2,
+      payload_t>(payload, tail_offset);
 }
 
 /// @brief Is prefetch data func.

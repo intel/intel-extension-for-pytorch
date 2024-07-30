@@ -350,11 +350,10 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_element> {
     uint32_t offset = (pos_y + pos_x * args.shape.stride) * sizeof(dtype_bias);
     auto bias_data_vector = xetla_load_global<
         dtype_bias,
+        16,
         1,
-        data_size::default_size,
         cache_hint::cached,
-        cache_hint::cached,
-        16>(ptr, offset);
+        cache_hint::cached>(ptr, offset);
     dtype_acc bias_data =
         xetla_cvt<dtype_acc, dtype_bias, 16>(bias_data_vector)[0];
 

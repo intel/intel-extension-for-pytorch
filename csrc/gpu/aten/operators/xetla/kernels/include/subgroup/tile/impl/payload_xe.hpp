@@ -1116,7 +1116,10 @@ struct mem_payload_t<
   static constexpr uint32_t tile_size_y = tile_desc::tile_size_y;
   static constexpr uint32_t block_size_x = tile_desc::block_size_x;
   static constexpr uint32_t block_size_y = tile_desc::block_size_y;
-
+  static constexpr uint32_t tile_bytes =
+      tile_size_x * tile_size_y * sizeof(dtype);
+  static constexpr uint32_t block_bytes =
+      block_size_x * block_size_y * sizeof(dtype);
   using this_payload_t =
       mem_payload_t<mem_desc_t, tile_desc, msg_type::block_2d, arch_tag_>;
 
@@ -1132,11 +1135,6 @@ struct mem_payload_t<
       (register_layout == reg_layout::vnni_tiled ||
        register_layout == reg_layout::vnni_tiled_col_major);
 
-  static constexpr uint32_t tile_bytes =
-      tile_size_x * tile_size_y * sizeof(dtype);
-  static constexpr uint32_t block_bytes =
-      block_size_x * block_size_y * sizeof(dtype);
-
   static constexpr uint32_t block_per_row_bytes = std::min(
       (mem_transpose ? block_size_y : block_size_x) * uint32_t(sizeof(dtype)),
       alignment_in_bytes);
@@ -1151,10 +1149,9 @@ struct mem_payload_t<
           dtype>::type>::type;
   static constexpr uint32_t pack_factor = sizeof(mem_dtype) / sizeof(dtype);
 
-  static constexpr uint32_t simd_exec_size =
-      (mem_transpose ? block_size_y : block_size_x) >= pack_factor
-      ? (mem_transpose ? block_size_y : block_size_x) / pack_factor
-      : 1;
+  static constexpr uint32_t vector_size =
+      ((mem_transpose ? block_size_y : block_size_x) + pack_factor - 1) /
+      pack_factor;
 
   // for pvc, we can use simd16 or simd32
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
@@ -1164,7 +1161,7 @@ struct mem_payload_t<
   static constexpr uint32_t max_bytes = std::min(max_load_vec_len, block_bytes);
 
   static constexpr uint32_t max_channel =
-      max_bytes / (simd_exec_size * sizeof(mem_dtype));
+      max_bytes / (vector_size * sizeof(mem_dtype));
 
   static constexpr uint32_t select_channel(const uint32_t channel) {
     return (channel >= load_store_attr::max_channel_num)
@@ -1175,8 +1172,7 @@ struct mem_payload_t<
   }
 
   static constexpr uint32_t num_channel = select_channel(
-      mem_transpose ? std::min(block_size_x, max_channel)
-                    : std::min(block_size_y, max_channel));
+      std::min(mem_transpose ? block_size_x : block_size_y, max_channel));
 
   xetla_vector<uint32_t, num_channel> channel_offset;
   xetla_vector<uint32_t, num_channel> step_x;
@@ -1261,7 +1257,7 @@ struct mem_payload_t<
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
-    base_ptr = (mem_dtype*)p;
+    base_ptr = p;
 
     xetla_vector<uint32_t, num_channel> channel_index =
         xetla_vector_gen<uint32_t, num_channel>(0, 1);
@@ -1723,10 +1719,9 @@ struct prefetch_payload_t<
       : (simd_channel >= block_size_y) ? block_size_y
                                        : simd_channel;
 
-  static constexpr uint32_t simd_exec_size =
-      (mem_transpose ? block_size_y : block_size_x) >= pack_factor
-      ? (mem_transpose ? block_size_y : block_size_x) / pack_factor
-      : 1;
+  static constexpr uint32_t vector_size = mem_transpose
+      ? (block_size_y + pack_factor - 1) / pack_factor
+      : (block_size_x + pack_factor - 1) / pack_factor;
 
   static constexpr uint32_t mem_tile_size_w =
       mem_transpose ? tile_size_y : tile_size_x;
@@ -2217,9 +2212,14 @@ struct prefetch_payload_t<
   // CL aligned, so we can use uint64_t
   using prefetch_dtype = uint64_t;
   static constexpr msg_type message_type = msg_type::block_1d;
-  using tile_desc = tile_desc_t<tile_size_x_, 1, block_size_x_, 1, reg_layout_>;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = mem_layout_;
+  static constexpr bool mem_transpose = memory_layout == mem_layout::col_major;
+  using tile_desc = std::conditional_t<
+      mem_transpose,
+      tile_desc_t<1, tile_size_y_, 1, block_size_y_, reg_layout_>,
+      tile_desc_t<tile_size_x_, 1, block_size_x_, 1, reg_layout_>>;
+
   static constexpr gpu_arch arch_tag = arch_tag_;
 
  private:
@@ -2239,13 +2239,7 @@ struct prefetch_payload_t<
   using this_payload_t =
       prefetch_payload_t<mem_desc_t, tile_desc, num_coop_sg_, arch_tag>;
 
-  // Fixed prefetch_dtype, close this assertion
-  // static_assert(sizeof(prefetch_dtype) >= 4,
-  //         "prefetch dtype size should at least DW aligned");
-
  public:
-  static constexpr uint32_t scale_factor =
-      sizeof(prefetch_dtype) / sizeof(dtype);
   uint32_t base_offset;
   prefetch_dtype* base_ptr;
   uint32_t pitch_in_bytes;
@@ -2265,14 +2259,21 @@ struct prefetch_payload_t<
     return *this;
   }
 
-  inline prefetch_payload_t(mem_desc_t& mem_desc, uint32_t coop_id = 0) {
+  inline prefetch_payload_t(
+      mem_desc_t& mem_desc,
+      [[maybe_unused]] uint32_t coop_id = 0) {
     pitch_in_bytes = mem_desc.shape.stride * sizeof(dtype);
     uint32_t offset_x = mem_desc.coord.x;
     uint32_t offset_y = mem_desc.coord.y;
-    base_offset = offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
-    uint64_t ptr_temp = (uint64_t)mem_desc.base.base;
-    base_ptr =
-        (prefetch_dtype*)ptr_temp + (coop_id % num_coop_sg) * mem_tile_size_x;
+    base_offset = mem_transpose
+        ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
+        : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
+
+    // uint64_t ptr_temp = (uint64_t)mem_desc.base.base;
+    // base_ptr =
+    //     (prefetch_dtype*)ptr_temp + (coop_id % num_coop_sg) *
+    //     mem_tile_size_x;
+    base_ptr = (prefetch_dtype*)mem_desc.base.base;
   }
 
   inline prefetch_payload_t(
@@ -2282,12 +2283,17 @@ struct prefetch_payload_t<
       int surface_pitch,
       int surface_offset_x,
       int surface_offset_y,
-      uint32_t coop_id = 0) {
+      [[maybe_unused]] uint32_t coop_id = 0) {
     pitch_in_bytes = surface_pitch * sizeof(dtype);
     uint32_t offset_x = surface_offset_x;
     uint32_t offset_y = surface_offset_y;
-    base_offset = offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
-    base_ptr = (prefetch_dtype*)p + (coop_id % num_coop_sg) * mem_tile_size_x;
+    base_offset = mem_transpose
+        ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
+        : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
+
+    // base_ptr = (prefetch_dtype*)p + (coop_id % num_coop_sg) *
+    // mem_tile_size_x;
+    base_ptr = (prefetch_dtype*)p;
   }
 
   inline void init(mem_desc_t& mem_desc, uint32_t coop_id = 0) {

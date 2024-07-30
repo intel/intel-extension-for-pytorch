@@ -1124,11 +1124,10 @@ class ifmha_forward_t {
       matAcc.reg.xetla_select<simd_lanes, 1>(i * simd_lanes) =
           xetla_load_global<
               scalar_t,
+              simd_lanes,
               1,
-              data_size::default_size,
               cache_hint::cached,
-              cache_hint::cached,
-              simd_lanes>(ptr, offsets);
+              cache_hint::cached>(ptr, offsets);
     }
   }
 
