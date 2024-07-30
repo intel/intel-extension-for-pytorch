@@ -1867,7 +1867,7 @@ void qlinear_woq_affine_dequant_upfront_impl(
       std::tuple</*qw_type*/ int, /*BLOCK_N*/ long>,
       std::tuple<
           enumerate_dispatcher<int, QINT8, QINT4, NF4>,
-          enumerate_dispatcher<long, 16, 32, 64, 128>>>::
+          enumerate_dispatcher<long, 32>>>::
       call(
           std::make_tuple(qw_type, Nb),
           [&](auto tuple) {
@@ -2440,7 +2440,7 @@ void qlinear_woq_affine_impl(
   product_dispatcher<
       std::tuple</*BLOCK_N*/ long, /*qw_type*/ int, /*no_dequant_weight*/ bool>,
       std::tuple<
-          enumerate_dispatcher<long, 16, 32, 64, 128>,
+          enumerate_dispatcher<long, 32>,
           enumerate_dispatcher<int, QINT8, QINT4, NF4>,
           enumerate_dispatcher<bool, false, true>>>::
       call(
