@@ -201,59 +201,60 @@ static at::Tensor dequantize_woq_weight(
     const at::Tensor& scale,
     const at::Tensor& zp,
     int64_t qw_type, // weight dtype
-    int64_t quant_w_mode // weight quant mode
-) {
-  bool sym_quant = qw_type == WOQ_DTYPE_NF4;
+    int64_t group_size) {
+  using namespace at::indexing;
+  static at::Tensor empty_tensor;
+  bool sym_quant = qw_type == WOQ_DTYPE_NF4 || !zp.defined();
   TORCH_CHECK(qw.dim() == 2, "Weight must 2D but got ", qw.dim(), "D");
   auto N = weight_shape[0];
   auto K = weight_shape[1];
+  at::Tensor w_int8;
+  if (qw_type == WOQ_DTYPE_NF4 || qw_type == WOQ_DTYPE_INT4) {
+    // unpack to uint8
+    w_int8 = at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
+    w_int8.index({Slice(), Slice(None, None, 2)}).copy_(qw.bitwise_and(0xf));
+    w_int8.index({Slice(), Slice(1, None, 2)}).copy_(qw.bitwise_right_shift(4));
+  } else { // INT8
+    w_int8 = qw;
+  }
   at::Tensor dqw;
-  if (qw_type == WOQ_DTYPE_NF4) {
-    TORCH_CHECK(sym_quant, "Weight must be symmetrically quantized for NF4");
-    using namespace at::indexing;
-    auto w_int8 = at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
-    w_int8.index({Slice(), Slice(None, None, 2)}).copy_(qw.bitwise_and(0xf));
-    w_int8.index({Slice(), Slice(1, None, 2)}).copy_(qw.bitwise_right_shift(4));
-    auto w_ret = map_nf4_tensor_to_float(w_int8);
-    if (quant_w_mode == 0) {
-      dqw = w_ret * scale;
+  if (group_size <= 0) {
+    if (qw_type == WOQ_DTYPE_NF4) {
+      dqw = map_nf4_tensor_to_float(w_int8) * scale;
     } else {
-      int64_t num_blocks = scale.size(-2);
-      auto w_int8_view = w_ret.view({N, num_blocks, -1});
-      dqw = w_int8_view * scale;
-      dqw = dqw.view({N, -1});
-    }
-  } else if (qw_type == WOQ_DTYPE_INT4) {
-    TORCH_CHECK(!sym_quant, "Weight must be asymmetrically quantized for INT4");
-    using namespace at::indexing;
-    auto w_int8 = at::empty({N, qw.size(1) * 2}, qw.options().dtype(at::kByte));
-    w_int8.index({Slice(), Slice(None, None, 2)}).copy_(qw.bitwise_and(0xf));
-    w_int8.index({Slice(), Slice(1, None, 2)}).copy_(qw.bitwise_right_shift(4));
-    if (quant_w_mode == 0) {
-      dqw = (w_int8.to(at::kFloat) - zp) * scale;
-    } else {
-      int64_t num_blocks = scale.size(-2);
-      auto w_int8_view = w_int8.view({N, num_blocks, -1});
-      dqw = (w_int8_view.to(at::kFloat) - zp) * scale;
-      dqw = dqw.view({N, -1});
+      dqw = sym_quant ? w_int8.to(at::kFloat) * scale
+                      : (w_int8.to(at::kFloat) - zp) * scale;
     }
   } else {
-    TORCH_CHECK(!sym_quant, "Weight must be asymmetrically quantized for INT8");
-    if (quant_w_mode == 0) {
-      dqw = sym_quant ? qw.to(at::kFloat) * scale
-                      : (qw.to(at::kFloat) - zp) * scale;
+    int64_t num_blocks = scale.size(-2);
+    auto rem = K % group_size;
+    auto w_fp = qw_type == WOQ_DTYPE_NF4 ? map_nf4_tensor_to_float(w_int8)
+                                         : w_int8.to(at::kFloat);
+    if (rem > 0) {
+      dqw = at::empty({N, K}, qw.options().dtype(at::kFloat));
+      auto w_com = w_fp.slice(1, 0, K - rem).view({N, -1, group_size});
+      auto w_rem = w_fp.slice(1, K - rem, K).view({N, 1, -1});
+      auto s_com = scale.slice(-2, 0, num_blocks - 1);
+      auto s_rem = scale.slice(-2, num_blocks - 1, num_blocks);
+      auto z_com = sym_quant ? empty_tensor : zp.slice(-2, 0, num_blocks - 1);
+      auto z_rem =
+          sym_quant ? empty_tensor : zp.slice(-2, num_blocks - 1, num_blocks);
+      auto dqw_com = sym_quant ? (w_com * s_com).view({N, -1})
+                               : ((w_com - z_com) * s_com).view({N, -1});
+      auto dqw_rem = sym_quant ? (w_rem * s_rem).view({N, -1})
+                               : ((w_rem - z_rem) * s_rem).view({N, -1});
+      dqw.index_put_({Slice(), Slice(None, K - rem)}, dqw_com);
+      dqw.index_put_({Slice(), Slice(K - rem, K)}, dqw_rem);
     } else {
-      int64_t num_blocks = scale.size(-2);
-      auto w_int8_view = qw.view({N, num_blocks, -1});
-      dqw = sym_quant ? w_int8_view.to(at::kFloat) * scale
-                      : (w_int8_view.to(at::kFloat) - zp) * scale;
-      dqw = dqw.view({N, -1});
+      auto w_fp_view = w_fp.view({N, num_blocks, -1});
+      dqw = sym_quant ? w_fp_view * scale : (w_fp_view - zp) * scale;
     }
+    dqw = dqw.view({N, -1});
   }
   if (K != qw.size(1) * 2) {
     TORCH_CHECK(
         K < qw.size(1) * 2, 'WOQ Linear kernel: Unexpected weight shape');
-    dqw = dqw.narrow(1, 0, K);
+    dqw = dqw.narrow(1, 0, K).contiguous();
   }
   return dqw;
 }

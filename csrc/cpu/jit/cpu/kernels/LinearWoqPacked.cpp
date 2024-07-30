@@ -335,7 +335,7 @@ static void _dequant_weight_and_cache_in_context(ContextLinearWoq& context) {
         scale,
         zp,
         context.weight_dtype_,
-        quant_w_mode);
+        context.group_size_);
     auto new_weight = N % 100 == 0
         ? block_weight(dequant_weight, 100, 64).to(c10::kBFloat16)
         : block_weight(dequant_weight, 64, 64).to(c10::kBFloat16);
