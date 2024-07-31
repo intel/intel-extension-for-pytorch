@@ -45,12 +45,13 @@ void prepareProfiler(
       config.state == ProfilerState::KINETO ||
           config.state == ProfilerState::KINETO_GPU_FALLBACK,
       "Supported only in Kineto profiler");
-  torch_ipex::xpu::dpcpp::profiler::impl::kineto::prepareTrace(
-      /*cpuOnly=*/!at::hasXPU(), activities, config.experimental_config);
 
 #ifdef USE_PTI
   prepareDevicePool();
 #endif
+
+  torch_ipex::xpu::dpcpp::profiler::impl::kineto::prepareTrace(
+      /*cpuOnly=*/!at::hasXPU(), activities, config.experimental_config);
 
   if (!config.experimental_config.performance_events.empty()) {
     TORCH_CHECK(
