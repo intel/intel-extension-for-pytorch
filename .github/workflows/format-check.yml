@@ -29,7 +29,8 @@ jobs:
       - name: flake8-check
         run: |
           pwd
-          pip install lintrunner pip install lintrunner-adapters
+          pip install lintrunner 
+          pip install lintrunner-adapters
           lintrunner init
           python scripts/tools/setup/flake8.py
  
