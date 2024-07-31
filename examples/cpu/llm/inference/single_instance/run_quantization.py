@@ -414,7 +414,10 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
     else:
         config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model.name == "mpt" and args.prompt is None:
-    config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
+    max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
+    if hasattr(config, "max_seq_len") and config.max_seq_len > max_seq_len:
+        max_seq_len = config.max_seq_len
+    config.max_seq_len = max_seq_len
 if model.name in ["git", "llava"]:
     config.batch_size = int(args.batch_size) * num_beams
 if model.name == "whisper":
