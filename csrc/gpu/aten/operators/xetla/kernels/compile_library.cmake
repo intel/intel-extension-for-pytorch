@@ -1,5 +1,5 @@
 
-function(add_library_with_options TARGET IS_DOUBLE_GRF)
+function(add_library_with_options TARGET IS_DOUBLE_GRF AOT_DEVLIST)
   # link openblas
   set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS}
     -fsycl
@@ -7,7 +7,7 @@ function(add_library_with_options TARGET IS_DOUBLE_GRF)
     -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS}
   )
 
-  if (USE_AOT_DEVLIST)
+  if (AOT_DEVLIST)
     set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
   endif()
 
@@ -34,31 +34,8 @@ function(add_library_with_options TARGET IS_DOUBLE_GRF)
 
   set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs )
 
-  if (USE_AOT_DEVLIST)
-    # Disable implementations for architectures not in USE_AOT_DEVLIST
-    function (disable_architecture_by_aot ARCH REGULAR_EXPRESSION)
-      string(REGEX MATCHALL ${REGULAR_EXPRESSION} USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST}")
-      string(REPLACE ";" "," USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST_${ARCH}}")
-      set(USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST_${ARCH}}" PARENT_SCOPE)
-      message(STATUS "XeTLA: USE_AOT_DEVLIST_${ARCH}: ${USE_AOT_DEVLIST_${ARCH}}")
-      if("${USE_AOT_DEVLIST_${ARCH}}" STRLESS_EQUAL "")
-        set(USE_XETLA_${ARCH} OFF PARENT_SCOPE)
-      endif()
-    endfunction()
-    disable_architecture_by_aot(XE_HPC "(pvc|xe-hpc)")
-    disable_architecture_by_aot(XE_HPG "(ats-m150|acm-g10|acm-g11|acm-g12|xe-hpg)")
-    disable_architecture_by_aot(XE_LPG "(mtl-m|mtl-s|mtl-p|xe-lpg|0x7d55|0x7dd5|0x7d57|0x7dd7)")
-
-    set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST}")
-    if (USE_XETLA_XE_HPC)  # Temporary fix as AOT fails of try to compile XE_HPC kernels for ats-m150 etc
-      message(STATUS "XeTLA: XE_HPC suppress other aot targets")
-      set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST_XE_HPC}")
-    elseif(USE_XETLA_XE_HPG) # Temporary fix as AOT fails of try to compile XE_HPG kernels for mtl-p etc
-      message(STATUS "XeTLA: XE_HPG suppress other aot targets")
-      set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST_XE_HPG}")
-    endif()
-    message(STATUS "XeTLA: XETLA_USE_AOT_DEVLIST: ${XETLA_USE_AOT_DEVLIST}")
-    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-device ${XETLA_USE_AOT_DEVLIST} -options '${XETLA_OFFLINE_OPTIONS}'")
+  if (AOT_DEVLIST)
+    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-device ${AOT_DEVLIST} -options '${XETLA_OFFLINE_OPTIONS}'")
   else()
     set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "${XETLA_OFFLINE_OPTIONS}")
   endif()
@@ -88,7 +65,7 @@ function(add_library_with_options TARGET IS_DOUBLE_GRF)
 
   target_link_options(${TARGET} PRIVATE ${XETLA_KERNEL_FLAGS})
   target_compile_options(${TARGET} PRIVATE -fsycl)
-  if (USE_AOT_DEVLIST)
+  if (AOT_DEVLIST)
     target_compile_options(${TARGET} PRIVATE -fsycl-targets=spir64_gen)
   endif()
 

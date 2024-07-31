@@ -13,6 +13,10 @@ elseif(NOT USE_XETLA) # if(<variable>): True if given a variable that is defined
   set(USE_XETLA "")
 endif()
 
+set(AOT_REGEX_XE_HPC "(xe-hpc.*|pvc|bmg-.*|lnl-.*|xe2-.*)")
+set(AOT_REGEX_XE_HPG "(xe-hpg.*|ats-m150|acm-.*|dg2-.*)")
+set(AOT_REGEX_XE_LPG "(xe-lpg.*|mtl-.*|0x7d55|0x7dd5|0x7d57|0x7dd7)")
+
 foreach(used_arch IN LISTS USE_XETLA)
   foreach(available_arch IN LISTS XETLA_AVAILABLE_ARCHS)
     if (used_arch STREQUAL available_arch)
@@ -27,21 +31,39 @@ foreach(used_arch IN LISTS USE_XETLA)
   endif()
 endforeach()
 
+set(XETLA_USE_AOT_DEVLIST)
 if (USE_AOT_DEVLIST)
-  # Disable implementations for architectures not in USE_AOT_DEVLIST
-  function (disable_architecture_by_aot ARCH REGULAR_EXPRESSION)
-    string(REGEX MATCHALL ${REGULAR_EXPRESSION} USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST}")
-    string(REPLACE ";" "," USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST_${ARCH}}")
-    set(USE_AOT_DEVLIST_${ARCH} "${USE_AOT_DEVLIST_${ARCH}}" PARENT_SCOPE)
-    message(STATUS "XeTLA: USE_AOT_DEVLIST_${ARCH}: ${USE_AOT_DEVLIST_${ARCH}}")
-    if("${USE_AOT_DEVLIST_${ARCH}}" STRLESS_EQUAL "")
-      set(USE_XETLA_${ARCH} OFF PARENT_SCOPE)
+  # dispatch aot targets to xetla's gpu_arch
+  string(REPLACE "," ";" L_USE_AOT_DEVLIST ${USE_AOT_DEVLIST})
+  foreach(aot_target IN LISTS L_USE_AOT_DEVLIST)
+    set(UNKNOWN_AOT_TARGET ON)
+    foreach(arch IN LISTS XETLA_AVAILABLE_ARCHS)
+      string(TOUPPER ${arch} ARCH)
+      if(aot_target MATCHES "^${AOT_REGEX_${ARCH}}$")  # Requires full match: e.g. pvc-vg can not match pvc
+        set(UNKNOWN_AOT_TARGET OFF)
+        list(APPEND XETLA_USE_AOT_DEVLIST_${ARCH} "${aot_target}")
+        message(STATUS "XeTLA: match arch from AOT: ${aot_target} - ${ARCH}")
+      endif()
+    endforeach()
+    if(UNKNOWN_AOT_TARGET)
+      message(FATAL_ERROR "XeTLA: unknown AOT target: ${aot_target}")
     endif()
-  endfunction()
-  disable_architecture_by_aot(XE_HPC "(pvc|xe-hpc)")
-  disable_architecture_by_aot(XE_HPG "(ats-m150|acm-g10|acm-g11|acm-g12|xe-hpg)")
-  disable_architecture_by_aot(XE_LPG "(mtl-m|mtl-s|mtl-p|mtl-h|mtl-u|xe-lpg|0x7d55|0x7dd5|0x7d57|0x7dd7)")
+  endforeach()
 
+  foreach(arch IN LISTS XETLA_AVAILABLE_ARCHS)
+    string(TOUPPER ${arch} ARCH)
+    if("${XETLA_USE_AOT_DEVLIST_${ARCH}}" STREQUAL "")
+      # Disable implementations for architectures not in USE_AOT_DEVLIST
+      set(USE_XETLA_${ARCH} OFF)
+    else()
+      # To comma separated string as aot device list
+      string(REPLACE ";" "," XETLA_USE_AOT_DEVLIST_${ARCH} "${XETLA_USE_AOT_DEVLIST_${ARCH}}")
+    endif()
+    message(STATUS "XeTLA: XETLA_USE_AOT_DEVLIST_${ARCH}: ${XETLA_USE_AOT_DEVLIST_${ARCH}}")
+  endforeach()
+  
+  # General USE_AOT_DEVLIST for XeTLA libs
+  # Use XETLA_USE_AOT_DEVLIST_${ARCH} if possible
   set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST}")
   if (USE_XETLA_XE_HPC)  # Temporary fix as AOT fails of try to compile XE_HPC kernels for ats-m150 etc
     message(STATUS "XeTLA: XE_HPC suppress other aot targets")
@@ -51,9 +73,6 @@ if (USE_AOT_DEVLIST)
     set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST_XE_HPG}")
   endif()
   message(STATUS "XeTLA: XETLA_USE_AOT_DEVLIST: ${XETLA_USE_AOT_DEVLIST}")
-  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "-device ${XETLA_USE_AOT_DEVLIST} -options '${XETLA_OFFLINE_OPTIONS}'")
-else()
-  set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} "${XETLA_OFFLINE_OPTIONS}")
 endif()
 
 cmake_minimum_required(VERSION 3.16)
@@ -86,7 +105,7 @@ fmha_forward_configure("${XETLA_USED_ARCHS}")
 # Xetla kernel apply different offline compiler options than framework.
 # If framework link XeTLA as static lib, link options would conflict now.
 # Temporarily adopting shared lib, will fix it soon.
-add_library_with_options(xetla_gemm TRUE ${kernels_src} ${FMHA_FORWARD_KERNEL_SRCS})
+add_library_with_options(xetla_gemm TRUE "${XETLA_USE_AOT_DEVLIST}" ${kernels_src} ${FMHA_FORWARD_KERNEL_SRCS})
 
 # ------------------------------------------------------------------------------------------------
 # compile libraries for INT4, one library for one configuration
@@ -96,10 +115,8 @@ GEMM_int4_configure("${XETLA_USED_ARCHS}")
 # ------------------------------------------------------------------------------------------------
 # link the libraries to the interface library\
 add_library(${TARGET} INTERFACE)
-message(STATUS "XETLA_LIBS: ${XETLA_LIBS}")
-set(XETLA_LIBS ${GEMM_INT4_LIBS})
-message(STATUS "XETLA_LIBS: ${XETLA_LIBS}")
 list(APPEND XETLA_LIBS xetla_gemm)
+list(APPEND XETLA_LIBS ${GEMM_INT4_LIBS})
 message(STATUS "XETLA_LIBS: ${XETLA_LIBS}")
 foreach(LIB ${XETLA_LIBS})
   target_link_libraries(${TARGET} INTERFACE ${LIB})
