@@ -29,6 +29,12 @@ Tensor& addmm_out(
   TORCH_CHECK(
       mat2.dim() == 2, "mat2 must be a matrix, got ", mat2.dim(), "-D tensor");
   TORCH_CHECK(
+      mat1.dtype() == mat2.dtype(),
+      "expected mat1 and mat2 to have the same dtype, but got: ",
+      mat1.dtype(),
+      " != ",
+      mat2.dtype())
+  TORCH_CHECK(
       mat1.sizes()[1] == mat2.sizes()[0],
       "mat1 and mat2 shapes cannot be multiplied (",
       mat1.sizes()[0],
@@ -185,6 +191,12 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
   TORCH_CHECK(self.dim() == 2, "self must be a matrix");
   TORCH_CHECK(mat2.dim() == 2, "mat2 must be a matrix");
   TORCH_CHECK(
+      self.dtype() == mat2.dtype(),
+      "expected self and mat2 to have the same dtype, but got: ",
+      self.dtype(),
+      " != ",
+      mat2.dtype())
+  TORCH_CHECK(
       self.sizes()[1] == mat2.sizes()[0],
       "mat1 and mat2 shapes cannot be multiplied (",
       self.sizes()[0],
@@ -262,6 +274,12 @@ Tensor& baddbmm_out(
   checkBackend("baddbmm_out", {input, batch1, batch2}, Backend::XPU);
   TORCH_CHECK(batch1.dim() == 3, "expected 3D tensor");
   TORCH_CHECK(batch2.dim() == 3, "expected 3D tensor");
+  TORCH_CHECK(
+      batch1.dtype() == batch2.dtype(),
+      "expected batch1 and batch2 to have the same dtype, but got: ",
+      batch1.dtype(),
+      " != ",
+      batch2.dtype())
 
   std::vector<int64_t> result_shape = {
       batch1.size(0), batch1.size(1), batch2.size(2)};
@@ -550,6 +568,12 @@ Tensor tensordot(
   TORCH_CHECK(
       dims1.size() == dims2.size(),
       "both dimension lists should have same length");
+  TORCH_CHECK(
+      input1.dtype() == input2.dtype(),
+      "expected input1 and input2 to have the same dtype, but got: ",
+      input1.dtype(),
+      " != ",
+      input2.dtype())
   int64_t csize = 1; // total size of the contracted dimensions
   Tensor t1 = input1;
   Tensor t2 = input2;

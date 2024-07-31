@@ -45,6 +45,12 @@ sycl::event matmul(
       "oneDNN input matrixes must have the same ranks");
   TORCH_CHECK(result.defined(), "oneDNN matmul result should be defined");
 
+  auto dtype = mat1.scalar_type();
+  if (dtype == at::ScalarType::Int || dtype == at::ScalarType::Long ||
+      dtype == at::ScalarType::Short) {
+    AT_ERROR("\"oneDNN matmul\" not implemented for '", toString(dtype), "'");
+  }
+
   at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // engine index means the engine created on which device
