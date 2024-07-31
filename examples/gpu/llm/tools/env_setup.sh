@@ -3,10 +3,10 @@ set -e
 
 # Mode: Select to compile projects into wheel files or install wheel files compiled.
 # High bit: 8 7 6 5 4 3 2 1 :Low bit
-#           | | | | | | | └- Install wheel files
-#           | | | | | | └--- Compile wheel files
+#           | | | | | | | └- Deploy env
+#           | | | | | | └--- Prepare env
 #           | | | | | └----- Install from prebuilt wheel files
-#           | | | | └------- Undefined
+#           | | | | └------- 0: inference, 1: fine-tuning
 #           | | | └--------- Undefined
 #           | | └----------- Undefined
 #           | └------------- Undefined
@@ -58,12 +58,6 @@ WHEELFOLDER=${BASEFOLDER}/../wheels
 AUX_INSTALL_SCRIPT=${WHEELFOLDER}/aux_install.sh
 cd ${BASEFOLDER}/..
 
-if [ $((${MODE} & 0x02)) -eq 0 ] &&
-   ([ ! -f ${WHEELFOLDER}/transformers*.whl ]); then
-    (( MODE |= 0x02 ))
-    echo "Expected wheel files are not found. Swith to source code compilation."
-fi
-
 if [ $((${MODE} & 0x06)) -eq 2 ] &&
    ([ -z ${DPCPP_ROOT} ] ||
    [ -z ${ONEMKL_ROOT} ] ||
@@ -79,7 +73,7 @@ fi
 # Check existance of required Linux commands
 if [ $((${MODE} & 0x02)) -ne 0 ]; then
     # Enter IPEX root dir
-    cd ../../../../..
+    cd ../../..
 
     if [ ! -f dependency_version.yml ]; then
         echo "Please check if `pwd` is a valid Intel® Extension for PyTorch* source code directory."
@@ -91,6 +85,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     VER_GCC=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
     VER_TORCH=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
     COMMIT_TRANSFORMERS=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d transformers -k commit)
+    VER_TRANSFORMERS=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d transformers -k version)
     VER_PROTOBUF=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d protobuf -k version)
     VER_LM_EVAL=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d lm_eval -k version)
     VER_IPEX_MAJOR=$(grep "VERSION_MAJOR" version.txt | cut -d " " -f 2)
@@ -142,21 +137,25 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     #echo "python -m pip install impi-devel" >> ${AUX_INSTALL_SCRIPT}
-    echo "python -m pip install cpuid accelerate datasets sentencepiece diffusers mpi4py protobuf==${VER_PROTOBUF} lm_eval==${VER_LM_EVAL} huggingface_hub py-cpuinfo " >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate unzip datasets sentencepiece diffusers mpi4py protobuf==${VER_PROTOBUF} lm_eval==${VER_LM_EVAL} huggingface_hub py-cpuinfo bitsandbytes transformers_stream_generator einops" >> ${AUX_INSTALL_SCRIPT}
     echo "python -m pip install deepspeed==${VER_DS}" >> ${AUX_INSTALL_SCRIPT}
 
     # Install Transformers
-    if [ -d transformers ]; then
+    if [ $((${MODE} & 0x08)) -eq 0 ]; then
+        if [ -d transformers ]; then
+            rm -rf transformers
+        fi
+        git clone https://github.com/huggingface/transformers.git
+        cd transformers
+        git checkout ${COMMIT_TRANSFORMERS}
+        git apply ../intel-extension-for-pytorch/examples/gpu/llm/tools/profile_patch
+        python setup.py bdist_wheel
+        cp dist/*.whl ${WHEELFOLDER}
+        cd ..
         rm -rf transformers
+    else
+        echo "python -m pip install transformers==${VER_TRANSFORMERS}" >> ${AUX_INSTALL_SCRIPT}
     fi
-    git clone https://github.com/huggingface/transformers.git
-    cd transformers
-    git checkout ${COMMIT_TRANSFORMERS}
-    git apply ../intel-extension-for-pytorch/examples/gpu/inference/python/llm/tools/profile_patch
-    python setup.py bdist_wheel
-    cp dist/*.whl ${WHEELFOLDER}
-    cd ..
-    rm -rf transformers
 
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
