@@ -5,15 +5,16 @@ import sys
 import shutil
 import re
 
+yaml = YAML()
+
 def load_from_yaml(yaml_file):
     with open(yaml_file, "r") as load_f:
-        yaml = YAML()
         loaded = yaml.load(load_f.read())
     return loaded
 
 def save_to_yaml(src, target_file):
     with open(target_file, "w") as save_f:
-        yaml.dump(src, save_f, Dumper=yaml.RoundTripDumper)
+        yaml.dump(src, save_f)
 
 def load_from_json(json_file):
     with open(json_file, "r") as load_f:
