@@ -33,8 +33,20 @@ if(DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
 endif()
 
 set(THIRD_PARTY_BUILD_PATH_NAME "cpu_third_party")
-add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn ${THIRD_PARTY_BUILD_PATH_NAME}/ideep/mkl-dnn EXCLUDE_FROM_ALL)
-# add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/mkl-dnn cpu_third_party/mkl-dnn)
+if(USE_SYSTEM_ONEDNN)
+  find_package(dnnl 3.4.1 CONFIG REQUIRED)
+  get_target_property(ONEDNN_INCLUDE_DIR DNNL::dnnl INTERFACE_INCLUDE_DIRECTORIES)
+  set(ONEDNN_LIBRARY DNNL::dnnl)
+  set(ONEDNN_GENERATED_INCLUDE ${ONEDNN_INCLUDE_DIR})
+else()
+  add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn ${THIRD_PARTY_BUILD_PATH_NAME}/ideep/mkl-dnn EXCLUDE_FROM_ALL)
+  set(ONEDNN_INCLUDE_DIR ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
+  set(ONEDNN_LIBRARY dnnl)
+
+  # path of oneDNN .h.in generated file
+  file(RELATIVE_PATH CUR_DIR_REL_PATH "${IPEX_ROOT_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
+  set(ONEDNN_GENERATED_INCLUDE "${CMAKE_BINARY_DIR}/${CUR_DIR_REL_PATH}/${THIRD_PARTY_BUILD_PATH_NAME}/ideep/mkl-dnn/include")
+endif()
 
 IF(IPEX_DISP_OP)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIPEX_DISP_OP")
@@ -116,7 +128,7 @@ add_library(${PLUGIN_NAME_CPU} SHARED ${IPEX_CPU_CPP_SRCS})
 # For IPEX_API macro
 target_compile_definitions(${PLUGIN_NAME_CPU} PUBLIC "BUILD_IPEX_MAIN_LIB")
 
-set_target_properties(${PLUGIN_NAME_CPU} PROPERTIES ONEDNN_INCLUDE_DIR "${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include")
+set_target_properties(${PLUGIN_NAME_CPU} PROPERTIES ONEDNN_INCLUDE_DIR ${ONEDNN_INCLUDE_DIR})
 
 # includes
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_ROOT_DIR})
@@ -129,19 +141,21 @@ target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/jit)
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_JIT_CPP_ROOT})
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_UTLIS_CPP_ROOT})
 
-target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/mkl-dnn/include)
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${ONEDNN_INCLUDE_DIR})
 
 if(USE_LIBXSMM)
   target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_ROOT_DIR}/tpp)
-  target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
+  target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${LIBXSMM_INCLUDE_DIRS})
 endif(USE_LIBXSMM)
 
-# path of oneDNN .h.in generated file
-file(RELATIVE_PATH CUR_DIR_REL_PATH "${IPEX_ROOT_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
-set(ONEDNN_GENERATED_INCLUDE "${CMAKE_BINARY_DIR}/${CUR_DIR_REL_PATH}/${THIRD_PARTY_BUILD_PATH_NAME}/ideep/mkl-dnn/include")
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${ONEDNN_GENERATED_INCLUDE})
 
-target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
+if(USE_SYSTEM_IDEEP)
+  find_path(IDEEP_INCLUDE_DIR ideep.hpp REQUIRED)
+else()
+  set(IDEEP_INCLUDE_DIR ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/ideep/include)
+endif()
+target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IDEEP_INCLUDE_DIR})
 target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${PYTHON_INCLUDE_DIR})
 
 if(BUILD_CPU_WITH_ONECCL)
@@ -161,12 +175,17 @@ if(CLANG_FORMAT)
 endif()
 
 if(USE_LIBXSMM)
-  if(BUILD_LIBXSMM_VIA_CMAKE)
+  if(USE_SYSTEM_LIBXSMM)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBXSMM REQUIRED libxsmm)
+    target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${LIBXSMM_INCLUDE_DIRS})
+    target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${LIBXSMM_LIBRARIES})
+  elseif(BUILD_LIBXSMM_VIA_CMAKE)
     add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm cpu_third_party/libxsmm EXCLUDE_FROM_ALL)
     add_definitions(-DLIBXSMM_DEFAULT_CONFIG)
-    target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
+    set(LIBXSMM_INCLUDE_DIRS ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
     target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE xsmm)
-  else(BUILD_LIBXSMM_VIA_CMAKE)
+  else()
     include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
     set(args
     CC=${CMAKE_C_COMPILER}
@@ -184,20 +203,31 @@ if(USE_LIBXSMM)
         ${args}
       INSTALL_COMMAND ""
       )
+    set(LIBXSMM_INCLUDE_DIRS ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/include)
     target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/libxsmm/lib/libxsmm.a)
   endif(BUILD_LIBXSMM_VIA_CMAKE)
 endif(USE_LIBXSMM)
 
-# setup sleef options:
-set(SLEEF_BUILD_SHARED_LIBS OFF CACHE BOOL "Build sleef as static library" FORCE)
-set(SLEEF_BUILD_DFT OFF CACHE BOOL "Don't build sleef DFT lib" FORCE)
-set(SLEEF_BUILD_GNUABI_LIBS OFF CACHE BOOL "Don't build sleef gnuabi libs" FORCE)
-set(SLEEF_BUILD_TESTS OFF CACHE BOOL "Don't build sleef tests" FORCE)
-set(SLEEF_BUILD_SCALAR_LIB OFF CACHE BOOL "libsleefscalar will be built." FORCE)
-add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/sleef ${THIRD_PARTY_BUILD_PATH_NAME}/sleef EXCLUDE_FROM_ALL)
-target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE sleef)
+if(USE_SYSTEM_SLEEF)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(SLEEF REQUIRED sleef)
+  target_include_directories(${PLUGIN_NAME_CPU} PUBLIC ${SLEEF_INCLUDE_DIRS})
+  target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE ${SLEEF_LIBRARIES})
+else()
+  # setup sleef options:
+  set(SLEEF_BUILD_SHARED_LIBS OFF CACHE BOOL "Build sleef as static library" FORCE)
+  set(SLEEF_BUILD_DFT OFF CACHE BOOL "Don't build sleef DFT lib" FORCE)
+  set(SLEEF_BUILD_GNUABI_LIBS OFF CACHE BOOL "Don't build sleef gnuabi libs" FORCE)
+  set(SLEEF_BUILD_TESTS OFF CACHE BOOL "Don't build sleef tests" FORCE)
+  set(SLEEF_BUILD_SCALAR_LIB OFF CACHE BOOL "libsleefscalar will be built." FORCE)
+  add_subdirectory(${IPEX_CPU_CPP_THIRD_PARTY_ROOT}/sleef ${THIRD_PARTY_BUILD_PATH_NAME}/sleef EXCLUDE_FROM_ALL)
+  target_link_libraries(${PLUGIN_NAME_CPU} PRIVATE sleef)
+endif()
 
-add_dependencies(${PLUGIN_NAME_CPU} dnnl)
+if(NOT USE_SYSTEM_ONEDNN)
+  add_dependencies(${PLUGIN_NAME_CPU} dnnl)
+endif()
+
 # If Graph Compiler is built, then it should link to its LLVM dependencies,
 # and not the LLVM symbols exposed by PyTorch.
 if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
@@ -209,7 +239,7 @@ if (DEFINED ENV{DNNL_GRAPH_BUILD_COMPILER_BACKEND})
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs=${DNNL_GRAPHCOMPILER_LLVM_LIB_EXCLUDE}")
   endif()
 else()
-  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC dnnl)
+  target_link_libraries(${PLUGIN_NAME_CPU} PUBLIC ${ONEDNN_LIBRARY})
 endif()
 find_package(oneMKL QUIET)
 if (ONEMKL_FOUND)
