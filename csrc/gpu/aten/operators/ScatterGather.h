@@ -108,13 +108,15 @@ void scatter_impl(
     FillStub& fill_stub,
     const c10::optional<c10::string_view> reduce = nullopt,
     bool reduce_includes_self = true) {
-  if (index.numel() == 0)
-    return;
   dim = at::maybe_wrap_dim(dim, self.dim());
   auto mut_out = const_cast<Tensor&>(out);
 
   if (!self.is_same(mut_out)) {
     mut_out.copy_(self);
+  }
+
+  if (index.numel() == 0) {
+    return;
   }
 
   if (reduce.has_value()) {
