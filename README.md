@@ -54,7 +54,7 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 |Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 | 🟩 |   |   |
+|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 | 🟩 | 🟩 |   |
 
 - 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
 
