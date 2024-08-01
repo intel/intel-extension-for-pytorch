@@ -21,6 +21,5 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama
 | facebook/opt-30b | python run.py -m facebook/opt-30b --ipex-smooth-quant --batch-size 56 --calib-iters 100 --calib-shuffle |
 | facebook/opt-1.3b | python run.py -m facebook/opt-1.3b --ipex-smooth-quant --batch-size 56 --calib-iters 100 --calib-shuffle --alpha 0.85 |
 | baichuan-inc/Baichuan2-7B-Chat | python run.py -m baichuan-inc/Baichuan2-7B-Chat --ipex-smooth-quant --batch-size 56 --calib-iters 100 --calib-shuffle --alpha 0.95 |
-| baichuan-inc/Baichuan2-13B-Chat | python run.py -m baichuan-inc/Baichuan2-13B-Chat --ipex-smooth-quant --batch-size 56 --calib-iters 100 --calib-shuffle --alpha 0.65 |
 
 *Note*: The above examples are validated with good accuracy on the "lamada_openai" dataset.

@@ -311,8 +311,3 @@ $ ldd example-app
         libdnnl_graph.so.0 => /workspace/libtorch/lib/libdnnl_graph.so.0 (0x00007f3cde954000)
         ...
 ```
-
-## Intel® AI Reference Models
-
-Use cases that have already been optimized by Intel engineers are available at [Intel® AI Reference Models](https://github.com/IntelAI/models/tree/pytorch-r2.4-models) (former Model Zoo). A number of PyTorch use cases for benchmarking are also available in the [benchmarks](https://github.com/IntelAI/models/tree/pytorch-r2.4-models/benchmarks#pytorch-use-cases). You can get performance benefits out-of-the-box by simply running scripts in the Intel® AI Reference Models.
-

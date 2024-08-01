@@ -4,16 +4,16 @@
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟨 | 🟩 |   |
-|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
 |GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 |   |
-|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 |   |   |   |
+|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
@@ -23,7 +23,7 @@
 |Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 | 🟨 |
 |ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 | 🟩 |   |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
@@ -32,15 +32,15 @@
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 |   |
+|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 | 🟩 |
 |GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |   |
 |Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |   |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 |   |   |   |
+|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 | 🟩 |   |   |
 
 ## 1.2 Verified for distributed inference mode via DeepSpeed
 
@@ -278,17 +278,20 @@ We provide the following qconfig summary files with good quality (calibration on
 
 | Model ID | Download links |
 |---|:---:|
-| meta-llama/Llama-2-7b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-7b_qconfig.json) |
 | meta-llama/Llama-2-13b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-13b_qconfig.json) |
 | meta-llama/Llama-2-70b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-70b_qconfig.json) |
 | EleutherAI/gpt-j-6b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/gpt-j-6b_qconfig.json) |
+| tiiuae/falcon-7b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-7b_qconfig.json) |
 | tiiuae/falcon-40b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-40b_qconfig.json) |
 | facebook/opt-30b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-30b_qconfig.json) |
 | facebook/opt-1.3b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-1b3_qconfig.json) |
 | baichuan-inc/Baichuan2-7B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan2-7b_qconfig.json) |
-| baichuan-inc/Baichuan2-13B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan2-13b_qconfig.json) |
 | baichuan-inc/Baichuan-13B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan-13b_qconfig.json) |
 | bigscience/bloom-1b7 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/bloom-1b7_qconfig.json) |
+| Salesforce/codegen-2B-multi | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/codegen-2b_qconfig.json) |
+| mosaicml/mpt-7b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/mpt-7b_qconfig.json) |
+| microsoft/phi-2 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/phi-2_qconfig.json) |
+| openai/whisper-large-v2 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/whisper_qconfig.json) |
 
 If you would like to generate qconfig summary files (due to changes on model variants or calibration dataset), we provide the [autotune API](../../../../docs/tutorials/features/sq_recipe_tuning_api.md) and its [tuning examples](llm_sq_recipes.md), which allows an automatic global smoothquant tuning, and automatic layer-by-layer tuning provided by Intel® Neural Compressor for the best accuracy.
 
