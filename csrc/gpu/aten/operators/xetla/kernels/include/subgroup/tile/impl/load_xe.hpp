@@ -500,10 +500,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             load_elems,
             payload_t::vector_size,
             L1,
-            L2>(
-            payload.base_ptr,
-            payload.channel_offset + payload.base_offset + address_offset,
-            mask);
+            L2>(payload.base_ptr, channel_offset + address_offset, mask);
 
         if constexpr (
             payload_t::vector_size > 1 && payload_t::num_channel > 1) {
