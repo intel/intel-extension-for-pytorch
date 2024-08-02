@@ -181,8 +181,7 @@ def test_varlen_fwd(
         )
     out_ref = query.clone()
     out = query.clone()
-
-    torch.ops.torch_ipex.varlen_fwd(
+    ipex.llm.functional.varlen_fwd(
         query,
         key,
         value,
@@ -190,13 +189,16 @@ def test_varlen_fwd(
         cu_seqlen,
         cu_seqlen,
         None,
-        alibi_slopes,
+        None,
+        alibi_slopes if use_alibi else None,
         max_seqlen,
         max_seqlen,
         0.0,
         softmax_scale,
         False,
         is_causal,
+        -1,
+        -1,
         False,
         None,
     )

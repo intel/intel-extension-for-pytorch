@@ -392,6 +392,53 @@ class VarlenAttention(nn.Module):
             gen_,
         )
 
+    @classmethod
+    def apply_function_flash_varlen(
+        cls,
+        query,
+        key,
+        value,
+        out,
+        seqlen_q,
+        seqlen_k,
+        seqused_k,
+        block_tables_,
+        alibi_slopes,
+        max_seqlen_q,
+        max_seqlen_k,
+        p_dropout,
+        softmax_scale,
+        zero_tensors,
+        is_causal,
+        window_size_left,
+        window_size_right,
+        return_softmax,
+        gen_,
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            query.device.type, IPEXCustomOpType.VARLEN_ATTENTION, False
+        ).apply_function_flash_varlen(
+            query,
+            key,
+            value,
+            out,
+            seqlen_q,
+            seqlen_k,
+            seqused_k,
+            block_tables_,
+            alibi_slopes,
+            max_seqlen_q,
+            max_seqlen_k,
+            p_dropout,
+            softmax_scale,
+            zero_tensors,
+            is_causal,
+            window_size_left,
+            window_size_right,
+            return_softmax,
+            gen_,
+        )
+
     def forward(
         self,
         query: torch.Tensor,
@@ -519,6 +566,18 @@ class PagedAttention:
             value_cache,
             slot_mapping.int() if slot_mapping.dtype is torch.long else slot_mapping,
         )
+
+    @classmethod
+    def swap_blocks(cls, src, dst, block_map):
+        return cls.runtime_ops.get_module_from_device(
+            "xpu", IPEXCustomOpType.PAGED_ATTENTION, False
+        ).swap_blocks(src, dst, block_map)
+
+    @classmethod
+    def copy_blocks(cls, key_cache, value_cache, block_map):
+        return cls.runtime_ops.get_module_from_device(
+            key_cache[0].device.type, IPEXCustomOpType.PAGED_ATTENTION, False
+        ).copy_blocks(key_cache, value_cache, block_map)
 
     @classmethod
     def single_query_cached_kv_attention(

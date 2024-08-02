@@ -12,6 +12,7 @@
 #include <torch/custom_class.h>
 #include <utils/DPCPP.h>
 #include <utils/SimpleTrace.h>
+#include <cstdint>
 #include "../Blas.h"
 #include "../DistributionTemplates.h"
 #include "../RandomEngine.h"
@@ -1499,6 +1500,64 @@ void xetla_paged_attention_v2(
       alibi_slopes);
 }
 
+void paged_attention(
+    Tensor& output,
+    const Tensor& query,
+    const Tensor& key_cache,
+    const Tensor& value_cache,
+    const Tensor& head_mapping,
+    const Tensor& block_tables,
+    const Tensor& context_lens,
+    const double head_scale,
+    const int64_t block_size,
+    const int64_t max_context_len,
+    const c10::optional<Tensor>& alibi_slopes) {
+  // This partition size follows the vllm's paged attention implementation
+  int32_t partition_size = 512;
+  if (max_context_len > partition_size) {
+    int32_t num_partitions =
+        (max_context_len + partition_size - 1) / partition_size;
+    int64_t num_tokens = query.size(0);
+    int64_t num_heads = query.size(1);
+    int64_t head_dim = query.size(2);
+    Tensor tmp_output = at::empty(
+        {num_tokens, num_heads, num_partitions, head_dim},
+        query.options().dtype(query.scalar_type()).device(query.device()));
+    Tensor exp_sums = at::empty(
+        {num_tokens, num_heads, num_partitions},
+        query.options().dtype(at::kFloat).device(query.device()));
+    Tensor max_logits = at::empty_like(exp_sums);
+    xetla_paged_attention_v2(
+        max_logits,
+        exp_sums,
+        tmp_output,
+        output,
+        query,
+        key_cache,
+        value_cache,
+        head_mapping,
+        block_tables,
+        context_lens,
+        head_scale,
+        block_size,
+        max_context_len,
+        alibi_slopes);
+  } else {
+    xetla_paged_attention_v1(
+        output,
+        query,
+        key_cache,
+        value_cache,
+        head_mapping,
+        block_tables,
+        context_lens,
+        head_scale,
+        block_size,
+        max_context_len,
+        alibi_slopes);
+  }
+}
+
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeNestedTensorXPU {
@@ -2358,5 +2417,10 @@ IPEX_LIBRARY_FRAGMENT() {
 
   IPEX_OP_REGISTER_DISPATCH(
       "varlen_fwd", at::AtenIpexTypeXPU::varlen_fwd, c10::DispatchKey::XPU)
+
+  IPEX_OP_REGISTER_DISPATCH(
+      "paged_attention",
+      at::AtenIpexTypeXPU::paged_attention,
+      c10::DispatchKey::XPU)
 }
 } // namespace

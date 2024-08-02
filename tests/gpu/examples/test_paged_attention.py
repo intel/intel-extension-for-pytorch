@@ -167,7 +167,8 @@ class TestPagedAttention(TestCase):
             num_queries_per_kv,
         )
         alibi_slopes = None
-        context_lens = [512 + i for i in range(num_seqs)]
+        seqlens = 128 if version == "v1" else 512
+        context_lens = [seqlens + i for i in range(num_seqs)]
 
         max_context_len = max(context_lens)
         context_lens = torch.tensor(context_lens, dtype=torch.int, device="cpu")
