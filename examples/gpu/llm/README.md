@@ -2,7 +2,7 @@
 
 Here you can find benchmarking scripts for large language models (LLM) text generation. These scripts:
 
-- Support Llama 2, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as ChatGLMv3-6B and Baichuan2-13B. 
+- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other models such as ChatGLMv3-6B, Baichuan2-13B and Phi3-mini. 
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 

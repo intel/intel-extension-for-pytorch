@@ -2,7 +2,7 @@
 
 Here you can find the inference benchmarking scripts for large language models (LLM) text generation. These scripts:
 
-- Support Llama 2, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as ChatGLMv3-6B and Baichuan2-13B. 
+- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as ChatGLMv3-6B, Baichuan2-13B and Phi3-mini. 
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
@@ -14,6 +14,8 @@ Currently, only support Transformers 4.31.0. Support for newer versions of Trans
 | MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Arc™ A-Series Graphics (A770) |
 |---|:---:|:---:|:---:|:---:|:---:|
 |Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |🟩| 🟩|🟩|🟩|
+|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |🟩| 🟩|🟩|🟩|
+|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct" |🟩| 🟩|🟩|🟩|
 |GPT-J| "EleutherAI/gpt-j-6b" | 🟩 | 🟩 |🟩 | 🟩|
 |Qwen|"Qwen/Qwen-7B"|🟩 | 🟩 |🟩 | 🟩|
 |OPT|"facebook/opt-6.7b", "facebook/opt-30b"| 🟩 | 🟥 |🟩 | 🟥 |
@@ -132,5 +134,6 @@ bash run_benchmark_woq.sh
 >Note:
 > * Saving quantized model should be executed before the optimize_transformers function is called.
 > * The optimize_transformers function is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. The detail of `optimize_transformers`, please refer to [Transformers Optimization Frontend API](../../../../../docs/tutorials/llm/llm_optimize_transformers.md).
+
 
 
