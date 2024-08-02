@@ -232,12 +232,6 @@ class _IPEXConv3d(_IPEXConvNd):
         super(_IPEXConv3d, self).__init__()
 
 
-torch.library.define(
-    "torch_ipex::choose_tpp_linear_weight",
-    "(Tensor x, Tensor weight, Tensor? weight_for_large_batch) -> Tensor",
-)
-
-
 @torch.library.impl("torch_ipex::choose_tpp_linear_weight", "cpu")
 def choose_tpp_linear_weight(x, weight, weight_for_large_batch):
     M = x.numel() // x.size(-1)
@@ -246,6 +240,12 @@ def choose_tpp_linear_weight(x, weight, weight_for_large_batch):
         if weight_for_large_batch is not None and M >= 256
         else weight
     )
+
+
+torch.library.define(
+    "torch_ipex::choose_tpp_linear_weight",
+    "(Tensor x, Tensor weight, Tensor? weight_for_large_batch) -> Tensor",
+)
 
 
 class _IPEXLinear(_IPEXPrepackModule):

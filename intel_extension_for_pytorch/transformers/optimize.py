@@ -1424,8 +1424,8 @@ def optimize(
             It means there is no need to further apply optimization like torchscirpt. Default value is ``True``.
         cache_weight_for_large_batch (bool): Whether to cache the dedicated weight for large batch to speed up
             its inference (e.g., prefill phase) with extra memory usage. It is only valid for non-quantization cases
-            where dtype = bfloat16 and weight-only quantization cases where lowp-mode=BF16. In other cases, an error
-            will be raised. Default value is ``False``.
+            where dtype = bfloat16 and weight-only quantization cases where lowp-mode=BF16/INT8. In other cases, an
+            error will be raised. Default value is ``False``.
 
     Returns:
         Optimized model object for model.generate(), also workable with model.forward

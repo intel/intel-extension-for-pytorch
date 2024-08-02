@@ -46,9 +46,10 @@ def _woq_enable_weight_cache_for_large_batch(qconfig_mapping):
         if isinstance(qconfig_mapping, QConfigMapping)
         else qconfig_mapping
     )
-    assert (
-        qconfig.lowp_mode == WoqLowpMode.BF16
-    ), "Weight cache is only supported for lowp-mode=BF16"
+    assert qconfig.lowp_mode in [
+        WoqLowpMode.BF16,
+        WoqLowpMode.INT8,
+    ], "Weight cache is only supported for lowp-mode=BF16 and INT8"
     qconfig_dict = qconfig._asdict()
     qconfig_dict["cache_weight_for_large_batch"] = True
     if isinstance(qconfig_mapping, QConfigMapping):

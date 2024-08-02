@@ -293,60 +293,96 @@ static at::Tensor _shuffle_input_channels_if_needed(
   return input;
 }
 
-// Unpack WOQ Linear weight to plain format, dequantize it, then repack it to
-// blocked format for BF16 computation.
-static at::Tensor _weight_unpack_dequantize_repack(ContextLinearWoq& context) {
-  // Requres lowp_mode=BF16, g_idx disabled, and N/K divisible by block size
-  auto N = context.weight_shape_[0];
-  auto K = context.weight_shape_[1];
-  bool supported = context.lowp_mode_ == 2 && !context.g_idx_.has_value() &&
-      K % 64 == 0 && (N % 100 == 0 || N % 64 == 0);
-  if (!supported)
-    return at::Tensor();
-  auto unpacked_weight = unpack(context, context.at_weight_);
-  auto block_weight = [&](const at::Tensor& weight, int64_t Nb, int64_t Kb) {
-    return weight.reshape({N / Nb, Nb, K / Kb, Kb / 2, 2})
-        .permute({0, 2, 3, 1, 4})
-        .contiguous()
-        .to(c10::kBFloat16);
-  };
-  at::Tensor scale, zp;
-  scale = context.scales_list_[0].unsqueeze(-1);
-  if (context.weight_dtype_ != WOQ_DTYPE_NF4) {
-    zp = context.zero_points_list_[0].unsqueeze(-1);
+IPEX_DEFINE_DISPATCH(woq_dequant_int4_to_int8_packed_stub);
+// Dequantize WOQ Linear weight and cache it in context
+// Lowp_mode != 3:
+//     Unpack weight to plain format, dequantize it, then repack it to
+//     blocked format for BF16 computation.
+// Lowp_mode == 3:
+//     Dequantize weight to INT8 and compute compensation.
+static void _dequant_weight_and_cache_in_context(ContextLinearWoq& context) {
+  if (context.lowp_mode_ == 2) {
+    // Requres g_idx disabled, and N/K divisible by block size
+    auto N = context.weight_shape_[0];
+    auto K = context.weight_shape_[1];
+    bool supported = !context.g_idx_.has_value() && K % 64 == 0 &&
+        (N % 100 == 0 || N % 64 == 0);
+    if (!supported)
+      return;
+    auto unpacked_weight = unpack(context, context.at_weight_);
+    auto block_weight = [&](const at::Tensor& weight, int64_t Nb, int64_t Kb) {
+      return weight.reshape({N / Nb, Nb, K / Kb, Kb / 2, 2})
+          .permute({0, 2, 3, 1, 4})
+          .contiguous()
+          .to(c10::kBFloat16);
+    };
+    at::Tensor scale, zp;
+    scale = context.scales_list_[0].unsqueeze(-1);
+    if (context.weight_dtype_ != WOQ_DTYPE_NF4) {
+      zp = context.zero_points_list_[0].unsqueeze(-1);
+    }
+    int64_t quant_w_mode = context.group_size_ > 0 ? 1 : 0;
+    auto dequant_weight = torch_ipex::cpu::dequantize_woq_weight(
+        unpacked_weight,
+        context.weight_shape_,
+        scale,
+        zp,
+        context.weight_dtype_,
+        quant_w_mode);
+    auto new_weight = N % 100 == 0
+        ? block_weight(dequant_weight, 100, 64).to(c10::kBFloat16)
+        : block_weight(dequant_weight, 64, 64).to(c10::kBFloat16);
+    context.cached_weight_ =
+        c10::make_optional<at::Tensor>(std::move(new_weight));
+  } else if (context.lowp_mode_ == 3) {
+    if (context.at_weight_.dim() != 4)
+      return;
+    auto w_sizes = context.at_weight_.sizes();
+    auto Nc = w_sizes[0];
+    auto Kc = w_sizes[1];
+    auto Kb = w_sizes[2];
+    auto Nb = w_sizes[3] * 2;
+    at::Tensor compensation =
+        at::empty({Nc, Kc, Nb}, device(c10::kCPU).dtype(c10::kInt));
+    int64_t quant_w_mode = context.group_size_ > 0 ? 1 : 0;
+    auto new_weight = woq_dequant_int4_to_int8_packed_stub(
+        kCPU,
+        context.at_weight_,
+        context.scales_list_[0], // float
+        context.zero_points_list_[3], // int8
+        context.group_size_,
+        quant_w_mode,
+        compensation);
+
+    context.cached_weight_ =
+        c10::make_optional<at::Tensor>(std::move(new_weight));
+    context.cached_compensation_ =
+        c10::make_optional<at::Tensor>(std::move(compensation));
   }
-  int64_t quant_w_mode = context.group_size_ > 0 ? 1 : 0;
-  auto dequant_weight = torch_ipex::cpu::dequantize_woq_weight(
-      unpacked_weight,
-      context.weight_shape_,
-      scale,
-      zp,
-      context.weight_dtype_,
-      context.group_size_);
-  if (N % 100 == 0) {
-    return block_weight(dequant_weight, 100, 64);
-  }
-  return block_weight(dequant_weight, 64, 64);
 }
 
 at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
   if (context.cache_weight_for_large_batch_ &&
       !context.cached_weight_.has_value()) {
-    auto dequant_weight =
-        _weight_unpack_dequantize_repack(context).to(c10::kBFloat16);
-    context.cached_weight_ =
-        c10::make_optional<at::Tensor>(std::move(dequant_weight));
+    _dequant_weight_and_cache_in_context(context);
   }
   auto M = input.numel() > 0 ? input.numel() / input.size(-1) : 0;
-  if (M > SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
+  bool fast_path_lowp_mode_3 = false;
+  if (M >= SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
       context.cached_weight_.value().defined()) {
-    auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
-    auto out = tpp_linear_bias_forward_cpu(
-        input_reshaped.to(c10::kBFloat16).contiguous(),
-        context.cached_weight_.value(),
-        context.bias_list_[2],
-        c10::nullopt);
-    return input.dim() == 2 ? out.squeeze(0) : out;
+    if (context.lowp_mode_ == 2) {
+      auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
+      auto out = tpp_linear_bias_forward_cpu(
+          input_reshaped.to(c10::kBFloat16).contiguous(),
+          context.cached_weight_.value(),
+          context.bias_list_[2],
+          c10::nullopt);
+      return input.dim() == 2 ? out.squeeze(0) : out;
+    } else if (
+        context.lowp_mode_ == 3 && context.cached_compensation_.has_value() &&
+        context.cached_compensation_.value().defined()) {
+      fast_path_lowp_mode_3 = true;
+    }
   }
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
@@ -362,14 +398,16 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
   input_ = _shuffle_input_channels_if_needed(context, input_);
   auto res = woq_linear_kernel(
       input_,
-      context.at_weight_,
+      fast_path_lowp_mode_3 ? context.cached_weight_.value()
+                            : context.at_weight_,
       context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
       context.bias_list_,
       context.group_size_,
       context.lowp_mode_,
-      context.act_quant_mode_);
+      context.act_quant_mode_,
+      fast_path_lowp_mode_3 ? context.cached_compensation_ : c10::nullopt);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
     return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
@@ -386,51 +424,56 @@ at::Tensor run_unary(
     const c10::optional<c10::string_view>& algorithm) {
   if (context.cache_weight_for_large_batch_ &&
       !context.cached_weight_.has_value()) {
-    auto dequant_weight =
-        _weight_unpack_dequantize_repack(context).to(c10::kBFloat16);
-    context.cached_weight_ = c10::make_optional<at::Tensor>(dequant_weight);
+    _dequant_weight_and_cache_in_context(context);
   }
   auto M = input.numel() > 0 ? input.numel() / input.size(-1) : 0;
-  if (M > SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
+  bool fast_path_lowp_mode_3 = false;
+  if (M >= SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
       context.cached_weight_.value().defined()) {
-    auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
-    if (post_op == "gelu") {
-      if (algorithm == "none") {
-        auto out = tpp_linear_gelu_forward_cpu(
+    if (context.lowp_mode_ == 2) {
+      auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
+      if (post_op == "gelu") {
+        if (algorithm == "none") {
+          auto out = tpp_linear_gelu_forward_cpu(
+              input_reshaped.to(c10::kBFloat16).contiguous(),
+              context.cached_weight_.value(),
+              context.bias_list_[2],
+              c10::nullopt);
+          return input.dim() == 2 ? out.squeeze(0) : out;
+        } else if (algorithm == "tanh") {
+          auto out = tpp_linear_gelu_tanh_forward_cpu(
+              input_reshaped.to(c10::kBFloat16).contiguous(),
+              context.cached_weight_.value(),
+              context.bias_list_[2],
+              c10::nullopt);
+          return input.dim() == 2 ? out.squeeze(0) : out;
+        }
+      } else if (post_op == "silu") {
+        auto out = tpp_linear_silu_forward_cpu(
             input_reshaped.to(c10::kBFloat16).contiguous(),
             context.cached_weight_.value(),
             context.bias_list_[2],
             c10::nullopt);
         return input.dim() == 2 ? out.squeeze(0) : out;
-      } else if (algorithm == "tanh") {
-        auto out = tpp_linear_gelu_tanh_forward_cpu(
+      } else if (post_op == "relu") {
+        auto out = tpp_linear_relu_forward_cpu(
             input_reshaped.to(c10::kBFloat16).contiguous(),
             context.cached_weight_.value(),
             context.bias_list_[2],
             c10::nullopt);
         return input.dim() == 2 ? out.squeeze(0) : out;
       }
-    } else if (post_op == "silu") {
-      auto out = tpp_linear_silu_forward_cpu(
-          input_reshaped.to(c10::kBFloat16).contiguous(),
-          context.cached_weight_.value(),
-          context.bias_list_[2],
-          c10::nullopt);
-      return input.dim() == 2 ? out.squeeze(0) : out;
-    } else if (post_op == "relu") {
-      auto out = tpp_linear_relu_forward_cpu(
-          input_reshaped.to(c10::kBFloat16).contiguous(),
-          context.cached_weight_.value(),
-          context.bias_list_[2],
-          c10::nullopt);
-      return input.dim() == 2 ? out.squeeze(0) : out;
+    } else if (
+        context.lowp_mode_ == 3 && context.cached_compensation_.has_value() &&
+        context.cached_compensation_.value().defined()) {
+      fast_path_lowp_mode_3 = true;
     }
   }
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
       input.size(input.dim() - 1) == w_k,
-      "WOQ linear: input and weight shapes do not match, got k = ",
+      "WOQ linear_unary: input and weight shapes do not match, got k = ",
       input.size(input.dim() - 1),
       " and ",
       w_k,
@@ -440,7 +483,8 @@ at::Tensor run_unary(
   input_ = _shuffle_input_channels_if_needed(context, input_);
   return woq_linear_unary_kernel(
       input_,
-      context.at_weight_,
+      fast_path_lowp_mode_3 ? context.cached_weight_.value()
+                            : context.at_weight_,
       context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
@@ -450,7 +494,8 @@ at::Tensor run_unary(
       algorithm,
       context.group_size_,
       context.lowp_mode_,
-      context.act_quant_mode_);
+      context.act_quant_mode_,
+      fast_path_lowp_mode_3 ? context.cached_compensation_ : c10::nullopt);
 }
 
 // Called by IpexWoqLinearOpContext::run_binary
@@ -462,47 +507,52 @@ at::Tensor run_binary(
   auto M = input.numel() > 0 ? input.numel() / input.size(-1) : 0;
   if (context.cache_weight_for_large_batch_ &&
       !context.cached_weight_.has_value()) {
-    auto dequant_weight =
-        _weight_unpack_dequantize_repack(context).to(c10::kBFloat16);
-    context.cached_weight_ = c10::make_optional<at::Tensor>(dequant_weight);
+    _dequant_weight_and_cache_in_context(context);
   }
-  if (M > SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
+  bool fast_path_lowp_mode_3 = false;
+  if (M >= SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
       context.cached_weight_.value().defined()) {
-    auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
-    if (post_op == "add") {
-      auto out = tpp_linear_add_forward_cpu(
-          input_reshaped.to(c10::kBFloat16).contiguous(),
-          others[0],
-          context.cached_weight_.value(),
-          context.bias_list_[2],
-          1.0,
-          c10::nullopt);
-      return input.dim() == 2 ? out.squeeze(0) : out;
-    } else if (post_op == "add_add") {
-      auto out = tpp_linear_add_add_forward_cpu(
-          input_reshaped.to(c10::kBFloat16),
-          others[0],
-          others[1],
-          context.cached_weight_.value(),
-          context.bias_list_[2],
-          1.0,
-          c10::nullopt);
-      return input.dim() == 2 ? out.squeeze(0) : out;
-    } else if (post_op == "mul") {
-      auto out = tpp_linear_mul_forward_cpu(
-          input_reshaped.to(c10::kBFloat16),
-          others[0],
-          context.cached_weight_.value(),
-          context.bias_list_[2],
-          c10::nullopt);
-      return input.dim() == 2 ? out.squeeze(0) : out;
+    if (context.lowp_mode_ == 2) {
+      auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
+      if (post_op == "add") {
+        auto out = tpp_linear_add_forward_cpu(
+            input_reshaped.to(c10::kBFloat16).contiguous(),
+            others[0],
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            1.0,
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      } else if (post_op == "add_add") {
+        auto out = tpp_linear_add_add_forward_cpu(
+            input_reshaped.to(c10::kBFloat16),
+            others[0],
+            others[1],
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            1.0,
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      } else if (post_op == "mul") {
+        auto out = tpp_linear_mul_forward_cpu(
+            input_reshaped.to(c10::kBFloat16),
+            others[0],
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      }
+    } else if (
+        context.lowp_mode_ == 3 && context.cached_compensation_.has_value() &&
+        context.cached_compensation_.value().defined()) {
+      fast_path_lowp_mode_3 = true;
     }
   }
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
       input.size(input.dim() - 1) == w_k,
-      "WOQ linear: input and weight shapes do not match, got k = ",
+      "WOQ linear_binary: input and weight shapes do not match, got k = ",
       input.size(input.dim() - 1),
       " and ",
       w_k,
@@ -512,7 +562,8 @@ at::Tensor run_binary(
   input_ = _shuffle_input_channels_if_needed(context, input_);
   return woq_linear_binary_kernel(
       input_,
-      context.at_weight_,
+      fast_path_lowp_mode_3 ? context.cached_weight_.value()
+                            : context.at_weight_,
       context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
@@ -521,7 +572,8 @@ at::Tensor run_binary(
       context.lowp_mode_,
       post_op,
       others,
-      context.act_quant_mode_);
+      context.act_quant_mode_,
+      fast_path_lowp_mode_3 ? context.cached_compensation_ : c10::nullopt);
 }
 
 at::Tensor pack(ContextLinearWoq& context, const at::Tensor& tensor) {
