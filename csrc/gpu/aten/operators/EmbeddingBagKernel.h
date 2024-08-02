@@ -34,7 +34,8 @@ constexpr int MODE_MAX = 2;
     bag_num,                                                                 \
     vec_len,                                                                 \
     padding_idx,                                                             \
-    ignore_offsets)                                                          \
+    ignore_offsets,                                                          \
+    num_row)                                                                 \
   embedding_bag_kernel<scalar_t, accscalar_t, index_t, mode, vec_size>(      \
       output.data_ptr<scalar_t>(),                                           \
       weight.data_ptr<scalar_t>(),                                           \
@@ -49,7 +50,8 @@ constexpr int MODE_MAX = 2;
       bag_num,                                                               \
       vec_len,                                                               \
       padding_idx,                                                           \
-      ignore_offsets)
+      ignore_offsets,                                                        \
+      num_row)
 
 #define EMBBAG_KERNEL_NO_ACC(                                                \
     scalar_t,                                                                \
@@ -68,7 +70,8 @@ constexpr int MODE_MAX = 2;
     bag_num,                                                                 \
     vec_len,                                                                 \
     padding_idx,                                                             \
-    ignore_offsets)                                                          \
+    ignore_offsets,                                                          \
+    num_row)                                                                 \
   embedding_bag_kernel<scalar_t, scalar_t, index_t, mode, vec_size>(         \
       output.data_ptr<scalar_t>(),                                           \
       weight.data_ptr<scalar_t>(),                                           \
@@ -83,7 +86,8 @@ constexpr int MODE_MAX = 2;
       bag_num,                                                               \
       vec_len,                                                               \
       padding_idx,                                                           \
-      ignore_offsets)
+      ignore_offsets,                                                        \
+      num_row)
 
 template <
     typename scalar_t,
@@ -129,6 +133,7 @@ struct EmbeddingBagKernelFunctor {
         for (index_t off = start; off < end; off++) {
           index_t index_off = off;
           index_t vec_idx = index[index_off];
+          SYCL_KERNEL_ASSERT(vec_idx < num_row);
 
           if (walk_on_bag && desc.glb_problem == 0) {
             offset2bag[index_off] = off_off;
@@ -220,7 +225,8 @@ struct EmbeddingBagKernelFunctor {
       vec_t* w_vec_,
       vec_idx_t* max_idx_vec_,
       BatchKernelConfig cfg_,
-      index_t fixing_bag_size_)
+      index_t fixing_bag_size_,
+      int64_t num_row_)
       : index(index_),
         offset(offset_),
         offset2bag(offset2bag_),
@@ -236,7 +242,8 @@ struct EmbeddingBagKernelFunctor {
         w_vec(w_vec_),
         max_idx_vec(max_idx_vec_),
         cfg(cfg_),
-        fixing_bag_size(fixing_bag_size_) {}
+        fixing_bag_size(fixing_bag_size_),
+        num_row(num_row_) {}
 
  private:
   index_t* const index;
@@ -255,6 +262,7 @@ struct EmbeddingBagKernelFunctor {
   vec_idx_t* max_idx_vec;
   BatchKernelConfig cfg;
   index_t fixing_bag_size;
+  int64_t num_row;
 };
 
 template <
@@ -276,7 +284,8 @@ void embedding_bag_kernel(
     int64_t bag_num,
     int64_t vec_len,
     index_t padding_idx,
-    bool ignore_offsets) {
+    bool ignore_offsets,
+    int64_t num_row) {
   using vec_t = at::detail::Array<scalar_t, vec_size>;
   using vec_acc_t = at::detail::Array<accscalar_t, vec_size>;
   using vec_idx_t = at::detail::Array<index_t, vec_size>;
@@ -314,7 +323,8 @@ void embedding_bag_kernel(
             w_vec,
             max_idx_vec,
             cfg,
-            fixing_bag_size);
+            fixing_bag_size,
+            num_row);
     __cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<2>(cfg.global_size(), cfg.group_size()), kfn);
   };

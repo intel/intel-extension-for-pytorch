@@ -20,6 +20,7 @@ void embedding_bag_mean_template(
     int64_t vec_len,
     int64_t padding_idx,
     bool ignore_offsets) {
+  uint64_t num_row = weights.size(0);
 #define EXTEND_EMBBAG_MEAN_KERNEL_VEC(vec_size) \
   EMBBAG_KERNEL_ACC(                            \
       scalar_t,                                 \
@@ -39,7 +40,8 @@ void embedding_bag_mean_template(
       bag_num,                                  \
       vec_len,                                  \
       padding_idx,                              \
-      ignore_offsets)
+      ignore_offsets,                           \
+      num_row)
 
   IPEX_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::Half,
