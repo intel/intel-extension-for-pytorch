@@ -296,6 +296,78 @@ def varlen_attention(
     )
 
 
+def varlen_fwd(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    out: torch.Tensor,
+    seqlen_q: torch.Tensor,
+    seqlen_k: torch.Tensor,
+    sequesd_k: Optional[torch.Tensor],
+    block_table: Optional[torch.Tensor],
+    alibi_slopes: Optional[torch.Tensor],
+    max_seqlen_q: int,
+    max_seqlen_k: int,
+    pdropout: float,
+    softmax_scale: float,
+    zero_tensors: bool,
+    is_causal: bool,
+    window_size_left: int,
+    window_size_right: int,
+    return_softmax: bool,
+    gen_: Optional[torch.Generator],
+):
+    r"""
+    Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value
+    (see https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html),
+    and accept the variant (different) sequence length among the query, key and value.
+
+    This module does not have args for `module init`.
+
+    `forward()`
+
+    Args:
+        query (torch.Tensor): shape [query_tokens, num_head, head_size],
+            where tokens is total sequence length among batch size.
+        key (torch.Tensor):  shape [key_tokens, num_head, head_size],
+            where tokens is total sequence length among batch size.
+        value (torch.Tensor): shape [value_tokens, num_head, head_size],
+            where tokens is total sequence length among batch size.
+        out (torch.Tensor): buffer to get the results, the shape is the same as query.
+        seqlen_q (torch.Tensor): shape [batch_size + 1],
+            points the current query_tokens among total sequence length.
+        seqlen_k (torch.Tensor): shape [batch_size + 1],
+            points the current key_tokens among total sequence length.
+        max_seqlen_q (int): max/total sequence length of query.
+        max_seqlen_k (int): max/total sequence length of key.
+        pdropout (float): dropout probability; if greater than 0.0, dropout is applied, default is 0.0.
+        softmax_scale (float): scaling factor applied is prior to softmax.
+        is_causal (bool): whether to apply causal attention masking, default is True.
+
+    """
+    return VarlenAttention.apply_function_flash_varlen(
+        query,
+        key,
+        value,
+        out,
+        seqlen_q,
+        seqlen_k,
+        sequesd_k,
+        block_table,
+        alibi_slopes,
+        max_seqlen_q,
+        max_seqlen_k,
+        pdropout,
+        softmax_scale,
+        zero_tensors,
+        is_causal,
+        window_size_left,
+        window_size_right,
+        return_softmax,
+        gen_,
+    )
+
+
 def gelu_quick(x: torch.Tensor, out: torch.Tensor = None):
     r"""
     Applies gelu quick:

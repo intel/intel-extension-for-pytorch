@@ -4,7 +4,7 @@ import pytest
 from typing import List, Tuple
 import intel_extension_for_pytorch as ipex  # noqa
 
-
+COPYING_DIRECTION = [("xpu", "cpu"), ("xpu", "xpu"), ("cpu", "xpu")]
 DTYPES = [torch.half]
 NUM_TOKENS = [42]  # Arbitrary values for testing
 NUM_LAYERS = [1]  # Arbitrary values for testing
@@ -100,7 +100,7 @@ def test_copy_blocks(
     cloned_value_caches = [value_cache.clone() for value_cache in value_caches]
 
     # Call the copy blocks kernel.
-    torch.xpu.copy_blocks(key_caches, value_caches, block_mapping)
+    ipex.llm.modules.PagedAttention.copy_blocks(key_caches, value_caches, block_mapping)
 
     # Run the reference implementation.
     for src, dsts in block_mapping.items():
@@ -117,6 +117,89 @@ def test_copy_blocks(
         assert torch.allclose(value_cache, cloned_value_cache, atol=1e-2, rtol=1e-2)
     torch.set_default_device("cpu")
     torch.xpu.empty_cache()
+
+
+@pytest.mark.parametrize("direction", COPYING_DIRECTION)
+@pytest.mark.parametrize("num_mappings", NUM_MAPPINGS)
+@pytest.mark.parametrize("num_heads", NUM_HEADS)
+@pytest.mark.parametrize("head_size", HEAD_SIZES)
+@pytest.mark.parametrize("block_size", BLOCK_SIZES)
+@pytest.mark.parametrize("num_blocks", NUM_BLOCKS)
+@pytest.mark.parametrize("dtype", DTYPES)
+@pytest.mark.parametrize("seed", SEEDS)
+@torch.inference_mode()
+def test_swap_blocks(
+    direction: Tuple[str, str],
+    num_mappings: int,
+    num_heads: int,
+    head_size: int,
+    block_size: int,
+    num_blocks: int,
+    dtype: torch.dtype,
+    seed: int,
+) -> None:
+    random.seed(seed)
+    torch.random.manual_seed(seed)
+    torch.xpu.manual_seed(seed)
+    device = torch.device("xpu")
+    src_device = device if direction[0] == "xpu" else "cpu"
+    dst_device = device if direction[1] == "xpu" else "cpu"
+
+    src_blocks = random.sample(range(num_blocks), num_mappings)
+    # For the same device, mapping must not overlap
+    if src_device == dst_device:
+        remaining_blocks = list(set(range(num_blocks)) - set(src_blocks))
+        dst_blocks = random.sample(remaining_blocks, num_mappings)
+    else:
+        dst_blocks = random.sample(range(num_blocks), num_mappings)
+
+    block_mapping = list(zip(src_blocks, dst_blocks))
+    block_mapping_tensor = torch.tensor(
+        block_mapping, dtype=torch.int64, device="cpu"
+    ).view(-1, 2)
+
+    # Create the KV caches on the first device.
+    src_key_caches, src_value_caches = kv_cache_factory(
+        num_blocks,
+        block_size,
+        1,
+        num_heads,
+        head_size,
+        dtype,
+        seed,
+        src_device,
+    )
+
+    # Create the KV caches on the second device.
+    dist_key_caches, dist_value_caches = kv_cache_factory(
+        num_blocks,
+        block_size,
+        1,
+        num_heads,
+        head_size,
+        dtype,
+        seed,
+        dst_device,
+    )
+
+    src_key_caches_clone = src_key_caches[0].clone()
+    src_value_caches_clone = src_value_caches[0].clone()
+
+    # Call the swap_blocks kernel.
+    ipex.llm.modules.PagedAttention.swap_blocks(
+        src_key_caches[0], dist_key_caches[0], block_mapping_tensor
+    )
+    ipex.llm.modules.PagedAttention.swap_blocks(
+        src_value_caches[0], dist_value_caches[0], block_mapping_tensor
+    )
+
+    for src, dst in block_mapping:
+        assert torch.allclose(
+            src_key_caches_clone[src].cpu(), dist_key_caches[0][dst].cpu()
+        )
+        assert torch.allclose(
+            src_value_caches_clone[src].cpu(), dist_value_caches[0][dst].cpu()
+        )
 
 
 @pytest.mark.parametrize("num_tokens", NUM_TOKENS)

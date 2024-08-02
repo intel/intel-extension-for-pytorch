@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from ...reference.fusions.mha_fusion import RotaryEmbedding
-from typing import Optional
+from typing import Optional, Dict
 
 
 class _IPEXRopeXPU(nn.Module):
@@ -233,13 +233,16 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
         return_softmax,
         gen_,
     ):
-        return torch.xpu.varlen_fwd(
+        _IPEXVarlenScaledDotProductXPU.apply_function_flash_varlen(
             query,
             key,
             value,
             out,
             seqlen_q,
             seqlen_k,
+            None,
+            None,
+            None,
             max_seqlen_q,
             max_seqlen_k,
             pdropout,
@@ -249,6 +252,73 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
             return_softmax,
             gen_,
         )
+        return out
+
+    @classmethod
+    def apply_function_flash_varlen(
+        cls,
+        query,
+        key,
+        value,
+        out,
+        seqlen_q,
+        seqlen_k,
+        seqused_k,
+        block_tables_,
+        alibi_slopes,
+        max_seqlen_q,
+        max_seqlen_k,
+        p_dropout,
+        softmax_scale,
+        zero_tensors,
+        is_causal,
+        window_size_left,
+        window_size_right,
+        return_softmax,
+        gen_,
+    ):
+        assert (
+            window_size_left == -1 and window_size_right == -1
+        ), "IPEX only support window_size_left and window_size_right as -1"
+        assert seqused_k is None, "IPEX only support seqused_k as None yet"
+        assert block_tables_ is None, "IPEX only support block_tables_ as None yet"
+        if torch.xpu.has_2d_block_array():
+            torch.ops.torch_ipex.varlen_fwd(
+                query,
+                key,
+                value,
+                out,
+                seqlen_q,
+                seqlen_k,
+                seqused_k,  # seqused_k
+                alibi_slopes,  # alibi_slopes
+                max_seqlen_q,
+                max_seqlen_k,
+                p_dropout,
+                softmax_scale,
+                zero_tensors,
+                is_causal,
+                return_softmax,
+                gen_,
+            )
+        else:
+            torch.xpu.varlen_fwd(
+                query,
+                key,
+                value,
+                out,
+                seqlen_q,
+                seqlen_k,
+                max_seqlen_q,
+                max_seqlen_k,
+                p_dropout,
+                softmax_scale,
+                zero_tensors,
+                is_causal,
+                return_softmax,
+                gen_,
+            )
+        return out
 
     def forward(
         self,
@@ -267,7 +337,7 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
         return_softmax,
         gen_,
     ):
-        return torch.xpu.varlen_fwd(
+        return self.apply_function(
             query,
             key,
             value,
@@ -286,6 +356,8 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
 
 
 class _IPEXPagedAttentionXPU:
+    PARTITION_SIZE = 512
+
     @classmethod
     def reshape_and_cache(cls, key, value, key_cache, value_cache, slot_mapping):
         torch.ops.torch_ipex.reshape_and_cache(
@@ -308,7 +380,7 @@ class _IPEXPagedAttentionXPU:
         alibi_slopes,
     ):
         query = query.contiguous()
-        torch.ops.torch_ipex.xetla_paged_attention_v1(
+        torch.ops.torch_ipex.paged_attention(
             output,
             query,
             key_cache,
@@ -321,3 +393,39 @@ class _IPEXPagedAttentionXPU:
             max_context_len,
             alibi_slopes,
         )
+
+    @classmethod
+    def swap_blocks(cls, src, dst, block_mapping):
+        assert isinstance(block_mapping, Dict) or isinstance(
+            block_mapping, torch.Tensor
+        ), "We only support block_mapping as dict or torch tensor"
+        if isinstance(block_mapping, Dict):
+            block_mapping_tensor = []
+            for key, values in block_mapping.items():
+                if hasattr(values, "__iter__"):
+                    for value in values:
+                        block_mapping_tensor.append([key, value])
+                else:
+                    block_mapping_tensor.append([key, value])
+            block_mapping = torch.tensor(
+                block_mapping_tensor, device="xpu", dtype=torch.int64
+            )
+        return torch.ops.torch_ipex.swap_blocks(src, dst, block_mapping)
+
+    @classmethod
+    def copy_blocks(cls, key_caches, value_caches, block_mapping):
+        assert isinstance(block_mapping, Dict) or isinstance(
+            block_mapping, torch.Tensor
+        ), "We only support block_mapping as dict or torch tensor"
+        if isinstance(block_mapping, Dict):
+            block_mapping_tensor = []
+            for key, values in block_mapping.items():
+                if hasattr(values, "__iter__"):
+                    for value in values:
+                        block_mapping_tensor.append([key, value])
+                else:
+                    block_mapping_tensor.append([key, value])
+            block_mapping = torch.tensor(
+                block_mapping_tensor, device="xpu", dtype=torch.int64
+            )
+        return torch.ops.torch_ipex.copy_blocks(key_caches, value_caches, block_mapping)
