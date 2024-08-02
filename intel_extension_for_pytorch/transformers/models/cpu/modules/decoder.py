@@ -120,6 +120,13 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 self.mlp_linear_add = _IPEXlinearAddCPU(
                     module.mlp_linear_add.linear, tpp=tpp, woq=woq
                 )
+            if hasattr(module, "linear_silu_mul"):
+                self.linear_silu_mul = _IPEXlinearSiluMulCPU(
+                    module.linear_silu_mul.linear_s,
+                    module.linear_silu_mul.linear_m,
+                    tpp=tpp,
+                    woq=woq,
+                )
         elif self.model_backbone == "GPTBigCodeForCausalLM":
             self.linear_gelu = _IPEXlinearGeluCPU(
                 module.linear_gelu.linear, tpp=tpp, woq=woq

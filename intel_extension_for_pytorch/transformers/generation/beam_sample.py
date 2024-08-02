@@ -165,6 +165,10 @@ def _beam_sample(
             if this_peer_finished_flag.item() == 0.0:
                 break
 
+        if "past_key_values" in model_kwargs and not isinstance(
+            model_kwargs["past_key_values"], tuple
+        ):
+            model_kwargs["past_key_values"] = None
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
         self.model_backbone = self.config.architectures[0]
@@ -477,8 +481,11 @@ def _beam_sample(
         # increase cur_len
         cur_len = cur_len + 1
         latency_list.append(time.time() - tic)
-
-        if beam_scorer.is_done or stopping_criteria(input_ids, scores):
+        stopping_res = stopping_criteria(input_ids, scores)
+        is_stopped = (
+            stopping_res if isinstance(stopping_res, bool) else all(stopping_res)
+        )
+        if beam_scorer.is_done or is_stopped:
             if not synced_gpus:
                 break
             else:

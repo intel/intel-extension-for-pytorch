@@ -17,7 +17,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.38.1"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.43.2"]
     )
     import transformers
     from transformers import AutoConfig
@@ -490,14 +490,14 @@ class OptimizeTransformersTester(TestCase):
             generate_kwargs_greedy = dict(
                 do_sample=False, temperature=0.9, max_new_tokens=2, min_new_tokens=2
             )
-            # sample, use a temperature of 0.01 to constrain text generation diversity in UT.
+            # sample, use a temperature of 0.001 to constrain text generation diversity in UT.
             generate_kwargs_sample = dict(
-                do_sample=True, temperature=0.01, max_new_tokens=2, min_new_tokens=2
+                do_sample=True, temperature=0.001, max_new_tokens=2, min_new_tokens=2
             )
-            # beam_sample, use a temperature of 0.01 to constrain text generation diversity in UT.
-            generate_kwargs_sample = dict(
+            # beam_sample, use a temperature of 0.001 to constrain text generation diversity in UT.
+            generate_kwargs_beam_sample = dict(
                 do_sample=True,
-                temperature=0.01,
+                temperature=0.001,
                 num_beams=4,
                 max_new_tokens=2,
                 min_new_tokens=2,
@@ -506,7 +506,7 @@ class OptimizeTransformersTester(TestCase):
                 generate_kwargs_beam,
                 generate_kwargs_greedy,
                 generate_kwargs_sample,
-                generate_kwargs_sample,
+                generate_kwargs_beam_sample,
             ]:
                 with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
                     enabled=True, dtype=dtype

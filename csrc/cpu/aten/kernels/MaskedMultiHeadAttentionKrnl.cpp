@@ -1313,15 +1313,6 @@ first_token_masked_mha(
   auto key_lenght = key.size(1);
   auto kv_head_num = key.size(2);
   auto head_size = key.size(3);
-  if (add_casual_mask) {
-    auto casual_mask = at::full(
-        {query_length, key_lenght},
-        origin_type == at::kHalf ? -6e4 : -1e6,
-        query.options());
-    casual_mask = at::triu(casual_mask, 1);
-    casual_mask = casual_mask.unsqueeze(0).unsqueeze(0);
-    attention_mask = attention_mask + casual_mask;
-  }
   if (key.scalar_type() != at::kBFloat16 && key.scalar_type() != at::kFloat &&
       key.scalar_type() != at::kHalf) {
     TORCH_CHECK(
@@ -1358,7 +1349,7 @@ first_token_masked_mha(
         key,
         value,
         /* dropout */ 0.0,
-        /* is_causal*/ false,
+        add_casual_mask,
         attention_mask,
         1. / scale_attn));
   } else {
@@ -1572,7 +1563,7 @@ at::Tensor prepare_4d_causal_attention_mask_kernel_impl(
   int64_t src_length = attention_mask.size(-1);
   int64_t past_key_value_length = past_kv_len.item<int64_t>();
   int64_t length = seq_length + past_key_value_length;
-  int64_t diagonal = past_key_value_length - sliding_window + 1;
+  int64_t diagonal = past_key_value_length - sliding_window;
 
   at::Tensor causal_4d_mask = torch::empty(
       {batch_size, 1, seq_length, length}, inputs_embeds.options());

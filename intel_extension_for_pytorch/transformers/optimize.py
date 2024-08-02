@@ -92,7 +92,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.38.2"
+    validated_version = "4.43.2"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -124,6 +124,7 @@ def model_convert_reference(_model):
     # generation wise optimization
     from .generation.utils import (
         _extract_past_from_model_output,
+        _update_model_kwargs_for_generation,
     )
     from .generation import (
         _beam_search,
@@ -211,10 +212,19 @@ def model_convert_reference(_model):
     convert_function(_model, "greedy_search", _greedy_search)
     convert_function(_model, "sample", _sample)
     convert_function(_model, "beam_sample", _beam_sample)
+    convert_function(_model, "_beam_search", _beam_search)
+    convert_function(_model, "_greedy_search", _greedy_search)
+    convert_function(_model, "_sample", _sample)
+    convert_function(_model, "_beam_sample", _beam_sample)
     convert_function(
         _model,
         "_extract_past_from_model_output",
         _extract_past_from_model_output,
+    )
+    convert_function(
+        _model,
+        "_update_model_kwargs_for_generation",
+        _update_model_kwargs_for_generation,
     )
     convert_functions(
         _model,
@@ -581,6 +591,11 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
     elif _model.config.architectures[0] == "MptForCausalLM":
         convert_function(_model, "forward", MptForCausalLM_forward)
         convert_class(
@@ -600,6 +615,11 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "MixtralForCausalLM":
         convert_function(_model, "forward", MixtralForCausalLM_forward)
         convert_function(_model.model, "forward", MixtralModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
         convert_class(
             _model,
             transformers.models.mixtral.modeling_mixtral.MixtralAttention,
@@ -617,6 +637,11 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "StableLmForCausalLM":
         convert_function(_model, "forward", StableLMEpochForCausalLM_forward)
         convert_function(_model.model, "forward", StableLMEpochModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
         convert_class(
             _model,
             type(_model.model.layers[0].self_attn),

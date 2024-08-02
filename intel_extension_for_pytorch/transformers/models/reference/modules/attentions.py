@@ -2284,6 +2284,13 @@ class _IPEXAttentionRef(nn.Module):
             if k.startswith("__") or k.startswith("forward"):
                 continue
             setattr(self.__class__, k, getattr(module.__class__, k))
+        for base_class in module.__class__.__bases__:
+            if base_class.__class__ == nn.Module:
+                continue
+            for k, v in base_class.__dict__.items():
+                if k.startswith("__") or k.startswith("forward"):
+                    continue
+                setattr(self.__class__, k, getattr(base_class, k))
 
         self.model_backbone = config.architectures[0]
         self.distributed = distributed
@@ -2376,35 +2383,41 @@ class _IPEXAttentionRef(nn.Module):
                 self.rope_base = config.rotary_emb_base
             elif hasattr(config, "rope_theta"):
                 self.rope_base = config.rope_theta
-            if self.model_backbone in ["Phi3ForCausalLM"]:
-                extra_inputs = {}
-                if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
-                    if "short_factor" in config.rope_scaling:
-                        extra_inputs["short_factor"] = config.rope_scaling[
-                            "short_factor"
-                        ]
-                    if "long_factor" in config.rope_scaling:
-                        extra_inputs["long_factor"] = config.rope_scaling["long_factor"]
-                    if "type" in config.rope_scaling:
-                        extra_inputs["type"] = config.rope_scaling["type"]
-                if hasattr(config, "original_max_position_embeddings"):
+            extra_inputs = {}
+            if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
+                if "short_factor" in config.rope_scaling:
+                    extra_inputs["short_factor"] = config.rope_scaling["short_factor"]
+                if "long_factor" in config.rope_scaling:
+                    extra_inputs["long_factor"] = config.rope_scaling["long_factor"]
+                if "type" in config.rope_scaling:
+                    extra_inputs["type"] = config.rope_scaling["type"]
+                if "factor" in config.rope_scaling:
+                    extra_inputs["factor"] = config.rope_scaling["factor"]
+                if "low_freq_factor" in config.rope_scaling:
+                    extra_inputs["low_freq_factor"] = config.rope_scaling[
+                        "low_freq_factor"
+                    ]
+                if "high_freq_factor" in config.rope_scaling:
+                    extra_inputs["high_freq_factor"] = config.rope_scaling[
+                        "high_freq_factor"
+                    ]
+                if "original_max_position_embeddings" in config.rope_scaling:
                     extra_inputs["original_max_position_embeddings"] = (
-                        config.original_max_position_embeddings
+                        config.rope_scaling["original_max_position_embeddings"]
                     )
-                self._IPEXROPE = _IPEXRopeRef(
-                    self.max_position_embeddings,
-                    self.pos_embd_dim,
-                    self.rope_base,
-                    self.model_backbone,
-                    extra_inputs,
+                if "rope_type" in config.rope_scaling:
+                    extra_inputs["rope_type"] = config.rope_scaling["rope_type"]
+            if hasattr(config, "original_max_position_embeddings"):
+                extra_inputs["original_max_position_embeddings"] = (
+                    config.original_max_position_embeddings
                 )
-            else:
-                self._IPEXROPE = _IPEXRopeRef(
-                    self.max_position_embeddings,
-                    self.pos_embd_dim,
-                    self.rope_base,
-                    self.model_backbone,
-                )
+            self._IPEXROPE = _IPEXRopeRef(
+                self.max_position_embeddings,
+                self.pos_embd_dim,
+                self.rope_base,
+                self.model_backbone,
+                extra_inputs,
+            )
 
         if self.model_backbone in [
             "GPTJForCausalLM",
@@ -2870,6 +2883,8 @@ class _IPEXAttentionRef(nn.Module):
 def _reorder_cache(
     self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
 ) -> Tuple[Tuple[torch.Tensor]]:
+    if isinstance(past_key_values[0], str):
+        past_key_values = past_key_values[1]
     if (
         len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1
     ):  # discrete kv_cache

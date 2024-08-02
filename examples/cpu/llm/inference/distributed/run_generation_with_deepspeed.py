@@ -61,11 +61,6 @@ MODEL_CLASSES = {
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
-# The latest model is not compatible with the current transformers/tokenizers, so we specify the revision of the model
-pin_model_revision = {
-    "mistralai/Mistral-7B-v0.1": "26bca36bde8333b5d7f72e9ed20ccda6a618af24",
-    "mistralai/Mixtral-8x7B-Instruct-v0.1": "a60832cb6c88d5cb6e507680d0e9996fbad77050",
-}
 try:
     from llava.model.language_model.llava_llama import LlavaLlamaForCausalLM
     from llava.model.builder import load_pretrained_model
@@ -312,19 +307,12 @@ tp_presharded_mode = True if model_name in tp_presharded_models else False
 print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), "auto")
 model_class = MODEL_CLASSES[model_type]
-tokenizer = model_class[1].from_pretrained(
-    model_name,
-    trust_remote_code=True,
-    revision=pin_model_revision.get(model_name, None),
-)
+tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=True)
 
 if model_type == "auto":
     if args.config_file is None:
         config = AutoConfig.from_pretrained(
-            args.model_id,
-            torchscript=True,
-            trust_remote_code=True,
-            revision=pin_model_revision.get(args.model_id, None),
+            args.model_id, torchscript=True, trust_remote_code=True
         )
     else:
         config = AutoConfig.from_pretrained(
@@ -353,10 +341,7 @@ if args.config_file is None:
         )
     else:
         config = AutoConfig.from_pretrained(
-            args.model_id,
-            torchscript=True,
-            trust_remote_code=True,
-            revision=pin_model_revision.get(args.model_id, None),
+            args.model_id, torchscript=True, trust_remote_code=True
         )
 else:
     config = AutoConfig.from_pretrained(
