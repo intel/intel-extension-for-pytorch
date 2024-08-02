@@ -866,6 +866,12 @@ static void dump_md_data_type(memory::data_type dt) {
     case memory::data_type::u8:
       std::cout << "data type:u8" << std::endl;
       break;
+    case memory::data_type::s4:
+      std::cout << "data type:s4" << std::endl;
+      break;
+    case memory::data_type::u4:
+      std::cout << "data type:u4" << std::endl;
+      break;
     default:
       std::cout << "unknown dtype" << std::endl;
   };

@@ -4,6 +4,7 @@ from .Mlp import IPEXTransformerMLP
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
 )
+from .model_utils import xpu_gemm_use_xetla
 
 
 class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
@@ -36,27 +37,62 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
         fc_out.qzeros = None
 
     def transpose_parameter(self):
-        self.fc_in_quant.qweight.data = self.fc_in_quant.qweight.transpose(
-            0, 1
-        ).contiguous()
-        self.fc_out_quant.qweight.data = self.fc_out_quant.qweight.transpose(
-            0, 1
-        ).contiguous()
-
-        self.fc_in_quant.scales.data = self.fc_in_quant.scales.transpose(
-            0, 1
-        ).contiguous()
-        self.fc_out_quant.scales.data = self.fc_out_quant.scales.transpose(
-            0, 1
-        ).contiguous()
-
-        if self.fc_in_quant.qzeros:
-            self.fc_in_quant.qzeros.data = self.fc_in_quant.qzeros.transpose(
+        if xpu_gemm_use_xetla():
+            self.fc_in_quant.qweight.data = self.fc_in_quant.qweight.transpose(
                 0, 1
             ).contiguous()
-            self.fc_out_quant.qzeros.data = self.fc_out_quant.qzeros.transpose(
+            self.fc_out_quant.qweight.data = self.fc_out_quant.qweight.transpose(
                 0, 1
             ).contiguous()
+
+            self.fc_in_quant.scales.data = self.fc_in_quant.scales.transpose(
+                0, 1
+            ).contiguous()
+            self.fc_out_quant.scales.data = self.fc_out_quant.scales.transpose(
+                0, 1
+            ).contiguous()
+
+            if self.fc_in_quant.qzeros is not None:
+                self.fc_in_quant.qzeros.data = self.fc_in_quant.qzeros.transpose(
+                    0, 1
+                ).contiguous()
+                self.fc_out_quant.qzeros.data = self.fc_out_quant.qzeros.transpose(
+                    0, 1
+                ).contiguous()
+        else:
+            self.fc_in_quant.qweight.data = (
+                self.fc_in_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+            )
+            self.fc_out_quant.qweight.data = (
+                self.fc_out_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+            )
+
+            self.fc_in_quant.scales.data = self.fc_in_quant.scales
+            self.fc_out_quant.scales.data = self.fc_out_quant.scales
+
+            self.fc_in_quant.qzeros = torch.ones(
+                [
+                    self.fc_in_quant.qweight.size()[-2] // self.fc_in_quant.blocksize,
+                    self.fc_in_quant.qweight.size()[-1] // 8,
+                ],
+                dtype=torch.int32,
+                device="xpu",
+            )
+            self.fc_in_quant.qzeros = torch.fill(
+                self.fc_in_quant.qzeros, int(-2004318072)
+            )
+
+            self.fc_out_quant.qzeros = torch.ones(
+                [
+                    self.fc_out_quant.qweight.size()[-2] // self.fc_out_quant.blocksize,
+                    self.fc_out_quant.qweight.size()[-1] // 8,
+                ],
+                dtype=torch.int32,
+                device="xpu",
+            )
+            self.fc_out_quant.qzeros = torch.fill(
+                self.fc_out_quant.qzeros, int(-2004318072)
+            )
 
         torch.xpu.synchronize()
 
@@ -282,17 +318,34 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(
 
     def transpose_parameter(self):
         super().transpose_parameter()
-        super().transpose_inner()
-        self.c_proj_quant.qweight.data = self.c_proj_quant.qweight.transpose(
-            0, 1
-        ).contiguous()
-        self.c_proj_quant.scales.data = self.c_proj_quant.scales.transpose(
-            0, 1
-        ).contiguous()
-        if self.c_proj_quant.qzeros:
-            self.c_proj_quant.qzeros.data = self.c_proj_quant.qzeros.transpose(
+        if xpu_gemm_use_xetla():
+            super().transpose_inner()
+            self.c_proj_quant.qweight.data = self.c_proj_quant.qweight.transpose(
                 0, 1
             ).contiguous()
+            self.c_proj_quant.scales.data = self.c_proj_quant.scales.transpose(
+                0, 1
+            ).contiguous()
+            if self.c_proj_quant.qzeros is not None:
+                self.c_proj_quant.qzeros.data = self.c_proj_quant.qzeros.transpose(
+                    0, 1
+                ).contiguous()
+        else:
+            self.c_proj_quant.qweight.data = (
+                self.c_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+            )
+            self.c_proj_quant.scales.data = self.c_proj_quant.scales
+            self.c_proj_quant.qzeros = torch.ones(
+                [
+                    self.c_proj_quant.qweight.size()[-2] // self.c_proj_quant.blocksize,
+                    self.c_proj_quant.qweight.size()[-1] // 8,
+                ],
+                dtype=torch.int32,
+                device="xpu",
+            )
+            self.c_proj_quant.qzeros = torch.fill(
+                self.c_proj_quant.qzeros, int(-2004318072)
+            )
         torch.xpu.synchronize()
 
     def out_mm(self, hidden_states, residual=None):
@@ -316,6 +369,47 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(
                 residual,
             )
         return hidden_states
+
+    def inter_mm(self, hidden_states):
+        if xpu_gemm_use_xetla():
+            return super().inter_mm(hidden_states)
+        else:
+            if self.fc_in_quant.bias is None:
+                hidden_states1 = torch.ops.torch_ipex.mm_int4(
+                    hidden_states,
+                    self.fc_in_quant.qweight,
+                    self.fc_in_quant.scales,
+                    self.fc_in_quant.qzeros,
+                    self.fc_in_quant.blocksize,
+                )
+            else:
+                hidden_states1 = torch.ops.torch_ipex.mm_bias_int4(
+                    hidden_states,
+                    self.fc_in_quant.qweight,
+                    self.fc_in_quant.bias,
+                    self.fc_in_quant.scales,
+                    self.fc_in_quant.qzeros,
+                    self.fc_in_quant.blocksize,
+                )
+            if self.fc_out_quant.bias is None:
+                return torch.ops.torch_ipex.mm_silu_mul_int4(
+                    hidden_states,
+                    self.fc_out_quant.qweight,
+                    self.fc_out_quant.scales,
+                    self.fc_out_quant.qzeros,
+                    self.fc_out_quant.blocksize,
+                    hidden_states1,
+                )
+            else:
+                return torch.ops.torch_ipex.mm_bias_silu_mul_int4(
+                    hidden_states,
+                    self.fc_out_quant.qweight,
+                    self.fc_out_quant.bias,
+                    self.fc_out_quant.scales,
+                    self.fc_out_quant.qzeros,
+                    self.fc_out_quant.blocksize,
+                    hidden_states1,
+                )
 
 
 class IPEXTransformerMLPOptimizedInt4SiluLlama(IPEXTransformerMLPOptimizedInt4SiluQwen):

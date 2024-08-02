@@ -57,6 +57,18 @@ class ParamsLowBits(torch.nn.Parameter):
         return self
 
 
+# Determine gemm backend usage with has_xetla() and compute_eng_valid (last 2 lines) in kernel implementation
+def xpu_gemm_use_xetla():
+    return (
+        torch.xpu.has_xetla()
+        and (not torch.xpu.using_onednn_layout())
+        and (
+            torch.xpu.get_compute_eng()
+            in (torch.xpu.XPUComputeEng.RECOMMEND, torch.xpu.XPUComputeEng.XETLA)
+        )
+    )
+
+
 class WeightOnlyQuantizedLinear(nn.Module):
     __constants__ = ["in_features", "out_features", "blocksize"]
     in_features: int
@@ -183,10 +195,13 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self.register_buffer("scales", scales)
         self.register_buffer("qzeros", qzeros)
         self.register_buffer("g_idx", g_idx)
-        if self.scheme == "sym":
+        # WA: for sym scheme with xetla impl., qzeros needs to be None
+        if self.scheme == "sym" and xpu_gemm_use_xetla():
             self.qzeros = None
-        else:
+        elif xpu_gemm_use_xetla():
             self.qzeros += 0x11111111
+        else:
+            self.qzeros = qzeros
 
     def extra_repr(self) -> str:
         tmp_str = (

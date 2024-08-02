@@ -5,10 +5,17 @@
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
+#include "oneDNN/WoqMatmul.h"
 #include "utils/CustomOperatorRegistration.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
+
+bool choose_recommand_compute_eng() {
+  auto compute_eng = Settings::I().get_compute_eng();
+  return compute_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA ||
+      compute_eng == torch_ipex::xpu::COMPUTE_ENG::RECOMMEND;
+}
 
 int8_t GetGpuArchId() noexcept {
   DeviceId curDevID = at::xpu::current_device();
@@ -28,62 +35,128 @@ static void mm_qkv_out_wint4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     const optional<Tensor>& bias_,
-    const Tensor& out0_,
-    const Tensor& out1_,
-    const Tensor& out2_,
+    Tensor& out0_,
+    Tensor& out1_,
+    Tensor& out2_,
     int64_t group_size) {
-  auto input = input_.flatten(0, -2);
-  if (input.scalar_type() == ScalarType::Float)
-    input = input.to(at::kHalf);
-  auto out0 = out0_.flatten(0, -2);
-  auto out1 = out1_.flatten(0, -2);
-  auto out2 = out2_.flatten(0, -2);
-  // input: m,k; weight: 3,k,n, bias(opt): 3,n
-  TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
-  TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
-  int m = input.sizes()[0];
-  int k = input.sizes()[1];
-  int n = weight.sizes()[1];
+  if (choose_recommand_compute_eng()) {
+    auto input = input_.flatten(0, -2);
+    if (input.scalar_type() == ScalarType::Float)
+      input = input.to(at::kHalf);
+    auto out0 = out0_.flatten(0, -2);
+    auto out1 = out1_.flatten(0, -2);
+    auto out2 = out2_.flatten(0, -2);
+    // input: m,k; weight: 3,k,n, bias(opt): 3,n
+    TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
+    TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
+    int m = input.sizes()[0];
+    int k = input.sizes()[1];
+    int n = weight.sizes()[1];
 
-  bool has_bias = bias_.has_value();
-  if (has_bias) {
-    auto bias = bias_.value();
+    bool has_bias = bias_.has_value();
+    if (has_bias) {
+      auto bias = bias_.value();
+      TORCH_CHECK(
+          bias.dim() == 2 && bias.sizes()[0] == 3 && bias.sizes()[1] == n);
+    }
     TORCH_CHECK(
-        bias.dim() == 2 && bias.sizes()[0] == 3 && bias.sizes()[1] == n);
+        out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
+    TORCH_CHECK(
+        out0.sizes()[1] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
+
+    bool is_a_contiguous = input.is_contiguous();
+    bool is_b_row_major = weight.is_contiguous();
+
+    TORCH_CHECK(is_a_contiguous && is_b_row_major);
+    TORCH_CHECK(
+        input.scalar_type() == kHalf || input.scalar_type() == kBFloat16);
+    TORCH_CHECK(
+        weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
+        weight.scalar_type() == kChar || weight.scalar_type() == kInt)
+
+    auto policy = HGEMMXetla_INT4()
+                      .add_matrix_out(out0)
+                      .add_matrix_out(out1)
+                      .add_matrix_out(out2)
+                      .add_matrix_inp(input)
+                      .add_matrix_wei(weight)
+                      .add_matrix_scl(weight_scl)
+                      .add_matrix_zp(weight_zp);
+    if (has_bias)
+      policy.add_epilogue(bias_.value(), HGEMMXetla_INT4::EpilogueType::BIAS);
+    policy.add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SPLIT3)
+        .add_group_size(group_size)
+        .add_arch(GetGpuArchId())
+        .build();
+    TORCH_CHECK(
+        policy.fallback() == false,
+        has_bias ? "qkv bias: " : "qkv: ",
+        "invalid gemm shape");
+    policy.run();
+  } else {
+    Attr attr;
+    if (bias_.has_value()) {
+      auto bias = bias_.value();
+      out0_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
+          out0_,
+          input_,
+          weight[0],
+          weight_scl[0],
+          weight_zp[0],
+          group_size,
+          false,
+          attr,
+          bias[0]);
+      out1_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
+          out1_,
+          input_,
+          weight[1],
+          weight_scl[1],
+          weight_zp[1],
+          group_size,
+          false,
+          attr,
+          bias[1]);
+      out2_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
+          out2_,
+          input_,
+          weight[2],
+          weight_scl[2],
+          weight_zp[2],
+          group_size,
+          false,
+          attr,
+          bias[2]);
+    } else {
+      out0_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
+          out0_,
+          input_,
+          weight[0],
+          weight_scl[0],
+          weight_zp[0],
+          group_size,
+          false,
+          attr);
+      out1_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
+          out1_,
+          input_,
+          weight[1],
+          weight_scl[1],
+          weight_zp[1],
+          group_size,
+          false,
+          attr);
+      out2_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
+          out2_,
+          input_,
+          weight[2],
+          weight_scl[2],
+          weight_zp[2],
+          group_size,
+          false,
+          attr);
+    }
   }
-  TORCH_CHECK(
-      out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
-  TORCH_CHECK(
-      out0.sizes()[1] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
-
-  bool is_a_contiguous = input.is_contiguous();
-  bool is_b_row_major = weight.is_contiguous();
-
-  TORCH_CHECK(is_a_contiguous && is_b_row_major);
-  TORCH_CHECK(input.scalar_type() == kHalf || input.scalar_type() == kBFloat16);
-  TORCH_CHECK(
-      weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
-      weight.scalar_type() == kChar || weight.scalar_type() == kInt)
-
-  auto policy = HGEMMXetla_INT4()
-                    .add_matrix_out(out0)
-                    .add_matrix_out(out1)
-                    .add_matrix_out(out2)
-                    .add_matrix_inp(input)
-                    .add_matrix_wei(weight)
-                    .add_matrix_scl(weight_scl)
-                    .add_matrix_zp(weight_zp);
-  if (has_bias)
-    policy.add_epilogue(bias_.value(), HGEMMXetla_INT4::EpilogueType::BIAS);
-  policy.add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SPLIT3)
-      .add_group_size(group_size)
-      .add_arch(GetGpuArchId())
-      .build();
-  TORCH_CHECK(
-      policy.fallback() == false,
-      has_bias ? "qkv bias: " : "qkv: ",
-      "invalid gemm shape");
-  policy.run();
 }
 
 static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
@@ -112,12 +185,16 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
       out1,
       out2,
       group_size);
-  auto sizes = input.sym_sizes().vec();
-  sizes[sizes.size() - 1] = n;
-  return std::forward_as_tuple(
-      out0.view_symint(sizes),
-      out1.view_symint(sizes),
-      out2.view_symint(sizes));
+  if (choose_recommand_compute_eng()) {
+    auto sizes = input.sym_sizes().vec();
+    sizes[sizes.size() - 1] = n;
+    return std::forward_as_tuple(
+        out0.view_symint(sizes),
+        out1.view_symint(sizes),
+        out2.view_symint(sizes));
+  } else {
+    return std::forward_as_tuple(out0, out1, out2);
+  }
 }
 
 // mlp operators naming convention:
@@ -378,17 +455,32 @@ static Tensor mm_bias_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size) {
-  auto bias = bias_.flatten();
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input,
-      weight,
-      weight_scl,
-      weight_zp,
-      group_size,
-      {{bias, HGEMMXetla_INT4::EpilogueType::BIAS}},
-      &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    auto bias = bias_.flatten();
+    auto dispatcher = mm_int4_dispatch(
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        {{bias, HGEMMXetla_INT4::EpilogueType::BIAS}},
+        &out);
+    return resize_as_mat1(input, out);
+  } else {
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_int4(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        false,
+        attr,
+        bias_);
+    return out;
+  }
 }
 
 static Tensor mm_int4(
@@ -398,9 +490,25 @@ static Tensor mm_int4(
     const Tensor& weight_zp,
     int64_t group_size) {
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input, weight, weight_scl, weight_zp, group_size, {}, &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    auto dispatcher = mm_int4_dispatch(
+        input, weight, weight_scl, weight_zp, group_size, {}, &out);
+    return resize_as_mat1(input, out);
+  } else {
+    at::Tensor bias = Tensor();
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_int4(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        false,
+        attr,
+        bias);
+    return out;
+  }
 }
 
 static void mm_int4_out(
@@ -410,9 +518,16 @@ static void mm_int4_out(
     const Tensor& weight_zp,
     Tensor& out,
     int64_t group_size) {
-  auto dispatcher = mm_int4_dispatch(
-      input, weight, weight_scl, weight_zp, group_size, {}, &out);
-  return;
+  if (choose_recommand_compute_eng()) {
+    auto dispatcher = mm_int4_dispatch(
+        input, weight, weight_scl, weight_zp, group_size, {}, &out);
+    return;
+  } else {
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_int4(
+        out, input, weight, weight_scl, weight_zp, group_size, false, attr);
+    return;
+  }
 }
 
 static Tensor mm_silu_int4(
@@ -422,15 +537,31 @@ static Tensor mm_silu_int4(
     const Tensor& weight_zp,
     int64_t group_size) {
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input,
-      weight,
-      weight_scl,
-      weight_zp,
-      group_size,
-      {{Tensor(), HGEMMXetla_INT4::EpilogueType::SILU}},
-      &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    auto dispatcher = mm_int4_dispatch(
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        {{Tensor(), HGEMMXetla_INT4::EpilogueType::SILU}},
+        &out);
+    return resize_as_mat1(input, out);
+  } else {
+    at::Tensor bias = Tensor();
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_silu(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        false,
+        attr,
+        bias);
+    return out;
+  }
 }
 
 static Tensor mm_resmul_int4(
@@ -442,15 +573,30 @@ static Tensor mm_resmul_int4(
     int64_t group_size) {
   auto res_flat = res.flatten(0, -2);
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input,
-      weight,
-      weight_scl,
-      weight_zp,
-      group_size,
-      {{res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
-      &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    auto dispatcher = mm_int4_dispatch(
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        {{res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
+        &out);
+    return resize_as_mat1(input, out);
+  } else {
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_resmul(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        attr);
+    return out;
+  }
 }
 
 static Tensor mm_bias_gelu_int4(
@@ -461,19 +607,35 @@ static Tensor mm_bias_gelu_int4(
     const Tensor& bias,
     int64_t group_size,
     c10::string_view approximate) {
-  auto bias_flat = bias.flatten();
-  TORCH_CHECK(approximate == "tanh");
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input,
-      weight,
-      weight_scl,
-      weight_zp,
-      group_size,
-      {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
-       {Tensor(), HGEMMXetla_INT4::EpilogueType::GELU}},
-      &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    auto bias_flat = bias.flatten();
+    TORCH_CHECK(approximate == "tanh");
+    auto dispatcher = mm_int4_dispatch(
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
+         {Tensor(), HGEMMXetla_INT4::EpilogueType::GELU}},
+        &out);
+    return resize_as_mat1(input, out);
+  } else {
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_bias_gelu(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        approximate,
+        false,
+        attr,
+        bias);
+    return out;
+  }
 }
 
 static Tensor mm_bias_resadd_resadd_int4(
@@ -485,21 +647,40 @@ static Tensor mm_bias_resadd_resadd_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size) {
-  auto bias_flat = bias.flatten();
-  auto res0_flat = res0.flatten(0, -2);
-  auto res1_flat = res1.flatten(0, -2);
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input,
-      weight,
-      weight_scl,
-      weight_zp,
-      group_size,
-      {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
-       {res0_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD},
-       {res1_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
-      &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    std::cout << "xetla path" << std::endl;
+    auto bias_flat = bias.flatten();
+    auto res0_flat = res0.flatten(0, -2);
+    auto res1_flat = res1.flatten(0, -2);
+    auto dispatcher = mm_int4_dispatch(
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
+         {res0_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD},
+         {res1_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
+        &out);
+    return resize_as_mat1(input, out);
+  } else {
+    std::cout << "onednn path" << std::endl;
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_bias_resadd_resadd(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        res0,
+        res1,
+        group_size,
+        false,
+        attr,
+        bias);
+    return out;
+  }
 }
 
 static Tensor mm_low_bits(
@@ -524,18 +705,33 @@ static Tensor mm_silu_mul_int4(
     const Tensor& weight_zp,
     int64_t group_size,
     const Tensor& res) {
-  auto res_flat = res.flatten(0, -2);
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input,
-      weight,
-      weight_scl,
-      weight_zp,
-      group_size,
-      {{Tensor(), HGEMMXetla_INT4::EpilogueType::SILU},
-       {res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
-      &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    auto res_flat = res.flatten(0, -2);
+    auto dispatcher = mm_int4_dispatch(
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        {{Tensor(), HGEMMXetla_INT4::EpilogueType::SILU},
+         {res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
+        &out);
+    return resize_as_mat1(input, out);
+  } else {
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_silu_mul(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        attr);
+    return out;
+  }
 }
 
 static Tensor mm_bias_silu_mul_int4(
@@ -546,20 +742,36 @@ static Tensor mm_bias_silu_mul_int4(
     const Tensor& weight_zp,
     int64_t group_size,
     const Tensor& res) {
-  auto res_flat = res.flatten(0, -2);
-  auto bias_flat = bias.flatten();
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input,
-      weight,
-      weight_scl,
-      weight_zp,
-      group_size,
-      {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
-       {Tensor(), HGEMMXetla_INT4::EpilogueType::SILU},
-       {res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
-      &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    auto res_flat = res.flatten(0, -2);
+    auto bias_flat = bias.flatten();
+    auto dispatcher = mm_int4_dispatch(
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
+         {Tensor(), HGEMMXetla_INT4::EpilogueType::SILU},
+         {res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
+        &out);
+    return resize_as_mat1(input, out);
+  } else {
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_bias_silu_mul_int4(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        attr,
+        bias);
+    return out;
+  }
 }
 
 static Tensor mm_add_int4(
@@ -569,17 +781,32 @@ static Tensor mm_add_int4(
     const Tensor& weight_zp,
     int64_t group_size,
     const Tensor& res) {
-  auto res_flat = res.flatten(0, -2);
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input,
-      weight,
-      weight_scl,
-      weight_zp,
-      group_size,
-      {{res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
-      &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    auto res_flat = res.flatten(0, -2);
+    auto dispatcher = mm_int4_dispatch(
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        {{res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
+        &out);
+    return resize_as_mat1(input, out);
+  } else {
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_add_int4(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        attr);
+    return out;
+  }
 }
 
 static Tensor mm_bias_add_int4(
@@ -590,19 +817,35 @@ static Tensor mm_bias_add_int4(
     const Tensor& weight_zp,
     int64_t group_size,
     const Tensor& res) {
-  auto res_flat = res.flatten(0, -2);
-  auto bias_flat = bias.flatten();
   Tensor out;
-  auto dispatcher = mm_int4_dispatch(
-      input,
-      weight,
-      weight_scl,
-      weight_zp,
-      group_size,
-      {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
-       {res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
-      &out);
-  return resize_as_mat1(input, out);
+  if (choose_recommand_compute_eng()) {
+    auto res_flat = res.flatten(0, -2);
+    auto bias_flat = bias.flatten();
+    auto dispatcher = mm_int4_dispatch(
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
+         {res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
+        &out);
+    return resize_as_mat1(input, out);
+  } else {
+    Attr attr;
+    torch_ipex::xpu::oneDNN::woq_matmul_bias_add_int4(
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        attr,
+        bias);
+    return out;
+  }
 }
 
 bool is_match_total_mem(
