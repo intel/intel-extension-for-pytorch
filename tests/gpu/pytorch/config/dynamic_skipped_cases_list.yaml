@@ -8976,3 +8976,18 @@
 - reason: Auto skipped due to feature of _slow_conv2d_forward_p3_1_Error
   cases:
   - test_nn.py::TestFusionEval::test_fuse_module_eval_numerics
+- reason: Auto skipped due to page fault issue
+  cases:
+  - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_sgn_xpu_float32
+  - test_linalg.py::TestLinalgXPU::test_cholesky_inverse_xpu_float32
+  - test_linalg.py::TestLinalgXPU::test_cholesky_inverse_xpu_float64
+  - test_ops.py::TestCommonXPU::test_noncontiguous_samples_sgn_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_index_add_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_index_copy_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_log_softmax_with_dtype_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_log_softmax_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_softmax_with_dtype_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_softmax_xpu_float32
+  - test_ops.py::TestCommonXPU::test_variant_consistency_eager_sgn_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_backward_sgn_xpu_float32
+  - test_ops.py::TestMathBitsXPU::test_neg_view_sgn_xpu_float64
