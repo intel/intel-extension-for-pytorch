@@ -101,6 +101,7 @@ class NewIPEXPhi3DecoderLayer(IPEXTransformerBlock):
             resid_pdrop=self.config.resid_pdrop,
             attn_dropout=self.config.attention_dropout,
             scale_attention=True,
+            sliding_window=self.config.sliding_window,
             dtype=dtype,
             impl=impl_mode,
             tp_size=tp_size,

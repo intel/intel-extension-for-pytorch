@@ -490,7 +490,7 @@ class IPEXTransformerAttnOptimizedFp16(IPEXTransformerAttnNaive):
                 )
 
                 attention_mask = local_mask.half().masked_fill(
-                    local_mask == 1.0, torch.finfo(dtype).min
+                    local_mask == 1.0, -65504.0
                 )
                 # expand the dim of bs_beam and head
                 attention_mask = attention_mask.expand(
