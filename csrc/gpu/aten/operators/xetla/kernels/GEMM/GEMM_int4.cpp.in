@@ -161,8 +161,13 @@ using bf16 = gpu::xetla::bf16;
       const uint32_t k);                                                      \
   template cgfs_t XETLA_KERNEL_API hgemm_qkv_wint4<scalar_t, ##__VA_ARGS__>(  \
       scalar_t * out0,                                                        \
+      uint32_t ld_out0,                                                       \
+      uint32_t offset_n1,                                                     \
       scalar_t * out1,                                                        \
+      uint32_t ld_out1,                                                       \
+      uint32_t offset_n2,                                                     \
       scalar_t * out2,                                                        \
+      uint32_t ld_out2,                                                       \
       const scalar_t* a,                                                      \
       const uint32_t* b,                                                      \
       const uint32_t* b_zp,                                                   \
@@ -216,8 +221,13 @@ using bf16 = gpu::xetla::bf16;
   template cgfs_t XETLA_KERNEL_API                                            \
   hgemm_qkv_bias_wint4<scalar_t, ##__VA_ARGS__>(                              \
       scalar_t * out0,                                                        \
+      uint32_t ld_out0,                                                       \
+      uint32_t offset_n1,                                                     \
       scalar_t * out1,                                                        \
+      uint32_t ld_out1,                                                       \
+      uint32_t offset_n2,                                                     \
       scalar_t * out2,                                                        \
+      uint32_t ld_out2,                                                       \
       const scalar_t* a,                                                      \
       const uint32_t* b,                                                      \
       const uint32_t* b_zp,                                                   \

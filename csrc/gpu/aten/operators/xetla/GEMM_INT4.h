@@ -229,8 +229,13 @@ template <
     int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_qkv_wint4(
     scalar_t* out0,
+    uint32_t ld_out0,
+    uint32_t offset_n1,
     scalar_t* out1,
+    uint32_t ld_out1,
+    uint32_t offset_n2,
     scalar_t* out2,
+    uint32_t ld_out2,
     const scalar_t* a,
     const uint32_t* b,
     const uint32_t* b_zp,
@@ -256,8 +261,13 @@ template <
     int ARCH = static_cast<int>(gpu::xetla::gpu_arch::XeHpc)>
 XETLA_KERNEL_API cgfs_t hgemm_qkv_bias_wint4(
     scalar_t* out0,
+    uint32_t ld_out0,
+    uint32_t offset_n1,
     scalar_t* out1,
+    uint32_t ld_out1,
+    uint32_t offset_n2,
     scalar_t* out2,
+    uint32_t ld_out2,
     const scalar_t* a,
     const uint32_t* b,
     const uint32_t* b_zp,

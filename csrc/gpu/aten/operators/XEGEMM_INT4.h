@@ -440,8 +440,13 @@ using namespace torch_ipex::xpu::xetla;
     STAGES,                                                 \
     ARCH>(                                                  \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()), \
+      outputs_[0]->stride(0),                               \
+      offset_n_k,                                           \
       reinterpret_cast<scalar_t*>(outputs_[1]->data_ptr()), \
+      outputs_[1]->stride(0),                               \
+      offset_n_v,                                           \
       reinterpret_cast<scalar_t*>(outputs_[2]->data_ptr()), \
+      outputs_[2]->stride(0),                               \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),      \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),     \
       weight_zp_ptr_,                                       \
@@ -591,8 +596,13 @@ using namespace torch_ipex::xpu::xetla;
     STAGES,                                                   \
     ARCH>(                                                    \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
+      outputs_[0]->stride(0),                                 \
+      offset_n_k,                                             \
       reinterpret_cast<scalar_t*>(outputs_[1]->data_ptr()),   \
+      outputs_[1]->stride(0),                                 \
+      offset_n_v,                                             \
       reinterpret_cast<scalar_t*>(outputs_[2]->data_ptr()),   \
+      outputs_[2]->stride(0),                                 \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
       weight_zp_ptr_,                                         \
@@ -1004,6 +1014,7 @@ class HGEMMXetla_INT4 final {
   bool is_b_col_major_;
   bool fallback_;
   int m_, n_, k_;
+  int offset_n_k = 0, offset_n_v = 0; // n-dim offset, for qkv fusion
   int64_t group_size_;
   int8_t arch_ = static_cast<int>(gpu::xetla::gpu_arch::XeHpc);
   template <uint32_t a, uint32_t b>
@@ -1133,8 +1144,7 @@ class HGEMMXetla_INT4 final {
       std::cout << "output dim check fail!" << std::endl;
       return *this;
     }
-    if ((has_split3 || has_gate_up) ? weight_->dim() != 3
-                                    : weight_->dim() != 2) {
+    if ((has_gate_up) ? weight_->dim() != 3 : weight_->dim() != 2) {
       std::cout << "weight dim check fail!" << std::endl;
       return *this;
     }
@@ -1150,15 +1160,22 @@ class HGEMMXetla_INT4 final {
     if (group_size_ == -1 || group_size_ == k_)
       group_size_ = 0;
     // Set correct n dim.
-    if (has_split3 || has_gate_up)
-      n_ = b_sizes[1];
-    else
-      n_ = b_sizes[0];
+    n_ = b_sizes[has_gate_up ? 1 : 0];
+
+    if (has_split3) {
+      offset_n_k = outputs_[0]->sizes()[1];
+      offset_n_v = offset_n_k + outputs_[1]->sizes()[1];
+      auto offset_end = offset_n_v + outputs_[2]->sizes()[1];
+      if (offset_end != n_) {
+        std::cout << "output size for the k/v tensor do not match output size!"
+                  << std::endl;
+        return *this;
+      }
+    }
     for (int i = 0; i < num_epilogues_; i++) {
       switch (epilogue_type_[i]) {
         case BIAS: {
-          if (has_split3 ? (epilogues_[i]->dim() != 2)
-                         : (epilogues_[i]->dim() != 1)) {
+          if (epilogues_[i]->dim() != 1) {
             std::cout << "bias dim check fail!" << std::endl;
             return *this;
           }
@@ -1166,7 +1183,7 @@ class HGEMMXetla_INT4 final {
             std::cout << "bias contiguity check fail!" << std::endl;
             return *this;
           }
-          if (epilogues_[i]->sizes()[has_split3 ? 1 : 0] != n_) {
+          if (epilogues_[i]->sizes()[0] != n_) {
             std::cout << "bias size check fail!" << std::endl;
             return *this;
           }

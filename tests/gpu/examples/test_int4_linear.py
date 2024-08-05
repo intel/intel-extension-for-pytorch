@@ -12,6 +12,7 @@ from torch.testing._internal.common_utils import (
 
 checking_atol = 1e-2
 checking_rtol = 2e-2
+skip_bf16_input = not torch.xpu.has_2d_block_array() and not torch.xpu.has_xmx()
 
 
 class TestInt4Linear(TestCase):
@@ -69,56 +70,76 @@ class TestInt4Linear(TestCase):
     # qkv per-channel not used && TODO: Mismatched elements: 1 / 9216
     @parametrize("per_channel", [False], lambda k: "per_channel" * k)
     @parametrize("dtype", [torch.float16, torch.bfloat16])
-    @parametrize("m,n,k", [(1, 3072, 3072)])
+    @parametrize(
+        "m,n_q, n_kv ,k",
+        [(1, 3072, 3072, 3072), (1, 4096, 1024, 4096), (129, 4096, 1024, 4096)],
+    )
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
-    def test_qkv_int4(self, m, n, k, per_channel, dtype):
+    @parametrize("inplace", [False, True])
+    def test_qkv_int4(self, m, n_q, n_kv, k, per_channel, dtype, inplace):
+        if skip_bf16_input and dtype == torch.bfloat16:
+            pytest.skip("bf16 input is not available on mtl")
         group_size = min(32, k)
         if per_channel:
             group_size = k
 
-        input = torch.rand([1, m, k], device="xpu", dtype=dtype)
-        bias = torch.rand([3, n], device="xpu", dtype=dtype)
-        weight = (torch.randint(0, 1112111, [3, k // 8, n], device="xpu")).to(
-            torch.int32
-        )
+        input = torch.rand([m, k], device="xpu", dtype=dtype)
+        bias = [torch.rand([n], device="xpu", dtype=dtype) for n in (n_q, n_kv, n_kv)]
+        weight = [
+            torch.randint(0, 1112111, [k // 8, n], device="xpu").to(torch.int32)
+            for n in (n_q, n_kv, n_kv)
+        ]
 
         group_num = int(k / group_size)
 
-        scales = torch.rand([3, group_num, n], device="xpu", dtype=dtype)
-        zero_points = (torch.zeros([3, group_num, n // 8], device="xpu")).to(
-            torch.int32
-        )
+        scales = [
+            torch.rand([group_num, n], device="xpu", dtype=dtype)
+            for n in (n_q, n_kv, n_kv)
+        ]
+        zero_points = [
+            torch.zeros([group_num, n // 8], device="xpu").to(torch.int32)
+            for n in (n_q, n_kv, n_kv)
+        ]
 
-        out_xetla = torch.ops.torch_ipex.mm_qkv_int4(
-            input,
-            weight.transpose(1, 2).contiguous(),
-            bias,
-            scales.transpose(1, 2).contiguous(),
-            None,
-            group_size,
-        )
+        weight_fp16 = [
+            self.dequantize(weight[i], scales[i], zero_points[i], group_size).to(dtype)
+            for i in range(3)
+        ]
+        out_torch = [
+            torch.matmul(input.cpu().float(), weight_fp16[i].cpu().float())
+            for i in range(3)
+        ]
+        out_torch_bias = [out_torch[i] + bias[i].cpu().float() for i in range(3)]
 
-        weight_fp16_1 = self.dequantize(
-            weight[0], scales[0], zero_points[0], group_size
-        ).to(dtype)
-        out_torch_1 = torch.matmul(input.cpu().float(), weight_fp16_1.cpu().float())
-        out_torch_bias_1 = out_torch_1 + bias[0].cpu().float()
-
-        weight_fp16_2 = self.dequantize(
-            weight[1], scales[1], zero_points[1], group_size
-        ).to(dtype)
-        out_torch_2 = torch.matmul(input.cpu().float(), weight_fp16_2.cpu().float())
-        out_torch_bias_2 = out_torch_2 + bias[1].cpu().float()
-
-        weight_fp16_3 = self.dequantize(
-            weight[2], scales[2], zero_points[2], group_size
-        ).to(dtype)
-        out_torch_3 = torch.matmul(input.cpu().float(), weight_fp16_3.cpu().float())
-        out_torch_bias_3 = out_torch_3 + bias[2].cpu().float()
-
+        if inplace:
+            out_xetla = [
+                # use -999 for throughout testing; use torch.empty in real use case
+                torch.full([m, n], -999, device="xpu", dtype=dtype)
+                for n in (n_q, n_kv, n_kv)
+            ]
+            torch.ops.torch_ipex.mm_qkv_out_int4(
+                input,
+                torch.cat([w.t() for w in weight]).contiguous(),
+                torch.cat([s.t() for s in scales]).contiguous(),
+                None,
+                torch.cat(bias).contiguous(),
+                *out_xetla,
+                group_size,
+            )
+        else:
+            out_xetla = torch.ops.torch_ipex.mm_qkv_int4(
+                input,
+                torch.cat([w.t() for w in weight]).contiguous(),
+                torch.cat([s.t() for s in scales]).contiguous(),
+                None,
+                torch.cat(bias).contiguous(),
+                n_kv,
+                n_kv,
+                group_size,
+            )
         self.assertEqual(
-            torch.cat([out_xetla[i].cpu().float() for i in range(3)]),
-            torch.cat((out_torch_bias_1, out_torch_bias_2, out_torch_bias_3)),
+            torch.cat([out_xetla[i].cpu().float() for i in range(3)], dim=-1),
+            torch.cat(out_torch_bias, dim=-1),
             atol=checking_atol,
             rtol=checking_rtol,
         )
@@ -128,6 +149,8 @@ class TestInt4Linear(TestCase):
     @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_gemm_int4(self, m, n, k, per_channel, dtype):
+        if skip_bf16_input and dtype == torch.bfloat16:
+            pytest.skip("bf16 input is not available on mtl")
         input = torch.rand([m, k], device="xpu", dtype=dtype)
         input_torch = input.cpu()
         weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
@@ -272,6 +295,8 @@ class TestInt4Linear(TestCase):
     @parametrize("dtype", [torch.float16, torch.bfloat16])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_mlp_int4(self, m, n, k, per_channel, dtype):
+        if skip_bf16_input and dtype == torch.bfloat16:
+            pytest.skip("bf16 input is not available on mtl")
         input = torch.rand([m, k], device="xpu", dtype=dtype)
         input_torch = input.cpu()
         weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)

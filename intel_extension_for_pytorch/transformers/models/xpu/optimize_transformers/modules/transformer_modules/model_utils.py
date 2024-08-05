@@ -28,11 +28,6 @@ def qwen_load_attn_params_int4(self, qkv_layer, out_layer):
     self.qkv_proj_quant.set_scales_zps_gidx(qkv_layer.scales, qkv_layer.qzeros)
     self.qkv_proj_quant.blocksize = qkv_layer.blocksize
 
-    if qkv_layer.bias is not None:
-        self.qkv_proj_quant.bias.data = self.qkv_proj_quant.bias.data.reshape(
-            3, -1
-        ).contiguous()
-
     self.out_proj_quant.set_weights_bias(out_layer.qweight, out_layer.bias)
     self.out_proj_quant.set_scales_zps_gidx(out_layer.scales, out_layer.qzeros)
     self.out_proj_quant.blocksize = out_layer.blocksize
@@ -49,27 +44,15 @@ def qwen_load_attn_params_int4(self, qkv_layer, out_layer):
 
 
 def qwen_transpose_attn_params_int4(self):
-    self.qkv_proj_quant.qweight.data = (
-        self.qkv_proj_quant.qweight.t().reshape(3, self.embed_dim, -1).contiguous()
-    )
-    self.qkv_proj_quant.scales.data = (
-        self.qkv_proj_quant.scales.t().reshape(3, self.embed_dim, -1).contiguous()
-    )
+    self.qkv_proj_quant.qweight.data = self.qkv_proj_quant.qweight.t().contiguous()
+    self.qkv_proj_quant.scales.data = self.qkv_proj_quant.scales.t().contiguous()
     if self.qkv_proj_quant.qzeros is not None:
-        self.qkv_proj_quant.qzeros.data = (
-            self.qkv_proj_quant.qzeros.t().reshape(3, self.embed_dim, -1).contiguous()
-        )
+        self.qkv_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros.t().contiguous()
 
-    self.out_proj_quant.qweight.data = self.out_proj_quant.qweight.transpose(
-        0, 1
-    ).contiguous()
-    self.out_proj_quant.scales.data = self.out_proj_quant.scales.transpose(
-        0, 1
-    ).contiguous()
+    self.out_proj_quant.qweight.data = self.out_proj_quant.qweight.t().contiguous()
+    self.out_proj_quant.scales.data = self.out_proj_quant.scales.t().contiguous()
     if self.out_proj_quant.qzeros is not None:
-        self.out_proj_quant.qzeros.data = self.out_proj_quant.qzeros.transpose(
-            0, 1
-        ).contiguous()
+        self.out_proj_quant.qzeros.data = self.out_proj_quant.qzeros.t().contiguous()
     torch.xpu.synchronize()
 
 

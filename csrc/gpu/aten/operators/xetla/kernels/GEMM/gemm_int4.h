@@ -91,22 +91,19 @@ struct hgemm_wint4_func {
   }
 
   template <typename gemm_op_t>
-  struct RunKernelFunctor {
+  using op_args_t =
+      typename gemm_op_t::template arguments_t<compute_policy::quant_mode>;
+
+  template <typename gemm_op_t>
+  struct GEMMFunctor {
+    op_args_t<gemm_op_t> gemm_arg;
+
     KERNEL_MAIN void operator()(nd_item<3> item) const {
       slm_barrier_init<gemm_op_t>();
       gemm_op_t gemm_op;
       gemm_op(item, gemm_arg);
     }
-    RunKernelFunctor(
-        typename gemm_op_t::template arguments_t<compute_policy::quant_mode>
-            gemm_arg_)
-        : gemm_arg(gemm_arg_) {}
-
-   private:
-    typename gemm_op_t::template arguments_t<compute_policy::quant_mode>
-        gemm_arg;
   };
-
   static inline cgf_t run(
       dtype_a* A,
       dtype_b* B,
@@ -119,26 +116,94 @@ struct hgemm_wint4_func {
       dtype_zero_pt* zero_pt_ptr,
       dtype_scale* scale_ptr,
       typename epilogue_t::arguments_t epilogue_args = {}) {
-    typename gemm_op_t::template arguments_t<compute_policy::quant_mode>
-        gemm_arg(
-            mat_m,
-            mat_k,
-            mat_n,
-            A,
-            mat_k, // mat_k
-            B,
-            mat_k,
-            C,
-            mat_n,
-            scale_ptr,
-            dequant_s == 0 ? 1 : (mat_k / compute_policy::dequant_s),
-            acc_ptr,
-            cnt_ptr,
-            epilogue_args);
+    op_args_t<gemm_op_t> gemm_arg(
+        mat_m,
+        mat_k,
+        mat_n,
+        A,
+        mat_k, // mat_k
+        B,
+        mat_k,
+        C,
+        mat_n,
+        scale_ptr,
+        dequant_s == 0 ? 1 : (mat_k / compute_policy::dequant_s),
+        acc_ptr,
+        cnt_ptr,
+        epilogue_args);
+    sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
 
-    cl::sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
+    GEMMFunctor<gemm_op_t> kfn(gemm_arg);
+    return [=](sycl::handler& cgh) {
+      cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
+    };
+  }
 
-    RunKernelFunctor<gemm_op_t> kfn(gemm_arg);
+  template <typename gemm_op_t>
+  struct QKVFunctor {
+    op_args_t<gemm_op_t> gemm_arg;
+    std::array<size_t, 3> NTile_offset;
+    std::array<uint32_t, 3> C_ld;
+    std::array<dtype_c*, 3> C_ptr;
+
+    KERNEL_MAIN void operator()(nd_item<3> item) const {
+      slm_barrier_init<gemm_op_t>();
+      auto ntile_idx = item.get_global_id(2); // K, M, [N]
+      size_t qkv012 = // 0: q, 1: k, 2: v
+          ntile_idx < NTile_offset[1]   ? 0
+          : ntile_idx < NTile_offset[2] ? 1
+                                        : 2;
+      op_args_t<gemm_op_t> item_args = gemm_arg;
+      item_args.matC_ld = C_ld[qkv012];
+      item_args.matC_base = C_ptr[qkv012];
+      gemm_op_t gemm_op;
+      gemm_op(item, item_args);
+    }
+  };
+  static inline cgf_t run_qkv(
+      dtype_a* A,
+      dtype_b* B,
+      // offset_n0 assumes to be 0
+      dtype_c* C0,
+      uint32_t ldc0,
+      uint32_t offset_n1,
+      dtype_c* C1,
+      uint32_t ldc1,
+      uint32_t offset_n2,
+      dtype_c* C2,
+      uint32_t ldc2,
+      dtype_acc* acc_ptr,
+      uint32_t* cnt_ptr,
+      uint32_t mat_m,
+      uint32_t mat_n,
+      uint32_t mat_k,
+      dtype_zero_pt* zero_pt_ptr,
+      dtype_scale* scale_ptr,
+      typename epilogue_t::arguments_t epilogue_args = {}) {
+    assert(offset_n1 % sg_n == 0);
+    assert(offset_n2 % sg_n == 0);
+    assert(mat_n % sg_n == 0);
+    op_args_t<gemm_op_t> gemm_arg(
+        mat_m,
+        mat_k,
+        mat_n,
+        A,
+        mat_k, // mat_k
+        B,
+        mat_k,
+        C0,
+        mat_n,
+        scale_ptr,
+        dequant_s == 0 ? 1 : (mat_k / compute_policy::dequant_s),
+        acc_ptr,
+        cnt_ptr,
+        epilogue_args);
+    sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
+    QKVFunctor<gemm_op_t> kfn{
+        gemm_arg,
+        {0, offset_n1 / sg_n, offset_n2 / sg_n},
+        {ldc0, ldc1, ldc2},
+        {C0, C1 - offset_n1, C2 - offset_n2}};
     return [=](sycl::handler& cgh) {
       cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
     };
@@ -281,7 +346,7 @@ struct hgemm_mlp_gate_mul_up_wint4_func {
         post_ops_up_args,
         post_ops_gate_args);
 
-    cl::sycl::nd_range<3> NDRange = mlp_op_t::get_nd_range(mlp_arg);
+    sycl::nd_range<3> NDRange = mlp_op_t::get_nd_range(mlp_arg);
     RunKernelFunctor kfn(mlp_arg);
     return [=](sycl::handler& cgh) {
       cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
@@ -766,8 +831,13 @@ template <
     int ARCH>
 inline cgfs_t hgemm_qkv_wint4(
     scalar_t* out0,
+    uint32_t ld_out0,
+    uint32_t offset_n1,
     scalar_t* out1,
+    uint32_t ld_out1,
+    uint32_t offset_n2,
     scalar_t* out2,
+    uint32_t ld_out2,
     const scalar_t* a,
     const uint32_t* b,
     const uint32_t* b_zp,
@@ -817,42 +887,25 @@ inline cgfs_t hgemm_qkv_wint4(
   }
   uint32_t zp_offset = group_num * n / 8;
   uint32_t scale_offset = group_num * n;
-  return {
 
-      hgemm_wint4_functor::run(
-          const_cast<scalar_t*>(a),
-          const_cast<data_type_b*>(b_alias),
-          out0,
-          acc_ptr,
-          cnt_ptr,
-          m,
-          n,
-          k,
-          const_cast<data_type_zp*>(b_zp_alias),
-          const_cast<scalar_t*>(b_scale)),
-      hgemm_wint4_functor::run(
-          const_cast<scalar_t*>(a),
-          const_cast<data_type_b*>(b_alias + weight_offset),
-          out1,
-          acc_ptr,
-          cnt_ptr,
-          m,
-          n,
-          k,
-          const_cast<data_type_zp*>(b_zp_alias + zp_offset),
-          const_cast<scalar_t*>(b_scale + scale_offset)),
-      hgemm_wint4_functor::run(
-          const_cast<scalar_t*>(a),
-          const_cast<data_type_b*>(b_alias + 2 * weight_offset),
-          out2,
-          acc_ptr,
-          cnt_ptr,
-          m,
-          n,
-          k,
-          const_cast<data_type_zp*>(b_zp_alias + 2 * zp_offset),
-          const_cast<scalar_t*>(b_scale + 2 * scale_offset)),
-  };
+  return {hgemm_wint4_functor::run_qkv(
+      const_cast<scalar_t*>(a),
+      const_cast<data_type_b*>(b_alias),
+      out0,
+      ld_out0,
+      offset_n1,
+      out1,
+      ld_out1,
+      offset_n2,
+      out2,
+      ld_out2,
+      acc_ptr,
+      cnt_ptr,
+      m,
+      n,
+      k,
+      const_cast<data_type_zp*>(b_zp_alias),
+      const_cast<scalar_t*>(b_scale))};
 }
 
 template <
@@ -1047,8 +1100,13 @@ template <
     int ARCH>
 inline cgfs_t hgemm_qkv_bias_wint4(
     scalar_t* out0,
+    uint32_t ld_out0,
+    uint32_t offset_n1,
     scalar_t* out1,
+    uint32_t ld_out1,
+    uint32_t offset_n2,
     scalar_t* out2,
+    uint32_t ld_out2,
     const scalar_t* a,
     const uint32_t* b,
     const uint32_t* b_zp,
@@ -1106,44 +1164,25 @@ inline cgfs_t hgemm_qkv_bias_wint4(
   }
   uint32_t zp_offset = group_num * n / 8;
   uint32_t scale_offset = group_num * n;
-  return {
-      hgemm_wint4_functor::run(
-          const_cast<scalar_t*>(a),
-          const_cast<data_type_b*>(b_alias),
-          out0,
-          acc_ptr,
-          cnt_ptr,
-          m,
-          n,
-          k,
-          const_cast<data_type_zp*>(b_zp_alias),
-          const_cast<scalar_t*>(b_scale),
-          {{{const_cast<scalar_t*>(bias), {n, 1, n}}}}),
-      hgemm_wint4_functor::run(
-          const_cast<scalar_t*>(a),
-          const_cast<data_type_b*>(b_alias + weight_offset),
-          out1,
-          acc_ptr,
-          cnt_ptr,
-          m,
-          n,
-          k,
-          const_cast<data_type_zp*>(b_zp_alias + zp_offset),
-          const_cast<scalar_t*>(b_scale + scale_offset),
-          {{{const_cast<scalar_t*>(bias + n), {n, 1, n}}}}),
-      hgemm_wint4_functor::run(
-          const_cast<scalar_t*>(a),
-          const_cast<data_type_b*>(b_alias + 2 * weight_offset),
-          out2,
-          acc_ptr,
-          cnt_ptr,
-          m,
-          n,
-          k,
-          const_cast<data_type_zp*>(b_zp_alias + 2 * zp_offset),
-          const_cast<scalar_t*>(b_scale + 2 * scale_offset),
-          {{{const_cast<scalar_t*>(bias + 2 * n), {n, 1, n}}}}),
-  };
+  return {hgemm_wint4_functor::run_qkv(
+      const_cast<scalar_t*>(a),
+      const_cast<data_type_b*>(b_alias),
+      out0,
+      ld_out0,
+      offset_n1,
+      out1,
+      ld_out1,
+      offset_n2,
+      out2,
+      ld_out2,
+      acc_ptr,
+      cnt_ptr,
+      m,
+      n,
+      k,
+      const_cast<data_type_zp*>(b_zp_alias),
+      const_cast<scalar_t*>(b_scale),
+      {{{const_cast<scalar_t*>(bias), {n, 1, n}}}})};
 }
 
 template <

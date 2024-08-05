@@ -31,7 +31,7 @@ int8_t GetGpuArchId() noexcept {
 }
 static void mm_qkv_out_wint4(
     const Tensor& input_,
-    const Tensor& weight,
+    const Tensor& weight_,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     const optional<Tensor>& bias_,
@@ -43,31 +43,26 @@ static void mm_qkv_out_wint4(
     auto input = input_.flatten(0, -2);
     if (input.scalar_type() == ScalarType::Float)
       input = input.to(at::kHalf);
+    auto weight = weight_.flatten(0, -2);
     auto out0 = out0_.flatten(0, -2);
     auto out1 = out1_.flatten(0, -2);
     auto out2 = out2_.flatten(0, -2);
-    // input: m,k; weight: 3,k,n, bias(opt): 3,n
-    TORCH_CHECK(input.dim() == 2 && weight.dim() == 3);
+    // input: m,k; weight: (n_q+n_k+n_v),k bias(opt): (n_q+n_k+n_v)
+    TORCH_CHECK(input.dim() == 2);
     TORCH_CHECK(out0.dim() == 2 && out1.dim() == 2 && out2.dim() == 2);
     int m = input.sizes()[0];
     int k = input.sizes()[1];
-    int n = weight.sizes()[1];
+    int n = weight.sizes()[0];
 
     bool has_bias = bias_.has_value();
     if (has_bias) {
       auto bias = bias_.value();
-      TORCH_CHECK(
-          bias.dim() == 2 && bias.sizes()[0] == 3 && bias.sizes()[1] == n);
+      TORCH_CHECK(bias.dim() == 1 && bias.sizes()[0] == n);
     }
     TORCH_CHECK(
         out0.sizes()[0] == m && out1.sizes()[0] == m && out2.sizes()[0] == m);
-    TORCH_CHECK(
-        out0.sizes()[1] == n && out1.sizes()[1] == n && out2.sizes()[1] == n);
-
-    bool is_a_contiguous = input.is_contiguous();
-    bool is_b_row_major = weight.is_contiguous();
-
-    TORCH_CHECK(is_a_contiguous && is_b_row_major);
+    TORCH_CHECK(n == (out0.sizes()[1] + out1.sizes()[1] + out2.sizes()[1]));
+    TORCH_CHECK(input.is_contiguous() && weight.is_contiguous());
     TORCH_CHECK(
         input.scalar_type() == kHalf || input.scalar_type() == kBFloat16);
     TORCH_CHECK(
@@ -100,7 +95,7 @@ static void mm_qkv_out_wint4(
       out0_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out0_,
           input_,
-          weight[0],
+          weight_[0],
           weight_scl[0],
           weight_zp[0],
           group_size,
@@ -110,7 +105,7 @@ static void mm_qkv_out_wint4(
       out1_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out1_,
           input_,
-          weight[1],
+          weight_[1],
           weight_scl[1],
           weight_zp[1],
           group_size,
@@ -120,7 +115,7 @@ static void mm_qkv_out_wint4(
       out2_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out2_,
           input_,
-          weight[2],
+          weight_[2],
           weight_scl[2],
           weight_zp[2],
           group_size,
@@ -131,7 +126,7 @@ static void mm_qkv_out_wint4(
       out0_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out0_,
           input_,
-          weight[0],
+          weight_[0],
           weight_scl[0],
           weight_zp[0],
           group_size,
@@ -140,7 +135,7 @@ static void mm_qkv_out_wint4(
       out1_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out1_,
           input_,
-          weight[1],
+          weight_[1],
           weight_scl[1],
           weight_zp[1],
           group_size,
@@ -149,7 +144,7 @@ static void mm_qkv_out_wint4(
       out2_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out2_,
           input_,
-          weight[2],
+          weight_[2],
           weight_scl[2],
           weight_zp[2],
           group_size,
@@ -162,19 +157,23 @@ static void mm_qkv_out_wint4(
 static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
     const Tensor& input,
     const Tensor& weight,
-    const optional<Tensor>& bias_,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
+    const optional<Tensor>& bias_,
+    int64_t n_key,
+    int64_t n_value,
     int64_t group_size) {
   auto input_flat = input.flatten(0, -2);
   if (input_flat.scalar_type() == ScalarType::Float)
     input_flat = input_flat.to(at::kHalf);
+  auto weight_flat = weight.flatten(0, -2);
   int m = input_flat.sizes()[0];
   int k = input_flat.sizes()[1];
-  int n = weight.sizes()[1];
-  auto out0 = at::empty({m, n}, input.options());
-  auto out1 = at::empty({m, n}, input.options());
-  auto out2 = at::empty({m, n}, input.options());
+  int n = weight_flat.sizes()[0];
+  const auto n_query = n - n_key - n_value;
+  auto out0 = at::empty({m, n_query}, input.options());
+  auto out1 = at::empty({m, n_key}, input.options());
+  auto out2 = at::empty({m, n_value}, input.options());
   mm_qkv_out_wint4(
       input,
       weight,
@@ -186,12 +185,15 @@ static std::tuple<Tensor, Tensor, Tensor> mm_qkv_wint4(
       out2,
       group_size);
   if (choose_recommand_compute_eng()) {
-    auto sizes = input.sym_sizes().vec();
-    sizes[sizes.size() - 1] = n;
+    const auto sizes = input.sym_sizes().vec();
+    auto sizes0 = sizes, sizes1 = sizes, sizes2 = sizes;
+    sizes0[sizes0.size() - 1] = n_query;
+    sizes1[sizes1.size() - 1] = n_key;
+    sizes2[sizes2.size() - 1] = n_value;
     return std::forward_as_tuple(
-        out0.view_symint(sizes),
-        out1.view_symint(sizes),
-        out2.view_symint(sizes));
+        out0.view_symint(sizes0),
+        out1.view_symint(sizes1),
+        out2.view_symint(sizes2));
   } else {
     return std::forward_as_tuple(out0, out1, out2);
   }
