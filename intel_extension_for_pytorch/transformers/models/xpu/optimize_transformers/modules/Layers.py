@@ -180,7 +180,7 @@ class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
         self.port_data()
 
     def port_data(self):
-        self.n_dim = self.module.scales.shape[1]  # 32000 or 128256
+        self.n_dim = self.module.scales.shape[0]  # 32000 or 128256
         self.bias = self.module.bias
         self.qweight = self.module.qweight
         self.scales = self.module.scales
