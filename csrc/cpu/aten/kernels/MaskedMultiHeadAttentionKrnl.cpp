@@ -568,13 +568,13 @@ scale_dot_product_for_indirect_access_kv_cache(
       : std::max(seq_len / max_parallel_parts, 1L);
   kv_block_size = std::min(kv_block_size, target_block_size);
   auto kv_block_count = (seq_len + kv_block_size - 1) / kv_block_size;
-  auto need_update_beam_idx = offset > 0 and bs > 1;
   auto b_ptr = beam_idx.data_ptr<long>();
   auto max_cache_size = beam_idx.size(0);
   long new_beam_idx[beam_batch][offset + query.size(1) + 1] = {};
   auto prompt_len = b_ptr[(max_cache_size - 2) * beam_batch];
   auto prompt_bs = b_ptr[(max_cache_size - 1) * beam_batch];
   auto beam_size = beam_batch / prompt_bs;
+  auto need_update_beam_idx = offset > 0 and beam_size > 1;
   if (need_update_beam_idx) {
     // according to the last decoded token to get the target beam for the past
     // token
@@ -655,6 +655,8 @@ scale_dot_product_for_indirect_access_kv_cache(
                   auto beam_size = beam_batch / bs;
                   kc_t_beam_start =
                       kc_t_beam_start + bi * beam_size * kv_head * head_size;
+                } else if (beam_size == 1) {
+                  kc_t_beam_start = kc_t_beam_start + bi * kv_head * head_size;
                 }
                 auto kc_head_start =
                     k_cache_ptr + kc_t_beam_start + kv_hi * head_size;
@@ -814,6 +816,8 @@ scale_dot_product_for_indirect_access_kv_cache(
                   auto beam_size = beam_batch / bs;
                   vc_t_beam_start =
                       vc_t_beam_start + bi * beam_size * kv_head * head_size;
+                } else if (beam_size == 1) {
+                  vc_t_beam_start = vc_t_beam_start + bi * kv_head * head_size;
                 }
                 auto v_cache_head_start =
                     v_cache_ptr + vc_t_beam_start + kv_hi * head_size;
