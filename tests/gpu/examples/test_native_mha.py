@@ -137,12 +137,6 @@ class TestTorchMethod(TestCase):
             bs = 4
             seq_len = 8
 
-            use_padding = True
-            pad_all = False
-            use_nt = False
-            need_weights = False
-            average_attn_weights = False
-
             q = (
                 6
                 * torch.rand(
@@ -152,23 +146,24 @@ class TestTorchMethod(TestCase):
             )
 
             if use_padding:
-                # Security Scan: pad_all is False and the following code is logically dead.
-                # if pad_all:
-                #    for q_i in q:
-                #        q_i[-1] = torch.zeros_like(
-                #            q[0][-1], device=cpu_device, dtype=torch.float32
-                #        )
-                #    mask = torch.zeros(
-                #        q.shape[:-1], device=cpu_device, dtype=torch.bool
-                #    )
-                #    for mask_i in mask:
-                #        mask_i[-1] = True
-                # else:
-                q[0][-1] = torch.zeros_like(
-                    q[0][-1], device=cpu_device, dtype=torch.float32
-                )
-                mask = torch.zeros(q.shape[:-1], device=cpu_device, dtype=torch.bool)
-                mask[0][-1] = True
+                if pad_all:
+                    for q_i in q:
+                        q_i[-1] = torch.zeros_like(
+                            q[0][-1], device=cpu_device, dtype=torch.float32
+                        )
+                    mask = torch.zeros(
+                        q.shape[:-1], device=cpu_device, dtype=torch.bool
+                    )
+                    for mask_i in mask:
+                        mask_i[-1] = True
+                else:
+                    q[0][-1] = torch.zeros_like(
+                        q[0][-1], device=cpu_device, dtype=torch.float32
+                    )
+                    mask = torch.zeros(
+                        q.shape[:-1], device=cpu_device, dtype=torch.bool
+                    )
+                    mask[0][-1] = True
 
             k = (
                 6
