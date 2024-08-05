@@ -56,7 +56,7 @@ class IPEXTransformerConfig:
     tp_group: object = None
     transpose: bool = True
     dynamic_cache_stride: int = 16
-    sliding_window: int = 2047
+    sliding_window: int = None
 
 
 @dataclass
