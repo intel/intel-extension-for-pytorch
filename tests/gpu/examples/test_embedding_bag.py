@@ -60,3 +60,26 @@ class TestTorchMethod(TestCase):
                                 atol=1e-5,
                                 rtol=1e-5,
                             )
+
+    def test_embeddingbag_out_of_bounds(self):
+        stderr = TestCase.runWithPytorchAPIUsageStderr(
+            f"""\
+import torch
+import intel_extension_for_pytorch   # noqa F401
+from torch.testing._internal.common_utils import (run_tests, TestCase)
+
+class TestThatContainsXPUAssert(TestCase):
+    def test_embeddingbag_out_of_bounds(self):
+        emb = torch.nn.EmbeddingBag(10, 10).to("xpu")
+        input = torch.randint(low=20, high=50, size=[1]).to("xpu")
+        offset = torch.tensor([0], dtype=torch.int32).to("xpu")
+        
+        a = emb(input, offset)
+        torch.xpu.synchronize()
+
+
+if __name__ == '__main__':
+    run_tests()
+        """
+        )
+        self.assertIn("Assertion `vec_idx < num_row` failed", stderr)
