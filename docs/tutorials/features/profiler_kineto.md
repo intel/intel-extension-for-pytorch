@@ -11,7 +11,8 @@ To use the Kineto supported profiler tool, you need to build Intel® Extension f
 
 ### Build Tool
 
-Set the build flag `export USE_PTI=1` to enable the PTI-based Kineto Profiler in Intel® Extension for PyTorch*. You must export this environment variable, make sure the PTI-SDK is preinstalled and source PTI by `source ~/intel/oneapi/pti/latest/env/vars.sh` ahead of building Intel® Extension for PyTorch*.
+The build flag `USE_PTI` is default ON for Intel® Extension for PyTorch\* to enable the PTI-based Kineto Profiler. Before building, you need to make sure the PTI-SDK is well preinstalled and sourced in your env.
+Here is the command you can use to download the PTI-SDK onto your machine: `wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/5987ec30-be32-4dee-870f-7b97a1113488/l_intel-pti-dev_p_0.9.0.33_offline.sh`. After downloading the file, you need to install it by running `sh l_intel-pti-dev_p_0.9.0.33_offline.sh`. After you install the PTI, you need to run `source <path-of-installation>/pti/latest/env/vars.sh` to source the PTI, then you can start your building.
 
 ### Use Tool
 
