@@ -456,6 +456,12 @@ def _get_class_from_dynamic_module(
         local_files_only=local_files_only,
         repo_type=repo_type,
     )
-    return get_class_in_module(
-        class_name, final_module.replace(".py", "").replace("-", "_")
-    )
+    import transformers
+    from packaging import version
+
+    trans_version = transformers.__version__
+    if version.parse(trans_version) < version.parse("4.39.0"):
+        return get_class_in_module(
+            class_name, final_module.replace(".py", "").replace("-", "_")
+        )
+    return get_class_in_module(class_name, final_module.replace("-", "_"))

@@ -237,7 +237,6 @@ class HuggingFaceModel(BaseLM):
                     config=self.config,
                     torch_dtype=load_dtype,
                     trust_remote_code=True,
-                    revision=pin_model_revision.get(model_id, None),
                 )
         else:
             self.model = model_class[0].from_pretrained(

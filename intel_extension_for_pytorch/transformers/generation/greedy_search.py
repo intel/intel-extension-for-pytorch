@@ -334,6 +334,7 @@ def _greedy_search(
                 model_inputs.pop("decoder_attention_mask", None)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)

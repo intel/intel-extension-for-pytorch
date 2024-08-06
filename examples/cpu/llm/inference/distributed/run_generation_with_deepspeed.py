@@ -139,7 +139,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--image-url",
-    default="http://images.cocodataset.org/val2017/000000039769.jpg",
+    default="https://images.cocodataset.org/val2017/000000039769.jpg",
     type=str,
     help="image url for image-to-text task",
 )
@@ -557,7 +557,7 @@ if model_type == "git":
     from PIL import Image
     import requests
 
-    prompt = Image.open(requests.get(args.image_url, stream=True).raw)
+    prompt = Image.open(requests.get(args.image_url, stream=True, verify=False).raw)
     inputs = [prompt] * args.batch_size
     generate_kwargs.pop("min_new_tokens", None)
 elif model_type == "llava":
@@ -567,7 +567,7 @@ elif model_type == "llava":
 
     def load_image(image_file):
         if image_file.startswith("http://") or image_file.startswith("https://"):
-            response = requests.get(image_file)
+            response = requests.get(image_file, verify=False)
             image = Image.open(BytesIO(response.content)).convert("RGB")
         else:
             image = Image.open(image_file).convert("RGB")

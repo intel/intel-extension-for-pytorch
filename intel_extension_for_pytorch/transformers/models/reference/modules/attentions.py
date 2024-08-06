@@ -2326,7 +2326,7 @@ class _IPEXAttentionRef(nn.Module):
                 if (
                     self.model_backbone == "LlavaLlamaForCausalLM"
                     and module._get_name() == "CLIPAttention"
-                ):
+                ) or config.num_key_value_heads == config.num_attention_heads:
                     self.num_key_value_heads = self.num_attention_heads
                 else:
                     raise ValueError(

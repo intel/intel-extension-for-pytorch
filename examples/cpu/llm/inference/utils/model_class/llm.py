@@ -59,7 +59,6 @@ class LLMConfig(ABC):
                     config=config,
                     low_cpu_mem_usage=True,
                     trust_remote_code=True,
-                    revision=pin_model_revision.get(self.model_id, None),
                 )
         else:
             self.model = AutoModelForCausalLM.from_pretrained(

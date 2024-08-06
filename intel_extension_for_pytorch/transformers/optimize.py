@@ -194,10 +194,12 @@ def model_convert_reference(_model):
         Phi3Model_forward,
         WhisperForConditionalGeneration_forward,
         WhisperModel_forward,
+        WhisperDecoderLayer_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
         prepare_inputs_for_generation_llama,
         prepare_inputs_labels_for_multimodal_llavallama,
+        prepare_inputs_for_generation_chatglm,
         detect_language,
     )
 
@@ -574,6 +576,11 @@ def model_convert_reference(_model):
             distributed=distributed,
         )
         convert_function(_model.transformer, "get_masks", GLM2_get_masks)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_chatglm,
+        )
     elif _model.config.architectures[0] == "MistralForCausalLM":
         convert_function(_model, "forward", MistralForCausalLM_forward)
         convert_function(_model.model, "forward", MistralModel_forward)
@@ -823,6 +830,11 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
     elif _model.config.architectures[0] == "Phi3ForCausalLM":
         convert_function(_model, "forward", PhiForCausalLM_forward)
         convert_function(_model.model, "forward", Phi3Model_forward)
@@ -844,6 +856,7 @@ def model_convert_reference(_model):
         convert_function(_model, "detect_language", detect_language)
         convert_function(_model, "forward", WhisperForConditionalGeneration_forward)
         convert_function(_model.model, "forward", WhisperModel_forward)
+        convert_function(_model.model.decoder, "forward", WhisperDecoderLayer_forward)
         convert_class(
             _model,
             type(_model.model.encoder.layers[0]),

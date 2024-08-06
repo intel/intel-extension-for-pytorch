@@ -366,6 +366,7 @@ def _beam_sample(
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)

@@ -361,6 +361,7 @@ def _sample(
                 )
                 model_inputs.pop("decoder_position_ids", None)
                 model_inputs.pop("decoder_attention_mask", None)
+            model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
