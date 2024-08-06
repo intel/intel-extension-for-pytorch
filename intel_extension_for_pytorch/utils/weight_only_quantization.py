@@ -3,6 +3,9 @@ import torch
 from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
 from intel_extension_for_pytorch.quantization import QConfigWoq, WoqLowpMode
 from torch.ao.quantization import PlaceholderObserver, QConfigMapping
+from intel_extension_for_pytorch.nn.utils._model_convert import (
+    _convert_optimum_format_to_desired,
+)
 
 # The config describes how to load low precision checkpoint for weight only quantization.
 # Weight shape is N by K if transposed is False otherwise K by N.
@@ -73,63 +76,6 @@ def _get_keys_from_config(checkpoint_config):
     bias_key = checkpoint_config.get("bias_key", "bias")
     g_idx_key = checkpoint_config.get("g_idx_key", "bias")
     return weight_key, scales_key, zeros_key, bias_key, g_idx_key
-
-
-def _convert_optimum_format_to_desired(qweight, scales, qzeros):
-    """
-    Optimum format:
-        qweight: (math.ceil(IC / comp_ratio), OC)
-        scales: (n_groups, OC)
-        qzeros: (n_groups, math.ceil(OC / comp_ratio))
-        qzeros are substracted by 1 before packing
-
-    Desired format:
-        compression_dim = 1
-        qweight: (OC, math.ceil(IC / comp_ratio))
-        scales: (OC, n_groups)
-        qzeros: (OC, math.ceil(n_groups / comp_ratio))
-
-    Note:
-        IC = input channels or input features
-        OC = output channels or output features
-        n_groups = math.ceil(IC / group_size)
-        comp_ratio = compression data type bits // weight or zeros data type bits
-        E.g., compression dtype = int32, weight dtype = int4, comp_ratio = 32 / 4 = 8
-
-    """
-    if qweight is None:
-        return qweight, scales, qzeros
-    oc = qweight.shape[1]
-    assert oc == scales.shape[1]
-    n_groups = scales.shape[0]
-    qweight = qweight.t_().contiguous()
-    scales = scales.t_().contiguous()
-    if qzeros is None:
-        return qweight, scales, qzeros
-    zp_dtype = torch.int32
-    zp = torch.empty((n_groups, oc), dtype=zp_dtype)
-    # Steps to convert qzeros:
-    # (1) unpack qzeros to (n_groups, OC)
-    # (2) take transpose
-    # (3) plus one and handle overflow
-    zp_bits = 4  # int4
-    comp_dtype_bits = 32  # int32
-    comp_ratio = comp_dtype_bits // zp_bits
-    mask = torch.tensor(2**zp_bits - 1, dtype=zp_dtype)
-    for j in range(qzeros.shape[1]):
-        packed_data = qzeros[:, j]
-        for e in range(comp_ratio):
-            index = j * comp_ratio + e
-            if index >= zp.shape[1]:
-                continue
-            data = (packed_data >> (zp_bits * e)) & mask
-            zp[:, index] = data.type(zp_dtype)
-    zp = zp.t_().contiguous()
-    zp += 1
-    # it may overflow after adding one
-    zp = torch.where(zp > (2**zp_bits - 1), 0, zp)
-
-    return qweight, scales, zp
 
 
 def _get_linear_parameters(attr_name, state_dict, checkpoint_config):

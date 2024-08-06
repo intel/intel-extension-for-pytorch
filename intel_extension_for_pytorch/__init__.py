@@ -117,7 +117,7 @@ if sys.platform == "win32":
                 raise err
 
     kernel32.SetErrorMode(prev_error_mode)
-
+from . import llm
 from . import cpu
 from . import xpu
 from . import quantization
@@ -143,7 +143,6 @@ from .transformers import (
     optimize_transformers,
     _set_optimized_model_for_generation,
 )
-from . import llm
 from . import distributed
 from .frontend import enable_auto_channels_last, disable_auto_channels_last
 from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode

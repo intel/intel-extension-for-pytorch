@@ -12,7 +12,12 @@ from intel_extension_for_pytorch.quantization import (
     quantize_per_block,
     WoqWeightDtype,
 )
-from intel_extension_for_pytorch.nn.utils._model_convert import prepack_awq_weight
+from intel_extension_for_pytorch.nn.utils._model_convert import (
+    prepack_awq_weight,
+    _convert_optimum_format_to_desired,
+)
+
+from intel_extension_for_pytorch.llm.quantization.utils import QuantMethod, QuantDtype
 from intel_extension_for_pytorch.quantization._qconfig import (
     WOQ_LOWP_MODE_TO_STR,
     WOQ_ACT_QUANT_MODE_TO_STR,
@@ -246,7 +251,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         group_size=-1,
         g_idx=None,
     ):
-        r"""Create a weight-only quantized module from int4 weight including autoAWQ format
+        r"""Create a weight-only quantized module from int4 weight including autoAWQ and autoGPTQ format
 
         Args:
             qweight (Tensor): tensor in int32 dtype and contains actually int4 data
@@ -288,9 +293,13 @@ class WeightOnlyQuantizedLinear(nn.Module):
         )
 
         qlinear = cls(in_features, out_features, dtype=WoqWeightDtype.INT4)
-        if quant_method == 1:
+        if quant_method == QuantMethod.AWQ_GEMM:
             qweight, scales, zero_points = prepack_awq_weight(
                 qweight, zero_points, scales, 4, group_size
+            )
+        elif quant_method == QuantMethod.GPTQ_GEMM:
+            qweight, scales, zero_points = _convert_optimum_format_to_desired(
+                qweight, scales, zero_points, inplace=False
             )
 
         if bias is not None and torch.count_nonzero(bias) == 0:
@@ -329,7 +338,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         group_size: int = -1,
         g_idx: Optional[torch.Tensor] = None,
         dtype: int = 0,
-        quant_method: int = 0,
+        quant_method: QuantMethod = QuantMethod.GPTQ_GEMM,
         **kwargs,
     ):
         r"""Create a weight-only quantized module from weight
@@ -350,7 +359,10 @@ class WeightOnlyQuantizedLinear(nn.Module):
             dtype (int): quantization data type, INT4=0
 
         """
-        if quant_method in [1] and dtype == 0:
+        if (
+            quant_method in [QuantMethod.GPTQ_GEMM, QuantMethod.AWQ_GEMM]
+            and dtype == QuantDtype.INT4
+        ):
             return cls.from_int4_weight(
                 qweight,
                 scales,
@@ -365,7 +377,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
             )
         else:
             raise AssertionError(
-                "Currently ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight() supports 4bits with AWQ."
+                "Currently ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight() supports 4bits with AWQ or GPTQ."
             )
 
     @classmethod
