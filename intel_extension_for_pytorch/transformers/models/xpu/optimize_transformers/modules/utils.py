@@ -80,7 +80,7 @@ def pad_for_gptj_lm_head(model, is_int4=False):
 
         model.lm_head.qweight.data = model.lm_head.qweight.transpose(0, 1).contiguous()
         model.lm_head.scales.data = model.lm_head.scales.transpose(0, 1).contiguous()
-        if hasattr(model.lm_head, "qzeros"):
+        if hasattr(model.lm_head, "qzeros") and model.lm_head.qzeros is not None:
             model.lm_head.qzeros.data = model.lm_head.qzeros.transpose(
                 0, 1
             ).contiguous()
