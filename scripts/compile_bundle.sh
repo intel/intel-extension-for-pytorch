@@ -245,10 +245,11 @@ python -m pip install --force-reinstall mkl-static mkl-include
 export PYTORCH_BUILD_VERSION=${VERSION_TORCH}
 export PYTORCH_BUILD_NUMBER=0
 # Ensure cmake can find python packages when using conda or virtualenv
+CMAKE_PREFIX_PATH_BK=${CMAKE_PREFIX_PATH}
 if [ -n "${CONDA_PREFIX-}" ]; then
-    export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(command -v conda))/../"}
+    export CMAKE_PREFIX_PATH+=${CONDA_PREFIX:-"$(dirname $(command -v conda))/../"}
 elif [ -n "${VIRTUAL_ENV-}" ]; then
-    export CMAKE_PREFIX_PATH=${VIRTUAL_ENV:-"$(dirname $(command -v python))/../"}
+    export CMAKE_PREFIX_PATH+=${VIRTUAL_ENV:-"$(dirname $(command -v python))/../"}
 fi
 export USE_STATIC_MKL=1
 export _GLIBCXX_USE_CXX11_ABI=${ABI}
@@ -265,7 +266,7 @@ unset USE_CUDA
 unset USE_NUMA
 unset _GLIBCXX_USE_CXX11_ABI
 unset USE_STATIC_MKL
-unset CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH_BK}
 unset PYTORCH_BUILD_NUMBER
 unset PYTORCH_BUILD_VERSION
 python -m pip uninstall -y mkl-static mkl-include
