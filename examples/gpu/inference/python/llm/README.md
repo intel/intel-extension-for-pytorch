@@ -111,6 +111,7 @@ conda install pkg-config
 cd examples/gpu/inference/python/llm
 # If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
 bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <AOT>
+# e.g. bash ./tools/env_setup.sh 3 /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest pvc
 export LD_PRELOAD=$(bash ../../../../../tools/get_libstdcpp_lib.sh)
 export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
 source ./tools/env_activate.sh
@@ -118,7 +119,7 @@ source ./tools/env_activate.sh
 ```
 
 where <br />
-- `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. Check [tutorial](../../../../../docs/tutorials/technical_details/AOT.md) for details.<br />
+- `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. For example 'pvc,ats-m150' for the Platform Intel® Data Center GPU Max Series, Intel® Data Center GPU Flex Series and Intel® Arc™ A-Series Graphics (A770). Check [tutorial](../../../../../docs/tutorials/technical_details/AOT.md) for details.<br />
 
 
  
