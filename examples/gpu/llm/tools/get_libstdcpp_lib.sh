@@ -1,1 +1,1 @@
-../../../../../../scripts/tools/compilation_helper/get_libstdcpp_lib.sh
+../../../../scripts/tools/compilation_helper/get_libstdcpp_lib.sh
