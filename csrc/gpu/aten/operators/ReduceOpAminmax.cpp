@@ -12,6 +12,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
+#include "comm/XPUPair.h"
 
 #include "Reduce.h"
 #include "ReduceOpsUtils.h"
@@ -24,7 +25,7 @@ namespace AtenIpexTypeXPU {
 
 template <typename scalar_t, typename acc_scalar_t, typename index_t>
 struct MinMaxOps {
-  using acc_t = std::pair<acc_scalar_t, acc_scalar_t>;
+  using acc_t = at::AtenIpexTypeXPU::pair<acc_scalar_t, acc_scalar_t>;
   inline acc_t reduce(acc_t acc, scalar_t data, int64_t idx) const {
     return combine(acc, {data, data});
   }
@@ -59,7 +60,7 @@ void _min_max_values_kernel_dpcpp_impl(TensorIterator& iter) {
   dpcpp_reduce_kernel<scalar_t, scalar_t>(
       iter,
       MinMaxOps<scalar_t, scalar_t, int32_t>{},
-      std::pair<scalar_t, scalar_t>(
+      at::AtenIpexTypeXPU::pair<scalar_t, scalar_t>(
           std::numeric_limits<scalar_t>::max(),
           std::numeric_limits<scalar_t>::lowest()));
 }

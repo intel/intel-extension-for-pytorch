@@ -61,7 +61,7 @@ struct RotaryEmbeddingKernelFunctor {
           const auto offset = offset_calc.get(global_offset);
           scalar_t val = *(input_ptr + offset[j + noutput]);
           scalar_t scale = i % 2 == 0 ? -1 : 1;
-          scalar_t shift_val = sg.shuffle_xor(val, 1) * scale;
+          scalar_t shift_val = sycl::permute_group_by_xor(sg, val, 1) * scale;
           float sin_val = static_cast<float>(*(sin_ptr + offset[sin_offset]));
           float cos_val = static_cast<float>(*(cos_ptr + offset[cos_offset]));
           *(output_ptr + offset[j]) =

@@ -4,7 +4,6 @@
 #include <ATen/core/DimVector.h>
 #include <ATen/native/ReduceOps.h>
 #include <ATen/native/ReduceOpsUtils.h>
-#include <ATen/native/SharedReduceOps.h>
 #include <ATen/native/TensorIterator.h>
 
 #include <c10/core/ScalarType.h>
@@ -12,6 +11,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
+#include "comm/XPUPair.h"
 
 #include "Reduce.h"
 #include "ReduceOpStdVar.h"
@@ -82,7 +82,8 @@ struct WelfordOps {
     const auto var = acc.m2 / divisor;
     auto ret = take_sqrt ? std::sqrt(var) : var;
 
-    std::pair<scalar_t, scalar_t> results{(scalar_t)ret, (scalar_t)mean};
+    at::AtenIpexTypeXPU::pair<scalar_t, scalar_t> results{
+        (scalar_t)ret, (scalar_t)mean};
     return results;
   }
   inline acc_t sg_shfl_down(acc_t arg, int offset) const {
@@ -104,8 +105,11 @@ void std_var_kernel_impl(
   // reducing unrolling factor to 2 for welford kernel
   // This is necessary to lower register usage that leads to register spills.
   using accscalar_t = AtenIpexTypeXPU::acc_type<scalar_t>;
-  using ops_t =
-      WelfordOps<scalar_t, accscalar_t, int32_t, std::pair<out_t, out_t>>;
+  using ops_t = WelfordOps<
+      scalar_t,
+      accscalar_t,
+      int32_t,
+      at::AtenIpexTypeXPU::pair<out_t, out_t>>;
   ops_t ops(static_cast<accscalar_t>(correction_opt), take_sqrt);
   dpcpp_reduce_kernel<scalar_t, out_t, 2>(iter, ops, typename ops_t::acc_t{});
 }

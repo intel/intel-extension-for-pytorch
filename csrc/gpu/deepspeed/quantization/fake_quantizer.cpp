@@ -69,7 +69,7 @@ class fake_quantize_kernel<sycl::half> {
 
 #pragma unroll
     for (int i = 1; i < WARP_SIZE; i <<= 1) {
-      auto temp = g.shuffle_xor(max, i);
+      auto temp = sycl::permute_group_by_xor(g, max, i);
       if (max < temp)
         max = temp;
     }
@@ -87,12 +87,12 @@ class fake_quantize_kernel<sycl::half> {
 
 #pragma unroll
     for (int i = 1; i < WARP_SIZE; i <<= 1) {
-      auto temp = g.shuffle_down(max, i);
+      auto temp = sycl::shift_group_left(g, max, i);
       if (max < temp)
         max = temp;
     }
 
-    max = g.shuffle(max, 0);
+    max = sycl::select_from_group(g, max, 0);
 
     float q_scale = (float)(1 << num_bits) / (2 * max + 1e-5);
     float q_scale_inv = 1 / q_scale;
@@ -167,7 +167,7 @@ class fake_quantize_kernel<float> {
 
 #pragma unroll
     for (int i = 1; i < WARP_SIZE; i <<= 1) {
-      auto temp = g.shuffle_xor(max, i);
+      auto temp = sycl::permute_group_by_xor(g, max, i);
       if (max < temp)
         max = temp;
     }
@@ -187,12 +187,12 @@ class fake_quantize_kernel<float> {
 
 #pragma unroll
     for (int i = 1; i < warp_num; i <<= 1) {
-      auto temp = g.shuffle_down(max, i);
+      auto temp = sycl::shift_group_left(g, max, i);
       if (max < temp)
         max = temp;
     }
 
-    max = g.shuffle(max, 0);
+    max = sycl::select_from_group(g, max, 0);
 
     float q_scale = (1 << num_bits) / (2 * max + 1e-5);
     float q_scale_inv = 1 / q_scale;
@@ -330,7 +330,7 @@ class sr_fake_quantize_kernel<sycl::half> {
 
 #pragma unroll
       for (int i = 1; i < WARP_SIZE; i <<= 1) {
-        auto temp = g.shuffle_xor(max, i);
+        auto temp = sycl::permute_group_by_xor(g, max, i);
         if (max < temp)
           max = temp;
       }
@@ -348,12 +348,12 @@ class sr_fake_quantize_kernel<sycl::half> {
 
 #pragma unroll
       for (int i = 1; i < warp_num; i <<= 1) {
-        auto temp = g.shuffle_down(max, i);
+        auto temp = sycl::shift_group_left(g, max, i);
         if (max < temp)
           max = temp;
       }
 
-      max = g.shuffle(max, 0);
+      max = sycl::select_from_group(g, max, 0);
 
       float q_scale_val = (float)(1 << num_bits) / (max * 2 + 1e-5);
       float high_q = (float)((1 << (num_bits - 1)) - 1);
@@ -497,7 +497,7 @@ class sr_fake_quantize_kernel<float> {
 
 #pragma unroll
       for (int i = 1; i < WARP_SIZE; i <<= 1) {
-        auto temp = g.shuffle_xor(max, i);
+        auto temp = sycl::permute_group_by_xor(g, max, i);
         if (max < temp)
           max = temp;
       }
@@ -514,12 +514,12 @@ class sr_fake_quantize_kernel<float> {
 
 #pragma unroll
       for (int i = 1; i < warp_num; i <<= 1) {
-        auto temp = g.shuffle_down(max, i);
+        auto temp = sycl::shift_group_left(g, max, i);
         if (max < temp)
           max = temp;
       }
 
-      max = g.shuffle(max, 0);
+      max = sycl::select_from_group(g, max, 0);
 
       float q_scale_val = (float)(1 << num_bits) / (max * 2 + 1e-5);
       float high_q = (float)((1 << (num_bits - 1)) - 1);
@@ -677,14 +677,14 @@ class fake_quantize_kernel_asym<sycl::half> {
 
 #pragma unroll
       for (int i = 1; i < WARP_SIZE; i <<= 1) {
-        auto temp = g.shuffle_xor(max, i);
+        auto temp = sycl::permute_group_by_xor(g, max, i);
         if (max < temp)
           max = temp;
       }
 
 #pragma unroll
       for (int i = 1; i < WARP_SIZE; i <<= 1) {
-        auto temp = g.shuffle_xor(min, i);
+        auto temp = sycl::permute_group_by_xor(g, min, i);
         if (min > temp)
           min = temp;
       }
@@ -708,19 +708,19 @@ class fake_quantize_kernel_asym<sycl::half> {
 
 #pragma unroll
       for (int i = 1; i < warp_num; i <<= 1) {
-        auto temp = g.shuffle_down(max, i);
+        auto temp = sycl::shift_group_left(g, max, i);
         if (max < temp)
           max = temp;
       }
 #pragma unroll
       for (int i = 1; i < warp_num; i <<= 1) {
-        auto temp = g.shuffle_down(min, i);
+        auto temp = sycl::shift_group_left(g, min, i);
         if (min > temp)
           min = temp;
       }
 
-      max = g.shuffle(max, 0);
-      min = g.shuffle(min, 0);
+      max = sycl::select_from_group(g, max, 0);
+      min = sycl::select_from_group(g, min, 0);
 
       float q_scale = ((max - min) + 1e-5) / (float)(1 << num_bits);
       float q_scale_inv = 1 / q_scale;
@@ -819,14 +819,14 @@ class fake_quantize_kernel_asym<float> {
 
 #pragma unroll
     for (int i = 1; i < WARP_SIZE; i <<= 1) {
-      auto temp = g.shuffle_xor(max, i);
+      auto temp = sycl::permute_group_by_xor(g, max, i);
       if (max < temp)
         max = temp;
     }
 
 #pragma unroll
     for (int i = 1; i < WARP_SIZE; i <<= 1) {
-      auto temp = g.shuffle_xor(min, i);
+      auto temp = sycl::permute_group_by_xor(g, min, i);
       if (min > temp)
         min = temp;
     }
@@ -852,19 +852,19 @@ class fake_quantize_kernel_asym<float> {
 
 #pragma unroll
     for (int i = 1; i < warp_num; i <<= 1) {
-      auto temp = g.shuffle_down(max, i);
+      auto temp = sycl::shift_group_left(g, max, i);
       if (max < temp)
         max = temp;
     }
 #pragma unroll
     for (int i = 1; i < warp_num; i <<= 1) {
-      auto temp = g.shuffle_down(min, i);
+      auto temp = sycl::shift_group_left(g, min, i);
       if (min > temp)
         min = temp;
     }
 
-    max = g.shuffle(max, 0);
-    min = g.shuffle(min, 0);
+    max = sycl::select_from_group(g, max, 0);
+    min = sycl::select_from_group(g, min, 0);
 
     float q_scale = ((max - min) + 1e-5) / (float)(1 << num_bits);
     float q_scale_inv = 1 / q_scale;
@@ -992,14 +992,14 @@ void sr_fake_quantize_kernel_asym(
 
 #pragma unroll
     for (int i = 1; i < WARP_SIZE; i <<= 1) {
-      auto temp = g.shuffle_xor(max, i);
+      auto temp = sycl::permute_group_by_xor(g, max, i);
       if (max < temp)
         max = temp;
     }
 
 #pragma unroll
     for (int i = 1; i < WARP_SIZE; i <<= 1) {
-      auto temp = g.shuffle_xor(min, i);
+      auto temp = sycl::permute_group_by_xor(g, min, i);
       if (min > temp)
         min = temp;
     }
@@ -1025,19 +1025,19 @@ void sr_fake_quantize_kernel_asym(
 
 #pragma unroll
     for (int i = 1; i < warp_num; i <<= 1) {
-      auto temp = g.shuffle_down(max, i);
+      auto temp = sycl::shift_group_left(g, max, i);
       if (max < temp)
         max = temp;
     }
 #pragma unroll
     for (int i = 1; i < warp_num; i <<= 1) {
-      auto temp = g.shuffle_down(min, i);
+      auto temp = sycl::shift_group_left(g, min, i);
       if (min > temp)
         min = temp;
     }
 
-    max = g.shuffle(max, 0);
-    min = g.shuffle(min, 0);
+    max = sycl::select_from_group(g, max, 0);
+    min = sycl::select_from_group(g, min, 0);
 
     float q_scale_val = ((max - min) + 1e-5) / (float)(1 << num_bits);
     float q_scale_val_inv = 1 / q_scale_val;
@@ -1176,14 +1176,14 @@ void sr_fake_quantize_kernel_asym(
 
 #pragma unroll
     for (int i = 1; i < WARP_SIZE; i <<= 1) {
-      auto temp = g.shuffle_xor(max, i);
+      auto temp = sycl::permute_group_by_xor(g, max, i);
       if (max < temp)
         max = temp;
     }
 
 #pragma unroll
     for (int i = 1; i < WARP_SIZE; i <<= 1) {
-      auto temp = g.shuffle_xor(min, i);
+      auto temp = sycl::permute_group_by_xor(g, min, i);
       if (min > temp)
         min = temp;
     }
@@ -1209,19 +1209,19 @@ void sr_fake_quantize_kernel_asym(
 
 #pragma unroll
     for (int i = 1; i < warp_num; i <<= 1) {
-      auto temp = g.shuffle_down(max, i);
+      auto temp = sycl::shift_group_left(g, max, i);
       if (max < temp)
         max = temp;
     }
 #pragma unroll
     for (int i = 1; i < warp_num; i <<= 1) {
-      auto temp = g.shuffle_down(min, i);
+      auto temp = sycl::shift_group_left(g, min, i);
       if (min > temp)
         min = temp;
     }
 
-    max = g.shuffle(max, 0);
-    min = g.shuffle(min, 0);
+    max = sycl::select_from_group(g, max, 0);
+    min = sycl::select_from_group(g, min, 0);
 
     float q_scale_val = ((max - min) + 1e-5) / (float)(1 << num_bits);
     float high_q = (float)((1 << num_bits) - 1);

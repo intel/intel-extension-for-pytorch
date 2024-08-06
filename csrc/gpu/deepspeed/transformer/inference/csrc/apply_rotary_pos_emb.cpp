@@ -104,8 +104,10 @@ class apply_rotary_pos_half {
               ? head_group.get_local_linear_id() + half_dim_threads
               : head_group.get_local_linear_id() - half_dim_threads;
 
-          const float q_rot_temp = head_group.shuffle(q_rot, target_lane);
-          const float k_rot_temp = head_group.shuffle(k_rot, target_lane);
+          const float q_rot_temp =
+              sycl::select_from_group(head_group, q_rot, target_lane);
+          const float k_rot_temp =
+              sycl::select_from_group(head_group, k_rot, target_lane);
 
           q[i] = conversion::to<T>(
               conversion::to<float>(q[i]) * sycl::cos(inv_freq) +

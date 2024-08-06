@@ -7,6 +7,7 @@
 #include "comm/MathReduce.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
+#include "comm/XPUPair.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -43,7 +44,7 @@ template <typename comp_t>
 struct MinMaxReductionOps {
   using scalar_t = typename binary_function_traits<comp_t>::arg1_t;
   using index_t = int64_t;
-  using arg_t = std::pair<scalar_t, index_t>;
+  using arg_t = at::AtenIpexTypeXPU::pair<scalar_t, index_t>;
 
   static arg_t project(arg_t arg) {
     return arg;
@@ -102,7 +103,7 @@ std::tuple<Tensor&, Tensor&> _min_out(
           dpcpp_reduce_kernel<scalar_t, scalar_t, 4 /* vt0 */, 2 /* vt1 */>(
               iter,
               MinOps<scalar_t>{},
-              std::pair<scalar_t, int64_t>(
+              at::AtenIpexTypeXPU::pair<scalar_t, int64_t>(
                   Numerics<scalar_t>::upper_bound(), 0));
         });
 
@@ -158,7 +159,7 @@ std::tuple<Tensor&, Tensor&> _max_out(
           dpcpp_reduce_kernel<scalar_t, scalar_t, 4 /* vt0 */, 2 /* vt1 */>(
               iter,
               MaxOps<scalar_t>{},
-              std::pair<scalar_t, int64_t>(
+              at::AtenIpexTypeXPU::pair<scalar_t, int64_t>(
                   Numerics<scalar_t>::lower_bound(), 0));
         });
 

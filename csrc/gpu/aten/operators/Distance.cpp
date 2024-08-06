@@ -173,7 +173,7 @@ scalar_t subgroup_reduce_agg_impl(nd_item item, scalar_t value) {
 
 #pragma unroll
   for (int offset = (SG_SIZE >> 1); offset > 0; offset >>= 1) {
-    F::agg(value, sg.shuffle_down(value, offset));
+    F::agg(value, sycl::shift_group_left(sg, value, offset));
   }
   return value;
 }

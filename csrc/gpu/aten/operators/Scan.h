@@ -331,7 +331,7 @@ T subgroup_scan(sycl::nd_item<2> item, T value, BinaryFunction func) {
 
   T tmp = 0;
   for (int offset = 1; offset < sg_size; offset <<= 1) {
-    tmp = sg.shuffle_up(value, offset);
+    tmp = sycl::shift_group_right(sg, value, offset);
     if (lane >= offset)
       value = func(value, tmp);
   }
@@ -352,8 +352,8 @@ void subgroup_scan_with_indices(
   T tmp = 0;
   int64_t tmp_idx = idx;
   for (int offset = 1; offset < sg_size; offset <<= 1) {
-    tmp = sg.shuffle_up(value, offset);
-    tmp_idx = sg.shuffle_up(idx, offset);
+    tmp = sycl::shift_group_right(sg, value, offset);
+    tmp_idx = sycl::shift_group_right(sg, idx, offset);
     if (lane >= offset) {
       binary_op_update(tmp, value, tmp_idx, idx, func);
     }

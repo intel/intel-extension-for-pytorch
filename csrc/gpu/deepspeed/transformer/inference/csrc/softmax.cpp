@@ -281,7 +281,8 @@ class attn_softmax_v2 {
         DPCT1007:13: Migration of cooperative_groups::thread_block_tile::shfl is
         not supported.
         */
-        max_val = g.shuffle(max_val, item_ct1.get_local_id(2) / WARP_SIZE);
+        max_val = sycl::select_from_group(
+            g, max_val, item_ct1.get_local_id(2) / WARP_SIZE);
       }
       float sum = 0;
       for (int i = 0; i < iterations; i++) {
@@ -328,7 +329,8 @@ class attn_softmax_v2 {
         DPCT1007:14: Migration of cooperative_groups::thread_block_tile::shfl is
         not supported.
         */
-        sum = g.shuffle(sum, item_ct1.get_local_id(2) / WARP_SIZE);
+        sum = sycl::select_from_group(
+            g, sum, item_ct1.get_local_id(2) / WARP_SIZE);
       }
       sum += 1e-6;
       for (int i = 0; i < iterations; i++) {
@@ -524,7 +526,8 @@ class attn_softmax_v2<float, iterations> {
         DPCT1007:15: Migration of cooperative_groups::thread_block_tile::shfl is
         not supported.
         */
-        max_val = g.shuffle(max_val, item_ct1.get_local_id(2) / WARP_SIZE);
+        max_val = sycl::select_from_group(
+            g, max_val, item_ct1.get_local_id(2) / WARP_SIZE);
       }
 
       float sum = 0;
@@ -570,7 +573,8 @@ class attn_softmax_v2<float, iterations> {
         DPCT1007:16: Migration of cooperative_groups::thread_block_tile::shfl is
         not supported.
         */
-        sum = g.shuffle(sum, item_ct1.get_local_id(2) / WARP_SIZE);
+        sum = sycl::select_from_group(
+            g, sum, item_ct1.get_local_id(2) / WARP_SIZE);
       }
       sum += 1e-6;
 

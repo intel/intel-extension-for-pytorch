@@ -6,7 +6,7 @@ template <typename T, typename sg_t>
 inline T GroupReduceSumSGSizeEqualstoNumSG(sg_t& sg, T val) {
   auto sg_size = sg.get_local_range()[0];
   for (int offset = (sg_size >> 1); offset > 0; offset >>= 1) {
-    val += sg.shuffle_down(val, offset);
+    val += sycl::shift_group_left(sg, val, offset);
   }
   return val;
 }

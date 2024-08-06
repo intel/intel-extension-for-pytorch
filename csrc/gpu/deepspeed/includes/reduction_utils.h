@@ -495,9 +495,12 @@ template <
 DS_D_INLINE void _warp(sycl::sub_group& warp, T* data) {
 #pragma unroll
   for (int i = 1; i < reduce_width; i *= 2) {
-    data[0] = element<Op1>(data[0], warp.shuffle_xor(data[0], i));
-    data[1] = element<Op2>(data[1], warp.shuffle_xor(data[1], i));
-    data[2] = element<Op3>(data[2], warp.shuffle_xor(data[2], i));
+    data[0] =
+        element<Op1>(data[0], sycl::permute_group_by_xor(warp, data[0], i));
+    data[1] =
+        element<Op2>(data[1], sycl::permute_group_by_xor(warp, data[1], i));
+    data[2] =
+        element<Op3>(data[2], sycl::permute_group_by_xor(warp, data[2], i));
   }
 }
 
@@ -511,10 +514,14 @@ template <
 DS_D_INLINE void _warp(sycl::sub_group& warp, T* data) {
 #pragma unroll
   for (int i = 1; i < reduce_width; i *= 2) {
-    data[0] = element<Op1>(data[0], warp.shuffle_xor(data[0], i));
-    data[1] = element<Op2>(data[1], warp.shuffle_xor(data[1], i));
-    data[2] = element<Op3>(data[2], warp.shuffle_xor(data[2], i));
-    data[3] = element<Op4>(data[3], warp.shuffle_xor(data[3], i));
+    data[0] =
+        element<Op1>(data[0], sycl::permute_group_by_xor(warp, data[0], i));
+    data[1] =
+        element<Op2>(data[1], sycl::permute_group_by_xor(warp, data[1], i));
+    data[2] =
+        element<Op3>(data[2], sycl::permute_group_by_xor(warp, data[2], i));
+    data[3] =
+        element<Op4>(data[3], sycl::permute_group_by_xor(warp, data[3], i));
   }
 }
 

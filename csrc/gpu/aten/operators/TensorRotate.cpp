@@ -38,7 +38,8 @@ struct ApplyRotaryEmbeddingImplKernelFunctor {
       const auto offset = offset_calc.get(global_offset);
       tensor_val = *(tensor + offset[1]);
       scalar_t scale = i % 2 == 0 ? -1 : 1;
-      scalar_t shift_val = sg.shuffle_xor(tensor_val, 1) * scale;
+      scalar_t shift_val =
+          sycl::permute_group_by_xor(sg, tensor_val, 1) * scale;
       scalar_t sin_val = *(sin + offset[2]);
       scalar_t cos_val = *(cos + offset[3]);
       scalar_t out_val = shift_val * sin_val + tensor_val * cos_val;

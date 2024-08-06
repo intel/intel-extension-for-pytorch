@@ -72,7 +72,7 @@ inline T group_reduce_op(
   int sg_range = sg.get_group_range()[0];
 
   for (int offset = 1; offset < sg_size; offset <<= 1) {
-    T other = sg.shuffle_down(value, offset);
+    T other = sycl::shift_group_left(sg, value, offset);
     value = reduce(value, other);
   }
 
@@ -90,7 +90,7 @@ inline T group_reduce_op(
     if (sg_gid == 0 && sg_lid < sg_range) {
       value = shared_[sg_lid];
       for (int offset = 1; offset < sg_range; offset <<= 1) {
-        T other = sg.shuffle_down(value, offset);
+        T other = sycl::shift_group_left(sg, value, offset);
         value = reduce(value, other);
       }
     }
@@ -1096,7 +1096,7 @@ struct FinalizeKernelFunctor {
     for (int i = 0; i < out_sentence_num; i++) {
       scalar_t value = s_score[wi_id];
       for (int offset = 1; offset < sg_size; offset <<= 1) {
-        scalar_t other = sg.shuffle_down(value, offset);
+        scalar_t other = sycl::shift_group_left(sg, value, offset);
         value = combine(value, other);
       }
 
