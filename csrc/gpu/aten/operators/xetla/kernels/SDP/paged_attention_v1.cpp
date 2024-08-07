@@ -140,12 +140,13 @@ cgfs_t _paged_attention_v1(
     return paged_attention_v1_dispatch<arch_tag, fp16>(args);
   } else if (xeType == XetlaType::bf16) {
     // 2024.1 and below do not support bf16's operator< etc
-#if __INTEL_LLVM_COMPILER >= 20240200
-    return paged_attention_v1_dispatch<arch_tag, bf16>(args);
-#else
-    printf("paged_attention: No bf16 support for current arch!!\n\n");
-    return {};
-#endif
+    if constexpr (
+        __INTEL_LLVM_COMPILER >= 20240200 && arch_tag != gpu_arch::XeLpg) {
+      return paged_attention_v1_dispatch<arch_tag, bf16>(args);
+    } else {
+      printf("paged_attention: No bf16 support for current arch!!\n\n");
+      return {};
+    }
   } else {
     printf("paged_attention: Unsupported dtype!\n\n");
     return {};
