@@ -6,7 +6,7 @@ from .QuantizedAttention import IPEXTransformerAttnOptimizedInt4
 
 from .Linear import IPEXTransformerLinear
 
-from .model_utils import xpu_sdpa_support
+from .model_utils import xpu_sdpa_support, xpu_gemm_use_xetla
 
 
 class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
@@ -241,10 +241,8 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
     # int4 grouped attention do not support fused_qkv computation so far
 
     def cat_qkv(self):
-        if self.num_kv_head == self.num_attn_head:
+        if self.num_kv_head == self.num_attn_head or xpu_gemm_use_xetla():
             super().cat_qkv()
-        else:
-            pass
 
     def prepare_kv_prompt(self, hidden_states, kv_head):
         return super().prepare_kv_prompt(hidden_states, self.num_kv_head)
@@ -287,8 +285,9 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
         return query, key, value
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
-        if self.num_kv_group <= 1:
+        if xpu_gemm_use_xetla() or self.num_kv_group <= 1:
             return super().compute_qkv_gemm(hidden_states, query, key, value)
+
         hidden_states_flat = hidden_states.flatten(0, -2)
         if self.q_proj.bias is None:
             torch.ops.torch_ipex.mm_int4_out(

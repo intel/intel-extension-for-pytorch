@@ -180,46 +180,119 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         torch.xpu.synchronize()
 
     def cat_qkv(self):
-        qkv_proj_quant_qweight = torch.cat(
-            [
-                self.q_proj_quant.qweight,
-                self.k_proj_quant.qweight,
-                self.v_proj_quant.qweight,
-            ]
-        ).contiguous()
-        qkv_proj_quant_scales = torch.cat(
-            [
-                self.q_proj_quant.scales,
-                self.k_proj_quant.scales,
-                self.v_proj_quant.scales,
-            ]
-        ).contiguous()
-        qkv_proj_quant_qzeros = None
-        if self.q_proj_quant.qzeros is not None:
-            qkv_proj_quant_qzeros = torch.cat(
+        if xpu_gemm_use_xetla():
+            qkv_proj_quant_qweight = torch.cat(
                 [
-                    self.q_proj_quant.qzeros,
-                    self.k_proj_quant.qzeros,
-                    self.v_proj_quant.qzeros,
+                    self.q_proj_quant.qweight,
+                    self.k_proj_quant.qweight,
+                    self.v_proj_quant.qweight,
                 ]
             ).contiguous()
+            qkv_proj_quant_scales = torch.cat(
+                [
+                    self.q_proj_quant.scales,
+                    self.k_proj_quant.scales,
+                    self.v_proj_quant.scales,
+                ]
+            ).contiguous()
+            qkv_proj_quant_qzeros = None
+            if self.q_proj_quant.qzeros is not None:
+                qkv_proj_quant_qzeros = torch.cat(
+                    [
+                        self.q_proj_quant.qzeros,
+                        self.k_proj_quant.qzeros,
+                        self.v_proj_quant.qzeros,
+                    ]
+                ).contiguous()
 
-        qkv_proj_quant_bias = None
-        if self.q_proj_quant.bias is not None:
-            qkv_proj_quant_bias = torch.cat(
-                [
-                    self.q_proj_quant.bias,
-                    self.k_proj_quant.bias,
-                    self.v_proj_quant.bias,
-                ]
-            ).contiguous()
-        self.qkv_proj_quant.set_weights_bias(
-            qkv_proj_quant_qweight, qkv_proj_quant_bias
-        )
-        self.qkv_proj_quant.set_scales_zps_gidx(
-            qkv_proj_quant_scales, qkv_proj_quant_qzeros
-        )
-        self.qkv_proj_quant.blocksize = self.q_proj_quant.blocksize
+            qkv_proj_quant_bias = None
+            if self.q_proj_quant.bias is not None:
+                qkv_proj_quant_bias = torch.cat(
+                    [
+                        self.q_proj_quant.bias,
+                        self.k_proj_quant.bias,
+                        self.v_proj_quant.bias,
+                    ]
+                ).contiguous()
+            self.qkv_proj_quant.set_weights_bias(
+                qkv_proj_quant_qweight, qkv_proj_quant_bias
+            )
+            self.qkv_proj_quant.set_scales_zps_gidx(
+                qkv_proj_quant_scales, qkv_proj_quant_qzeros
+            )
+            self.qkv_proj_quant.blocksize = self.q_proj_quant.blocksize
+        else:
+            shape = [3, -1, self.q_proj_quant.qweight.shape[-1]]
+            qkv_proj_quant_qweight = (
+                torch.stack(
+                    [
+                        self.q_proj_quant.qweight,
+                        self.k_proj_quant.qweight,
+                        self.v_proj_quant.qweight,
+                    ]
+                )
+                .contiguous()
+                .view([3, *self.q_proj_quant.qweight.shape])
+            )
+            qkv_proj_quant_scales = (
+                torch.stack(
+                    [
+                        self.q_proj_quant.scales,
+                        self.k_proj_quant.scales,
+                        self.v_proj_quant.scales,
+                    ]
+                )
+                .contiguous()
+                .view([3, *self.q_proj_quant.scales.shape])
+            )
+            qkv_proj_quant_qzeros = None
+            if self.q_proj_quant.qzeros is not None:
+                qkv_proj_quant_qzeros = (
+                    torch.stack(
+                        [
+                            self.q_proj_quant.qzeros,
+                            self.k_proj_quant.qzeros,
+                            self.v_proj_quant.qzeros,
+                        ]
+                    )
+                    .contiguous()
+                    .view([3, *self.q_proj_quant.qzeros.shape])
+                )
+
+            qkv_proj_quant_bias = None
+            if self.q_proj_quant.bias is not None:
+                bias_shape = [3, -1]
+                qkv_proj_quant_bias = (
+                    torch.stack(
+                        [
+                            self.q_proj_quant.bias,
+                            self.k_proj_quant.bias,
+                            self.v_proj_quant.bias,
+                        ]
+                    )
+                    .contiguous()
+                    .view(bias_shape)
+                )
+            self.qkv_proj_quant.set_weights_bias(
+                qkv_proj_quant_qweight, qkv_proj_quant_bias
+            )
+            self.qkv_proj_quant.set_scales_zps_gidx(
+                qkv_proj_quant_scales, qkv_proj_quant_qzeros
+            )
+            self.qkv_proj_quant.blocksize = self.q_proj_quant.blocksize
+
+            # Note: synchronize to ensure the completion of contiguous
+            torch.xpu.synchronize()
+
+            if self.q_proj_quant.qzeros is not None:
+                self.q_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros[0, :, :]
+                self.k_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros[1, :, :]
+                self.v_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros[2, :, :]
+
+            if self.qkv_proj_quant.bias is not None:
+                self.q_proj_quant.bias.data = self.qkv_proj_quant.bias[0, :]
+                self.k_proj_quant.bias.data = self.qkv_proj_quant.bias[1, :]
+                self.v_proj_quant.bias.data = self.qkv_proj_quant.bias[2, :]
 
         # Note: synchronize to ensure the completion of contiguous
         torch.xpu.synchronize()
