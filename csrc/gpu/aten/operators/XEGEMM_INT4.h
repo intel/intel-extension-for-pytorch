@@ -1292,7 +1292,12 @@ class HGEMMXetla_INT4 final {
         if constexpr (arch_tag == gpu_arch::XeLpg) {
           TORCH_CHECK(false, "XeLpg does not support bfloat16!")
         } else {
+#if __INTEL_LLVM_COMPILER >= 20240200
           return dispatch<sycl::ext::oneapi::bfloat16, arch_tag>(q);
+#else
+          TORCH_CHECK(
+              false, "bfloat16 is only supported on oneAPI 2024.2 and above!")
+#endif
         }
       default:
         TORCH_CHECK(false, "Unexpected input dtype!");

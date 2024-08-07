@@ -2,6 +2,7 @@ import torch
 import intel_extension_for_pytorch  # noqa
 import pytest
 
+
 from torch.testing._internal.common_utils import (
     TestCase,
     instantiate_parametrized_tests,
@@ -13,6 +14,7 @@ from torch.testing._internal.common_utils import (
 checking_atol = 1e-2
 checking_rtol = 2e-2
 skip_bf16_input = not torch.xpu.has_2d_block_array() and not torch.xpu.has_xmx()
+COMPILER_VERSION = torch.xpu.get_compiler_version()
 
 
 class TestInt4Linear(TestCase):
@@ -77,8 +79,10 @@ class TestInt4Linear(TestCase):
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     @parametrize("inplace", [False, True])
     def test_qkv_int4(self, m, n_q, n_kv, k, per_channel, dtype, inplace):
-        if skip_bf16_input and dtype == torch.bfloat16:
+        if (dtype == torch.bfloat16) and skip_bf16_input:
             pytest.skip("bf16 input is not available on mtl")
+        elif (dtype == torch.bfloat16) and (COMPILER_VERSION < 20240200):
+            pytest.skip("bf16 input is only available on OneAPI 2024.2 and above")
         group_size = min(32, k)
         if per_channel:
             group_size = k
@@ -149,8 +153,10 @@ class TestInt4Linear(TestCase):
     @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_gemm_int4(self, m, n, k, per_channel, dtype):
-        if skip_bf16_input and dtype == torch.bfloat16:
+        if (dtype == torch.bfloat16) and skip_bf16_input:
             pytest.skip("bf16 input is not available on mtl")
+        elif (dtype == torch.bfloat16) and (COMPILER_VERSION < 20240200):
+            pytest.skip("bf16 input is only available on OneAPI 2024.2 and above")
         input = torch.rand([m, k], device="xpu", dtype=dtype)
         input_torch = input.cpu()
         weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
@@ -295,8 +301,10 @@ class TestInt4Linear(TestCase):
     @parametrize("dtype", [torch.float16, torch.bfloat16])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     def test_mlp_int4(self, m, n, k, per_channel, dtype):
-        if skip_bf16_input and dtype == torch.bfloat16:
+        if (dtype == torch.bfloat16) and skip_bf16_input:
             pytest.skip("bf16 input is not available on mtl")
+        elif (dtype == torch.bfloat16) and (COMPILER_VERSION < 20240200):
+            pytest.skip("bf16 input is only available on OneAPI 2024.2 and above")
         input = torch.rand([m, k], device="xpu", dtype=dtype)
         input_torch = input.cpu()
         weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)

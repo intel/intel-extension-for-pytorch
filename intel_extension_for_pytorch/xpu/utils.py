@@ -374,6 +374,10 @@ def has_xetla():
     return _C._is_xetla_enabled()
 
 
+def get_compiler_version():
+    return _C._get_compiler_version()
+
+
 # oneDNN Layout
 def using_onednn_layout():
     return _C._is_onednn_layout_enabled()

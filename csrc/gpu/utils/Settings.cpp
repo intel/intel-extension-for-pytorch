@@ -25,7 +25,7 @@ namespace dpcpp {
  * XPU ONLY optionos:
  * ==========GPU==========
  *   IPEX_VERBOSE:
- *      Default = 0 | Set verbose level with synchronization execution mode, will be deprecated 
+ *      Default = 0 | Set verbose level with synchronization execution mode, will be deprecated
  *      very soon. Please use IPEX_LOG_LEVEL instead.
  *   IPEX_XPU_SYNC_MODE:
  *      Default = 0 | Set 1 to enforce synchronization execution mode, will be deprecated very soon.
@@ -518,6 +518,10 @@ bool Settings::is_ds_kernel_enabled() const {
 #else
   return false;
 #endif
+}
+
+int64_t Settings::get_compiler_version() const {
+  return __INTEL_LLVM_COMPILER;
 }
 
 } // namespace dpcpp
