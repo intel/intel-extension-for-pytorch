@@ -4430,3 +4430,60 @@ def prepare_inputs_labels_for_multimodal_llavallama(
     if new_labels is not None:
         model_inputs["labels"] = new_labels
     return model_inputs
+
+
+def _postprocess_outputs_whisper(
+    self,
+    seek_outputs,
+    decoder_input_ids,
+    return_token_timestamps,
+    generation_config,
+    is_shortform,
+):
+    # remove all previously passed decoder input ids
+    start_idx = decoder_input_ids.shape[-1] if not is_shortform else torch.tensor(0)
+    if isinstance(seek_outputs, torch.Tensor):
+        seek_outputs = seek_outputs[:, start_idx:]
+        return seek_outputs, seek_outputs
+    if hasattr(self.config, "token_latency") and self.config.token_latency:
+        return seek_outputs[0][:, decoder_input_ids.shape[-1] :], [seek_outputs[1]]
+
+    if return_token_timestamps and hasattr(generation_config, "alignment_heads"):
+        num_frames = getattr(generation_config, "num_frames", None)
+        seek_outputs["token_timestamps"] = self._extract_token_timestamps(
+            seek_outputs, generation_config.alignment_heads, num_frames=num_frames
+        )
+        seek_outputs["token_timestamps"] = seek_outputs["token_timestamps"][
+            :, start_idx:
+        ]
+
+    seek_outputs["sequences"] = seek_outputs["sequences"][:, start_idx:]
+
+    def split_by_batch_index(values, key, batch_idx, is_shortform):
+        if key in ["scores", "encoder_attentions", "encoder_hidden_states", "logits"]:
+            return [v[batch_idx].cpu() for v in values]
+        if key in ["decoder_attentions", "decoder_hidden_states", "cross_attentions"]:
+            return tuple(tuple(w[batch_idx][None].cpu() for w in v) for v in values)
+        elif key == "past_key_values":
+            if not is_shortform:
+                # we don't save `past_key_values` as this is too costly for longform
+                return None
+            else:
+                return tuple(
+                    tuple(w[batch_idx][None].cpu() for w in values[v])
+                    for v in range(len(values))
+                )
+
+        return values[batch_idx].cpu()
+
+    sequence_tokens = seek_outputs["sequences"]
+
+    seek_outputs = [
+        {
+            k: split_by_batch_index(v, k, i, is_shortform)
+            for k, v in seek_outputs.items()
+        }
+        for i in range(sequence_tokens.shape[0])
+    ]
+
+    return sequence_tokens, seek_outputs

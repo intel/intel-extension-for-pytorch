@@ -131,6 +131,7 @@ def model_convert_reference(_model):
         _greedy_search,
         _sample,
         _beam_sample,
+        whisper_generate,
     )
 
     # model wise optimization for MHA module
@@ -201,6 +202,7 @@ def model_convert_reference(_model):
         prepare_inputs_labels_for_multimodal_llavallama,
         prepare_inputs_for_generation_chatglm,
         detect_language,
+        _postprocess_outputs_whisper,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -854,6 +856,11 @@ def model_convert_reference(_model):
         )
     elif _model.config.architectures[0] == "WhisperForConditionalGeneration":
         convert_function(_model, "detect_language", detect_language)
+        if version.parse(transformers.__version__) >= version.parse("4.43.0"):
+            convert_function(
+                _model, "_postprocess_outputs", _postprocess_outputs_whisper
+            )
+            convert_function(_model, "generate", whisper_generate)
         convert_function(_model, "forward", WhisperForConditionalGeneration_forward)
         convert_function(_model.model, "forward", WhisperModel_forward)
         convert_function(_model.model.decoder, "forward", WhisperDecoderLayer_forward)
