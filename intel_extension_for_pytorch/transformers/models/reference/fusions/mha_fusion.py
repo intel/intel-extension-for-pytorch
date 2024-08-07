@@ -208,7 +208,7 @@ class _IPEXRopeRef(nn.Module):
         super().__init__()
         self.model_backbone = backbone
         self.embed_positions = RotaryEmbedding(
-            max_position_embeddings, pos_embd_dim, backbone, base, kwargs
+            max_position_embeddings, pos_embd_dim, backbone, base, kwargs=kwargs
         )
 
     def rotate_every_two(self, x: torch.Tensor) -> torch.Tensor:
