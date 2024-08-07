@@ -249,6 +249,8 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
             softmax_scale,
             zero_tensors,
             is_causal,
+            -1,
+            -1,
             return_softmax,
             gen_,
         )

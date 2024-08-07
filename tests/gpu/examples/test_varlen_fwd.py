@@ -221,3 +221,21 @@ def test_varlen_fwd(
         None,
     )
     torch.testing.assert_close(out, out_ref, atol=1e-3, rtol=1e-3)
+
+    ipex.llm.functional.varlen_attention(
+        query,
+        key,
+        value,
+        out,
+        cu_seqlen,
+        cu_seqlen,
+        max_seqlen,
+        max_seqlen,
+        0.0,
+        softmax_scale,
+        False,
+        is_causal,
+        False,
+        None,
+    )
+    torch.testing.assert_close(out, out_ref, atol=1e-3, rtol=1e-3)
