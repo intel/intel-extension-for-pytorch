@@ -143,10 +143,10 @@ struct DeviceProp {
 
   bool support_fp64;
   bool support_atomic64;
-  bool support_cl_bf16_conversion;
-  bool support_cl_sg_matmul_acc;
-  bool support_cl_sg_matmul_acc_tf32;
-  bool support_cl_sg_2d_block_io;
+  bool has_bf16_conversion;
+  bool has_subgroup_matrix_multiply_accumulate;
+  bool has_subgroup_matrix_multiply_accumulate_tensor_float32;
+  bool has_subgroup_2d_block_io;
 };
 
 } // namespace dpcpp
