@@ -131,8 +131,8 @@ else
 fi
 
 MAX_JOBS_VAR=$(nproc)
-if [ ! -z "${MAX_JOBS}" ]; then
-    MAX_JOBS_VAR=${MAX_JOBS}
+if [ -z "${MAX_JOBS}" ]; then
+    export MAX_JOBS=${MAX_JOBS_VAR}
 fi
 
 # Install dependencies
@@ -259,7 +259,7 @@ if [ ! -d ${LLVM_ROOT} ]; then
     echo "***************************** cmake *****************************" > ../build.log
     cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=${ABI}" -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF ../llvm 2>&1 | tee -a ../build.log
     echo "***************************** build *****************************" >> ../build.log
-    cmake --build . -j ${MAX_JOBS_VAR} 2>&1 | tee -a ../build.log
+    cmake --build . -j ${MAX_JOBS} 2>&1 | tee -a ../build.log
     echo "**************************** install ****************************" >> ../build.log
     cmake -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT} -P cmake_install.cmake 2>&1 | tee -a ../build.log
     #xargs rm -rf < install_manifest.txt
