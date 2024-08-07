@@ -12,7 +12,7 @@
 # Order is important; the last matching pattern takes the most precedence.
 
 # Frontend
-/intel_extension_for_pytorch @gujinghui @zejun-chen @jgong5
+/intel_extension_for_pytorch @gujinghui @zejun-chen @jgong5 @zhuyuhua-v
 
 # IPEX GPU code base
 /csrc/gpu @gujinghui @fengyuan14 @majing921201
