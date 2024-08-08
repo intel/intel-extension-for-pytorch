@@ -83,6 +83,10 @@
 
 - 🟨 signifies that the model can perform well while accuracy may not been in a perfect state (>1% difference as compared with FP32).
 
+*Note*: As the modeling file of `meta-llama/Llama-2-7b-hf` is updated,
+the previous static quantization INT8 recipe is invalid and retuning is working in progress.
+If needed, you can try to retune the model with the [autotune API](../../../../docs/tutorials/features/sq_recipe_tuning_api.md).
+
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16).
 We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
