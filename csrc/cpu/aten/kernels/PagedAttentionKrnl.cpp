@@ -1,13 +1,31 @@
+#include <ATen/ATen.h>
+#include <ATen/AccumulateType.h>
+#include <ATen/Dispatch.h>
+#include <ATen/Parallel.h>
 #include <ATen/Tensor.h>
+#include <ATen/core/Tensor.h>
 #include <ATen/cpu/vec/functional.h>
 #include <ATen/cpu/vec/vec.h>
+#include <ATen/native/CPUBlas.h>
+#include <ATen/native/cpu/utils.h>
 #include <aten/PagedAttention.h>
+#include <c10/util/irange.h>
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
+
+#ifndef AT_PER_OPERATOR_HEADERS
+#include <ATen/Functions.h>
+#else
+#include <ATen/ops/empty.h>
+#endif
+
+#include <aten/PagedAttention.h>
+#include <omp.h>
 #include <limits>
+#include "mkl.h"
 #include "vec/vec.h"
 
-#define PARTITION_SIZE 512
+#define PARTITION_SIZE 128
 
 namespace torch_ipex {
 namespace cpu {
@@ -17,44 +35,67 @@ namespace {
 template <typename QT, typename KT>
 void reduce_head(
     const QT* q_ptr_start,
+    int64_t kv_head_group_size,
     const KT* k_cache_start,
     float* attn_w_pos,
+    int attn_w_stride,
     int64_t head_size) {
-  attn_w_pos[0] = 0;
 #if defined(CPU_CAPABILITY_AVX512)
-  torch_ipex::cpu::kernel::_reduce_head<QT, KT, KT>(
-      q_ptr_start, k_cache_start, attn_w_pos, head_size, false, nullptr);
-#else
-  for (auto hsi = 0; hsi < head_size; hsi++) {
-    attn_w_pos[0] += (float)q_ptr_start[hsi] * (float)k_cache_start[hsi];
+  for (auto i = 0; i < kv_head_group_size; i++) {
+    attn_w_pos[i * attn_w_stride] = 0;
+    torch_ipex::cpu::kernel::_reduce_head<QT, KT, KT>(
+        q_ptr_start + i * head_size,
+        k_cache_start,
+        attn_w_pos + i * attn_w_stride,
+        head_size,
+        false,
+        nullptr);
   }
+#else
+  for (auto i = 0; i < kv_head_group_size; i++) {
+    attn_w_pos[i * attn_w_stride] = 0;
+    for (auto hsi = 0; hsi < head_size; hsi++) {
+      attn_w_pos[i * attn_w_stride] +=
+          (float)q_ptr_start[i * head_size + hsi] * (float)k_cache_start[hsi];
+    }
+  }
+
 #endif
 }
 
 template <typename OT, typename CT>
 inline void mul_attenion_weights_and_value_of_head(
-    const float& attn_w,
+    const float* attn_w,
+    int attn_w_stride,
     const CT* v_cache_start,
     OT* attn_out_start,
+    int attn_out_strideH,
+    int kv_head_group_size,
     int64_t head_size,
     bool accumulated) {
   auto vec_size = 16; // 512/32
   auto hsi = 0;
 #if defined(CPU_CAPABILITY_AVX512)
-  torch_ipex::cpu::kernel::_mul_and_accumulate<CT, OT, CT>(
-      attn_w,
-      v_cache_start,
-      attn_out_start,
-      head_size,
-      false,
-      nullptr,
-      accumulated);
+  for (auto i = 0; i < kv_head_group_size; i++) {
+    torch_ipex::cpu::kernel::_mul_and_accumulate<CT, OT, CT>(
+        attn_w[i * attn_w_stride],
+        v_cache_start,
+        attn_out_start + i * attn_out_strideH,
+        head_size,
+        false,
+        nullptr,
+        accumulated);
+  }
 #else
-  for (hsi = 0; hsi < head_size; hsi++) {
-    if (accumulated) {
-      attn_out_start[hsi] += attn_w * (float)v_cache_start[hsi];
-    } else {
-      attn_out_start[hsi] = attn_w * (float)v_cache_start[hsi];
+  for (auto i = 0; i < kv_head_group_size; i++) {
+    for (hsi = 0; hsi < head_size; hsi++) {
+      if (accumulated) {
+        attn_out_start[i * attn_out_strideH + hsi] +=
+            attn_w[i * attn_w_stride] * (float)v_cache_start[hsi];
+      } else {
+        attn_out_start[i * attn_out_strideH + hsi] =
+            attn_w[i * attn_w_stride] * (float)v_cache_start[hsi];
+      }
     }
   }
 #endif
@@ -254,7 +295,8 @@ void single_query_cached_kv_attention_kernel(
   for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
     for (auto partition_id = 0; partition_id < max_num_partitions;
          partition_id++) {
-      for (auto head_id = 0; head_id < num_heads; head_id++) {
+      for (auto head_group_start = 0; head_group_start < num_heads;
+           head_group_start += kv_head_group_size) {
         auto context_len = context_lens_ptr[seq_id];
         auto partition_start = partition_id * PARTITION_SIZE;
         if (partition_start >= context_len)
@@ -265,16 +307,17 @@ void single_query_cached_kv_attention_kernel(
         auto block_num = (token_num + block_size - 1) / block_size;
         auto logical_block_start = partition_start / block_size;
         auto logical_block_end = logical_block_start + block_num;
-        auto need_update = block_num > 1;
-        auto kv_head_id = head_id / kv_head_group_size;
-        auto q_ptr_start = query_ptr + seq_id * q_strideN + head_id * q_strideH;
+        auto kv_head_id = head_group_start / kv_head_group_size;
+        auto q_ptr_start =
+            query_ptr + seq_id * q_strideN + head_group_start * q_strideH;
         auto max_logits_offset = seq_id * max_logits_strideN +
-            head_id * max_logits_strideH + partition_id;
-        auto exp_sum_offset =
-            seq_id * exp_sum_strideN + head_id * exp_sum_strideH + partition_id;
+            head_group_start * max_logits_strideH + partition_id;
+        auto exp_sum_offset = seq_id * exp_sum_strideN +
+            head_group_start * exp_sum_strideH + partition_id;
+        //{num_seqs, num_heads, max_num_partitions, head_size}
         auto tmp_out_start = tmp_out_ptr + seq_id * tmp_out_strideN +
-            head_id * tmp_out_strideH + partition_id * tmp_out_strideS;
-        float logits[PARTITION_SIZE] __attribute__((aligned(64))) = {0};
+            head_group_start * tmp_out_strideH + partition_id * tmp_out_strideS;
+        float logits[16 * PARTITION_SIZE] __attribute__((aligned(64))) = {0};
         auto logits_position = 0;
         // 1)calculate the matmul(query, key) for this partition
         for (auto logical_block_id = logical_block_start;
@@ -293,32 +336,44 @@ void single_query_cached_kv_attention_kernel(
                 block_offset * kv_block_strideP + kv_head_id * kv_block_strideH;
             reduce_head(
                 q_ptr_start,
+                kv_head_group_size,
                 k_cache_start,
                 &(logits[logits_position]),
+                PARTITION_SIZE,
                 head_size);
             logits_position++;
           }
         }
         // 2) calculate the max and exp_sum for this partition
-        auto partition_max = -std::numeric_limits<float>::infinity();
-        if (alibi_slopes_ptr != nullptr) {
-          _mul_alibi_reduce_max_fusion_kernel<float>(
-              logits,
-              scale,
+        for (int hi = 0; hi < kv_head_group_size; hi++) {
+          auto partition_max = -std::numeric_limits<float>::infinity();
+          if (alibi_slopes_ptr != nullptr) {
+            _mul_alibi_reduce_max_fusion_kernel<float>(
+                logits + hi * PARTITION_SIZE,
+                scale,
+                token_num,
+                logits + hi * PARTITION_SIZE,
+                partition_max,
+                partition_start,
+                context_len,
+                alibi_slopes_ptr[head_group_start + hi]);
+          } else {
+            _mul_reduce_max_fusion_kernel<float>(
+                logits + hi * PARTITION_SIZE,
+                scale,
+                token_num,
+                logits + hi * PARTITION_SIZE,
+                partition_max);
+          }
+          max_logits_ptr[max_logits_offset + hi * max_logits_strideH] =
+              partition_max;
+          _exp_reduce_sum_fusion_kernel<float, float>(
+              logits + hi * PARTITION_SIZE,
               token_num,
-              logits,
-              partition_max,
-              partition_start,
-              context_len,
-              alibi_slopes_ptr[head_id]);
-        } else {
-          _mul_reduce_max_fusion_kernel<float>(
-              logits, scale, token_num, logits, partition_max);
+              logits + hi * PARTITION_SIZE,
+              partition_max);
+          exp_sum_ptr[exp_sum_offset + hi * exp_sum_strideH] = partition_max;
         }
-        max_logits_ptr[max_logits_offset] = partition_max;
-        _exp_reduce_sum_fusion_kernel<float, float>(
-            logits, token_num, logits, partition_max);
-        exp_sum_ptr[exp_sum_offset] = partition_max;
 
         // 3) calculate the matmul(exp(logits-partition_max), value) for this
         // partition, need to divide the global exp_sum in the final result.
@@ -339,9 +394,12 @@ void single_query_cached_kv_attention_kernel(
                 block_offset * kv_block_strideP + kv_head_id * kv_block_strideH;
             auto accumulated = logits_position > 0;
             mul_attenion_weights_and_value_of_head(
-                logits[logits_position],
+                &(logits[logits_position]),
+                PARTITION_SIZE,
                 v_cache_start,
                 tmp_out_start,
+                tmp_out_strideH,
+                kv_head_group_size,
                 head_size,
                 accumulated);
             logits_position++;
