@@ -61,13 +61,13 @@ function add-repo-driver() {
     fi
 
     if [ "${OS_ID}" = "ubuntu" ]; then
-        wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | ${SUDO} gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg
-        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu ${OS_VERSION}/lts/2350 unified" | ${SUDO} tee /etc/apt/sources.list.d/intel-gpu-${OS_VERSION}.list
+        wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | ${SUDO} gpg --dearmor --yes --output /usr/share/keyrings/intel-graphics.gpg
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu ${OS_VERSION} unified" | ${SUDO} tee /etc/apt/sources.list.d/intel-gpu-${OS_VERSION}.list
         ${SUDO} apt update
     fi
     if [ "${OS_ID}" = "rhel" ] || [ "${OS_ID}" = "centos" ]; then
           ${SUDO} dnf install -y 'dnf-command(config-manager)'
-          ${SUDO} dnf config-manager --add-repo https://repositories.intel.com/gpu/rhel/${OS_VERSION}/lts/2350/unified/intel-gpu-${OS_VERSION}.repo
+          ${SUDO} dnf config-manager --add-repo https://repositories.intel.com/gpu/rhel/${OS_VERSION}/unified/intel-gpu-${OS_VERSION}.repo
     fi
 }
 
@@ -109,19 +109,19 @@ function install-driver() {
 
     if [ "${OS_ID}" = "ubuntu" ]; then
         ${SUDO} apt update
-        ${SUDO} apt install -y intel-opencl-icd=23.43.27642.40-803~22.04 \
-        level-zero=1.14.0-744~22.04 \
-        level-zero-dev=1.14.0-744~22.04 \
-        intel-level-zero-gpu=1.3.27642.40-803~22.04 \
-        xpu-smi=1.2.26-37~22.04
+        ${SUDO} apt install -y intel-opencl-icd=24.22.29735.27-914~22.04 \
+        libze1=1.17.6-914~22.04 \
+        libze-dev=1.17.6-914~22.04 \
+        intel-level-zero-gpu=1.3.29735.27-914~22.04 \
+        xpu-smi=1.2.35-56~22.04
     fi
     if [ "${OS_ID}" = "rhel" ] || [ "${OS_ID}" = "centos" ]; then
-        ${SUDO} dnf install -y intel-opencl-23.43.27642.40 \
-        level-zero-1.14.0 \
-        level-zero-devel-1.14.0 \
-        intel-level-zero-gpu-1.3.27642.40 \
-        intel-ocloc-23.43.27642.40 \
-        xpu-smi-1.2.26
+        ${SUDO} dnf install -y intel-opencl-24.22.29735.27 \
+        level-zero-1.17.6 \
+        level-zero-devel-1.17.6 \
+        intel-level-zero-gpu-1.3.29735 \
+        intel-ocloc-24.22.29735.27 \
+        xpu-smi-1.2.35
     fi
 }
 
@@ -136,16 +136,16 @@ function install-dev() {
 
     if [ "${OS_ID}" = "ubuntu" ]; then
         ${SUDO} apt update
-        ${SUDO} apt install -y intel-level-zero-gpu-dev=1.3.27642.40-803~22.04 \
-        intel-oneapi-dpcpp-cpp-2024.1=2024.1.0-963 \
-        intel-oneapi-mkl-devel=2024.1.0-691 \
-        intel-oneapi-ccl-devel=2021.12.0-309
+        ${SUDO} apt install -y intel-level-zero-gpu-dev=1.3.29735.27-914~22.04 \
+        intel-oneapi-dpcpp-cpp-2024.2=2024.2.1-1079 \
+        intel-oneapi-mkl-devel=2024.2.1-103 \
+        intel-oneapi-ccl-devel=2021.13.1-31
     fi
     if [ "${OS_ID}" = "rhel" ] || [ "${OS_ID}" = "centos" ]; then
-        ${SUDO} dnf install -y intel-level-zero-gpu-devel-1.3.27642.40 \
-        intel-oneapi-dpcpp-cpp-2024.1-2024.1.0-963 \
-        intel-oneapi-mkl-devel-2024.1.0-691 \
-        intel-oneapi-ccl-devel-2021.12.0-309
+        ${SUDO} dnf install -y intel-level-zero-gpu-devel-1.3.29735 \
+        intel-oneapi-dpcpp-cpp-2024.2-2024.2.1 \
+        intel-oneapi-mkl-devel-2024.2.1 \
+        intel-oneapi-ccl-devel-2021.13.1
     fi
 }
 
@@ -160,14 +160,14 @@ function install-runtime() {
 
     if [ "${OS_ID}" = "ubuntu" ]; then
         ${SUDO} apt update
-        ${SUDO} apt install -y intel-oneapi-runtime-dpcpp-cpp=2024.1.0-963 \
-        intel-oneapi-runtime-mkl=2024.1.0-691 \
-        intel-oneapi-runtime-ccl=2021.12.0-309
+        ${SUDO} apt install -y intel-oneapi-runtime-dpcpp-cpp=2024.2.1-1079 \
+        intel-oneapi-runtime-mkl=2024.2.1-103 \
+        intel-oneapi-runtime-ccl=2021.13.1-31
     fi
     if [ "${OS_ID}" = "rhel" ] || [ "${OS_ID}" = "centos" ]; then
-        ${SUDO} dnf install -y intel-oneapi-runtime-dpcpp-cpp-2024.1.0-963 \
-        intel-oneapi-runtime-mkl-2024.1.0-691 \
-        intel-oneapi-runtime-ccl-2021.12.0-309
+        ${SUDO} dnf install -y intel-oneapi-runtime-dpcpp-cpp-2024.2.1-1079 \
+        intel-oneapi-runtime-mkl-2024.2.1-103 \
+        intel-oneapi-runtime-ccl-2021.13.1-31
     fi
 }
 
@@ -182,14 +182,14 @@ function install-runtime-withdev() {
 
     if [ "${OS_ID}" = "ubuntu" ]; then
         ${SUDO} apt update
-        ${SUDO} apt install -y intel-oneapi-runtime-dpcpp-cpp=2024.1.0-963 \
-        intel-oneapi-runtime-mkl=2024.1.0-691 \
-        intel-oneapi-ccl-devel=2021.12.0-309
+        ${SUDO} apt install -y intel-oneapi-runtime-dpcpp-cpp=2024.2.1-1079 \
+        intel-oneapi-runtime-mkl=2024.2.1-103 \
+        intel-oneapi-ccl-devel=2021.13.1-31
     fi
     if [ "${OS_ID}" = "rhel" ] || [ "${OS_ID}" = "centos" ]; then
-        ${SUDO} dnf install -y intel-oneapi-runtime-dpcpp-cpp-2024.1.0-963 \
-        intel-oneapi-runtime-mkl-2024.1.0-691 \
-        intel-oneapi-ccl-devel=2021.12.0-309
+        ${SUDO} dnf install -y intel-oneapi-runtime-dpcpp-cpp-2024.2.1-1079 \
+        intel-oneapi-runtime-mkl-2024.2.1-103 \
+        intel-oneapi-ccl-devel-2021.13.1-31
     fi
 }
 
