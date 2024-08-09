@@ -44,15 +44,58 @@ def qwen_load_attn_params_int4(self, qkv_layer, out_layer):
 
 
 def qwen_transpose_attn_params_int4(self):
-    self.qkv_proj_quant.qweight.data = self.qkv_proj_quant.qweight.t().contiguous()
-    self.qkv_proj_quant.scales.data = self.qkv_proj_quant.scales.t().contiguous()
-    if self.qkv_proj_quant.qzeros is not None:
-        self.qkv_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros.t().contiguous()
+    if xpu_gemm_use_xetla():
+        self.qkv_proj_quant.qweight.data = self.qkv_proj_quant.qweight.t().contiguous()
+        self.qkv_proj_quant.scales.data = self.qkv_proj_quant.scales.t().contiguous()
+        if self.qkv_proj_quant.qzeros is not None:
+            self.qkv_proj_quant.qzeros.data = (
+                self.qkv_proj_quant.qzeros.t().contiguous()
+            )
 
-    self.out_proj_quant.qweight.data = self.out_proj_quant.qweight.t().contiguous()
-    self.out_proj_quant.scales.data = self.out_proj_quant.scales.t().contiguous()
-    if self.out_proj_quant.qzeros is not None:
-        self.out_proj_quant.qzeros.data = self.out_proj_quant.qzeros.t().contiguous()
+        self.out_proj_quant.qweight.data = self.out_proj_quant.qweight.t().contiguous()
+        self.out_proj_quant.scales.data = self.out_proj_quant.scales.t().contiguous()
+        if self.out_proj_quant.qzeros is not None:
+            self.out_proj_quant.qzeros.data = (
+                self.out_proj_quant.qzeros.t().contiguous()
+            )
+    else:
+        self.qkv_proj_quant.qweight.data = (
+            self.qkv_proj_quant.qweight.reshape(3, -1, self.embed_dim)
+            .transpose(1, 2)
+            .contiguous()
+            .transpose(1, 2)
+        )
+        self.qkv_proj_quant.scales.data = self.qkv_proj_quant.scales.reshape(
+            3, -1, self.embed_dim
+        )
+        self.qkv_proj_quant.qzeros = torch.ones(
+            [
+                self.qkv_proj_quant.qweight.size()[-3],
+                self.qkv_proj_quant.qweight.size()[-2] // self.qkv_proj_quant.blocksize,
+                self.qkv_proj_quant.qweight.size()[-1] // 8,
+            ],
+            dtype=torch.int32,
+            device="xpu",
+        )
+        self.qkv_proj_quant.qzeros = torch.fill(
+            self.qkv_proj_quant.qzeros, int(-2004318072)
+        )
+
+        self.out_proj_quant.qweight.data = (
+            self.out_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+        )
+        self.out_proj_quant.scales.data = self.out_proj_quant.scales
+        self.out_proj_quant.qzeros = torch.ones(
+            [
+                self.out_proj_quant.qweight.size()[-2] // self.out_proj_quant.blocksize,
+                self.out_proj_quant.qweight.size()[-1] // 8,
+            ],
+            dtype=torch.int32,
+            device="xpu",
+        )
+        self.out_proj_quant.qzeros = torch.fill(
+            self.out_proj_quant.qzeros, int(-2004318072)
+        )
     torch.xpu.synchronize()
 
 
