@@ -21,7 +21,7 @@ The extension can be loaded as a Python module for Python programs or linked as 
 
 ## Large Language Models (LLMs) Optimization
 
-In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are introduced in the Intel® Extension for PyTorch\*. Check [LLM optimizations CPU](./examples/cpu/inference/python/llm) and [LLM optimizations GPU](./examples/gpu/inference/python/llm) for details.
+In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are introduced in the Intel® Extension for PyTorch\*. Check [LLM optimizations CPU](./examples/cpu/inference/python/llm) and [LLM optimizations GPU](./examples/gpu/llm) for details.
 
 ### Optimized Model List 
 
@@ -60,9 +60,9 @@ Compilation instruction of the latest CPU code base `main` branch can be found i
 You can install Intel® Extension for PyTorch\* for GPU via command below.
 
 ```bash
-python -m pip install torch==2.1.0.post2 torchvision==0.16.0.post2 torchaudio==2.1.0.post2 intel-extension-for-pytorch==2.1.30+xpu oneccl_bind_pt==2.1.300+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ 
+python -m pip install torch==2.1.0.post3 torchvision==0.16.0.post3 torchaudio==2.1.0.post3 intel-extension-for-pytorch==2.1.40+xpu oneccl_bind_pt==2.1.400+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ 
 # for PRC user, you can check with the following link
-python -m pip install torch==2.1.0.post2 torchvision==0.16.0.post2 torchaudio==2.1.0.post2 intel-extension-for-pytorch==2.1.30+xpu oneccl_bind_pt==2.1.300+xpu  --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/
+python -m pip install torch==2.1.0.post3 torchvision==0.16.0.post3 torchaudio==2.1.0.post3 intel-extension-for-pytorch==2.1.40+xpu oneccl_bind_pt==2.1.400+xpu  --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/
 
 ```
 
@@ -124,5 +124,6 @@ See Intel's [Security Center](https://www.intel.com/content/www/us/en/security-c
 for information on how to report a potential security issue or vulnerability.
 
 See also: [Security Policy](SECURITY.md)
+
 
 
