@@ -22,7 +22,7 @@ cd intel-extension-for-pytorch
 git checkout xpu-main
 git submodule sync
 git submodule update --init --recursive
-docker build -f docker/Dockerfile.compile --build-arg GID_RENDER=$(getent group render | sed -E 's,^render:[^:]*:([^:]*):.*$,\1,') -t intel/intel-extension-for-pytorch:xpu .
+docker build -f docker/Dockerfile.compile -t intel/intel-extension-for-pytorch:xpu .
 ```
 
 Alternatively, `./build.sh` script has docker build command to install prebuilt wheel files, update all the relevant build arguments and execute the script. Run the command below in current directory.

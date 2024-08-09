@@ -42,13 +42,15 @@ fi
 LIBSTDCPP_ACTIVE=${LIBSTDCPP_SYS}
 if [ ! -z ${CONDA_PREFIX} ]; then
     LIBSTDCPP_CONDA=$(find ${CONDA_PREFIX}/lib -regextype sed -regex ".*libstdc++\.so\.[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*" 2>/dev/null)
-    LIBSTDCPP_VER_SYS=$(echo ${LIBSTDCPP_SYS} | sed "s/.*libstdc++.so.//")
-    LIBSTDCPP_VER_CONDA=$(echo ${LIBSTDCPP_CONDA} | sed "s/.*libstdc++.so.//")
-    VER_COMP=$(ver_compare ${LIBSTDCPP_VER_CONDA} ${LIBSTDCPP_VER_SYS})
-    if [[ ${VER_COMP} -gt 0 ]]; then
-        LIBSTDCPP_ACTIVE=${LIBSTDCPP_SYS}
-    else
-        LIBSTDCPP_ACTIVE=${LIBSTDCPP_CONDA}
+    if [ ! -z ${LIBSTDCPP_CONDA} ]; then
+        LIBSTDCPP_VER_SYS=$(echo ${LIBSTDCPP_SYS} | sed "s/.*libstdc++.so.//")
+        LIBSTDCPP_VER_CONDA=$(echo ${LIBSTDCPP_CONDA} | sed "s/.*libstdc++.so.//")
+        VER_COMP=$(ver_compare ${LIBSTDCPP_VER_CONDA} ${LIBSTDCPP_VER_SYS})
+        if [[ ${VER_COMP} -gt 0 ]]; then
+            LIBSTDCPP_ACTIVE=${LIBSTDCPP_SYS}
+        else
+            LIBSTDCPP_ACTIVE=${LIBSTDCPP_CONDA}
+        fi
     fi
 fi
 echo ${LIBSTDCPP_ACTIVE}
