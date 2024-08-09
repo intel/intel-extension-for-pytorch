@@ -6,8 +6,6 @@ from .QuantizedAttention import IPEXTransformerAttnOptimizedInt4
 
 from .Linear import IPEXTransformerLinear
 
-from .model_utils import xpu_sdpa_support
-
 
 class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
     def __init__(self, config: IPEXTransformerConfig) -> None:
@@ -368,7 +366,9 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
     def sdp_kv_preprocess_1st_token_beam_search(self, key, value):
         if self.num_kv_group <= 1:
             return super().sdp_kv_preprocess_1st_token_beam_search(key, value)
-        if xpu_sdpa_support(self.is_beam_search(), self.head_dim):
+        # greedy search will use IpexSDP which supports GQA and not need to repeat_kv
+        # future GQA will accept kv directly without repeating
+        if not self.is_beam_search():
             return key, value, key, value
         else:
             key = self.repeat_kv(key, self.num_kv_group)
@@ -379,7 +379,8 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
     def sdp_kv_preprocess_2nd2last(self, key, value):
         if self.num_kv_group <= 1:
             return super().sdp_kv_preprocess_2nd2last(key, value)
-        if xpu_sdpa_support(self.is_beam_search(), self.head_dim):
+        # next token for greedy will use IpexSDP which supports GQA and not need to repeat_kv
+        if not self.is_beam_search():
             return (
                 key,
                 value,

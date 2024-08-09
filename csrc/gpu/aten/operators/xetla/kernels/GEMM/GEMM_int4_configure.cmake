@@ -56,8 +56,8 @@ foreach(QUANT_MODE ${L_QUANT_MODE})
         configure_("fp16"      ${arch_tag} "${aot_tag}" ${QUANT_MODE} 1   1   1  1  512  1 1 0 0)
 
     elseif(ARCH STREQUAL "xe_hpc")
-        configure_("fp16"      ${arch_tag} "${aot_tag}" ${QUANT_MODE} 1   1   1  1  256  1 1 1 3)
-        configure_("fp16"      ${arch_tag} "${aot_tag}" ${QUANT_MODE} 1   1   1  1  512  1 1 1 3)
+        configure_("fp16"      ${arch_tag} "${aot_tag}" ${QUANT_MODE} 1   1   1  1  256  1 1 0 0)
+        configure_("fp16"      ${arch_tag} "${aot_tag}" ${QUANT_MODE} 1   1   1  1  512  1 1 0 0)
 
     else()
         message(FATAL_ERROR "Unsupported arch: ${ARCH}")
