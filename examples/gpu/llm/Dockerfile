@@ -41,7 +41,7 @@ RUN . ./miniforge3/bin/activate && \
     conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
     cd intel-extension-for-pytorch/examples/gpu/llm && \
     MODE=0; if [ -z ${COMPILE} ]; then (( MODE |= 0x06 )); else (( MODE |= 0x02 )); fi; if [ ${USAGE} == "fine-tuning" ]; then (( MODE |= 0x08 )); fi && \
-    bash tools/env_setup.sh ${MODE} /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest pvc,ats-m150,acm-g11
+    bash tools/env_setup.sh ${MODE} /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest /opt/intel/oneapi/pti/latest pvc,ats-m150,acm-g11
 
 FROM base AS deploy
 COPY --from=dev /root/intel-extension-for-pytorch/examples/gpu/llm ./llm

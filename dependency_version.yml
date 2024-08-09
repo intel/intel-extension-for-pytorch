@@ -29,10 +29,10 @@ lm_eval:
   version: 0.4.2
 basekit:
   dpcpp-cpp-rt:
-    version: 2024.1.0
+    version: 2024.2.1
   mkl-dpcpp:
-    version: 2024.1.0
+    version: 2024.2.1
   oneccl-devel:
-    version: 2021.12.0
+    version: 2021.13.1
   impi-devel:
-    version: 2021.12.0
+    version: 2021.13.1

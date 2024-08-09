@@ -7,9 +7,9 @@ set -eo pipefail
 
 VER_IPEX=xpu-main
 
-if [[ $# -lt 5 ]]; then
-    echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> <CCLROOT> <MPIROOT> <AOT>"
-    echo "DPCPPROOT, MKLROOT, CCLROOT and MPIROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler, oneMKL, oneCCL and Intel(R) MPI respectively."
+if [[ $# -lt 6 ]]; then
+    echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> <CCLROOT> <MPIROOT> <PTIROOT> <AOT>"
+    echo "DPCPPROOT, MKLROOT, CCLROOT, MPIROOT and PTIROOT are mandatory, should be absolute or relative path to the root directory of DPC++ compiler, oneMKL, oneCCL, Intel(R) MPI and Profiling Tools Interfaces for GPU (PTI for GPU) respectively."
     echo "AOT should be set to the text string for environment variable USE_AOT_DEVLIST. Setting it to \"none\" to disable AOT."
     exit 1
 fi
@@ -17,7 +17,8 @@ DPCPP_ROOT=$1
 ONEMKL_ROOT=$2
 ONECCL_ROOT=$3
 MPI_ROOT=$4
-AOT=$5
+PTI_ROOT=$5
+AOT=$6
 if [[ ${AOT} == "none" ]]; then
     AOT=""
 fi
@@ -33,11 +34,11 @@ fi
 #           | └------------- Undefined
 #           └--------------- Undefined
 MODE=0x07
-if [ $# -gt 5 ]; then
-    if [[ ! $6 =~ ^[0-9]+$ ]] && [[ ! $6 =~ ^0x[0-9a-fA-F]+$ ]]; then
+if [ $# -gt 6 ]; then
+    if [[ ! $7 =~ ^[0-9]+$ ]] && [[ ! $7 =~ ^0x[0-9a-fA-F]+$ ]]; then
         echo "Warning: Unexpected argument. Using default value."
     else
-        MODE=$6
+        MODE=$7
     fi
 fi
 
@@ -59,13 +60,19 @@ if [ ! -f ${ONECCL_ROOT}/env/vars.sh ]; then
     echo "oneCCL environment ${ONECCL_ROOT} doesn't seem to exist."
     exit 4
 fi
+ONEAPIROOT=${ONECCL_ROOT}/../..
 
 MPI_ENV=${MPI_ROOT}/env/vars.sh
 if [ ! -f ${MPI_ROOT}/env/vars.sh ]; then
     echo "Intel(R) MPI environment ${MPI_ROOT} doesn't seem to exist."
     exit 5
 fi
-ONEAPIROOT=${ONEMKL_ROOT}/../..
+
+PTI_ENV=${PTI_ROOT}/env/vars.sh
+if [ ! -f ${PTI_ROOT}/env/vars.sh ]; then
+    echo "Profiling Tools Interfaces for GPU (PTI for GPU) ${PTI_ROOT} doesn't seem to exist."
+    exit 5
+fi
 
 # Check existance of required Linux commands
 for APP in python git patch nproc bzip2; do
@@ -106,8 +113,8 @@ done
 
 # set number of compile processes, if not already defined
 MAX_JOBS_VAR=$(nproc)
-if [ ! -z "${MAX_JOBS}" ]; then
-    MAX_JOBS_VAR=${MAX_JOBS}
+if [ -z "${MAX_JOBS}" ]; then
+    export MAX_JOBS=${MAX_JOBS_VAR}
 fi
 
 # Save current directory path
@@ -237,6 +244,7 @@ source ${DPCPP_ENV}
 source ${ONEMKL_ENV}
 source ${CCL_ENV}
 source ${MPI_ENV}
+source ${PTI_ENV}
 
 #  PyTorch
 cd pytorch
