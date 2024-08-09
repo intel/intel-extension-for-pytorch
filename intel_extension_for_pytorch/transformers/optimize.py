@@ -203,6 +203,7 @@ def model_convert_reference(_model):
         prepare_inputs_for_generation_chatglm,
         detect_language,
         _postprocess_outputs_whisper,
+        _prepare_encoder_decoder_kwargs_for_generation,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -336,6 +337,11 @@ def model_convert_reference(_model):
         == transformers.models.t5.modeling_t5.T5ForConditionalGeneration
     ):
         convert_function(_model, "forward", T5ForConditionalGeneration_forward)
+        convert_function(
+            _model,
+            "_prepare_encoder_decoder_kwargs_for_generation",
+            _prepare_encoder_decoder_kwargs_for_generation,
+        )
         convert_function(
             transformers.models.t5.modeling_t5.T5Attention,
             "_relative_position_bucket",
