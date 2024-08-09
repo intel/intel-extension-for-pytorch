@@ -34,7 +34,7 @@ export IMAGE_TYPE="xpu"
 To pull docker images use the following command:
 
 ```bash
-docker pull intel/intel-extension-for-pytorch:2.1.40-xpu
+docker pull intel/intel-extension-for-pytorch:2.1.40-xpu-pip-base
 ```
 ### Running container:
 
@@ -42,7 +42,7 @@ Run the following commands to start Intel® Extension for PyTorch\* GPU containe
 local directory into the container. The `-v` argument can be omitted if you do not need
 access to a local directory in the container. 
 
-```
+```bash
 IMAGE_NAME=intel/intel-extension-for-pytorch:2.1.40-xpu
 ```
 ```bash
@@ -98,5 +98,3 @@ Sample output looks like below:
 
 Now you are inside container with Python 3.10, PyTorch, and Intel® Extension for PyTorch\* preinstalled. You can run your own script
 to run on Intel GPU.
-
-
