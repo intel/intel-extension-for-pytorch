@@ -214,6 +214,7 @@ def run_accuracy():
     from lm_eval.utils import make_table
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    model.config.tie_word_embeddings = False
 
     hfmodel = HFLM(
         pretrained=model,
