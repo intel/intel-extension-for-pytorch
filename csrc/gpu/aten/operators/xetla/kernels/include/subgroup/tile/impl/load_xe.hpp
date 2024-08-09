@@ -457,6 +457,7 @@ tile_load(tile_t& tile, payload_t& payload) {
   constexpr uint32_t num_channel = payload_t::num_channel;
   constexpr uint32_t load_elems = num_channel * payload_t::vector_size;
   constexpr uint32_t pack_factor = payload_t::pack_factor;
+  const xetla_vector<load_dtype, load_elems> reg_zeros(0);
 
   auto channel_offset = payload.channel_offset + payload.base_offset;
 #pragma unroll
@@ -494,28 +495,35 @@ tile_load(tile_t& tile, payload_t& payload) {
               ? (xetla_vector_gen<uint32_t, num_channel>(offset_ch_dim, 1) <
                  size_ch_dim)
               : 1;
+          reg_tmp = xetla_load_global<
+              load_dtype,
+              load_elems,
+              payload_t::vector_size,
+              L1,
+              L2>(
+              payload.base_ptr,
+              channel_offset + address_offset,
+              mask,
+              reg_zeros);
+        } else {
+          reg_tmp = xetla_load_global<
+              load_dtype,
+              load_elems,
+              payload_t::vector_size,
+              L1,
+              L2>(payload.base_ptr, channel_offset + address_offset, mask);
         }
-        reg_tmp = xetla_load_global<
-            load_dtype,
-            load_elems,
-            payload_t::vector_size,
-            L1,
-            L2>(payload.base_ptr, channel_offset + address_offset, mask);
 
         if constexpr (
             payload_t::vector_size > 1 && payload_t::num_channel > 1) {
           xetla_vector<load_dtype, load_elems> reg_tmp_trans;
 #pragma unroll
           for (uint32_t iii = 0; iii < payload_t::num_channel; iii++) {
-            if ((bool)mask[iii]) // TODO (dingyi): Delete after driver fix
-              reg_tmp_trans.xetla_select<payload_t::vector_size, 1>(
-                  iii * payload_t::vector_size) =
-                  reg_tmp.xetla_select<
-                      payload_t::vector_size,
-                      payload_t::num_channel>(iii);
-            else // TODO (dingyi): Delete after driver fix
-              reg_tmp_trans.xetla_select<payload_t::vector_size, 1>(
-                  iii * payload_t::vector_size) = 0;
+            reg_tmp_trans.xetla_select<payload_t::vector_size, 1>(
+                iii * payload_t::vector_size) =
+                reg_tmp.xetla_select<
+                    payload_t::vector_size,
+                    payload_t::num_channel>(iii);
           }
           reg_sub
               .xetla_select<load_elems * pack_factor, 1>(

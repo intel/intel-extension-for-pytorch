@@ -500,12 +500,23 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
     xetla_vector<OffsetT, N / VS> byte_offsets,
     xetla_mask<N / VS> mask,
     xetla_vector<T, N> pass_thru) {
+#if __INTEL_LLVM_COMPILER >= 20240200
   __ESIMD_NS::properties props{
       __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
       __ESIMD_NS::alignment<alignment>};
 
   return __ESIMD_NS::gather<T, N, VS>(p, byte_offsets, mask, pass_thru, props);
+#else
+  constexpr data_size DS = data_size::default_size;
+  return __ESIMD_ENS::lsc_gather<
+      T,
+      VS,
+      gpu::xetla::detail::get_data_size(DS),
+      gpu::xetla::detail::get_cache_hint(L1H),
+      gpu::xetla::detail::get_cache_hint(L2H),
+      N / VS>(p, byte_offsets, mask, pass_thru);
+#endif
 }
 
 /// template <typename T, int N, int VS, typename OffsetT,

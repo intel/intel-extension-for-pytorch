@@ -651,7 +651,6 @@ static Tensor mm_bias_resadd_resadd_int4(
     int64_t group_size) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
-    std::cout << "xetla path" << std::endl;
     auto bias_flat = bias.flatten();
     auto res0_flat = res0.flatten(0, -2);
     auto res1_flat = res1.flatten(0, -2);
