@@ -288,8 +288,6 @@ inline bool onednn_strides_check(const Tensor& src) {
   dnnl_memory_desc_query(md, dnnl_query_inner_idxs, &md_blk_inner_idxs);
   dnnl_memory_desc_query(md, dnnl_query_inner_blks, &md_inner_blks);
 
-  dnnl_memory_desc_destroy(md);
-
   if (strides == nullptr || md_ndims == 0 ||
       md_fmt_kind != dnnl_format_kind_t::dnnl_blocked)
     return true;
@@ -340,6 +338,7 @@ inline bool onednn_strides_check(const Tensor& src) {
     const auto padded_dim = *md_padded_dims[d];
     min_stride = block_size * strides[d] * (padded_dim / blocks[d]);
   }
+  dnnl_memory_desc_destroy(md);
   return true;
 }
 
