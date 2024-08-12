@@ -542,6 +542,7 @@ $(document).ready(function() {
          data.preparation.basekit.install != null &&
          !$.pkgInArray(data.package, ["docker"])) {
         ret += "<p>You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system. The command should return PyTorch* and Intel® Extension for PyTorch* versions installed, as well as GPU card(s) information detected.</p>";
+        ret += "<p>Check section <b><i>Install Intel® oneAPI Base Toolkit</i></b> for <b>placeholders</b> used below.</p>";
         $.each(data.preparation.basekit.install, function(index, value) {
           commands.push(value.env);
         });
