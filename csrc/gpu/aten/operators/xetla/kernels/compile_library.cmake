@@ -1,5 +1,5 @@
 
-function(add_library_with_options TARGET IS_DOUBLE_GRF AOT_DEVLIST)
+function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
   # link openblas
   set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS}
     -fsycl
@@ -20,7 +20,7 @@ function(add_library_with_options TARGET IS_DOUBLE_GRF AOT_DEVLIST)
   endif()
 
   set(XETLA_OFFLINE_OPTIONS "")
-  if(${IS_DOUBLE_GRF})
+  if(${USE_DOUBLE_GRF})
     set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
   endif()
   set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
@@ -49,8 +49,8 @@ function(add_library_with_options TARGET IS_DOUBLE_GRF AOT_DEVLIST)
 
   # Set visibility to hidden to close the differences of Windows & Linux
   set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden)
-  if(!${IS_DOUBLE_GRF})
-    target_compile_definitions(${TARGET} PRIVATE NORMAL_GRF)
+  if(${USE_DOUBLE_GRF})
+    target_compile_definitions(${TARGET} PRIVATE USE_DOUBLE_GRF)
   endif()
   target_compile_definitions(${TARGET} PRIVATE BUILD_XETLA_KERNEL_LIB)
 

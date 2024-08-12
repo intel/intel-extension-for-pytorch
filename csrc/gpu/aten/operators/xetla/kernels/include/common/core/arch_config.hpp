@@ -147,18 +147,18 @@ struct fpu_attr_t {
 template <gpu_arch arch_tag>
 inline constexpr bool arch_has_fpu = fpu_attr_t<arch_tag>::has_fpu;
 
-#ifdef NORMAL_GRF
-#define GRF grf_mode::normal_grf
-#else
+#ifdef USE_DOUBLE_GRF
 #define GRF grf_mode::double_grf
+#else
+#define GRF grf_mode::normal_grf
 #endif
 
 template <grf_mode grf_num_mode>
 struct register_nums_t {
   static constexpr uint32_t register_nums =
-      (grf_num_mode == grf_mode::normal) ? 128 : 256;
+      (grf_num_mode == grf_mode::normal_grf) ? 128 : 256;
   static constexpr uint32_t acc_register_nums =
-      (grf_num_mode == grf_mode::normal) ? 4 : 8;
+      (grf_num_mode == grf_mode::normal_grf) ? 4 : 8;
 };
 
 template <gpu_arch arch_tag>

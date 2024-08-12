@@ -28,7 +28,7 @@ inline constexpr bool valid_xe_arch_tag = (arch_tag < gpu_arch::XeLast);
 
 enum class mma_engine : uint8_t { xmx = 0, fpu = 1 };
 
-enum class grf_mode : uint8_t { normal = 0, double_grf = 1 };
+enum class grf_mode : uint8_t { normal_grf = 0, double_grf = 1 };
 
 enum class mem_layout : uint8_t { row_major = 0, col_major = 1 };
 
