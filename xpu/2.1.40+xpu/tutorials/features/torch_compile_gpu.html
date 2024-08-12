@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>torch.compile for GPU (Beta) &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.40+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Simple Trace Tool (Prototype)" href="simple_trace.html" />
+    <link rel="prev" title="Fully Sharded Data Parallel (FSDP)" href="FSDP.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.1.40+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">torch.compile for GPU (Beta)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#required-dependencies">Required Dependencies</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#inferenece-with-torch-compile">Inferenece with torch.compile</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#training-with-torch-compile">Training with torch.compile</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#simple-trace-tool-prototype">Simple Trace Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ipex-logging-prototype-feature-for-debug"><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> (Prototype feature for debug)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">torch.compile for GPU (Beta)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/torch_compile_gpu.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="torch-compile-for-gpu-beta">
+<h1>torch.compile for GPU (Beta)<a class="headerlink" href="#torch-compile-for-gpu-beta" title="Link to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* now empowers users to seamlessly harness graph compilation capabilities for optimal PyTorch model performance on Intel GPU via the flagship <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile">torch.compile</a> API through the default “inductor” backend (<a class="reference external" href="https://dev-discuss.pytorch.org/t/torchinductor-a-pytorch-native-compiler-with-define-by-run-ir-and-symbolic-shapes/747/1">TorchInductor</a>). The Triton compiler has been the core of the Inductor codegen supporting various accelerator devices. Intel has extended TorchInductor by adding Intel GPU support to Triton. Additionally, post-op fusions for convolution and matrix multiplication, facilitated by oneDNN fusion kernels, contribute to enhanced efficiency for computational intensive operations. Leveraging these features is as simple as using the default “inductor” backend, making it easier than ever to unlock the full potential of your PyTorch models on Intel GPU platforms.</p>
+<p><strong>Note</strong>: <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> for GPU is a beta feature and available from 2.1.10. So far, the feature is functional on Intel® Data Center GPU Max Series.</p>
+</section>
+<section id="required-dependencies">
+<h2>Required Dependencies<a class="headerlink" href="#required-dependencies" title="Link to this heading"></a></h2>
+<p><strong>Verified version</strong>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">torch</span></code> : v2.1.0</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> : &gt; v2.1.10</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">triton</span></code> : <a class="reference external" href="https://github.com/intel/intel-xpu-backend-for-triton/releases/tag/v2.1.0">v2.1.0</a> with Intel® XPU Backend for Triton* backend enabled.</p></li>
+</ul>
+<p>Follow <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.1.40%2bxpu">Intel® Extension for PyTorch* Installation</a> to install <code class="docutils literal notranslate"><span class="pre">torch</span></code> and <code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> firstly.</p>
+<p>Then install <a class="reference external" href="https://github.com/intel/intel-xpu-backend-for-triton">Intel® XPU Backend for Triton* backend</a> for <code class="docutils literal notranslate"><span class="pre">triton</span></code> package. You may install it via prebuilt wheel package or build it from the source. We recommend installing via prebuilt package:</p>
+<ul class="simple">
+<li><p>Download the wheel package from <a class="reference external" href="https://github.com/intel/intel-xpu-backend-for-triton/releases">release page</a>. Note that you don’t need to install the LLVM release manually.</p></li>
+<li><p>Install the wheel package by <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span></code>. Note that this wheel package is a <code class="docutils literal notranslate"><span class="pre">triton</span></code> package with Intel GPU support, so you don’t need to <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">triton</span></code> again.</p></li>
+</ul>
+<div class="highlight-Bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--force-reinstall<span class="w">  </span>triton-2.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+</pre></div>
+</div>
+<p>Please follow the <a class="reference external" href="https://github.com/intel/intel-xpu-backend-for-triton?tab=readme-ov-file#setup-guide">Intel® XPU Backend for Triton* Installation</a> for more detailed installation steps.</p>
+<p>Note that if you install <code class="docutils literal notranslate"><span class="pre">triton</span></code> using <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">triton</span></code> command inside PyTorch* repo, the installed <code class="docutils literal notranslate"><span class="pre">triton</span></code> does not compile with Intel GPU support by default, you will need to manually set <code class="docutils literal notranslate"><span class="pre">TRITON_CODEGEN_INTEL_XPU_BACKEND=1</span></code> for enabling Intel GPU support. In addition, for building from the source via the <code class="docutils literal notranslate"><span class="pre">triton</span></code> <a class="reference external" href="https://github.com/openai/triton.git">repo</a>, the commit needs to be pinned at a tested <a class="reference external" href="https://github.com/intel/intel-xpu-backend-for-triton/blob/main/triton_hash.txt">triton commit</a>. Please follow the <a class="reference external" href="https://github.com/intel/intel-xpu-backend-for-triton?tab=readme-ov-file#option-2-build-from-the-source">Intel® XPU Backend for Triton* Installation #build from the source</a> section for more information about build <code class="docutils literal notranslate"><span class="pre">triton</span></code> package from the source.</p>
+<section id="inferenece-with-torch-compile">
+<h3>Inferenece with torch.compile<a class="headerlink" href="#inferenece-with-torch-compile" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+
+<span class="c1"># create model</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+
+<span class="c1"># compile model</span>
+<span class="n">compiled_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;freezing&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+
+<span class="c1"># inference main</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">))</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">):</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">compiled_model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="training-with-torch-compile">
+<h3>Training with torch.compile<a class="headerlink" href="#training-with-torch-compile" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+
+<span class="c1"># create model and optimizer</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=...</span><span class="p">,</span> <span class="n">momentum</span><span class="o">=...</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=...</span><span class="p">)</span>
+
+<span class="c1"># compile model</span>
+<span class="n">compiled_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="c1"># training main</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">))</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">):</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">compiled_model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">loss_function</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+<span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+<span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+<span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="FSDP.html" class="btn btn-neutral float-left" title="Fully Sharded Data Parallel (FSDP)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="simple_trace.html" class="btn btn-neutral float-right" title="Simple Trace Tool (Prototype)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f04d86b93f0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

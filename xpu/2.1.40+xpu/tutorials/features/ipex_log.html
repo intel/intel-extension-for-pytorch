@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPEX_LOGGING (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.40+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Large Language Models (LLM) Optimizations Overview" href="../llm.html" />
+    <link rel="prev" title="Compute Engine (Experimental feature for debug)" href="compute_engine.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.1.40+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#simple-trace-tool-prototype">Simple Trace Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#ipex-logging-prototype-feature-for-debug"><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> (Prototype feature for debug)</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> (Prototype)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ipex-logging-definition"><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> Definition</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#log-level">Log Level</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#log-component">Log Component</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#usage-in-c">Usage in C++</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#simple-log">Simple Log</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#event-log">Event Log</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#enviornment-settings">Enviornment settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#usage-in-python">Usage in python</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#replace-ipex-simple-trace">Replace <code class="docutils literal notranslate"><span class="pre">IPEX_SIMPLE_TRACE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#replace-ipex-verbose">Replace <code class="docutils literal notranslate"><span class="pre">IPEX_VERBOSE</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active"><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> (Prototype)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/ipex_log.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ipex-logging-prototype">
+<h1><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> (Prototype)<a class="headerlink" href="#ipex-logging-prototype" title="Link to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> provides the capability to log verbose information from Intel® Extension for PyTorch* . Please use <code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> to get the log information or trace the execution from Intel® Extension for PyTorch*. Please continue using PyTorch* macros such as <code class="docutils literal notranslate"><span class="pre">TORCH_CHECK</span></code>, <code class="docutils literal notranslate"><span class="pre">TORCH_ERROR</span></code>, etc. to get the log information from PyTorch*.</p>
+</section>
+<section id="ipex-logging-definition">
+<h2><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> Definition<a class="headerlink" href="#ipex-logging-definition" title="Link to this heading"></a></h2>
+<section id="log-level">
+<h3>Log Level<a class="headerlink" href="#log-level" title="Link to this heading"></a></h3>
+<p>The supported log levels are defined as follows, default log level is <code class="docutils literal notranslate"><span class="pre">DISABLED</span></code>:</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th style="text-align: center;">log level</th>
+<th style="text-align: center;">number</th>
+<th style="text-align: center;">usage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">DISABLED</td>
+<td style="text-align: center;">-1</td>
+<td style="text-align: center;">Disable the logging</td>
+</tr>
+<tr>
+<td style="text-align: center;">TRACE</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">Reserve for further usage</td>
+</tr>
+<tr>
+<td style="text-align: center;">DEBUG</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">Provide the whole calling stack info</td>
+</tr>
+<tr>
+<td style="text-align: center;">INFO</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">Record calling info to other library functions and environment variable settings</td>
+</tr>
+<tr>
+<td style="text-align: center;">WARN</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">Warn the second attempt of an action, such as memory reallocation</td>
+</tr>
+<tr>
+<td style="text-align: center;">ERR</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">Report error in try catch</td>
+</tr>
+<tr>
+<td style="text-align: center;">CRITICAL</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">Reserve for further usage</td>
+</tr>
+</tbody>
+</table></section>
+<section id="log-component">
+<h3>Log Component<a class="headerlink" href="#log-component" title="Link to this heading"></a></h3>
+<p>Log component is used to specify which part from Intel® Extension for PyTorch* does this log information belong to. The supported log components are defined as follows:</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th style="text-align: center;">log component</th>
+<th style="text-align: center;">description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">OPS</td>
+<td style="text-align: center;">Launch SYCL, oneDNN, oneMKL operators</td>
+</tr>
+<tr>
+<td style="text-align: center;">SYNGRAPH</td>
+<td style="text-align: center;">Syngraph related</td>
+</tr>
+<tr>
+<td style="text-align: center;">MEMORY</td>
+<td style="text-align: center;">Allocate/Free memory, Allocate/Free cache</td>
+</tr>
+<tr>
+<td style="text-align: center;">RUNTIME</td>
+<td style="text-align: center;">Device / Queue related</td>
+</tr>
+<tr>
+<td style="text-align: center;">ALL</td>
+<td style="text-align: center;">All output log</td>
+</tr>
+</tbody>
+</table></section>
+</section>
+<section id="usage-in-c">
+<h2>Usage in C++<a class="headerlink" href="#usage-in-c" title="Link to this heading"></a></h2>
+<p>All the usage are defined in <code class="docutils literal notranslate"><span class="pre">utils/LogUtils.h</span></code>. Currently Intel® Extension for PyTorch* supports:</p>
+<section id="simple-log">
+<h3>Simple Log<a class="headerlink" href="#simple-log" title="Link to this heading"></a></h3>
+<p>You can use <code class="docutils literal notranslate"><span class="pre">IPEX_XXX_LOG</span></code>, XXX represents the log level as mentioned above. There are four parameters defined for simple log:</p>
+<ul class="simple">
+<li><p>Log component, representing which part of Intel® Extension for PyTorch* does this log belong to.</p></li>
+<li><p>Log sub component, input an empty string(””) for general usages. For <code class="docutils literal notranslate"><span class="pre">SYNGRAPH</span></code> you can add any log sub componment.</p></li>
+<li><p>Log message template format string, same as fmt_string in lib fmt, <code class="docutils literal notranslate"><span class="pre">{}</span></code> is used as a place holder for format args .</p></li>
+<li><p>Log args for template format string, args numbers should be aligned with size of <code class="docutils literal notranslate"><span class="pre">{}</span></code>s.</p></li>
+</ul>
+<p>Below is an example for using simple log inside abs kernel:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">IPEX_INFO_LOG</span><span class="p">(</span><span class="s">&quot;OPS&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Add a log for inside ops {}&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;abs&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="event-log">
+<h3>Event Log<a class="headerlink" href="#event-log" title="Link to this heading"></a></h3>
+<p>Event log is used for recording a whole event, such as an operator calculation. The whole event is identified by an unique <code class="docutils literal notranslate"><span class="pre">event_id</span></code>. You can also mark each step by using <code class="docutils literal notranslate"><span class="pre">step_id</span></code>. Use <code class="docutils literal notranslate"><span class="pre">IPEX_XXX_EVENT_END()</span></code> to complete the logging of the whole event. <code class="docutils literal notranslate"><span class="pre">XXX</span></code> represents the log level mentioned above. It will be used as the log level for all logs within one single log event.</p>
+<p>Below is an example for using event log:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">IPEX_EVENT_LOG</span><span class="p">(</span><span class="s">&quot;OPS&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;record_avg_pool&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;start&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Here record the time start with arg:{}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">arg</span><span class="p">);</span>
+<span class="n">prepare_data</span><span class="p">();</span>
+<span class="n">IPEX_EVENT_LOG</span><span class="p">(</span><span class="s">&quot;OPS&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;record_avg_pool&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;data_prepare_finish&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Here record the data_prepare_finish with arg:{}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">arg</span><span class="p">);</span>
+<span class="n">avg_pool</span><span class="p">();</span>
+<span class="n">IPEX_INFO_EVENT_END</span><span class="p">(</span><span class="s">&quot;OPS&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;record_avg_pool&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;finish conv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Here record the end&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="enviornment-settings">
+<h2>Enviornment settings<a class="headerlink" href="#enviornment-settings" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* provides five enviornment variables for configuring log output:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING_LEVEL</span></code>, accept integar or string, default is -1 for <code class="docutils literal notranslate"><span class="pre">DISABLED</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">IPEX_LOG_COMPONENT</span></code>, accept string, used for specifying the log component and sub log component you would like to log, default is “ALL”. The log component and sub log component are separated by <code class="docutils literal notranslate"><span class="pre">/</span></code>. You could also specify several log components, such as “OPS;MEMORY”.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">IPEX_LOG_OUTPUT</span></code>, accept string. If you are using <code class="docutils literal notranslate"><span class="pre">IPEX_LOG_OUTPUT</span></code>, than all the logs will recorded inside a file rather than the console. Example: export IPEX_LOG_OUTPUT=”./ipex.log”.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">IPEX_LOG_ROTATE_SIZE</span></code>, accept integar, default is 10. Can be used only with <code class="docutils literal notranslate"><span class="pre">IPEX_LOG_OUTPUT</span></code>, for specifing how large file will be used when rotating this log, size is MB.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">IPEX_LOG_SPLIT_SIZE</span></code>, accept integar, default = null. Can be used only with <code class="docutils literal notranslate"><span class="pre">IPEX_LOG_OUTPUT</span></code>, for specifing how large file will be used when splitting the logs, size is MB.</p></li>
+</ul>
+</section>
+<section id="usage-in-python">
+<h2>Usage in python<a class="headerlink" href="#usage-in-python" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">torch.xpu.set_log_level(log_level)</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.xpu.get_log_level()</span></code>, these two functions are used for getting and setting the log level.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch.xpu.set_log_output_file_path(log_path)</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.xpu.get_log_output_file_path()</span></code>, these two functions are used for getting and setting the log output file path, once log output file path is set, logs will be recorded in file only.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch.xpu.set_log_rotate_file_size(file</span> <span class="pre">size)</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.xpu.get_log_rotate_file_size()</span></code>, these two functions are used for getting and setting the log rotate file size. Can be used when output file path is set.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch.xpu.set_log_split_file_size(file</span> <span class="pre">size)</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.xpu.get_log_split_file_size()</span></code>, these two functions are used for getting and setting the log split file size. Can be used when output file path is set.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch.xpu.set_log_component(log_component)</span></code>, and <code class="docutils literal notranslate"><span class="pre">torch.xpu.get_log_component()</span></code>, these two functions are used for getting and setting the log component. The log component string are the same as defined in enviornment settings.</p></li>
+</ul>
+</section>
+<section id="replace-ipex-simple-trace">
+<h2>Replace <code class="docutils literal notranslate"><span class="pre">IPEX_SIMPLE_TRACE</span></code><a class="headerlink" href="#replace-ipex-simple-trace" title="Link to this heading"></a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">torch.xpu.set_log_level(0)</span></code> to get logs to replace the previous usage in <code class="docutils literal notranslate"><span class="pre">IPEX_SIMPLE_TRACE</span></code>.</p>
+</section>
+<section id="replace-ipex-verbose">
+<h2>Replace <code class="docutils literal notranslate"><span class="pre">IPEX_VERBOSE</span></code><a class="headerlink" href="#replace-ipex-verbose" title="Link to this heading"></a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">torch.xpu.set_log_level(1)</span></code> to get logs to replace the previous usage in <code class="docutils literal notranslate"><span class="pre">IPEX_VERBOSE</span></code>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="compute_engine.html" class="btn btn-neutral float-left" title="Compute Engine (Experimental feature for debug)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../llm.html" class="btn btn-neutral float-right" title="Large Language Models (LLM) Optimizations Overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f04dab6f0d0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

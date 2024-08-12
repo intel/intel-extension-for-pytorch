@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DistributedDataParallel (DDP) &mdash; Intel&amp;#174 Extension for PyTorch* 2.1.40+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Horovod with PyTorch (Prototype)" href="horovod.html" />
+    <link rel="prev" title="Float8 Data Type Support (Prototype)" href="float8.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.1.40+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">DistributedDataParallel (DDP)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#installation-of-intel-oneccl-bindings-for-pytorch">Installation of Intel® oneCCL Bindings for Pytorch*</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#install-pytorch-and-intel-extension-for-pytorch">Install PyTorch and Intel® Extension for PyTorch*</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#install-intel-oneccl-bindings-for-pytorch">Install Intel® oneCCL Bindings for Pytorch*</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#recommended-install-from-prebuilt-wheels">[Recommended] Install from prebuilt wheels</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#install-from-source">Install from source</a></li>
+</ul>
+</li>
+<li class="toctree-l5"><a class="reference internal" href="#runtime-dynamic-linking">Runtime Dynamic Linking</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#ddp-usage">DDP Usage</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example-usage-mpi-launch-for-single-node">Example Usage (MPI launch for single node):</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ddp-scaling-api-gpu-only">DDP scaling API (GPU Only)</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#usage-of-ddp-scaling-api">Usage of DDP scaling API</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="horovod.html">Horovod with PyTorch (Prototype)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#simple-trace-tool-prototype">Simple Trace Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ipex-logging-prototype-feature-for-debug"><code class="docutils literal notranslate"><span class="pre">IPEX_LOGGING</span></code> (Prototype feature for debug)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">DistributedDataParallel (DDP)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/DDP.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="distributeddataparallel-ddp">
+<h1>DistributedDataParallel (DDP)<a class="headerlink" href="#distributeddataparallel-ddp" title="Link to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">DistributedDataParallel</span> <span class="pre">(DDP)</span></code> is a PyTorch* module that implements multi-process data parallelism across multiple GPUs and machines. With DDP, the model is replicated on every process, and each model replica is fed a different set of input data samples. Please refer to <a class="reference external" href="https://pytorch.org/tutorials/intermediate/ddp_tutorial.html">DDP Tutorial</a> for an introduction to DDP.</p>
+<p>The PyTorch <code class="docutils literal notranslate"><span class="pre">Collective</span> <span class="pre">Communication</span> <span class="pre">(c10d)</span></code> library supports communication across processes. To run DDP on GPU, we use Intel® oneCCL Bindings for Pytorch* (formerly known as torch-ccl) to implement the PyTorch c10d ProcessGroup API (https://github.com/intel/torch-ccl). It holds PyTorch bindings maintained by Intel for the Intel® oneAPI Collective Communications Library* (oneCCL), a library for efficient distributed deep learning training implementing such collectives as <code class="docutils literal notranslate"><span class="pre">allreduce</span></code>, <code class="docutils literal notranslate"><span class="pre">allgather</span></code>, and <code class="docutils literal notranslate"><span class="pre">alltoall</span></code>. Refer to <a class="reference external" href="https://github.com/oneapi-src/oneCCL">oneCCL Github page</a> for more information about oneCCL.</p>
+</section>
+<section id="installation-of-intel-oneccl-bindings-for-pytorch">
+<h2>Installation of Intel® oneCCL Bindings for Pytorch*<a class="headerlink" href="#installation-of-intel-oneccl-bindings-for-pytorch" title="Link to this heading"></a></h2>
+<p>To use PyTorch DDP on GPU, install Intel® oneCCL Bindings for Pytorch* as described below.</p>
+<section id="install-pytorch-and-intel-extension-for-pytorch">
+<h3>Install PyTorch and Intel® Extension for PyTorch*<a class="headerlink" href="#install-pytorch-and-intel-extension-for-pytorch" title="Link to this heading"></a></h3>
+<p>Make sure you have installed PyTorch and Intel® Extension for PyTorch* successfully.
+For more detailed information, check <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu">Installation Guide</a>.</p>
+</section>
+<section id="install-intel-oneccl-bindings-for-pytorch">
+<h3>Install Intel® oneCCL Bindings for Pytorch*<a class="headerlink" href="#install-intel-oneccl-bindings-for-pytorch" title="Link to this heading"></a></h3>
+<section id="recommended-install-from-prebuilt-wheels">
+<h4>[Recommended] Install from prebuilt wheels<a class="headerlink" href="#recommended-install-from-prebuilt-wheels" title="Link to this heading"></a></h4>
+<ol class="simple">
+<li><p>Install oneCCL package:</p></li>
+</ol>
+<p>We recommend using apt/yum/dnf to install the oneCCL package. Refer to <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html">Base Toolkit Installation</a> for adding the APT/YUM/DNF key and sources for first-time users.</p>
+<p>Reference commands:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>intel-oneapi-ccl-devel<span class="o">=</span><span class="m">2021</span>.12.0-309
+sudo<span class="w"> </span>yum<span class="w"> </span>install<span class="w"> </span>intel-oneapi-ccl-devel<span class="o">=</span><span class="m">2021</span>.12.0-309
+sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>intel-oneapi-ccl-devel<span class="o">=</span><span class="m">2021</span>.12.0-309
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Install <code class="docutils literal notranslate"><span class="pre">oneccl_bindings_for_pytorch</span></code></p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Generic Python* for CPU</span>
+<span class="n">REPO_URL</span><span class="p">:</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">pytorch</span><span class="o">-</span><span class="n">extension</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">release</span><span class="o">-</span><span class="n">whl</span><span class="o">/</span><span class="n">stable</span><span class="o">/</span><span class="n">cpu</span><span class="o">/</span><span class="n">us</span><span class="o">/</span>
+<span class="c1"># Generic Python* for GPU</span>
+<span class="n">REPO_URL</span><span class="p">:</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">pytorch</span><span class="o">-</span><span class="n">extension</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">release</span><span class="o">-</span><span class="n">whl</span><span class="o">/</span><span class="n">stable</span><span class="o">/</span><span class="n">xpu</span><span class="o">/</span><span class="n">us</span><span class="o">/</span>
+</pre></div>
+</div>
+<p>Installation from either repository shares the command below. Replace the place holder <code class="docutils literal notranslate"><span class="pre">&lt;REPO_URL&gt;</span></code> with a real URL mentioned above.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>oneccl_bind_pt<span class="w"> </span>--extra-index-url<span class="w"> </span>&lt;REPO_URL&gt;
+</pre></div>
+</div>
+</section>
+<section id="install-from-source">
+<h4>Install from source<a class="headerlink" href="#install-from-source" title="Link to this heading"></a></h4>
+<p>Refer to <a class="reference external" href="https://github.com/intel/torch-ccl/tree/ccl_torch2.1.400+xpu?tab=readme-ov-file#install-from-source">Installation Guide</a> to install Intel® oneCCL Bindings for Pytorch* from source.</p>
+</section>
+</section>
+<section id="runtime-dynamic-linking">
+<h3>Runtime Dynamic Linking<a class="headerlink" href="#runtime-dynamic-linking" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>dynamic link oneCCl from oneAPI basekit:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span>&lt;ONEAPI_ROOT&gt;/ccl/latest/env/vars.sh
+<span class="nb">source</span><span class="w"> </span>&lt;ONEAPI_ROOT&gt;/mpi/latest/env/vars.sh
+</pre></div>
+</div>
+<p>Note: Make sure you have installed <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html#base-kit">basekit</a> when using Intel® oneCCL Bindings for Pytorch* on Intel® GPUs. If the basekit is installed with a package manager, &lt;ONEAPI_ROOT&gt; is <code class="docutils literal notranslate"><span class="pre">/opt/intel/oneapi</span></code>.</p>
+</section>
+</section>
+<section id="ddp-usage">
+<h2>DDP Usage<a class="headerlink" href="#ddp-usage" title="Link to this heading"></a></h2>
+<p>DDP follows its usage in PyTorch. To use DDP with Intel® Extension for PyTorch*, make the following modifications to your model script:</p>
+<ol class="simple">
+<li><p>Import the necessary packages.</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> 
+<span class="kn">import</span> <span class="nn">oneccl_bindings_for_pytorch</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Initialize the process group with ccl backend.</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;ccl&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>For DDP with each process exclusively works on a single GPU, set the device ID as <code class="docutils literal notranslate"><span class="pre">local</span> <span class="pre">rank</span></code>. This step is not required for usage on CPU.</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;xpu:</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">local_rank</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">set_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Wrap model by DDP.</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">parallel</span><span class="o">.</span><span class="n">DistributedDataParallel</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">device_ids</span><span class="o">=</span><span class="p">[</span><span class="n">device</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Note: For single-device modules, <code class="docutils literal notranslate"><span class="pre">device_ids</span></code> can contain exactly one device id, which represents the only GPU device where the input module corresponding to this process resides. Alternatively, device_ids can be <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<p>Note: When using <code class="docutils literal notranslate"><span class="pre">torch.xpu.optimize</span></code> for distributed training with low precision, the <code class="docutils literal notranslate"><span class="pre">torch.xpu.manual_seed(seed_number)</span></code> is needed to make sure the master weight is the same on all ranks.</p>
+</section>
+<section id="example-usage-mpi-launch-for-single-node">
+<h2>Example Usage (MPI launch for single node):<a class="headerlink" href="#example-usage-mpi-launch-for-single-node" title="Link to this heading"></a></h2>
+<p>Intel® oneCCL Bindings for Pytorch* recommends MPI as the launcher to start multiple processes. Here’s an example to illustrate such usage.</p>
+<p>Dynamic link oneCCL and Intel MPI libraries:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)&quot;</span><span class="k">)</span>/env/setvars.sh
+<span class="c1"># Or</span>
+<span class="nb">source</span><span class="w"> </span>&lt;ONEAPI_ROOT&gt;/ccl/latest/env/vars.sh
+<span class="nb">source</span><span class="w"> </span>&lt;ONEAPI_ROOT&gt;/mpi/latest/env/vars.sh
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Example_DDP.py</span></code></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This example shows how to use MPI as the launcher to start DDP on single node with multiple devices.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+<span class="kn">from</span> <span class="nn">torch.nn.parallel</span> <span class="kn">import</span> <span class="n">DistributedDataParallel</span> <span class="k">as</span> <span class="n">DDP</span>
+<span class="kn">import</span> <span class="nn">torch.distributed</span> <span class="k">as</span> <span class="nn">dist</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+<span class="kn">import</span> <span class="nn">oneccl_bindings_for_pytorch</span>
+
+
+<span class="k">class</span> <span class="nc">Model</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Model</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">linear</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+
+    <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">123</span><span class="p">)</span>  <span class="c1"># set a seed number</span>
+    <span class="n">mpi_world_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PMI_SIZE&#39;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">mpi_rank</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;PMI_RANK&#39;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">mpi_world_size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;RANK&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">mpi_rank</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;WORLD_SIZE&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">mpi_world_size</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># set the default rank and world size to 0 and 1</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;RANK&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;RANK&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;WORLD_SIZE&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;WORLD_SIZE&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;MASTER_ADDR&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;127.0.0.1&#39;</span>  <span class="c1"># your master address</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;MASTER_PORT&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;29500&#39;</span>  <span class="c1"># your master port</span>
+
+    <span class="c1"># Initialize the process group with ccl backend</span>
+    <span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;ccl&#39;</span><span class="p">)</span>
+
+    <span class="c1"># For single-node distributed training, local_rank is the same as global rank</span>
+    <span class="n">local_rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+    <span class="c1"># Only set device for distributed training on GPU</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;xpu:</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_rank</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">DDP</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">device_ids</span><span class="o">=</span><span class="p">[</span><span class="n">device</span><span class="p">])</span>
+
+    <span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.001</span><span class="p">)</span>
+    <span class="n">loss_fn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">MSELoss</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Runing Iteration: </span><span class="si">{}</span><span class="s2"> on device </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">device</span><span class="p">))</span>
+        <span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="c1"># forward</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Runing forward: </span><span class="si">{}</span><span class="s2"> on device </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">device</span><span class="p">))</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+        <span class="c1"># loss</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Runing loss: </span><span class="si">{}</span><span class="s2"> on device </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">device</span><span class="p">))</span>
+        <span class="n">L</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span>
+        <span class="c1"># backward</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Runing backward: </span><span class="si">{}</span><span class="s2"> on device </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">device</span><span class="p">))</span>
+        <span class="n">L</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+        <span class="c1"># update</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Runing optim: </span><span class="si">{}</span><span class="s2"> on device </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">device</span><span class="p">))</span>
+        <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Running command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>-l<span class="w"> </span>python<span class="w"> </span>Example_DDP.py
+</pre></div>
+</div>
+</section>
+<section id="ddp-scaling-api-gpu-only">
+<h2>DDP scaling API (GPU Only)<a class="headerlink" href="#ddp-scaling-api-gpu-only" title="Link to this heading"></a></h2>
+<p>For using one GPU card with multiple tiles, each tile could be regarded as a device for explicit scaling. We provide a DDP scaling API to enable DDP on one GPU card in <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/xpu-master/intel_extension_for_pytorch/xpu/single_card.py">GitHub repo</a>.</p>
+<section id="usage-of-ddp-scaling-api">
+<h3>Usage of DDP scaling API<a class="headerlink" href="#usage-of-ddp-scaling-api" title="Link to this heading"></a></h3>
+<p>Note: This API supports GPU devices on one card.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Args</span><span class="p">:</span>
+<span class="n">model</span><span class="p">:</span> <span class="n">model</span> <span class="n">to</span> <span class="n">be</span> <span class="n">parallelized</span>
+<span class="n">train_dataset</span><span class="p">:</span> <span class="n">dataset</span> <span class="k">for</span> <span class="n">training</span>
+</pre></div>
+</div>
+<p>If you have a model running on a single tile, you only need to make minor changes to enable the DDP training by following these steps:</p>
+<ol class="simple">
+<li><p>Import the API:</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">intel_extension_for_pytorch.xpu.single_card</span> <span class="kn">import</span> <span class="n">single_card_dist</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;single_card_dist not available!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Use multi_process_spawn launcher as a torch.multiprocessing wrapper.</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">single_card_dist</span><span class="o">.</span><span class="n">multi_process_spawn</span><span class="p">(</span><span class="n">main_worker</span><span class="p">,</span> <span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="p">))</span> <span class="c1"># put arguments of main_worker into a tuple</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Usage of this API:</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dist</span> <span class="o">=</span> <span class="n">single_card_dist</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">train_dataset</span><span class="p">)</span>
+<span class="n">local_rank</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">train_sampler</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">rank</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">train_sampler</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Set in the model training:</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span> <span class="o">...</span>
+    <span class="n">train_sampler</span><span class="o">.</span><span class="n">set_epoch</span><span class="p">(</span><span class="n">epoch</span><span class="p">)</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Adjust the model to call <code class="docutils literal notranslate"><span class="pre">local_rank</span></code>, <code class="docutils literal notranslate"><span class="pre">model</span></code>, and <code class="docutils literal notranslate"><span class="pre">train_sampler</span></code> as shown here:</p></li>
+</ol>
+<ul class="simple">
+<li><p>device: get the xpu information used in model training</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">xpu</span> <span class="o">=</span> <span class="s2">&quot;xpu:</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_rank</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;DDP Use XPU: </span><span class="si">{}</span><span class="s2"> for training&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">xpu</span><span class="p">))</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>model: use the model warpped by DDP in the following training</p></li>
+<li><p>train_sampler: use the train_sampler to get the train_loader</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">train_loader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">train_dataset</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="p">(</span><span class="n">train_sampler</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">),</span>
+    <span class="n">num_workers</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">workers</span><span class="p">,</span> <span class="n">pin_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sampler</span><span class="o">=</span><span class="n">train_sampler</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Then you can start your model training on multiple GPU devices of one card.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="float8.html" class="btn btn-neutral float-left" title="Float8 Data Type Support (Prototype)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="horovod.html" class="btn btn-neutral float-right" title="Horovod with PyTorch (Prototype)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f04d841e590> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
