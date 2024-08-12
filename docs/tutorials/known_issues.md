@@ -39,9 +39,10 @@ Troubleshooting
 - **Problem**: Random bad termination after AI model convergence test (>24 hours) finishes.
   - **Cause**: This is a random issue when some AI model convergence test execution finishes. It is not user-friendly as the model execution ends ungracefully.
   - **Solution**: Kill the process after the convergence test finished, or use checkpoints to divide the convergence test into several phases and execute separately.
-- **Problem**: Random instability issues such as page fault or atomic access violation when executing LLM inference workloads on Intel® Data Center GPU Max series cards.
-  - **Cause**:  This issue is reported on LTS driver [803.29](https://dgpu-docs.intel.com/releases/LTS_803.29_20240131.html). The root cause is under investigation.
-  - **Solution**: Use active rolling stable release driver [775.20](https://dgpu-docs.intel.com/releases/stable_775_20_20231219.html) or latest driver version to workaround.
+- **Problem**: Runtime error `munmap_chunk(): invalid pointer` when executing some scaling LLM workloads on Intel® Data Center GPU Max Series platform
+  - **Cause**: Users targeting GPU use, must set the environment variable ‘FI_HMEM=system’ to disable GPU support in underlying libfabric as Intel® MPI Library 2021.13.1 will offload the GPU support instead. This avoids a potential bug in libfabric GPU initialization.
+   - **Solution**: Set the environment variable ‘FI_HMEM=system’ to workaround this issue when encounter.
+
 
 ## Library Dependencies
 

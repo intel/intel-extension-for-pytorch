@@ -34,7 +34,7 @@ export IMAGE_TYPE="xpu"
 To pull docker images use the following command:
 
 ```bash
-docker pull intel/intel-extension-for-pytorch:2.1.40-xpu-pip-base
+docker pull intel/intel-extension-for-pytorch:2.1.40-xpu
 ```
 ### Running container:
 

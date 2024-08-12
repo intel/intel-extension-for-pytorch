@@ -17,7 +17,7 @@ Optimizers are a key part of the training workloads. Intel® Extension for PyTor
    technical_details/optimizer_fusion_gpu
  
 
-For more detailed information, check `Optimizer Fusion on CPU <technical_details/optimizer_fusion_cpu.md>`_, `Optimizer Fusion on GPU <technical_details/optimizer_fusion_gpu.md>`_ and `Split SGD <technical_details/split_sgd.html>`_.
+For more detailed information, check `Optimizer Fusion on GPU <technical_details/optimizer_fusion_gpu.md>`_.
 
 Ahead of Time Compilation (AOT) [GPU]
 -------------------------------------

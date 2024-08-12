@@ -338,8 +338,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     CMD="${CMD} import torchaudio; print(f'torchaudio_version:  {torchaudio.__version__}');"
 fi
 CMD="${CMD} import intel_extension_for_pytorch as ipex; print(f'ipex_version:        {ipex.__version__}');"
-if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    CMD="${CMD} import oneccl_bindings_for_pytorch as torch_ccl; print(f'torchccl_version:    {torch_ccl.__version__}');"
-fi
+#if [ $((${MODE} & 0x01)) -ne 0 ]; then
+#    CMD="${CMD} import oneccl_bindings_for_pytorch as torch_ccl; print(f'torchccl_version:    {torch_ccl.__version__}');"
+#fi
 python -c "${CMD}"
 

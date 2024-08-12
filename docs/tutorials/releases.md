@@ -1,6 +1,38 @@
 Releases
 =============
 
+## 2.1.40+xpu
+
+Intel® Extension for PyTorch\* v2.1.40+xpu is a minor release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series，Intel® Arc™ A-Series Graphics and Intel® Core™ Ultra Processors with Intel® Arc™ Graphics) based on PyTorch\* 2.1.0.
+
+### Highlights
+
+- Intel® oneAPI Base Toolkit 2024.2.1 compatibility
+- Intel® oneDNN v3.5 integration
+- Intel® oneCCL 2021.13.1 integration
+- Intel® Core™ Ultra Processors with Intel® Arc™ Graphics (MTL-H) support on Windows (Prototype)
+- Bug fixing and other optimization
+  - Fix host memory leak [#4280](https://github.com/intel/intel-extension-for-pytorch/commit/5c252a1e34ccecc8e2e5d10ccc67f410ac7b87e2)
+  - Fix LayerNorm issue for undefined grad_input [#4317](https://github.com/intel/intel-extension-for-pytorch/commit/619cd9f5c300a876455411bcacc470bd94c923be)
+  - Replace FP64 device check method [#4354](https://github.com/intel/intel-extension-for-pytorch/commit/d60d45187b1dd891ec8aa2abc42eca8eda5cb242)
+  - Fix online doc search issue [#4358](https://github.com/intel/intel-extension-for-pytorch/commit/2e957315fdad776617e24a3222afa55f54b51507)
+  - Fix pdist unit test failure on client GPUs [#4361](https://github.com/intel/intel-extension-for-pytorch/commit/00f94497a94cf6d69ebba33ff95d8ab39113ecf4)
+  - Remove primitive cache from conv fwd [#4429](https://github.com/intel/intel-extension-for-pytorch/commit/bb1c6e92d4d11faac5b6fc01b226d27950b86579)
+  - Fix sdp bwd page fault with no grad bias [#4439](https://github.com/intel/intel-extension-for-pytorch/commit/d015f00011ad426af33bb970451331321417bcdb)  
+  - Fix implicit data conversion [#4463](https://github.com/intel/intel-extension-for-pytorch/commit/d6987649e58af0da4964175aed3286aef16c78c9)
+  - Fix compiler version parsing issue [#4468](https://github.com/intel/intel-extension-for-pytorch/commit/50b2b5933b6df6632a18d76bdec46b638750dc48)  
+  - Fix irfft invalid descriptor [#4480](https://github.com/intel/intel-extension-for-pytorch/commit/3e60e87cf011b643cc0e72d82c10b28417061d97)
+  - Change condition order to fix out-of-bound access in index [#4495](https://github.com/intel/intel-extension-for-pytorch/commit/8b74d6c5371ed0bd442279be42b0d454cb2b31b3)
+  - Add parameter check in embedding bag [#4504](https://github.com/intel/intel-extension-for-pytorch/commit/57174797bab9de2647abb8fdbcda638b0c694e01)
+  - Add the backward implementation for rms norm [#4527](https://github.com/intel/intel-extension-for-pytorch/commit/e4938e0a9cee15ffe2f8d205e0228c1842a5735c)
+  - Fix attn_mask for sdpa beam_search [#4557](https://github.com/intel/intel-extension-for-pytorch/commit/80ed47655b003fa132ac264b3d3008c298865473)
+  - Use data_ptr template instead of force data conversion [#4558](https://github.com/intel/intel-extension-for-pytorch/commit/eeb92d2f4c34f143fc76e409987543d42e68d065)
+  - Workaround windows AOT image size over 2GB issue on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics [#4407](https://github.com/intel/intel-extension-for-pytorch/commit/d7ebba7c94374bdd12883ffd45d6670b96029d11) [#4450](https://github.com/intel/intel-extension-for-pytorch/commit/550fd767b723bd9a1a799b05be5d8ce073e6faf7)
+  
+### Known Issues
+
+Please refer to [Known Issues webpage](./known_issues.md).
+
 ## 2.1.30+xpu
 
 Intel® Extension for PyTorch\* v2.1.30+xpu is an update release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.1.0.
