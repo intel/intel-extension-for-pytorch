@@ -249,7 +249,7 @@ class HuggingFaceModel(BaseLM):
 
         self.model = self.model.eval()
 
-        if with_ipex and dtype not in ["int8", "int4", "nf4"]:
+        if with_ipex and (dtype not in ["int8", "int4", "nf4"] or model_type in ["t5"]):
             self.model = ipex.llm.optimize(
                 self.model.eval(),
                 dtype=infer_dtype,
