@@ -167,7 +167,7 @@ if (BUILD_WITH_SANITIZER)
     set(SANITIZER_OPTION ${BUILD_WITH_SANITIZER})
   endif()
 
-  set(IPEX_SYCL_LINK_FLAGS "${IPEX_SYCL_LINK_FLAGS} -fsanitize=${SANITIZER_OPTION}")
+  set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -fsanitize=${SANITIZER_OPTION})
 endif()
 
 # WARNING: Append link flags in kernel flags before adding offline options
