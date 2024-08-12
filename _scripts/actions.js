@@ -296,7 +296,7 @@ $(document).ready(function() {
               placeholder_example = "";
               if(value.placeholder_example != null)
                 placeholder_example = ", <i>e.g. " + value.placeholder_example + "</i>";
-              components.push(value.name + " (Placeholder <cite>" + value.placeholder + "</cite> as its installation path" + placeholder_example + ")");
+              components.push(value.name + " (<b>Placeholder <cite>" + value.placeholder + "</cite></b> as its installation path" + placeholder_example + ")");
             });
             ret += $.ul_gen(components);
 
