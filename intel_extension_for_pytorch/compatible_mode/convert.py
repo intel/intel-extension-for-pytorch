@@ -4,7 +4,7 @@ import torch
 import functools
 import intel_extension_for_pytorch  # noqa:F401
 
-from .fake_module import common
+from .fake_module import common, nccl
 from collections import namedtuple
 from ruamel.yaml import YAML
 from .wrap_api import WrapAPI
@@ -159,6 +159,7 @@ class WrapHelper:
             set_attr(torch.jit, "script", WrapAPI.wrap_jit_script(torch.jit.script))
 
             # fake for torch.cuda.amp.common for it cannot be found in torch.xpu
+            set_attr(torch.cuda, "nccl", nccl)
             set_attr(torch.cuda.amp, "common", common)
             set_attr(
                 torch.cuda,
