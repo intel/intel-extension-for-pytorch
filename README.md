@@ -23,11 +23,12 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 |LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
 |GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 |   |
-|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
@@ -37,7 +38,7 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 |Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 | 🟨 |
 |ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 | 🟩 |   |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
