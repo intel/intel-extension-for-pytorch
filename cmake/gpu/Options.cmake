@@ -61,7 +61,6 @@ function (print_xpu_config_summary)
   get_target_property(ONEDNN_INCLUDE_DIR intel-ext-pt-gpu ONEDNN_INCLUDE_DIR)
   get_target_property(ONEDNN_LIBRARY intel-ext-pt-gpu ONEDNN_LIBRARY)
   get_target_property(ONEMKL_INCLUDE_DIR intel-ext-pt-gpu ONEMKL_INCLUDE_DIR)
-  get_target_property(ONETRACE_INCLUDE_DIRS intel-ext-pt-gpu ONETRACE_INCLUDE_DIRS)
 
     print_config_summary()
     message(STATUS "******** Summary on XPU ********")
