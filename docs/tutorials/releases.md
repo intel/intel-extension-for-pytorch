@@ -1,31 +1,63 @@
 Releases
-=============
+========
+
+## 2.4.0
+
+We are excited to announce the release of Intel® Extension for PyTorch\* 2.4.0+cpu which accompanies PyTorch 2.4. This release mainly brings you the support for Llama3.1, basic support for LLM serving frameworks like vLLM/TGI, and a set of optimization to push better performance for LLM models. This release also extends the list of optimized LLM models to a broader level and includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
+
+### Highlights
+
+- Llama 3.1 support
+
+Meta has newly released [Llama 3.1](https://ai.meta.com/blog/meta-llama-3-1/) with new features like longer context length (128K) support. Intel® Extension for PyTorch\*  provides [support of Llama 3.1](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-ai-solutions-support-meta-llama-3-1-launch.html) since its launch date with early release version, and now support with this official release.
+
+- Serving framework support
+
+Typical LLM serving frameworks including vLLM, TGI can co-work with Intel® Extension for PyTorch\* now which provides optimized performance for Xeon® Scalable CPUs. Besides the integration of LLM serving frameworks with ipex.llm module level APIs, we also continue optimizing the performance and quality of underneath Intel® Extension for PyTorch\* operators such as paged attention and flash attention. We also provide new support in ipex.llm module level APIs for 4bits AWQ quantization based on weight only quantization, and distributed communications with shared memory optimization.
+
+- Large Language Model (LLM) optimization:
+
+Intel® Extension for PyTorch\* further optimized the performance of the weight only quantization kernels, enabled more fusion pattern variants for LLMs and extended the optimized models to include whisper, falcon-11b, Qwen2, and definitely Llama 3.1, etc. A full list of optimized models can be found at [LLM optimization](https://github.com/intel/intel-extension-for-pytorch/tree/v2.4.0+cpu/examples/cpu/llm/inference).
+
+- Bug fixing and other optimization
+
+    - Fixed the quantization with auto-mixed-precision (AMP) mode of Qwen-7b [#3030](https://github.com/intel/intel-extension-for-pytorch/commit/ad29b2346fe0b26e87e1aefc15e1eb25fb4b9b4d)
+
+    - Fixed the illegal memory access issue in the Flash Attention kernel [#2987](https://github.com/intel/intel-extension-for-pytorch/commit/620a9bfd9db42813931a857e78fa3f5d298be200)
+
+    - Re-structured the paths of LLM example scripts [#3080](https://github.com/intel/intel-extension-for-pytorch/commit/bee4a423d99b4dea7362d8cb31b1d48e38344a8f)
+
+    - Upgraded oneDNN to v3.5.2 [#3143](https://github.com/intel/intel-extension-for-pytorch/commit/7911528f0fef4e1b493cb0b363bf76de2eb6a9ca)
+
+    - Misc fix and enhancement [#3079](https://github.com/intel/intel-extension-for-pytorch/commit/e74d7a97186e6cafc8e41c2b40f03e95fe6c8060) [#3116](https://github.com/intel/intel-extension-for-pytorch/commit/76dfb92af8aa4778aff09a089bde70f614712b33)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.3.0+cpu...v2.4.0+cpu
 
 ## 2.3.100
 
-### Highlights 
+### Highlights
 
-- Added the optimization for Phi-3: [#2883](https://github.com/intel/intel-extension-for-pytorch/commit/5fde074252d9b61dd0d410832724cbbec882cb96) 
+- Added the optimization for Phi-3: [#2883](https://github.com/intel/intel-extension-for-pytorch/commit/5fde074252d9b61dd0d410832724cbbec882cb96)
 
-- Fixed the `state_dict` method patched by `ipex.optimize` to support DistributedDataParallel [#2910](https://github.com/intel/intel-extension-for-pytorch/commit/9a192efa4cf9a9a2dabac19e57ec5d81f9f5d22c) 
+- Fixed the `state_dict` method patched by `ipex.optimize` to support DistributedDataParallel [#2910](https://github.com/intel/intel-extension-for-pytorch/commit/9a192efa4cf9a9a2dabac19e57ec5d81f9f5d22c)
 
-- Fixed the linking issue in CPPSDK [#2911](https://github.com/intel/intel-extension-for-pytorch/commit/38573f2938061620f072346d2b3345b69454acbc) 
+- Fixed the linking issue in CPPSDK [#2911](https://github.com/intel/intel-extension-for-pytorch/commit/38573f2938061620f072346d2b3345b69454acbc)
 
-- Fixed the ROPE kernel for cases where the batch size is larger than one [#2928](https://github.com/intel/intel-extension-for-pytorch/commit/2d02768af957011244dd9ca89186cc1318466d6c) 
+- Fixed the ROPE kernel for cases where the batch size is larger than one [#2928](https://github.com/intel/intel-extension-for-pytorch/commit/2d02768af957011244dd9ca89186cc1318466d6c)
 
-- Upgraded deepspeed to v0.14.3 to include the support for Phi-3 [#2985](https://github.com/intel/intel-extension-for-pytorch/commit/73105990e551656f79104dd93adc4a8020978947) 
+- Upgraded deepspeed to v0.14.3 to include the support for Phi-3 [#2985](https://github.com/intel/intel-extension-for-pytorch/commit/73105990e551656f79104dd93adc4a8020978947)
 
 **Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.3.0+cpu...v2.3.100+cpu
 
 ## 2.3.0
 
-We are excited to announce the release of Intel® Extension for PyTorch* 2.3.0+cpu which accompanies PyTorch 2.3. This release mainly brings you the new feature on Large Language Model (LLM) called module level LLM optimization API, which provides module level optimizations for commonly used LLM modules and functionalities, and targets to optimize customized LLM modeling for scenarios like private models, self-customized models, LLM serving frameworks, etc. This release also extends the list of optimized LLM models to a broader level and includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
+We are excited to announce the release of Intel® Extension for PyTorch\* 2.3.0+cpu which accompanies PyTorch 2.3. This release mainly brings you the new feature on Large Language Model (LLM) called module level LLM optimization API, which provides module level optimizations for commonly used LLM modules and functionalities, and targets to optimize customized LLM modeling for scenarios like private models, self-customized models, LLM serving frameworks, etc. This release also extends the list of optimized LLM models to a broader level and includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
 
 ### Highlights
 
 - Large Language Model (LLM) optimization
 
-  [Intel® Extension for PyTorch*](https://github.com/intel/intel-extension-for-pytorch) provides a new feature called module level LLM optimization API, which provides module level optimizations for commonly used LLM modules and functionalities. LLM creators can then use this new API set to replace related parts in models by themselves, with which to reach peak performance.
+  [Intel® Extension for PyTorch\*](https://github.com/intel/intel-extension-for-pytorch) provides a new feature called module level LLM optimization API, which provides module level optimizations for commonly used LLM modules and functionalities. LLM creators can then use this new API set to replace related parts in models by themselves, with which to reach peak performance.
 
   There are 3 categories of module level LLM optimization APIs in general:
 
@@ -77,10 +109,10 @@ We are excited to announce the release of Intel® Extension for PyTorch* 2.3.0+c
 
 - Bug fixing and other optimization
 
-    - Optimized the performance of LLM [#2561](https://github.com/intel/intel-extension-for-pytorch/commit/ade45387ecc4e707754de9db6fc2be0af186e2ba) [#2584](https://github.com/intel/intel-extension-for-pytorch/commit/05d07645e1ae5eeeff15abda31a6ba5806dd2bb2) [#2617](https://github.com/intel/intel-extension-for-pytorch/commit/adb563834a4f6bd327d7307c493c8fe1648e6211) [#2663](https://github.com/intel/intel-extension-for-pytorch/commit/214dea0c8e7b2864a0c2d1a1c32fb7815ca68070) [#2733](https://github.com/intel/intel-extension-for-pytorch/commit/f5b941c3b7ea8fe1a387617a9329467d1e1b544a) 
+    - Optimized the performance of LLM [#2561](https://github.com/intel/intel-extension-for-pytorch/commit/ade45387ecc4e707754de9db6fc2be0af186e2ba) [#2584](https://github.com/intel/intel-extension-for-pytorch/commit/05d07645e1ae5eeeff15abda31a6ba5806dd2bb2) [#2617](https://github.com/intel/intel-extension-for-pytorch/commit/adb563834a4f6bd327d7307c493c8fe1648e6211) [#2663](https://github.com/intel/intel-extension-for-pytorch/commit/214dea0c8e7b2864a0c2d1a1c32fb7815ca68070) [#2733](https://github.com/intel/intel-extension-for-pytorch/commit/f5b941c3b7ea8fe1a387617a9329467d1e1b544a)
     - Supported Act Order of GPTQ [#2550](https://github.com/intel/intel-extension-for-pytorch/commit/be636289eef628b995e79a475c58f8a4d93e4890) [#2568](https://github.com/intel/intel-extension-for-pytorch/commit/9fcc4897492333330fb6bd156b1178d55347d292)
     - Improved the warning and the logging information for better user experience [#2641](https://github.com/intel/intel-extension-for-pytorch/commit/e0bf673cf3ea4063a7e168ec221f421fbd378fb3) [#2675](https://github.com/intel/intel-extension-for-pytorch/commit/770275a755ea0445675720a3f6f14e77c491fceb)
-    - Added TorchServe CPU Example [#2613](https://github.com/intel/intel-extension-for-pytorch/commit/1f6fe6423dde7ccecc1565e73dc81d9cb281bc1f)    
+    - Added TorchServe CPU Example [#2613](https://github.com/intel/intel-extension-for-pytorch/commit/1f6fe6423dde7ccecc1565e73dc81d9cb281bc1f)
     - Upgraded oneDNN to v3.4.1 [#2747](https://github.com/intel/intel-extension-for-pytorch/commit/e2a9af49874fcf39097036c08848cd37cadc0084)
     - Misc fix and enhancement [#2468](https://github.com/intel/intel-extension-for-pytorch/commit/f88a7d127a6a3017db508454c7d332d7b2ad83f6) [#2627](https://github.com/intel/intel-extension-for-pytorch/commit/bc32ea463084d711e4a9aae85e38dd5d7d427849) [#2631](https://github.com/intel/intel-extension-for-pytorch/commit/f55a2bfa5d505fb7c7a6225c1c6206b5926777ab) [#2704](https://github.com/intel/intel-extension-for-pytorch/commit/eae477f76356b5a83640941787a168f680334775)
 
@@ -202,7 +234,7 @@ We are pleased to announce the release of Intel® Extension for PyTorch\* 2.0.0-
 - **MHA optimization with Flash Attention**: Intel optimized MHA module with Flash Attention technique as inspired by [Stanford paper](https://arxiv.org/abs/2205.14135). This brings less memory consumption for LLM, and also provides better inference performance for models like BERT, Stable Diffusion, etc.
 
 - **Work with torch.compile as an backend (Experimental)**: PyTorch 2.0 introduces a new feature, `torch.compile`, to speed up PyTorch execution. We've enabled Intel® Extension for PyTorch as a backend of torch.compile, which can leverage this new PyTorch API's power of graph capture and provide additional optimization based on these graphs.
-The usage of this new feature is quite simple as below: 
+The usage of this new feature is quite simple as below:
 
 ```python
 import torch
@@ -217,7 +249,7 @@ model = torch.compile(model, backend='ipex')
   - Supported [RMSNorm](https://arxiv.org/abs/1910.07467) which is widely used in the t5 model of huggingface [#1341](https://github.com/intel/intel-extension-for-pytorch/commit/d1de1402a8d6b9ca49b9c9a45a92899f7566866a)
   - Optimized InstanceNorm [#1330](https://github.com/intel/intel-extension-for-pytorch/commit/8b97d2998567cc2fda6eb008194cd64f624e857f)
   - Fixed the quantization of LSTM [#1414](https://github.com/intel/intel-extension-for-pytorch/commit/a4f93c09855679d2b424ca5be81930e3a4562cef) [#1473](https://github.com/intel/intel-extension-for-pytorch/commit/5b44996dc0fdb5c45995d403e18a44f2e1a11b3d)
-  - Fixed the correctness issue of unpacking non-contiguous Linear weight [#1419](https://github.com/intel/intel-extension-for-pytorch/commit/84d413d6c10e16c025c407b68652b1769597e016) 
+  - Fixed the correctness issue of unpacking non-contiguous Linear weight [#1419](https://github.com/intel/intel-extension-for-pytorch/commit/84d413d6c10e16c025c407b68652b1769597e016)
   - oneDNN update [#1488](https://github.com/intel/intel-extension-for-pytorch/commit/fd5c10b664d19c87f8d94cf293077f65f78c3937)
 
 ### Known Issues
@@ -273,7 +305,7 @@ We are pleased to announce the release of Intel® Extension for PyTorch\* 1.13.0
     --model_name_or_path bert-base-uncased --dataset_name squad --do_eval \
     --per_device_train_batch_size 12 --learning_rate 3e-5 --num_train_epochs 2 \
     --max_seq_length 384 --doc_stride 128 --output_dir /tmp/debug_squad/
-  
+
   # automatically apply bfloat16 optimization (--auto-ipex --dtype bfloat16)
   ipexrun --use_default_allocator --ninstance 2 --ncore_per_instance 28 --auto_ipex --dtype bfloat16 run_qa.py \
     --model_name_or_path bert-base-uncased --dataset_name squad --do_eval \
@@ -363,7 +395,7 @@ Highlights include:
   </tr>
   <tr>
   <td valign="top">
-  
+
   ```python
   import intel_extension_for_pytorch as ipex
   # Calibrate the model
@@ -376,17 +408,17 @@ Highlights include:
   conf = ipex.quantization.QuantConf('qconfig.json')
   with torch.no_grad():
       traced_model = ipex.quantization.convert(model, conf, example_input)
-  # Do inference 
+  # Do inference
   y = traced_model(x)
   ```
-  
+
   </td>
   <td valign="top">
-  
+
   ```python
   import intel_extension_for_pytorch as ipex
   # Calibrate the model
-  qconfig = ipex.quantization.default_static_qconfig # Histogram calibration algorithm and 
+  qconfig = ipex.quantization.default_static_qconfig # Histogram calibration algorithm and
   calibrated_model = ipex.quantization.prepare(model_to_be_calibrated, qconfig, example_inputs=example_inputs)
   for data in calibration_data_set:
       calibrated_model(data)
@@ -395,10 +427,10 @@ Highlights include:
   with torch.no_grad():
       traced_model = torch.jit.trace(quantized_model, example_input)
       traced_model = torch.jit.freeze(traced_model)
-  # Do inference 
+  # Do inference
   y = traced_model(x)
   ```
-  
+
   </td>
   </tr>
   </tbody>
@@ -414,7 +446,7 @@ Highlights include:
   </tr>
   <tr>
   <td valign="top">
-  
+
   ```python
   import intel_extension_for_pytorch as ipex
   # Create CPU pool
@@ -422,10 +454,10 @@ Highlights include:
   # Create multi-stream model
   multi_Stream_model = ipex.cpu.runtime.MultiStreamModule(model, num_streams=2, cpu_pool=cpu_pool)
   ```
-  
+
   </td>
   <td valign="top">
-  
+
   ```python
   import intel_extension_for_pytorch as ipex
   # Create CPU pool
@@ -438,7 +470,7 @@ Highlights include:
     multi_stream_input_hint,   # optional
     multi_stream_output_hint ) # optional
   ```
-  
+
   </td>
   </tr>
   </tbody>
@@ -454,7 +486,7 @@ Highlights include:
   </tr>
   <tr>
   <td valign="top">
-  
+
   ```python
   import intel_extension_for_pytorch as ipex
   model = ...
@@ -462,10 +494,10 @@ Highlights include:
   model.eval()
   optimized_model = ipex.optimize(model, dtype=torch.bfloat16)
   ```
-  
+
   </td>
   <td valign="top">
-  
+
   ```python
   import intel_extension_for_pytorch as ipex
   model = ...
@@ -473,7 +505,7 @@ Highlights include:
   model.eval()
   optimized_model = ipex.optimize(model, dtype=torch.bfloat16, sample_input=input)
   ```
-  
+
   </td>
   </tr>
   </tbody>
@@ -577,7 +609,7 @@ We are excited to announce Intel® Extension for PyTorch\* 1.11.0-cpu release by
 ### Highlights
 - Combine the AVX2 and AVX512 binary as a single binary and automatically dispatch to different implementations based on hardware ISA detection at runtime. The typical case is to serve the data center that mixtures AVX2-only and AVX512 platforms. It does not need to deploy the different ISA binary now compared to the previous version
 
-    ***NOTE***:  The extension uses the oneDNN library as the backend. However, the BF16 and INT8 operator sets and features are different between AVX2 and AVX512. Refer to [oneDNN document](https://oneapi-src.github.io/oneDNN/dev_guide_int8_computations.html#processors-with-the-intel-avx2-or-intel-avx-512-support) for more details. 
+    ***NOTE***:  The extension uses the oneDNN library as the backend. However, the BF16 and INT8 operator sets and features are different between AVX2 and AVX512. Refer to [oneDNN document](https://oneapi-src.github.io/oneDNN/dev_guide_int8_computations.html#processors-with-the-intel-avx2-or-intel-avx-512-support) for more details.
 
     > When one input is of type u8, and the other one is of type s8, oneDNN assumes the user will choose the quantization parameters so no overflow/saturation occurs. For instance, a user can use u7 [0, 127] instead of u8 for the unsigned input, or s7 [-64, 63] instead of the s8 one. It is worth mentioning that this is required only when the Intel AVX2 or Intel AVX512 Instruction Set is used.
 
@@ -606,7 +638,7 @@ pip install intel_extension_for_pytorch
 </tbody>
 </table>
 
-- Compared to the previous version, this release provides a dedicated installation file for the C++ SDK. The installation file automatically detects the PyTorch C++ SDK location and installs the extension C++ SDK files to the PyTorch C++ SDK. The user does not need to manually add the extension C++ SDK source files and CMake to the PyTorch SDK. In addition to that, the installation file reduces the C++ SDK binary size from ~220MB to ~13.5MB. 
+- Compared to the previous version, this release provides a dedicated installation file for the C++ SDK. The installation file automatically detects the PyTorch C++ SDK location and installs the extension C++ SDK files to the PyTorch C++ SDK. The user does not need to manually add the extension C++ SDK source files and CMake to the PyTorch SDK. In addition to that, the installation file reduces the C++ SDK binary size from ~220MB to ~13.5MB.
 
 <table align="center">
 <tbody>
