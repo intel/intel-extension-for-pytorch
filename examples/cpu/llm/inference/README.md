@@ -288,11 +288,13 @@ We provide the following qconfig summary files with good quality (calibration on
 | meta-llama/Llama-2-70b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-70b_qconfig.json) |
 | EleutherAI/gpt-j-6b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/gpt-j-6b_qconfig.json) |
 | tiiuae/falcon-7b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-7b_qconfig.json) |
+| tiiuae/falcon-11b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-11b_qconfig.json) |
 | tiiuae/falcon-40b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-40b_qconfig.json) |
 | facebook/opt-30b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-30b_qconfig.json) |
 | facebook/opt-1.3b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-1b3_qconfig.json) |
 | baichuan-inc/Baichuan2-7B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan2-7b_qconfig.json) |
 | baichuan-inc/Baichuan-13B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan-13b_qconfig.json) |
+| THUDM/chatglm2-6b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/chatglm2_qconfig.json) |
 | bigscience/bloom-1b7 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/bloom-1b7_qconfig.json) |
 | Salesforce/codegen-2B-multi | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/codegen-2b_qconfig.json) |
 | mosaicml/mpt-7b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/mpt-7b_qconfig.json) |
