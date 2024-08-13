@@ -160,7 +160,10 @@ inline const std::string OverheadActivity::metadataJson() const {
 
 inline bool RuntimeActivity::flowStart() const {
   std::string name(activity_._name);
-  return name == "piEnqueueKernelLaunch";
+  return std::find(
+             correlate_runtime_ops.begin(),
+             correlate_runtime_ops.end(),
+             name) != correlate_runtime_ops.end();
 }
 
 inline const std::string RuntimeActivity::metadataJson() const {

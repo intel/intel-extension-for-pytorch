@@ -9,6 +9,7 @@
 #include <pti/pti_view.h>
 
 #include <string>
+#include <vector>
 
 namespace libkineto {
 class ActivityLogger;
@@ -18,6 +19,18 @@ namespace KINETO_NAMESPACE {
 
 using namespace libkineto;
 struct TraceSpan;
+// This vector contains the legal runtime ops for drawing the correlation line
+// in the output json file
+inline const std::vector<std::string> correlate_runtime_ops = {
+    "piextUSMEnqueueFill",
+    "piextUSMEnqueueFill2D",
+    "piextUSMEnqueueMemcpy",
+    "piextUSMEnqueueMemset",
+    "piextUSMEnqueueMemcpy2D",
+    "piextUSMEnqueueMemset2D",
+    "piEnqueueKernelLaunch",
+    "piextEnqueueKernelLaunchCustom",
+    "piextEnqueueCooperativeKernelLaunch"};
 
 template <class T>
 struct XPUActivity : public ITraceActivity {
