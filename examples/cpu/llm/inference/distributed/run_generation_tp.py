@@ -292,7 +292,7 @@ elif re.search("git", model.config.architectures[0], re.IGNORECASE) or re.search
 
     def load_image(image_file):
         if image_file.startswith("http://") or image_file.startswith("https://"):
-            response = requests.get(image_file, verify=False)
+            response = requests.get(image_file)
             image = Image.open(BytesIO(response.content)).convert("RGB")
         else:
             image = Image.open(image_file).convert("RGB")
@@ -400,7 +400,7 @@ if args.benchmark:
         if not hasattr(model.config, "token_latency"):
             model.config.token_latency = True
     if model_type == "git":
-        prompt = Image.open(requests.get(args.image_url, stream=True, verify=False).raw)
+        prompt = Image.open(requests.get(args.image_url, stream=True).raw)
         generate_kwargs.pop("min_new_tokens", None)
     elif model_type == "llava":
         if args.prompt is not None:
