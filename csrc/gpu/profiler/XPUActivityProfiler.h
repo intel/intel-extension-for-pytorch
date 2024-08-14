@@ -170,6 +170,18 @@ class XPUActivityProfiler {
     profilers_.push_back(std::move(profiler));
   }
 
+  // for reducing post processing overhead, filter following runtime
+  // ops to be traced down
+  static const std::vector<std::string> _traceableRuntimeOps;
+
+  // each runtime record will be checked to trace or not
+  static bool isNeededToTrace(const char* name) {
+    return std::find(
+               _traceableRuntimeOps.begin(),
+               _traceableRuntimeOps.end(),
+               std::string(name)) != _traceableRuntimeOps.end();
+  }
+
  protected:
   using CpuGpuSpanPair = std::pair<TraceSpan, TraceSpan>;
   static const CpuGpuSpanPair& defaultTraceSpan();
