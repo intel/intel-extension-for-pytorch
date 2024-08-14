@@ -27,7 +27,7 @@ Intel® Extension for PyTorch\* further optimized the performance of the weight 
 
     - Re-structured the paths of LLM example scripts [#3080](https://github.com/intel/intel-extension-for-pytorch/commit/bee4a423d99b4dea7362d8cb31b1d48e38344a8f)
 
-    - Upgraded oneDNN to v3.5.2 [#3143](https://github.com/intel/intel-extension-for-pytorch/commit/7911528f0fef4e1b493cb0b363bf76de2eb6a9ca)
+    - Upgraded oneDNN to v3.5.3 [#3160](https://github.com/intel/intel-extension-for-pytorch/commit/c78cb773d4e25d27b2a3eba19e4f17428ebd9b90)
 
     - Misc fix and enhancement [#3079](https://github.com/intel/intel-extension-for-pytorch/commit/e74d7a97186e6cafc8e41c2b40f03e95fe6c8060) [#3116](https://github.com/intel/intel-extension-for-pytorch/commit/76dfb92af8aa4778aff09a089bde70f614712b33)
 
