@@ -213,14 +213,20 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenInnerMLPMixin:
         self.mlp_silu_qweight = torch.stack(
             (self.fc_out_quant.qweight, self.fc_in_quant.qweight)
         ).contiguous()
+        del self.fc_out_quant.qweight
+        del self.fc_in_quant.qweight
         self.mlp_silu_scales = torch.stack(
             (self.fc_out_quant.scales, self.fc_in_quant.scales)
         ).contiguous()
+        del self.fc_out_quant.scales
+        del self.fc_in_quant.scales
         self.mlp_silu_qzeros = None
         if self.fc_out_quant.qzeros is not None:
             self.mlp_silu_qzeros = torch.stack(
                 (self.fc_out_quant.qzeros, self.fc_in_quant.qzeros)
             ).contiguous()
+            del self.fc_out_quant.qzeros
+            del self.fc_in_quant.qzeros
 
     def inter_mm(self, hidden_states):
         assert self.fc_in_quant.blocksize == self.fc_out_quant.blocksize
