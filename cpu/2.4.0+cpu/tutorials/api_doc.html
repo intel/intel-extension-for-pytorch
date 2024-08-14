@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Documentation &mdash; Intel&amp;#174 Extension for PyTorch* 2.4.0+cpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=01a6a0bb" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Performance Tuning Guide" href="performance_tuning/tuning_guide.html" />
+    <link rel="prev" title="Cheat Sheet" href="cheat_sheet.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../">2.4.0+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cheat_sheet.html">Cheat Sheet</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general">General</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.optimize"><code class="docutils literal notranslate"><span class="pre">optimize()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.optimize"><code class="docutils literal notranslate"><span class="pre">optimize()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.verbose"><code class="docutils literal notranslate"><span class="pre">verbose</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#llm-module-level-optimizations-prototype">LLM Module Level Optimizations (Prototype)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.LinearSilu"><code class="docutils literal notranslate"><span class="pre">LinearSilu</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.LinearSiluMul"><code class="docutils literal notranslate"><span class="pre">LinearSiluMul</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.Linear2SiluMul"><code class="docutils literal notranslate"><span class="pre">Linear2SiluMul</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.LinearRelu"><code class="docutils literal notranslate"><span class="pre">LinearRelu</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.LinearNewGelu"><code class="docutils literal notranslate"><span class="pre">LinearNewGelu</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.LinearGelu"><code class="docutils literal notranslate"><span class="pre">LinearGelu</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.LinearMul"><code class="docutils literal notranslate"><span class="pre">LinearMul</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.LinearAdd"><code class="docutils literal notranslate"><span class="pre">LinearAdd</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.LinearAddAdd"><code class="docutils literal notranslate"><span class="pre">LinearAddAdd</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.RotaryEmbedding"><code class="docutils literal notranslate"><span class="pre">RotaryEmbedding</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.RMSNorm"><code class="docutils literal notranslate"><span class="pre">RMSNorm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.FastLayerNorm"><code class="docutils literal notranslate"><span class="pre">FastLayerNorm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.IndirectAccessKVCacheAttention"><code class="docutils literal notranslate"><span class="pre">IndirectAccessKVCacheAttention</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.PagedAttention"><code class="docutils literal notranslate"><span class="pre">PagedAttention</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.modules.VarlenAttention"><code class="docutils literal notranslate"><span class="pre">VarlenAttention</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.functional.rotary_embedding"><code class="docutils literal notranslate"><span class="pre">rotary_embedding()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.functional.rms_norm"><code class="docutils literal notranslate"><span class="pre">rms_norm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.functional.fast_layer_norm"><code class="docutils literal notranslate"><span class="pre">fast_layer_norm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.functional.indirect_access_kv_cache_attention"><code class="docutils literal notranslate"><span class="pre">indirect_access_kv_cache_attention()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.llm.functional.varlen_attention"><code class="docutils literal notranslate"><span class="pre">varlen_attention()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#fast-bert-prototype">Fast Bert (Prototype)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.fast_bert"><code class="docutils literal notranslate"><span class="pre">fast_bert()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#graph-optimization">Graph Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.enable_onednn_fusion"><code class="docutils literal notranslate"><span class="pre">enable_onednn_fusion()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-ipex.quantization">Quantization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.quantization.get_smooth_quant_qconfig_mapping"><code class="docutils literal notranslate"><span class="pre">get_smooth_quant_qconfig_mapping()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.quantization.get_weight_only_quant_qconfig_mapping"><code class="docutils literal notranslate"><span class="pre">get_weight_only_quant_qconfig_mapping()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.quantization.prepare"><code class="docutils literal notranslate"><span class="pre">prepare()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.quantization.convert"><code class="docutils literal notranslate"><span class="pre">convert()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.quantization.autotune"><code class="docutils literal notranslate"><span class="pre">autotune()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-ipex.cpu.runtime">CPU Runtime</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.cpu.runtime.is_runtime_ext_enabled"><code class="docutils literal notranslate"><span class="pre">is_runtime_ext_enabled()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool"><code class="docutils literal notranslate"><span class="pre">CPUPool</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.cpu.runtime.pin"><code class="docutils literal notranslate"><span class="pre">pin</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModuleHint"><code class="docutils literal notranslate"><span class="pre">MultiStreamModuleHint</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModule"><code class="docutils literal notranslate"><span class="pre">MultiStreamModule</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.cpu.runtime.Task"><code class="docutils literal notranslate"><span class="pre">Task</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.cpu.runtime.get_core_list_of_node_id"><code class="docutils literal notranslate"><span class="pre">get_core_list_of_node_id()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">PERFORMANCE TUNING</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/tuning_guide.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/launch_script.html">Launch Script Usage Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/torchserve.html">TorchServe with Intel® Extension for PyTorch*</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">API Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/api_doc.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-documentation">
+<h1>API Documentation<a class="headerlink" href="#api-documentation" title="Link to this heading"></a></h1>
+<section id="general">
+<h2>General<a class="headerlink" href="#general" title="Link to this heading"></a></h2>
+<p><cite>ipex.optimize</cite> is generally used for generic PyTorch models.</p>
+<dl class="py function" id="module-intel_extension_for_pytorch">
+<dt class="sig sig-object py" id="ipex.optimize">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'O1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linear_bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights_prepack</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace_dropout_with_identity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimize_lstm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">split_master_weight_for_bf16</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fuse_update_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_kernel_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_input</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">graph_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">concat_linear</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.optimize" title="Link to this definition"></a></dt>
+<dd><p>Apply optimizations at Python frontend to the given model (nn.Module), as
+well as the given optimizer (optional). If the optimizer is given,
+optimizations will be applied for training. Otherwise, optimization will be
+applied for inference. Optimizations include <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding (for
+inference only), weight prepacking and so on.</p>
+<p>Weight prepacking is a technique to accelerate performance of oneDNN
+operators. In order to achieve better vectorization and cache reuse, onednn
+uses a specific memory layout called <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code>. Although the
+calculation itself with <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code> is fast enough, from memory usage
+perspective it has drawbacks. Running with the <code class="docutils literal notranslate"><span class="pre">blocked</span> <span class="pre">layout</span></code>, oneDNN
+splits one or several dimensions of data into blocks with fixed size each
+time the operator is executed. More details information about oneDNN data
+mermory format is available at <a class="reference external" href="https://oneapi-src.github.io/oneDNN/dev_guide_understanding_memory_formats.html">oneDNN manual</a>.
+To reduce this overhead, data will be converted to predefined block shapes
+prior to the execution of oneDNN operator execution. In runtime, if the data
+shape matches oneDNN operator execution requirements, oneDNN won’t perform
+memory layout conversion but directly go to calculation. Through this
+methodology, called <code class="docutils literal notranslate"><span class="pre">weight</span> <span class="pre">prepacking</span></code>, it is possible to avoid runtime
+weight data format convertion and thus increase performance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – User model to apply optimizations on.</p></li>
+<li><p><strong>dtype</strong> (<em>torch.dtype</em>) – Only works for <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.half</span></code> a.k.a <code class="docutils literal notranslate"><span class="pre">torch.float16</span></code>.
+Model parameters will be casted to <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.half</span></code>
+according to dtype of settings. The default value is None, meaning do nothing.
+Note: Data type conversion is only applied to <code class="docutils literal notranslate"><span class="pre">nn.Conv2d</span></code>, <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code>
+and <code class="docutils literal notranslate"><span class="pre">nn.ConvTranspose2d</span></code> for both training and inference cases. For
+inference mode, additional data type conversion is applied to the weights
+of <code class="docutils literal notranslate"><span class="pre">nn.Embedding</span></code> and <code class="docutils literal notranslate"><span class="pre">nn.LSTM</span></code>.</p></li>
+<li><p><strong>optimizer</strong> (<em>torch.optim.Optimizer</em>) – User optimizer to apply optimizations
+on, such as SGD. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, meaning inference case.</p></li>
+<li><p><strong>level</strong> (<em>string</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;O0&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>. No optimizations are applied with
+<code class="docutils literal notranslate"><span class="pre">&quot;O0&quot;</span></code>. The optimizer function just returns the original model and
+optimizer. With <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>, the following optimizations are applied:
+conv+bn folding, weights prepack, dropout removal (inferenc model),
+master weight split and fused optimizer update step (training model).
+The optimization options can be further overridden by setting the
+following options explicitly. The default value is <code class="docutils literal notranslate"><span class="pre">&quot;O1&quot;</span></code>.</p></li>
+<li><p><strong>inplace</strong> (<em>bool</em>) – Whether to perform inplace optimization. Default value is
+<code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p><strong>conv_bn_folding</strong> (<em>bool</em>) – Whether to perform <code class="docutils literal notranslate"><span class="pre">conv_bn</span></code> folding. It only
+works for inference model. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly
+setting this knob overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>linear_bn_folding</strong> (<em>bool</em>) – Whether to perform <code class="docutils literal notranslate"><span class="pre">linear_bn</span></code> folding. It only
+works for inference model. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly
+setting this knob overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>weights_prepack</strong> (<em>bool</em>) – Whether to perform weight prepack for convolution
+and linear to avoid oneDNN weights reorder. The default value is
+<code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the configuration
+set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob. For now, XPU doesn’t support weights prepack.</p></li>
+<li><p><strong>replace_dropout_with_identity</strong> (<em>bool</em>) – Whether to replace <code class="docutils literal notranslate"><span class="pre">nn.Dropout</span></code>
+with <code class="docutils literal notranslate"><span class="pre">nn.Identity</span></code>. If replaced, the <code class="docutils literal notranslate"><span class="pre">aten::dropout</span></code> won’t be
+included in the JIT graph. This may provide more fusion opportunites
+on the graph. This only works for inference model. The default value
+is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the configuration
+set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>optimize_lstm</strong> (<em>bool</em>) – Whether to replace <code class="docutils literal notranslate"><span class="pre">nn.LSTM</span></code> with <code class="docutils literal notranslate"><span class="pre">IPEX</span> <span class="pre">LSTM</span></code>
+which takes advantage of oneDNN kernels to get better performance.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob
+overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>split_master_weight_for_bf16</strong> (<em>bool</em>) – Whether to split master weights
+update for BF16 training. This saves memory comparing to master
+weight update solution. Split master weights update methodology
+doesn’t support all optimizers. The default value is None. The
+default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites
+the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>fuse_update_step</strong> (<em>bool</em>) – Whether to use fused params update for training
+which have better performance. It doesn’t support all optimizers.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob
+overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>sample_input</strong> (<em>tuple</em><em> or </em><em>torch.Tensor</em>) – Whether to feed sample input data to ipex.optimize. The shape of
+input data will impact the block format of packed weight. If not feed a sample
+input, Intel® Extension for PyTorch* will pack the weight per some predefined heuristics.
+If feed a sample input with real input shape, Intel® Extension for PyTorch* can get
+best block format.</p></li>
+<li><p><strong>auto_kernel_selection</strong> (<em>bool</em>) – Different backends may have
+different performances with different dtypes/shapes. Default value
+is False. Intel® Extension for PyTorch* will try to optimize the
+kernel selection for better performance if this knob is set to
+<code class="docutils literal notranslate"><span class="pre">True</span></code>. You might get better performance at the cost of extra memory usage.
+The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly setting this knob overwrites the
+configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+<li><p><strong>graph_mode</strong> – (bool) [prototype]: It will automatically apply a combination of methods
+to generate graph or multiple subgraphs if True. The default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p><strong>concat_linear</strong> (<em>bool</em>) – Whether to perform <code class="docutils literal notranslate"><span class="pre">concat_linear</span></code>. It only
+works for inference model. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Explicitly
+setting this knob overwrites the configuration set by <code class="docutils literal notranslate"><span class="pre">level</span></code> knob.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Model and optimizer (if given) modified according to the <code class="docutils literal notranslate"><span class="pre">level</span></code> knob
+or other user settings. <code class="docutils literal notranslate"><span class="pre">conv+bn</span></code> folding may take place and
+<code class="docutils literal notranslate"><span class="pre">dropout</span></code> may be replaced by <code class="docutils literal notranslate"><span class="pre">identity</span></code>. In inference scenarios,
+convolutuon, linear and lstm will be replaced with the optimized
+counterparts in Intel® Extension for PyTorch* (weight prepack for
+convolution and linear) for good performance. In bfloat16 or float16 scenarios,
+parameters of convolution and linear will be casted to bfloat16 or float16 dtype.</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function BEFORE invoking DDP in distributed
+training scenario.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function deepcopys the original model. If DDP is invoked
+before <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function, DDP is applied on the origin model, rather
+than the one returned from <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function. In this case, some
+operators in DDP, like allreduce, will not be invoked and thus may cause
+unpredictable accuracy loss.</p>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running evaluation step.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 training case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="p">,</span> <span class="n">optimized_optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running training step.</span>
+</pre></div>
+</div>
+<p><cite>torch.xpu.optimize()</cite> is an alternative of optimize API in Intel® Extension for PyTorch*,
+to provide identical usage for XPU device only. The motivation of adding this alias is
+to unify the coding style in user scripts base on torch.xpu modular.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running evaluation step.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 training case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="p">,</span> <span class="n">optimized_optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running training step.</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<p><cite>ipex.llm.optimize</cite> is used for Large Language Models (LLM).</p>
+<dl class="py function" id="module-ipex.llm">
+<dt class="sig sig-object py" id="ipex.llm.optimize">
+<span class="sig-prename descclassname"><span class="pre">ipex.llm.</span></span><span class="sig-name descname"><span class="pre">optimize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quantization_config</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qconfig_summary_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">low_precision_checkpoint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_inputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deployment_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_weight_for_large_batch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.optimize" title="Link to this definition"></a></dt>
+<dd><p>Apply optimizations at Python frontend to the given transformers model (nn.Module).
+This API focus on transformers models, especially for generation tasks inference.</p>
+<p>Well supported model family with full functionalities:
+Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
+T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Whisper.</p>
+<p>For the model that is not in the scope of supported model family above, will try to
+apply default ipex.optimize transparently to get benifits (not include quantizations,
+only works for dtypes of torch.bfloat16 and torch.half and torch.float).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – User model to apply optimizations.</p></li>
+<li><p><strong>optimizer</strong> (<em>torch.optim.Optimizer</em>) – User optimizer to apply optimizations
+on, such as SGD. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, meaning inference case.</p></li>
+<li><p><strong>dtype</strong> (<em>torch.dtype</em>) – Now it works for <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>, <code class="docutils literal notranslate"><span class="pre">torch.half</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.float</span></code>.
+The default value is <code class="docutils literal notranslate"><span class="pre">torch.float</span></code>. When working with quantization, it means the mixed dtype with quantization.</p></li>
+<li><p><strong>inplace</strong> (<em>bool</em>) – Whether to perform inplace optimization. Default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p><strong>device</strong> (<em>str</em>) – Specifying the device on which the optimization will be performed.
+Can be either ‘cpu’ or ‘xpu’ (‘xpu’ is not applicable for cpu only packages). The default value is ‘cpu’.</p></li>
+<li><p><strong>quantization_config</strong> (<em>object</em>) – Defining the IPEX quantization recipe (Weight only quant or static quant).
+Default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Once used, meaning using IPEX quantizatization model for model.generate().</p></li>
+<li><p><strong>qconfig_summary_file</strong> (<em>str</em>) – Path to the IPEX static quantization config json file.
+Default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>. Work with quantization_config under static quantization use case.
+Need to do IPEX static quantization calibration and generate this file.</p></li>
+<li><p><strong>low_precision_checkpoint</strong> (<em>dict</em><em> or </em><em>tuple</em><em> of </em><em>dict</em>) – For weight only quantization with INT4 weights.
+If it’s a dict, it should be the state_dict of checkpoint (<cite>.pt</cite>) generated by GPTQ, etc.
+If a tuple is provided, it should be <cite>(checkpoint, checkpoint config)</cite>,
+where <cite>checkpoint</cite> is the state_dict and <cite>checkpoint config</cite> is dict specifying
+keys of weight/scale/zero point/bias in the state_dict.
+The default config is {‘weight_key’: ‘packed_weight’, ‘scale_key’: ‘scale’,
+‘zero_point_key’: ‘packed_zp’, bias_key: ‘bias’}. Change the values of the dict to make a custom config.
+Weights shape should be N by K and they are quantized to UINT4 and compressed along K, then stored as
+<cite>torch.int32</cite>. Zero points are also UINT4 and stored as INT32. Scales and bias are floating point values.
+Bias is optional. If bias is not in state dict, bias of the original model is used.
+Default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p><strong>sample_inputs</strong> (<em>Tuple tensors</em>) – sample inputs used for model quantization or torchscript.
+Default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, and for well supported model, we provide this sample inputs automaticlly.</p></li>
+<li><p><strong>deployment_mode</strong> (<em>bool</em>) – Whether to apply the optimized model for deployment of model generation.
+It means there is no need to further apply optimization like torchscirpt. Default value is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
+<li><p><strong>cache_weight_for_large_batch</strong> (<em>bool</em>) – Whether to cache the dedicated weight for large batch to speed up
+its inference (e.g., prefill phase) with extra memory usage. It is only valid for non-quantization cases
+where dtype = bfloat16 and weight-only quantization cases where lowp-mode=BF16/INT8. In other cases, an
+error will be raised. Default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optimized model object for model.generate(), also workable with model.forward</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> function AFTER invoking DeepSpeed in Tensor Parallel
+inference scenario.</p>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 generation inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="o">.</span><span class="n">generate</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.verbose">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">verbose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.verbose" title="Link to this definition"></a></dt>
+<dd><p>On-demand oneDNN verbosing functionality</p>
+<p>To make it easier to debug performance issues, oneDNN can dump verbose
+messages containing information like kernel size, input data size and
+execution duration while executing the kernel. The verbosing functionality
+can be invoked via an environment variable named <cite>DNNL_VERBOSE</cite>. However,
+this methodology dumps messages in all steps. Those are a large amount of
+verbose messages. Moreover, for investigating the performance issues,
+generally taking verbose messages for one single iteration is enough.</p>
+<p>This on-demand verbosing functionality makes it possible to control scope
+for verbose message dumping. In the following example, verbose messages
+will be dumped out for the second inference only.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">ipex</span><span class="o">.</span><span class="n">verbose</span><span class="p">(</span><span class="n">ipex</span><span class="o">.</span><span class="n">verbose</span><span class="o">.</span><span class="n">VERBOSE_ON</span><span class="p">):</span>
+    <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>level</strong> – <p>Verbose level</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">VERBOSE_OFF</span></code>: Disable verbosing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VERBOSE_ON</span></code>:  Enable verbosing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VERBOSE_ON_CREATION</span></code>: Enable verbosing, including oneDNN kernel creation</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="llm-module-level-optimizations-prototype">
+<h2>LLM Module Level Optimizations (Prototype)<a class="headerlink" href="#llm-module-level-optimizations-prototype" title="Link to this heading"></a></h2>
+<p>Module level optimization APIs are provided for optimizing customized LLMs.</p>
+<dl class="py class" id="module-ipex.llm.modules">
+<dt class="sig sig-object py" id="ipex.llm.modules.LinearSilu">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearSilu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearSilu" title="Link to this definition"></a></dt>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data, and then apply PyTorch SILU
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html</a>)
+on the result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">silu</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with silu.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape:</dt><dd><p>Input and output shapes are the same as torch.nn.Linear.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex_fusion</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">LinearSilu</span><span class="p">(</span><span class="n">linear_module</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># module forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">ipex_fusion</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.LinearSiluMul">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearSiluMul</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearSiluMul" title="Link to this definition"></a></dt>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data, then apply PyTorch SILU
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html</a>)
+on the result, and multiplies the result by <cite>other</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">silu</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span> <span class="o">*</span> <span class="n">other</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module to
+be fused with silu and mul.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape:</dt><dd><p>Input and output shapes are the same as torch.nn.Linear.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex_fusion</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">LinearSiluMul</span><span class="p">(</span><span class="n">linear_module</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># module forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">other</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">ipex_fusion</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.Linear2SiluMul">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">Linear2SiluMul</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear_s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linear_m</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.Linear2SiluMul" title="Link to this definition"></a></dt>
+<dd><p>Applies two linear transformation to the <cite>input</cite> data (<cite>linear_s</cite> and
+<cite>linear_m</cite>), then apply PyTorch SILU
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.silu.html</a>)
+on the result from <cite>linear_s</cite>, and multiplies the result from <cite>linear_m</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">silu</span><span class="p">(</span><span class="n">linear_s</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span> <span class="o">*</span> <span class="n">linear_m</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>linear_s</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with silu.</p></li>
+<li><p><strong>linear_m</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with mul.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape:</dt><dd><p>Input and output shapes are the same as torch.nn.Linear.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_s_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_m_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex_fusion</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">Linear2SiluMul</span><span class="p">(</span><span class="n">linear_s_module</span><span class="p">,</span> <span class="n">linear_m_module</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># module forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">ipex_fusion</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.LinearRelu">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearRelu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearRelu" title="Link to this definition"></a></dt>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data, and then apply PyTorch RELU
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.relu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.relu.html</a>)
+on the result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module
+to be fused with relu.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape:</dt><dd><p>Input and output shapes are the same as torch.nn.Linear.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex_fusion</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">LinearRelu</span><span class="p">(</span><span class="n">linear_module</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># module forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">ipex_fusion</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.LinearNewGelu">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearNewGelu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearNewGelu" title="Link to this definition"></a></dt>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data, and then apply NewGELUActivation
+(see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/activations.py#L50">https://github.com/huggingface/transformers/blob/main/src/transformers/activations.py#L50</a>)
+on the result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">NewGELUActivation</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module
+to be fused with new_gelu.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape:</dt><dd><p>Input and output shapes are the same as torch.nn.Linear.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex_fusion</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">LinearNewGelu</span><span class="p">(</span><span class="n">linear_module</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># module forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">ipex_fusion</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.LinearGelu">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearGelu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearGelu" title="Link to this definition"></a></dt>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data, and then apply PyTorch GELU
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.gelu.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.gelu.html</a>)
+on the result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">gelu</span><span class="p">(</span><span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with gelu.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape:</dt><dd><p>Input and output shapes are the same as torch.nn.Linear.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex_fusion</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">LinearGelu</span><span class="p">(</span><span class="n">linear_module</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># module forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">ipex_fusion</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.LinearMul">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearMul</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearMul" title="Link to this definition"></a></dt>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data, and then multiplies
+the result by <cite>other</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span> <span class="o">*</span> <span class="n">other</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear module
+to be fused with mul.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape:</dt><dd><p>Input and output shapes are the same as torch.nn.Linear.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex_fusion</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">LinearMul</span><span class="p">(</span><span class="n">linear_module</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># module forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">other</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">ipex_fusion</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.LinearAdd">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearAdd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearAdd" title="Link to this definition"></a></dt>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data,
+and then add the result by <cite>other</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span> <span class="o">+</span> <span class="n">other</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with add.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape:</dt><dd><p>Input and output shapes are the same as torch.nn.Linear.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex_fusion</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">LinearAdd</span><span class="p">(</span><span class="n">linear_module</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># module forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">other</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">ipex_fusion</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.LinearAddAdd">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">LinearAddAdd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">linear</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.LinearAddAdd" title="Link to this definition"></a></dt>
+<dd><p>Applies a linear transformation to the <cite>input</cite> data,
+and then add the result by <cite>other_1</cite> and <cite>other_2</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">linear</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span> <span class="o">+</span> <span class="n">other_1</span> <span class="o">+</span> <span class="n">other_2</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>linear</strong> (<em>torch.nn.Linear module</em>) – the original torch.nn.Linear
+module to be fused with add and add.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Shape:</dt><dd><p>Input and output shapes are the same as torch.nn.Linear.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex_fusion</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">LinearAddAdd</span><span class="p">(</span><span class="n">linear_module</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># module forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">other_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">other_2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">ipex_fusion</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">other_1</span><span class="p">,</span> <span class="n">other_2</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.RotaryEmbedding">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">RotaryEmbedding</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_position_embeddings</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos_embd_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backbone</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_rope_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.RotaryEmbedding" title="Link to this definition"></a></dt>
+<dd><p>[module init and forward] Applies RotaryEmbedding (see <a class="reference external" href="https://huggingface.co/papers/2104.09864">https://huggingface.co/papers/2104.09864</a>)
+on the <code class="docutils literal notranslate"><span class="pre">query</span></code> or <code class="docutils literal notranslate"><span class="pre">key</span></code> before their multi-head attention computation.</p>
+<p><cite>module init</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>max_position_embeddings</strong> (<em>int</em>) – size (max) of the position embeddings.</p></li>
+<li><p><strong>pos_embd_dim</strong> (<em>int</em>) – dimension of the position embeddings.</p></li>
+<li><p><strong>base</strong> (<em>int</em>) – Default: 10000. Base to generate the frequency of position embeddings.</p></li>
+<li><p><strong>backbone</strong> (<em>str</em>) – Default: None. The exact transformers model backbone
+(e.g., “GPTJForCausalLM”, get from model.config.architectures[0],
+see <a class="reference external" href="https://huggingface.co/EleutherAI/gpt-j-6b/blob/main/config.json#L4">https://huggingface.co/EleutherAI/gpt-j-6b/blob/main/config.json#L4</a>).</p></li>
+<li><p><strong>extra_rope_config</strong> (<em>dict</em>) – like phi-3 model, it uses original_max_position_embeddings,
+long_factor and short_factor, see details:
+<a class="reference external" href="https://huggingface.co/microsoft/Phi-3-mini-128k-instruct/blob/main/config.json#L23">https://huggingface.co/microsoft/Phi-3-mini-128k-instruct/blob/main/config.json#L23</a>.</p></li>
+</ul>
+</dd>
+</dl>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input</strong> (<em>torch.Tensor</em>) – input to be applied with position embeddings,
+taking shape of [batch size, sequence length, num_head/num_kv_head, head_dim]
+(as well as the output shape).</p></li>
+<li><p><strong>position_ids</strong> (<em>torch.Tensor</em>) – the according position_ids for the input.
+The shape should be [batch size, sequence length. In some cases,
+there is only one element which the past_kv_length, and position id
+can be constructed by past_kv_length + current_position.</p></li>
+<li><p><strong>num_head</strong> (<em>int</em>) – head num from the input shape.</p></li>
+<li><p><strong>head_dim</strong> (<em>int</em>) – head dim from the input shape.</p></li>
+<li><p><strong>offset</strong> (<em>int</em>) – the offset value. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,
+so the offset is 1. For llama, cos/sin is applied to the neighboring rotary_dim elements,
+so the offset is rotary_dim/2.</p></li>
+<li><p><strong>rotary_ndims</strong> (<em>int</em>) – the rotary dimension. e.g., 64 for GPTJ. head size for LLama.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rope_module</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">RotaryEmbedding</span><span class="p">(</span><span class="mi">2048</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">backbone</span><span class="o">=</span><span class="s2">&quot;GPTJForCausalLM&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">query</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">256</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">position_ids</span>  <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">query_rotery</span> <span class="o">=</span> <span class="n">rope_module</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">position_ids</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">256</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite> function call
+to be used on query and key at the same time without initializing the module
+(assume rotary embedding sin/cos values are provided).</p>
+<p><cite>apply_function()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – inputs to be applied with position embeddings, taking shape of
+[batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – inputs to be applied with position embeddings, taking shape of
+[batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p></li>
+<li><p><strong>sin/cos</strong> (<em>torch.Tensor</em>) – [num_tokens, rotary_dim] the sin/cos value tensor generated to be applied on query/key.</p></li>
+<li><p><strong>rotary_ndims</strong> (<em>int</em>) – the rotary dimension. e.g., 64 for GPTJ. head size for LLama.</p></li>
+<li><p><strong>head_dim</strong> (<em>int</em>) – head dim from the input shape.</p></li>
+<li><p><strong>rotary_half</strong> (<em>bool</em>) – if False. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,
+so the offset is 1.
+if True, e.g., for llama, cos/sin is applied to the neighboring rotary_dim elements,
+so the offset is rotary_dim/2.</p></li>
+<li><p><strong>position_ids</strong> (<em>torch.Tensor</em>) – Default is None and optional if sin/cos is provided. the according position_ids
+for the input. The shape should be [batch size, sequence length].</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>[batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim].</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>query, key (torch.Tensor)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.RMSNorm">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">RMSNorm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hidden_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.RMSNorm" title="Link to this definition"></a></dt>
+<dd><p>[module init and forward] Applies RMSnorm on the input (hidden states).
+(see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76</a>)</p>
+<p><cite>module init</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_size</strong> (<em>int</em>) – the size of the hidden states.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – the variance_epsilon to apply RMSnorm, default using 1e-6.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply RMSnorm, default None
+and will use <cite>torch.ones(hidden_size)</cite>.</p></li>
+</ul>
+</dd>
+</dl>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – input to be applied RMSnorm, usually taking shape of
+[batch size, sequence length, hidden_size] (as well as the output shape).</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rmsnorm_module</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">RMSNorm</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">rmsnorm_module</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite> function
+call to apply RMSNorm without initializing the module.</p>
+<p><cite>apply_function()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – the input tensor to apply RMSNorm.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply RMSnorm.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – the variance_epsilon to apply RMSnorm.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.FastLayerNorm">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">FastLayerNorm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">normalized_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.FastLayerNorm" title="Link to this definition"></a></dt>
+<dd><p>[module init and forward] Applies PyTorch Layernorm (see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html">https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html</a>)
+on the input (hidden states).</p>
+<p><cite>module init</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>normalized_shape</strong> (<em>(</em><em>int</em><em> or </em><em>list</em><em>) or </em><em>torch.Size</em>)</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – a value added to the denominator for numerical stability.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight of Layernorm to apply normalization.</p></li>
+<li><p><strong>bias</strong> (<em>torch.Tensor</em>) – an additive bias for normalization.</p></li>
+</ul>
+</dd>
+</dl>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – input to be applied Layernorm, usually taking shape of
+[batch size, sequence length, hidden_size] (as well as the output shape).</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">layernorm</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">layernorm_module</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">FastLayerNorm</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-05</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="n">layernorm</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">layernorm</span><span class="o">.</span><span class="n">bias</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">layernorm_module</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite> function call to apply fast layernorm
+without initializing the module.</p>
+<p><cite>apply_function()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – the input tensor to apply normalization.</p></li>
+<li><p><strong>normalized_shape</strong> (<em>int</em><em> or </em><em>list</em><em>) or </em><em>torch.Size</em>)</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply normalization.</p></li>
+<li><p><strong>bias</strong> (<em>torch.Tensor</em>) – an additive bias for normalization.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – a value added to the denominator for numerical stability.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.IndirectAccessKVCacheAttention">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">IndirectAccessKVCacheAttention</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text_max_length</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2048</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.modules.IndirectAccessKVCacheAttention" title="Link to this definition"></a></dt>
+<dd><p>kv_cache is used to reduce computation for <strong>Decoder</strong> layer but it also brings memory overheads,
+for example, when using beam search, the kv_cache should be reordered according to the latest beam
+idx and the current key/value should also be concat with kv_cache in the attention layer to get entire
+context to do scale dot product. When the sequence is very long, the memory overhead will be the
+performance bottleneck. This module provides an Indirect Access KV_cache(IAKV), Firstly, IAKV pre-allocates
+buffers(key and value use different buffers) to store all key/value hidden states and beam index information.
+It can use beam index history to decide which beam should be used by a timestamp and this information will
+generate an offset to access the kv_cache buffer.</p>
+<p>Data Format:</p>
+<p>The shape of the pre-allocated key(value) buffer is [max_seq, beam*batch, head_num, head_size],
+the hidden state of key/value which is the shape of [beam*batch, head_num, head_size] is stored token by token.
+All beam idx information of every timestamp is also stored in a Tensor with the shape of [max_seq, beam*batch].</p>
+<p><cite>module init</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>text_max_length</strong> (<em>int</em>) – the max length of kv cache to be used
+for generation (allocate the pre-cache buffer).</p>
+</dd>
+</dl>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – Query tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – Key tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – Value tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>scale_attn</strong> (<em>float</em>) – scale used by the attention layer. should be <code class="docutils literal notranslate"><span class="pre">sqrt(head_size)</span></code>.</p></li>
+<li><p><strong>layer_past</strong> (<em>tuple</em><em>(</em><em>torch.Tensor</em><em>)</em>) – <p>tuple(seq_info, key_cache, value_cache, beam-idx).</p>
+<ul>
+<li><p>key_cache: key cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);</p></li>
+<li><p>value_cache: value cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);</p></li>
+<li><p>beam-idx:  history beam idx, shape:(max_seq, beam*batch);</p></li>
+<li><p>seq_info: Sequence info tensor, shape:(1, 1, max_seq, max_seq).</p></li>
+</ul>
+</p></li>
+<li><p><strong>head_mask</strong> (<em>torch.Tensor</em>) – Head mask tensor which is not supported by kernel yet.</p></li>
+<li><p><strong>attention_mask</strong> (<em>torch.Tensor</em>) – Attention mask information.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>Weighted value which is the output of scale dot product.
+shape (beam*batch, seq_len, head_num, head_size).</p>
+<p>attn_weights: The output tensor of the first matmul in scale dot product
+which is not supported by kernel now.</p>
+<p>new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).</p>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>attn_output</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>How to reorder KV cache when using the format of IndirectAccessKVCacheAttention (e.g., on llama model
+see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318</a>)</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">_reorder_cache</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">past_key_values</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]],</span> <span class="n">beam_idx</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">past_key_values</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">past_key_values</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+    <span class="p">):</span>
+        <span class="k">for</span> <span class="n">layer_past</span> <span class="ow">in</span> <span class="n">past_key_values</span><span class="p">:</span>
+            <span class="n">layer_past</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="n">layer_past</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">beam_idx</span>
+        <span class="k">return</span> <span class="n">past_key_values</span>
+</pre></div>
+</div>
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite> function call
+to apply IndirectAccessKVCacheAttention without initializing the module.</p>
+<p>The parameters of <cite>apply_function()</cite> are the same as the <cite>forward()</cite> call.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.PagedAttention">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">PagedAttention</span></span><a class="headerlink" href="#ipex.llm.modules.PagedAttention" title="Link to this definition"></a></dt>
+<dd><p>This module follows the API of two class methods as [vLLM](<a class="reference external" href="https://blog.vllm.ai/2023/06/20/vllm.html">https://blog.vllm.ai/2023/06/20/vllm.html</a>)
+to enable the paged attention kernel in and use the layout of (num_blocks, self.block_size, num_heads, head_size)
+for key/value cache. The basic logic as following figure. Firstly, The DRAM buffer which includes num_blocks
+are pre-allocated to store key or value cache. For every block, block_size tokens can be stored. In the forward
+pass, the cache manager will firstly allocate some slots from this buffer and use reshape_and_cache API to store
+the key/value and then use single_query_cached_kv_attention API to do the scale-dot-product of MHA.
+The block is basic allocation unit of paged attention and the token intra-block are stored one-by-one.
+The block tables are used to map the logical block of sequence into the physical block.</p>
+<p>[class method]: reshape_and_cache
+ipex.llm.modules.PagedAttention.reshape_and_cache(key, value, key_cache, value_cache, slot_mapping)
+This operator is used to store the key/value token states into the pre-allcated kv_cache buffers of paged attention.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – The keytensor. The shape should be [num_seqs, num_heads, head_size].</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – The value tensor. The shape should be [num_seqs, num_heads, head_size].</p></li>
+<li><p><strong>key_cache</strong> (<em>torch.Tensor</em>) – The pre-allocated buffer to store the key cache.
+The shape should be [num_blocks, block_size, num_heads, head_size].</p></li>
+<li><p><strong>value_cache</strong> (<em>torch.Tensor</em>) – The pre-allocated buffer to store the value cache.
+The shape should be [num_blocks, block_size, num_heads, head_size].</p></li>
+<li><p><strong>slot_mapping</strong> (<em>torch.Tensor</em>) – It stores the position to store the key/value in the pre-allocated buffers.
+The shape should be the number of sequences. For sequence <code class="docutils literal notranslate"><span class="pre">i</span></code>, the <code class="docutils literal notranslate"><span class="pre">slot_mapping[i]</span> <span class="pre">//</span> <span class="pre">block_number</span></code>
+can get the block index, and the <code class="docutils literal notranslate"><span class="pre">slot_mapping</span> <span class="pre">%</span> <span class="pre">block_size</span></code> can get the offset of this block.</p></li>
+</ul>
+</dd>
+</dl>
+<p>[class method]: single_query_cached_kv_attention</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">PagedAttention</span><span class="o">.</span><span class="n">single_query_cached_kv_attention</span><span class="p">(</span>
+                                                    <span class="n">out</span><span class="p">,</span>
+                                                    <span class="n">query</span><span class="p">,</span>
+                                                    <span class="n">key_cache</span><span class="p">,</span>
+                                                    <span class="n">value_cache</span><span class="p">,</span>
+                                                    <span class="n">head_mapping</span><span class="p">,</span>
+                                                    <span class="n">scale</span><span class="p">,</span>
+                                                    <span class="n">block_tables</span><span class="p">,</span>
+                                                    <span class="n">context_lens</span><span class="p">,</span>
+                                                    <span class="n">block_size</span><span class="p">,</span>
+                                                    <span class="n">max_context_len</span><span class="p">,</span>
+                                                    <span class="n">alibi_slopes</span>
+                                                    <span class="p">)</span>
+</pre></div>
+</div>
+<p>This operator is used to be calculated the scale-dot-product based on the paged attention.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>out</strong> (<em>torch.Tensor</em>) – The output tensor with shape of [num_seqs, num_heads, head_size],
+where the num_seqs is the number of the sequence in this batch. The num_heads
+means the number of query head. head_size means the head dimension.</p></li>
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – The query tensor. The shape should be [num_seqs, num_heads, head_size].</p></li>
+<li><p><strong>key_cache</strong> (<em>torch.Tensor</em>) – The pre-allocated buffer to store the key cache.
+The shape should be [num_blocks,  block_size, num_heads, head_size].</p></li>
+<li><p><strong>value_cache</strong> (<em>torch.Tensor</em>) – The pre-allocated buffer to store the value cache.
+The shape should be [num_blocks,  block_size, num_heads, head_size].</p></li>
+<li><p><strong>head_mapping</strong> (<em>torch.Tensor</em>) – The mapping from the query head to the kv head.
+The shape should be the number of query heads.</p></li>
+<li><p><strong>scale</strong> (<em>float</em>) – The scale used by the scale-dot-product.
+In general, it is: <code class="docutils literal notranslate"><span class="pre">float(1.0</span> <span class="pre">/</span> <span class="pre">(head_size</span> <span class="pre">**</span> <span class="pre">0.5))</span></code>.</p></li>
+<li><p><strong>block_tables</strong> – (torch.Tensor): The mapping table used to mapping the logical sequence
+to the physical sequence. The shape should be [num_seqs, max_num_blocks_per_seq].</p></li>
+<li><p><strong>context_lens</strong> (<em>torch.Tensor</em>) – The sequence length for every sequence. The size is [num_seqs].</p></li>
+<li><p><strong>block_size</strong> (<em>int</em>) – The block size which means the number of token in every block.</p></li>
+<li><p><strong>max_context_len</strong> (<em>int</em>) – The max sequence length.</p></li>
+<li><p><strong>alibi_slopes</strong> (<em>torch.Tensor</em><em>, </em><em>optinal</em>) – which is the alibi slope with the shape of (num_heads).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.llm.modules.VarlenAttention">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.llm.modules.</span></span><span class="sig-name descname"><span class="pre">VarlenAttention</span></span><a class="headerlink" href="#ipex.llm.modules.VarlenAttention" title="Link to this definition"></a></dt>
+<dd><p>[module init and forward] Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html</a>),
+and accept the variant (different) sequence length among the query, key and value.</p>
+<p>This module does not have args for <cite>module init</cite>.</p>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – shape [query_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – shape [key_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – shape [value_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>out</strong> (<em>torch.Tensor</em>) – buffer to get the results, the shape is the same as query.</p></li>
+<li><p><strong>seqlen_q</strong> (<em>torch.Tensor</em>) – shape [batch_size + 1], points the
+current query_tokens among total sequence length.</p></li>
+<li><p><strong>seqlen_k</strong> (<em>torch.Tensor</em>) – shape [batch_size + 1], points the
+current key_tokens among total sequence length.</p></li>
+<li><p><strong>max_seqlen_q</strong> (<em>int</em>) – max/total sequence length of query.</p></li>
+<li><p><strong>max_seqlen_k</strong> (<em>int</em>) – max/total sequence length of key.</p></li>
+<li><p><strong>pdropout</strong> (<em>float</em>) – dropout probability; if greater than 0.0,
+dropout is applied, default is 0.0.</p></li>
+<li><p><strong>softmax_scale</strong> (<em>float</em>) – scaling factor applied is prior to softmax.</p></li>
+<li><p><strong>is_causal</strong> (<em>bool</em>) – whether to apply causal attention masking, default is True.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># module init:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">varlenAttention_module</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">VarlenAttention</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># forward:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">query</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">256</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">key</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">256</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">value</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">256</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">out</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">emply_like</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">seqlen_q</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">seqlen_k</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">max_seqlen_q</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">max_seqlen_k</span>  <span class="o">=</span> <span class="mi">1</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pdropout</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">softmax_scale</span>  <span class="o">=</span> <span class="mf">0.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">varlenAttention_module</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">seqlen_q</span><span class="p">,</span> <span class="n">seqlen_k</span><span class="p">,</span> <span class="n">max_seqlen_q</span><span class="p">,</span> <span class="n">max_seqlen_k</span><span class="p">,</span> <span class="n">pdropout</span><span class="p">,</span> <span class="n">softmax_scale</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>[Direct function call] This module also provides a <cite>.apply_function</cite>
+function call to apply VarlenAttention without initializing the module.</p>
+<p>The parameters of <cite>apply_function()</cite> are the same as the <cite>forward()</cite> call.</p>
+</dd></dl>
+
+<dl class="py function" id="module-ipex.llm.functional">
+<dt class="sig sig-object py" id="ipex.llm.functional.rotary_embedding">
+<span class="sig-prename descclassname"><span class="pre">ipex.llm.functional.</span></span><span class="sig-name descname"><span class="pre">rotary_embedding</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cos</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotary_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotary_half</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position_ids</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.functional.rotary_embedding" title="Link to this definition"></a></dt>
+<dd><p>Applies RotaryEmbedding (see <a class="reference external" href="https://huggingface.co/papers/2104.09864">https://huggingface.co/papers/2104.09864</a>)
+on the <cite>query ` or `key</cite> before their multi-head attention computation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – inputs to be applied with position embeddings,
+taking shape of [batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – inputs to be applied with position embeddings,
+taking shape of [batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim] (as well as the output shape).</p></li>
+<li><p><strong>sin/cos</strong> (<em>torch.Tensor</em>) – [num_tokens, rotary_dim] the sin/cos value tensor
+generated to be applied on query/key.</p></li>
+<li><p><strong>rotary_ndims</strong> (<em>int</em>) – the rotary dimension. e.g., 64 for GPTJ. head size for LLama.</p></li>
+<li><p><strong>head_dim</strong> (<em>int</em>) – head dim from the input shape.</p></li>
+<li><p><strong>rotary_half</strong> (<em>bool</em>) – <p>if False. e.g., GPT-J 6B/ChatGLM, cos/sin is applied to the neighboring 2 elements,
+so the offset is 1.</p>
+<p>if True, e.g., for llama, cos/sin is applied to the neighboring rotary_dim elements,
+so the offset is rotary_dim/2.</p>
+</p></li>
+<li><p><strong>position_ids</strong> (<em>torch.Tensor</em>) – Default is None and optional if sin/cos is provided.
+The according position_ids for the input. The shape should be [batch size, sequence length].</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Return</dt><dd><p>query, key (torch.Tensor): [batch size, sequence length, num_head/num_kv_head, head_dim]
+or [num_tokens, num_head/num_kv_head, head_dim].</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.llm.functional.rms_norm">
+<span class="sig-prename descclassname"><span class="pre">ipex.llm.functional.</span></span><span class="sig-name descname"><span class="pre">rms_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hidden_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.functional.rms_norm" title="Link to this definition"></a></dt>
+<dd><p>Applies RMSnorm on the input (hidden states).
+(see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L76</a>)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – the input tensor to apply RMSNorm.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply RMSnorm.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – the variance_epsilon to apply RMSnorm.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.llm.functional.fast_layer_norm">
+<span class="sig-prename descclassname"><span class="pre">ipex.llm.functional.</span></span><span class="sig-name descname"><span class="pre">fast_layer_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hidden_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalized_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bias</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.functional.fast_layer_norm" title="Link to this definition"></a></dt>
+<dd><p>Applies PyTorch Layernorm (see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html">https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html</a>)
+on the input (hidden states).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hidden_states</strong> (<em>torch.Tensor</em>) – the input tensor to apply normalization.</p></li>
+<li><p><strong>normalized_shape</strong> (<em>int</em><em> or </em><em>list</em><em>) or </em><em>torch.Size</em>) – expected input of size.</p></li>
+<li><p><strong>weight</strong> (<em>torch.Tensor</em>) – the weight to apply normalization.</p></li>
+<li><p><strong>bias</strong> (<em>torch.Tensor</em>) – an additive bias for normalization.</p></li>
+<li><p><strong>eps</strong> (<em>float</em>) – a value added to the denominator for numerical stability.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.llm.functional.indirect_access_kv_cache_attention">
+<span class="sig-prename descclassname"><span class="pre">ipex.llm.functional.</span></span><span class="sig-name descname"><span class="pre">indirect_access_kv_cache_attention</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_attn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layer_past</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">head_mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alibi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_casual_mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seq_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">text_max_length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.functional.indirect_access_kv_cache_attention" title="Link to this definition"></a></dt>
+<dd><p>kv_cache is used to reduce computation for <strong>Decoder</strong> layer but it also brings memory overheads,
+for example, when using beam search, the kv_cache should be reordered according to the latest beam
+idx and the current key/value should also be concat with kv_cache in the attention layer to get entire
+context to do scale dot product. When the sequence is very long, the memory overhead will be the
+performance bottleneck. This module provides an Indirect Access KV_cache(IAKV), Firstly, IAKV pre-allocates
+buffers(key and value use different buffers) to store all key/value hidden states and beam index information.
+It can use beam index history to decide which beam should be used by a timestamp and this information will
+generate an offset to access the kv_cache buffer.</p>
+<p>Data Format:</p>
+<p>The shape of the pre-allocated key(value) buffer is [max_seq, beam*batch, head_num, head_size],
+the hidden state of key/value which is the shape of [beam*batch, head_num, head_size] is stored token by token.
+All beam idx information of every timestamp is also stored in a Tensor with the shape of [max_seq, beam*batch].</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – Query tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – Key tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – Value tensor; shape: (beam*batch, seq_len, head_num, head_dim).</p></li>
+<li><p><strong>scale_attn</strong> (<em>float</em>) – scale used by the attention layer. should be the  sqrt(head_size).</p></li>
+<li><p><strong>layer_past</strong> (<em>tuple</em><em>(</em><em>torch.Tensor</em><em>)</em>) – <p>tuple(seq_info, key_cache, value_cache, beam-idx).</p>
+<ul>
+<li><p>key_cache: key cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);</p></li>
+<li><p>value_cache: value cache tensor, shape: (max_seq, beam*batch,  head_num, head_dim);</p></li>
+<li><p>beam-idx:  history beam idx, shape:(max_seq, beam*batch);</p></li>
+<li><p>seq_info: Sequence info tensor, shape:(1, 1, max_seq, max_seq).</p></li>
+</ul>
+</p></li>
+<li><p><strong>head_mask</strong> (<em>torch.Tensor</em>) – Head mask tensor which is not supported by kernel yet.</p></li>
+<li><p><strong>attention_mask</strong> (<em>torch.Tensor</em>) – Attention mask information.</p></li>
+<li><p><strong>text_max_length</strong> (<em>int</em>) – the max length of kv cache to be used for generation
+(allocate the pre-cache buffer).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>weighted value which is the output of scale dot product.
+shape (beam*batch, seq_len, head_num, head_size).</p>
+<p>attn_weights: the output tensor of the first matmul in scale dot product
+which is not supported by kernel now.</p>
+<p>new_layer_past: updated layer_past (seq_info, key_cache, value_cache, beam-idx).</p>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>attn_output</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>How to reorder KV cache when using the format of IndirectAccessKVCacheAttention (e.g., on llama model
+see <a class="reference external" href="https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318">https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L1318</a>)</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">_reorder_cache</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">past_key_values</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]],</span> <span class="n">beam_idx</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">past_key_values</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">past_key_values</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+    <span class="p">):</span>
+        <span class="k">for</span> <span class="n">layer_past</span> <span class="ow">in</span> <span class="n">past_key_values</span><span class="p">:</span>
+            <span class="n">layer_past</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="n">layer_past</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">beam_idx</span>
+        <span class="k">return</span> <span class="n">past_key_values</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.llm.functional.varlen_attention">
+<span class="sig-prename descclassname"><span class="pre">ipex.llm.functional.</span></span><span class="sig-name descname"><span class="pre">varlen_attention</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seqlen_q</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seqlen_k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_seqlen_q</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_seqlen_k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pdropout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">softmax_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_tensors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_causal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_softmax</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gen_</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Generator</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.llm.functional.varlen_attention" title="Link to this definition"></a></dt>
+<dd><p>Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value
+(see <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html">https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html</a>),
+and accept the variant (different) sequence length among the query, key and value.</p>
+<p>This module does not have args for <cite>module init</cite>.</p>
+<p><cite>forward()</cite></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>query</strong> (<em>torch.Tensor</em>) – shape [query_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>key</strong> (<em>torch.Tensor</em>) – shape [key_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>value</strong> (<em>torch.Tensor</em>) – shape [value_tokens, num_head, head_size],
+where tokens is total sequence length among batch size.</p></li>
+<li><p><strong>out</strong> (<em>torch.Tensor</em>) – buffer to get the results, the shape is the same as query.</p></li>
+<li><p><strong>seqlen_q</strong> (<em>torch.Tensor</em>) – shape [batch_size + 1],
+points the current query_tokens among total sequence length.</p></li>
+<li><p><strong>seqlen_k</strong> (<em>torch.Tensor</em>) – shape [batch_size + 1],
+points the current key_tokens among total sequence length.</p></li>
+<li><p><strong>max_seqlen_q</strong> (<em>int</em>) – max/total sequence length of query.</p></li>
+<li><p><strong>max_seqlen_k</strong> (<em>int</em>) – max/total sequence length of key.</p></li>
+<li><p><strong>pdropout</strong> (<em>float</em>) – dropout probability; if greater than 0.0, dropout is applied, default is 0.0.</p></li>
+<li><p><strong>softmax_scale</strong> (<em>float</em>) – scaling factor applied is prior to softmax.</p></li>
+<li><p><strong>is_causal</strong> (<em>bool</em>) – whether to apply causal attention masking, default is True.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="fast-bert-prototype">
+<h2>Fast Bert (Prototype)<a class="headerlink" href="#fast-bert-prototype" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.fast_bert">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">fast_bert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unpad</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.fast_bert" title="Link to this definition"></a></dt>
+<dd><p>Use TPP to speedup training/inference. fast_bert API is still a prototype
+feature and now only optimized for bert model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – User model to apply optimizations on.</p></li>
+<li><p><strong>dtype</strong> (<em>torch.dtype</em>) – Only works for <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.float</span></code> .
+The default value is torch.float.</p></li>
+<li><p><strong>optimizer</strong> (<em>torch.optim.Optimizer</em>) – User optimizer to apply optimizations
+on, such as SGD. The default value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, meaning inference case.</p></li>
+<li><p><strong>unpad</strong> (<em>bool</em>) – Unpad the squence to reduce the sparsity.</p></li>
+<li><p><strong>seed</strong> (<em>string</em>) – The seed used for the libxsmm kernel. In general it should be same
+to the torch.seed</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently <code class="docutils literal notranslate"><span class="pre">ipex.fast_bert</span></code> API is well optimized for training tasks.
+It works for inference tasks, though, please use the <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code>
+API with TorchScript to achieve the peak performance.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">fast_bert</span></code> function AFTER loading weights to model via
+<code class="docutils literal notranslate"><span class="pre">model.load_state_dict(torch.load(PATH))</span></code>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This API can’t be used when you have applied the <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize</span></code> function BEFORE invoking DDP in distributed
+training scenario.</p>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 inference case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">fast_bert</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running evaluation step.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># bfloat16 training case.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="o">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="p">,</span> <span class="n">optimized_optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">fast_bert</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
+<span class="go">        optimizer=optimizer, unpad=True, seed=args.seed)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># running training step.</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="graph-optimization">
+<h2>Graph Optimization<a class="headerlink" href="#graph-optimization" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.enable_onednn_fusion">
+<span class="sig-prename descclassname"><span class="pre">ipex.</span></span><span class="sig-name descname"><span class="pre">enable_onednn_fusion</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">enabled</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.enable_onednn_fusion" title="Link to this definition"></a></dt>
+<dd><p>Enables or disables oneDNN fusion functionality. If enabled, oneDNN
+operators will be fused in runtime, when intel_extension_for_pytorch
+is imported.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>enabled</strong> (<em>bool</em>) – Whether to enable oneDNN fusion functionality or not.
+Default value is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to enable the oneDNN fusion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex</span><span class="o">.</span><span class="n">enable_onednn_fusion</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># to disable the oneDNN fusion</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ipex</span><span class="o">.</span><span class="n">enable_onednn_fusion</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="module-ipex.quantization">
+<span id="quantization"></span><h2>Quantization<a class="headerlink" href="#module-ipex.quantization" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.quantization.get_smooth_quant_qconfig_mapping">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">get_smooth_quant_qconfig_mapping</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">act_observer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">act_ic_observer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wei_observer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wei_ic_observer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">share_weight_observers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.get_smooth_quant_qconfig_mapping" title="Link to this definition"></a></dt>
+<dd><p>Configuration with SmoothQuant for static quantization of large language models (LLM)
+For SmoothQuant, see <a class="reference external" href="https://arxiv.org/pdf/2211.10438.pdf">https://arxiv.org/pdf/2211.10438.pdf</a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>alpha</strong> – Hyper-parameter for SmoothQuant.</p></li>
+<li><p><strong>act_observer</strong> – Observer for activation of ops other than nn.Linear.
+HistogramObserver by default. For nn.Linear with SmoothQuant
+enabled, q-param is calculated based on act_ic_observer’s and
+wei_ic_observer’s min/max. It is not affected by this argument.
+Example: <code class="docutils literal notranslate"><span class="pre">torch.ao.quantization.MinMaxObserver</span></code></p></li>
+<li><p><strong>act_ic_observer</strong> – Per-input-channel Observer for activation.
+For nn.Linear with SmoothQuant enabled only.
+PerChannelMinMaxObserver by default.
+Example: <code class="docutils literal notranslate"><span class="pre">torch.ao.quantization.PerChannelMinMaxObserver.with_args(ch_axis=1)</span></code></p></li>
+<li><p><strong>wei_observer</strong> – Observer for weight of all weighted ops.
+For nn.Linear with SmoothQuant enabled, it calculates q-params
+after applying scaling factors. PerChannelMinMaxObserver by
+default.
+Example: <code class="docutils literal notranslate"><span class="pre">torch.ao.quantization.PerChannelMinMaxObserver.with_args(dtype=torch.qint8,</span> <span class="pre">qscheme=torch.per_channel_symmetric)</span></code></p></li>
+<li><p><strong>wei_ic_observer</strong> – Per-input-channel Observer for weight.
+For nn.Linear with SmoothQuant enabled only.
+PerChannelMinMaxObserver by default.
+Example: <code class="docutils literal notranslate"><span class="pre">torch.ao.quantization.PerChannelMinMaxObserver.with_args(ch_axis=1)</span></code></p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>torch.ao.quantization.QConfig</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.quantization.get_weight_only_quant_qconfig_mapping">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">get_weight_only_quant_qconfig_mapping</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqWeightDtype.INT8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lowp_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqLowpMode.NONE</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">act_quant_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">WoqActQuantMode.PER_IC_BLOCK</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.get_weight_only_quant_qconfig_mapping" title="Link to this definition"></a></dt>
+<dd><p>Configuration for weight-only quantization (WOQ) for LLM.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>weight_dtype</strong> – Data type for weight, WoqWeightDtype.INT8/INT4/NF4, etc.</p></li>
+<li><p><strong>lowp_mode</strong> – <p>specify the lowest precision data type for computation. Data types
+that has even lower precision won’t be used.
+Not necessarily related to activation or weight dtype.</p>
+<ul>
+<li><p>NONE(0): Use the activation data type for computation.</p></li>
+<li><p>FP16(1): Use float16 (a.k.a. half) as the lowest precision for computation.</p></li>
+<li><p>BF16(2): Use bfloat16 as the lowest precision for computation.</p></li>
+<li><p>INT8(3): Use INT8 as the lowest precision for computation.
+Activation is quantized to int8 at runtime in this case.</p></li>
+</ul>
+<p>Note that lowp_mode=INT8(3) is only available when weight_dtype=INT4.
+In other cases, it will fall back to lowp_mode=BF16(2).</p>
+</p></li>
+<li><p><strong>act_quant_mode</strong> – <p>Quantization granularity of activation. It only works for lowp_mode=INT8.
+It has no effect in other cases. The tensor is divided into groups, and
+each group is quantized with its own quantization parameters.
+Suppose the activation has shape batch_size by input_channel (IC).</p>
+<ul>
+<li><p>PER_TENSOR(0): Use the same quantization parameters for the entire tensor.</p></li>
+<li><p>PER_IC_BLOCK(1): Tensor is divided along IC with group size = IC_BLOCK.</p></li>
+<li><p>PER_BATCH(2): Tensor is divided along batch_size with group size = 1.</p></li>
+<li><p>PER_BATCH_IC_BLOCK(3): Tenosr is divided into blocks of 1 x IC_BLOCK.</p></li>
+</ul>
+<p>Note that IC_BLOCK is determined by group_size automatically.</p>
+</p></li>
+<li><p><strong>group_size</strong> – <p>Control quantization granularity along input channel (IC) dimension of weight.
+Must be a positive power of 2 (i.e., 2^k, k &gt; 0) or -1.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">If</span> <span class="n">group_size</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+    <span class="n">If</span> <span class="n">act_quant_mode</span> <span class="o">=</span> <span class="n">PER_TENSOR</span> <span class="n">ro</span> <span class="n">PER_BATCH</span><span class="p">:</span>
+        <span class="n">No</span> <span class="n">grouping</span> <span class="n">along</span> <span class="n">IC</span> <span class="k">for</span> <span class="n">both</span> <span class="n">activation</span> <span class="ow">and</span> <span class="n">weight</span>
+    <span class="n">If</span> <span class="n">act_quant_mode</span> <span class="o">=</span> <span class="n">PER_IC_BLOCK</span> <span class="ow">or</span> <span class="n">PER_BATCH_IC_BLOCK</span><span class="p">:</span>
+        <span class="n">No</span> <span class="n">grouping</span> <span class="n">along</span> <span class="n">IC</span> <span class="k">for</span> <span class="n">weight</span><span class="o">.</span> <span class="n">For</span> <span class="n">activation</span><span class="p">,</span>
+        <span class="n">IC_BLOCK</span> <span class="ow">is</span> <span class="n">determined</span> <span class="n">automatically</span> <span class="n">by</span> <span class="n">IC</span><span class="o">.</span>
+<span class="n">If</span> <span class="n">group_size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="n">act_quant_mode</span> <span class="n">can</span> <span class="n">be</span> <span class="nb">any</span><span class="o">.</span> <span class="n">If</span> <span class="n">act_quant_mode</span> <span class="ow">is</span> <span class="n">PER_IC_BLOCK</span>
+    <span class="ow">or</span> <span class="n">PER_BATCH_IC_BLOCK</span><span class="p">,</span> <span class="n">weight</span> <span class="ow">is</span> <span class="n">grouped</span> <span class="n">along</span> <span class="n">IC</span> <span class="n">by</span> <span class="n">group_size</span><span class="o">.</span>
+    <span class="n">The</span> <span class="n">IC_BLOCK</span> <span class="k">for</span> <span class="n">activation</span> <span class="ow">is</span> <span class="n">determined</span> <span class="n">by</span> <span class="n">group_size</span> <span class="n">automatically</span><span class="o">.</span>
+    <span class="n">Each</span> <span class="n">group</span> <span class="n">has</span> <span class="n">its</span> <span class="n">own</span> <span class="n">quantization</span> <span class="n">parameters</span><span class="o">.</span>
+</pre></div>
+</div>
+</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.quantization.prepare">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">prepare</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">configure</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">example_inputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bn_folding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">example_kwarg_inputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.prepare" title="Link to this definition"></a></dt>
+<dd><p>Prepare an FP32 torch.nn.Module model to do calibration or to convert to quantized model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – The FP32 model to be prepared.</p></li>
+<li><p><strong>configure</strong> (<em>torch.quantization.qconfig.QConfig</em>) – The observer settings about activation and weight.</p></li>
+<li><p><strong>example_inputs</strong> (<em>tuple</em><em> or </em><em>torch.Tensor</em>) – A tuple of example inputs that
+will be passed to the function while running to init quantization state. Only one of this
+argument or <code class="docutils literal notranslate"><span class="pre">example_kwarg_inputs</span></code> should be specified.</p></li>
+<li><p><strong>inplace</strong> – (bool): It will change the given model in-place if True. The default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.
+Note that if <code class="docutils literal notranslate"><span class="pre">bn_folding</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, the returned model is a different object from the
+original model even if <code class="docutils literal notranslate"><span class="pre">inplace=True</span></code>. So, with the following code
+&gt;&gt;&gt; prepared_model = prepare(original_model, …, inplace=True)
+please use <code class="docutils literal notranslate"><span class="pre">prepared_model</span></code> for later operations to avoid unexpected behaviors.</p></li>
+<li><p><strong>bn_folding</strong> – (bool): whether to perform <code class="docutils literal notranslate"><span class="pre">conv_bn</span></code> and <code class="docutils literal notranslate"><span class="pre">linear_bn</span></code> folding.
+The default value is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
+<li><p><strong>example_kwarg_inputs</strong> (<em>dict</em>) – A dict of example inputs that will be passed to the function while
+running to init quantization state. Only one of this argument or <code class="docutils literal notranslate"><span class="pre">example_inputs</span></code> should be
+specified.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>torch.nn.Module</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.quantization.convert">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">convert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.convert" title="Link to this definition"></a></dt>
+<dd><p>Convert an FP32 prepared model to a model which will automatically insert fake quant
+before a quantizable module or operator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – The FP32 model to be convert.</p></li>
+<li><p><strong>inplace</strong> – (bool): It will change the given model in-place if True. The default value is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>torch.nn.Module</p>
+</dd>
+</dl>
+</dd></dl>
+
+<p>Prototype API, introduction is avaiable at <a class="reference external" href="./features/int8_recipe_tuning_api.html">feature page</a>.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.quantization.autotune">
+<span class="sig-prename descclassname"><span class="pre">ipex.quantization.</span></span><span class="sig-name descname"><span class="pre">autotune</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calib_dataloader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calib_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eval_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">op_type_dict</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">smoothquant_args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampling_sizes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accuracy_criterion</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tuning_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.quantization.autotune" title="Link to this definition"></a></dt>
+<dd><p>Automatic accuracy-driven tuning helps users quickly find out the advanced recipe for INT8 inference.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.nn.Module</em>) – fp32 model.</p></li>
+<li><p><strong>calib_dataloader</strong> (<em>generator</em>) – set a dataloader for calibration.</p></li>
+<li><p><strong>calib_func</strong> (<em>function</em>) – calibration function for post-training static quantization. It is optional.
+This function takes “model” as input parameter and executes entire inference process.</p></li>
+<li><p><strong>eval_func</strong> (<em>function</em>) – set a evaluation function. This function takes “model” as input parameter
+executes entire evaluation process with self contained metrics, and returns an accuracy value
+which is a scalar number. The higher the better.</p></li>
+<li><p><strong>op_type_dict</strong> (<em>dict</em>) – Tuning constraints on optype-wise for advance user to reduce tuning space.
+User can specify the quantization config by op type:</p></li>
+<li><p><strong>smoothquant_args</strong> (<em>dict</em>) – smoothquant recipes for automatic global alpha tuning, and automatic
+layer-by-layer alpha tuning for the best INT8 accuracy.</p></li>
+<li><p><strong>sampling_sizes</strong> (<em>list</em>) – a list of sample sizes used in calibration, where the tuning algorithm would explore from.
+The default value is <code class="docutils literal notranslate"><span class="pre">[100]</span></code>.</p></li>
+<li><p><strong>accuracy_criterion</strong> (<em>{accuracy_criterion_type</em><em>(</em><em>str</em><em>, </em><em>'relative'</em><em> or </em><em>'absolute'</em>) – accuracy_criterion_value(float)}):
+set the maximum allowed accuracy loss, either relative or absolute. The default value is <code class="docutils literal notranslate"><span class="pre">{'relative':</span> <span class="pre">0.01}</span></code>.</p></li>
+<li><p><strong>tuning_time</strong> (<em>seconds</em>) – tuning timeout. The default value is <code class="docutils literal notranslate"><span class="pre">0</span></code> which means early stop.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the prepared model loaded qconfig after tuning.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>prepared_model (torch.nn.Module)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-ipex.cpu.runtime">
+<span id="cpu-runtime"></span><h2>CPU Runtime<a class="headerlink" href="#module-ipex.cpu.runtime" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.is_runtime_ext_enabled">
+<span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">is_runtime_ext_enabled</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.is_runtime_ext_enabled" title="Link to this definition"></a></dt>
+<dd><p>Helper function to check whether runtime extension is enabled or not.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong> (<em>None</em>) – None</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Whether the runtime exetension is enabled or not. If the</dt><dd><p>Intel OpenMP Library is preloaded, this API will return True.
+Otherwise, it will return False.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.CPUPool">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">CPUPool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">core_ids</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.CPUPool" title="Link to this definition"></a></dt>
+<dd><p>An abstraction of a pool of CPU cores used for intra-op parallelism.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>core_ids</strong> (<em>list</em>) – A list of CPU cores’ ids used for intra-op parallelism.</p></li>
+<li><p><strong>node_id</strong> (<em>int</em>) – A numa node id with all CPU cores on the numa node.
+<code class="docutils literal notranslate"><span class="pre">node_id</span></code> doesn’t work if <code class="docutils literal notranslate"><span class="pre">core_ids</span></code> is set.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.CPUPool object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool">ipex.cpu.runtime.CPUPool</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.pin">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">pin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.pin" title="Link to this definition"></a></dt>
+<dd><p>Apply the given CPU pool to the master thread that runs the scoped code
+region or the function/method def.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – ipex.cpu.runtime.CPUPool object, contains
+all CPU cores used by the designated operations.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.pin object which can be used
+as a <cite>with</cite> context or a function decorator.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.pin" title="ipex.cpu.runtime.pin">ipex.cpu.runtime.pin</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.MultiStreamModuleHint">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModuleHint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.MultiStreamModuleHint" title="Link to this definition"></a></dt>
+<dd><p>MultiStreamModuleHint is a hint to MultiStreamModule about how to split the inputs
+or concat the output. Each argument should be None, with type of int or a container
+which containes int or None such as: (0, None, …) or [0, None, …]. If the argument
+is None, it means this argument will not be split or concat. If the argument is with
+type int, its value means along which dim this argument will be split or concat.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>*args</strong> – Variable length argument list.</p></li>
+<li><p><strong>**kwargs</strong> – Arbitrary keyword arguments.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.MultiStreamModuleHint object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModuleHint" title="ipex.cpu.runtime.MultiStreamModuleHint">ipex.cpu.runtime.MultiStreamModuleHint</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.MultiStreamModule">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">MultiStreamModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_streams:</span> <span class="pre">int</span> <span class="pre">|</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'AUTO'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool:</span> <span class="pre">~ipex.cpu.runtime.cpupool.CPUPool</span> <span class="pre">=</span> <span class="pre">&lt;ipex.cpu.runtime.cpupool.CPUPool</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">concat_output:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_split_hint:</span> <span class="pre">~ipex.cpu.runtime.multi_stream.MultiStreamModuleHint</span> <span class="pre">=</span> <span class="pre">&lt;ipex.cpu.runtime.multi_stream.MultiStreamModuleHint</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_concat_hint:</span> <span class="pre">~ipex.cpu.runtime.multi_stream.MultiStreamModuleHint</span> <span class="pre">=</span> <span class="pre">&lt;ipex.cpu.runtime.multi_stream.MultiStreamModuleHint</span> <span class="pre">object&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.MultiStreamModule" title="Link to this definition"></a></dt>
+<dd><p>MultiStreamModule supports inference with multi-stream throughput mode.</p>
+<p>If the number of cores inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>,
+the cores will be allocated equally to each stream. If the number of cores
+inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code> is not divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> with remainder N,
+one extra core will be allocated to the first N streams. We suggest to set
+the <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> as divisor of core number inside <code class="docutils literal notranslate"><span class="pre">cpu_pool</span></code>.</p>
+<p>If the inputs’ batchsize is larger than and divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code>,
+the batchsize will be allocated equally to each stream. If batchsize is not
+divisible by <code class="docutils literal notranslate"><span class="pre">num_streams</span></code> with remainder N, one extra piece will be
+allocated to the first N streams. If the inputs’ batchsize is less than
+<code class="docutils literal notranslate"><span class="pre">num_streams</span></code>, only the first batchsize’s streams are used with mini batch
+as one. We suggest to set inputs’ batchsize larger than and divisible by
+<code class="docutils literal notranslate"><span class="pre">num_streams</span></code>. If you don’t want to tune the num of streams and leave it
+as “AUTO”, we suggest to set inputs’ batchsize larger than and divisible by
+number of cores.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.jit.ScriptModule</em><em> or </em><em>torch.nn.Module</em>) – The input model.</p></li>
+<li><p><strong>num_streams</strong> (<em>Union</em><em>[</em><em>int</em><em>, </em><em>str</em><em>]</em>) – Number of instances (int) or “AUTO” (str). “AUTO” means the stream number
+will be selected automatically. Although “AUTO” usually provides a
+reasonable performance, it may still not be optimal for some cases which
+means manual tuning for number of streams is needed for this case.</p></li>
+<li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – An
+ipex.cpu.runtime.CPUPool object, contains
+all CPU cores used to run multi-stream inference.</p></li>
+<li><p><strong>concat_output</strong> (<em>bool</em>) – A flag indicates whether the output of each
+stream will be concatenated or not. The default value is True. Note:
+if the output of each stream can’t be concatenated, set this flag to
+false to get the raw output (a list of each stream’s output).</p></li>
+<li><p><strong>input_split_hint</strong> (<a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModuleHint" title="ipex.cpu.runtime.MultiStreamModuleHint"><em>MultiStreamModuleHint</em></a>) – Hint to MultiStreamModule about
+how to split the inputs.</p></li>
+<li><p><strong>output_concat_hint</strong> (<a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModuleHint" title="ipex.cpu.runtime.MultiStreamModuleHint"><em>MultiStreamModuleHint</em></a>) – Hint to MultiStreamModule about
+how to concat the outputs.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.MultiStreamModule object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.MultiStreamModule" title="ipex.cpu.runtime.MultiStreamModule">ipex.cpu.runtime.MultiStreamModule</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.Task">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">Task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpu_pool</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.cpupool.CPUPool"><span class="pre">CPUPool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.Task" title="Link to this definition"></a></dt>
+<dd><p>An abstraction of computation based on PyTorch module and is scheduled
+asynchronously.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>torch.jit.ScriptModule</em><em> or </em><em>torch.nn.Module</em>) – The input module.</p></li>
+<li><p><strong>cpu_pool</strong> (<a class="reference internal" href="#ipex.cpu.runtime.CPUPool" title="ipex.cpu.runtime.CPUPool"><em>ipex.cpu.runtime.CPUPool</em></a>) – An
+ipex.cpu.runtime.CPUPool object, contains
+all CPU cores used to run Task asynchronously.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Generated
+ipex.cpu.runtime.Task object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#ipex.cpu.runtime.Task" title="ipex.cpu.runtime.Task">ipex.cpu.runtime.Task</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.cpu.runtime.get_core_list_of_node_id">
+<span class="sig-prename descclassname"><span class="pre">ipex.cpu.runtime.</span></span><span class="sig-name descname"><span class="pre">get_core_list_of_node_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.cpu.runtime.get_core_list_of_node_id" title="Link to this definition"></a></dt>
+<dd><p>Helper function to get the CPU cores’ ids of the input numa node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node_id</strong> (<em>int</em>) – Input numa node id.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>List of CPU cores’ ids on this numa node.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cheat_sheet.html" class="btn btn-neutral float-left" title="Cheat Sheet" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="performance_tuning/tuning_guide.html" class="btn btn-neutral float-right" title="Performance Tuning Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f830be18400> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

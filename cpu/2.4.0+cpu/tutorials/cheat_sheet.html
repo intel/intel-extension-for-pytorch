@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cheat Sheet &mdash; Intel&amp;#174 Extension for PyTorch* 2.4.0+cpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=01a6a0bb" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="API Documentation" href="api_doc.html" />
+    <link rel="prev" title="Examples" href="examples.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../">2.4.0+cpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Cheat Sheet</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">PERFORMANCE TUNING</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/tuning_guide.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/launch_script.html">Launch Script Usage Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/torchserve.html">TorchServe with Intel® Extension for PyTorch*</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Cheat Sheet</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/cheat_sheet.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="cheat-sheet">
+<h1>Cheat Sheet<a class="headerlink" href="#cheat-sheet" title="Link to this heading"></a></h1>
+<p>Get started with Intel® Extension for PyTorch* using the following commands:</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>Description</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Basic CPU Installation</td>
+<td><code>python -m pip install intel_extension_for_pytorch</code></td>
+</tr>
+<tr>
+<td>Import Intel® Extension for PyTorch*</td>
+<td><code>import intel_extension_for_pytorch as ipex</code></td>
+</tr>
+<tr>
+<td>Capture a Verbose Log (Command Prompt)</td>
+<td><code>export ONEDNN_VERBOSE=1</code></td>
+</tr>
+<tr>
+<td>Optimization During Training</td>
+<td><code>model = ...</code><br><code>optimizer = ...</code><br><code>model.train()</code><br><code>model, optimizer = ipex.optimize(model, optimizer=optimizer)</code></td>
+</tr>
+<tr>
+<td>Optimization During Inference</td>
+<td><code>model = ...</code><br><code>model.eval()</code><br><code>model = ipex.optimize(model)</code></td>
+</tr>
+<tr>
+<td>Optimization Using the Low-Precision Data Type bfloat16 <br>During Training (Default FP32)</td>
+<td><code>model = ...</code><br><code>optimizer = ...</code><br><code>model.train()</code><br/><br/><code>model, optimizer = ipex.optimize(model, optimizer=optimizer, dtype=torch.bfloat16)</code><br/><br/><code>with torch.no_grad():</code><br><code>with torch.cpu.amp.autocast():</code><br><code>model(data)</code></td>
+</tr>
+<tr>
+<td>Optimization Using the Low-Precision Data Type bfloat16 <br>During Inference (Default FP32)</td>
+<td><code>model = ...</code><br><code>model.eval()</code><br/><br/><code>model = ipex.optimize(model, dtype=torch.bfloat16)</code><br/><br/><code>with torch.cpu.amp.autocast():</code><br><code>model(data)</code></td>
+</tr>
+<tr>
+<td>[Prototype] Fast BERT Optimization</td>
+<td><code>from transformers import BertModel</code><br><code>model = BertModel.from_pretrained("bert-base-uncased")</code><br><code>model.eval()</code><br/><br/><code>model = ipex.fast_bert(model, dtype=torch.bfloat16)</code></td>
+</tr>
+<tr>
+<td>Run CPU Launch Script (Command Prompt): <br>Automate Configuration Settings for Performance</td>
+<td><code>ipexrun [knobs] &lt;your_pytorch_script&gt; [args]</code></td>
+</tr>
+<tr>
+<td>[Prototype] Run HyperTune to perform hyperparameter/execution configuration search</td>
+<td><code>python -m intel_extension_for_pytorch.cpu.hypertune --conf-file &lt;your_conf_file&gt; &lt;your_python_script&gt; [args]</code></td>
+</tr>
+<tr>
+<td>[Prototype] Enable Graph capture</td>
+<td><code>model = …</code><br><code>model.eval()</code><br><code>model = ipex.optimize(model, graph_mode=True)</code></td>
+</tr>
+<tr>
+<td>Post-Training INT8 Quantization (Static)</td>
+<td><code>model = …</code><br><code>model.eval()</code><br><code>data = …</code><br/><br/><code>qconfig = ipex.quantization.default_static_qconfig</code><br/><br/><code>prepared_model = ipex.quantization.prepare(model, qconfig, example_inputs=data, anyplace=False)</code><br/><br/><code>for d in calibration_data_loader():</code><br><code>prepared_model(d)</code><br/><br/><code>converted_model = ipex.quantization.convert(prepared_model)</code></td>
+</tr>
+<tr>
+<td>Post-Training INT8 Quantization (Dynamic)</td>
+<td><code>model = …</code><br><code>model.eval()</code><br><code>data = …</code><br/><br/><code>qconfig = ipex.quantization.default_dynamic_qconfig</code><br/><br/><code>prepared_model = ipex.quantization.prepare(model, qconfig, example_inputs=data)</code><br/><br/><code>converted_model = ipex.quantization.convert(prepared_model)</code></td>
+</tr>
+<tr>
+<td>[Prototype] Post-Training INT8 Quantization (Tuning Recipe):</td>
+<td><code>model = …</code><br><code>model.eval()</code><br><code>data = …</code><br/><br/><code>qconfig = ipex.quantization.default_static_qconfig</code><br/><br/><code>prepared_model = ipex.quantization.prepare(model, qconfig, example_inputs=data, inplace=False)</code><br/><br/><code>tuned_model = ipex.quantization.autotune(prepared_model, calibration_data_loader, eval_function, sampling_sizes=[100],</code><br><code>accuracy_criterion={'relative': .01}, tuning_time=0)</code><br/><br/><code>convert_model = ipex.quantization.convert(tuned_model)</code></td>
+</tr>
+</tbody>
+</table></section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="examples.html" class="btn btn-neutral float-left" title="Examples" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="api_doc.html" class="btn btn-neutral float-right" title="API Documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f830ae88520> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
