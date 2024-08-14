@@ -28,6 +28,8 @@ template <
 class fmha_forward_t {
  public:
   using accum_t = float;
+  static constexpr accum_t kNegInfinity =
+      -std::numeric_limits<accum_t>::infinity();
 
   struct arguments_t {
     // Input tensors
@@ -243,7 +245,7 @@ class fmha_forward_t {
       // nbarrier
       nbarrier.init_nbarrier(sg_idy, nbarrier_role::producer_consumer);
       // softmax statistics
-      softmax_m = -std::numeric_limits<accum_t>::infinity();
+      softmax_m = kNegInfinity;
       softmax_l = 0.f;
 
       // mem desc variables
@@ -635,6 +637,9 @@ class fmha_forward_t {
     wg_row_max_t wg_row_max(ctx.sg_idx, ctx.sg_idy, reducer_slm);
     xetla_vector<accum_t, kSgBr> m_new = wg_row_max(matAccSij);
     m_new = xetla_max<accum_t, kSgBr>(m_new, ctx.softmax_m);
+
+    xetla_mask<kSgBr> mask_inf = m_new == kNegInfinity;
+    m_new.xetla_merge(0.f, mask_inf);
 
     if constexpr (wg_size_x > 1)
       ctx.nbarrier.arrive();
