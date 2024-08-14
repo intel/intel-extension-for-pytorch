@@ -277,7 +277,8 @@ TORCH_LIBRARY_IMPL(aten, AutocastXPU, m) {
           const c10::optional<Tensor>&,
           double,
           bool,
-          c10::optional<double>),
+          c10::optional<double>,
+          bool),
       lower_precision_fp)
   // The macro doesn't like these (I think it chokes on commas inside <>) so
   // write them manually

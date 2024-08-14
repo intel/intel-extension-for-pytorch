@@ -32,8 +32,8 @@ struct RepeatInterleaveDpcppKernelFunctor {
     }
   }
   RepeatInterleaveDpcppKernelFunctor(
-      index_t* rep_data_,
-      int64_t* cum_data_,
+      const index_t* rep_data_,
+      const int64_t* cum_data_,
       index_t* res_data_,
       int64_t size_,
       int64_t result_size_)
@@ -44,8 +44,8 @@ struct RepeatInterleaveDpcppKernelFunctor {
         result_size(result_size_) {}
 
  private:
-  index_t* rep_data;
-  int64_t* cum_data;
+  const index_t* rep_data;
+  const int64_t* cum_data;
   index_t* res_data;
   int64_t size;
   int64_t result_size;
@@ -53,8 +53,8 @@ struct RepeatInterleaveDpcppKernelFunctor {
 
 template <typename index_t>
 static void repeat_interleave_dpcpp_kernel(
-    index_t* repeat_ptr,
-    int64_t* cumsum_ptr,
+    const index_t* repeat_ptr,
+    const int64_t* cumsum_ptr,
     index_t* result_ptr,
     int64_t size,
     int64_t result_size) {
