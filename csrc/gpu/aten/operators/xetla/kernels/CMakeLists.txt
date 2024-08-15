@@ -67,10 +67,10 @@ if (USE_AOT_DEVLIST)
   set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST}")
   if (USE_XETLA_XE_HPC)  # Temporary fix as AOT fails of try to compile XE_HPC kernels for ats-m150 etc
     message(STATUS "XeTLA: XE_HPC suppress other aot targets")
-    set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST_XE_HPC}")
+    set(XETLA_USE_AOT_DEVLIST "${XETLA_USE_AOT_DEVLIST_XE_HPC}")
   elseif(USE_XETLA_XE_HPG) # Temporary fix as AOT fails of try to compile XE_HPG kernels for mtl-p etc
     message(STATUS "XeTLA: XE_HPG suppress other aot targets")
-    set(XETLA_USE_AOT_DEVLIST "${USE_AOT_DEVLIST_XE_HPG}")
+    set(XETLA_USE_AOT_DEVLIST "${XETLA_USE_AOT_DEVLIST_XE_HPG}")
   endif()
   message(STATUS "XeTLA: XETLA_USE_AOT_DEVLIST: ${XETLA_USE_AOT_DEVLIST}")
 endif()
