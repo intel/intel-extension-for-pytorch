@@ -26,7 +26,7 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 import sys
 
-sys.path.append(sys.path[0] + "/../../")
+sys.path.append(sys.path[0] + "/../../../")
 
 try:
     import lmms_eval

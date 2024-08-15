@@ -240,7 +240,7 @@ generate results for the input prompt.
 [//]: # (marker_llm_optimize_woq)
 [//]: # (marker_llm_optimize_woq)
 
-**Note:** Please check [LLM Best Known Practice Page](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/inference/python/llm)
+**Note:** Please check [LLM Best Known Practice Page](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm)
 for detailed environment setup and LLM workload running instructions.
 
 ## C++

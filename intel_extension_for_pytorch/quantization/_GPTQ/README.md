@@ -109,7 +109,7 @@ calib_dataloader = DataLoader(
     collate_fn=calib_evaluator.collate_batch,
 )
 ```
-For details, please refer to [example](../../../examples/cpu/inference/python/llm/utils/run_gptq.py)
+For details, please refer to [example](../../../examples/cpu/llm/inference/utils/run_gptq.py)
 
 #### Quantization
 ```py
@@ -155,4 +155,4 @@ model = ipex.llm.optimize(
 
 # inference with model.generate()
 ```
-For LLM example, please refer to [gpt-j](../../../examples/cpu/inference/python/llm/single_instance/run_int4_gpt-j_on_cnndailymail.py).
+For LLM example, please refer to [gpt-j](../../../examples/cpu/llm/inference/single_instance/run_int4_gpt-j_on_cnndailymail.py).

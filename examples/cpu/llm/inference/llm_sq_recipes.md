@@ -1,5 +1,6 @@
 ## Smooth Quantization Autotune Feature (Prototype):
-SmoothQuant is a popular method to improve the accuracy of int8 quantization. The [autotune API](../../../../../docs/tutorials/features/sq_recipe_tuning_api.md) allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best accuracy. Below is the basic command to generate the qconfig summary files (and quantized model ".pt" file) with the SmoothQuant autotune API.
+
+SmoothQuant is a popular method to improve the accuracy of int8 quantization. The [autotune API](../../../../docs/tutorials/features/sq_recipe_tuning_api.md) allows automatic global alpha tuning, and automatic layer-by-layer alpha tuning provided by Intel® Neural Compressor for the best accuracy. Below is the basic command to generate the qconfig summary files (and quantized model ".pt" file) with the SmoothQuant autotune API.
 
 ```bash
 # general command:
@@ -10,6 +11,7 @@ OMP_NUM_THREADS=56 numactl -m 0 -C 0-55 python run.py  --benchmark -m meta-llama
 ```
 
 ## Example command for model tuning with AutoTune API
+
 | Model ID | Command |
 |---|:---:|
 | meta-llama/Llama-2-13b-hf | python run.py -m meta-llama/Llama-2-13b-hf --ipex-smooth-quant --alpha auto --init-alpha 0.8 --alpha-min 0.75 --alpha-max 0.99 --alpha-step 0.01 --shared-criterion 'max' --calib-len 1024 --calib-padding --fallback-add |
