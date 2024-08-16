@@ -12,7 +12,13 @@ from ._functional import lars_step
 
 
 def create_optimizer_lars(
-    model, lr, momentum, weight_decay, bn_bias_separately, epsilon, fused
+    model,
+    lr,
+    momentum,
+    weight_decay,
+    bn_bias_separately,
+    epsilon,
+    fused=True,
 ):
     if bn_bias_separately:
         optimizer = Lars(
