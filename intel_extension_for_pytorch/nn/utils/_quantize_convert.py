@@ -150,7 +150,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
     def forward(self, input: Tensor) -> Tensor:
         if self.compute_dtype == "fp16":
             input = input.to(convert_dtype_str2torch(self.compute_dtype))
-        if not self.weight_transposed:
+        if not self.weight_transposed and xpu_gemm_use_xetla():
             self.qweight.data = self.qweight.t().contiguous()
             self.scales.data = self.scales.t().contiguous().to(torch.float16)
             if self.bias is not None:
@@ -160,18 +160,40 @@ class WeightOnlyQuantizedLinear(nn.Module):
             else:
                 self.qzeros += 0x11111111
             self.weight_transposed = True
+        else:
+            self.qweight.data = (
+                self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+            )
 
-        return torch.ops.torch_ipex.mm_low_bits(
-            input,
-            self.qweight,
-            self.scales,
-            self.qzeros,
-            self.bias,
-            self.bias is not None,
-            self.compute_dtype,
-            self.weight_dtype,
-            self.blocksize,
-        )
+        if xpu_gemm_use_xetla():
+            return torch.ops.torch_ipex.mm_low_bits(
+                input,
+                self.qweight,
+                self.scales,
+                self.qzeros,
+                self.bias,
+                self.bias is not None,
+                self.compute_dtype,
+                self.weight_dtype,
+                self.blocksize,
+            )
+        elif self.bias is not None:
+            return torch.ops.torch_ipex.mm_bias_int4(
+                input,
+                self.qweight,
+                self.bias,
+                self.scales,
+                self.qzeros,
+                self.blocksize,
+            )
+        else:
+            return torch.ops.torch_ipex.mm_int4(
+                input,
+                self.qweight,
+                self.scales,
+                self.qzeros,
+                self.blocksize,
+            )
 
     def set_weights_bias(self, weight_data, bias=None):
         qweight = ParamsLowBits(
@@ -201,7 +223,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         elif xpu_gemm_use_xetla():
             self.qzeros += 0x11111111
         else:
-            self.qzeros = qzeros
+            self.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
 
     def extra_repr(self) -> str:
         tmp_str = (

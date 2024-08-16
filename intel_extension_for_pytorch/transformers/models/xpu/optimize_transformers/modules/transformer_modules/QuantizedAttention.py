@@ -130,52 +130,11 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
             self.v_proj_quant.scales.data = self.v_proj_quant.scales
             self.out_proj_quant.scales.data = self.out_proj_quant.scales
 
-            self.q_proj_quant.qzeros = torch.ones(
-                [
-                    self.q_proj_quant.qweight.size()[-2] // self.q_proj_quant.blocksize,
-                    self.q_proj_quant.qweight.size()[-1] // 8,
-                ],
-                dtype=torch.int32,
-                device="xpu",
-            )
-            self.q_proj_quant.qzeros = torch.fill(
-                self.q_proj_quant.qzeros, int(-2004318072)
-            )
+            self.q_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
 
-            self.k_proj_quant.qzeros = torch.ones(
-                [
-                    self.k_proj_quant.qweight.size()[-2] // self.k_proj_quant.blocksize,
-                    self.k_proj_quant.qweight.size()[-1] // 8,
-                ],
-                dtype=torch.int32,
-                device="xpu",
-            )
-            self.k_proj_quant.qzeros = torch.fill(
-                self.k_proj_quant.qzeros, int(-2004318072)
-            )
-            self.v_proj_quant.qzeros = torch.ones(
-                [
-                    self.v_proj_quant.qweight.size()[-2] // self.v_proj_quant.blocksize,
-                    self.v_proj_quant.qweight.size()[-1] // 8,
-                ],
-                dtype=torch.int32,
-                device="xpu",
-            )
-            self.v_proj_quant.qzeros = torch.fill(
-                self.v_proj_quant.qzeros, int(-2004318072)
-            )
-            self.out_proj_quant.qzeros = torch.ones(
-                [
-                    self.out_proj_quant.qweight.size()[-2]
-                    // self.out_proj_quant.blocksize,
-                    self.out_proj_quant.qweight.size()[-1] // 8,
-                ],
-                dtype=torch.int32,
-                device="xpu",
-            )
-            self.out_proj_quant.qzeros = torch.fill(
-                self.out_proj_quant.qzeros, int(-2004318072)
-            )
+            self.k_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
+            self.v_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
+            self.out_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
 
         torch.xpu.synchronize()
 
@@ -221,95 +180,56 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                 qkv_proj_quant_scales, qkv_proj_quant_qzeros
             )
             self.qkv_proj_quant.blocksize = self.q_proj_quant.blocksize
-        else:
-            shape = [3, -1, self.q_proj_quant.qweight.shape[-1]]
-            qkv_proj_quant_qweight = (
-                torch.stack(
-                    [
-                        self.q_proj_quant.qweight,
-                        self.k_proj_quant.qweight,
-                        self.v_proj_quant.qweight,
-                    ]
-                )
-                .contiguous()
-                .view([3, *self.q_proj_quant.qweight.shape])
-            )
-            qkv_proj_quant_scales = (
-                torch.stack(
-                    [
-                        self.q_proj_quant.scales,
-                        self.k_proj_quant.scales,
-                        self.v_proj_quant.scales,
-                    ]
-                )
-                .contiguous()
-                .view([3, *self.q_proj_quant.scales.shape])
-            )
-            qkv_proj_quant_qzeros = None
-            if self.q_proj_quant.qzeros is not None:
-                qkv_proj_quant_qzeros = (
-                    torch.stack(
-                        [
-                            self.q_proj_quant.qzeros,
-                            self.k_proj_quant.qzeros,
-                            self.v_proj_quant.qzeros,
-                        ]
-                    )
-                    .contiguous()
-                    .view([3, *self.q_proj_quant.qzeros.shape])
-                )
-
-            qkv_proj_quant_bias = None
-            if self.q_proj_quant.bias is not None:
-                bias_shape = [3, -1]
-                qkv_proj_quant_bias = (
-                    torch.stack(
-                        [
-                            self.q_proj_quant.bias,
-                            self.k_proj_quant.bias,
-                            self.v_proj_quant.bias,
-                        ]
-                    )
-                    .contiguous()
-                    .view(bias_shape)
-                )
-            self.qkv_proj_quant.set_weights_bias(
-                qkv_proj_quant_qweight, qkv_proj_quant_bias
-            )
-            self.qkv_proj_quant.set_scales_zps_gidx(
-                qkv_proj_quant_scales, qkv_proj_quant_qzeros
-            )
-            self.qkv_proj_quant.blocksize = self.q_proj_quant.blocksize
 
             # Note: synchronize to ensure the completion of contiguous
             torch.xpu.synchronize()
-
-            if self.q_proj_quant.qzeros is not None:
-                self.q_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros[0, :, :]
-                self.k_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros[1, :, :]
-                self.v_proj_quant.qzeros.data = self.qkv_proj_quant.qzeros[2, :, :]
-
-            if self.qkv_proj_quant.bias is not None:
-                self.q_proj_quant.bias.data = self.qkv_proj_quant.bias[0, :]
-                self.k_proj_quant.bias.data = self.qkv_proj_quant.bias[1, :]
-                self.v_proj_quant.bias.data = self.qkv_proj_quant.bias[2, :]
-
-        # Note: synchronize to ensure the completion of contiguous
-        torch.xpu.synchronize()
+        else:
+            pass
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
-        torch.ops.torch_ipex.mm_qkv_out_int4(
-            hidden_states,
-            self.qkv_proj_quant.qweight,
-            self.qkv_proj_quant.scales,
-            self.qkv_proj_quant.qzeros,
-            self.qkv_proj_quant.bias,
-            query,
-            key,
-            value,
-            self.qkv_proj_quant.blocksize,
-        )
-        return query, key, value
+        if xpu_gemm_use_xetla():
+            torch.ops.torch_ipex.mm_qkv_out_int4(
+                hidden_states,
+                self.qkv_proj_quant.qweight,
+                self.qkv_proj_quant.scales,
+                self.qkv_proj_quant.qzeros,
+                self.qkv_proj_quant.bias,
+                query,
+                key,
+                value,
+                self.qkv_proj_quant.blocksize,
+            )
+            return query, key, value
+        else:
+            query = torch.ops.torch_ipex.mm_bias_int4(
+                hidden_states,
+                self.q_proj_quant.qweight,
+                self.q_proj_quant.bias,
+                self.q_proj_quant.scales,
+                self.q_proj_quant.qzeros,
+                self.q_proj_quant.blocksize,
+            )
+            key.copy_(
+                torch.ops.torch_ipex.mm_bias_int4(
+                    hidden_states,
+                    self.k_proj_quant.qweight,
+                    self.k_proj_quant.bias,
+                    self.k_proj_quant.scales,
+                    self.k_proj_quant.qzeros,
+                    self.k_proj_quant.blocksize,
+                )
+            )
+            value.copy_(
+                torch.ops.torch_ipex.mm_bias_int4(
+                    hidden_states,
+                    self.v_proj_quant.qweight,
+                    self.v_proj_quant.bias,
+                    self.v_proj_quant.scales,
+                    self.v_proj_quant.qzeros,
+                    self.v_proj_quant.blocksize,
+                )
+            )
+            return query, key, value
 
     def out_proj_compute(self, attn_output, residual=None):
         arch = 1 if ipex._C._has_2d_block_array(0) else 0
