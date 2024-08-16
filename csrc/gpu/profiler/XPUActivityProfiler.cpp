@@ -90,6 +90,21 @@ bool ConfigDerivedState::isCollectionDone(
   return false;
 }
 
+const std::vector<std::string> XPUActivityProfiler::_traceableRuntimeOps = {
+    "piextUSMEnqueueFill",
+    "piextUSMEnqueueFill2D",
+    "piextUSMEnqueueMemcpy",
+    "piextUSMEnqueueMemset",
+    "piextUSMEnqueueMemcpy2D",
+    "piextUSMEnqueueMemset2D",
+    "piEnqueueKernelLaunch",
+    "piextEnqueueKernelLaunchCustom",
+    "piextEnqueueCooperativeKernelLaunch",
+    "piextUSMDeviceAlloc",
+    "piextUSMHostAlloc",
+    "piEnqueueMemBufferRead",
+    "piEnqueueMemBufferWrite"};
+
 void XPUActivityProfiler::transferCpuTrace(
     std::unique_ptr<libkineto::CpuTraceBuffer> cpuTrace) {
   std::lock_guard<std::mutex> guard(mutex_);
@@ -285,33 +300,13 @@ inline bool XPUActivityProfiler::outOfRange(const ITraceActivity& act) {
   return out_of_range;
 }
 
-// inline static bool isBlockListedRuntimeCbid(Onepti_CallbackId cbid) {
-//   // Some CUDA calls that are very frequent and also not very interesting.
-//   // Filter these out to reduce trace size.
-//   if (cbid == ONEPTI_RUNTIME_TRACE_CBID_cudaGetDevice_v3020 ||
-//       cbid == ONEPTI_RUNTIME_TRACE_CBID_cudaSetDevice_v3020 ||
-//       cbid == ONEPTI_RUNTIME_TRACE_CBID_cudaGetLastError_v3020 ||
-//       // Don't care about cudaEvents
-//       cbid == ONEPTI_RUNTIME_TRACE_CBID_cudaEventCreate_v3020 ||
-//       cbid == ONEPTI_RUNTIME_TRACE_CBID_cudaEventCreateWithFlags_v3020 ||
-//       cbid == ONEPTI_RUNTIME_TRACE_CBID_cudaEventRecord_v3020 ||
-//       cbid == ONEPTI_RUNTIME_TRACE_CBID_cudaEventDestroy_v3020 ||
-//       cbid == ONEPTI_RUNTIME_TRACE_CBID_cudaEventSynchronize_v3020) {
-//     return true;
-//   }
-//
-//   return false;
-// }
-
 void XPUActivityProfiler::handleRuntimeActivity(
     const pti_view_record_sycl_runtime* activity,
     ActivityLogger* logger) {
-  // if (isBlockListedRuntimeCbid(activity->cbid)) {
-  //   return;
-  // }
-  // VLOG(2) << activity->correlationId
-  //         << ": ONEPTI_ACTIVITY_KIND_RUNTIME, cbid=" << activity->cbid
-  //         << " tid=" << activity->threadId;
+  if (!isNeededToTrace(activity->_name)) {
+    return;
+  }
+
   int32_t tid = activity->_thread_id;
   const auto& it = resourceInfo_.find({processId(), tid});
   if (it != resourceInfo_.end()) {
