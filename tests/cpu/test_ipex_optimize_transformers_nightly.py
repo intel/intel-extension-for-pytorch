@@ -187,6 +187,13 @@ supported_models = [
         lambda m: m.model.decoder.layers[0].self_attn.__class__,
         lambda m: m.model.decoder.layers[0].__class__,
     ),
+    model_info(
+        "llama3",
+        transformers.models.llama.modeling_llama.LlamaForCausalLM,
+        False,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
 ]
 
 

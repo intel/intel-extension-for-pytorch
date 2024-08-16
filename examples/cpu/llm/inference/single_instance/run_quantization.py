@@ -71,7 +71,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--image-url",
-    default="http://images.cocodataset.org/val2017/000000039769.jpg",
+    default="https://images.cocodataset.org/val2017/000000039769.jpg",
     type=str,
     help="image url for image-to-text task",
 )
@@ -396,7 +396,11 @@ else:
     raise AssertionError("Not support %s." % (args.model_id))
 
 num_beams = 1 if args.greedy else 4
-if not hasattr(config, "text_max_length") and args.prompt is None:
+if (
+    not hasattr(config, "text_max_length")
+    and args.prompt is None
+    and model.name not in ["t5"]
+):
     if not args.benchmark:
         if hasattr(config, "max_position_embeddings"):
             config.text_max_length = config.max_position_embeddings
@@ -404,8 +408,11 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
             config.text_max_length = 2048
     else:
         config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
-if model.name == "mpt" and not hasattr(config, "max_seq_len") and args.prompt is None:
-    config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
+if model.name == "mpt" and args.prompt is None:
+    max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
+    if hasattr(config, "max_seq_len") and config.max_seq_len > max_seq_len:
+        max_seq_len = config.max_seq_len
+    config.max_seq_len = max_seq_len
 if model.name in ["git", "llava"]:
     config.batch_size = int(args.batch_size) * num_beams
 if model.name == "whisper":
@@ -863,7 +870,7 @@ if args.ipex_smooth_quant:
             tokenizer,
             args,
             batch_size=args.batch_size,
-            pad_max=int(args.input_tokens) if model.name == "t5" else 512,
+            pad_max=512,
         )
         calib_dataloader = DataLoader(
             calib_evaluator.dataset,

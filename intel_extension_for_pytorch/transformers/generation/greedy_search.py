@@ -147,6 +147,10 @@ def _greedy_search(
             if this_peer_finished_flag.item() == 0.0:
                 break
 
+        if "past_key_values" in model_kwargs and not isinstance(
+            model_kwargs["past_key_values"], tuple
+        ):
+            model_kwargs["past_key_values"] = None
         # prepare model inputs
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -330,6 +334,7 @@ def _greedy_search(
                 model_inputs.pop("decoder_attention_mask", None)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
@@ -425,7 +430,10 @@ def _greedy_search(
 
         # stop when each sentence is finished, or if we exceed the maximum length
         latency_list.append(time.time() - tic)
-        if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
+        unfinished_sequences = unfinished_sequences & ~stopping_criteria(
+            input_ids, scores
+        )
+        if unfinished_sequences.max() == 0:
             if not synced_gpus:
                 break
             else:

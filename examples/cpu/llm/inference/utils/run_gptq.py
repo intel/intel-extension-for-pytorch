@@ -106,7 +106,7 @@ class Evaluator:
 
 
 def get_user_model():
-    from transformers import AutoModelForCausalLM, AutoModel, AutoTokenizer
+    from transformers import AutoModelForCausalLM, AutoModel, AutoTokenizer, AutoConfig
 
     torchscript = False
     if re.search("llama", args.model.lower()):
@@ -142,6 +142,15 @@ def get_user_model():
             args.model,
             torchscript=torchscript,  # torchscript will force `return_dict=False` to avoid jit errors
             trust_remote_code=True,
+        )
+        tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    elif re.search("bigcode", args.model.lower()):
+        config = AutoConfig.from_pretrained(
+            args.model, torchscript=torchscript, trust_remote_code=True
+        )
+        config._attn_implementation = "eager"
+        user_model = AutoModelForCausalLM.from_pretrained(
+            args.model, trust_remote_code=True, config=config
         )
         tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     else:

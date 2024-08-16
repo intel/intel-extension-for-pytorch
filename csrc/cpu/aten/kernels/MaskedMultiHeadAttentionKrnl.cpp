@@ -1567,7 +1567,7 @@ at::Tensor prepare_4d_causal_attention_mask_kernel_impl(
   int64_t src_length = attention_mask.size(-1);
   int64_t past_key_value_length = past_kv_len.item<int64_t>();
   int64_t length = seq_length + past_key_value_length;
-  int64_t diagonal = past_key_value_length - sliding_window + 1;
+  int64_t diagonal = past_key_value_length - sliding_window;
 
   at::Tensor causal_4d_mask = torch::empty(
       {batch_size, 1, seq_length, length}, inputs_embeds.options());

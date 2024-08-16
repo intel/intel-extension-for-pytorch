@@ -16,4 +16,4 @@ git checkout intel
 git apply ${llava_patch}
 pip install -e . --no-deps
 
-pip install tenacity hf_transfer lmms-eval evaluate sqlitedict pycocoevalcap pycocotools --no-deps
+pip install tenacity hf_transfer lmms-eval==0.1.1 evaluate sqlitedict pycocoevalcap pycocotools --no-deps

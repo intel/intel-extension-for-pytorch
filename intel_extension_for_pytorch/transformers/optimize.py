@@ -92,7 +92,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.38.2"
+    validated_version = "4.43.2"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -124,12 +124,14 @@ def model_convert_reference(_model):
     # generation wise optimization
     from .generation.utils import (
         _extract_past_from_model_output,
+        _update_model_kwargs_for_generation,
     )
     from .generation import (
         _beam_search,
         _greedy_search,
         _sample,
         _beam_sample,
+        whisper_generate,
     )
 
     # model wise optimization for MHA module
@@ -193,11 +195,15 @@ def model_convert_reference(_model):
         Phi3Model_forward,
         WhisperForConditionalGeneration_forward,
         WhisperModel_forward,
+        WhisperDecoderLayer_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
         prepare_inputs_for_generation_llama,
         prepare_inputs_labels_for_multimodal_llavallama,
+        prepare_inputs_for_generation_chatglm,
         detect_language,
+        _postprocess_outputs_whisper,
+        _prepare_encoder_decoder_kwargs_for_generation,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -211,10 +217,19 @@ def model_convert_reference(_model):
     convert_function(_model, "greedy_search", _greedy_search)
     convert_function(_model, "sample", _sample)
     convert_function(_model, "beam_sample", _beam_sample)
+    convert_function(_model, "_beam_search", _beam_search)
+    convert_function(_model, "_greedy_search", _greedy_search)
+    convert_function(_model, "_sample", _sample)
+    convert_function(_model, "_beam_sample", _beam_sample)
     convert_function(
         _model,
         "_extract_past_from_model_output",
         _extract_past_from_model_output,
+    )
+    convert_function(
+        _model,
+        "_update_model_kwargs_for_generation",
+        _update_model_kwargs_for_generation,
     )
     convert_functions(
         _model,
@@ -322,6 +337,11 @@ def model_convert_reference(_model):
         == transformers.models.t5.modeling_t5.T5ForConditionalGeneration
     ):
         convert_function(_model, "forward", T5ForConditionalGeneration_forward)
+        convert_function(
+            _model,
+            "_prepare_encoder_decoder_kwargs_for_generation",
+            _prepare_encoder_decoder_kwargs_for_generation,
+        )
         convert_function(
             transformers.models.t5.modeling_t5.T5Attention,
             "_relative_position_bucket",
@@ -564,6 +584,11 @@ def model_convert_reference(_model):
             distributed=distributed,
         )
         convert_function(_model.transformer, "get_masks", GLM2_get_masks)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_chatglm,
+        )
     elif _model.config.architectures[0] == "MistralForCausalLM":
         convert_function(_model, "forward", MistralForCausalLM_forward)
         convert_function(_model.model, "forward", MistralModel_forward)
@@ -580,6 +605,11 @@ def model_convert_reference(_model):
             _IPEXDecoderLayerRef,
             _model.config,
             distributed=distributed,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
         )
     elif _model.config.architectures[0] == "MptForCausalLM":
         convert_function(_model, "forward", MptForCausalLM_forward)
@@ -600,6 +630,11 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "MixtralForCausalLM":
         convert_function(_model, "forward", MixtralForCausalLM_forward)
         convert_function(_model.model, "forward", MixtralModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
         convert_class(
             _model,
             transformers.models.mixtral.modeling_mixtral.MixtralAttention,
@@ -617,6 +652,11 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "StableLmForCausalLM":
         convert_function(_model, "forward", StableLMEpochForCausalLM_forward)
         convert_function(_model.model, "forward", StableLMEpochModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
         convert_class(
             _model,
             type(_model.model.layers[0].self_attn),
@@ -798,6 +838,11 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
     elif _model.config.architectures[0] == "Phi3ForCausalLM":
         convert_function(_model, "forward", PhiForCausalLM_forward)
         convert_function(_model.model, "forward", Phi3Model_forward)
@@ -817,8 +862,14 @@ def model_convert_reference(_model):
         )
     elif _model.config.architectures[0] == "WhisperForConditionalGeneration":
         convert_function(_model, "detect_language", detect_language)
+        if version.parse(transformers.__version__) >= version.parse("4.43.0"):
+            convert_function(
+                _model, "_postprocess_outputs", _postprocess_outputs_whisper
+            )
+            convert_function(_model, "generate", whisper_generate)
         convert_function(_model, "forward", WhisperForConditionalGeneration_forward)
         convert_function(_model.model, "forward", WhisperModel_forward)
+        convert_function(_model.model.decoder, "forward", WhisperDecoderLayer_forward)
         convert_class(
             _model,
             type(_model.model.encoder.layers[0]),

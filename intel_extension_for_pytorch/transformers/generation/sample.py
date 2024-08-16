@@ -50,6 +50,37 @@ def _sample(
     streamer: Optional["BaseStreamer"] = None,
     **model_kwargs,
 ) -> Union[SampleOutput, torch.LongTensor]:
+    new_generation_config = model_kwargs.pop("generation_config", None)
+    if new_generation_config is not None:
+        if not new_generation_config.do_sample:
+            pad_token_id = new_generation_config._pad_token_tensor
+            eos_token_id = new_generation_config._eos_token_tensor
+            return self._greedy_search(
+                input_ids,
+                logits_processor,
+                stopping_criteria,
+                max_length,
+                pad_token_id,
+                eos_token_id,
+                output_attentions,
+                output_hidden_states,
+                output_scores,
+                return_dict_in_generate,
+                synced_gpus,
+                streamer,
+                **model_kwargs,
+            )
+    else:
+        pad_token_id = (
+            pad_token_id
+            if pad_token_id is not None
+            else self.generation_config.pad_token_id
+        )
+        eos_token_id = (
+            eos_token_id
+            if eos_token_id is not None
+            else self.generation_config.eos_token_id
+        )
     token_latency = (
         self.config.token_latency if hasattr(self.config, "token_latency") else False
     )
@@ -71,16 +102,6 @@ def _sample(
         stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
     logits_warper = (
         logits_warper if logits_warper is not None else LogitsProcessorList()
-    )
-    pad_token_id = (
-        pad_token_id
-        if pad_token_id is not None
-        else self.generation_config.pad_token_id
-    )
-    eos_token_id = (
-        eos_token_id
-        if eos_token_id is not None
-        else self.generation_config.eos_token_id
     )
     if isinstance(eos_token_id, int):
         eos_token_id = [eos_token_id]
@@ -152,6 +173,10 @@ def _sample(
             if this_peer_finished_flag.item() == 0.0:
                 break
 
+        if "past_key_values" in model_kwargs and not isinstance(
+            model_kwargs["past_key_values"], tuple
+        ):
+            model_kwargs["past_key_values"] = None
         # prepare model inputs
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -336,6 +361,7 @@ def _sample(
                 )
                 model_inputs.pop("decoder_position_ids", None)
                 model_inputs.pop("decoder_attention_mask", None)
+            model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
@@ -435,9 +461,11 @@ def _sample(
             if unfinished_sequences.max() == 0:
                 this_peer_finished = True
         latency_list.append(time.time() - tic)
+        unfinished_sequences = unfinished_sequences & ~stopping_criteria(
+            input_ids, scores
+        )
         # stop if we exceed the maximum length
-        if stopping_criteria(input_ids, scores):
-            this_peer_finished = True
+        this_peer_finished = unfinished_sequences.max() == 0
 
         if this_peer_finished and not synced_gpus:
             break

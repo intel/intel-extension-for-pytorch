@@ -11,40 +11,8 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 sys.path.append(sys.path[0] + "/../../../")
-
-from transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    T5ForConditionalGeneration,
-    WhisperForConditionalGeneration,
-    AutoProcessor,
-)
-
-MODEL_CLASSES = {
-    "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
-    "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
-    "opt": (AutoModelForCausalLM, AutoTokenizer),
-    "llama": (AutoModelForCausalLM, AutoTokenizer),
-    "falcon": (AutoModelForCausalLM, AutoTokenizer),
-    "bloom": (AutoModelForCausalLM, AutoTokenizer),
-    "codegen": (AutoModelForCausalLM, AutoTokenizer),
-    "baichuan": (AutoModelForCausalLM, AutoTokenizer),
-    "chatglm": (AutoModelForCausalLM, AutoTokenizer),
-    "gptbigcode": (AutoModelForCausalLM, AutoTokenizer),
-    "t5": (T5ForConditionalGeneration, AutoTokenizer),
-    "mistral": (AutoModelForCausalLM, AutoTokenizer),
-    "mixtral": (AutoModelForCausalLM, AutoTokenizer),
-    "mpt": (AutoModelForCausalLM, AutoTokenizer),
-    "stablelm": (AutoModelForCausalLM, AutoTokenizer),
-    "qwen": (AutoModelForCausalLM, AutoTokenizer),
-    "git": (AutoModelForCausalLM, AutoProcessor),
-    "yuan": (AutoModelForCausalLM, AutoTokenizer),
-    "phi-3": (AutoModelForCausalLM, AutoTokenizer),
-    "phi": (AutoModelForCausalLM, AutoTokenizer),
-    "whisper": (WhisperForConditionalGeneration, AutoProcessor),
-    "auto": (AutoModelForCausalLM, AutoTokenizer),
-}
+from transformers import AutoConfig
+from llm.inference.utils.supported_models import MODEL_CLASSES
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", nargs="?", default="EleutherAI/gpt-j-6b")
@@ -120,9 +88,6 @@ try:
     from lmms_eval import utils as lmms_utils
     from lmms_eval.api.registry import ALL_TASKS
     from lmms_eval.tasks import initialize_tasks
-    from llava.model.language_model.llava_llama import (  # noqa F401
-        LlavaLlamaForCausalLM,
-    )
     from llava.model.builder import load_pretrained_model
     from llava.conversation import conv_templates
     from llava.mm_utils import (
@@ -237,7 +202,6 @@ class HuggingFaceModel(BaseLM):
                     config=self.config,
                     torch_dtype=load_dtype,
                     trust_remote_code=True,
-                    revision=pin_model_revision.get(model_id, None),
                 )
         else:
             self.model = model_class[0].from_pretrained(
@@ -250,7 +214,7 @@ class HuggingFaceModel(BaseLM):
 
         self.model = self.model.eval()
 
-        if with_ipex and dtype not in ["int8", "int4", "nf4"]:
+        if with_ipex:
             self.model = ipex.llm.optimize(
                 self.model.eval(),
                 dtype=infer_dtype,
@@ -422,7 +386,7 @@ class HuggingFaceModel(BaseLM):
             example_dict["past_key_values"] = past_key_values
             if has_position_ids:
                 example_dict["position_ids"] = position_ids_batched
-        if "return_last_logit" in model_inputs:
+        if "return_last_logit" in model_inputs and self._with_ipex:
             example_dict["return_last_logit"] = torch.tensor(True)
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
@@ -938,7 +902,7 @@ class LMMS(lmms):
         self.num_beams = 1 if with_greedy else 4
         self.tp_number = 1
         if self._with_jit:
-            input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
+            input_ids = torch.ones(1).to(torch.long).unsqueeze(0)
             attention_mask = torch.ones_like(input_ids)
             past_key_values = tuple(
                 [

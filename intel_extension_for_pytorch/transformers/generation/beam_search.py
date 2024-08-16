@@ -53,6 +53,25 @@ def _beam_search(
     synced_gpus: Optional[bool] = False,
     **model_kwargs,
 ) -> Union[BeamSearchOutput, torch.LongTensor]:
+    new_generation_config = model_kwargs.pop("generation_config", None)
+    if new_generation_config is not None:
+        if new_generation_config.do_sample:
+            return self._beam_sample(
+                input_ids,
+                beam_scorer,
+                logits_processor,
+                stopping_criteria,
+                model_kwargs.pop("logits_warper", None),
+                max_length,
+                pad_token_id,
+                eos_token_id,
+                output_attentions,
+                output_hidden_states,
+                output_scores,
+                return_dict_in_generate,
+                synced_gpus,
+                **model_kwargs,
+            )
     token_latency = (
         self.config.token_latency if hasattr(self.config, "token_latency") else False
     )
@@ -166,6 +185,10 @@ def _beam_search(
             # did all peers finish? the reduced sum will be 0.0 then
             if this_peer_finished_flag.item() == 0.0:
                 break
+        if "past_key_values" in model_kwargs and not isinstance(
+            model_kwargs["past_key_values"], tuple
+        ):
+            model_kwargs["past_key_values"] = None
 
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -382,6 +405,7 @@ def _beam_search(
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
@@ -499,8 +523,11 @@ def _beam_search(
         # increase cur_len
         cur_len = cur_len + 1
         latency_list.append(time.time() - tic)
-
-        if beam_scorer.is_done or stopping_criteria(input_ids, scores):
+        stopping_res = stopping_criteria(input_ids, scores)
+        is_stopped = (
+            stopping_res if isinstance(stopping_res, bool) else all(stopping_res)
+        )
+        if beam_scorer.is_done or is_stopped:
             if not synced_gpus:
                 break
             else:

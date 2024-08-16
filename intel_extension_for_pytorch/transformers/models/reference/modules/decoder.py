@@ -1550,22 +1550,25 @@ class _IPEXDecoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["self_attention"].dense
                 del self.__dict__["_modules"]["mlp"].dense_4h_to_h
 
-            gate_weights, up_weights = module.mlp.dense_h_to_4h.weight.chunk(2, dim=0)
-            has_bias = module.mlp.dense_h_to_4h.bias is not None
-            gate_linear = torch.nn.Linear(
-                gate_weights.shape[1], gate_weights.shape[0], has_bias
-            )
-            up_linear = torch.nn.Linear(
-                up_weights.shape[1], up_weights.shape[0], has_bias
-            )
-            gate_linear.weight.data = gate_weights
-            up_linear.weight.data = up_weights
-            if has_bias:
-                gate_bias, up_bias = module.mlp.dense_h_to_4h.bias.chunk(2, dim=0)
-                gate_linear.bias.data = gate_bias
-                up_linear.bias.data = up_bias
-            self.linear_silu_mul = _IPEXlinearSiluMulRef(gate_linear, up_linear)
-            del self.__dict__["_modules"]["mlp"].dense_h_to_4h
+            if module.mlp.dense_h_to_4h.weight.dtype not in [torch.uint8]:
+                gate_weights, up_weights = module.mlp.dense_h_to_4h.weight.chunk(
+                    2, dim=0
+                )
+                has_bias = module.mlp.dense_h_to_4h.bias is not None
+                gate_linear = torch.nn.Linear(
+                    gate_weights.shape[1], gate_weights.shape[0], has_bias
+                )
+                up_linear = torch.nn.Linear(
+                    up_weights.shape[1], up_weights.shape[0], has_bias
+                )
+                gate_linear.weight.data = gate_weights
+                up_linear.weight.data = up_weights
+                if has_bias:
+                    gate_bias, up_bias = module.mlp.dense_h_to_4h.bias.chunk(2, dim=0)
+                    gate_linear.bias.data = gate_bias
+                    up_linear.bias.data = up_bias
+                self.linear_silu_mul = _IPEXlinearSiluMulRef(gate_linear, up_linear)
+                del self.__dict__["_modules"]["mlp"].dense_h_to_4h
         elif self.model_backbone == "GPTBigCodeForCausalLM":
             self.linear_gelu = _IPEXlinearGeluRef(module.mlp.c_fc)
             del self.__dict__["_modules"]["mlp"].c_fc
