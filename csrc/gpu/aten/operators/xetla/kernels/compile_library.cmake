@@ -13,6 +13,8 @@ function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
 
   # set RPATH
   if(NOT WINDOWS)
+    # Window not support -ftemplate-backtrace-limit=0
+    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -ftemplate-backtrace-limit=0) 
     foreach(RPATH ${RPATHS_LIST})
       set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} ${RPATH})
     endforeach()

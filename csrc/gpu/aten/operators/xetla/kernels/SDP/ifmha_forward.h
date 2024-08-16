@@ -1108,34 +1108,26 @@ class ifmha_forward_t {
       uint32_t startT,
       uint32_t endT,
       matSij_t& matAcc) {
-    if (startT + ctx.sg_idx * kSgBc >= endT) {
-      return;
-    }
-
     base_offset += (startT + ctx.sg_idx * kSgBc);
-
-    constexpr int simd_lanes = kSgBc >= 32 ? 32 : 16;
+    constexpr int simd_lanes = kSgBc > 32 ? 32 : 16;
 
     static_assert(kSgBc % simd_lanes == 0);
 
+    constexpr int loops = kSgBc / simd_lanes;
     xetla_vector<uint32_t, simd_lanes> offsets =
         xetla_vector_gen<uint32_t, simd_lanes>(0, 1);
     offsets *= sizeof(scalar_t);
     offsets += (base_offset * sizeof(scalar_t));
 #pragma unroll
-    for (int i = 0; i < kSgBc / simd_lanes; ++i) {
+    for (int i = 0; i < loops; ++i) {
       offsets += i * simd_lanes * sizeof(scalar_t);
-      xetla_vector<uint32_t, simd_lanes> seq =
-          xetla_vector_gen<uint32_t, simd_lanes>(i * simd_lanes, 1);
-      xetla_mask<simd_lanes> mask = seq < (endT - startT - ctx.sg_idx * kSgBc);
       matAcc.reg.xetla_select<simd_lanes, 1>(i * simd_lanes) =
           xetla_load_global<
               scalar_t,
               simd_lanes,
               1,
               cache_hint::cached,
-              cache_hint::cached,
-              simd_lanes>(ptr, offsets, mask);
+              cache_hint::cached>(ptr, offsets);
     }
   }
 

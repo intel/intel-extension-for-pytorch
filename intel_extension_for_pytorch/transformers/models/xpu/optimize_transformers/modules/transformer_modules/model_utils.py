@@ -213,3 +213,35 @@ def xpu_gemm_use_xetla():
             in (torch.xpu.XPUComputeEng.RECOMMEND, torch.xpu.XPUComputeEng.XETLA)
         )
     )
+
+
+def dequant_gemm_block(input, quant_layer):
+    mm_out = torch.matmul(
+        input,
+        torch.ops.torch_ipex.int4x8_dequantize(
+            quant_layer.qweight,
+            quant_layer.scales,
+            quant_layer.qzeros,
+            quant_layer.blocksize,
+        ),
+    )
+    if quant_layer.bias is not None:
+        mm_out += quant_layer.bias
+    return mm_out
+
+
+def dequant_gemm_block_with_params(
+    input, qweight, scales, qzeros, blocksize, bias=None
+):
+    mm_out = torch.matmul(
+        input,
+        torch.ops.torch_ipex.int4x8_dequantize(
+            qweight,
+            scales,
+            qzeros,
+            blocksize,
+        ),
+    )
+    if bias is not None:
+        mm_out += bias
+    return mm_out
