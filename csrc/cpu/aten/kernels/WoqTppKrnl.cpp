@@ -1849,9 +1849,11 @@ void qlinear_woq_affine_dequant_upfront_impl(
 
   torch::Tensor dqw =
       torch::empty({Nc, Kc, Kb, Nb}, c10::CppTypeToScalarType<TComp>::value);
+  int b_vnni = 0;
   if (std::is_same<TComp, bfloat16>()) {
     // reshape to VNNI format
     dqw = dqw.view({Nc, Kc, Kb / 2, Nb, 2});
+    b_vnni = 1;
   }
   auto dqw_ptr = GetVLAPtr<TComp>(dqw, {Kc, Kb, Nb});
   auto tin0 = others_list.size() > 0
@@ -1978,22 +1980,22 @@ void qlinear_woq_affine_dequant_upfront_impl(
                                                at::Tensor& out,
                                                int fuse_type = 0) {
               if (fuse_type == WOQ_FUSE_GELU_ERF) {
-                tpp_linear_gelu<TComp, Tout>(in, dqw, b, out);
+                tpp_linear_gelu<TComp, Tout>(in, dqw, b, out, b_vnni);
               } else if (fuse_type == WOQ_FUSE_GELU_TANH) {
-                tpp_linear_gelu_tanh<TComp, Tout>(in, dqw, b, out);
+                tpp_linear_gelu_tanh<TComp, Tout>(in, dqw, b, out, b_vnni);
               } else if (fuse_type == WOQ_FUSE_RELU) {
-                tpp_linear_relu<TComp, Tout>(in, dqw, b, out);
+                tpp_linear_relu<TComp, Tout>(in, dqw, b, out, b_vnni);
               } else if (fuse_type == WOQ_FUSE_SILU) {
-                tpp_linear_silu<TComp, Tout>(in, dqw, b, out);
+                tpp_linear_silu<TComp, Tout>(in, dqw, b, out, b_vnni);
               } else if (fuse_type == WOQ_FUSE_MUL) {
-                tpp_linear_mul<TComp, Tout>(in, tin0, dqw, b, out);
+                tpp_linear_mul<TComp, Tout>(in, tin0, dqw, b, out, b_vnni);
               } else if (
                   fuse_type == WOQ_FUSE_ADD || fuse_type == WOQ_FUSE_ADD_ADD) {
                 TLA_ASSERT(
                     false,
                     "fuse_type should not be ADD or ADD_ADD since it's slower than aten add");
               } else {
-                tpp_linear_bias<TComp, TGemmOut>(in, dqw, b, out);
+                tpp_linear_bias<TComp, TGemmOut>(in, dqw, b, out, b_vnni);
               }
             };
 

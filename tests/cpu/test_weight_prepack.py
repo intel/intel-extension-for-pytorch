@@ -1065,66 +1065,32 @@ class TestPrepackCases(TestCase):
             else:
                 origin_model = copy.deepcopy(model).eval()
             if feed_sample_input:
-                if dtype == torch.float16:
-                    if is_train:
-                        ipex_model, ipex_optimizer = ipex.optimize(
-                            origin_model,
-                            dtype=dtype,
-                            optimizer=origin_optimizer,
-                            level="O0",
-                            weights_prepack=True,
-                            sample_input=x,
-                        )
-                    else:
-                        ipex_model = ipex.optimize(
-                            origin_model,
-                            dtype=dtype,
-                            level="O0",
-                            weights_prepack=True,
-                            sample_input=x,
-                        )
+                if is_train:
+                    ipex_model, ipex_optimizer = ipex.optimize(
+                        origin_model,
+                        dtype=dtype,
+                        optimizer=origin_optimizer,
+                        level="O1",
+                        sample_input=x,
+                    )
                 else:
-                    if is_train:
-                        ipex_model, ipex_optimizer = ipex.optimize(
-                            origin_model,
-                            dtype=dtype,
-                            optimizer=origin_optimizer,
-                            level="O1",
-                            sample_input=x,
-                        )
-                    else:
-                        ipex_model = ipex.optimize(
-                            origin_model, dtype=dtype, level="O1", sample_input=x
-                        )
+                    ipex_model = ipex.optimize(
+                        origin_model, dtype=dtype, level="O1", sample_input=x
+                    )
             else:
-                if dtype == torch.float16:
-                    if is_train:
-                        ipex_model, ipex_optimizer = ipex.optimize(
-                            origin_model,
-                            dtype=dtype,
-                            optimizer=origin_optimizer,
-                            level="O0",
-                            weights_prepack=True,
-                        )
-                    else:
-                        ipex_model = ipex.optimize(
-                            origin_model, dtype=dtype, level="O0", weights_prepack=True
-                        )
+                if is_train:
+                    ipex_model, ipex_optimizer = ipex.optimize(
+                        origin_model,
+                        dtype=dtype,
+                        optimizer=origin_optimizer,
+                        level="O1",
+                    )
                 else:
-                    if is_train:
-                        ipex_model, ipex_optimizer = ipex.optimize(
-                            origin_model,
-                            dtype=dtype,
-                            optimizer=origin_optimizer,
-                            level="O1",
-                        )
-                    else:
-                        ipex_model = ipex.optimize(
-                            origin_model, dtype=dtype, level="O1"
-                        )
-            if is_train or dtype == torch.float16:
+                    ipex_model = ipex.optimize(origin_model, dtype=dtype, level="O1")
+            if is_train:
                 self.assertTrue(ipex_model.weight.dtype == dtype)
-
+            if dtype == torch.float16 and is_train:
+                scaler = torch.cpu.amp.GradScaler(init_scale=1)
             for i in range(1):
                 # original fp32 path
                 y1 = origin_model(x1)
@@ -1139,9 +1105,13 @@ class TestPrepackCases(TestCase):
                 if is_train:
                     loss2 = y2.sum()
                     ipex_optimizer.zero_grad()
-                    loss2.backward()
-                    ipex_optimizer.step()
-
+                    if dtype == torch.float16:
+                        scaler.scale(loss2).backward()
+                        scaler.step(ipex_optimizer)
+                        scaler.update(new_scale=1.0)
+                    else:
+                        loss2.backward()
+                        ipex_optimizer.step()
             self.assertTrue(y2.dtype == dtype)
             self.assertEqual(y1, y2.float(), rtol=rtol, atol=atol)
             if is_train:

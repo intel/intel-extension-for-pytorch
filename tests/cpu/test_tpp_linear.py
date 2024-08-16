@@ -299,6 +299,9 @@ class TestTPPlinear(TestCase):
                 if dtype == torch.float:
                     atol = 2e-5
                     rtol = 1.3e-6
+                elif dtype == torch.float16:
+                    atol = 1e-4
+                    rtol = 2e-3
                 self.assertEqual(out, ref_out, atol=atol, rtol=rtol)
                 _disable_tpp()
 
@@ -353,7 +356,9 @@ class TestTPPlinear(TestCase):
                 out = torch.ops.torch_ipex.tpp_linear_mul(
                     x2, x2, model.mlp.weight, x2.new_empty(0)
                 )
-                self.assertEqual(out, ref_out)
+                atol = 1e-3 if dtype == torch.float16 else None
+                rtol = 1e-3 if dtype == torch.float16 else None
+                self.assertEqual(out, ref_out, atol=atol, rtol=rtol)
                 _disable_tpp()
 
     def test_tpp_linear_add(self):
@@ -412,7 +417,9 @@ class TestTPPlinear(TestCase):
                 out = torch.ops.torch_ipex.tpp_linear_add_add(
                     x2, x2, x2, model.mlp.weight, model.mlp.bias, 1.0
                 )
-                self.assertEqual(out, ref_out)
+                atol = 1e-3 if dtype == torch.float16 else None
+                rtol = 0.01 if dtype == torch.float16 else None
+                self.assertEqual(out, ref_out, atol=atol, rtol=rtol)
                 _disable_tpp()
 
 

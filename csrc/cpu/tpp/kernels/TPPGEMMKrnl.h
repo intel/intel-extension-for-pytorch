@@ -94,7 +94,8 @@ inline void tpp_linear_bias(
     const at::Tensor& t_in,
     const at::Tensor& t_wt,
     const at::Tensor& t_bias,
-    at::Tensor& t_out) {
+    at::Tensor& t_out,
+    int b_vnni) {
   auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto wt_sizes = t_wt_.sizes();
@@ -137,9 +138,6 @@ inline void tpp_linear_bias(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  int b_vnni = std::is_same<T, bfloat16>() ||
-      (std::is_same<T, half>() &&
-       torch_ipex::utils::isa_has_amx_fp16_support());
   auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
       BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
@@ -185,7 +183,8 @@ template <typename T, typename Tout = T>
 inline void tpp_linear_no_bias(
     const at::Tensor& t_in,
     const at::Tensor& t_wt,
-    at::Tensor& t_out) {
+    at::Tensor& t_out,
+    int b_vnni) {
   auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
@@ -220,10 +219,10 @@ inline void tpp_linear_no_bias(
 
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  auto brgemm_tpp = SCOPEITGEMM(
-      (BrgemmTPP<T, Tout>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto brgemm_tpp_rem = SCOPEITGEMM(
-      (BrgemmTPP<T, Tout>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
 
   {
     RECORD_SCOPE(tpp_linear_krnl, {t_in, t_wt_V});
@@ -259,7 +258,8 @@ inline void tpp_linear_mul(
     const at::Tensor t_in1,
     const at::Tensor t_wt,
     const at::Tensor t_bias,
-    at::Tensor t_out) {
+    at::Tensor t_out,
+    int b_vnni) {
   auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
@@ -297,10 +297,10 @@ inline void tpp_linear_mul(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  auto brgemm_tpp = SCOPEITGEMM(
-      (BrgemmTPP<T, Tout>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto brgemm_tpp_rem = SCOPEITGEMM(
-      (BrgemmTPP<T, Tout>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto mul_tpp = SCOPEIT((MulTPP<Tout, Tout>(BSb, Hk, K, K)), EW_MUL);
   auto mul_tpp_rem = SCOPEIT((MulTPP<Tout, Tout>(rem, Hk, K, K)), EW_MUL);
 
@@ -355,7 +355,8 @@ inline void tpp_linear_add_add(
     const at::Tensor& t_wt,
     const at::Tensor& t_bias,
     at::Tensor& t_out,
-    double scale) {
+    double scale,
+    int b_vnni) {
   auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
@@ -393,10 +394,10 @@ inline void tpp_linear_add_add(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<T>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<T>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<T>(rem, Hk, K), EW_ZERO);
-  auto brgemm_tpp = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto brgemm_tpp_rem = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, T>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, T>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto add_tpp = SCOPEIT((AddTPP<T, T>(BSb, Hk, K, K)), EW_ADD);
   auto add_tpp_rem = SCOPEIT((AddTPP<T, T>(rem, Hk, K, K)), EW_ADD);
   auto sadd_tpp = SCOPEIT((ScaleAddTPP<T, T>(BSb, Hk, K, K)), EW_ADD);
@@ -452,7 +453,8 @@ inline void tpp_linear_gelu(
     const at::Tensor& t_in,
     const at::Tensor& t_wt,
     const at::Tensor& t_bias,
-    at::Tensor& t_out) {
+    at::Tensor& t_out,
+    int b_vnni) {
   auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
@@ -488,9 +490,6 @@ inline void tpp_linear_gelu(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  int b_vnni = std::is_same<T, bfloat16>() ||
-      (std::is_same<T, half>() &&
-       torch_ipex::utils::isa_has_amx_fp16_support());
   auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
       BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
@@ -546,7 +545,8 @@ inline void tpp_linear_gelu_tanh(
     const at::Tensor& t_in,
     const at::Tensor& t_wt,
     const at::Tensor& t_bias,
-    at::Tensor& t_out) {
+    at::Tensor& t_out,
+    int b_vnni) {
   auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
@@ -582,9 +582,6 @@ inline void tpp_linear_gelu_tanh(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  int b_vnni = std::is_same<T, bfloat16>() ||
-      (std::is_same<T, half>() &&
-       torch_ipex::utils::isa_has_amx_fp16_support());
   auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
       BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
@@ -652,7 +649,8 @@ inline void tpp_fused_gate_up_proj(
     const at::Tensor& t_bias_gate,
     const at::Tensor& t_wt_up,
     const at::Tensor& t_bias_up,
-    at::Tensor& t_out) {
+    at::Tensor& t_out,
+    int b_vnni) {
   auto t_wt_gate_ = t_wt_gate;
   auto t_wt_up_ = t_wt_up;
   auto in_sizes = t_in.sizes();
@@ -700,10 +698,10 @@ inline void tpp_fused_gate_up_proj(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<T>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<T>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<T>(rem, Hk, K), EW_ZERO);
-  auto brgemm_tpp = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto brgemm_tpp_rem = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, T>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, T>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto silu_fwd_tpp = SCOPEIT(SiLUFwdTPP<T>(BSb, Hk, K, K), ACT);
   auto silu_fwd_tpp_rem = SCOPEIT(SiLUFwdTPP<T>(rem, Hk, K, K), ACT);
   auto mul_tpp = SCOPEIT((MulTPP<T, T>(BSb, Hk, K, K)), EW_MUL);
@@ -778,7 +776,8 @@ inline void tpp_linear_add(
     const at::Tensor t_wt,
     const at::Tensor t_bias,
     at::Tensor t_out,
-    float scale) {
+    float scale,
+    int b_vnni) {
   auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
@@ -816,10 +815,10 @@ inline void tpp_linear_add(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<T>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<T>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<T>(rem, Hk, K), EW_ZERO);
-  auto brgemm_tpp = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto brgemm_tpp_rem = SCOPEITGEMM(
-      (BrgemmTPP<T, T>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, T>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, T>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto sadd_tpp = SCOPEIT((ScaleAddTPP<T, T>(BSb, Hk, K, K)), EW_ADD);
   auto sadd_tpp_rem = SCOPEIT((ScaleAddTPP<T, T>(rem, Hk, K, K)), EW_ADD);
 
@@ -871,7 +870,8 @@ inline void tpp_linear_silu(
     const at::Tensor t_in,
     const at::Tensor t_wt,
     const at::Tensor t_bias,
-    at::Tensor t_out) {
+    at::Tensor t_out,
+    int b_vnni) {
   auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
@@ -908,10 +908,10 @@ inline void tpp_linear_silu(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  auto brgemm_tpp = SCOPEITGEMM(
-      (BrgemmTPP<T, Tout>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto brgemm_tpp_rem = SCOPEITGEMM(
-      (BrgemmTPP<T, Tout>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto silu_fwd_tpp = SCOPEIT(SiLUFwdTPP<Tout>(BSb, Hk, K, K), ACT);
   auto silu_fwd_tpp_rem = SCOPEIT(SiLUFwdTPP<Tout>(rem, Hk, K, K), ACT);
 
@@ -963,7 +963,8 @@ inline void tpp_linear_relu(
     const at::Tensor t_in,
     const at::Tensor t_wt,
     const at::Tensor t_bias,
-    at::Tensor t_out) {
+    at::Tensor t_out,
+    int b_vnni) {
   auto t_wt_ = t_wt;
   auto in_sizes = t_in.sizes();
   auto BS = in_sizes[0] * in_sizes[1];
@@ -1000,10 +1001,10 @@ inline void tpp_linear_relu(
   auto copy_bias_tpp_rem = SCOPEIT(CpyBiasTPP<Tout>(rem, Hk, K), BIAS);
   auto zero_tpp = SCOPEIT(SetZeroTPP<Tout>(BSb, Hk, K), EW_ZERO);
   auto zero_tpp_rem = SCOPEIT(SetZeroTPP<Tout>(rem, Hk, K), EW_ZERO);
-  auto brgemm_tpp = SCOPEITGEMM(
-      (BrgemmTPP<T, Tout>(BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
-  auto brgemm_tpp_rem = SCOPEITGEMM(
-      (BrgemmTPP<T, Tout>(rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb)));
+  auto brgemm_tpp = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      BSb, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
+  auto brgemm_tpp_rem = SCOPEITGEMM((BrgemmTPP<T, Tout>(
+      rem, Hk, Hc, Hc, Hk * Hc, C, Hk, K, 1.0, 0, Ncb, b_vnni)));
   auto relu_fwd_tpp = SCOPEIT(ReLUFwdTPP<Tout>(BSb, Hk, K, K, false), ACT);
   auto relu_fwd_tpp_rem = SCOPEIT(ReLUFwdTPP<Tout>(rem, Hk, K, K, false), ACT);
 
