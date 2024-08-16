@@ -200,7 +200,7 @@ Check [WOQ INT4](../../../../../docs/tutorials/llm/int4_weight_only_quantization
 #### Install intel-extension-for-transformers and intel-neural-compressor 
 
 ```
-pip install neural-compressor
+pip install neural-compressor==2.6
 pip install intel-extension-for-transformers
 ```
 
