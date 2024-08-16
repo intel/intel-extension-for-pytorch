@@ -168,6 +168,19 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
             print("Unsupported input shape")
             return
 
+        # broadcast attention mask if needed
+        if attention_mask.dim() < 4:
+            attention_mask = (
+                attention_mask.unsqueeze(0)
+                .expand(
+                    bs * beam,
+                    attention_mask.shape[0],
+                    attention_mask.shape[1],
+                    attention_mask.shape[2],
+                )
+                .contiguous()
+            )
+
         IPEXTransformerAttn.beam_size = beam
         first_token = True if past_key_value is None else False
 
