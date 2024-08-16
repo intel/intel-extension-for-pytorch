@@ -6,7 +6,7 @@ from .QuantizedAttention import IPEXTransformerAttnOptimizedInt4
 
 from .Linear import IPEXTransformerLinear
 
-from .model_utils import xpu_gemm_use_xetla, dequant_gemm_block
+from .model_utils import xpu_gemm_use_xetla
 
 
 class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
@@ -287,12 +287,6 @@ class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
     def compute_qkv_gemm(self, hidden_states, query, key, value):
         if xpu_gemm_use_xetla() or self.num_kv_group <= 1:
             return super().compute_qkv_gemm(hidden_states, query, key, value)
-        if hidden_states.shape[0] > 1:
-            # dequantize+gemm kernel can improve IPEX int4 linear performance of first token
-            query.copy_(dequant_gemm_block(hidden_states, self.q_proj_quant))
-            key.copy_(dequant_gemm_block(hidden_states, self.k_proj_quant))
-            value.copy_(dequant_gemm_block(hidden_states, self.v_proj_quant))
-            return query, key, value
 
         hidden_states_flat = hidden_states.flatten(0, -2)
         if self.q_proj.bias is None:

@@ -22,7 +22,6 @@
 #include <experimental/kernel/col_major_shuf/col_major_shuf.hpp>
 #include <experimental/kernel/data_transformer/data_transformer.hpp>
 #include <experimental/kernel/gemm/gemm.hpp>
-#include <experimental/kernel/int4_dequantize/int4_dequantize.hpp>
 #include <experimental/kernel/layer_norm/layer_norm.hpp>
 #include <experimental/kernel/mha_core_attention/mha_attn_reg.hpp>
 #include <experimental/kernel/mha_core_attention/mha_core_attn.hpp>

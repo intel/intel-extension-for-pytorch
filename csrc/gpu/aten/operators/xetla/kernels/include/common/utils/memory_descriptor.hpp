@@ -142,34 +142,20 @@ struct mem_base_t<dtype_, mem_space::local> {
   }
 };
 
-// Memory descriptor
-template <
-    typename dtype_,
-    mem_layout layout_,
-    mem_space space_,
-    uint32_t alignment_ = 8,
-    bool use_mask_ = false,
-    int dim_ = 2>
-struct mem_desc_t {};
-
-// Alias of mem_desc_t for data with non-divisible shape and requires primitives
-// with masks to load correctly
 template <
     typename dtype_,
     mem_layout layout_,
     mem_space space_,
     uint32_t alignment_ = 16,
     int dim_ = 2>
-using mem_mask_desc_t =
-    mem_desc_t<dtype_, layout_, space_, alignment_, true, dim_>;
+struct mem_desc_t {};
 
 template <
     typename dtype_,
     mem_layout layout_,
     mem_space space_,
-    uint32_t alignment_,
-    bool use_mask_>
-struct mem_desc_t<dtype_, layout_, space_, alignment_, use_mask_, 2> {
+    uint32_t alignment_>
+struct mem_desc_t<dtype_, layout_, space_, alignment_, 2> {
   using dtype = dtype_;
   static constexpr mem_layout layout = layout_;
   static constexpr mem_space space = space_;
@@ -179,13 +165,11 @@ struct mem_desc_t<dtype_, layout_, space_, alignment_, use_mask_, 2> {
 
   static constexpr bool is_col_major = layout == mem_layout::col_major;
   static constexpr bool is_local = space == mem_space::local;
-  static constexpr bool use_mask = use_mask_;
   using shape_t = mem_shape_t<dim>;
   using coord_t = mem_coord_t<dim>;
   using base_t = mem_base_t<dtype, space>;
 
-  using this_type_t =
-      mem_desc_t<dtype, layout_, space_, alignment, use_mask_, 2>;
+  using this_type_t = mem_desc_t<dtype, layout_, space_, alignment, 2>;
 
   inline mem_desc_t() = default;
   inline mem_desc_t(base_t base_, shape_t shape_, coord_t coord_)
