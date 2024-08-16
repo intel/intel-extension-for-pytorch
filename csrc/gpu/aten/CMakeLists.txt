@@ -30,14 +30,12 @@ endforeach()
 
 set(IPEX_ATEN_OPS_SRCS ${slow_srcs} ${fast_srcs} PARENT_SCOPE)
 
-FILE(GLOB aten_amp_src "amp/*.cpp")
 FILE(GLOB aten_core_src "core/*.cpp" "core/detail/*.cpp")
 FILE(GLOB aten_onednn_src "../oneDNN/*.cpp")
 FILE(GLOB aten_quant_src "quantized/*.cpp")
 FILE(GLOB aten_tensor_src "tensor/*.cpp")
 
 set(IPEX_ATEN_CORE_SRCS
-  ${aten_amp_src}
   ${aten_core_src}
   ${aten_onednn_src}
   ${aten_quant_src}
