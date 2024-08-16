@@ -3,11 +3,6 @@ if(Codegen_GPU_cmake_included)
 endif()
 set(Codegen_GPU_cmake_included true)
 
-set(SIMPLE_TRACE)
-if(BUILD_SIMPLE_TRACE)
-        set(SIMPLE_TRACE "--simple_trace")
-endif()
-
 set(BUILD_IPEX_GPU_ATEN_GENERATED "${CMAKE_BINARY_DIR}/csrc/aten/generated/ATen")
 file(MAKE_DIRECTORY ${BUILD_IPEX_GPU_ATEN_GENERATED})
 
@@ -24,7 +19,6 @@ Function(GEN_BACKEND file_yaml)
                 "${PYTHON_EXECUTABLE}" -m torchgen.gen_backend_stubs
                 --output_dir ${BUILD_IPEX_GPU_ATEN_GENERATED}
                 --source_yaml ${PROJECT_SOURCE_DIR}/scripts/tools/torchgen/yaml/${file_yaml}
-                ${SIMPLE_TRACE}
                 WORKING_DIRECTORY ${IPEX_ROOT_DIR}/scripts/tools
                 DEPENDS
                 ${depended_files}
@@ -49,7 +43,6 @@ Function(GEN_NATIVE_IMPL file_yaml file_impl file_head)
                 --header_file ${header_file}
                 --output_impl_file ${output_file}
                 ${GENERATE_IMPL}
-                ${SIMPLE_TRACE}
                 WORKING_DIRECTORY ${IPEX_ROOT_DIR}/scripts/tools
                 DEPENDS
                 ${source_file})
