@@ -201,7 +201,8 @@ model_class = MODEL_CLASSES[model_type]
 tokenizer = model_class[1].from_pretrained(model_name)
 config = AutoConfig.from_pretrained(model_name, torchscript=args.jit)
 # Avoid deepspeed tp>=2 lm_head weight reload. Not affect the results.
-config.tie_word_embeddings = False
+if not args.disable_optimize_transformers:
+    config.tie_word_embeddings = False
 #if not hasattr(config, "text_max_length") and args.prompt is None:
 #    config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 print_rank0("*** model config:", config)
