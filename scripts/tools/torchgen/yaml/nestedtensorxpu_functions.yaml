@@ -79,7 +79,7 @@ supported:
 #  - gt.Scalar # not supported now in torch 2.1
  - normal_
 #  - _pin_memory # not supported now in torch 2.1
- - _fused_sdp_choice
+#  - _fused_sdp_choice // schema change
  - _transform_bias_rescale_qkv
  - _native_multi_head_attention
  - _nested_tensor_softmax_with_shape
