@@ -46,20 +46,16 @@ fi
 git submodule sync
 git submodule update --init --recursive
 
-python -m pip install pyyaml
-VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
-VER_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k version)
-VER_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k version)
-REPO_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
-COMMIT_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k commit)
-REPO_LLVM=$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k repo)
-VER_LLVM=$(python tools/yaml_utils.py -f dependency_version.yml -d llvm -k commit)
-VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
-python -m pip uninstall -y pyyaml
+VER_TORCH=$(python tools/dep_ver_utils.py -f dependency_version.json -k pytorch:version)
+VER_TORCHVISION=$(python tools/dep_ver_utils.py -f dependency_version.json -k torchvision:version)
+VER_TORCHAUDIO=$(python tools/dep_ver_utils.py -f dependency_version.json -k torchaudio:version)
+COMMIT_TORCHCCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k torch-ccl:commit)
+VER_LLVM=$(python tools/dep_ver_utils.py -f dependency_version.json -k llvm:commit)
+VER_GCC=$(python tools/dep_ver_utils.py -f dependency_version.json -k gcc:min-version)
 cd ..
 
 if [ ! -d llvm-project ]; then
-    git clone ${REPO_LLVM} llvm-project
+    git clone https://github.com/llvm/llvm-project.git
 fi
 cd llvm-project
 if [ ! -z "${VER_LLVM}" ]; then
@@ -198,7 +194,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     if [ ! -d torch-ccl ]; then
-        git clone ${REPO_TORCHCCL} torch-ccl
+        git clone https://github.com/intel/torch-ccl.git
     fi
     cd torch-ccl
     if [ ! -z "${COMMIT_TORCHCCL}" ]; then

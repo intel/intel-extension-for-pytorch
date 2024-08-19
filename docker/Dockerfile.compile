@@ -43,11 +43,9 @@ RUN cp ./intel-extension-for-pytorch/scripts/compile_bundle.sh ./ && \
     sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
 RUN CC=gcc CXX=g++ bash compile_bundle.sh && \
     cd intel-extension-for-pytorch && \
-    python -m pip install pyyaml && \
-    VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version) && \
-    VER_TORCHVISION=$(python tools/yaml_utils.py -f dependency_version.yml -d torchvision -k version) && \
-    VER_TORCHAUDIO=$(python tools/yaml_utils.py -f dependency_version.yml -d torchaudio -k version) && \
-    python -m pip uninstall -y pyyaml && \
+    VER_TORCH=$(python tools/dep_ver_utils.py -f dependency_version.json -k pytorch:version) && \
+    VER_TORCHVISION=$(python tools/dep_ver_utils.py -f dependency_version.json -k torchvision:version) && \
+    VER_TORCHAUDIO=$(python tools/dep_ver_utils.py -f dependency_version.json -k torchaudio:version) && \
     cd .. && \
     echo ${VER_TORCH} | grep "dev" > /dev/null; TORCH_DEV=$?; URL_NIGHTLY=""; if [ ${TORCH_DEV} -eq 0 ]; then URL_NIGHTLY="nightly/"; fi; echo "#!/bin/bash\npython -m pip install torch==${VER_TORCH} torchvision==${VER_TORCHVISION} torchaudio==${VER_TORCHAUDIO} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu" > torch_install.sh
 

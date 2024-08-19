@@ -195,7 +195,7 @@ if [[ ${DEVICE} == "cpu" ]]; then
     parse_example "../examples/cpu/features/llm/llm_optimize_woq.py" ${MDEXAMPLE} "(marker_llm_optimize_woq)" "python"
     parse_example "../examples/cpu/inference/cpp/example-app.cpp" ${MDEXAMPLE} "(marker_cppsdk_sample)" "cpp"
     parse_example "../examples/cpu/inference/cpp/CMakeLists.txt" ${MDEXAMPLE} "(marker_cppsdk_cmake)" "cmake"
-	VER_TRANS=$(python ../tools/yaml_utils.py -f ../dependency_version.yml -d transformers -k version)
+	VER_TRANS=$(grep "transformers==" ../examples/cpu/llm/inference/requirements.txt | cut -d "=" -f 3)
 	sed -i "s/<VER_TRANSFORMERS>/${VER_TRANS}/g" ${MDEXAMPLE}
 
     cp tutorials/features/fast_bert.md tutorials/features/fast_bert.md.bk

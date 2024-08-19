@@ -46,25 +46,26 @@ else
     set_ld_preload /usr libtcmalloc.so
 fi
 
-ONECCL_PATH=${BASEFOLDER}/../oneCCL_release
-if [ ! -d ${ONECCL_PATH} ]; then
-    echo "Warning: oneCCL is not available."
-else
-    source ${ONECCL_PATH}/env/setvars.sh
-fi
-
-JAVA_PATH=${BASEFOLDER}/../
-cd ${JAVA_PATH}
-if [ ! -d jdk-22.0.2 ]; then
-    wget https://download.java.net/java/GA/jdk22.0.2/c9ecb94cd31b495da20a27d4581645e8/9/GPL/openjdk-22.0.2_linux-x64_bin.tar.gz
-    tar xvf openjdk-22.0.2_linux-x64_bin.tar.gz
-    rm openjdk-22.0.2_linux-x64_bin.tar.gz
-fi
-export JAVA_HOME=`pwd`/jdk-22.0.2
-export PATH=${PATH}:${JAVA_HOME}/bin
-
 cd ${BASEFOLDER}/../${MODE}
 if [ ${MODE} == "inference" ]; then
+    ONECCL_PATH=${BASEFOLDER}/../oneCCL_release
+    if [ ! -d ${ONECCL_PATH} ]; then
+        echo "Warning: oneCCL is not available."
+    else
+        source ${ONECCL_PATH}/env/setvars.sh
+    fi
+
+    cd ..
+    if [ ! -d jdk-22.0.2 ]; then
+        wget https://download.java.net/java/GA/jdk22.0.2/c9ecb94cd31b495da20a27d4581645e8/9/GPL/openjdk-22.0.2_linux-x64_bin.tar.gz
+        tar xvf openjdk-22.0.2_linux-x64_bin.tar.gz
+        rm openjdk-22.0.2_linux-x64_bin.tar.gz
+    fi
+    export JAVA_HOME=`pwd`/jdk-22.0.2
+    export PATH=${PATH}:${JAVA_HOME}/bin
+    cd ${MODE}
+
+    python -m pip install -r requirements.txt
     if [ -f prompt.json ]; then
         rm -f prompt.json
     fi

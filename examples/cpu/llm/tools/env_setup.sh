@@ -40,29 +40,24 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     # Enter IPEX root dir
     cd ../../..
 
-    if [ ! -f dependency_version.yml ]; then
+    if [ ! -f dependency_version.json ]; then
         echo "Please check if `pwd` is a valid Intel® Extension for PyTorch* source code directory."
         exit 2
     fi
-    python -m pip install pyyaml
-    REPO_LM_EVA=$(python tools/yaml_utils.py -f dependency_version.yml -d lm-evaluation-harness -k repo)
-    COMMIT_LM_EVA=$(python tools/yaml_utils.py -f dependency_version.yml -d lm-evaluation-harness -k commit)
-    REPO_DS_SYCL=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k repo)
-    COMMIT_DS_SYCL=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k commit)
-    VER_DS_SYCL=$(python tools/yaml_utils.py -f dependency_version.yml -d deepspeed -k version)
-    VER_TORCHCCL=$(python tools/yaml_utils.py -f dependency_version.yml -d torch-ccl -k version)
-    REPO_ONECCL=$(python tools/yaml_utils.py -f dependency_version.yml -d oneCCL -k repo)
-    COMMIT_ONECCL=$(python tools/yaml_utils.py -f dependency_version.yml -d oneCCL -k commit)
-    VER_GCC=$(python tools/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
-    VER_TORCH=$(python tools/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
-    VER_TRANSFORMERS=$(python tools/yaml_utils.py -f dependency_version.yml -d transformers -k version)
-    VER_PROTOBUF=$(python tools/yaml_utils.py -f dependency_version.yml -d protobuf -k version)
-    VER_INC=$(python tools/yaml_utils.py -f dependency_version.yml -d neural-compressor -k version)
+    COMMIT_LM_EVA=$(python tools/dep_ver_utils.py -f dependency_version.json -k lm-evaluation-harness:commit)
+    COMMIT_DS_SYCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k deepspeed:commit)
+    VER_DS_SYCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k deepspeed:version)
+    VER_TORCHCCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k torch-ccl:version)
+    COMMIT_ONECCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k oneCCL:commit)
+    VER_GCC=$(python tools/dep_ver_utils.py -f dependency_version.json -k gcc:min-version)
+    VER_TORCH=$(python tools/dep_ver_utils.py -f dependency_version.json -k pytorch:version)
+    VER_TRANSFORMERS=$(python tools/dep_ver_utils.py -f dependency_version.json -k transformers:version)
+    VER_PROTOBUF=$(python tools/dep_ver_utils.py -f dependency_version.json -k protobuf:version)
+    VER_INC=$(python tools/dep_ver_utils.py -f dependency_version.json -k neural-compressor:version)
     VER_IPEX_MAJOR=$(grep "VERSION_MAJOR" version.txt | cut -d " " -f 2)
     VER_IPEX_MINOR=$(grep "VERSION_MINOR" version.txt | cut -d " " -f 2)
     VER_IPEX_PATCH=$(grep "VERSION_PATCH" version.txt | cut -d " " -f 2)
     VER_IPEX="${VER_IPEX_MAJOR}.${VER_IPEX_MINOR}.${VER_IPEX_PATCH}+cpu"
-    python -m pip uninstall -y pyyaml
     # Enter IPEX parent dir
     cd ..
 
@@ -167,13 +162,13 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl
     fi
 
-    echo "python -m pip install cpuid accelerate datasets sentencepiece mkl protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC} transformers_stream_generator tiktoken" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install -r ./requirements.txt" >> ${AUX_INSTALL_SCRIPT}
 
     # Used for accuracy test only
     if [ -d lm-evaluation-harness ]; then
         rm -rf lm-evaluation-harness
     fi
-    git clone ${REPO_LM_EVA} lm-evaluation-harness
+    git clone https://github.com/EleutherAI/lm-evaluation-harness.git
     cd lm-evaluation-harness
     git checkout ${COMMIT_LM_EVA}
     python setup.py bdist_wheel
@@ -186,7 +181,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         if [ -d DeepSpeed ]; then
             rm -rf DeepSpeed
         fi
-        git clone ${REPO_DS_SYCL} DeepSpeed
+        git clone https://github.com/microsoft/DeepSpeed.git
         cd DeepSpeed
         git checkout ${COMMIT_DS_SYCL}
         python -m pip install -r requirements/requirements.txt
@@ -202,7 +197,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     if [ -d oneCCL ]; then
         rm -rf oneCCL
     fi
-    git clone ${REPO_ONECCL} oneCCL
+    git clone https://github.com/oneapi-src/oneCCL.git
     cd oneCCL
     git checkout ${COMMIT_ONECCL}
     mkdir build
@@ -212,7 +207,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     cd ../..
     cp -r oneCCL/build/_install ${CCLFOLDER}
     rm -rf oneCCL
-    cd intel-extension-for-pytorch/examples/cpu/llm
+
+    cd ${BASEFOLDER}/..
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     set +e
