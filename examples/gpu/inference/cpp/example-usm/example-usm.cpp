@@ -26,9 +26,7 @@ int main(int argc, const char* argv[]) {
   auto input = torch::from_blob(
       input_ptr,
       {1, 3, 224, 224},
-      nullptr,
-      options,
-      {stream.device()});
+      options);
   std::cout << "input tensor created from usm " << std::endl;
   inputs.push_back(input);
 
