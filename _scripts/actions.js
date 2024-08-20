@@ -202,16 +202,31 @@ $(document).ready(function() {
             items.push(item);
           }
           if(data.system_requirements.software.basekit != null) {
-            var item = {};
-            item["Software"] = "Intel® oneAPI Base Toolkit";
-            item["Version"] = data.system_requirements.software.basekit;
-            items.push(item);
+            var applyto = data.system_requirements.software.basekit.applyto;
+            if(applyto == null || applyto != null && $.pkgInArray(data.package, applyto)) {
+              var item = {};
+              item["Software"] = "Intel® oneAPI Base Toolkit";
+              item["Version"] = data.system_requirements.software.basekit.version;
+              items.push(item);
+            }
           }
           if(data.system_requirements.software.basekit_hotfix != null) {
-            var item = {};
-            item["Software"] = "Intel® oneAPI Base Toolkit Hotfix";
-            item["Version"] = data.system_requirements.software.basekit_hotfix;
-            items.push(item);
+            var applyto = data.system_requirements.software.basekit_hotfix.applyto;
+            if(applyto == null || applyto != null && $.pkgInArray(data.package, applyto)) {
+              var item = {};
+              item["Software"] = "Intel® oneAPI Base Toolkit Hotfix";
+              item["Version"] = data.system_requirements.software.basekit_hotfix;
+              items.push(item);
+            }
+          }
+          if(data.system_requirements.software.pti != null) {
+            var applyto = data.system_requirements.software.basekit.applyto;
+            if(applyto == null || applyto != null && $.pkgInArray(data.package, applyto)) {
+              var item = {};
+              item["Software"] = "Intel® Profiling Tools Interfaces for GPU (PTI for GPU)";
+              item["Version"] = data.system_requirements.software.pti.version;
+              items.push(item);
+            }
           }
           if(data.system_requirements.software.python != null) {
             var item = {};
@@ -266,86 +281,111 @@ $(document).ready(function() {
           indexb += 1;
         }
         if(data.preparation.basekit != null) {
-          ret += "<div class=\"simple\">";
-          ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Install Intel® oneAPI Base Toolkit</h3>";
-          var notes = [];
-          // if(data.preparation.basekit.notinstall != null) {
-          //   var note = "<p>Do NOT install the following Intel® oneAPI Base Toolkit components:</p>";
-          //   note += $.ul_gen(data.preparation.basekit.notinstall);
-          //   notes.push(note);
-          // }
-          var activate_script = "setvars.sh";
-          if(data.os == "Windows")
-            activate_script = "setvars.bat";
-          var note = "<p>Use either individual component-specific activation scripts to activate required components listed below one-by-one, or use the oneAPI bundle script <code>" + activate_script + "</code> to activate the whole oneAPI environment. Check the <i>Sanity Test</i> section below for a usage example.</p>";
-          if($.pkgInArray(data.package, ["source"])) {
-            var note = "<p>Use individual component-specific activation scripts to activate required components listed below one-by-one. Check the <i>Sanity Test</i> section below for a usage example.</p>";
-          }
-          notes.push(note);
-          if(data.preparation.msvc != null &&
-             $.pkgInArray(data.package, ["source", "cppsdk"]))
-            notes.push("Make sure the installation includes Miscrosoft C++ Build Tools integration.");
-          if(data.preparation.basekit.notes != null)
-            notes = $.merge(notes, data.basekit.notes);
-          ret += $.notes_gen(notes);
+          var applyto = data.system_requirements.software.basekit.applyto;
+          if(applyto == null || applyto != null && $.pkgInArray(data.package, applyto)) {
+            ret += "<div class=\"simple\">";
+            ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Install Intel® oneAPI Base Toolkit</h3>";
+            var notes = [];
+            // if(data.preparation.basekit.notinstall != null) {
+            //   var note = "<p>Do NOT install the following Intel® oneAPI Base Toolkit components:</p>";
+            //   note += $.ul_gen(data.preparation.basekit.notinstall);
+            //   notes.push(note);
+            // }
+            var activate_script = "setvars.sh";
+            if(data.os == "Windows")
+              activate_script = "setvars.bat";
+            var note = "<p>Use either individual component-specific activation scripts to activate required components listed below one-by-one, or use the oneAPI bundle script <code>" + activate_script + "</code> to activate the whole oneAPI environment. Check the <i>Sanity Test</i> section below for a usage example.</p>";
+            if($.pkgInArray(data.package, ["source"])) {
+              var note = "<p>Use individual component-specific activation scripts to activate required components listed below one-by-one. Check the <i>Sanity Test</i> section below for a usage example.</p>";
+            }
+            notes.push(note);
+            if(data.preparation.msvc != null &&
+               $.pkgInArray(data.package, ["source", "cppsdk"]))
+              notes.push("Make sure the installation includes Miscrosoft C++ Build Tools integration.");
+            if(data.preparation.basekit.notes != null)
+              notes = $.merge(notes, data.basekit.notes);
+            ret += $.notes_gen(notes);
 
-          if(data.preparation.basekit.install != null) {
-            ret += "<p>The following Intel® oneAPI Base Toolkit components are required:</p>";
+            if(data.preparation.basekit.install != null) {
+              ret += "<p>The following Intel® oneAPI Base Toolkit components are required:</p>";
+              var components = [];
+              $.each(data.preparation.basekit.install, function(index, value) {
+                placeholder_example = "";
+                if(value.placeholder_example != null)
+                  placeholder_example = ", <i>e.g. " + value.placeholder_example + "</i>";
+                components.push(value.name + " (<b>Placeholder <cite>" + value.placeholder + "</cite></b> as its installation path" + placeholder_example + ")");
+              });
+              ret += $.ul_gen(components);
+
+              if(data.os == "Linux/WSL2") {
+                var linux_dist = [];
+                $.each(data.preparation.basekit.install, function(index0, value0) {
+                  if(value0.package != null && value0.package[data.os] != null) {
+                    $.each(Object.keys(value0.package[data.os]), function(index1, value1) {
+                      if(!$.pkgInArray(value1, linux_dist)) {
+                        linux_dist.push(value1);
+                      }
+                    });
+                  }
+                });
+                if(linux_dist.length > 0) {
+                  ret += "<p>Recommend using a <b>package manager</b> like apt, yum or dnf to install the packages above. <b>Follow instructions at <a href=\"https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html?operatingsystem=linux\">Intel® oneAPI Base Toolkit Download page</a> to setup the package manager repository.</b></p>";
+                  ret += "<p>Take reference to commands below to install the packages on individual Linux distributions.</p>";
+                  $.each(linux_dist, function(index0, value0) {
+                    var packages = [];
+                    $.each(data.preparation.basekit.install, function(index1, value1) {
+                      if(value1.package != null && value1.package[data.os] != null && value1.package[data.os][value0] != null) {
+                        packages.push(value1.package[data.os][value0]);
+                      }
+                    });
+                    if(packages.length > 0) {
+                      ret += "<p>* " + value0 + "</p>";
+                      var command = "";
+                      if(value0 == "Ubuntu")
+                        command += "sudo apt install -y ";
+                      if(value0 == "RHEL")
+                        command += "sudo dnf install -y ";
+                      if(value0 == "SUSE")
+                        command += "sudo zypper install -y --oldpackage ";
+                      command += packages.join(" ");
+                      ret += $.code_gen([command]);
+                    }
+                  });
+                }
+              }
+            }
+            ret += "</div>";
+            indexb += 1;
+          }
+        }
+        if(data.system_requirements.software.basekit_hotfix != null) {
+          var applyto = data.system_requirements.software.basekit.applyto;
+          if(applyto == null || applyto != null && $.pkgInArray(data.package, applyto)) {
+            ret += "<div class=\"simple\">";
+            ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Install Intel® oneAPI Base Toolkit Hotfix</h3>";
+            ret += "<p>Follow the link above to install Intel® oneAPI Base Toolkit Hotfix</p>";
+            ret += "</div>";
+            indexb += 1;
+          }
+        }
+        if(data.system_requirements.software.pti != null) {
+          var applyto = data.system_requirements.software.basekit.applyto;
+          if(applyto == null || applyto != null && $.pkgInArray(data.package, applyto)) {
+            ret += "<div class=\"simple\">";
+            ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Install Intel® Profiling Tools Interfaces for GPU (PTI for GPU)</h3>";
+            ret += "<p>Follow the link above to download and install Intel® Profiling Tools Interfaces for GPU (PTI for GPU).</p>";
+            ret += "<p>The following Intel® Profiling Tools Interfaces for GPU (PTI for GPU) component is required:</p>";
             var components = [];
-            $.each(data.preparation.basekit.install, function(index, value) {
+            $.each(data.preparation.pti.install, function(index, value) {
               placeholder_example = "";
               if(value.placeholder_example != null)
                 placeholder_example = ", <i>e.g. " + value.placeholder_example + "</i>";
               components.push(value.name + " (<b>Placeholder <cite>" + value.placeholder + "</cite></b> as its installation path" + placeholder_example + ")");
             });
             ret += $.ul_gen(components);
-
-            if(data.os == "Linux/WSL2") {
-              var linux_dist = [];
-              $.each(data.preparation.basekit.install, function(index0, value0) {
-                if(value0.package != null && value0.package[data.os] != null) {
-                  $.each(Object.keys(value0.package[data.os]), function(index1, value1) {
-                    if(!$.pkgInArray(value1, linux_dist)) {
-                      linux_dist.push(value1);
-                    }
-                  });
-                }
-              });
-              if(linux_dist.length > 0) {
-                ret += "<p>Recommend using a <b>package manager</b> like apt, yum or dnf to install the packages above. <b>Follow instructions at <a href=\"https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html?operatingsystem=linux\">Intel® oneAPI Base Toolkit Download page</a> to setup the package manager repository.</b></p>";
-                ret += "<p>Take reference to commands below to install the packages on individual Linux distributions.</p>";
-                $.each(linux_dist, function(index0, value0) {
-                  var packages = [];
-                  $.each(data.preparation.basekit.install, function(index1, value1) {
-                    if(value1.package != null && value1.package[data.os] != null && value1.package[data.os][value0] != null) {
-                      packages.push(value1.package[data.os][value0]);
-                    }
-                  });
-                  if(packages.length > 0) {
-                    ret += "<p>* " + value0 + "</p>";
-                    var command = "";
-                    if(value0 == "Ubuntu")
-                      command += "sudo apt install -y ";
-                    if(value0 == "RHEL")
-                      command += "sudo dnf install -y ";
-                    if(value0 == "SUSE")
-                      command += "sudo zypper install -y --oldpackage ";
-                    command += packages.join(" ");
-                    ret += $.code_gen([command]);
-                  }
-                });
-              }
-            }
+            ret += "</div>";
+            indexb += 1;
           }
-          ret += "</div>";
-          indexb += 1;
-        }
-        if(data.system_requirements.software.basekit_hotfix != null) {
-          ret += "<div class=\"simple\">";
-          ret += "<h3>" + $.secid_gen([indexa, indexb]) + "Install Intel® oneAPI Base Toolkit Hotfix</h3>";
-          ret += "<p>Follow the link above to install Intel® oneAPI Base Toolkit Hotfix</p>";
-          ret += "</div>";
-          indexb += 1;
         }
       }
 
@@ -537,17 +577,29 @@ $(document).ready(function() {
        !$.pkgInArray(data.package, ["cppsdk"])) {
       ret += "<div class=\"simple\">";
       ret += "<h2>" + $.secid_gen([indexa]) + "Sanity Test</h2>";
+      ret += "<p>You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system. The command should return PyTorch* and Intel® Extension for PyTorch* versions installed, as well as GPU card(s) information detected.</p>";
       var commands = [];
+      var print_flag = false;
       if(data.system_requirements.software.basekit != null &&
          data.preparation.basekit.install != null &&
-         !$.pkgInArray(data.package, ["docker"])) {
-        ret += "<p>You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system. The command should return PyTorch* and Intel® Extension for PyTorch* versions installed, as well as GPU card(s) information detected.</p>";
-        ret += "<p>Check section <b><i>Install Intel® oneAPI Base Toolkit</i></b> for <b>placeholders</b> used below.</p>";
+         !$.pkgInArray(data.package, ["docker"]) &&
+         data.system_requirements.software.basekit.applyto == null) {
+        print_flag = true;
+      }
+      if(print_flag) {
+        ret += "<p>Check section <b><i>Install Intel® oneAPI Base Toolkit</i></b> ";
+        if(data.preparation.pti != null) {
+          ret += "and <b><i>Install Intel® Profiling Tools Interfaces for GPU (PTI for GPU)</i></b> ";
+        }
+        ret += "for <b>placeholders</b> used below.</p>";
         $.each(data.preparation.basekit.install, function(index, value) {
           commands.push(value.env);
         });
-      } else {
-        ret += "<p>You can run a simple sanity test to double confirm if the correct version is installed. The command should return PyTorch* and Intel® Extension for PyTorch* versions installed.</p>";
+        if(data.preparation.pti != null) {
+          $.each(data.preparation.pti.install, function(index, value) {
+            commands.push(value.env);
+          });
+        }
       }
       commands.push(data.sanity_test);
       ret += $.code_gen(commands);
@@ -672,7 +724,7 @@ $(document).ready(function() {
             var pair = encodeURIComponent(key) + "=" + encodeURIComponent(query_json[key]);
             hashes.push(pair.toLowerCase());
         }
-	}
+    }
     window.location.hash = "#installation?" + hashes.join("&");
     var formdata = new FormData();
     formdata.append("query", query);
