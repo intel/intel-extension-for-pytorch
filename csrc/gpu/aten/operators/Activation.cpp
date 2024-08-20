@@ -1029,10 +1029,6 @@ Tensor mish_backward(const Tensor& grad_output, const Tensor& input) {
   return grad_input;
 }
 
-TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("silu_backward", TORCH_FN(silu_backward));
-  m.impl("mish_backward", TORCH_FN(mish_backward));
-}
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
