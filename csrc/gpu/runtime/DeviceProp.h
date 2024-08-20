@@ -143,7 +143,7 @@ struct DeviceProp {
 
   bool support_fp64;
   bool support_atomic64;
-  bool has_bf16_conversion;
+  bool has_bfloat16_conversions;
   bool has_subgroup_matrix_multiply_accumulate;
   bool has_subgroup_matrix_multiply_accumulate_tensor_float32;
   bool has_subgroup_2d_block_io;
