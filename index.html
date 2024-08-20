@@ -12,36 +12,27 @@
   <script src="_scripts/jquery.js"></script>
   <script src="_scripts/theme.js"></script>
   <script src="_scripts/actions.js"></script>
-<script type="text/javascript">
-  // Configure TMS settings
-  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
-  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
-  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
-  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
-  var wapSinglePage = false; // Include this variable only if your site is a single page application, such as one developed with the React framework
-  // Load TMS
-  (() => {
-        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
-        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
-        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
-  }) ();
-</script>
+  <script src="_scripts/load_navi.js"></script>
+  <script type="text/javascript">
+    // Configure TMS settings
+    window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+    window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+    window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+    window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+    var wapSinglePage = false; // Include this variable only if your site is a single page application, such as one developed with the React framework
+    // Load TMS
+    (() => {
+          let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+          let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+          let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+    }) ();
+  </script>
 </head>
 
 <body class="wy-body-for-nav">
   <div class="wy-grid-for-nav">
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-          <p id="version-pick"><span><b>Pick a version:</b></span></p>
-          <p><span><b>CPU</b></span></p>
-          <ul id="ul_cpu">
-          </ul>
-          <p class="menu-separator"></p>
-          <p<span><b>XPU/GPU</b></span></p>
-          <ul id="ul_gpu">
-          </ul>
-        </div>
+      <div class="wy-side-scroll" id="nav-side">
       </div>
     </nav>
 
