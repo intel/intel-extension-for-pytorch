@@ -11,11 +11,16 @@ namespace dpcpp {
 // the WA with querying ISA info once SYCL runtime supports it.
 // https://github.com/intel/llvm/blob/sycl/sycl/doc/extensions/experimental/sycl_ext_oneapi_device_architecture.asciidoc#feature-test-macro
 
+#if __INTEL_LLVM_COMPILER < 20240200
 // PVC_VG not supported in SYCL architecture of OneAPI 2024.1
 static const std::array pvc_vg_device_list = {0xbd4};
 
 // MTL iGPU not supported in SYCL architecture of OneAPI 2024.1
 static const std::array mtl_device_list = {0x7D55, 0x7DD5, 0x7D57, 0x7DD7};
+#endif
+
+// BMG dGPU not supported in SYCL architecture of OneAPI 2024.1 and 2024.2
+static const std::array bmg_device_list = {0xE20B};
 
 // FS1 Coral Simulator not supported in SYCL architecture of OneAPI 2024.1
 static const std::array coral_device_list = {0x0b73};
@@ -27,6 +32,7 @@ bool dpcppGetDeviceHasXMX(DeviceId device_id) noexcept {
   if (device.has(sycl::aspect::ext_intel_device_id)) {
     auto ext_intel_device_id =
         device.get_info<intel::info::device::device_id>();
+#if __INTEL_LLVM_COMPILER < 20240200
     for (uint32_t pvc_vg_device_id : pvc_vg_device_list) {
       if (ext_intel_device_id == pvc_vg_device_id) {
         return false;
@@ -37,9 +43,15 @@ bool dpcppGetDeviceHasXMX(DeviceId device_id) noexcept {
         return false;
       }
     }
+#endif
     for (uint32_t coral_device_id : coral_device_list) {
       if (ext_intel_device_id == coral_device_id) {
         return false;
+      }
+    }
+    for (uint32_t bmg_device_id : bmg_device_list) {
+      if (ext_intel_device_id == bmg_device_id) {
+        return true;
       }
     }
   }
@@ -50,9 +62,20 @@ bool dpcppGetDeviceHasXMX(DeviceId device_id) noexcept {
     if (deviceArch <= experimental::architecture::intel_gpu_dg1) {
       return false;
     } else {
-      // currently PVC and DG2 all support XMX, will update after PVC_VG and MTL
+#if __INTEL_LLVM_COMPILER >= 20240200
+      switch (deviceArch) {
+        case experimental::architecture::intel_gpu_pvc_vg:
+        case experimental::architecture::intel_gpu_mtl_u:
+        case experimental::architecture::intel_gpu_mtl_h:
+          return false;
+        default:
+          return true;
+      }
+    }
+#else
       return true;
     }
+#endif
   } catch (sycl::exception) {
     TORCH_WARN_ONCE(
         "Detect an unknown architecture, will treat it as no XMX feature support.");
@@ -67,6 +90,7 @@ bool dpcppGetDeviceHas2DBlock(DeviceId device_id) noexcept {
   if (device.has(sycl::aspect::ext_intel_device_id)) {
     auto ext_intel_device_id =
         device.get_info<intel::info::device::device_id>();
+#if __INTEL_LLVM_COMPILER < 20240200
     for (uint32_t pvc_vg_device_id : pvc_vg_device_list) {
       if (ext_intel_device_id == pvc_vg_device_id) {
         return true;
@@ -77,9 +101,15 @@ bool dpcppGetDeviceHas2DBlock(DeviceId device_id) noexcept {
         return false;
       }
     }
+#endif
     for (uint32_t coral_device_id : coral_device_list) {
       if (ext_intel_device_id == coral_device_id) {
         return false;
+      }
+    }
+    for (uint32_t bmg_device_id : bmg_device_list) {
+      if (ext_intel_device_id == bmg_device_id) {
+        return true;
       }
     }
   }
@@ -94,6 +124,11 @@ bool dpcppGetDeviceHas2DBlock(DeviceId device_id) noexcept {
       case experimental::architecture::intel_gpu_dg2_g10:
       case experimental::architecture::intel_gpu_dg2_g11:
       case experimental::architecture::intel_gpu_dg2_g12:
+#if __INTEL_LLVM_COMPILER >= 20240200
+      case experimental::architecture::intel_gpu_mtl_u:
+      case experimental::architecture::intel_gpu_mtl_h:
+      case experimental::architecture::intel_gpu_arl_h:
+#endif
         return false;
       default:
         return true;
