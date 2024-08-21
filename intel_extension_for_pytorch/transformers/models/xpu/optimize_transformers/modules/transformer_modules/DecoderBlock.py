@@ -4,13 +4,14 @@ import torch.nn as nn
 import sys
 
 from .BaseAttention import IPEXTransformerAttn  # noqa
-from .QuantizedAttention import IPEXTransformerAttnOptimizedInt4  # noqa
+from .QuantizedAttention import *  # noqa
 from .NaiveAttention import IPEXTransformerAttnNaive  # noqa
 from .GroupedAttention import *  # noqa
 from .Attention import *  # noqa
 from .CrossedAttention import *  # noqa
 from .Mlp import *  # noqa
 from .QuantizedMlp import *  # noqa
+from .model_utils import xpu_gemm_use_xetla
 
 
 class IPEXTransformerBlock(nn.Module):
@@ -31,6 +32,8 @@ class IPEXTransformerBlock(nn.Module):
             attn_list.append("Grouped")
         if model_name is not None:
             attn_list.append(model_name)
+        if not xpu_gemm_use_xetla():
+            attn_list.append("OneDNN")
         for elem in attn_list:
             attn_type_str = (
                 attn_type_str + elem.capitalize()[0] + elem[1:]
@@ -48,6 +51,8 @@ class IPEXTransformerBlock(nn.Module):
         mlp_list = [impl.name, dtype, activation.name]
         if model_name is not None:
             mlp_list.append(model_name)
+        if not xpu_gemm_use_xetla():
+            mlp_list.append("OneDNN")
         for elem in mlp_list:
             mlp_type_str = mlp_type_str + elem.capitalize()[0] + elem[1:]
             if hasattr(sys.modules[__name__], mlp_type_str):
