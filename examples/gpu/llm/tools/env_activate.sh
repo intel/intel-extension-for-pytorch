@@ -11,13 +11,15 @@ if [ ${MODE} != "inference" ] && [ ${MODE} != "fine-tuning" ]; then
     return 2
 fi
 
-BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}" )" &> /dev/null && pwd )
 export LD_PRELOAD=$(bash ${BASEFOLDER}/get_libstdcpp_lib.sh)
 export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_ROOT=${CONDA_PREFIX}
 export TORCH_LLM_ALLREDUCE=1
 
 cd ${BASEFOLDER}/../${MODE}
-if [ ${MODE} == "fine-tuning" ]; then
-    python -m pip install -r requirements.txt
-fi
+python -m pip install -r ./requirements.txt
+PKGDIR=$(python -c 'import transformers; print(transformers.__path__[0]);')
+patch -d ${PKGDIR} -p3 -t < ./patches/transformers.patch
+find ${PKGDIR} -name "*.rej" | while read -r FILE; do FILE=${FILE::-4}; rm ${FILE}.rej; mv ${FILE}.orig ${FILE}; done
+find ${PKGDIR} -name "*.orig" -exec rm {} \;

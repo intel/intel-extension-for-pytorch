@@ -70,11 +70,9 @@ if not "%VER_IPEX%"=="" (
 git submodule sync
 git submodule update --init --recursive
 
-python -m pip install pyyaml
-for /f %%A in ('python scripts\tools\compilation_helper\yaml_utils.py -f dependency_version.yml -d pytorch -k commit') do set COMMIT_TORCH=%%A
-for /f %%A in ('python scripts\tools\compilation_helper\yaml_utils.py -f dependency_version.yml -d torchvision -k commit') do set COMMIT_TORCHVISION=%%A
-for /f %%A in ('python scripts\tools\compilation_helper\yaml_utils.py -f dependency_version.yml -d torchaudio -k commit') do set COMMIT_TORCHAUDIO=%%A
-python -m pip uninstall -y pyyaml
+for /f %%A in ('python scripts\tools\compilation_helper\dep_ver_utils.py -f dependency_version.json -k pytorch:commit') do set COMMIT_TORCH=%%A
+for /f %%A in ('python scripts\tools\compilation_helper\dep_ver_utils.py -f dependency_version.json -k torchvision:commit') do set COMMIT_TORCHVISION=%%A
+for /f %%A in ('python scripts\tools\compilation_helper\dep_ver_utils.py -f dependency_version.json -k torchaudio:commit') do set COMMIT_TORCHAUDIO=%%A
 cd ..
 
 rem Checkout individual components

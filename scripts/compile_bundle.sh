@@ -6,6 +6,7 @@
 set -eo pipefail
 
 VER_IPEX=xpu-main
+ENABLE_ONEAPI_INTEGRATION=1
 
 if [[ $# -lt 6 ]]; then
     echo "Usage: bash $0 <DPCPPROOT> <MKLROOT> <CCLROOT> <MPIROOT> <PTIROOT> <AOT>"
@@ -118,7 +119,7 @@ if [ -z "${MAX_JOBS}" ]; then
 fi
 
 # Save current directory path
-BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}" )" &> /dev/null && pwd )
 cd ${BASEFOLDER}
 
 # Checkout individual components
@@ -136,15 +137,12 @@ fi
 git submodule sync
 git submodule update --init --recursive
 
-python -m pip install pyyaml
-COMMIT_TORCH=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d pytorch -k commit)
-VERSION_TORCH=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d pytorch -k version)
-COMMIT_TORCHVISION=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torchvision -k commit)
-COMMIT_TORCHAUDIO=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torchaudio -k commit)
-REPO_TORCHCCL=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torch-ccl -k repo)
-COMMIT_TORCHCCL=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d torch-ccl -k commit)
-#VER_GCC=$(python scripts/tools/compilation_helper/yaml_utils.py -f dependency_version.yml -d gcc -k min-version)
-python -m pip uninstall -y pyyaml
+COMMIT_TORCH=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k pytorch:commit)
+VERSION_TORCH=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k pytorch:version)
+COMMIT_TORCHVISION=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torchvision:commit)
+COMMIT_TORCHAUDIO=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torchaudio:commit)
+COMMIT_TORCHCCL=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torch-ccl:commit)
+#VER_GCC=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k gcc:min-version)
 cd ..
 
 if [ "${COMMIT_TORCHVISION}" = "N/A" ]; then
@@ -172,13 +170,16 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     if [ ! -d torch-ccl ]; then
-        git clone ${REPO_TORCHCCL} torch-ccl
+        git clone https://github.com/intel/torch-ccl.git
     fi
 fi
 
 # Checkout required branch/commit and update submodules
 cd pytorch
 rm -rf * > /dev/null
+if [ -f .ci/docker/ci_commit_pins/triton-xpu.txt ]; then
+    rm .ci/docker/ci_commit_pins/triton-xpu.txt
+fi
 git checkout . > /dev/null
 if [ ! -z ${COMMIT_TORCH} ]; then
     git checkout main > /dev/null
@@ -315,7 +316,7 @@ python setup.py clean
 if [ -d dist ]; then
     rm -rf dist
 fi
-export ENABLE_ONEAPI_INTEGRATION=1
+export ENABLE_ONEAPI_INTEGRATION=${ENABLE_ONEAPI_INTEGRATION}
 python setup.py bdist_wheel 2>&1 | tee build_whl.log
 unset ENABLE_ONEAPI_INTEGRATION
 unset BUILD_WITH_CPU
@@ -354,7 +355,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     CMD="${CMD} import torchaudio; print(f'torchaudio_version:  {torchaudio.__version__}');"
 fi
 CMD="${CMD} import intel_extension_for_pytorch as ipex; print(f'ipex_version:        {ipex.__version__}');"
-if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    CMD="${CMD} import oneccl_bindings_for_pytorch as torch_ccl; print(f'torchccl_version:    {torch_ccl.__version__}');"
-fi
+#if [ $((${MODE} & 0x01)) -ne 0 ]; then
+#    CMD="${CMD} import oneccl_bindings_for_pytorch as torch_ccl; print(f'torchccl_version:    {torch_ccl.__version__}');"
+#fi
 python -c "${CMD}"

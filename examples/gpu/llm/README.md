@@ -100,7 +100,8 @@ conda activate llm
 # Setup the environment with the provided script
 cd examples/gpu/llm
 # If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
-bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <AOT>
+bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <PTI_ROOT> <AOT>
+# e.g. bash ./tools/env_setup.sh 0x03 /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest /opt/intel/oneapi/pti/latest pvc
 conda deactivate
 conda activate llm
 source ./tools/env_activate.sh [inference|fine-tuning]

@@ -1,0 +1,2 @@
+numpy<2
+transformers==4.38.1
