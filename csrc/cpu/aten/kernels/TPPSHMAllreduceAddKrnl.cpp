@@ -179,7 +179,7 @@ class SHMBuffer {
     if (need_copy) {
       auto src = ptr;
       auto dst = (T*)shm_data[rank];
-#pragma omp parallel for num_threads(nThreads)
+#pragma omp parallel for
       for (int i = 0; i < numel_aligned; i += BS) {
         cpy_tpp(src + i, dst + i);
       }
@@ -195,7 +195,7 @@ class SHMBuffer {
     if (numel <= DIRECT_THRESHOLD) {
       auto dst = (T*)scratch_data[rank];
       auto lsrc = (T*)shm_data[rank];
-#pragma omp parallel for num_threads(nThreads)
+#pragma omp parallel for
       for (int i = 0; i < numel; i += BS) {
         float ldst[BS];
         ucvt_tpp(lsrc + i, ldst);
@@ -211,7 +211,7 @@ class SHMBuffer {
       if (true) {
         auto src = (T*)scratch_data[rank];
         auto dst = ptr;
-#pragma omp parallel for num_threads(nThreads)
+#pragma omp parallel for
         for (int i = 0; i < numel_aligned; i += BS) {
           cpy_tpp(src + i, dst + i);
         }
@@ -227,7 +227,7 @@ class SHMBuffer {
 
       auto dst = (T*)scratch_data[rank];
       auto lsrc = (T*)shm_data[rank];
-#pragma omp parallel for num_threads(nThreads)
+#pragma omp parallel for
       for (int i = slice_start; i < slice_end; i += BS) {
         float ldst[BS];
         ucvt_tpp(lsrc + i, ldst);
@@ -252,7 +252,7 @@ class SHMBuffer {
 
           auto src = (T*)scratch_data[r1];
           auto dst = ptr;
-#pragma omp parallel for num_threads(nThreads)
+#pragma omp parallel for
           for (int i = slice_start; i < slice_end; i += BS) {
             cpy_tpp(src + i, dst + i);
           }
