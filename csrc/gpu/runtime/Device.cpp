@@ -323,7 +323,7 @@ static void initDeviceProperty(DeviceId device_id) {
   device_prop.support_atomic64 = device.has(dpcpp_dev_aspect_atomic64);
   device_prop.support_fp64 = device.has(dpcpp_dev_aspect_fp64);
   sycl::ext::oneapi::experimental::cl_version version;
-  device_prop.has_bf16_conversion = device.ext_oneapi_supports_cl_extension(
+  device_prop.has_bfloat16_conversions = device.ext_oneapi_supports_cl_extension(
       "cl_intel_bfloat16_conversions", &version);
   device_prop.has_subgroup_matrix_multiply_accumulate =
       device.ext_oneapi_supports_cl_extension(
@@ -369,7 +369,7 @@ static void initDeviceProperty(DeviceId device_id) {
   dev_info.max_num_sub_groups = device_prop.max_num_subgroup;
   dev_info.sub_group_sizes = device_prop.subgroup_sizes;
   dev_info.support_fp64 = device_prop.support_fp64;
-  dev_info.has_bf16_conversion = device_prop.has_bf16_conversion;
+  dev_info.has_bfloat16_conversions = device_prop.has_bfloat16_conversions;
   dev_info.has_subgroup_matrix_multiply_accumulate =
       device_prop.has_subgroup_matrix_multiply_accumulate;
   dev_info.has_subgroup_matrix_multiply_accumulate_tensor_float32 =
