@@ -137,6 +137,25 @@
   padding-top: 50px;
 }
 
+
+
+.code-div {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+.highlight-bash {
+  flex: 1;
+}
+
+.code-svg {
+  width: 20px;
+  height: 20px;
+  margin: 10px 5px 0px 8px;
+}
+
+
 /* Footer */
 a#wap_dns {
    display: none;
