@@ -4,40 +4,44 @@
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟨 | 🟩 |   |
-|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
 |GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 |   |
+|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Bloom| bigscience/bloom-1b7 | 🟩 | 🟨 | 🟩 | 🟩  | 🟨 |
 |CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 |    |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 |    |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 |    |
-|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟨 | 🟩 |    |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 | 🟨 |
+|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 |   | 🟩 |    |
+|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 | 🟩 |   |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  |  🟩 | 🟨 |
+|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  | 🟩 | 🟨 |
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 |  🟩 |  |
-|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 |    |
-|GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |    |
-|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |    |
+|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 | 🟩 |
+|GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |   |
+|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |   |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 | 🟩 | 🟩 |   |
 
 ## 1.2 Verified for distributed inference mode via DeepSpeed
 
@@ -48,9 +52,11 @@
 |LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 |
-|GPT-J| EleutherAI/gpt-j-6b | 🟨 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 |
+|GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟨 | 🟩 |
 |DOLLY| databricks/dolly-v2-12b | 🟨 | 🟩 |
+|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 |
 |FALCON| tiiuae/falcon-40b | 🟩 | 🟩 |
 |OPT| facebook/opt-30b | 🟨 | 🟩 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 |
@@ -66,19 +72,27 @@
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 |
 |Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 |
 |Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 |
+|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 |
 |GIT| microsoft/git-base | 🟩 | 🟩 |
 |Phi| microsoft/phi-2 | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 |
+|Whisper| openai/whisper-large-v2 | 🟩 | 🟩 |
 
 - 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
 
 - 🟨 signifies that the model can perform well while accuracy may not been in a perfect state (>1% difference as compared with FP32).
 
-*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp32/bf16).
-We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
+*Note*: As the modeling file of `meta-llama/Llama-2-7b-hf` is updated,
+the previous static quantization INT8 recipe is invalid and retuning is not completed yet.
+If needed, you can try to retune the model yourself with the [autotune API](../../../../docs/tutorials/features/sq_recipe_tuning_api.md).
+
+*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family)
+are well supported with all optimizations like indirect access KV cache, fused ROPE, and customized linear kernels.
+We are working in progress to better support the models in the tables with various data types.
+In addition, more models will be optimized in the future.
 
 <br>
 
@@ -272,17 +286,22 @@ We provide the following qconfig summary files with good quality (calibration on
 
 | Model ID | Download links |
 |---|:---:|
-| meta-llama/Llama-2-7b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-7b_qconfig.json) |
 | meta-llama/Llama-2-13b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-13b_qconfig.json) |
 | meta-llama/Llama-2-70b-hf | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/llama2-70b_qconfig.json) |
 | EleutherAI/gpt-j-6b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/gpt-j-6b_qconfig.json) |
+| tiiuae/falcon-7b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-7b_qconfig.json) |
+| tiiuae/falcon-11b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-11b_qconfig.json) |
 | tiiuae/falcon-40b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/falcon-40b_qconfig.json) |
 | facebook/opt-30b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-30b_qconfig.json) |
 | facebook/opt-1.3b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/opt-1b3_qconfig.json) |
 | baichuan-inc/Baichuan2-7B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan2-7b_qconfig.json) |
-| baichuan-inc/Baichuan2-13B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan2-13b_qconfig.json) |
 | baichuan-inc/Baichuan-13B-Chat | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/baichuan-13b_qconfig.json) |
+| THUDM/chatglm2-6b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/chatglm2_qconfig.json) |
 | bigscience/bloom-1b7 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/bloom-1b7_qconfig.json) |
+| Salesforce/codegen-2B-multi | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/codegen-2b_qconfig.json) |
+| mosaicml/mpt-7b | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/mpt-7b_qconfig.json) |
+| microsoft/phi-2 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/phi-2_qconfig.json) |
+| openai/whisper-large-v2 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/whisper_qconfig.json) |
 
 If you would like to generate qconfig summary files (due to changes on model variants or calibration dataset), we provide the [autotune API](../../../../docs/tutorials/features/sq_recipe_tuning_api.md) and its [tuning examples](llm_sq_recipes.md), which allows an automatic global smoothquant tuning, and automatic layer-by-layer tuning provided by Intel® Neural Compressor for the best accuracy.
 
@@ -343,7 +362,7 @@ unset KMP_AFFINITY
 In the DeepSpeed cases below, we recommend "--shard-model" to shard model weight sizes more even for better memory usage when running with DeepSpeed.
 
 If using "--shard-model", it will save a copy of the shard model weights file in the path of "--output-dir" (default path is "./saved_results" if not provided).
-If you have used "--shard-model" and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove "--shard-model", and replace "-m <MODEL_ID>" with "-m <shard model path>" to skip the repeated shard steps.
+If you have used "--shard-model" and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove "--shard-model", and replace "-m <MODEL_ID>" with "-m \<shard model path\>" to skip the repeated shard steps.
 
 Besides, the standalone shard model function/scripts are also provided in the [Advanced Usage](#33-how-to-shard-model-for-distributed-tests-with-deepspeed-autotp) section, in case you would like to generate the shard model weights files in advance before running distributed inference.
 
@@ -483,7 +502,7 @@ Here is how to use it:
 python utils/run_gptq.py --model <MODEL_ID> --output-dir ./saved_results
 ```
 
-The dataset for calibration is `NeelNanda/pile-10k` by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify. Group size is specified by `--group-size <group_size>` (default is 128). You can specify calibration sample size by modifying `--nsamples <int>` (default is 128); you can also choose whether or not to align calibration data to a fixed length by modifying `--use_max_length <bool>` and `--pad_max_length <int>`. For details please refer to [GPTQ](../../../intel_extension_for_pytorch/quantization/_GPTQ/README.md)
+The dataset for calibration is `NeelNanda/pile-10k` by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify. Group size is specified by `--group-size <group_size>` (default is 128). You can specify calibration sample size by modifying `--nsamples <int>` (default is 128); you can also choose whether or not to align calibration data to a fixed length by modifying `--use_max_length <bool>` and `--pad_max_length <int>`. For details please refer to [GPTQ](../../../../intel_extension_for_pytorch/quantization/_GPTQ/README.md)
 
 It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default. Group size controls the granularity of quantization of weight along input channel. 
 Then generate model for weight only quantization with INT4 weights and run tasks.
@@ -662,8 +681,8 @@ To save memory usage, we could shard the model weights under the local path befo
 ```
 cd ./utils
 # general command:
-python create_shard_model.py -m <MODEL ID>  --save-path <SHARD MODEL NEW PATH>
-# After sharding the model, using -m <SHARD MODEL NEW PATH> in later tests
+python create_shard_model.py -m <MODEL ID>  --save-path <SHARD MODEL PATH>
+# After sharding the model, using -m <SHARD MODEL PATH> in later tests
 
 # An example of llama2 7b:
 python create_shard_model.py -m meta-llama/Llama-2-7b-hf --save-path ./local_llama2_7b

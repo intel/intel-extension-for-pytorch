@@ -2,7 +2,7 @@
 set -e
 
 # Save current directory path
-BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}" )" &> /dev/null && pwd )
 WHEELFOLDER=${BASEFOLDER}/../wheels
 AUX_INSTALL_SCRIPT=${WHEELFOLDER}/aux_install.sh
 CCLFOLDER=${BASEFOLDER}/../oneCCL_release
@@ -76,7 +76,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     # Install deps
-    python -m pip install cmake==3.28.4 ninja unzip
+    python -m pip install cmake==3.28.4 ninja
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then

@@ -10,9 +10,10 @@ In this case, we use data-parallel distributed training and every rank will hold
 
 ```
 export NNODES=#number_of_nodes (default using 1 node)
-# create your_ip_list_file, one ip per line, like (or self edit):
-scontrol show hostname > ./hostfile
-export HOSTFILE=hostfile 
+# Create your ip_list_file (hostfile), one IP per line. If you are using Slurm the step can be implemented by
+# scontrol show hostname > ./hostfile
+# You can also check the IPs of the hosts and create the hostfile manually.
+export HOSTFILE=hostfile
 ```
 
 *Note:* To use multi-nodes distributed training you should firstly setup the passwordless login (you can refer to [link](https://linuxize.com/post/how-to-setup-passwordless-ssh-login/)) among computation nodes. If you are using the Dockerfile, you can skip this step.

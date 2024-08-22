@@ -8,7 +8,20 @@ And a set of data types are supported for various scenarios, including FP32, BF1
 # 2. Environment Setup
 
 *Note*: The instructions in this section will setup an environment with a recent PyTorch\* nightly build and **a latest source build of IPEX**. 
-If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.3.100%2Bcpu/examples/cpu/inference/python/llm/README.md#3-environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
+If you would like to use stable PyTorch\* and IPEX release versions, please refer to the instructions [in the release branch](https://github.com/intel/intel-extension-for-pytorch/blob/v2.4.0%2Bcpu/examples/cpu/llm/README.md#2-environment-setup), in which IPEX is installed via prebuilt wheels using `pip install` rather than source code building.
+
+*Note*: For distributed inference of `microsoft/Phi-3-mini-128k-instruct` model, we need a source code build of DeepSpeed library which includes a recent bug fix for phi-3-mini-128k enabling.
+This is realized through **setting the argument value as 8** for `env_setup.sh` execution.
+For example, please change the command to
+
+```bash
+bash ./tools/env_setup.sh 8
+```
+
+for [setting up environment with compilation from source](#22-conda-based-environment-setup-with-pre-built-wheels).
+
+If you are setting up a docker-based environment with the provided `Dockerfile`,
+please do the corresponding changes in the `Dockerfile`.
 
 ## 2.1 [Recommended] Docker-based environment setup with compilation from source
 

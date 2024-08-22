@@ -28,7 +28,7 @@ for CMD in git nproc; do
 done
 
 # Save current directory path
-BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}" )" &> /dev/null && pwd )
 cd ${BASEFOLDER}
 
 # Checkout individual components

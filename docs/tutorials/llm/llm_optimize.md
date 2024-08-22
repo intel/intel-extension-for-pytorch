@@ -11,8 +11,6 @@ and supported model list can be found at [this page](https://intel.github.io/int
 
 For LLM fine-tuning, please check the [LLM fine-tuning tutorial](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm/fine-tuning).
 
-
-
 ## Pseudocode of Common Usage Scenarios
 
 The following sections show pseudocode snippets to invoke Intel® Extension for PyTorch\* APIs to work with LLM models.

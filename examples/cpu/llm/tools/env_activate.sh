@@ -18,7 +18,7 @@ export KMP_FORKJOIN_BARRIER_PATTERN=dist,dist
 export KMP_PLAIN_BARRIER_PATTERN=dist,dist
 export KMP_REDUCTION_BARRIER_PATTERN=dist,dist
 
-BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+BASEFOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}" )" &> /dev/null && pwd )
 export LD_PRELOAD=$(bash ${BASEFOLDER}/get_libstdcpp_lib.sh):${LD_PRELOAD}
 
 function set_ld_preload() {
