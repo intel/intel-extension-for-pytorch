@@ -210,7 +210,7 @@ print_rank0("*** model config:", config)
 if args.benchmark:
     print_mem_usage("pre-from-pretrained")
 
-is_meta_support = model_type not in ["auto"] and not args.disable_optimize_transformers
+is_meta_support = model_type not in ["auto"]
 
 # Construct model with fake meta tensors, later will be replaced during ds-inference ckpt load
 with deepspeed.OnDevice(dtype=load_dtype, device="meta", enabled=is_meta_support):
@@ -286,6 +286,12 @@ if args.ipex:
 # bypass assertion for beam4
 if isinstance(model, deepspeed.InferenceEngine):
     model = model.module
+
+# reinitialize some buffers that is empty caused by meta device loading
+if args.disable_optimize_transformers:
+    if model_type == "llama" and isinstance(model, LlamaForCausalLM):
+        if hasattr(model.model, "causal_mask"):
+            model.model.causal_mask = torch.triu(torch.ones_like(model.model.causal_mask), diagonal=1)
 
 if args.num_beams is None:
     args.num_beams = 1 if args.greedy else 4
