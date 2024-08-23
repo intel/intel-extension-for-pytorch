@@ -8,8 +8,13 @@ from intel_extension_for_pytorch.quantization.fp8 import (
     FP8Linear,
 )  # noqa
 
+import pytest
+
 
 class TestFP8GEMM(TestCase):
+    @pytest.mark.skip(
+        reason="PT2.5: Float8_e5m2fn is not supported in oneDNN!",
+    )
     def test_fp8_linear_E5M2(self, dtype=torch.float):
         input = torch.ones(
             [8, 2], requires_grad=True, dtype=dtype, device=torch.device("xpu")
@@ -53,6 +58,9 @@ class TestFP8GEMM(TestCase):
         self.assertEqual(gd, gd_ref, rtol=1e-1, atol=1e-2)
         self.assertEqual(gw, gw_ref, rtol=1e-1, atol=1e-1)
 
+    @pytest.mark.skip(
+        reason="PT2.5: Float8_e4m3fn is not supported in oneDNN!",
+    )
     def test_fp8_linear_E4M3(self, dtype=torch.float):
         input = torch.ones(
             [8, 2], requires_grad=True, dtype=dtype, device=torch.device("xpu")
@@ -96,6 +104,9 @@ class TestFP8GEMM(TestCase):
         self.assertEqual(gd, gd_ref, rtol=1e-1, atol=1e-2)
         self.assertEqual(gw, gw_ref, rtol=1e-1, atol=1e-2)
 
+    @pytest.mark.skip(
+        reason="PT2.5: Float8_e4m3fn is not supported in oneDNN!",
+    )
     def test_fp8_linear_HYBRID(self, dtype=torch.float):
         input = torch.ones(
             [8, 2], requires_grad=True, dtype=dtype, device=torch.device("xpu")

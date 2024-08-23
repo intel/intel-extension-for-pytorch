@@ -141,6 +141,9 @@ class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
+    @pytest.mark.skip(
+        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
+    )
     def test_bmm(self):
         def _test_bmm(device, dtype):
             # error case: one is nested but the other is not

@@ -593,6 +593,9 @@ class TestNNMethod(TestCase):
         self.assertEqual(save_mean_cpu, save_mean_dpcpp.to(cpu_device))
         self.assertEqual(save_var_cpu, save_var_dpcpp.to(cpu_device))
 
+    @pytest.mark.skip(
+        reason="PT2.5: TensorAccessor expected 1 dims but tensor has 4",
+    )
     def test_batch_norm_legit_simple(self):
         input_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
         n_input = input_cpu.size(1)

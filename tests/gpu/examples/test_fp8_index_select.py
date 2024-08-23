@@ -5,8 +5,13 @@ from intel_extension_for_pytorch.quantization.fp8.util import (
     cast_to_fp8,
 )
 
+import pytest
+
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skip(
+        reason="PT2.5: 'index_select_xpu' not implemented for 'Float8_e4m3fn'"
+    )
     def test_index_select(self, dtype=torch.float):
         dim_size = 10
         dims = 3

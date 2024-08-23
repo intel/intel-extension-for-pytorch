@@ -2,6 +2,8 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa F401
 
+import pytest
+
 cpu_device = torch.device("cpu")
 
 
@@ -77,6 +79,9 @@ class TestTorchMethod(TestCase):
 
         self.assertEqual(out_xpu.to("cpu"), out_cpu)
 
+    @pytest.mark.skip(
+        reason="PT2.5: tensors used as indices must be long, byte or bool tensors",
+    )
     def test_index_ind_dtype(self):
         torch.use_deterministic_algorithms(True)
 

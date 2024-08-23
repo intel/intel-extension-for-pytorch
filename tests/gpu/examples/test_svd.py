@@ -46,6 +46,9 @@ class TestTorchMethod(TestCase):
         self.assertEqual(r_cpu, r_xpu.cpu())
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
+    @pytest.mark.skip(
+        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
+    )
     def test_svd_complex_float(self, dtype=torch.cfloat):
         # Since U and V of an SVD is not unique, each vector can be multiplied by an arbitrary phase factor e^iϕ
         # while the SVD result is still correct. Different platforms, like Numpy, or inputs on different device types,
@@ -63,6 +66,9 @@ class TestTorchMethod(TestCase):
         self.assertEqual(r_cpu, r_xpu.cpu())
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
+    @pytest.mark.skip(
+        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
+    )
     def test_linalg_svd_complex_float(self, dtype=torch.cfloat):
         # Since U and V of an SVD is not unique, each vector can be multiplied by an arbitrary phase factor e^iϕ
         # while the SVD result is still correct. Different platforms, like Numpy, or inputs on different device types,

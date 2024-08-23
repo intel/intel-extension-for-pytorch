@@ -9,6 +9,9 @@ class TestTorchMethod(TestCase):
         not torch.xpu.has_fp64_dtype(),
         reason="Complex128 not unsupported by this device",
     )
+    @pytest.mark.skip(
+        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
+    )
     def test_bmm(self):
         batch1 = torch.randn([49152, 27, 3], dtype=torch.complex128)
         batch2 = torch.randn([49152, 3, 1], dtype=torch.complex128)

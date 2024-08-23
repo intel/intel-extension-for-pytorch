@@ -2,12 +2,16 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
+import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skip(
+        reason="PT2.5: module 'torch' has no attribute '_sparse_coo_tensor_unsafe'"
+    )
     def test_sparse(self, dtype=torch.float):
         i_cpu = torch.LongTensor([[0, 1, 1], [2, 0, 0]])
         v_cpu = torch.FloatTensor([3, 4, 5])

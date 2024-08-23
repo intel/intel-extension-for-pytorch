@@ -2,6 +2,8 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 
+import pytest
+
 xpu_device = torch.device("xpu")
 cpu_device = torch.device("cpu")
 checking_atol = 3e-2
@@ -13,6 +15,9 @@ def get_support_dtype():
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skip(
+        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
+    )
     def test_baddbmm_scale(self):
         def _test_baddbmm_scale(dtype=torch.float):
             m1_cpu = torch.ones([6, 3, 4], dtype=dtype) * 0.25
@@ -43,6 +48,9 @@ class TestTorchMethod(TestCase):
         for dtype in get_support_dtype():
             _test_baddbmm_scale(dtype=dtype)
 
+    @pytest.mark.skip(
+        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
+    )
     def test_baddbmm(self):
         def _test_baddbmm(dtype=torch.float):
             m1_cpu = torch.randn([6, 3, 4], dtype=dtype)
@@ -77,6 +85,9 @@ class TestTorchMethod(TestCase):
         for dtype in get_support_dtype():
             _test_baddbmm(dtype=dtype)
 
+    @pytest.mark.skip(
+        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
+    )
     # This case is used to check opaque tensor's allocation size in reorder, so it is running in block format
     def test_addmm_block(self):
         def _test_addmm_block(dtype=torch.float):

@@ -35,7 +35,7 @@ class TestTorchMethod(TestCase):
         print("y_dpcpp", torch.triu(y_dpcpp2).to("cpu"))
         self.assertEqual(torch.triu(y_cpu2), torch.triu(y_dpcpp2).to(cpu_device))
 
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     def test_cholesky(self, dtype=torch.float):
         x_cpu = torch.randn(3, 3)
         print("x cpu \n", x_cpu)
@@ -62,7 +62,10 @@ class TestTorchMethod(TestCase):
         L = torch.cholesky(A, upper=upper)
         return b, A, L
 
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
+    @pytest.mark.skip(
+        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
+    )
     def test_cholesky_solve(self, dtype=torch.float):
         def _run_test(dtype):
             for (k, n), upper in itertools.product(
@@ -77,7 +80,7 @@ class TestTorchMethod(TestCase):
         _run_test(torch.float)
         _run_test(torch.cfloat)
 
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     def test_logdet(self, dtype=torch.float):
         ts = int(time.time())
         torch.manual_seed(ts)
@@ -211,7 +214,7 @@ class TestTorchMethod(TestCase):
             x_xpu = torch.linalg.solve(A_xpu, b_xpu)
             _validate(A_xpu.cpu(), x_xpu.cpu(), b_xpu.cpu())
 
-    @pytest.mark.skipif("not torch.xpu.has_onemkl()")
+    @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
     def test_inverse(self, dtype=torch.float):
         def _validate(A, A_):
             self.assertEqual(

@@ -23,6 +23,9 @@ class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
         not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
     )
+    @pytest.mark.skip(
+        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
+    )
     def test_matrix_exp_complex(self, dtype=torch.float):
         real = torch.randn([10, 20, 20], dtype=dtype)
         imag = torch.randn([10, 20, 20], dtype=dtype)

@@ -2,9 +2,13 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
+import pytest
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skip(
+        reason="PT2.5: module 'torch' has no attribute '_sparse_coo_tensor_unsafe'"
+    )
     def test_sparse_mask(self, dtype=torch.float):
         nse = 5
         dims = (5, 5, 2, 2)

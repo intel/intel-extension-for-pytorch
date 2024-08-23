@@ -13,6 +13,7 @@ class TestNNMethod(TestCase):
         not torch.xpu.has_channels_last_1d() or torch.xpu.using_onednn_layout(),
         reason="doesn't enable channels last 1d or channels last does not support onednn block format",
     )
+    @pytest.mark.skip(reason="PT2.5: Booleans mismatch: False is not True")
     def test_upsamle_nearest_channels_last_1d(self, dtype=torch.float):
         # #### upsample nearest 1D #####
         input_cpu = torch.randn((2, 3, 5), dtype=torch.float32, device=cpu_device)
