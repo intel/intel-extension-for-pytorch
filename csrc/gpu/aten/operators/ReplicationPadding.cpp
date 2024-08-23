@@ -24,7 +24,7 @@ template <typename scalar_t, typename F>
 struct ParallelReplicationPad1dKernelFunctor {
   void operator()(sycl::nd_item<3> item) const {
     auto output_id = item.get_global_id(0);
-    if (output_id > output_plane_size) {
+    if (output_id >= output_plane_size) {
       return;
     }
     int64_t output_x = output_id % output.size(2);
@@ -563,7 +563,7 @@ template <typename scalar_t, typename F>
 struct ParallelReplicationPad3dKernelFunctor {
   void operator()(sycl::nd_item<3> item) const {
     auto output_id = item.get_global_id(0);
-    if (output_id > output_plane_size) {
+    if (output_id >= output_plane_size) {
       return;
     }
     int64_t output_x = output_id % output.size(4);

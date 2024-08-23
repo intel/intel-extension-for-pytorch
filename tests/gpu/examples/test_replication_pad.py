@@ -74,3 +74,15 @@ class TestNNMethod(TestCase):
 
         self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
         self.assertEqual(x_cpu.grad, x_dpcpp.grad.to("cpu"))
+
+    def test_replication_pad3d_shape2(self, dtype=torch.float):
+        x_cpu = torch.randn([2, 4, 6, 8, 10])
+        x_dpcpp = x_cpu.to("xpu")
+
+        m = nn.ReplicationPad3d(1)
+        y_cpu = m(x_cpu)
+
+        m = nn.ReplicationPad3d(1).to("xpu")
+        y_dpcpp = m(x_dpcpp)
+
+        self.assertEqual(y_cpu, y_dpcpp.to("cpu"))
