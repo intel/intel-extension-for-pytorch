@@ -352,61 +352,32 @@ class IPEXTransformerAttnOptimizedInt4GroupedOneDNN(
         if self.num_kv_group <= 1:
             return super().compute_qkv_gemm(hidden_states, query, key, value)
 
-        hidden_states_flat = hidden_states.flatten(0, -2)
-        if self.q_proj.bias is None:
-            torch.ops.torch_ipex.mm_int4_out(
-                hidden_states_flat,
-                self.q_proj_quant.qweight,
-                self.q_proj_quant.scales,
-                self.q_proj_quant.qzeros,
-                query,
-                self.q_proj_quant.blocksize,
-            )
-        else:
-            query = torch.ops.torch_ipex.mm_int4(
-                hidden_states_flat,
-                self.q_proj_quant.qweight,
-                self.q_proj_quant.bias,
-                self.q_proj_quant.scales,
-                self.q_proj_quant.qzeros,
-                self.q_proj_quant.blocksize,
-            )
-
-        if self.k_proj.bias is None:
-            torch.ops.torch_ipex.mm_int4_out(
-                hidden_states_flat,
-                self.k_proj_quant.qweight,
-                self.k_proj_quant.scales,
-                self.k_proj_quant.qzeros,
-                key,
-                self.k_proj_quant.blocksize,
-            )
-        else:
-            key = torch.ops.torch_ipex.mm_int4(
-                hidden_states_flat,
+        query = torch.ops.torch_ipex.mm_bias_int4(
+            hidden_states,
+            self.q_proj_quant.qweight,
+            self.q_proj_quant.bias,
+            self.q_proj_quant.scales,
+            self.q_proj_quant.qzeros,
+            self.q_proj_quant.blocksize,
+        )
+        key.copy_(
+            torch.ops.torch_ipex.mm_bias_int4(
+                hidden_states,
                 self.k_proj_quant.qweight,
                 self.k_proj_quant.bias,
                 self.k_proj_quant.scales,
                 self.k_proj_quant.qzeros,
                 self.k_proj_quant.blocksize,
             )
-
-        if self.v_proj.bias is None:
-            torch.ops.torch_ipex.mm_int4_out(
-                hidden_states_flat,
-                self.v_proj_quant.qweight,
-                self.v_proj_quant.scales,
-                self.v_proj_quant.qzeros,
-                value,
-                self.v_proj_quant.blocksize,
-            )
-        else:
-            value = torch.ops.torch_ipex.mm_int4(
-                hidden_states_flat,
+        )
+        value.copy_(
+            torch.ops.torch_ipex.mm_bias_int4(
+                hidden_states,
                 self.v_proj_quant.qweight,
                 self.v_proj_quant.bias,
                 self.v_proj_quant.scales,
                 self.v_proj_quant.qzeros,
                 self.v_proj_quant.blocksize,
             )
+        )
         return query, key, value
