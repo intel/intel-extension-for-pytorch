@@ -13,8 +13,14 @@ namespace AtenIpexTypeXPU {
 
 bool choose_recommand_compute_eng() {
   auto compute_eng = Settings::I().get_compute_eng();
-  return compute_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA ||
-      compute_eng == torch_ipex::xpu::COMPUTE_ENG::RECOMMEND;
+  DeviceId curDevID = at::xpu::current_device();
+  bool is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
+  bool is_xmx = dpcppGetDeviceHasXMX(curDevID);
+
+  return (is_2d_block && is_xmx)
+      ? (compute_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA)
+      : (compute_eng == torch_ipex::xpu::COMPUTE_ENG::RECOMMEND ||
+         compute_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
 }
 
 int8_t GetGpuArchId() noexcept {
@@ -666,7 +672,6 @@ static Tensor mm_bias_resadd_resadd_int4(
         &out);
     return resize_as_mat1(input, out);
   } else {
-    std::cout << "onednn path" << std::endl;
     Attr attr;
     torch_ipex::xpu::oneDNN::woq_matmul_bias_resadd_resadd(
         out,

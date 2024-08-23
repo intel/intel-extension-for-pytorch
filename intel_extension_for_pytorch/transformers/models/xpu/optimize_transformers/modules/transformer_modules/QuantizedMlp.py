@@ -391,6 +391,13 @@ class IPEXTransformerMLPOptimizedInt4OneDNN(IPEXTransformerMLPOptimizedInt4):
         torch.xpu.synchronize()
 
 
+class IPEXTransformerMLPOptimizedInt4GeluGptjOneDNN(
+    IPEXTransformerMLPOptimizedInt4OneDNN, IPEXTransformerMLPOptimizedInt4GeluGptj
+):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+
+
 class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
     IPEXTransformerMLPOptimizedInt4OneDNN
 ):

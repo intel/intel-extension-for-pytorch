@@ -178,13 +178,20 @@ def xpu_sdpa_support(is_beam_search, head_dim):
         return has_xetla
 
 
-# Determine gemm backend usage with has_xetla() and compute_eng_valid (last 2 lines) in kernel implementation
+# There are two implementations of int4 woq gemm.
+# Use the onednn implementation on client machines (LNL and BMG) and pvc.
+# On other platforms, use the xetla implementation if available
 def xpu_gemm_use_xetla():
+    has_xmx = torch.xpu.has_xmx()
+    has_2d_load = torch.xpu.has_2d_block_array()
+    compute_eng = torch.xpu.get_compute_eng()
+
+    if has_xmx and has_2d_load:
+        return compute_eng == torch.xpu.XPUComputeEng.XETLA
+
     return (
         torch.xpu.has_xetla()
-        and (not torch.xpu.using_onednn_layout())
-        and (
-            torch.xpu.get_compute_eng()
-            in (torch.xpu.XPUComputeEng.RECOMMEND, torch.xpu.XPUComputeEng.XETLA)
-        )
+        and not torch.xpu.using_onednn_layout()
+        and compute_eng
+        in (torch.xpu.XPUComputeEng.RECOMMEND, torch.xpu.XPUComputeEng.XETLA)
     )

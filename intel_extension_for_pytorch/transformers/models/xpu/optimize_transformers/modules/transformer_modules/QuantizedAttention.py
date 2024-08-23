@@ -304,7 +304,7 @@ class IPEXTransformerAttnOptimizedInt4OneDNN(IPEXTransformerAttnOptimizedInt4):
                 self.qkv_proj_quant.blocksize,
             )
             m = query.shape[-1]
-            query = qkv_out[:, :, :m]
+            query = qkv_out[:, :, :m].contiguous()
             key.copy_(qkv_out[:, :, m : 2 * m])
             value.copy_(qkv_out[:, :, 2 * m :])
         else:

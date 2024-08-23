@@ -268,7 +268,7 @@ static Tensor woq_matmul_int4(
   }
   // STEP2: creat attribute
   primitive_attr pattr;
-  // pattr.set_post_ops(po);
+  pattr.set_post_ops(po);
 
 #ifdef USE_SCRATCHPAD_MODE
   pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
@@ -582,7 +582,7 @@ at::Tensor woq_matmul_bias_resadd_resadd(
       attr,
       is_fused);
   if (!is_fused) {
-    result += bias + res0.flatten(0, -2) + res1.flatten(0, -2);
+    result += bias + res0 + res1;
   }
   return result;
 }
