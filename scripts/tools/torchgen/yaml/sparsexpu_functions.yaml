@@ -7,9 +7,9 @@ supported:
   - _coalesced_
   - copy_
   - _indices
-  - _nnz
-  - _sparse_coo_tensor_with_dims_and_tensors
-  - _values
+#  - _nnz # duplicated op
+#  - _sparse_coo_tensor_with_dims_and_tensors # duplicated op
+#  - _values # duplicated op
 #  - coalesce	# different schema
   - copy_sparse_to_sparse_
   - dense_dim

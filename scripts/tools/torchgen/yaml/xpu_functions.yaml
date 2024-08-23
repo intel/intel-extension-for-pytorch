@@ -25,7 +25,7 @@ supported:
 #  - cumprod.out
   - _cummax_helper
   - _cummin_helper
-  - cumsum.out  # newly added
+#  - cumsum.out  # newly added
   - _dirichlet_grad
 #  - _efficientzerotensor
 #  - _embedding_bag
@@ -67,7 +67,7 @@ supported:
   - _masked_softmax_backward
   - _pdist_backward
   - _pdist_forward
-  - _reshape_alias  # newly added
+#  - _reshape_alias  # newly added
   - _segment_reduce_backward
   - _sample_dirichlet
 #  - _softmax.out
@@ -101,14 +101,14 @@ supported:
 #  - add.out
 #  - add_.Scalar
 #  - add_.Tensor
-  - addbmm
-  - addbmm_
-  - addbmm.out
+#  - addbmm # duplicated op
+#  - addbmm_ # duplicated op
+#  - addbmm.out # duplicated op
 #  - addcdiv.out
 #  - addcmul.out
-  - _addmm_activation.out
-  - addmm.out  # newly added
-  - addmv.out  # newly added
+#  - _addmm_activation.out # duplicated op
+#  - addmm.out  # newly added # duplicated op
+#  - addmv.out  # newly added # duplicated op
 #  - addr
 #  - addr.out
 #  - all.all_out
@@ -137,9 +137,9 @@ supported:
 #  - avg_pool2d_backward.grad_input
   - avg_pool3d.out
   - avg_pool3d_backward.grad_input
-  - baddbmm
-  - baddbmm.out
-  - baddbmm_
+#  - baddbmm # duplicated op
+#  - baddbmm.out # duplicated op
+#  - baddbmm_ # duplicated op
 #  - batch_norm_elemt
 #  - batch_norm_elemt.out
   - batch_norm_gather_stats
@@ -177,8 +177,8 @@ supported:
   - bitwise_right_shift_.Tensor_Scalar
   - bitwise_right_shift.Tensor_Scalar_out
   - bitwise_right_shift.Scalar_Tensor
-  - bmm
-  - bmm.out
+#  - bmm # duplicated op
+#  - bmm.out # duplicated op
   - cauchy_
 #  - ceil.out
   - cholesky
@@ -199,8 +199,8 @@ supported:
 #  - col2im
 #  - col2im.out
   - conv_tbc
-  - convolution_backward_overrideable
-  - convolution_overrideable
+#  - convolution_backward_overrideable # duplicated op
+#  - convolution_overrideable # duplicated op
 #  - copy_
 #  - copysign.out
 #  - cos.out
@@ -277,7 +277,7 @@ supported:
   - geqrf.a
 #  - logit
 #  - logit_
-  - logit.out 
+#  - logit.out
 #  - glu
 #  - glu.out
 #  - glu_backward
@@ -404,8 +404,8 @@ supported:
 #  - min.unary_out
 #  - minimum
 #  - minimum.out
-  - mm
-  - mm.out
+#  - mm # duplicated op
+#  - mm.out # duplicated op
   - mode
 #  - mse_loss
 #  - mse_loss.out
@@ -530,7 +530,7 @@ supported:
 #  - scatter.reduce_out
 #  - scatter.src_out
 #  - scatter.value_reduce_out
-  - scatter_add.out  # newly added
+#  - scatter_add.out  # newly added
 #  - scatter_reduce.two_out
   - segment_reduce
 #  - set_
@@ -617,7 +617,7 @@ supported:
 #  - tanh.out
 #  - tanh_backward
 #  - tanh_backward.grad_input
-  - tensordot.out
+#  - tensordot.out # duplicated op
 #  - threshold
 #  - threshold.out
 #  - threshold_
@@ -667,7 +667,7 @@ supported:
 #  - var.correction
 #  - var_mean.correction
 #  - view
-  - view_as_real   # newly added
+#  - view_as_real   # newly added
 #  - view_as_complex
   - xlogy.OutTensor
 #  - zero_
@@ -869,8 +869,8 @@ supported:
 #  - _weight_norm_interface
   - _validate_compressed_sparse_indices
 #  - index.Tensor_out
-# - pad_sequence // schema change
-# - _fused_sdp_choice // schema change
+# - pad_sequence # schema change
+# - _fused_sdp_choice # schema change
   - _scaled_dot_product_efficient_attention
   - _scaled_dot_product_efficient_attention_backward
   - _transform_bias_rescale_qkv
@@ -880,4 +880,4 @@ autograd:
   - cdist
   - lstm.input
   - gru.input
-# - _scaled_dot_product_attention_math // schema change
+# - _scaled_dot_product_attention_math # schema change
