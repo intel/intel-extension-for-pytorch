@@ -163,7 +163,7 @@ static inline memory::data_type get_onednn_dtype_include_double(
     const at::Tensor& tensor,
     bool allow_undef = false) {
   DeviceId curDevID = at::xpu::current_device();
-  bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
+  bool fp64_valid = at::xpu::getDeviceProperties(curDevID)->has_fp64;
 
   if (tensor.scalar_type() == at::ScalarType::Double) {
     if (fp64_valid)
