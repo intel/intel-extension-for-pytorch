@@ -498,8 +498,7 @@ class gemm_t<
     wg_start_m = args.matA_base_desc.coord.y;
     wg_start_n = args.scale_base_desc.coord.x;
     wg_start_k = args.matA_base_desc.coord.x;
-    typename dequantize_t::arguments_t dequantize_args{
-        wg_start_m, wg_start_n, wg_start_k};
+    typename dequantize_t::arguments_t dequantize_args{wg_start_n, wg_start_k};
     dequantize_t dequantize;
 
     xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier_a;

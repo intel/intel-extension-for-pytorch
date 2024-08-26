@@ -64,13 +64,8 @@ struct dequant_int4_weight_t {
     uint32_t wg_start_n;
     uint32_t wg_start_k;
     inline arguments_t() = default;
-    inline arguments_t(
-        uint32_t wg_start_m_,
-        uint32_t wg_start_n_,
-        uint32_t wg_start_k_)
-        : wg_start_m(wg_start_m_),
-          wg_start_n(wg_start_n_),
-          wg_start_k(wg_start_k_) {}
+    inline arguments_t(uint32_t wg_start_n_, uint32_t wg_start_k_)
+        : wg_start_n(wg_start_n_), wg_start_k(wg_start_k_) {}
   };
   __XETLA_API KERNEL_FUNC void operator()(
       matB_acc_t& matB_acc,

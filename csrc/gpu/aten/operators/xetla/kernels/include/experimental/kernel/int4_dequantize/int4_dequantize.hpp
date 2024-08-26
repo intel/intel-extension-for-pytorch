@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2022-2023 Intel Corporation
+ * Copyright (c) 2023-2024 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,6 @@
 
 #pragma once
 
-#include <experimental/kernel/col_major_shuf/col_major_shuf.hpp>
-#include <experimental/kernel/data_transformer/data_transformer.hpp>
-#include <experimental/kernel/gemm/gemm.hpp>
-#include <experimental/kernel/int4_dequantize/int4_dequantize.hpp>
-#include <experimental/kernel/layer_norm/layer_norm.hpp>
-#include <experimental/kernel/mha_core_attention/mha_attn_reg.hpp>
-#include <experimental/kernel/mha_core_attention/mha_core_attn.hpp>
-#include <experimental/kernel/reduction/reduction.hpp>
+#include <experimental/kernel/int4_dequantize/api.hpp>
+#include <experimental/kernel/int4_dequantize/config.hpp>
+#include <experimental/kernel/int4_dequantize/int4_dequantize_xe_impl.hpp>

@@ -38,16 +38,17 @@ template <
     typename tile_desc_,
     mem_layout mem_layout_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_,
     msg_type::block_2d,
     arch_tag_,
     std::enable_if_t<arch_has_2d_load_store<arch_tag_>>> {
   using tile_desc = tile_desc_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using dtype = dtype_;
   static constexpr msg_type message_type = msg_type::block_2d;
   static constexpr mem_space memory_space = mem_space::global;
@@ -400,15 +401,25 @@ template <
     typename tile_desc_,
     gpu_arch arch_tag_,
     uint32_t alignment_,
-    mem_layout memory_layout_>
+    mem_layout memory_layout_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, memory_layout_, mem_space::global, alignment_>,
+    mem_desc_t<
+        dtype_,
+        memory_layout_,
+        mem_space::global,
+        alignment_,
+        use_mask_>,
     tile_desc_,
     msg_type::block_1d,
     arch_tag_,
     std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, memory_layout_, mem_space::global, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      memory_layout_,
+      mem_space::global,
+      alignment_,
+      use_mask_>;
   using dtype = native_type_t<dtype_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
@@ -441,8 +452,8 @@ struct mem_payload_t<
 
   inline mem_payload_t(mem_desc_t& mem_tdesc) {
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     payload_bytes = mem_transpose ? (mem_tdesc.shape.x - 1) * pitch_in_bytes +
             mem_tdesc.shape.y * sizeof(dtype)
                                   : (mem_tdesc.shape.y - 1) * pitch_in_bytes +
@@ -480,8 +491,8 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     uint32_t offset_x = mem_tdesc.coord.x;
     uint32_t offset_y = mem_tdesc.coord.y;
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     payload_bytes = mem_transpose ? (mem_tdesc.shape.x - 1) * pitch_in_bytes +
             mem_tdesc.shape.y * sizeof(dtype)
                                   : (mem_tdesc.shape.y - 1) * pitch_in_bytes +
@@ -554,15 +565,25 @@ template <
     typename dtype_,
     typename tile_desc_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout::row_major, mem_space::global, alignment_>,
+    mem_desc_t<
+        dtype_,
+        mem_layout::row_major,
+        mem_space::global,
+        alignment_,
+        use_mask_>,
     tile_desc_,
     msg_type::atomic_add,
     arch_tag_,
     std::enable_if_t<sizeof(dtype_) >= sizeof(uint16_t)>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout::row_major, mem_space::global, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      mem_layout::row_major,
+      mem_space::global,
+      alignment_,
+      use_mask_>;
   using dtype = dtype_;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
@@ -736,15 +757,25 @@ template <
     typename dtype_,
     typename tile_desc_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>,
+    mem_desc_t<
+        dtype_,
+        mem_layout::row_major,
+        mem_space::local,
+        alignment_,
+        use_mask_>,
     tile_desc_,
     msg_type::block_1d,
     arch_tag_,
     std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      mem_layout::row_major,
+      mem_space::local,
+      alignment_,
+      use_mask_>;
   using dtype = dtype_;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::local;
@@ -867,16 +898,17 @@ template <
     typename tile_desc_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     gpu_arch arch_tag_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_,
     msg_type::unaligned_2d,
     arch_tag_,
     std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
   using dtype = dtype_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = mem_layout_;
@@ -949,8 +981,8 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     base_x = mem_tdesc.coord.x;
     base_y = mem_tdesc.coord.y;
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
@@ -995,8 +1027,8 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     base_x = mem_tdesc.coord.x;
     base_y = mem_tdesc.coord.y;
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
@@ -1094,22 +1126,24 @@ template <
     typename tile_desc_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     gpu_arch arch_tag_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_,
     msg_type::block_2d,
     arch_tag_,
     std::enable_if_t<!arch_has_2d_load_store<arch_tag_>>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = mem_layout_;
   static constexpr msg_type message_type = msg_type::block_2d;
   static constexpr uint32_t alignment_in_bytes = mem_desc_t::alignment_in_bytes;
   static constexpr gpu_arch arch_tag = arch_tag_;
+  static constexpr bool use_mask = mem_desc_t::use_mask;
 
  private:
   static constexpr uint32_t tile_size_x = tile_desc::tile_size_x;
@@ -1140,13 +1174,13 @@ struct mem_payload_t<
       alignment_in_bytes);
 
   //     using mem_dtype = uint32_t;
-  using mem_dtype = typename std::conditional<
+  using mem_dtype = typename std::conditional_t<
       (block_per_row_bytes % sizeof(uint64_t) == 0),
       uint64_t,
-      typename std::conditional<
+      typename std::conditional_t<
           (block_per_row_bytes % sizeof(uint32_t) == 0),
           uint32_t,
-          dtype>::type>::type;
+          dtype>>;
   static constexpr uint32_t pack_factor = sizeof(mem_dtype) / sizeof(dtype);
 
   static constexpr uint32_t vector_size =
@@ -1191,8 +1225,8 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     base_x = mem_tdesc.coord.x;
     base_y = mem_tdesc.coord.y;
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
@@ -1230,8 +1264,8 @@ struct mem_payload_t<
     base_x = mem_tdesc.coord.x;
     base_y = mem_tdesc.coord.y;
 
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
@@ -1318,15 +1352,25 @@ template <
     typename dtype_,
     typename tile_desc_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>,
+    mem_desc_t<
+        dtype_,
+        mem_layout::row_major,
+        mem_space::local,
+        alignment_,
+        use_mask_>,
     tile_desc_,
     msg_type::scatter,
     arch_tag_,
     std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      mem_layout::row_major,
+      mem_space::local,
+      alignment_,
+      use_mask_>;
   using dtype = dtype_;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::local;
@@ -1492,9 +1536,15 @@ template <
     uint32_t block_size_x_,
     uint32_t block_size_y_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>,
+    mem_desc_t<
+        dtype_,
+        mem_layout::row_major,
+        mem_space::local,
+        alignment_,
+        use_mask_>,
     tile_desc_t<
         tile_size_x_,
         tile_size_y_,
@@ -1504,8 +1554,12 @@ struct mem_payload_t<
     msg_type::scatter,
     arch_tag_,
     std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      mem_layout::row_major,
+      mem_space::local,
+      alignment_,
+      use_mask_>;
   using dtype = dtype_;
   using tile_desc = tile_desc_t<
       tile_size_x_,
@@ -1642,11 +1696,12 @@ template <
     uint32_t block_size_y_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     uint32_t num_coop_sg_,
     reg_layout reg_layout_,
     gpu_arch arch_tag_>
 struct prefetch_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_t<
         tile_size_x_,
         tile_size_y_,
@@ -1662,7 +1717,7 @@ struct prefetch_payload_t<
          mem_layout_ == mem_layout::col_major))>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using tile_desc = tile_desc_t<
       tile_size_x_,
       tile_size_y_,
@@ -1697,31 +1752,34 @@ struct prefetch_payload_t<
   static constexpr bool trans = (mem_transpose ^ reg_transpose) &&
       !(std::is_same_v<dtype_, int4x2> || std::is_same_v<dtype_, int4x8>);
 
-  using prefetch_dtype = typename std::conditional<
+  using prefetch_dtype = typename std::conditional_t<
       (alignment_in_bytes % (sizeof(uint64_t)) == 0),
       uint64_t,
-      typename std::conditional<
+      typename std::conditional_t<
           (alignment_in_bytes % (sizeof(uint32_t)) == 0),
           uint32_t,
-          dtype>::type>::type;
+          dtype>>;
   static constexpr uint32_t pack_factor =
       sizeof(prefetch_dtype) / sizeof(dtype);
 
-  static constexpr uint32_t min_store_bytes = 16 * sizeof(dtype);
-  static constexpr uint32_t max_store_bytes = 32 * sizeof(dtype);
-  static constexpr uint32_t simd_channel =
-      ((tile_bytes % max_store_bytes) == 0 &&
-       (block_bytes % max_store_bytes) == 0)
-      ? 32
-      : 16;
-  static constexpr uint32_t num_channel = mem_transpose
-      ? (simd_channel >= block_size_x) ? block_size_x : simd_channel
-      : (simd_channel >= block_size_y) ? block_size_y
-                                       : simd_channel;
+  static constexpr uint32_t vector_size =
+      ((mem_transpose ? block_size_y : block_size_x) + pack_factor - 1) /
+      pack_factor;
 
-  static constexpr uint32_t vector_size = mem_transpose
-      ? (block_size_y + pack_factor - 1) / pack_factor
-      : (block_size_x + pack_factor - 1) / pack_factor;
+  // for pvc, we can use simd16 or simd32
+  static constexpr uint32_t max_bytes =
+      load_store_attr_t<msg_type::block_1d, arch_tag>::max_prefetch_vec_len;
+  // std::min(load_store_attr::max_load_vec_len, block_bytes);
+
+  static constexpr uint32_t max_channel =
+      max_bytes / (vector_size * sizeof(prefetch_dtype));
+
+  static constexpr uint32_t select_channel(const uint32_t channel) {
+    return channel >= 32 ? 32 : channel >= 16 ? 16 : channel >= 8 ? 8 : 1;
+  }
+
+  static constexpr uint32_t num_channel = select_channel(
+      std::min(mem_transpose ? block_size_x : block_size_y, max_channel));
 
   static constexpr uint32_t mem_tile_size_w =
       mem_transpose ? tile_size_y : tile_size_x;
@@ -1888,11 +1946,12 @@ template <
     uint32_t block_size_y_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     uint32_t num_coop_sg_,
     reg_layout reg_layout_,
     gpu_arch arch_tag_>
 struct prefetch_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_t<
         tile_size_x_,
         tile_size_y_,
@@ -1906,7 +1965,7 @@ struct prefetch_payload_t<
         ((tile_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
   using dtype = dtype_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using tile_desc = tile_desc_t<
       tile_size_x_,
       tile_size_y_,
@@ -2190,11 +2249,12 @@ template <
     uint32_t block_size_y_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     uint32_t num_coop_sg_,
     reg_layout reg_layout_,
     gpu_arch arch_tag_>
 struct prefetch_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_t<
         tile_size_x_,
         tile_size_y_,
@@ -2208,7 +2268,7 @@ struct prefetch_payload_t<
         ((tile_size_x_ == 1) && mem_layout_ == mem_layout::col_major)>> {
   using dtype = dtype_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   // CL aligned, so we can use uint64_t
   using prefetch_dtype = uint64_t;
   static constexpr msg_type message_type = msg_type::block_1d;
@@ -2326,18 +2386,19 @@ template <
     typename dtype_,
     typename tile_desc_,
     mem_layout mem_layout_,
+    bool use_mask_,
     uint32_t alignment_,
     uint32_t num_coop_sg_,
     gpu_arch arch_tag_>
 struct prefetch_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::local, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::local, alignment_, use_mask_>,
     tile_desc_,
     num_coop_sg_,
     arch_tag_,
     std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
   using dtype = dtype_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::local, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::local, alignment_, use_mask_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::local;
   static constexpr mem_layout memory_layout = mem_layout_;

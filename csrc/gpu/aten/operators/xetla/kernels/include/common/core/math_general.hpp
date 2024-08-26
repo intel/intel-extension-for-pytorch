@@ -460,7 +460,9 @@ __XETLA_API T xetla_rsqrt(T src, Sat sat = {}) {
 template <typename T, int SZ>
 __XETLA_API xetla_vector<T, SZ> xetla_tanh(xetla_vector<T, SZ> src) {
   static_assert(
-      std::is_same<remove_const_t<T>, float>::value, "Only support fp32! ");
+      (std::is_same<remove_const_t<T>, float>::value) ||
+          (std::is_same<remove_const_t<T>, fp16>::value),
+      "Only support fp32 and fp16");
   constexpr uint32_t flag_elems = 8 * 16;
   xetla_vector<T, SZ> ret;
   if constexpr (SZ / flag_elems > 0) {
@@ -502,7 +504,9 @@ __XETLA_API xetla_vector<T, SZ> xetla_tanh(xetla_vector<T, SZ> src) {
 template <typename T>
 __XETLA_API T xetla_tanh(T src) {
   static_assert(
-      std::is_same<remove_const_t<T>, float>::value, "Only support fp32! ");
+      (std::is_same<remove_const_t<T>, float>::value) ||
+          (std::is_same<remove_const_t<T>, fp16>::value),
+      "Only support fp32 and fp16");
   T exp2x = xetla_exp<T>(src * 2.f);
   T ret = (exp2x - 1.f) / (exp2x + 1.f);
   return (src >= 10) ? 1 : ret;

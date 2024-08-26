@@ -163,27 +163,27 @@ class fmha_forward_t {
   // --------------------- // Memory desc // ---------------------- //
   // suffix: L -> local; T -> transpose
   using mem_desc_Qi_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Qi_L_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_Kj_T_t =
-      mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::col_major, mem_space::global>;
   using mem_desc_Pij_L_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_Vj_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Bij_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Oi_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Ai_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
 
   using mem_desc_Li_t =
-      mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<accum_t, mem_layout::row_major, mem_space::global>;
 
   using mem_desc_Dp_Mask_t =
-      mem_desc_t<uint8_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<uint8_t, mem_layout::row_major, mem_space::global>;
 
   // ------------------- // Slm and nbarrier // ------------------- //
   static constexpr uint32_t slm_size_Qi = kBr * kHm * sizeof(scalar_t);
@@ -682,14 +682,14 @@ class fmha_forward_t {
     if constexpr (kIsDropout) {
       if (args.Dp_ptr) {
         using load_payload_mask_t = subgroup::mem_payload_t<
-            mem_desc_t<
+            mem_mask_desc_t<
                 uint8_t,
                 mem_desc_Dp_Mask_t::layout,
                 mem_desc_Dp_Mask_t::space>,
             dp_mask_tile_desc_t,
             subgroup::msg_type_v<
                 dp_mask_tile_desc_t,
-                mem_desc_t<
+                mem_mask_desc_t<
                     uint8_t,
                     mem_desc_Dp_Mask_t::layout,
                     mem_desc_Dp_Mask_t::space>>,
@@ -727,7 +727,7 @@ class fmha_forward_t {
     using store_tile_t = subgroup::tile_t<accum_t, store_desc>;
     // Note: use block_2d store as only block_2d supports boundary check
     using store_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
+        mem_mask_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
         store_desc,
         msg_type::block_2d,
         arch_tag>;
@@ -791,11 +791,14 @@ class fmha_forward_t {
           {0, 0});
       using matOi_tile_desc_t = typename matOi_t::tile_desc;
       using matOi_store_t = subgroup::mem_payload_t<
-          mem_desc_t<scalar_t, mem_desc_Oi_t::layout, mem_desc_Oi_t::space>,
+          mem_mask_desc_t<
+              scalar_t,
+              mem_desc_Oi_t::layout,
+              mem_desc_Oi_t::space>,
           matOi_tile_desc_t,
           subgroup::msg_type_v<
               matOi_tile_desc_t,
-              mem_desc_t<
+              mem_mask_desc_t<
                   scalar_t,
                   mem_desc_Oi_t::layout,
                   mem_desc_Oi_t::space>>,
@@ -836,18 +839,24 @@ class fmha_forward_t {
     using matQi_tile_desc_t = typename gemm_Oi_t::matAcc_tile_desc_t;
     using matQi_t = subgroup::tile_t<scalar_t, matQi_tile_desc_t>;
     using matQi_load_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
+        mem_mask_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
         matQi_tile_desc_t,
         subgroup::msg_type_v<
             matQi_tile_desc_t,
-            mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>>,
+            mem_mask_desc_t<
+                scalar_t,
+                mem_desc_Qi_t::layout,
+                mem_desc_Qi_t::space>>,
         arch_tag>;
     using matQi_store_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_desc_Qi_L_t::layout, mem_desc_Qi_L_t::space>,
+        mem_mask_desc_t<
+            scalar_t,
+            mem_desc_Qi_L_t::layout,
+            mem_desc_Qi_L_t::space>,
         matQi_tile_desc_t,
         subgroup::msg_type_v<
             matQi_tile_desc_t,
-            mem_desc_t<
+            mem_mask_desc_t<
                 scalar_t,
                 mem_desc_Qi_L_t::layout,
                 mem_desc_Qi_L_t::space>>,

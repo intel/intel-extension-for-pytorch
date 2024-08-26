@@ -159,21 +159,21 @@ class ifmha_forward_t {
 
   // --------------------- // Memory desc // ---------------------- //
   using mem_desc_Qi_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_QiL_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_Kj_t =
-      mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::col_major, mem_space::global>;
   using mem_desc_Vj_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Oi_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Ij_t =
-      mem_desc_t<index_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<index_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Bij_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Pij_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
+      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
 
   using imem_desc_Kj_t =
       imem_desc_t<scalar_t, kSgBc, 1, accum_step_1d, arch_tag>;
@@ -297,7 +297,7 @@ class ifmha_forward_t {
       using index_tile_desc_t = subgroup::tile_desc_t<1, kSgBc, 1, 16>;
       using index_tile_t = subgroup::tile_t<index_t, index_tile_desc_t>;
       using index_payload_t = subgroup::mem_payload_t<
-          mem_desc_t<index_t, mem_desc_Ij_t::layout, mem_desc_Ij_t::space>,
+          mem_mask_desc_t<index_t, mem_desc_Ij_t::layout, mem_desc_Ij_t::space>,
           index_tile_desc_t,
           msg_type::block_2d,
           arch_tag>;
@@ -492,14 +492,14 @@ class ifmha_forward_t {
         reg_layout::vnni_tiled>;
     using matB_t = subgroup::tile_t<scalar_t, matB_tile_desc_t>;
     using matB_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, layout_b, mem_space::global>,
+        mem_mask_desc_t<scalar_t, layout_b, mem_space::global>,
         matB_tile_desc_t,
         subgroup::msg_type_v<
             matB_tile_desc_t,
-            mem_desc_t<scalar_t, layout_b, mem_space::global>>,
+            mem_mask_desc_t<scalar_t, layout_b, mem_space::global>>,
         arch_tag>;
     using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
-        mem_desc_t<scalar_t, layout_b, mem_space::global>,
+        mem_mask_desc_t<scalar_t, layout_b, mem_space::global>,
         subgroup::tile_desc_t<kSgBc, accum_step_bmbc, 1, 1>,
         tile_shape_BmBc::wg_size_y,
         arch_tag>;
@@ -570,7 +570,10 @@ class ifmha_forward_t {
 
     using matQi_tile_desc_t = subgroup::tile_desc_t<accum_step_1d, 1, 16, 1>;
     using matQi_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_desc_QiL_t::layout, mem_desc_QiL_t::space>,
+        mem_mask_desc_t<
+            scalar_t,
+            mem_desc_QiL_t::layout,
+            mem_desc_QiL_t::space>,
         matQi_tile_desc_t,
         msg_type::block_1d,
         arch_tag>;
@@ -647,7 +650,7 @@ class ifmha_forward_t {
 
   inline void prefetch_V0() {
     using matVj_prefetch_payload_t = subgroup::prefetch_payload_t<
-        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+        mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
         subgroup::tile_desc_t<kSgHm, stages_bmhm * accum_step_bmhm, 1, 1>,
         1,
         arch_tag>;
@@ -680,7 +683,10 @@ class ifmha_forward_t {
     using matPi_tile_desc_t = subgroup::tile_desc_t<kBc, 1, kBc, 1>;
     using matPi_t = subgroup::tile_t<scalar_t, matPi_tile_desc_t>;
     using matPi_load_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_desc_Pij_t::layout, mem_desc_Pij_t::space>,
+        mem_mask_desc_t<
+            scalar_t,
+            mem_desc_Pij_t::layout,
+            mem_desc_Pij_t::space>,
         matPi_t,
         msg_type::block_1d,
         arch_tag>;
@@ -721,12 +727,12 @@ class ifmha_forward_t {
         reg_layout::vnni_tiled>;
     using matB_t = subgroup::tile_t<scalar_t, matB_tile_desc_t>;
     using matB_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, layout_b, mem_space::global>,
+        mem_mask_desc_t<scalar_t, layout_b, mem_space::global>,
         matB_tile_desc_t,
         msg_type::block_2d,
         arch_tag>;
     using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
-        mem_desc_t<scalar_t, layout_b, mem_space::global>,
+        mem_mask_desc_t<scalar_t, layout_b, mem_space::global>,
         subgroup::tile_desc_t<kSgBc, accum_step_bmhm, 1, 1>,
         tile_shape_BmHm::wg_size_y,
         arch_tag>;
@@ -844,7 +850,7 @@ class ifmha_forward_t {
     if constexpr (wg_size_x > 1) {
       using matX_tile_desc_t = subgroup::tile_desc_t<kSgHm, 1, 16, 1>;
       using matX_payload_t = subgroup::mem_payload_t<
-          mem_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
+          mem_mask_desc_t<accum_t, mem_layout::row_major, mem_space::local>,
           matX_tile_desc_t,
           msg_type::block_1d,
           arch_tag>;
@@ -1041,7 +1047,7 @@ class ifmha_forward_t {
 
   inline void preload_Qi(matQ_t& matQ) {
     using matQi_load_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
+        mem_mask_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
         matQ_tile_desc_t,
         msg_type::block_1d,
         arch_tag>;
