@@ -342,7 +342,6 @@ class gemm_t<
         matA_prefetch_payload);
     subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
         matB_prefetch_payload);
-    SW_BARRIER();
     matA_prefetch_payload.template update_tdesc<update_dir_a>(
         matA_t::tile_size_x);
     matB_prefetch_payload.template update_tdesc<update_dir_b>(
@@ -430,7 +429,6 @@ class gemm_t<
           matB, matB_payload);
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matA, matA_payload);
-      SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
 
@@ -438,18 +436,15 @@ class gemm_t<
         prefetch_and_update_ab();
       }
 
-      SW_BARRIER();
       matA_acc_t matA_acc;
       matB_acc_t matB_acc;
       subgroup::elemwise_cvt(matA_acc, matA);
       subgroup::vnni_transform(matB_acc, matB);
       pre_processing(matA_acc, matB_acc, matA, matB);
       tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
-      SW_BARRIER();
 
       periodic_sync_wait(i);
     }
-    SW_BARRIER();
   }
 
  private:

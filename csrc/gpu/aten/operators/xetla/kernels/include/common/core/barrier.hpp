@@ -33,7 +33,11 @@ namespace gpu::xetla {
 template <uint8_t NbarCount>
 __XETLA_API void xetla_nbarrier_init() {
   if constexpr (NbarCount != 0) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+    __ESIMD_NS::named_barrier_init<NbarCount>();
+#else
     __ESIMD_ENS::named_barrier_init<NbarCount>();
+#endif
   }
 }
 
@@ -55,8 +59,13 @@ __XETLA_API void named_barrier_signal(
     uint8_t producer_consumer_mode,
     uint32_t num_producers,
     uint32_t num_consumers) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  __ESIMD_NS::named_barrier_signal(
+      barrier_id, producer_consumer_mode, num_producers, num_consumers);
+#else
   __ESIMD_ENS::named_barrier_signal(
       barrier_id, producer_consumer_mode, num_producers, num_consumers);
+#endif
 }
 
 /// @brief Wait on a named barrier.
@@ -65,7 +74,11 @@ __XETLA_API void named_barrier_signal(
 /// @param barrier_id  [in] is the named barrier id.
 /// It’s value cannot exceed the total count of initialized named barriers.
 __XETLA_API void named_barrier_wait(uint8_t barrier_id) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  __ESIMD_NS::named_barrier_wait(barrier_id);
+#else
   __ESIMD_ENS::named_barrier_wait(barrier_id);
+#endif
 }
 
 /// @} xetla_core_barrier

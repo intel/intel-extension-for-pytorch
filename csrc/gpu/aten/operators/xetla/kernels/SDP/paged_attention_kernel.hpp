@@ -153,7 +153,6 @@ tile_load_2d(
         mat_load.reg.xetla_select<read_cnt, view_stride>(i * view_offset);
     tile_load_1d(mat_1d, mem_payload, boundary_x, boundary_y);
     tile_slice_2d = mat_1d.reg;
-    SW_BARRIER();
     mem_payload.template update_tdesc<tdesc_update_dir::y_dir>(1);
     if constexpr (stages != 0) {
       subgroup::tile_prefetch(prefetch_payload);
@@ -167,7 +166,6 @@ tile_load_2d(
         -loop_cnt - stages);
     prefetch_payload.template update_tdesc<tdesc_update_dir::x_dir>(read_cnt);
   }
-  SW_BARRIER();
   if constexpr (stages != 0) {
 #pragma unroll
     for (int i = 0; i < stages; ++i) {
@@ -231,7 +229,6 @@ tile_load_2d(
     if constexpr (stages != 0) {
       subgroup::tile_prefetch(prefetch_payload);
     }
-    SW_BARRIER();
     mem_payload.template update_tdesc<tdesc_update_dir::y_dir>(y_stride);
     if constexpr (stages != 0) {
       prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(y_stride);
@@ -272,7 +269,6 @@ tile_load_2d(
   if constexpr (stages != 0) {
     subgroup::tile_prefetch(prefetch_payload);
   }
-  SW_BARRIER();
   mem_payload.template update_tdesc<dir>(update_stride);
   if constexpr (stages != 0) {
     prefetch_payload.template update_tdesc<dir>(update_stride);
@@ -591,17 +587,13 @@ class paged_attention_kernel {
             stages>(
             mat_key, key_payload, key_prefetch_payload, boundary_x, boundary_y);
 
-        SW_BARRIER();
         query_payload.template update_tdesc<query_update_dir>(head_size_stride);
-        SW_BARRIER();
         query_acc_tile_t mat_query_acc;
         key_acc_tile_t mat_key_acc;
         subgroup::elemwise_cvt(mat_query_acc, mat_query);
         subgroup::elemwise_cvt(mat_key_acc, mat_key);
-        SW_BARRIER();
         score_sub += mat_vec_mul<accum_t, head_size_stride, key_acc_tile_t, 0>(
             mat_query_acc.reg, mat_key_acc);
-        SW_BARRIER();
       }
 
       score_sub *= args.sm_scale;
@@ -783,15 +775,12 @@ class paged_attention_kernel {
           value_prefetch_payload.template update_tdesc<value_update_dir>(
               head_size_stride);
         }
-        SW_BARRIER();
         value_acc_tile_t mat_value_acc;
         subgroup::elemwise_cvt(mat_value_acc, mat_value);
-        SW_BARRIER();
         auto out_sub =
             mat_out.reg.xetla_select<head_size_stride, 1>(i * head_size_stride);
         out_sub += mat_vec_mul<accum_t, block_size, value_acc_tile_t, 1>(
             score_sub, mat_value_acc);
-        SW_BARRIER();
       }
     }
   }
@@ -1241,15 +1230,12 @@ class paged_attention_reduce {
             args.head_size,
             boundary_x);
 
-        SW_BARRIER();
         tmp_acc_tile_t mat_tmp_out_acc;
         subgroup::elemwise_cvt(mat_tmp_out_acc, mat_tmp_out);
-        SW_BARRIER();
         auto out_sub =
             mat_out.reg.xetla_select<head_size_stride, 1>(j * head_size_stride);
         out_sub += mat_vec_mul<accum_t, partition_stride, tmp_acc_tile_t, 1>(
             rescaled_exp_sums_sub, mat_tmp_out_acc);
-        SW_BARRIER();
       }
     }
   }

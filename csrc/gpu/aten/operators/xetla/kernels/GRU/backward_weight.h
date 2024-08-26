@@ -45,8 +45,7 @@ struct bpk_config_t {
       {ptr_b},                                                        \
       {boundary_n_##op_id, boundary_k, matrix_n_##op_id},             \
       {start_x_b_##op_id, start_y_b_##op_id});                        \
-  brgemm_op_##op_id(g, matAcc_##op_id, brgemm_arg_##op_id);           \
-  SW_BARRIER();
+  brgemm_op_##op_id(g, matAcc_##op_id, brgemm_arg_##op_id);
 
 #define BPK_MATC_STORE_GLOBAL(id, ptr_c)            \
   matC_base_desc.init(                              \
@@ -67,8 +66,7 @@ struct bpk_config_t {
       {boundary_m, 1, matrix_m},                           \
       {start_m + brgemm_t_##id::get_matC_offset_y(g), 0}); \
   bias_payload.init(bias_desc);                            \
-  tile_store(bias_##id, bias_payload);                     \
-  SW_BARRIER();
+  tile_store(bias_##id, bias_payload);
 
 #define BIAS_REDUCE(id)                                                \
   for (int j = 0; j < block_x_num; j++) {                              \
@@ -316,10 +314,8 @@ struct gru_layer_bpk {
       matBPI_payload_1.template update_tdesc<load_update_config>(sg_tile_k);
       matBPI_1.reg +=
           xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_0.reg);
-      SW_BARRIER();
       matBPI_0.reg +=
           xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_1.reg);
-      SW_BARRIER();
 #pragma unroll
       for (int i = 0; i < prefetch_distance; i++) {
         tile_prefetch(prefetch0);
@@ -336,7 +332,6 @@ struct gru_layer_bpk {
         // * gate_nums);    /// err
         matBPI_1.reg +=
             xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_0.reg);
-        SW_BARRIER();
         tile_load(matBPI_load_1, matBPI_payload_1);
         matBPI_payload_1.template update_tdesc<load_update_config>(sg_tile_k);
         tile_prefetch(prefetch1);
@@ -345,7 +340,6 @@ struct gru_layer_bpk {
         // * gate_nums);    /// err
         matBPI_0.reg +=
             xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_1.reg);
-        SW_BARRIER();
       }
 
       BPK_BRGEMM_CALL(
@@ -363,13 +357,9 @@ struct gru_layer_bpk {
     BIAS_REDUCE(1);
 
     BIAS_STORE_GLOBAL(0, args->bias0_ptr);
-    // SW_BARRIER();
     BIAS_STORE_GLOBAL(1, args->bias1_ptr);
-    // SW_BARRIER();
     BPK_MATC_STORE_GLOBAL(1, args->w_i_ptr);
-    SW_BARRIER();
     BPK_MATC_STORE_GLOBAL(0, args->w_h_ptr);
-    SW_BARRIER();
   }
 };
 
@@ -475,7 +465,6 @@ struct perf_kernel_xcoder_gru_bpk {
       args.w_h_ptr = w_h_ptr + layer_id * 3 * hidden_weight_size;
       args.bias0_ptr = bias0_ptr + layer_id * hidden_size * 3;
       args.bias1_ptr = bias1_ptr + layer_id * hidden_size * 3;
-      SW_BARRIER();
       fused_op_1::call(item, &args);
     } else {
       args.slm_addr = 0;
@@ -490,7 +479,6 @@ struct perf_kernel_xcoder_gru_bpk {
       args.batch_size = batch_size;
       args.hidden_size = hidden_size;
       args.input_size = input_size;
-      SW_BARRIER();
       fused_op_0::call(item, &args);
     }
   }
@@ -594,7 +582,6 @@ struct kernel_xcoder_gru_bpk {
       args.w_h_ptr = w_h_ptr + layer_id * 3 * hidden_weight_size;
       args.bias0_ptr = bias0_ptr + layer_id * hidden_size * 3;
       args.bias1_ptr = bias1_ptr + layer_id * hidden_size * 3;
-      SW_BARRIER();
       fused_op_1::call(item, &args);
     }
     args.slm_addr = 0;
@@ -609,7 +596,6 @@ struct kernel_xcoder_gru_bpk {
     args.batch_size = batch_size;
     args.hidden_size = hidden_size;
     args.input_size = input_size;
-    SW_BARRIER();
     fused_op_0::call(item, &args);
   }
 };

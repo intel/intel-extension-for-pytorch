@@ -201,7 +201,6 @@ class global_reduce_t<
       mat_zero.reg = 0;
       subgroup::tile_store<cache_hint::uncached, cache_hint::write_back>(
           mat_zero, matAcc_payload);
-      SW_BARRIER();
     }
   }
 };

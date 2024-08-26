@@ -253,7 +253,6 @@ struct row_reduction_fused_op_t<
       mask_in_t mask_in;
       mask_in_payload_t mask_in_payload(mask_load_base_desc);
       subgroup::tile_load(mask_in, mask_in_payload);
-      SW_BARRIER();
       matAcc.reg = drop_out<dtype_acc, tile_size_x * tile_size_y>(
           matAcc.reg, mask_in.reg, dropout_scale_inv);
     }

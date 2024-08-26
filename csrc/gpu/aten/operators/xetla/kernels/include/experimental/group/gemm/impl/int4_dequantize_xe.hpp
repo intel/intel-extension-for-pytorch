@@ -518,7 +518,6 @@ class gemm_t<
         stages < args.inner_loop_count ? args.inner_loop_count - stages : 0;
     uint32_t compute_stages =
         stages < args.inner_loop_count ? stages : args.inner_loop_count;
-    SW_BARRIER();
     for (uint32_t i = 0; i < prefetch_stages; i++) {
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
           matA_prefetch_payload);
@@ -573,7 +572,6 @@ class gemm_t<
             zero_pt, zero_pt_payload);
       }
       tile_k_idx++;
-      SW_BARRIER();
       if constexpr (stages != 0) {
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             matA_prefetch_payload);
@@ -589,7 +587,6 @@ class gemm_t<
         }
         scale_prefetch_addr_i++;
       }
-      SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
       if (tile_k_idx % scale_addr_update_freq == 0) {
@@ -616,7 +613,6 @@ class gemm_t<
           }
         }
       }
-      SW_BARRIER();
       matA_acc_t matA_acc;
       matB_acc_t matB_acc;
       if constexpr (is_vnni_tiled_a) {
@@ -625,7 +621,6 @@ class gemm_t<
       subgroup::elemwise_cvt(matA_acc, matA);
 
       dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
-      SW_BARRIER();
       if constexpr (is_gemv) {
         tile_mma::mma(
             matAcc,
@@ -640,7 +635,6 @@ class gemm_t<
         }
         tile_mma::mma(matC, matC, matB_acc, matA_acc);
       }
-      SW_BARRIER();
       if constexpr (enable_periodic_sync) {
         if ((i % sync_freq) == 0) {
           if constexpr (wg_size_x > 1) {
@@ -654,7 +648,6 @@ class gemm_t<
         }
       }
     }
-    SW_BARRIER();
     for (uint32_t i = 0; i < compute_stages; i++) {
       if constexpr (enable_periodic_sync) {
         if ((i % sync_freq) == 0) {
@@ -681,7 +674,6 @@ class gemm_t<
             zero_pt, zero_pt_payload);
       }
       tile_k_idx++;
-      SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
       if (tile_k_idx % scale_addr_update_freq == 0) {
@@ -693,7 +685,6 @@ class gemm_t<
               zero_pt_t::tile_size_y);
         }
       }
-      SW_BARRIER();
       matA_acc_t matA_acc;
       matB_acc_t matB_acc;
       if constexpr (is_vnni_tiled_a) {
@@ -702,7 +693,6 @@ class gemm_t<
       subgroup::elemwise_cvt(matA_acc, matA);
 
       dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
-      SW_BARRIER();
       if constexpr (is_gemv) {
         tile_mma::mma(
             matAcc, matAcc, matC, matB_acc, matA_acc, i == compute_stages - 1);
@@ -712,7 +702,6 @@ class gemm_t<
         }
         tile_mma::mma(matC, matC, matB_acc, matA_acc);
       }
-      SW_BARRIER();
       if constexpr (enable_periodic_sync) {
         if ((i % sync_freq) == 0) {
           if constexpr (wg_size_x > 1) {
@@ -726,7 +715,6 @@ class gemm_t<
         }
       }
     }
-    SW_BARRIER();
   }
 
  private:

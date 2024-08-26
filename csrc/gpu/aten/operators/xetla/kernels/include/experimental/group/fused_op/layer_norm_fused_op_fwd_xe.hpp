@@ -255,7 +255,6 @@ struct ln_fwd_fused_op_t<
     if (dropout_prob != 0) {
       // dropout
       subgroup::tile_load(mask_in, mask_in_payload);
-      SW_BARRIER();
       if constexpr (n_chunks == 1) {
         mask_in_payload.update_tdesc(wg_num_m * wg_tile_m * mask_ld);
       } else {
@@ -389,7 +388,6 @@ struct ln_fwd_fused_op_t<
       xetla_vector<dtype_acc, chunk_size> input) {
     // dropout
     subgroup::tile_load(mask_in, mask_in_payload);
-    SW_BARRIER();
     if constexpr (n_chunks == 1) {
       mask_in_payload.update_tdesc(wg_num_m * wg_tile_m * mask_ld);
     } else {

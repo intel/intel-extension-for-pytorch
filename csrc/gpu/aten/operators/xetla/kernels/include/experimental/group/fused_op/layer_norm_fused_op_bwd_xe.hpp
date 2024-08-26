@@ -236,7 +236,6 @@ struct ln_bwd_fused_op_t<
     dx_resAdd_out_payload.update_tdesc(wg_num_m * wg_tile_m * mat_ld);
     if (dropout_prob != 0) {
       subgroup::tile_load(mask_in, mask_in_payload);
-      SW_BARRIER();
       mask_in_payload.update_tdesc(wg_num_m * wg_tile_m * mask_ld);
       output = drop_out<dtype_acc, sg_tile_n>(
           output, mask_in.reg, dropout_scale_inv);
@@ -368,7 +367,6 @@ struct ln_bwd_fused_op_t<
     if (dropout_prob != 0) {
       // dropout
       subgroup::tile_load(mask_in, mask_in_payload);
-      SW_BARRIER();
       mask_in_payload.update_tdesc(wg_num_m * wg_tile_m * mask_ld);
       output = drop_out<dtype_acc, sg_tile_n>(
           output, mask_in.reg, dropout_scale_inv);
@@ -479,7 +477,6 @@ struct ln_bwd_fused_op_t<
     xetla_vector<dtype_acc, sg_tile_n> output;
     // dropout
     subgroup::tile_load(mask_in, mask_in_payload);
-    SW_BARRIER();
     mask_in_payload.update_tdesc(wg_num_m * wg_tile_m * mask_ld);
     output =
         drop_out<dtype_acc, sg_tile_n>(input, mask_in.reg, dropout_scale_inv);

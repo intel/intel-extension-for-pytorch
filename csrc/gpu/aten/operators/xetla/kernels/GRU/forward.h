@@ -62,8 +62,7 @@ struct fwd_config_t {
   brgemm_arg.matB_base_desc.init(                                           \
       {ptr_b1}, {boundary_n, boundary_k, pitch_b}, {start_x_b, start_y_b}); \
                                                                             \
-  brgemm_op(g, acc0_ptr, brgemm_arg /*, acc1_ptr, acc2_ptr*/);              \
-  SW_BARRIER();
+  brgemm_op(g, acc0_ptr, brgemm_arg /*, acc1_ptr, acc2_ptr*/);
 
 #define MATC_STORE(acc_id, ptr_c)                                          \
   matC_base_desc.init(                                                     \
@@ -198,13 +197,10 @@ struct gru_cell {
     int local_pitch = ((hidden_size + wg_tile_n - 1) / wg_tile_n) * wg_tile_n;
     int wg_tile_k;
 
-    SW_BARRIER();
-
     int pitch_a, start_x_a, start_y_a;
     int pitch_b, start_x_b, start_y_b;
     boundary_n = (start_n + wg_tile_n) > hidden_size ? hidden_size
                                                      : (start_n + wg_tile_n);
-    SW_BARRIER();
     init_acc_with_bias(
         args->B_ir_ptr,
         args->B_hr_ptr,
@@ -229,7 +225,6 @@ struct gru_cell {
         start_n + brgemm_op_t::get_matC_offset_x(g),
         start_m);
 
-    SW_BARRIER();
     // caculate Mat_Wi_ * Mat_X(t)
     PART_BRGEMM_CALL(
         0,
@@ -250,7 +245,6 @@ struct gru_cell {
         args->hx_ptr,
         args->W_hr_ptr);
     sigmoid(matAcc0, 0);
-    SW_BARRIER();
     MATC_STORE(0, args->reset_gate_ptr);
 
     PART_BRGEMM_CALL(
@@ -263,7 +257,6 @@ struct gru_cell {
         args->W_hn_ptr);
 
     MATC_STORE(2, args->hgate_2_ptr);
-    SW_BARRIER();
     matAcc2.reg = matAcc2.reg * matAcc0.reg;
 
     init_acc_with_bias(
@@ -302,7 +295,6 @@ struct gru_cell {
         args->hx_ptr,
         args->W_hz_ptr);
     sigmoid(matAcc1, 0);
-    SW_BARRIER();
     matC_base_desc.init(
         {args->hx_ptr},
         {boundary_n, boundary_m, hidden_size},
@@ -311,12 +303,9 @@ struct gru_cell {
     mat_hidden_payload.init(matC_base_desc);
     tile_load<cache_hint::cached, cache_hint::cached>(
         mat_hidden, mat_hidden_payload);
-    SW_BARRIER();
 
     /// calculate reset gate: r_t = \sigma(X_t W_ir + h_{t - 1} W_hr)
-    SW_BARRIER();
     MATC_STORE(2, args->new_gate_ptr);
-    SW_BARRIER();
     MATC_STORE(1, args->input_gate_ptr);
 
     /// calculate h_t = (1 - z_t) n_t + z_t h_{t - 1} NOTICE z_t in Acc1, n_t in
@@ -348,7 +337,6 @@ struct gru_cell {
     }
 
     MATC_STORE(2, args->hidden_ptr);
-    SW_BARRIER();
   }
 
   static void inline init_acc_with_bias(
@@ -418,7 +406,6 @@ struct gru_cell {
     bias_payload.init(bias2_ptr, boundary_n, 1, matrix_n, start_n, 0);
     subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
         bias2, bias_payload);
-    SW_BARRIER();
     bias1.reg = bias1.reg + bias2.reg;
     subgroup::row_broadcast(matAcc, bias1);
     // matAcc.init(bias1);
@@ -567,14 +554,12 @@ struct kernel_gru_cell_fusion {
       args.mask_ptr = mask_ptr != nullptr
           ? (Act_T*)mask_ptr + seq_idx * hidden_io_size
           : nullptr;
-      SW_BARRIER();
       for (unsigned j = 0; j < (hidden_size + wg_tile_n_t - 1) / wg_tile_n_t;
            ++j) {
         args.group_offset = j;
         fused_cell_op::call(item, &args);
         __esimd_barrier();
       }
-      SW_BARRIER();
     }
   }
 };

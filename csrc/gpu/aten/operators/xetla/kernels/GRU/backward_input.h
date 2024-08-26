@@ -49,8 +49,7 @@ struct bpi_config_t {
       {ptr_a},                                                \
       {3 * boundary_k, boundary_m, 3 * matrix_k},             \
       {start_x_a, start_y_a});                                \
-  brgemm_op_##op_id(g, matAcc_##op_id, brgemm_arg_##op_id);   \
-  SW_BARRIER();
+  brgemm_op_##op_id(g, matAcc_##op_id, brgemm_arg_##op_id);
 
 #define BPI_MATC_STORE_GLOBAL(id, ptr_c, pitch)                   \
   matC_base_desc.init(                                            \
@@ -60,8 +59,7 @@ struct bpi_config_t {
        start_m + brgemm_t_##id::get_matC_offset_y(g)});           \
   matC_payload_##id.init(matC_base_desc);                         \
   elemwise_cvt<matC_t##id, matAcc_t##id>(matC_##id, matAcc_##id); \
-  tile_store(matC_##id, matC_payload_##id);                       \
-  SW_BARRIER();
+  tile_store(matC_##id, matC_payload_##id);
 
 #define MACC_INIT_LOAD(id, ptr_c, pitch)                                      \
   matC_base_desc.init(                                                        \
@@ -70,8 +68,7 @@ struct bpi_config_t {
       {item.get_group(2) * wg_tile_n_0 + brgemm_t_##id::get_matC_offset_x(g), \
        start_m + brgemm_t_##id::get_matC_offset_y(g)});                       \
   matC_payload_0.init(matC_base_desc);                                        \
-  tile_load(matAcc_init, matC_payload_0);                                     \
-  SW_BARRIER();
+  tile_load(matAcc_init, matC_payload_0);
 
 #define BPI_DESC_INIT(id, ptr)            \
   matC_base_desc.init(                    \
@@ -87,8 +84,7 @@ struct bpi_config_t {
        start_y_a + offset_y_a});                                      \
   matBPI_payload_g.init(matC_base_desc);                              \
   elemwise_cvt<matA_load_0_t, matA_bpi_t>(matBPI_store, matBPI_##id); \
-  tile_store(matBPI_store, matBPI_payload_g);                         \
-  SW_BARRIER();
+  tile_store(matBPI_store, matBPI_payload_g);
 
 #define DROPOUT(id, mask_ptr)                              \
   mask_desc.init(                                          \
@@ -309,7 +305,6 @@ struct gru_layer_bpi {
         MACC_INIT_LOAD(0, init_err_ptr, hidden_size);
         matAcc_0.reg = matAcc_0.reg +
             xetla_cvt<Act_T, T, matAcc_t0::tile_elems>(matAcc_init.reg);
-        SW_BARRIER();
         MACC_INIT_LOAD(
             0,
             args->input_gate_ptr + (seq_len - 1 - seq_id) * io_size,
@@ -334,7 +329,6 @@ struct gru_layer_bpi {
             sg_tile_k);
         matBPI.reg =
             xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_layer.reg);
-        SW_BARRIER();
 
         BPI_DESC_INIT(0, init_err_ptr);
         matBPI_payload_init.init(matC_base_desc);
@@ -346,7 +340,6 @@ struct gru_layer_bpi {
             sg_tile_k);
         matBPI.reg = matBPI.reg +
             xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_init.reg);
-        SW_BARRIER();
 
         BPI_DESC_INIT(
             1,
@@ -366,7 +359,6 @@ struct gru_layer_bpi {
         matBPI_0.reg = matBPI_2.reg;
         matBPI_1.reg = matBPI_2.reg *
             xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_input.reg);
-        SW_BARRIER();
 
         BPI_DESC_INIT(
             0,
@@ -385,7 +377,6 @@ struct gru_layer_bpi {
         matBPI_2.reg = matBPI_2.reg * matBPI.reg;
         MAT_STORE_GLOBAL(
             2, args->bpi1_ptr + (seq_len - 1 - seq_id) * io_size * gate_nums);
-        SW_BARRIER();
 
         BPI_DESC_INIT(
             1, args->hidden_ptr + (seq_len - 1 - seq_id) * io_size); // hidden
@@ -403,7 +394,6 @@ struct gru_layer_bpi {
         matBPI_1.reg = matBPI_1.reg * matBPI.reg;
         MAT_STORE_GLOBAL(
             1, args->bpi0_ptr + (seq_len - 1 - seq_id) * io_size * gate_nums);
-        SW_BARRIER();
 
         BPI_DESC_INIT(
             0,
@@ -426,7 +416,6 @@ struct gru_layer_bpi {
              xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(
                  matBPI_load_reset.reg));
         /// store bpi to global memory
-        SW_BARRIER();
 
         BPI_DESC_INIT(
             1, args->hgate_2_ptr + (seq_len - 1 - seq_id) * io_size); // h2_gate
@@ -468,7 +457,6 @@ struct gru_layer_bpi {
           layer_prefetch.template update_tdesc<load_update_config>(sg_tile_k);
           matBPI.reg = xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(
               matBPI_load_layer.reg);
-          SW_BARRIER();
 
           tile_load(matBPI_load_init, matBPI_payload_init);
           matBPI_payload_init.template update_tdesc<load_update_config>(
@@ -477,7 +465,6 @@ struct gru_layer_bpi {
           init_prefetch.template update_tdesc<load_update_config>(sg_tile_k);
           matBPI.reg = matBPI.reg +
               xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(matBPI_load_init.reg);
-          SW_BARRIER();
 
           tile_load(matBPI_load_input, matBPI_payload_input);
           matBPI_payload_input.template update_tdesc<load_update_config>(
@@ -493,7 +480,6 @@ struct gru_layer_bpi {
               xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(
                              matBPI_load_input.reg);
 
-          SW_BARRIER();
           tile_load(matBPI_load_new, matBPI_payload_new);
           matBPI_payload_new.template update_tdesc<load_update_config>(
               sg_tile_k);
@@ -510,7 +496,6 @@ struct gru_layer_bpi {
           matBPI_2.reg = matBPI_2.reg * matBPI.reg;
           MAT_STORE_GLOBAL(
               2, args->bpi1_ptr + (seq_len - 1 - seq_id) * io_size * gate_nums);
-          SW_BARRIER();
           tile_load(matBPI_load_hidden, matBPI_payload_hidden);
           matBPI_payload_hidden.template update_tdesc<load_update_config>(
               sg_tile_k);
@@ -526,7 +511,6 @@ struct gru_layer_bpi {
           MAT_STORE_GLOBAL(
               1, args->bpi0_ptr + (seq_len - 1 - seq_id) * io_size * gate_nums);
 
-          SW_BARRIER();
           tile_load(matBPI_load_reset, matBPI_payload_reset);
           matBPI_payload_reset.template update_tdesc<load_update_config>(
               sg_tile_k);
@@ -544,7 +528,6 @@ struct gru_layer_bpi {
                xetla_cvt<Act_T, T, matA_bpi_t::tile_elems>(
                    matBPI_load_reset.reg));
           /// store bpi to global memory
-          SW_BARRIER();
           tile_load(matBPI_load_g2, matBPI_payload_g2);
           matBPI_payload_g2.template update_tdesc<load_update_config>(
               sg_tile_k);
@@ -558,7 +541,6 @@ struct gru_layer_bpi {
           MAT_STORE_GLOBAL(
               0, args->bpi1_ptr + (seq_len - 1 - seq_id) * io_size * gate_nums);
         }
-        SW_BARRIER();
         __esimd_barrier();
         /// [h_0, h_1, h_2] x [w_hr, w_hz, w_hn]^T
         BPI_BRGEMM_CALL(
@@ -567,7 +549,6 @@ struct gru_layer_bpi {
             args->bpi0_ptr + (seq_len - 1 - seq_id) * io_size * gate_nums);
 
         BPI_MATC_STORE_GLOBAL(0, args->x0_grad_ptr, hidden_size);
-        SW_BARRIER();
         __esimd_barrier();
         BPI_BRGEMM_CALL(
             1,
@@ -581,7 +562,6 @@ struct gru_layer_bpi {
             1,
             args->x_grad_ptr + (seq_len - 1 - seq_id) * layer_grad_size,
             input_size);
-        SW_BARRIER();
       }
       args->layer_err_ptr = args->x0_grad_ptr;
     }
@@ -712,7 +692,6 @@ struct kernel_xcoder_gru_bpi {
           (layer_id - 1) * hidden_weight_size * 3;
       args.w_h_ptr = h_weights + 3 * hidden_weight_size * layer_id;
       args.mask_ptr = mask_ptr + (layer_id - 1) * one_layer_size;
-      SW_BARRIER();
       fused_op_1::call(item, &args);
       ping = (ping + 1) % 2;
       pong = (pong + 1) % 2;
@@ -737,7 +716,6 @@ struct kernel_xcoder_gru_bpi {
     args.input_size = input_size;
     args.reserve = 0;
     args.dropout = 0;
-    SW_BARRIER();
     fused_op_0::call(item, &args);
   }
 };

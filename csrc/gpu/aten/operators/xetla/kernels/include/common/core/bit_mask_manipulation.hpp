@@ -49,8 +49,13 @@ __XETLA_API xetla_vector<T0, SZ> xetla_shl(
     xetla_vector<T1, SZ> src0,
     U src1,
     Sat sat = {}) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::shl<T0, T1, SZ, U, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
+#else
   return __ESIMD_ENS::shl<T0, T1, SZ, U, typename Sat::sat_tag>(
       src0, src1, Sat::value);
+#endif
 }
 
 /// Shift left operation (scalar version)
@@ -68,8 +73,13 @@ template <
     typename T2,
     class Sat = xetla_saturation_off_tag>
 typename std::remove_const<T0>::type xetla_shl(T1 src0, T2 src1, Sat sat = {}) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::shl<T0, T1, T2, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
+#else
   return __ESIMD_ENS::shl<T0, T1, T2, typename Sat::sat_tag>(
       src0, src1, Sat::value);
+#endif
 }
 
 /// Shift right operation (vector version)
@@ -92,8 +102,13 @@ __XETLA_API xetla_vector<T0, SZ> xetla_shr(
     xetla_vector<T1, SZ> src0,
     U src1,
     Sat sat = {}) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::shr<T0, T1, SZ, U, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
+#else
   return __ESIMD_ENS::shr<T0, T1, SZ, U, typename Sat::sat_tag>(
       src0, src1, Sat::value);
+#endif
 }
 
 /// Shift right operation (scalar version)
@@ -114,8 +129,13 @@ __XETLA_API typename std::remove_const<T0>::type xetla_shr(
     T1 src0,
     T2 src1,
     Sat sat = {}) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::shr<T0, T1, T2, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
+#else
   return __ESIMD_ENS::shr<T0, T1, T2, typename Sat::sat_tag>(
       src0, src1, Sat::value);
+#endif
 }
 
 /// Rotate left operation with two vector inputs
@@ -130,7 +150,11 @@ template <typename T0, typename T1, int SZ>
 __XETLA_API xetla_vector<T0, SZ> xetla_rol(
     xetla_vector<T1, SZ> src0,
     xetla_vector<T1, SZ> src1) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::rol<T0, T1, SZ>(src0, src1);
+#else
   return __ESIMD_ENS::rol<T0, T1, SZ>(src0, src1);
+#endif
 }
 
 /// Rotate left operation with a vector and a scalar inputs
@@ -147,7 +171,11 @@ __XETLA_API std::enable_if_t<
         std::is_integral<U>::value && is_xetla_scalar<U>::value,
     xetla_vector<T0, SZ>>
 xetla_rol(xetla_vector<T1, SZ> src0, U src1) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::rol<T0, T1, SZ, U>(src0, src1);
+#else
   return __ESIMD_ENS::rol<T0, T1, SZ, U>(src0, src1);
+#endif
 }
 
 /// Rotate left operation with two scalar inputs
@@ -163,7 +191,11 @@ __XETLA_API std::enable_if_t<
         std::is_integral<T2>::value,
     remove_const_t<T0>>
 xetla_rol(T1 src0, T2 src1) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::rol<T0, T1, T2>(src0, src1);
+#else
   return __ESIMD_ENS::rol<T0, T1, T2>(src0, src1);
+#endif
 }
 
 /// Rotate right operation with two vector inputs
@@ -178,7 +210,11 @@ template <typename T0, typename T1, int SZ>
 __XETLA_API xetla_vector<T0, SZ> xetla_ror(
     xetla_vector<T1, SZ> src0,
     xetla_vector<T1, SZ> src1) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::ror<T0, T1, SZ>(src0, src1);
+#else
   return __ESIMD_ENS::ror<T0, T1, SZ>(src0, src1);
+#endif
 }
 
 /// Rotate right operation with a vector and a scalar inputs
@@ -195,7 +231,11 @@ __XETLA_API std::enable_if_t<
         std::is_integral<U>::value && is_xetla_scalar<U>::value,
     xetla_vector<T0, SZ>>
 xetla_ror(xetla_vector<T1, SZ> src0, U src1) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::ror<T0, T1, SZ, U>(src0, src1);
+#else
   return __ESIMD_ENS::ror<T0, T1, SZ, U>(src0, src1);
+#endif
 }
 
 /// Rotate right operation with two scalar inputs
@@ -211,7 +251,11 @@ __XETLA_API std::enable_if_t<
         std::is_integral<T2>::value,
     remove_const_t<T0>>
 xetla_ror(T1 src0, T2 src1) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::ror<T0, T1, T2>(src0, src1);
+#else
   return __ESIMD_ENS::ror<T0, T1, T2>(src0, src1);
+#endif
 }
 
 /// Logical Shift Right (vector version)
@@ -234,8 +278,13 @@ __XETLA_API xetla_vector<T0, SZ> xetla_lsr(
     xetla_vector<T1, SZ> src0,
     U src1,
     Sat sat = {}) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::lsr<T0, T1, SZ, U, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
+#else
   return __ESIMD_ENS::lsr<T0, T1, SZ, U, typename Sat::sat_tag>(
       src0, src1, Sat::value);
+#endif
 }
 
 /// Logical Shift Right (scalar version)
@@ -257,8 +306,13 @@ __XETLA_API typename std::remove_const<T0>::type xetla_lsr(
     T1 src0,
     T2 src1,
     Sat sat = {}) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::lsr<T0, T1, T2, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
+#else
   return __ESIMD_ENS::lsr<T0, T1, T2, typename Sat::sat_tag>(
       src0, src1, Sat::value);
+#endif
 }
 
 /// Arithmetical Shift Right (vector version)
@@ -281,8 +335,13 @@ __XETLA_API xetla_vector<T0, SZ> xetla_asr(
     xetla_vector<T1, SZ> src0,
     U src1,
     Sat sat = {}) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::asr<T0, T1, SZ, U, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
+#else
   return __ESIMD_ENS::asr<T0, T1, SZ, U, typename Sat::sat_tag>(
       src0, src1, Sat::value);
+#endif
 }
 
 /// Arithmetical Shift Right (scalar version)
@@ -304,8 +363,13 @@ __XETLA_API typename std::remove_const<T0>::type xetla_asr(
     T1 src0,
     T2 src1,
     Sat sat = {}) {
+#if __INTEL_LLVM_COMPILER >= 20250000
+  return __ESIMD_NS::asr<T0, T1, T2, typename Sat::sat_tag>(
+      src0, src1, Sat::value);
+#else
   return __ESIMD_ENS::asr<T0, T1, T2, typename Sat::sat_tag>(
       src0, src1, Sat::value);
+#endif
 }
 
 /// Pack a xetla_mask into a single unsigned 32-bit integer value.

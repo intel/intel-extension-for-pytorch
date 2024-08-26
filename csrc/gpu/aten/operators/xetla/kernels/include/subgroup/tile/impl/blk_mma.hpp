@@ -103,7 +103,6 @@ struct blk_mma_t<
               new_a_block[a_offset] * b_blk_2d.row(blk_k - 1) +
               dst_tmp_2d.row(i_acc);
         }
-        SW_BARRIER();
       }
     }
 
@@ -195,7 +194,6 @@ struct blk_mma_t<
                 new_a_block[a_start_off + i_acc * blk_k + k] * b_blk_k;
           }
         }
-        SW_BARRIER();
       }
     }
 
@@ -370,7 +368,6 @@ struct blk_mma_t<
           dst_blk_2d.row(i_acc + i * mma_m) =
               new_a_block[a_offset] * b_blk_k_last + dst_tmp_2d.row(i_acc);
         }
-        SW_BARRIER();
       }
     }
 

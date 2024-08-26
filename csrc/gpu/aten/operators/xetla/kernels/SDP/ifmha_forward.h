@@ -551,9 +551,7 @@ class ifmha_forward_t {
         matB_prefetch_payload.template update_tdesc<update_dir_b>(
             matB_t::tile_size_y);
       }
-      SW_BARRIER();
       xmx_mma(matA, matB, matSij, matSij);
-      SW_BARRIER();
       if constexpr (sync_freq_bmbc > 0) {
         if constexpr ((i % sync_freq_bmbc) == 0) {
           if constexpr (tile_shape_BmBc::wg_size_y > 1) {
@@ -611,10 +609,8 @@ class ifmha_forward_t {
             // load Kj from buffer 1
             ctx.idesc_Kj.iload_tile(matKj_acc);
             ctx.idesc_Kj.iprefetch_tile();
-            SW_BARRIER();
             ctx.idesc_Kj.update_tdesc();
             ctx.idesc_Kj.update_prefetch_tdesc();
-            SW_BARRIER();
             // compute
             auto QK_sub =
                 matQK_acc.reg.xetla_select<reduce_size, 1>(k * reduce_size);
@@ -782,9 +778,7 @@ class ifmha_forward_t {
         matB_prefetch_payload.template update_tdesc<update_dir_b>(
             matB_t::tile_size_y);
       }
-      SW_BARRIER();
       xmx_mma(matA, matB, matOi, matOi);
-      SW_BARRIER();
       if constexpr (sync_freq_bmbc > 0) {
         if constexpr ((i % sync_freq_bmbc) == 0) {
           if constexpr (tile_shape_BmHm::wg_size_y > 1) {
@@ -833,10 +827,8 @@ class ifmha_forward_t {
             // load Vj from buffer 1
             ctx.idesc_Vj.iload_tile(matVj_acc);
             ctx.idesc_Vj.iprefetch_tile();
-            SW_BARRIER();
             ctx.idesc_Vj.update_tdesc();
             ctx.idesc_Vj.update_prefetch_tdesc();
-            SW_BARRIER();
 
             accum_t tmp = matPij.reg.xetla_select<1, 1>(
                 j * block_elems + i * block_size_x + k);
