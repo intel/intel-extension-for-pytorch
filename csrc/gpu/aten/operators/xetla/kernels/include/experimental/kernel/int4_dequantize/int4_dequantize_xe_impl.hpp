@@ -252,7 +252,6 @@ struct int4_dequantize_t<
     typename dequantize_t::arguments_t dequantize_args(start_n, start_k);
     dequantize_t dequantize;
     int tile_k_idx = (start_k + k_stride - 1) / k_stride;
-    SW_BARRIER();
 #pragma unroll
     for (uint32_t i = 0; i < k_dim_loop; i++) {
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
@@ -264,7 +263,6 @@ struct int4_dequantize_t<
             zp, zp_payload);
       }
       tile_k_idx++;
-      SW_BARRIER();
       mat_qweight_payload.template update_tdesc<tdesc_update_dir::x_dir>(
           mat_qweight_t::tile_size_y);
 
@@ -276,13 +274,11 @@ struct int4_dequantize_t<
               zp_t::tile_size_y);
         }
       }
-      SW_BARRIER();
       dequantize(mat_dequant_weight, mat_qweight, scale, zp, dequantize_args);
       tile_transpose(mat_dequant_weight);
       subgroup::tile_store(mat_dequant_weight, mat_dequant_weight_payload);
       mat_dequant_weight_payload.template update_tdesc<tdesc_update_dir::y_dir>(
           mat_dequant_weight_t::tile_size_y);
-      SW_BARRIER();
     }
   };
 };
