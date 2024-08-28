@@ -37,7 +37,7 @@ def main():
         assert args.value != 'None', "[ERROR] when modifying the json file, value can not be 'None'"
         manipulate_result(result, keys, args.value)
         with open(args.file, 'w') as f:
-            json.dump(result, f)
+            json.dump(result, f, indent=2)
     else:
         print(manipulate_result(result, keys))
 
