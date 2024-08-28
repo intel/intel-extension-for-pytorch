@@ -458,10 +458,6 @@ class TestTensorMethod(TestCase):
         platform.system() == "Windows",
         reason="Profiler test of XPU not available on Windows.",
     )
-    @pytest.mark.skipif(
-        not intel_extension_for_pytorch._C._is_pti_enabled(),
-        reason="Profiler test of XPU not available without Kineto + PTI support.",
-    )
     def test_loops_backbone(self):
         run_tests()
 

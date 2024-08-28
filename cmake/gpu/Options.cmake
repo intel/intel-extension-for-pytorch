@@ -13,7 +13,7 @@ option(USE_SCRATCHPAD_MODE "Use oneDNN scratchpad mode" ON)
 option(USE_PRIMITIVE_CACHE "Cache oneDNN primitives by FRAMEWORK for specific operators" ON)
 option(USE_QUEUE_BARRIER "Use queue submit_barrier, otherwise use dummy kernel" ON)
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build")
-option(USE_PTI "Build XPU Profiler with PTI support." ON)
+option(USE_PTI "Build XPU Profiler with PTI support." OFF)
 option(USE_DS_KERNELS "Build deepspeed kernels" ON)
 if (WIN32 OR MSVC)
   # FIXME: when finish the PTI+Windows testing, remove disabling code here

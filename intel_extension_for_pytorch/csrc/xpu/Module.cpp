@@ -486,8 +486,6 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().is_simple_trace_enabled();
   });
 
-  m.def("_is_pti_enabled", []() { return Settings::I().is_pti_enabled(); });
-
   m.def("_is_ds_kernel_enabled", []() {
     return Settings::I().is_ds_kernel_enabled();
   });

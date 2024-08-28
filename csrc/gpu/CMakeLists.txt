@@ -57,26 +57,8 @@ endif()
 
 # Kineto + PTI-sdk dependency part
 if(USE_PTI)
-  find_package(Pti)
-  if(NOT TARGET Pti::pti_view)
-    set(USE_PTI OFF CACHE BOOL "Disable PTI support." FORCE)
-    message(FATAL_ERROR "PTI-sdk library not found. Please install the PTI by referring the installation steps in profiler_kineto.md.\n")
-  else()
-    get_target_property(PTI_INCLUDE_DIR Pti::pti_view INTERFACE_INCLUDE_DIRECTORIES)
-    find_library(PTI_VIEW_LIBRARY NAMES pti_view PATHS "${PTI_INCLUDE_DIR}/../lib")
-    set(PTI_LIBRARY ${PTI_VIEW_LIBRARY} CACHE STRING "Imported PTI library.")
-    set(PTI_INCLUDE_DIR ${PTI_INCLUDE_DIR} CACHE STRING "PTI include directory.")
-
-    # install libpti.so.0.9 and libpti_view.so.0.9
-    # FIXME: the library name is hardwritten here because PTI should create soft link for its library
-    # FIXME: when PTI can be isolated installed by pip, remove here installation code
-    find_file(PTI_LIBRARY_NEED_INSTALL NAMES libpti.so.0.9 PATHS "${PTI_INCLUDE_DIR}/../lib")
-    find_file(PTI_VIEW_LIBRARY_NEED_INSTALL NAMES libpti_view.so.0.9 PATHS "${PTI_INCLUDE_DIR}/../lib")
-
-    install(FILES ${PTI_LIBRARY_NEED_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
-    install(FILES ${PTI_VIEW_LIBRARY_NEED_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
-
-  endif()
+  set(USE_PTI OFF CACHE BOOL "Disable PTI support." FORCE)
+  message(WARNING "PTI build is deprecated in IPEX.\n")
 endif(USE_PTI)
 
 set(IPEX_PROFILER_INCLUDES)
