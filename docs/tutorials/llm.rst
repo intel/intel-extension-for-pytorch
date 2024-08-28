@@ -13,8 +13,11 @@ These LLM-specific optimizations can be automatically applied with a single fron
 
    llm/llm_optimize_transformers
 
-Optimized Models
-----------------
+Optimized Models List
+---------------------
+
+LLM Inference
+~~~~~~~~~~~~~
 
 .. list-table::
    :widths: auto
@@ -26,6 +29,14 @@ Optimized Models
      - INT4 WOQ
    * - Llama2
      - "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf"
+     - ✅
+     - ✅
+   * - Llama3
+     - "meta-llama/Meta-Llama-3-8B"
+     - ✅
+     - ✅
+   * - Phi-3 mini
+     - "microsoft/Phi-3-mini-128k-instruct"
      - ✅
      - ✅
    * - GPT-J
@@ -56,7 +67,57 @@ Optimized Models
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp16). For other LLMs families, we are working in progress to cover those optimizations, which will expand the model list above.
 
-Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.1.30/examples/gpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
+LLM fine-tuning
+~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+
+   * - Model Family
+     - Verified < MODEL ID > (Huggingface hub)
+     - Mixed Precision (BF16+FP32)
+     - Full fine-tuning
+     - LoRA
+     - Intel® Data Center Max 1550 GPU
+     - Intel® Core™ Ultra Processors with Intel® Arc™ Graphics
+   * - Llama2
+     - "meta-llama/Llama-2-7b-hf"
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - Llama2
+     - "meta-llama/Llama-2-70b-hf",
+     - ✅
+     - ❎
+     - ✅
+     - ✅
+     - ❎
+   * - Llama3
+     - "meta-llama/Meta-Llama-3-8B"
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+   * - Qwen
+     - "Qwen/Qwen-7B"
+     - ✅
+     - ✅
+     - ✅
+     - ✅
+     - ❎
+   * - Phi-3-mini 3.8B
+     - "Phi-3-mini-4k-instruct"
+     - ✅
+     - ✅
+     - ✅
+     - ❎
+     - ✅
+
+Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.3.110/examples/gpu/llm>`_ for instructions to install/setup environment and example scripts..
 
 Optimization Methodologies
 --------------------------

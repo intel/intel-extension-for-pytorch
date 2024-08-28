@@ -1,7 +1,3 @@
-# proxy set for downloading dataset error
-# export http_proxy="http://child-jf.intel.com:912"
-# export https_proxy="http://child-jf.intel.com:912"
-
 # export ZE_AFFINITY_MASK=4
 
 # export PROFILE=1

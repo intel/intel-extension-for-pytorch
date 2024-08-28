@@ -1,8 +1,5 @@
 #!/bin/bash
 
-export HF_HOME=/home/sdp/.cache/huggingface/
-#export HF_DATASETS_OFFLINE=1
-#export TRANSFORMERS_OFFLINE=1
 
 model="Qwen/Qwen1.5-7B"
 data="./dataset.json"

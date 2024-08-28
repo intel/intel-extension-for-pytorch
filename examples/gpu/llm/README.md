@@ -100,15 +100,17 @@ conda activate llm
 # Setup the environment with the provided script
 cd examples/gpu/llm
 # If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
-bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <PTI_ROOT> <AOT>
 # e.g. bash ./tools/env_setup.sh 0x03 /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest /opt/intel/oneapi/pti/latest pvc
+bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <PTI_ROOT> <AOT>
+
 conda deactivate
 conda activate llm
 source ./tools/env_activate.sh [inference|fine-tuning]
 ```
 
 where <br />
-- `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. Check [tutorial](../../../../../docs/tutorials/technical_details/AOT.md) for details.<br />
+- `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. For example 'pvc,ats-m150' for the Platform Intel® Data Center GPU Max Series, Intel® Data Center GPU Flex Series and Intel® Arc™ A-Series Graphics (A770). Check [tutorial](../../../docs/tutorials/technical_details/AOT.md) for details.<br />
+
 
 <br />
  

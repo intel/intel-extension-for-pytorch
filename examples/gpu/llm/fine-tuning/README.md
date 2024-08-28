@@ -53,11 +53,23 @@ Our examples integrate with the popular tools and libraries from the ecosystem:
 **Note**:
 Here we mainly focus on the memory-constrained fine-tuning on single GPU, and provide examples for LoRA fine-tuning. If you want to take a try for full fine-tuning, you could set the number of GPU in distributed cases as 1, and make sure your GPU memory is large enough for model states (parameters, gradients, optimizer states) and residual states (activation, temporary buffers and unusable fragmented memory).
 
-
 ### Download a Model
-During the execution, you may need to log in your Hugging Face account to access model files. Refer to [Hugging Face Login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
+During the execution, you may need to log in your Hugging Face account to access model files. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
+
+```
+huggingface-cli login --token <your_token_here>
+```
+
+**Note**: If you have download a model from Meta official Github, you can also convert it to huggingface format by following the [guide](https://huggingface.co/docs/transformers/en/model_doc/llama3#usage-tips).
 
 ### Download a Dataset
+
+During the execution, you may need to log in your wandb account. Refer to [Wandb Login](https://docs.wandb.ai/ref/cli/wandb-login)
+```
+wandb login
+```
+
+
 For Alpaca dataset, you can get here: [Alpaca dataset](https://github.com/tatsu-lab/stanford_alpaca/blob/main/alpaca_data.json).
 
 For more Hugging Face dataset, you can download from [Hugging Face Datasets](https://huggingface.co/docs/datasets/index), or you can load the dataset in Hugging Face online mode.
@@ -70,22 +82,24 @@ For more Hugging Face dataset, you can download from [Hugging Face Datasets](htt
 
 Example: Llama 3 8B + LoRA on single GPU
 
+
 ```bash
-# in Llama3/run_llama3-8b_ft.sh
-  python llama3_ft.py \
-      --model_name_or_path ${model} \
-      --use_flashattn True \
-      --custom_mp True \
-      --use_peft True \
-      --max_seq_length 128 \
-      --output_dir="output" \
-      --evaluation_strategy="epoch" \
-      --learning_rate=1e-3 \
-      --auto_find_batch_size=True \
-      --num_train_epochs=1 \
-      --save_steps=500 \
-      --logging_steps=1 \
-      --save_total_limit=8
+cd Llama3
+# the command will also executed with run_llama3-8b_ft.sh
+python llama3_ft.py \
+    --model_name_or_path "meta-llama/Meta-Llama-3-8B" \
+    --use_flashattn True \
+    --custom_mp True \
+    --use_peft True \
+    --max_seq_length 128 \
+    --output_dir="output" \
+    --evaluation_strategy="epoch" \
+    --learning_rate=1e-3 \
+    --auto_find_batch_size=True \
+    --num_train_epochs=1 \
+    --save_steps=500 \
+    --logging_steps=1 \
+    --save_total_limit=8
 ```
 
 
@@ -96,27 +110,28 @@ Example: Llama 3 8B + LoRA on single GPU
 Example: Llama 2 7B Full fine-tuning
 
 ```bash
-  # in Llama2/run_llama2_7b_fsdp.sh
-  accelerate launch --config_file "fsdp_config.yaml" train.py \
-      --model_name_or_path ${model} \
-      --data_path ./alpaca_data.json \
-      --bf16 True \
-      --use_flashattn True \
-      --output_dir ./result \
-      --num_train_epochs 1 \
-      --per_device_train_batch_size 1 \
-      --per_device_eval_batch_size 1 \
-      --gradient_accumulation_steps 1 \
-      --evaluation_strategy "no" \
-      --save_strategy "steps" \
-      --save_steps 2000 \
-      --save_total_limit 1 \
-      --learning_rate 2e-5 \
-      --weight_decay 0. \
-      --warmup_ratio 0.03 \
-      --lr_scheduler_type "cosine" \
-      --logging_steps 1 \
-      --optim "adamw_torch_fused"
+cd Llama2
+# the command will also executed with run_llama2_7b_fsdp.sh
+accelerate launch --config_file "fsdp_config.yaml" train.py \
+    --model_name_or_path "meta-llama/Llama-2-7b-hf" \
+    --data_path ./alpaca_data.json \
+    --bf16 True \
+    --use_flashattn True \
+    --output_dir ./result \
+    --num_train_epochs 1 \
+    --per_device_train_batch_size 1 \
+    --per_device_eval_batch_size 1 \
+    --gradient_accumulation_steps 1 \
+    --evaluation_strategy "no" \
+    --save_strategy "steps" \
+    --save_steps 2000 \
+    --save_total_limit 1 \
+    --learning_rate 2e-5 \
+    --weight_decay 0. \
+    --warmup_ratio 0.03 \
+    --lr_scheduler_type "cosine" \
+    --logging_steps 1 \
+    --optim "adamw_torch_fused"
 ```
 
 #### LoRA
@@ -124,28 +139,29 @@ Example: Llama 2 7B Full fine-tuning
 Example: Llama 2 7B LoRA fine-tuning
 
 ```bash
-  # in Llama2/run_llama2_7b_fsdp.sh
-  accelerate launch --config_file "fsdp_config.yaml" train.py \
-      --model_name_or_path ${model} \
-      --data_path ./alpaca_data.json \
-      --bf16 True \
-      --use_flashattn True \
-      --use_peft True \
-      --output_dir ./result \
-      --num_train_epochs 1 \
-      --per_device_train_batch_size 1 \
-      --per_device_eval_batch_size 1 \
-      --gradient_accumulation_steps 1 \
-      --evaluation_strategy "no" \
-      --save_strategy "steps" \
-      --save_steps 2000 \
-      --save_total_limit 1 \
-      --learning_rate 2e-5 \
-      --weight_decay 0. \
-      --warmup_ratio 0.03 \
-      --lr_scheduler_type "cosine" \
-      --logging_steps 1 \
-      --optim "adamw_torch_fused"
+cd Llama2
+# the command will also executed with run_llama2_7b_fsdp.sh
+accelerate launch --config_file "fsdp_config.yaml" train.py \
+    --model_name_or_path "meta-llama/Llama-2-7b-hf" \
+    --data_path ./alpaca_data.json \
+    --bf16 True \
+    --use_flashattn True \
+    --use_peft True \
+    --output_dir ./result \
+    --num_train_epochs 1 \
+    --per_device_train_batch_size 1 \
+    --per_device_eval_batch_size 1 \
+    --gradient_accumulation_steps 1 \
+    --evaluation_strategy "no" \
+    --save_strategy "steps" \
+    --save_steps 2000 \
+    --save_total_limit 1 \
+    --learning_rate 2e-5 \
+    --weight_decay 0. \
+    --warmup_ratio 0.03 \
+    --lr_scheduler_type "cosine" \
+    --logging_steps 1 \
+    --optim "adamw_torch_fused"
 ```
 
 **Note**:

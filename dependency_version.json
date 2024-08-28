@@ -20,7 +20,7 @@
   },
   "torch-ccl": {
     "version": "2.3.100+xpu",
-    "commit": "master"
+    "commit": "v2.3.100+xpu"
   },
   "basekit": {
     "dpcpp-cpp-rt": {

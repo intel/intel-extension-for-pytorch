@@ -58,12 +58,12 @@ The team tracks bugs and enhancement requests using `GitHub issues <https://gith
 
    tutorials/introduction
    tutorials/features
-   Large Language Models (LLM)<tutorials/llm>
+   Large Language Models (LLM) <tutorials/llm>
    tutorials/performance
    tutorials/technical_details
    tutorials/releases
    tutorials/known_issues
-   tutorials/blogs_publications
+   Blogs & Publications <https://intel.github.io/intel-extension-for-pytorch/blogs.html>
    tutorials/license
 
 .. toctree::
@@ -71,7 +71,7 @@ The team tracks bugs and enhancement requests using `GitHub issues <https://gith
    :caption: GET STARTED
    :hidden:
 
-   tutorials/installation
+   Installation <https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&version=v2.3.110%2bxpu>
    tutorials/getting_started
    tutorials/examples
 

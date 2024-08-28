@@ -1,7 +1,3 @@
-# proxy set for downloading dataset error
-# export http_proxy="http://child-jf.intel.com:912"
-# export https_proxy="http://child-jf.intel.com:912"
-
 # export ZE_AFFINITY_MASK=4
 
 # export PROFILE=1
@@ -53,7 +49,7 @@ Run_llama3-8b_peft_fsdp() {
 
 main() {
 
-    model='/path_to_llama3/llama3-8b'
+    model='meta-llama/Meta-Llama-3-8B'
 
     Run_llama3-8b_peft_singlecard
     Run_llama3-8b_peft_fsdp

@@ -18,7 +18,7 @@ export TORCH_LLM_ALLREDUCE=1
 ## alpaca dataset full-ft
 Run_llama2-7b_fsdp_alpaca_converge() {
 
-    model='/media/newdrive2/huggingface/llama2-7b'
+    model='meta-llama/Llama-2-7b-hf'
 
     torchrun --nproc_per_node=8 --master_port='29900' train.py \
         --model_name_or_path ${model} \
@@ -48,7 +48,7 @@ Run_llama2-7b_fsdp_alpaca_converge() {
 ## alpaca dataset peft lora
 Run_llama2-7b_fsdp_alpaca_peft_converge() {
     
-    model='/media/newdrive2/huggingface/llama2-7b'
+    model='meta-llama/Llama-2-7b-hf'
 
     torchrun --nproc_per_node=8 --master_port='29900' train.py \
         --model_name_or_path ${model} \
@@ -79,7 +79,7 @@ Run_llama2-7b_fsdp_alpaca_peft_converge() {
 # llama2-70b alpaca dataset peft lora
 Run_llama2-70b_fsdp_alpaca_peft_converge() {
 
-    model='/media/newdrive2/huggingface/llama2-70b'
+    model='meta-llama/Llama-2-70b-hf'
 
     accelerate launch --config_file "fsdp_config.yaml"  train.py \
         --model_name_or_path ${model} \
