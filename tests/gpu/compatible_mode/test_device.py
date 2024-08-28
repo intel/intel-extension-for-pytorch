@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch as ipex  # noqa
 ipex.compatible_mode()
@@ -52,3 +51,34 @@ class TestTorchMethod(TestCase):
 
     def test_memory_snapshot(self):
         torch.cuda.memory_snapshot()
+
+
+    def test_device(self):
+        cuda_device = torch.device("cuda")
+        self.assertEqual(cuda_device.type, "xpu")
+
+        cuda_num_device = torch.device("cuda:0")
+        self.assertEqual(cuda_num_device.type, "xpu")
+
+        num_device = torch.device(0)
+        self.assertEqual(num_device.type, "xpu")
+
+        cpu_device = torch.device("cpu")
+        self.assertEqual(cpu_device.type, "cpu")
+
+        cpu_num_device = torch.device("cpu:0")
+        self.assertEqual(cpu_num_device.type, "cpu")
+
+        meta_device = torch.device("meta")
+        self.assertEqual(meta_device.type, "meta")
+
+        xpu_device = torch.device("xpu")
+        self.assertEqual(xpu_device.type, "xpu")
+
+        xpu_num_device = torch.device("xpu:0")
+        self.assertEqual(xpu_num_device.type, "xpu")
+
+    def test_index_device(self):
+        torch.cuda.set_device(0)
+        device = torch.device("cuda")
+        self.assertEqual(device.type, "xpu")
