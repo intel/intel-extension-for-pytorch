@@ -86,7 +86,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         exit 3
     fi
     VER_TORCHCCL=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k torch-ccl:version)
-    VER_GCC=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k gcc:min-version)
     VER_TORCH=$(python scripts/tools/compilation_helper/dep_ver_utils.py -f dependency_version.json -k pytorch:version)
     VER_IPEX_MAJOR=$(grep "VERSION_MAJOR" version.txt | cut -d " " -f 2)
     VER_IPEX_MINOR=$(grep "VERSION_MINOR" version.txt | cut -d " " -f 2)

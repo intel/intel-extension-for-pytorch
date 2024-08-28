@@ -2,6 +2,7 @@
 setlocal
 
 set "VER_IPEX=xpu-main"
+set "ENABLE_ONEAPI_INTEGRATION=1"
 
 if "%~2"=="" (
     echo Usage: %~nx0 ^<DPCPPROOT^> ^<MKLROOT^> [AOT]
@@ -200,7 +201,6 @@ if NOT "%AOT%"=="" (
 set "BUILD_WITH_CPU=0"
 set "USE_MULTI_CONTEXT=1"
 set "DISTUTILS_USE_SDK=1"
-set "ENABLE_ONEAPI_INTEGRATION=1"
 python setup.py clean
 python setup.py bdist_wheel
 set "ENABLE_ONEAPI_INTEGRATION="

@@ -14,4 +14,3 @@ bitsandbytes
 transformers_stream_generator
 einops
 deepspeed==0.14.4
-wandb==0.17.5
