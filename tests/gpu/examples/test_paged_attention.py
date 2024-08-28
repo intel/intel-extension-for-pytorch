@@ -2,6 +2,7 @@ import torch
 import random
 from typing import List, Optional, Tuple
 import intel_extension_for_pytorch as ipex  # noqa
+import pytest
 from torch.testing._internal.common_utils import (
     TestCase,
 )
@@ -310,6 +311,10 @@ class TestPagedAttention(TestCase):
         for version in ["v1", "v2"]:
             self.paged_attention(version, torch.float16)
 
+    @pytest.mark.skipif(
+        not torch.xpu.has_xmx(),
+        reason="Paged_attention: No bf16 support for current gpu arch.",
+    )
     def test_bf16(self):
         for version in ["v1", "v2"]:
             self.paged_attention(version, torch.bfloat16)
