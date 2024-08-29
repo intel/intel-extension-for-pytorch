@@ -75,10 +75,17 @@ void* DeviceAllocator::getBaseAllocation(void* ptr, size_t* size) {
 void DeviceAllocator::recordStream(
     const at::DataPtr& ptr,
     at::xpu::XPUStream stream) {
+  // Empty tensor's storage().data() might be a null ptr. As there is no
+  // blocks associated with those tensors, it is fine to do nothing here.
   if (!ptr.get()) {
     return;
   }
 
+  // If a tensor is not allocated by this instance, simply skip
+  // This usually happens when XPU tensors are shared across processes,
+  // we need to implement reference counting based sharing mechanism to
+  // guarantee tensors won't be accidentally freed by one process while
+  // they are still being used in another
   if (ptr.get_deleter() != &deleter) {
     return;
   }
