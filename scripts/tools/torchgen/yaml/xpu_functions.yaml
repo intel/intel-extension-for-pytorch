@@ -67,7 +67,6 @@ supported:
   - _masked_softmax_backward
   - _pdist_backward
   - _pdist_forward
-  - _pin_memory
   - _reshape_alias  # newly added
   - _segment_reduce_backward
   - _sample_dirichlet
@@ -334,7 +333,6 @@ supported:
   - isnan
   - isneginf.out
   - isposinf.out
-  - is_pinned
   - kthvalue.values
   - l1_loss
   - le.Scalar
