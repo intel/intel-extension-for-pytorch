@@ -4,7 +4,6 @@ from .Mlp import IPEXTransformerMLP
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
 )
-from .model_utils import xpu_gemm_use_xetla
 
 
 class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
@@ -19,11 +18,13 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
 
     def load_parameter(self, fc_in, fc_out):
         self.fc_in_quant.set_weights_bias(fc_in.qweight, fc_in.bias)
-        self.fc_in_quant.set_scales_zps_gidx(fc_in.scales, fc_in.qzeros)
+        self.fc_in_quant.set_scales_zps_gidx(fc_in.scales, fc_in.qzeros, fc_in.g_idx)
         self.fc_in_quant.blocksize = fc_in.blocksize
 
         self.fc_out_quant.set_weights_bias(fc_out.qweight, fc_out.bias)
-        self.fc_out_quant.set_scales_zps_gidx(fc_out.scales, fc_out.qzeros)
+        self.fc_out_quant.set_scales_zps_gidx(
+            fc_out.scales, fc_out.qzeros, fc_out.g_idx
+        )
         self.fc_out_quant.blocksize = fc_out.blocksize
 
         fc_in.qweight = None
@@ -69,6 +70,7 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
                 self.fc_in_quant.scales,
                 self.fc_in_quant.qzeros,
                 self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
             )
         else:
             hidden_states = torch.ops.torch_ipex.mm_bias_int4(
@@ -78,6 +80,7 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
                 self.fc_in_quant.scales,
                 self.fc_in_quant.qzeros,
                 self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
             )
 
         return self.act(hidden_states)
@@ -90,6 +93,7 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                self.fc_out_quant.g_idx,
             )
         else:
             hidden_states = torch.ops.torch_ipex.mm_bias_int4(
@@ -99,6 +103,7 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                self.fc_out_quant.g_idx,
             )
 
         if residual is not None:
@@ -120,6 +125,7 @@ class IPEXTransformerMLPOptimizedInt4Gelu(IPEXTransformerMLPOptimizedInt4):
                 self.fc_in_quant.scales,
                 self.fc_in_quant.qzeros,
                 self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
             )
             hidden_states = self.act(hidden_states)
         else:
@@ -131,6 +137,7 @@ class IPEXTransformerMLPOptimizedInt4Gelu(IPEXTransformerMLPOptimizedInt4):
                 self.fc_in_quant.bias,
                 self.fc_in_quant.blocksize,
                 "tanh",
+                self.fc_in_quant.g_idx,
             )
         return hidden_states
 
@@ -154,6 +161,7 @@ class IPEXTransformerMLPOptimizedInt4GeluGptj(IPEXTransformerMLPOptimizedInt4Gel
             self.fc_out_quant.scales,
             self.fc_out_quant.qzeros,
             self.fc_out_quant.blocksize,
+            self.fc_out_quant.g_idx,
         )
         hidden_states = self.all_reduce_if_necessary(hidden_states)
         return hidden_states
@@ -170,7 +178,9 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4):
     def load_parameter(self, fc_in, fc_out, c_proj):
         super().load_parameter(fc_in, fc_out)
         self.c_proj_quant.set_weights_bias(c_proj.qweight, c_proj.bias)
-        self.c_proj_quant.set_scales_zps_gidx(c_proj.scales, c_proj.qzeros)
+        self.c_proj_quant.set_scales_zps_gidx(
+            c_proj.scales, c_proj.qzeros, c_proj.g_idx
+        )
         self.c_proj_quant.blocksize = c_proj.blocksize
 
         c_proj.qweight = None
@@ -221,6 +231,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4):
                 self.c_proj_quant.qzeros,
                 self.c_proj_quant.blocksize,
                 residual,
+                self.c_proj_quant.g_idx,
             )
         else:
             hidden_states = torch.ops.torch_ipex.mm_bias_add_int4(
@@ -231,52 +242,56 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4):
                 self.c_proj_quant.qzeros,
                 self.c_proj_quant.blocksize,
                 residual,
+                self.c_proj_quant.g_idx,
             )
         return hidden_states
 
-    def inter_mm_seperate(self, hidden_states):
-        if xpu_gemm_use_xetla():
-            return super().inter_mm(hidden_states)
+    def inter_mm_fallback(self, hidden_states):
+        if self.fc_in_quant.bias is None:
+            hidden_states1 = torch.ops.torch_ipex.mm_int4(
+                hidden_states,
+                self.mlp_silu_qweight[1],
+                self.mlp_silu_scales[1],
+                self.mlp_silu_qzeros[1] if self.mlp_silu_qzeros is not None else None,
+                self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
+            )
         else:
-            if self.fc_in_quant.bias is None:
-                hidden_states1 = torch.ops.torch_ipex.mm_int4(
-                    hidden_states,
-                    self.fc_in_quant.qweight,
-                    self.fc_in_quant.scales,
-                    self.fc_in_quant.qzeros,
-                    self.fc_in_quant.blocksize,
-                )
-            else:
-                hidden_states1 = torch.ops.torch_ipex.mm_bias_int4(
-                    hidden_states,
-                    self.fc_in_quant.qweight,
-                    self.fc_in_quant.bias,
-                    self.fc_in_quant.scales,
-                    self.fc_in_quant.qzeros,
-                    self.fc_in_quant.blocksize,
-                )
-            if self.fc_out_quant.bias is None:
-                hidden_states2 = torch.ops.torch_ipex.mm_int4(
-                    hidden_states,
-                    self.fc_out_quant.qweight,
-                    self.fc_out_quant.scales,
-                    self.fc_out_quant.qzeros,
-                    self.fc_out_quant.blocksize,
-                )
-            else:
-                hidden_states2 = torch.ops.torch_ipex.mm_bias_int4(
-                    hidden_states,
-                    self.fc_out_quant.qweight,
-                    self.fc_out_quant.bias,
-                    self.fc_out_quant.scales,
-                    self.fc_out_quant.qzeros,
-                    self.fc_out_quant.blocksize,
-                )
-            # split due to the difference between onednn and torch with silu fusion
-            hidden_states2 = self.act(hidden_states2)
-            return hidden_states1 * hidden_states2
+            hidden_states1 = torch.ops.torch_ipex.mm_bias_int4(
+                hidden_states,
+                self.mlp_silu_qweight[1],
+                self.fc_in_quant.bias,
+                self.mlp_silu_scales[1],
+                self.mlp_silu_qzeros[1] if self.mlp_silu_qzeros is not None else None,
+                self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
+            )
+        if self.fc_out_quant.bias is None:
+            return torch.ops.torch_ipex.mm_silu_mul_int4(
+                hidden_states,
+                self.mlp_silu_qweight[0],
+                self.mlp_silu_scales[0],
+                self.mlp_silu_qzeros[0] if self.mlp_silu_qzeros else None,
+                self.fc_out_quant.blocksize,
+                hidden_states1,
+                self.fc_out_quant.g_idx,
+            )
+        else:
+            return torch.ops.torch_ipex.mm_bias_silu_mul_int4(
+                hidden_states,
+                self.mlp_silu_qweight[0],
+                self.fc_out_quant.bias,
+                self.mlp_silu_scales[0],
+                self.mlp_silu_qzeros[0] if self.mlp_silu_qzeros else None,
+                self.fc_out_quant.blocksize,
+                hidden_states1,
+                self.fc_out_quant.g_idx,
+            )
 
     def inter_mm(self, hidden_states):
+        if self.fc_in_quant.g_idx is not None:
+            # mlp fusion cannot apply actorder, so fallback
+            return self.inter_mm_fallback(hidden_states)
         assert self.fc_in_quant.blocksize == self.fc_out_quant.blocksize
         has_gate_bias = self.fc_out_quant.bias is not None
         has_up_bias = self.fc_in_quant.bias is not None
@@ -335,6 +350,7 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3(IPEXTransformerMLPOptimizedInt4):
                 self.fc_in_quant.scales,
                 self.fc_in_quant.qzeros,
                 self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
             )
         else:
             up_states = torch.ops.torch_ipex.mm_bias_int4(
@@ -344,6 +360,7 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3(IPEXTransformerMLPOptimizedInt4):
                 self.fc_in_quant.scales,
                 self.fc_in_quant.qzeros,
                 self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
             )
 
         gate, up_states = up_states.chunk(2, dim=-1)
@@ -356,6 +373,7 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3(IPEXTransformerMLPOptimizedInt4):
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                self.fc_out_quant.g_idx,
             )
         else:
             output = torch.ops.torch_ipex.mm_bias_int4(
@@ -365,6 +383,7 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3(IPEXTransformerMLPOptimizedInt4):
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                self.fc_out_quant.g_idx,
             )
         return output
 
@@ -411,7 +430,9 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
     def load_parameter(self, fc_in, fc_out, c_proj):
         super().load_parameter(fc_in, fc_out)
         self.c_proj_quant.set_weights_bias(c_proj.qweight, c_proj.bias)
-        self.c_proj_quant.set_scales_zps_gidx(c_proj.scales, c_proj.qzeros)
+        self.c_proj_quant.set_scales_zps_gidx(
+            c_proj.scales, c_proj.qzeros, c_proj.g_idx
+        )
         self.c_proj_quant.blocksize = c_proj.blocksize
 
         c_proj.qweight = None
@@ -428,6 +449,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
                 self.c_proj_quant.qzeros,
                 self.c_proj_quant.blocksize,
                 residual,
+                self.c_proj_quant.g_idx,
             )
         else:
             hidden_states = torch.ops.torch_ipex.mm_bias_add_int4(
@@ -438,6 +460,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
                 self.c_proj_quant.qzeros,
                 self.c_proj_quant.blocksize,
                 residual,
+                self.c_proj_quant.g_idx,
             )
         return hidden_states
 
@@ -458,6 +481,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
                 self.fc_in_quant.scales,
                 self.fc_in_quant.qzeros,
                 self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
             )
         else:
             hidden_states1 = torch.ops.torch_ipex.mm_bias_int4(
@@ -467,6 +491,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
                 self.fc_in_quant.scales,
                 self.fc_in_quant.qzeros,
                 self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
             )
         if self.fc_out_quant.bias is None:
             hidden_states2 = torch.ops.torch_ipex.mm_int4(
@@ -475,6 +500,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                self.fc_out_quant.g_idx,
             )
         else:
             hidden_states2 = torch.ops.torch_ipex.mm_bias_int4(
@@ -484,6 +510,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                self.fc_out_quant.g_idx,
             )
         # split due to the difference between onednn and torch with silu fusion
         hidden_states2 = self.act(hidden_states2)
@@ -517,6 +544,7 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3OneDNN(
                 self.fc_in_quant.scales,
                 self.fc_in_quant.qzeros,
                 self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
             )
         else:
             up_states = torch.ops.torch_ipex.mm_bias_int4(
@@ -526,6 +554,7 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3OneDNN(
                 self.fc_in_quant.scales,
                 self.fc_in_quant.qzeros,
                 self.fc_in_quant.blocksize,
+                self.fc_in_quant.g_idx,
             )
 
         gate, up_states = up_states.chunk(2, dim=-1)
@@ -538,6 +567,7 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3OneDNN(
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                self.fc_out_quant.g_idx,
             )
         else:
             output = torch.ops.torch_ipex.mm_bias_int4(
@@ -547,5 +577,6 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3OneDNN(
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                self.fc_out_quant.g_idx,
             )
         return output

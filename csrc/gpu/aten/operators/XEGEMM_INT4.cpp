@@ -107,6 +107,7 @@ static void mm_qkv_out_wint4(
           group_size,
           false,
           attr,
+          std::nullopt,
           bias[0]);
       out1_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out1_,
@@ -117,6 +118,7 @@ static void mm_qkv_out_wint4(
           group_size,
           false,
           attr,
+          std::nullopt,
           bias[1]);
       out2_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out2_,
@@ -127,6 +129,7 @@ static void mm_qkv_out_wint4(
           group_size,
           false,
           attr,
+          std::nullopt,
           bias[2]);
     } else {
       out0_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
@@ -137,7 +140,8 @@ static void mm_qkv_out_wint4(
           weight_zp[0],
           group_size,
           false,
-          attr);
+          attr,
+          std::nullopt);
       out1_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out1_,
           input_,
@@ -146,7 +150,8 @@ static void mm_qkv_out_wint4(
           weight_zp[1],
           group_size,
           false,
-          attr);
+          attr,
+          std::nullopt);
       out2_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out2_,
           input_,
@@ -155,7 +160,8 @@ static void mm_qkv_out_wint4(
           weight_zp[2],
           group_size,
           false,
-          attr);
+          attr,
+          std::nullopt);
     }
   }
 }
@@ -429,8 +435,14 @@ static inline HGEMMXetla_INT4 mm_int4_dispatch(
     int64_t group_size,
     const std::vector<std::tuple<const Tensor&, HGEMMXetla_INT4::EpilogueType>>&
         epilogues,
-    Tensor* const output) {
-  auto input_flat = input.flatten(0, -2);
+    Tensor* const output,
+    const c10::optional<Tensor>& g_idx) {
+  Tensor input_flat;
+  if (g_idx.has_value()) {
+    input_flat = input.index_select(-1, g_idx.value()).flatten(0, -2);
+  } else {
+    input_flat = input.flatten(0, -2);
+  }
   auto weight_flat = weight.flatten(0, -2);
   if (input_flat.scalar_type() == ScalarType::Float)
     input_flat = input_flat.to(at::kHalf);
@@ -462,7 +474,8 @@ static Tensor mm_bias_int4(
     const Tensor& bias_,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
-    int64_t group_size) {
+    int64_t group_size,
+    const c10::optional<Tensor>& g_idx) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
     auto bias = bias_.flatten();
@@ -473,7 +486,8 @@ static Tensor mm_bias_int4(
         weight_zp,
         group_size,
         {{bias, HGEMMXetla_INT4::EpilogueType::BIAS}},
-        &out);
+        &out,
+        g_idx);
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
@@ -486,6 +500,7 @@ static Tensor mm_bias_int4(
         group_size,
         false,
         attr,
+        g_idx,
         bias_);
     return out;
   }
@@ -496,11 +511,12 @@ static Tensor mm_int4(
     const Tensor& weight,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
-    int64_t group_size) {
+    int64_t group_size,
+    const c10::optional<Tensor>& g_idx) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
     auto dispatcher = mm_int4_dispatch(
-        input, weight, weight_scl, weight_zp, group_size, {}, &out);
+        input, weight, weight_scl, weight_zp, group_size, {}, &out, g_idx);
     return resize_as_mat1(input, out);
   } else {
     at::Tensor bias = Tensor();
@@ -514,6 +530,7 @@ static Tensor mm_int4(
         group_size,
         false,
         attr,
+        g_idx,
         bias);
     return out;
   }
@@ -525,15 +542,24 @@ static void mm_int4_out(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     Tensor& out,
-    int64_t group_size) {
+    int64_t group_size,
+    const c10::optional<Tensor>& g_idx) {
   if (choose_recommand_compute_eng()) {
     auto dispatcher = mm_int4_dispatch(
-        input, weight, weight_scl, weight_zp, group_size, {}, &out);
+        input, weight, weight_scl, weight_zp, group_size, {}, &out, g_idx);
     return;
   } else {
     Attr attr;
     torch_ipex::xpu::oneDNN::woq_matmul_int4(
-        out, input, weight, weight_scl, weight_zp, group_size, false, attr);
+        out,
+        input,
+        weight,
+        weight_scl,
+        weight_zp,
+        group_size,
+        false,
+        attr,
+        g_idx);
     return;
   }
 }
@@ -543,7 +569,8 @@ static Tensor mm_silu_int4(
     const Tensor& weight,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
-    int64_t group_size) {
+    int64_t group_size,
+    const c10::optional<Tensor>& g_idx) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
     auto dispatcher = mm_int4_dispatch(
@@ -553,7 +580,8 @@ static Tensor mm_silu_int4(
         weight_zp,
         group_size,
         {{Tensor(), HGEMMXetla_INT4::EpilogueType::SILU}},
-        &out);
+        &out,
+        g_idx);
     return resize_as_mat1(input, out);
   } else {
     at::Tensor bias = Tensor();
@@ -567,6 +595,7 @@ static Tensor mm_silu_int4(
         group_size,
         false,
         attr,
+        g_idx,
         bias);
     return out;
   }
@@ -578,7 +607,8 @@ static Tensor mm_resmul_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     const Tensor& res,
-    int64_t group_size) {
+    int64_t group_size,
+    const c10::optional<Tensor>& g_idx) {
   auto res_flat = res.flatten(0, -2);
   Tensor out;
   if (choose_recommand_compute_eng()) {
@@ -589,7 +619,8 @@ static Tensor mm_resmul_int4(
         weight_zp,
         group_size,
         {{res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
-        &out);
+        &out,
+        g_idx);
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
@@ -602,7 +633,8 @@ static Tensor mm_resmul_int4(
         res,
         group_size,
         false,
-        attr);
+        attr,
+        g_idx);
     return out;
   }
 }
@@ -614,7 +646,8 @@ static Tensor mm_bias_gelu_int4(
     const Tensor& weight_zp,
     const Tensor& bias,
     int64_t group_size,
-    c10::string_view approximate) {
+    c10::string_view approximate,
+    const c10::optional<Tensor>& g_idx) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
     auto bias_flat = bias.flatten();
@@ -627,7 +660,8 @@ static Tensor mm_bias_gelu_int4(
         group_size,
         {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
          {Tensor(), HGEMMXetla_INT4::EpilogueType::GELU}},
-        &out);
+        &out,
+        g_idx);
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
@@ -641,6 +675,7 @@ static Tensor mm_bias_gelu_int4(
         approximate,
         false,
         attr,
+        g_idx,
         bias);
     return out;
   }
@@ -654,7 +689,8 @@ static Tensor mm_bias_resadd_resadd_int4(
     const Tensor& res1,
     const Tensor& weight_scl,
     const Tensor& weight_zp,
-    int64_t group_size) {
+    int64_t group_size,
+    const c10::optional<Tensor>& g_idx) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
     auto bias_flat = bias.flatten();
@@ -669,7 +705,8 @@ static Tensor mm_bias_resadd_resadd_int4(
         {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
          {res0_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD},
          {res1_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
-        &out);
+        &out,
+        g_idx);
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
@@ -684,6 +721,7 @@ static Tensor mm_bias_resadd_resadd_int4(
         group_size,
         false,
         attr,
+        g_idx,
         bias);
     return out;
   }
@@ -698,10 +736,12 @@ static Tensor mm_low_bits(
     bool has_bias,
     const std::string& compute_dtype,
     const std::string& weight_dtype,
-    int64_t group_size) {
+    int64_t group_size,
+    const c10::optional<Tensor>& g_idx) {
   return has_bias
-      ? mm_bias_int4(input, weight, bias, weight_scl, weight_zp, group_size)
-      : mm_int4(input, weight, weight_scl, weight_zp, group_size);
+      ? mm_bias_int4(
+            input, weight, bias, weight_scl, weight_zp, group_size, g_idx)
+      : mm_int4(input, weight, weight_scl, weight_zp, group_size, g_idx);
 }
 
 static Tensor mm_silu_mul_int4(
@@ -710,7 +750,8 @@ static Tensor mm_silu_mul_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size,
-    const Tensor& res) {
+    const Tensor& res,
+    const c10::optional<Tensor>& g_idx) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
     auto res_flat = res.flatten(0, -2);
@@ -722,7 +763,8 @@ static Tensor mm_silu_mul_int4(
         group_size,
         {{Tensor(), HGEMMXetla_INT4::EpilogueType::SILU},
          {res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
-        &out);
+        &out,
+        g_idx);
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
@@ -735,7 +777,8 @@ static Tensor mm_silu_mul_int4(
         res,
         group_size,
         false,
-        attr);
+        attr,
+        g_idx);
     return out;
   }
 }
@@ -747,7 +790,8 @@ static Tensor mm_bias_silu_mul_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size,
-    const Tensor& res) {
+    const Tensor& res,
+    const c10::optional<Tensor>& g_idx) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
     auto res_flat = res.flatten(0, -2);
@@ -761,7 +805,8 @@ static Tensor mm_bias_silu_mul_int4(
         {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
          {Tensor(), HGEMMXetla_INT4::EpilogueType::SILU},
          {res_flat, HGEMMXetla_INT4::EpilogueType::RES_MUL}},
-        &out);
+        &out,
+        g_idx);
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
@@ -775,6 +820,7 @@ static Tensor mm_bias_silu_mul_int4(
         group_size,
         false,
         attr,
+        g_idx,
         bias);
     return out;
   }
@@ -786,7 +832,8 @@ static Tensor mm_add_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size,
-    const Tensor& res) {
+    const Tensor& res,
+    const c10::optional<Tensor>& g_idx) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
     auto res_flat = res.flatten(0, -2);
@@ -797,7 +844,8 @@ static Tensor mm_add_int4(
         weight_zp,
         group_size,
         {{res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
-        &out);
+        &out,
+        g_idx);
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
@@ -810,7 +858,8 @@ static Tensor mm_add_int4(
         res,
         group_size,
         false,
-        attr);
+        attr,
+        g_idx);
     return out;
   }
 }
@@ -822,7 +871,8 @@ static Tensor mm_bias_add_int4(
     const Tensor& weight_scl,
     const Tensor& weight_zp,
     int64_t group_size,
-    const Tensor& res) {
+    const Tensor& res,
+    const c10::optional<Tensor>& g_idx) {
   Tensor out;
   if (choose_recommand_compute_eng()) {
     auto res_flat = res.flatten(0, -2);
@@ -835,7 +885,8 @@ static Tensor mm_bias_add_int4(
         group_size,
         {{bias_flat, HGEMMXetla_INT4::EpilogueType::BIAS},
          {res_flat, HGEMMXetla_INT4::EpilogueType::RES_ADD}},
-        &out);
+        &out,
+        g_idx);
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
@@ -849,6 +900,7 @@ static Tensor mm_bias_add_int4(
         group_size,
         false,
         attr,
+        g_idx,
         bias);
     return out;
   }

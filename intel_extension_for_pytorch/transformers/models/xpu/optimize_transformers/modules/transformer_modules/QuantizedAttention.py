@@ -10,7 +10,6 @@ from intel_extension_for_pytorch.nn.utils._quantize_convert import (
 class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
     def __init__(self, config: IPEXTransformerConfig) -> None:
         super().__init__(config)
-
         self.q_proj_quant = WeightOnlyQuantizedLinear(
             in_features=4096, out_features=4096
         )
@@ -30,19 +29,27 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
 
     def load_parameter(self, q_proj, k_proj, v_proj, out_proj):
         self.q_proj_quant.set_weights_bias(q_proj.qweight, q_proj.bias)
-        self.q_proj_quant.set_scales_zps_gidx(q_proj.scales, q_proj.qzeros)
+        self.q_proj_quant.set_scales_zps_gidx(
+            q_proj.scales, q_proj.qzeros, q_proj.g_idx
+        )
         self.q_proj_quant.blocksize = q_proj.blocksize
 
         self.k_proj_quant.set_weights_bias(k_proj.qweight, k_proj.bias)
-        self.k_proj_quant.set_scales_zps_gidx(k_proj.scales, k_proj.qzeros)
+        self.k_proj_quant.set_scales_zps_gidx(
+            k_proj.scales, k_proj.qzeros, k_proj.g_idx
+        )
         self.k_proj_quant.blocksize = k_proj.blocksize
 
         self.v_proj_quant.set_weights_bias(v_proj.qweight, v_proj.bias)
-        self.v_proj_quant.set_scales_zps_gidx(v_proj.scales, v_proj.qzeros)
+        self.v_proj_quant.set_scales_zps_gidx(
+            v_proj.scales, v_proj.qzeros, v_proj.g_idx
+        )
         self.v_proj_quant.blocksize = v_proj.blocksize
 
         self.out_proj_quant.set_weights_bias(out_proj.qweight, out_proj.bias)
-        self.out_proj_quant.set_scales_zps_gidx(out_proj.scales, out_proj.qzeros)
+        self.out_proj_quant.set_scales_zps_gidx(
+            out_proj.scales, out_proj.qzeros, out_proj.g_idx
+        )
         self.out_proj_quant.blocksize = out_proj.blocksize
 
         q_proj.qweight = None
@@ -157,6 +164,9 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         torch.xpu.synchronize()
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
+        if self.q_proj_quant.g_idx is not None:
+            # qkv fusion cannot apply actorder
+            return self.compute_qkv_gemm_separate(hidden_states, query, key, value)
         torch.ops.torch_ipex.mm_qkv_out_int4(
             hidden_states,
             self.qkv_proj_quant.qweight,
@@ -170,6 +180,75 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         )
         return query, key, value
 
+    def compute_qkv_gemm_separate(self, hidden_states, query, key, value):
+        if self.q_proj.bias is None:
+            torch.ops.torch_ipex.mm_int4_out(
+                hidden_states,
+                self.q_proj_quant.qweight,
+                self.q_proj_quant.scales,
+                self.q_proj_quant.qzeros,
+                query,
+                self.q_proj_quant.blocksize,
+                self.q_proj_quant.g_idx,
+            )
+        else:
+            query = torch.ops.torch_ipex.mm_int4(
+                hidden_states,
+                self.q_proj_quant.qweight,
+                self.q_proj_quant.bias,
+                self.q_proj_quant.scales,
+                self.q_proj_quant.qzeros,
+                self.q_proj_quant.blocksize,
+                self.q_proj_quant.g_idx,
+            )
+
+        if self.k_proj.bias is None:
+            torch.ops.torch_ipex.mm_int4_out(
+                hidden_states,
+                self.k_proj_quant.qweight,
+                self.k_proj_quant.scales,
+                self.k_proj_quant.qzeros,
+                key,
+                self.k_proj_quant.blocksize,
+                self.k_proj_quant.g_idx,
+            )
+        else:
+            key.copy_(
+                torch.ops.torch_ipex.mm_int4(
+                    hidden_states,
+                    self.k_proj_quant.qweight,
+                    self.k_proj_quant.bias,
+                    self.k_proj_quant.scales,
+                    self.k_proj_quant.qzeros,
+                    self.k_proj_quant.blocksize,
+                    self.k_proj_quant.g_idx,
+                )
+            )
+
+        if self.v_proj.bias is None:
+            torch.ops.torch_ipex.mm_int4_out(
+                hidden_states,
+                self.v_proj_quant.qweight,
+                self.v_proj_quant.scales,
+                self.v_proj_quant.qzeros,
+                value,
+                self.v_proj_quant.blocksize,
+                self.v_proj_quant.g_idx,
+            )
+        else:
+            value.copy_(
+                torch.ops.torch_ipex.mm_int4(
+                    hidden_states,
+                    self.v_proj_quant.qweight,
+                    self.v_proj_quant.bias,
+                    self.v_proj_quant.scales,
+                    self.v_proj_quant.qzeros,
+                    self.v_proj_quant.blocksize,
+                    self.v_proj_quant.g_idx,
+                )
+            )
+        return query, key, value
+
     def out_proj_compute(self, attn_output, residual=None):
         arch = 1 if ipex._C._has_2d_block_array(0) else 0
         if residual is None:
@@ -181,6 +260,7 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                     self.out_proj_quant.scales,
                     self.out_proj_quant.qzeros,
                     self.out_proj_quant.blocksize,
+                    self.out_proj_quant.g_idx,
                 )
             else:
                 attn_output = torch.ops.torch_ipex.mm_int4(
@@ -189,6 +269,7 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                     self.out_proj_quant.scales,
                     self.out_proj_quant.qzeros,
                     self.out_proj_quant.blocksize,
+                    self.out_proj_quant.g_idx,
                 )
         else:
             shape = [attn_output.shape[0], attn_output.shape[1], self.embed_dim]
@@ -201,6 +282,7 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                     self.out_proj_quant.qzeros,
                     self.out_proj_quant.blocksize,
                     residual,
+                    self.out_proj_quant.g_idx,
                 )
             else:
                 attn_output = torch.ops.torch_ipex.mm_add_int4(
@@ -210,6 +292,7 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
                     self.out_proj_quant.qzeros,
                     self.out_proj_quant.blocksize,
                     residual,
+                    self.out_proj_quant.g_idx,
                 )
             attn_output = attn_output.view(shape)
         return attn_output
@@ -221,19 +304,27 @@ class IPEXTransformerAttnOptimizedInt4OneDNN(IPEXTransformerAttnOptimizedInt4):
 
     def load_parameter(self, q_proj, k_proj, v_proj, out_proj):
         self.q_proj_quant.set_weights_bias(q_proj.qweight, q_proj.bias)
-        self.q_proj_quant.set_scales_zps_gidx(q_proj.scales, q_proj.qzeros)
+        self.q_proj_quant.set_scales_zps_gidx(
+            q_proj.scales, q_proj.qzeros, q_proj.g_idx
+        )
         self.q_proj_quant.blocksize = q_proj.blocksize
 
         self.k_proj_quant.set_weights_bias(k_proj.qweight, k_proj.bias)
-        self.k_proj_quant.set_scales_zps_gidx(k_proj.scales, k_proj.qzeros)
+        self.k_proj_quant.set_scales_zps_gidx(
+            k_proj.scales, k_proj.qzeros, k_proj.g_idx
+        )
         self.k_proj_quant.blocksize = k_proj.blocksize
 
         self.v_proj_quant.set_weights_bias(v_proj.qweight, v_proj.bias)
-        self.v_proj_quant.set_scales_zps_gidx(v_proj.scales, v_proj.qzeros)
+        self.v_proj_quant.set_scales_zps_gidx(
+            v_proj.scales, v_proj.qzeros, v_proj.g_idx
+        )
         self.v_proj_quant.blocksize = v_proj.blocksize
 
         self.out_proj_quant.set_weights_bias(out_proj.qweight, out_proj.bias)
-        self.out_proj_quant.set_scales_zps_gidx(out_proj.scales, out_proj.qzeros)
+        self.out_proj_quant.set_scales_zps_gidx(
+            out_proj.scales, out_proj.qzeros, out_proj.g_idx
+        )
         self.out_proj_quant.blocksize = out_proj.blocksize
 
         q_proj.qweight = None
@@ -302,6 +393,7 @@ class IPEXTransformerAttnOptimizedInt4OneDNN(IPEXTransformerAttnOptimizedInt4):
                 self.qkv_proj_quant.scales,
                 self.qkv_proj_quant.qzeros,
                 self.qkv_proj_quant.blocksize,
+                self.qkv_proj_quant.g_idx,
             )
             m = query.shape[-1]
             query = qkv_out[:, :, :m].contiguous()
@@ -315,6 +407,7 @@ class IPEXTransformerAttnOptimizedInt4OneDNN(IPEXTransformerAttnOptimizedInt4):
                 self.q_proj_quant.scales,
                 self.q_proj_quant.qzeros,
                 self.q_proj_quant.blocksize,
+                self.q_proj_quant.g_idx,
             )
             key.copy_(
                 torch.ops.torch_ipex.mm_bias_int4(
@@ -324,6 +417,7 @@ class IPEXTransformerAttnOptimizedInt4OneDNN(IPEXTransformerAttnOptimizedInt4):
                     self.k_proj_quant.scales,
                     self.k_proj_quant.qzeros,
                     self.k_proj_quant.blocksize,
+                    self.k_proj_quant.g_idx,
                 )
             )
             value.copy_(
@@ -334,6 +428,7 @@ class IPEXTransformerAttnOptimizedInt4OneDNN(IPEXTransformerAttnOptimizedInt4):
                     self.v_proj_quant.scales,
                     self.v_proj_quant.qzeros,
                     self.v_proj_quant.blocksize,
+                    self.v_proj_quant.g_idx,
                 )
             )
         return query, key, value

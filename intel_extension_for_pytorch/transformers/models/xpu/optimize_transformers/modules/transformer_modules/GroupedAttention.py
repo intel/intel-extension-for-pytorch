@@ -359,6 +359,7 @@ class IPEXTransformerAttnOptimizedInt4GroupedOneDNN(
             self.q_proj_quant.scales,
             self.q_proj_quant.qzeros,
             self.q_proj_quant.blocksize,
+            self.q_proj_quant.g_idx,
         )
         key.copy_(
             torch.ops.torch_ipex.mm_bias_int4(
@@ -368,6 +369,7 @@ class IPEXTransformerAttnOptimizedInt4GroupedOneDNN(
                 self.k_proj_quant.scales,
                 self.k_proj_quant.qzeros,
                 self.k_proj_quant.blocksize,
+                self.k_proj_quant.g_idx,
             )
         )
         value.copy_(
@@ -378,6 +380,7 @@ class IPEXTransformerAttnOptimizedInt4GroupedOneDNN(
                 self.v_proj_quant.scales,
                 self.v_proj_quant.qzeros,
                 self.v_proj_quant.blocksize,
+                self.v_proj_quant.g_idx,
             )
         )
         return query, key, value

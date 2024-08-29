@@ -177,6 +177,7 @@ class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
         self.scales = None
         self.qzeros = None
         self.blocksize = None
+        self.g_idx = None
         self.port_data()
 
     def port_data(self):
@@ -186,6 +187,7 @@ class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
         self.scales = self.module.scales
         self.qzeros = self.module.qzeros
         self.blocksize = self.module.blocksize
+        self.g_idx = self.module.g_idx
 
     def forward(self, input):
         if input.dim() > 3:
@@ -196,7 +198,12 @@ class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
             input = input[:, -1, :].view(shape)
         if self.bias is None:
             return torch.ops.torch_ipex.mm_int4(
-                input, self.qweight, self.scales, self.qzeros, self.blocksize
+                input,
+                self.qweight,
+                self.scales,
+                self.qzeros,
+                self.blocksize,
+                self.g_idx,
             )[:, :, : self.n_dim]
         else:
             return torch.ops.torch_ipex.mm_bias_int4(
@@ -206,6 +213,7 @@ class IPEXLmHeadLinearAllreduceWithPaddingInt4(IPEXOpForInference):
                 self.scales,
                 self.qzeros,
                 self.blocksize,
+                self.g_idx,
             )[:, :, : self.n_dim]
 
 

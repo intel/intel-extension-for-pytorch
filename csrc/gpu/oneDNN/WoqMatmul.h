@@ -39,8 +39,14 @@ static Tensor woq_matmul_int4(
     int64_t group_size,
     bool m2_trans,
     Attr attr,
+    const c10::optional<Tensor>& g_idx,
     Tensor b_raw = at::Tensor()) {
-  auto mat1 = mat1_.flatten(0, -2);
+  Tensor mat1;
+  if (g_idx.has_value()) {
+    mat1 = mat1_.index_select(-1, g_idx.value()).flatten(0, -2);
+  } else {
+    mat1 = mat1_.flatten(0, -2);
+  }
   auto mat2 = mat2_.flatten(0, -2);
   int m = mat1.sizes()[0];
   int n = mat2.sizes()[1];
@@ -395,6 +401,7 @@ static Tensor& woq_matmul_fusion_variants(
     int64_t group_size,
     bool trans,
     Attr& attr,
+    const c10::optional<Tensor>& g_idx,
     bool& is_fused,
     Tensor bias = at::Tensor()) {
   auto tensor1 = tensor1_.flatten(0, -2);
@@ -433,6 +440,7 @@ static Tensor& woq_matmul_fusion_variants(
         group_size,
         false,
         attr,
+        g_idx,
         bias);
     if (output.defined() && !output.is_alias_of(result)) {
       output.copy_(result);
@@ -460,6 +468,7 @@ at::Tensor woq_matmul_silu(
     int64_t group_size,
     bool m2_trans,
     Attr attr,
+    const c10::optional<Tensor>& g_idx,
     Tensor b_raw = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_silu", std::vector<c10::IValue>({tensor1, tensor2}));
@@ -478,6 +487,7 @@ at::Tensor woq_matmul_silu(
       group_size,
       m2_trans,
       attr,
+      g_idx,
       is_fused);
 }
 
@@ -491,6 +501,7 @@ at::Tensor woq_matmul_resmul(
     int64_t group_size,
     bool m2_trans,
     Attr attr,
+    const c10::optional<Tensor>& g_idx,
     Tensor b_raw = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_resmul", std::vector<c10::IValue>({tensor1, tensor2}));
@@ -505,6 +516,7 @@ at::Tensor woq_matmul_resmul(
       group_size,
       m2_trans,
       attr,
+      g_idx,
       is_fused);
   if (!is_fused) {
     result = result * res.flatten(0, -2);
@@ -522,6 +534,7 @@ at::Tensor woq_matmul_bias_gelu(
     c10::string_view approximate,
     bool m2_trans,
     Attr attr,
+    const c10::optional<Tensor>& g_idx,
     Tensor b_raw = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_bias_gelu", std::vector<c10::IValue>({tensor1, tensor2}));
@@ -548,6 +561,7 @@ at::Tensor woq_matmul_bias_gelu(
       group_size,
       m2_trans,
       attr,
+      g_idx,
       is_fused,
       b_raw);
 }
@@ -563,6 +577,7 @@ at::Tensor woq_matmul_bias_resadd_resadd(
     int64_t group_size,
     bool m2_trans,
     Attr attr,
+    const c10::optional<Tensor>& g_idx,
     Tensor bias = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_bias_resadd_resadd",
@@ -580,6 +595,7 @@ at::Tensor woq_matmul_bias_resadd_resadd(
       group_size,
       m2_trans,
       attr,
+      g_idx,
       is_fused);
   if (!is_fused) {
     result += bias + res0 + res1;
@@ -597,6 +613,7 @@ at::Tensor woq_matmul_silu_mul(
     int64_t group_size,
     bool m2_trans,
     Attr attr,
+    const c10::optional<Tensor>& g_idx,
     Tensor b_raw = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_silu_mul", std::vector<c10::IValue>({tensor1, tensor2}));
@@ -616,6 +633,7 @@ at::Tensor woq_matmul_silu_mul(
       group_size,
       m2_trans,
       attr,
+      g_idx,
       is_fused);
   return result;
 }
@@ -630,6 +648,7 @@ at::Tensor woq_matmul_bias_silu_mul_int4(
     int64_t group_size,
     bool m2_trans,
     Attr attr,
+    const c10::optional<Tensor>& g_idx,
     Tensor bias = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_bias_silu_mul_int4",
@@ -650,6 +669,7 @@ at::Tensor woq_matmul_bias_silu_mul_int4(
       group_size,
       m2_trans,
       attr,
+      g_idx,
       is_fused,
       bias);
   return result;
@@ -665,6 +685,7 @@ at::Tensor woq_matmul_add_int4(
     int64_t group_size,
     bool m2_trans,
     Attr attr,
+    const c10::optional<Tensor>& g_idx,
     Tensor b_raw = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_add_int4", std::vector<c10::IValue>({tensor1, tensor2}));
@@ -679,6 +700,7 @@ at::Tensor woq_matmul_add_int4(
       group_size,
       m2_trans,
       attr,
+      g_idx,
       is_fused);
   if (!is_fused) {
     result += res;
@@ -696,6 +718,7 @@ at::Tensor woq_matmul_bias_add_int4(
     int64_t group_size,
     bool m2_trans,
     Attr attr,
+    const c10::optional<Tensor>& g_idx,
     Tensor bias = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_bias_add_int4", std::vector<c10::IValue>({tensor1, tensor2}));
@@ -710,6 +733,7 @@ at::Tensor woq_matmul_bias_add_int4(
       group_size,
       m2_trans,
       attr,
+      g_idx,
       is_fused,
       bias);
   if (!is_fused) {

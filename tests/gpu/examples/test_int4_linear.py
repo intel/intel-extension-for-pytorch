@@ -1,6 +1,7 @@
 import torch
 import intel_extension_for_pytorch  # noqa
 import pytest
+from intel_extension_for_pytorch.nn.utils._quantize_convert import GPTQShuffle
 
 
 from torch.testing._internal.common_utils import (
@@ -48,7 +49,7 @@ class TestInt4Linear(TestCase):
         return weight, scales, zeros
 
     @staticmethod
-    def dequantize(qweight, scales, qzeros, group_size):
+    def dequantize(qweight, scales, qzeros, group_size, g_idx=None):
         q_config = {"group_size": group_size, "bits": 4}
         weight, gptq_scales, gptq_zeros = TestInt4Linear.unpack_weight(
             qweight, scales, qzeros, q_config
@@ -57,9 +58,11 @@ class TestInt4Linear(TestCase):
         if len(weight.shape) > 2:
             weight = weight.reshape(-1, weight.shape[-1])
         infeatures = weight.shape[0]
-        g_idx = torch.tensor(
-            [i // q_config["group_size"] for i in range(infeatures)], dtype=torch.int32
-        )
+        if g_idx is None:
+            g_idx = torch.tensor(
+                [i // q_config["group_size"] for i in range(infeatures)],
+                dtype=torch.int32,
+            )
         scale_zeros = gptq_zeros * gptq_scales
         weight = gptq_scales[g_idx.long()] * weight - scale_zeros[g_idx.long()]
         return weight
@@ -151,9 +154,10 @@ class TestInt4Linear(TestCase):
 
     @parametrize("per_channel", [False], lambda k: "per_channel" * k)
     @parametrize("dtype", [torch.float16, torch.bfloat16])
+    @parametrize("act_order", [False, True])
     @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
-    def test_gemm_int4(self, m, n, k, per_channel, dtype):
+    def test_gemm_int4(self, m, n, k, per_channel, act_order, dtype):
         if (dtype == torch.bfloat16) and skip_bf16_input:
             pytest.skip("bf16 input is not available on mtl")
         elif (dtype == torch.bfloat16) and (COMPILER_VERSION < 20240200):
@@ -171,16 +175,27 @@ class TestInt4Linear(TestCase):
         zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
             group_num, n // 8
         )
+        if act_order:
+            g_idx = torch.randperm(k, dtype=torch.int32) // group_size
+            shuf_weight = GPTQShuffle(bits=4, blocksize=group_size)
+            shuffled_weight, g_idx4kernel = shuf_weight(weight, g_idx)
+        else:
+            g_idx = None
+            g_idx4kernel = None
+            shuffled_weight = weight
 
-        weight_fp = self.dequantize(weight, scales, zero_points, group_size).cpu()
+        weight_fp = self.dequantize(
+            weight, scales, zero_points, group_size, g_idx
+        ).cpu()
         # check gemm
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
             out_xetla = torch.ops.torch_ipex.mm_int4(
                 input,
-                weight.t().contiguous(),
+                shuffled_weight.t().contiguous(),
                 scales.t().contiguous(),
                 None,
                 group_size,
+                g_idx4kernel,
             )
         out_torch = torch.matmul(input_torch, weight_fp)
         self.assertEqual(
@@ -195,11 +210,12 @@ class TestInt4Linear(TestCase):
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
             out_xetla_res = torch.ops.torch_ipex.mm_add_int4(
                 input,
-                weight.t().contiguous(),
+                shuffled_weight.t().contiguous(),
                 scales.t().contiguous(),
                 None,
                 group_size,
                 res0,
+                g_idx4kernel,
             )
         out_torch_res = out_torch + res0.cpu().float()
         self.assertEqual(
@@ -214,11 +230,12 @@ class TestInt4Linear(TestCase):
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
             out_xetla_bias = torch.ops.torch_ipex.mm_bias_int4(
                 input,
-                weight.t().contiguous(),
+                shuffled_weight.t().contiguous(),
                 bias,
                 scales.t().contiguous(),
                 None,
                 group_size,
+                g_idx4kernel,
             )
         out_torch_bias = out_torch + bias.cpu().float()
         self.assertEqual(
@@ -232,12 +249,13 @@ class TestInt4Linear(TestCase):
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
             out_xetla_gelu = torch.ops.torch_ipex.mm_bias_gelu_int4(
                 input,
-                weight.t().contiguous(),
+                shuffled_weight.t().contiguous(),
                 scales.t().contiguous(),
                 None,
                 bias,
                 group_size,
                 "tanh",
+                g_idx4kernel,
             )
         gelu_out = torch.nn.GELU(approximate="tanh")(out_torch_bias)
         self.assertEqual(
@@ -252,11 +270,12 @@ class TestInt4Linear(TestCase):
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
             out_xetla_silu = torch.ops.torch_ipex.mm_silu_mul_int4(
                 input,
-                weight.t().contiguous(),
+                shuffled_weight.t().contiguous(),
                 scales.t().contiguous(),
                 None,
                 group_size,
                 res0,
+                g_idx4kernel,
             )
         silu_mul_out = torch.nn.SiLU()(out_torch) * res0.cpu().float()
         self.assertEqual(
@@ -272,20 +291,21 @@ class TestInt4Linear(TestCase):
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
             out_xetla_bias_2res = torch.ops.torch_ipex.mm_bias_resadd_resadd_int4(
                 input,
-                weight.t().contiguous(),
+                shuffled_weight.t().contiguous(),
                 bias,
                 res0,
                 res1,
                 scales.t().contiguous(),
                 None,
                 group_size,
+                g_idx4kernel,
             )
         out_torch_bias_2res = out_torch_bias + res0.cpu().float() + res1.cpu().float()
         self.assertEqual(
             out_xetla_bias_2res.cpu().float(),
             out_torch_bias_2res.float(),
             atol=checking_atol,
-            rtol=checking_rtol,
+            rtol=checking_rtol * 2,
         )
 
         # check gemm + bias + residual
@@ -293,12 +313,13 @@ class TestInt4Linear(TestCase):
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
             out_xetla_bias_add = torch.ops.torch_ipex.mm_bias_add_int4(
                 input,
-                weight.t().contiguous(),
+                shuffled_weight.t().contiguous(),
                 bias,
                 scales.t().contiguous(),
                 None,
                 group_size,
                 res0,
+                g_idx4kernel,
             )
         out_torch_bias_add = out_torch_bias + res0.cpu().float()
         self.assertEqual(

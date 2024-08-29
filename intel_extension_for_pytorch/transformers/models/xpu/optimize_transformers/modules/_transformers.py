@@ -54,7 +54,7 @@ class IPEXEmptyINT4Linear(nn.Module):
     def forward(self, input):
         if self.bias is None:
             return torch.ops.torch_ipex.mm_int4(
-                input, self.qweight, self.scales, self.qzeros, self.group_size
+                input, self.qweight, self.scales, self.qzeros, self.group_size, None
             )
         else:
             return torch.ops.torch_ipex.mm_bias_int4(
@@ -64,6 +64,7 @@ class IPEXEmptyINT4Linear(nn.Module):
                 self.scales,
                 self.qzeros,
                 self.group_size,
+                None,
             )
 
 
@@ -80,7 +81,7 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
     def forward(self, input):
         if self.bias is None:
             return torch.ops.torch_ipex.mm_int4(
-                input, self.qweight, self.scales, self.qzeros, self.group_size
+                input, self.qweight, self.scales, self.qzeros, self.group_size, None
             )[:, :, : self.n_dim]
         else:
             return torch.ops.torch_ipex.mm_bias_int4(
@@ -90,6 +91,7 @@ class IPEXEmptyINT4LinearWithPadding(nn.Module):
                 self.scales,
                 self.qzeros,
                 self.group_size,
+                None,
             )[:, :, : self.n_dim]
 
 
@@ -547,13 +549,13 @@ class IPEXTransformerAtten(nn.Module):
         if self.row_major:
             if self.is_int4 and hidden_states.shape[0] == 1:
                 query = torch.ops.torch_ipex.mm_int4(
-                    hidden_states, self.q_qwei, self.q_scl, self.q_zp, self.q_gs
+                    hidden_states, self.q_qwei, self.q_scl, self.q_zp, self.q_gs, None
                 )
                 key = torch.ops.torch_ipex.mm_int4(
-                    hidden_states, self.k_qwei, self.k_scl, self.k_zp, self.k_gs
+                    hidden_states, self.k_qwei, self.k_scl, self.k_zp, self.k_gs, None
                 )
                 value = torch.ops.torch_ipex.mm_int4(
-                    hidden_states, self.v_qwei, self.v_scl, self.v_zp, self.v_gs
+                    hidden_states, self.v_qwei, self.v_scl, self.v_zp, self.v_gs, None
                 )
             else:
                 query = torch.ops.torch_ipex.matmul_bias_out(
@@ -1073,6 +1075,7 @@ class IPEXTransformerAtten(nn.Module):
                         self.out_scl,
                         self.out_zp,
                         self.out_gs,
+                        None,
                     )
                 else:
                     attn_output = torch.matmul(attn_output, self.out_wei)
@@ -1089,6 +1092,7 @@ class IPEXTransformerAtten(nn.Module):
                             self.out_bias,
                             residual,
                             1.0 / self.tp_size,
+                            None,
                         )
                     else:
                         attn_output = torch.ops.torch_ipex.mm_bias_resadd(
@@ -1098,6 +1102,7 @@ class IPEXTransformerAtten(nn.Module):
                             1.0 / self.tp_size,
                             residual,
                             1.0 / self.tp_size,
+                            None,
                         )
                 else:
                     attn_output = torch.addmm(

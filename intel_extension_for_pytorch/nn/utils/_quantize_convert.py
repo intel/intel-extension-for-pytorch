@@ -3,7 +3,6 @@ import intel_extension_for_pytorch as ipex  # noqa
 import torch.nn as nn
 from torch import Tensor
 
-
 DTYPE_BITS_MAPPING = {
     "nf4": 4,
     "fp4_e2m1_bnb": 4,
@@ -12,6 +11,72 @@ DTYPE_BITS_MAPPING = {
     "int4_clip": 4,
     "int8": 8,
 }
+
+
+class GPTQShuffle(nn.Module):
+    def __init__(self, bits=4, blocksize=128):
+        super(GPTQShuffle, self).__init__()
+        self.bits = bits
+        self.blocksize = blocksize
+
+    def convert_idx(self, g_idx, k):
+        ret_idx = torch.zeros(k, dtype=int)
+        g_counter = torch.zeros((k + self.blocksize - 1) // self.blocksize, dtype=int)
+        for i in range(k):
+            ret_idx[g_idx[i] * self.blocksize + g_counter[g_idx[i]]] = i
+            g_counter[g_idx[i]] += 1
+        return ret_idx.to(torch.int32)
+
+    def unpack(self, qweight_int32):
+        s32_bits = 32
+
+        assert self.bits == 4
+        # Int32 can store 8 * 4bits data. This is the offset for each data.
+        wf = (
+            torch.tensor(list(range(0, s32_bits, self.bits)), dtype=torch.int32)
+            .unsqueeze(0)
+            .to(qweight_int32.device)
+        )
+        weight = torch.bitwise_right_shift(
+            torch.unsqueeze(qweight_int32, 1).expand(-1, 32 // self.bits, -1),
+            wf.unsqueeze(-1),
+        ).to(torch.int16 if self.bits == 8 else torch.int8)
+        torch.bitwise_and(weight, (2**self.bits) - 1, out=weight)
+
+        return weight
+
+    def pack(self, qweight_int8):
+        i = 0
+        row = 0
+        qweight_int32_shape = (
+            qweight_int8.shape[0] // 32 * self.bits,
+            qweight_int8.shape[1],
+        )
+        qweight_int32 = torch.zeros(
+            qweight_int32_shape, dtype=torch.int32, device=qweight_int8.device
+        )
+
+        while row < qweight_int32.shape[0]:
+            if self.bits in [2, 4, 8]:
+                for j in range(i, i + (32 // self.bits)):
+                    qweight_int32[row] |= qweight_int8[j].to(torch.int32) << (
+                        self.bits * (j - i)
+                    )
+                i += 32 // self.bits
+                row += 1
+            else:
+                raise NotImplementedError("Only 2,3,4,8 bits are supported.")
+
+        return qweight_int32
+
+    def forward(self, qweight_int32, g_idx):
+        k = qweight_int32.shape[0] * 8
+        g_idx4kernel = self.convert_idx(g_idx, k).to(qweight_int32.device)
+        qweight_int8 = self.unpack(qweight_int32)
+        qweight_int8 = qweight_int8.reshape(-1, qweight_int8.shape[-1])
+        qweight_int8_shuffled = qweight_int8[g_idx4kernel, :]
+        qweight_int32_shuffled = self.pack(qweight_int8_shuffled)
+        return qweight_int32_shuffled, g_idx4kernel
 
 
 def convert_dtype_str2torch(str_dtype):
@@ -153,24 +218,26 @@ class WeightOnlyQuantizedLinear(nn.Module):
 
         self.register_parameter("qweight", None)
         self.register_parameter("bias", None)
+        self.register_buffer("g_idx", None)
 
     def forward(self, input: Tensor) -> Tensor:
         if self.compute_dtype == "fp16":
             input = input.to(convert_dtype_str2torch(self.compute_dtype))
-        if not self.weight_transposed and xpu_gemm_use_xetla():
-            self.qweight.data = self.qweight.t().contiguous()
-            self.scales.data = self.scales.t().contiguous().to(torch.float16)
-            if self.bias is not None:
-                self.bias.data = self.bias.contiguous().to(torch.float16)
-            if self.scheme == "sym":
-                self.qzeros = None
+        if not self.weight_transposed:
+            if xpu_gemm_use_xetla():
+                self.qweight.data = self.qweight.t().contiguous()
+                self.scales.data = self.scales.t().contiguous().to(torch.float16)
+                if self.bias is not None:
+                    self.bias.data = self.bias.contiguous().to(torch.float16)
+                if self.scheme == "sym":
+                    self.qzeros = None
+                else:
+                    self.qzeros += 0x11111111
             else:
-                self.qzeros += 0x11111111
+                self.qweight.data = (
+                    self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+                )
             self.weight_transposed = True
-        else:
-            self.qweight.data = (
-                self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
-            )
 
         if xpu_gemm_use_xetla():
             return torch.ops.torch_ipex.mm_low_bits(
@@ -183,6 +250,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
                 self.compute_dtype,
                 self.weight_dtype,
                 self.blocksize,
+                self.g_idx,
             )
         elif self.bias is not None:
             return torch.ops.torch_ipex.mm_bias_int4(
@@ -192,6 +260,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
                 self.scales,
                 self.qzeros,
                 self.blocksize,
+                self.g_idx,
             )
         else:
             return torch.ops.torch_ipex.mm_int4(
@@ -200,6 +269,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
                 self.scales,
                 self.qzeros,
                 self.blocksize,
+                self.g_idx,
             )
 
     def set_weights_bias(self, weight_data, bias=None):
@@ -219,11 +289,22 @@ class WeightOnlyQuantizedLinear(nn.Module):
             self.bias = torch.nn.Parameter(
                 bias.contiguous().to(torch.float16), requires_grad=False
             )
+        if hasattr(self, "g_idx") and self.g_idx is not None:
+            # The prerequisite for this to work is that set_scales_zps_gidx is called first.
+            assert self.qweight.data.dtype == torch.int32
+            shuf_weight = GPTQShuffle(self.bits, self.blocksize)
+            self.qweight.data, self.g_idx = shuf_weight(self.qweight.data, self.g_idx)
 
     def set_scales_zps_gidx(self, scales, qzeros=None, g_idx=None):
         self.register_buffer("scales", scales)
         self.register_buffer("qzeros", qzeros)
-        self.register_buffer("g_idx", g_idx)
+        unuse_g_idx = torch.tensor(
+            [i // self.blocksize for i in range(self.in_features)],
+            dtype=torch.int32,
+            device=scales.device,
+        )
+        if g_idx is not None and not torch.equal(g_idx, unuse_g_idx):
+            self.g_idx = g_idx
         # WA: for sym scheme with xetla impl., qzeros needs to be None
         if self.scheme == "sym" and xpu_gemm_use_xetla():
             self.qzeros = None
