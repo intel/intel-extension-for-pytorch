@@ -421,18 +421,15 @@ void Settings::disable_sync_mode() {
 }
 
 bool Settings::is_onednn_layout_enabled() const {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return onednn_layout_enabled == ENV_VAL::ON;
+  return false;
 }
 
 void Settings::enable_onednn_layout() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  onednn_layout_enabled = ENV_VAL::ON;
+  TORCH_WARN_ONCE("oneDNN block format support is deprecated since 2.5");
 }
 
 void Settings::disable_onednn_layout() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  onednn_layout_enabled = ENV_VAL::OFF;
+  TORCH_WARN_ONCE("oneDNN block format support is deprecated since 2.5");
 }
 
 FP32_MATH_MODE Settings::get_fp32_math_mode() const {
