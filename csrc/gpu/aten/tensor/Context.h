@@ -114,7 +114,8 @@ struct DPCPPTensorContext {
     if (!t.defined())
       return true;
     auto ctx = get_tensor_ctx(t);
-    return ctx.is_plain();
+    TORCH_CHECK(ctx.is_plain(), "Block format support is deprecated since 2.5");
+    return true;
   }
 
   static void set_aten_meta(

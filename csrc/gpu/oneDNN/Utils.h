@@ -673,30 +673,11 @@ static inline int get_memory_layout_for_conv(
     return MEMORY_LAYOUT_FOR_CONV::ChannelsFirst;
   }
 
-  if (is_transpose || src.is_quantized() || weight.is_quantized() ||
-      (!Settings::I().has_2d_block_array(curDevID))) {
-    if (Settings::I().is_onednn_layout_enabled()) {
-      // suggest blocked
-      return MEMORY_LAYOUT_FOR_CONV::Blocked;
-    }
-  }
-
   auto suggest_channels_last_format =
       (is_smf_channels_last(src) || is_smf_channels_last(weight));
   if (suggest_channels_last_format) {
     // suggest channels_last
     return MEMORY_LAYOUT_FOR_CONV::ChannelsLast;
-  }
-
-  // inference workloads on ATSM platform, the conv will use blocked format
-  // used double support to distinguish is atsm or not
-  auto suggest_block_format =
-      !Settings::I().has_2d_block_array(curDevID) // on ATSM platform
-      && (c10::InferenceMode::is_enabled() ||
-          !at::GradMode::is_enabled()); // for inference workload
-  if (suggest_block_format) {
-    // suggest blocked
-    return MEMORY_LAYOUT_FOR_CONV::Blocked;
   }
 
   // suggest channels_last
@@ -719,23 +700,7 @@ static inline at::MemoryFormat get_tensor_format_for_conv(
 
 // judge to use block or plain for Matmul
 static inline bool using_onednn_layout_for_matmul(const at::Tensor& src) {
-  if (!src.defined() || src.is_sparse()) {
-    // suggest plain
-    return false;
-  }
-
-  if (Settings::I().is_onednn_layout_enabled()) {
-    // suggest block
-    return true;
-  }
-
-  auto src_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(src);
-  if (!src_ctx.is_plain()) {
-    // suggest block
-    return true;
-  }
-
-  // suggest plain
+  // suggest plain always since PyTorch 2.5.
   return false;
 }
 
