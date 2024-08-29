@@ -215,7 +215,12 @@ class DeepspeedTester(JitTestCase):
             if False:  # if check_lm_head:
                 self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
 
-            optimized = ipex.optimize(ds_model.eval(), inplace=True)
+            optimized = ipex.optimize(
+                ds_model.eval(),
+                inplace=True,
+                conv_bn_folding=False,
+                linear_bn_folding=False,
+            )
 
             with torch.no_grad():
                 y_optimized = optimized(x)
@@ -349,6 +354,8 @@ class DeepspeedTester(JitTestCase):
                     ds_model.eval(),
                     inplace=True,
                     auto_kernel_selection=True if krnl == "onednn" else False,
+                    conv_bn_folding=False,
+                    linear_bn_folding=False,
                 )
                 with torch.no_grad():
                     y = optimized(x)
