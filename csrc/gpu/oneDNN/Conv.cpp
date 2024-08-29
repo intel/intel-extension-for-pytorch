@@ -39,12 +39,10 @@ static std::tuple<memory::desc, memory::desc, memory::desc> conv_get_usr_md(
   memory::desc src_usr_md, wgh_usr_md, dst_usr_md;
   auto ndim = src.ndimension();
   auto src_ctx = DPCPPTensorContext::get_tensor_ctx(src);
-  auto fmt_src =
-      conv_src_fmt(ndim, memory_layout == MEMORY_LAYOUT_FOR_CONV::ChannelsLast);
   if (src_ctx.is_plain()) {
     auto src_tz = src.sizes().vec();
     auto src_data_t = get_onednn_dtype_include_double(src);
-    src_usr_md = memory::desc(src_tz, src_data_t, fmt_src);
+    src_usr_md = memory::desc(src_tz, src_data_t, get_onednn_strides(src));
   } else {
     src_usr_md = src_ctx.meta();
   }
@@ -53,7 +51,7 @@ static std::tuple<memory::desc, memory::desc, memory::desc> conv_get_usr_md(
   if (dst_ctx.is_plain()) {
     auto dst_tz = dst.sizes().vec();
     auto dst_data_t = get_onednn_dtype_include_double(dst);
-    dst_usr_md = memory::desc(dst_tz, dst_data_t, fmt_src);
+    dst_usr_md = memory::desc(dst_tz, dst_data_t, get_onednn_strides(dst));
   } else {
     dst_usr_md = dst_ctx.meta();
   }

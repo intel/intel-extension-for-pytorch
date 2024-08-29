@@ -753,6 +753,13 @@ static inline Tensor contiguous_if_needed(
   return t_;
 }
 
+static inline bool conv_wgh_need_contiguous(
+    const Tensor& t,
+    at::MemoryFormat mfmt = at::MemoryFormat::Contiguous) {
+  auto ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(t);
+  return ctx.is_plain() ? !t.is_contiguous(mfmt) : false;
+}
+
 static inline bool eltwise_forward_valid(
     const Tensor& out,
     const Tensor& self) {
