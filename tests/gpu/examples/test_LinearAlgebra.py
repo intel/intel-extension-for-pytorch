@@ -13,9 +13,6 @@ dpcpp_device = torch.device("xpu")
 
 class TestTorchMethod(TestCase):
     @pytest.mark.skipif("not torch.xpu.has_onemkl()")
-    @pytest.mark.skip(
-        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
-    )
     def test_cholesky_inverse(self, dtype=torch.float, device=dpcpp_device):
         from torch.testing._internal.common_utils import random_hermitian_pd_matrix
 

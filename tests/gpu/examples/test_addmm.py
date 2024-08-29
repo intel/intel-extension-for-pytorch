@@ -15,9 +15,6 @@ def get_support_dtype():
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip(
-        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
-    )
     def test_addmm_scale(self):
         def _test_addmm_scale(dtype=torch.float):
             m1_cpu = torch.randn([3, 4], dtype=dtype)
@@ -42,9 +39,6 @@ class TestTorchMethod(TestCase):
         for dtype in get_support_dtype():
             _test_addmm_scale(dtype=dtype)
 
-    @pytest.mark.skip(
-        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
-    )
     def test_addmm(self):
         def _test_addmm(dtype=torch.float):
             m1_cpu = torch.randn([3, 4], dtype=dtype)
@@ -66,9 +60,6 @@ class TestTorchMethod(TestCase):
         for dtype in get_support_dtype():
             _test_addmm(dtype=dtype)
 
-    @pytest.mark.skip(
-        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
-    )
     def test_addmm_activation(self):
         def _test_addmm_activation(dtype=torch.float):
             m1_cpu = torch.randn([30, 40], dtype=dtype)
@@ -100,9 +91,6 @@ class TestTorchMethod(TestCase):
         for dtype in get_support_dtype():
             _test_addmm_activation(dtype=dtype)
 
-    @pytest.mark.skip(
-        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
-    )
     # This case is used to check opaque tensor's allocation size in reorder, so it is running in block format
     def test_addmm_block(self):
         def _test_addmm_block(dtype=torch.float):

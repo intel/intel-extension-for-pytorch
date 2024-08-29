@@ -63,9 +63,6 @@ class TestTorchMethod(TestCase):
         return b, A, L
 
     @pytest.mark.skipif(not torch.xpu.has_onemkl(), reason="not torch.xpu.has_onemkl()")
-    @pytest.mark.skip(
-        reason="PT2.5: Double and complex datatype matmul is not supported in oneDNN",
-    )
     def test_cholesky_solve(self, dtype=torch.float):
         def _run_test(dtype):
             for (k, n), upper in itertools.product(

@@ -106,9 +106,9 @@ supported:
 #  - addbmm.out # duplicated op
 #  - addcdiv.out
 #  - addcmul.out
-#  - _addmm_activation.out # duplicated op
-#  - addmm.out  # newly added # duplicated op
-#  - addmv.out  # newly added # duplicated op
+  - _addmm_activation.out # duplicated op
+  - addmm.out  # newly added # duplicated op
+  - addmv.out  # newly added # duplicated op
 #  - addr
 #  - addr.out
 #  - all.all_out
@@ -137,9 +137,9 @@ supported:
 #  - avg_pool2d_backward.grad_input
   - avg_pool3d.out
   - avg_pool3d_backward.grad_input
-#  - baddbmm # duplicated op
-#  - baddbmm.out # duplicated op
-#  - baddbmm_ # duplicated op
+  - baddbmm # duplicated op
+  - baddbmm.out # duplicated op
+  - baddbmm_ # duplicated op
 #  - batch_norm_elemt
 #  - batch_norm_elemt.out
   - batch_norm_gather_stats
@@ -177,8 +177,8 @@ supported:
   - bitwise_right_shift_.Tensor_Scalar
   - bitwise_right_shift.Tensor_Scalar_out
   - bitwise_right_shift.Scalar_Tensor
-#  - bmm # duplicated op
-#  - bmm.out # duplicated op
+  - bmm # duplicated op
+  - bmm.out # duplicated op
   - cauchy_
 #  - ceil.out
   - cholesky
@@ -404,8 +404,8 @@ supported:
 #  - min.unary_out
 #  - minimum
 #  - minimum.out
-#  - mm # duplicated op
-#  - mm.out # duplicated op
+  - mm # duplicated op
+  - mm.out # duplicated op
   - mode
 #  - mse_loss
 #  - mse_loss.out
