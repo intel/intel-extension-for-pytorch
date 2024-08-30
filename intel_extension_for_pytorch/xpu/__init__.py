@@ -126,16 +126,20 @@ def _xpu_deserialize(obj, location):
 
 
 _register_submodule_white_list = {"empty_cache"}
+_register_submodule_black_list = {"mem_get_info"}
 
 
 def _register_torch_device_module(device_type, module):
     global _register_submodule_white_list
+    global _register_submodule_black_list
     device_type = torch.device(device_type).type
     torch_module = sys.modules["torch"]
     torch_device_module = getattr(torch_module, device_type, None)
     torch_device_module_name = ".".join(["torch", device_type])
     if torch_device_module:
         for submodule_key in dir(module):
+            if submodule_key in _register_submodule_black_list:
+                continue
             if submodule_key in _register_submodule_white_list or not hasattr(
                 torch_device_module, submodule_key
             ):

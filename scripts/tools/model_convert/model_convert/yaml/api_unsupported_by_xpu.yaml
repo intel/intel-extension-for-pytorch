@@ -55,8 +55,6 @@
 - torch.cuda.set_per_process_memory_fraction
 - torch.cuda._warn_typed_storage_removal
 - torch.cuda.has_magma
-- torch.cuda.mem_get_info
-- torch.cuda._DeviceGuard
 - torch.cuda.ExternalStream
 - torch.cuda._queued_calls
 - torch.cuda._CudaDeviceProperties

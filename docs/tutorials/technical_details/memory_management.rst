@@ -9,6 +9,8 @@ managed by the caching allocator. Calling :meth:`~torch.xpu.empty_cache`
 releases all **unused** cached memory from PyTorch so that those can be used
 by other GPU applications. However, the occupied GPU memory by tensors will not
 be freed so it can not increase the amount of GPU memory available for PyTorch.
+We provide an API :meth:`~intel_extension_for_pytorch.xpu.mem_get_info`, which
+can help you estimate the free memory. Please note that it is overestimated. 
 
 For more advanced users, we offer more comprehensive memory benchmarking via
 :meth:`~torch.xpu.memory_stats`. We also offer the capability to capture a

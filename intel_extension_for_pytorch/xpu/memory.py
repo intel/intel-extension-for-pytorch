@@ -1,10 +1,11 @@
 import collections
 import warnings
-from typing import Any, Dict, Union
+from typing import Any, Dict, Tuple, Union
 
+import torch
 import intel_extension_for_pytorch
 from torch.types import Device
-from torch._utils import _get_device_index
+from torch.xpu._utils import _get_device_index
 
 
 def empty_cache() -> None:
@@ -457,3 +458,23 @@ def memory_summary(device: Union[Device, int] = None, abbreviated: bool = False)
     for k, v in stats.items():
         fmt_dict[k.replace(".", "-")] = v
     return "|" + "|\n|".join(lines).format(**fmt_dict) + "|\n"
+
+
+def mem_get_info(device: Union[Device, int] = None) -> Tuple[int, int]:
+    r"""Return the estimated value of global free and total GPU memory for a given device.
+
+    Args:
+        device (torch.device or int or str, optional): selected device. Returns
+            statistic for the current device, given by :func:`~torch.xpu.current_device`,
+            if :attr:`device` is ``None`` (default) or if the device index is not specified.
+
+    .. note::
+        See :ref:`xpu-memory-management` for more details about GPU memory
+        management.
+    """
+    if device is None:
+        device = torch.xpu.current_device()
+    device = _get_device_index(device, optional=True)
+    total_memory = torch.xpu.get_device_properties(device).total_memory
+    free_memory = total_memory - memory_reserved(device)
+    return free_memory, total_memory

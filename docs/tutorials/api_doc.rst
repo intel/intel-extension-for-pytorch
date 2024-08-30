@@ -72,7 +72,7 @@ Memory management
 .. currentmodule:: intel_extension_for_pytorch.xpu
 .. autofunction:: empty_cache
 .. list_gpu_processes
-.. mem_get_info
+.. autofunction:: mem_get_info
 .. autofunction:: memory_stats
 .. autofunction:: memory_summary
 .. autofunction:: memory_snapshot
