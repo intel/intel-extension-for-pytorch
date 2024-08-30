@@ -9,13 +9,10 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip(
-        reason="PT2.5: module 'torch' has no attribute '_sparse_coo_tensor_unsafe'"
-    )
     def test_sparse(self, dtype=torch.float):
         i_cpu = torch.LongTensor([[0, 1, 1], [2, 0, 0]])
         v_cpu = torch.FloatTensor([3, 4, 5])
-        r_cpu = torch.torch._sparse_coo_tensor_unsafe(i_cpu, v_cpu, torch.Size([2, 3]))
+        r_cpu = torch.sparse_coo_tensor(i_cpu, v_cpu, torch.Size([2, 3]))
         dense_dim_cpu = r_cpu.dense_dim()
         sparse_dim_cpu = r_cpu.sparse_dim()
         indices_cpu = r_cpu._indices()
@@ -25,7 +22,7 @@ class TestTorchMethod(TestCase):
 
         i_xpu = i_cpu.to("xpu")
         v_xpu = v_cpu.to("xpu")
-        r_xpu = torch.torch._sparse_coo_tensor_unsafe(i_xpu, v_xpu, torch.Size([2, 3]))
+        r_xpu = torch.sparse_coo_tensor(i_xpu, v_xpu, torch.Size([2, 3]))
         dense_dim_xpu = r_xpu.dense_dim()
         sparse_dim_xpu = r_xpu.sparse_dim()
         indices_xpu = r_xpu._indices()

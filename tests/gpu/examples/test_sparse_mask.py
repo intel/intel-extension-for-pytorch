@@ -6,9 +6,6 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip(
-        reason="PT2.5: module 'torch' has no attribute '_sparse_coo_tensor_unsafe'"
-    )
     def test_sparse_mask(self, dtype=torch.float):
         nse = 5
         dims = (5, 5, 2, 2)
@@ -20,7 +17,7 @@ class TestTorchMethod(TestCase):
             0,
         ).reshape(2, nse)
         V = torch.randn(nse, dims[2], dims[3])
-        S = torch._sparse_coo_tensor_unsafe(I, V, dims).coalesce()
+        S = torch.sparse_coo_tensor(I, V, dims).coalesce()
         S_xpu = S.to("xpu")
         D = torch.randn(dims)
         D_xpu = D.to("xpu")
