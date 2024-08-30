@@ -142,10 +142,6 @@ class PagedAttentionTest(TestCase):
             dim=1,
         )
         query = query.view(num_seqs, num_query_heads, head_size)
-        # import pdb
-
-        # pdb.set_trace()
-        print(query.shape, query.stride())
         query.uniform_(-scale, scale)
         assert num_query_heads % num_kv_head == 0
         num_queries_per_kv = num_query_heads // num_kv_head

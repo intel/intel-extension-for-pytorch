@@ -9,6 +9,7 @@
 #include <ATen/native/CPUBlas.h>
 #include <ATen/native/cpu/utils.h>
 #include <aten/PagedAttention.h>
+#include <aten/utils/mkl_gemm.h>
 #include <c10/util/irange.h>
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
@@ -19,18 +20,38 @@
 #include <ATen/ops/empty.h>
 #endif
 
-#include <aten/PagedAttention.h>
 #include <omp.h>
 #include <limits>
-#include "mkl.h"
 #include "vec/vec.h"
 
 #define PARTITION_SIZE 128
+
+template <typename scalar_t>
+static inline scalar_t* conditional_data_ptr(scalar_t* ptr, scalar_t* ptr2) {
+  TORCH_CHECK(ptr2 == nullptr);
+  return ptr;
+}
+
+template <
+    typename scalar_t,
+    typename std::enable_if_t<is_reduced_floating_point_v<scalar_t>, int> = 0>
+static inline scalar_t* conditional_data_ptr(float* ptr, scalar_t* ptr2) {
+  return ptr2;
+}
 
 namespace torch_ipex {
 namespace cpu {
 
 namespace {
+
+inline c10::SymFloat calculate_scale(
+    const at::Tensor& query,
+    c10::optional<double> scale) {
+  const auto softmax_scale = scale.has_value()
+      ? scale.value()
+      : (c10::SymFloat(1.0) / (c10::SymFloat(query.sym_size(-1)).sqrt()));
+  return c10::SymFloat(softmax_scale);
+}
 
 template <typename QT, typename KT>
 void reduce_head(
@@ -119,7 +140,7 @@ inline void _exp_reduce_sum_fusion_kernel(
     auto tmp1 = tmp0 - vec_max;
     auto tmp2 = tmp1.exp_u20();
     vec_tmp_sum += tmp2;
-    tmp2.store(out + i);
+    at::native::_store(out + i, tmp2);
   }
   tmp_sum = at::vec::vec_reduce_all<T1>(
       [](at::vec::Vectorized<T1>& x, at::vec::Vectorized<T1>& y) {
@@ -556,6 +577,257 @@ void reshape_and_cache_kernel(
   }
 }
 
+/**
+ * Performs scale-dot-product for the chunked prefill case.
+ * In this case, we assume the current key/value already been cached.
+ * The attention weights are calculated based on the query and the cached
+ * key/value. If causal=True, the causal mask is aligned to the bottom right
+ * corner of the attention matrix. For example, if seqlen_q = 2 and seqlen_k =
+ * 5, the causal mask (1 = keep, 0 = masked out) is: 1 1 1 1 0 1 1 1 1 1 if
+ * seqlen_q = 5 and seqlen_k = 2, the causal mask is: 0 0 0 0 0 0 1 0 1 1 If the
+ * row of the mask is all zero, the output will be zero.
+ *
+ * For the chuned prefill case, the data layout is as follow:
+ *
+ * Definition of context_len, query_len, and seq_len.
+ *   |---------- N-1 iteration --------|
+ *   |---------------- N iteration ---------------------|
+ *   |- tokenA -|......................|-- newTokens ---|
+ *   |---------- context_len ----------|
+ *   |-------------------- seq_len ---------------------|
+ *                                     |-- query_len ---|
+ *
+ * when chunked prefill is enabled, prefill tokens and decode tokens can be
+ * batched together in a flattened 1D query.
+ *  |<----- num_prefill_tokens ---->|<------- num_decode_tokens --------->|
+ *  |<-prefill_0->|...|<-prefill_N-1->|<--decode_0-->|...|<--decode_M-1-->|
+ * For the flash_attn_varlen kernel, only chunked prefill tokens are processed
+ * by this kernel. The decode tokens are processed by the
+ * single_query_cached_kv_attention_kernel.
+ */
+template <typename scalar_t, int64_t q_split_size = 16>
+void flash_attn_varlen_kernel(
+    at::Tensor& out, // [num_seqs, num_heads, head_size]
+    at::Tensor& query, // [num_seqs, num_heads, head_size]
+    at::Tensor& key_cache, // [num_blocks, num_heads, block_size,  head_size]
+    at::Tensor& value_cache, //[num_blocks, num_heads, block_size, head_size]
+    at::Tensor& cu_seqlens_q, // [batch_size+1] // the accumulted sequence
+                              // length of query
+    at::Tensor& cu_seqlens_k, // [batch_size+1] // the accumulted sequence
+                              // length of key(cached)
+    int64_t max_seqlen_q, // max sequence length of query
+    int64_t max_seqlens_k, // max sequence length of key and value(cached,
+                           // past+current)
+    const double softmax_scale, // scale for softmax
+    bool is_causal, // whether the attention is causal
+    at::Tensor& block_table,
+    const c10::optional<at::Tensor>& alibi_slopes) {
+  auto kv_block_strideN = key_cache.stride(0);
+  auto kv_block_strideH = key_cache.stride(1);
+  auto kv_block_strideP = key_cache.stride(2);
+  auto out_strideN = out.stride(0);
+  auto out_strideH = out.stride(1);
+  auto q_strideN = query.stride(0);
+  auto q_strideH = query.stride(1);
+
+  auto num_heads = query.size(1);
+  auto head_size = query.size(2);
+  auto num_kv_heads = key_cache.size(1);
+  auto kv_head_group_size = num_heads / num_kv_heads;
+  auto max_num_blocks_per_seq = block_table.size(1);
+  auto batch_size = cu_seqlens_q.size(0) - 1;
+  auto block_size = key_cache.size(2);
+
+  auto qSplitSize = q_split_size > max_seqlen_q ? max_seqlen_q : q_split_size;
+  auto kvSplitSize = block_size > max_seqlens_k ? max_seqlens_k : block_size;
+  // kvSplitSize should be the same as block_size
+  auto qSliceMax = (max_seqlen_q + qSplitSize - 1) / qSplitSize;
+  auto kvSliceMax = (max_seqlens_k + kvSplitSize - 1) / kvSplitSize;
+
+  constexpr bool is_reduced_type = is_reduced_floating_point_v<scalar_t>;
+  using accum_t = at::opmath_type<scalar_t>;
+  using Vec = at::vec::Vectorized<accum_t>;
+  // ToDo(liangan1): align the scale semantic with other repo
+  accum_t scaling_factor =
+      calculate_scale(query, softmax_scale).as_float_unchecked();
+
+  const auto dtype = query.scalar_type();
+  const auto accumulate_dtype = at::toOpMathType(dtype);
+  // allocate per thread temp buf (accumulate type)
+  int64_t size_per_thread =
+      /* qk     */ qSplitSize * kvSplitSize +
+      /* qk_max */ qSplitSize +
+      /* qk_sum */ qSplitSize +
+      /* dst    */ qSplitSize * head_size;
+
+  int64_t num_thread = at::get_num_threads();
+  at::Tensor buf = at::empty(
+      {num_thread, size_per_thread}, query.options().dtype(accumulate_dtype));
+  at::Tensor buf_reduced = at::empty(
+      {num_thread, qSplitSize, is_reduced_type ? kvSplitSize : 0},
+      query.options());
+
+  auto out_ptr = out.data_ptr<scalar_t>();
+  auto query_ptr = query.data_ptr<scalar_t>();
+  auto key_ptr = key_cache.data_ptr<scalar_t>();
+  auto value_ptr = value_cache.data_ptr<scalar_t>();
+  auto cu_seqlens_q_ptr = cu_seqlens_q.data_ptr<int>();
+  auto cu_seqlens_k_ptr = cu_seqlens_k.data_ptr<int>();
+  auto block_table_ptr = block_table.data_ptr<int>();
+  auto buf_data = buf.data_ptr<accum_t>();
+  scalar_t* buf_reduced_data =
+      is_reduced_type ? buf_reduced.data_ptr<scalar_t>() : nullptr;
+  auto alibi_slopes_ptr = alibi_slopes.has_value()
+      ? alibi_slopes.value().data_ptr<float>()
+      : nullptr;
+
+#pragma omp parallel for collapse(3) schedule(static, 1)
+  for (auto i = 0; i < batch_size; i++) {
+    for (auto j = 0; j < num_heads; j++) {
+      for (auto k = 0; k < qSliceMax; k++) {
+        auto ompIdx = omp_get_thread_num();
+        auto kv_head_id = j / kv_head_group_size;
+
+        accum_t* buf_ptr = buf_data + ompIdx * size_per_thread;
+        accum_t* qk_data = buf_ptr;
+        accum_t* qk_max_data = qk_data + qSplitSize * kvSplitSize;
+        accum_t* qk_sum_data = qk_max_data + qSplitSize;
+        accum_t* dst_data = qk_sum_data + qSplitSize;
+        scalar_t* qk_reduced_data = is_reduced_type
+            ? buf_reduced_data + ompIdx * qSplitSize * kvSplitSize
+            : nullptr;
+
+        // get the current query len
+        int64_t qSize = cu_seqlens_q_ptr[i + 1] - cu_seqlens_q_ptr[i];
+        int64_t kvSize = cu_seqlens_k_ptr[i + 1] - cu_seqlens_k_ptr[i];
+
+        int64_t context_len = kvSize - qSize; // computed context lens
+        int64_t m = k * qSplitSize;
+        if (m >= qSize) {
+          continue;
+        }
+        int64_t qBlockSize = std::min(qSplitSize, qSize - m);
+
+        // Initialize max and sum
+        torch_ipex::cpu::kernel::fill_stub(
+            qk_max_data, -std::numeric_limits<accum_t>::infinity(), qBlockSize);
+        torch_ipex::cpu::kernel::fill_stub(
+            qk_sum_data, static_cast<accum_t>(0), qBlockSize);
+        torch_ipex::cpu::kernel::fill_stub(
+            dst_data, static_cast<accum_t>(0), qBlockSize * head_size);
+        int64_t num_keys =
+            is_causal ? std::min(m + qBlockSize + context_len, kvSize) : kvSize;
+
+        for (int64_t n = 0; n < num_keys; n += kvSplitSize) {
+          // get the physical block id of the key and value
+          int64_t physical_block_id =
+              block_table_ptr[i * max_num_blocks_per_seq + n / kvSplitSize];
+          auto key_page_data = key_ptr + physical_block_id * kv_block_strideN +
+              kv_head_id * kv_block_strideH;
+          auto value_page_data = value_ptr +
+              physical_block_id * kv_block_strideN +
+              kv_head_id * kv_block_strideH;
+          int64_t kvBlockSize = std::min(kvSplitSize, kvSize - n);
+          // Calculate the scale * query * key
+          // query block[qBlockSize, head_size], key block: [kvBlockSize,
+          // head_size]
+          _mkl_gemm(
+              CblasRowMajor,
+              CblasNoTrans,
+              CblasTrans,
+              qBlockSize,
+              kvBlockSize,
+              head_size,
+              static_cast<accum_t>(1),
+              query_ptr + (cu_seqlens_q_ptr[i] + m) * q_strideN + j * q_strideH,
+              q_strideN,
+              key_page_data,
+              head_size,
+              static_cast<accum_t>(0),
+              qk_data,
+              kvSplitSize);
+
+          // apply causal mask, fill unmasked position with -inf
+          if (is_causal) {
+            for (int64_t q = 0; q < qBlockSize; q++) {
+              for (int64_t p = 0; p < kvBlockSize; p++) {
+                if (m + q + context_len < n + p) {
+                  qk_data[q * kvSplitSize + p] =
+                      -std::numeric_limits<accum_t>::infinity();
+                }
+              }
+            }
+          }
+          // Calculate max and sum of exp(val-max)
+          for (int64_t q = 0; q < qBlockSize; q++) {
+            accum_t tmp_max = -std::numeric_limits<accum_t>::infinity(),
+                    tmp_sum = 0, exp_tmp = 0;
+
+            _mul_reduce_max_fusion_kernel<accum_t>(
+                qk_data + q * kvSplitSize,
+                scaling_factor,
+                kvBlockSize,
+                qk_data + q * kvSplitSize,
+                tmp_max);
+
+            tmp_max = qk_max_data[q] > tmp_max ? qk_max_data[q] : tmp_max;
+            tmp_sum = tmp_max;
+            _exp_reduce_sum_fusion_kernel<accum_t, scalar_t>(
+                qk_data + q * kvSplitSize,
+                kvBlockSize,
+                conditional_data_ptr(qk_data, qk_reduced_data) +
+                    q * kvSplitSize,
+                tmp_sum);
+            // exp_tmp <- exp(max[row] - max)
+            exp_tmp = std::exp(qk_max_data[q] - tmp_max);
+            // sum[row] <- sum + exp_tmp * sum[row]
+            qk_sum_data[q] = tmp_sum + exp_tmp * qk_sum_data[q];
+            // max[row] <- max
+            qk_max_data[q] = tmp_max;
+            // dst <- dst * exp_tmp
+            if (n > 0) {
+              at::vec::map<accum_t>(
+                  [exp_tmp](Vec x) { return x * Vec(exp_tmp); },
+                  dst_data + q * head_size,
+                  dst_data + q * head_size,
+                  head_size);
+            }
+          }
+
+          // Calculate the sum of attn_weight * value
+
+          _mkl_gemm(
+              CblasRowMajor,
+              CblasNoTrans,
+              CblasNoTrans,
+              qBlockSize,
+              head_size,
+              kvBlockSize,
+              static_cast<accum_t>(1),
+              conditional_data_ptr(qk_data, qk_reduced_data),
+              kvSplitSize,
+              value_page_data,
+              head_size,
+              n == 0 ? static_cast<accum_t>(0) : static_cast<accum_t>(1),
+              dst_data,
+              head_size);
+        }
+
+        // copy the result to the output
+        // dst<-dst/sum
+        for (int64_t q = 0; q < qBlockSize; q++) {
+          accum_t sum_reciprocal = 1 / qk_sum_data[q];
+          at::vec::map<scalar_t>(
+              [sum_reciprocal](Vec x) { return x * Vec(sum_reciprocal); },
+              out_ptr + (cu_seqlens_q_ptr[i] + m + q) * out_strideN +
+                  j * out_strideH,
+              dst_data + q * head_size,
+              head_size);
+        }
+      }
+    }
+  }
+}
 void single_query_cached_kv_attention_kernel_impl(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
     at::Tensor& query, // [num_seqs, num_heads, head_size]
@@ -646,6 +918,132 @@ void reshape_and_cache_cpu_kernel_impl(
   }
 }
 
+void flash_attn_varlen_cpu_kernel_impl(
+    at::Tensor& out,
+    at::Tensor& query,
+    at::Tensor& key,
+    at::Tensor& value,
+    at::Tensor& cu_seqlens_q,
+    at::Tensor& cu_seqlens_kv,
+    int64_t max_seqlen_q,
+    int64_t max_seqlen_kv,
+    const double softmax_scale,
+    bool is_causal,
+    at::Tensor& block_table,
+    const c10::optional<at::Tensor>& alibi_slopes) {
+  TORCH_CHECK(
+      query.scalar_type() == key.scalar_type(),
+      "query and key should have the same data type");
+  TORCH_CHECK(
+      query.scalar_type() == value.scalar_type(),
+      "query and value should have the same data type");
+  TORCH_CHECK(
+      !alibi_slopes.has_value(),
+      "alibi_slopes is not supported for flash_attn_varlen yet");
+  TORCH_CHECK(
+      is_causal,
+      "flash_attn_varlen_cpu_kernel_impl only supports causal attention, pls use the is_causal=True");
+  TORCH_CHECK(
+      query.scalar_type() == out.scalar_type(),
+      "query and out should have the same data type");
+  RECORD_FUNCTION(
+      "ipex::flash_attn_varlen_cpu_kernel_impl",
+      c10::ArrayRef<c10::IValue>({}));
+  if (query.scalar_type() == at::ScalarType::Float) {
+    if (max_seqlen_q >= 768) {
+      flash_attn_varlen_kernel<float, 128>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes);
+    } else if (max_seqlen_q >= 192) {
+      flash_attn_varlen_kernel<float, 64>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes);
+    } else {
+      flash_attn_varlen_kernel<float, 32>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes);
+    }
+
+  } else if (query.scalar_type() == at::ScalarType::BFloat16) {
+    if (max_seqlen_q >= 768) {
+      flash_attn_varlen_kernel<at::BFloat16, 128>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes);
+    } else if (max_seqlen_q >= 192) {
+      flash_attn_varlen_kernel<at::BFloat16, 64>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes);
+    } else {
+      flash_attn_varlen_kernel<at::BFloat16, 32>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes);
+    }
+
+  } else {
+    TORCH_CHECK(false, "Unsupported data type for ipex::flash_attn_varlen");
+  }
+}
+
 } // namespace
 
 IPEX_REGISTER_DISPATCH(
@@ -654,6 +1052,9 @@ IPEX_REGISTER_DISPATCH(
 IPEX_REGISTER_DISPATCH(
     reshape_and_cache_kernel_stub,
     &reshape_and_cache_cpu_kernel_impl);
+IPEX_REGISTER_DISPATCH(
+    flash_attn_var_len_kernel_stub,
+    &flash_attn_varlen_cpu_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -379,6 +379,37 @@ class _IPEXPagedAttentionCPU:
             alibi_slopes,
         )
 
+    @classmethod
+    def flash_attn_varlen_func(
+        cls,
+        output,
+        query,
+        k_cache,
+        v_cache,
+        cu_seq_lens_q,
+        cu_seq_lens_kv,
+        max_seq_len_q,
+        max_seq_len_kv,
+        scale,
+        is_causal,
+        block_table,
+        alibi_slopes=None,
+    ):
+        torch.ops.torch_ipex.flash_attn_varlen_func(
+            output,
+            query,
+            k_cache,
+            v_cache,
+            cu_seq_lens_q,
+            cu_seq_lens_kv,
+            max_seq_len_q,
+            max_seq_len_kv,
+            scale,
+            is_causal,
+            block_table,
+            alibi_slopes,
+        )
+
 
 class _IPEXVarlenScaledDotProductCPU(nn.Module):
     def __init__(self):
