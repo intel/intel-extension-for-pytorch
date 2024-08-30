@@ -110,6 +110,7 @@ for tag, cases in casenames_total.items():
     num = len(cases)
     msg += f'=========================== FAILED on {tag} CASES total {num} ============================\n'
     for case in cases:
+        case = "  - " + case
         msg += case
 report_details(msg, header, tail, "casekind.log")
 

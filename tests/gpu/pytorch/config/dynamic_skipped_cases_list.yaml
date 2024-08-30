@@ -8989,6 +8989,7 @@
   - test_ops.py::TestCommonXPU::test_out_softmax_with_dtype_xpu_float32
   - test_ops.py::TestCommonXPU::test_out_softmax_xpu_float32
   - test_ops.py::TestCommonXPU::test_variant_consistency_eager_sgn_xpu_float32
+  - test_ops.py::TestCommonXPU::test_out_baddbmm_xpu_float32
   - test_ops.py::TestCompositeComplianceXPU::test_backward_sgn_xpu_float32
   - test_ops.py::TestMathBitsXPU::test_neg_view_sgn_xpu_float64
   - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float64

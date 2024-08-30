@@ -94,9 +94,12 @@ def collect_pytorch_rebase_details(testname, issued_cases, data):
     p3 = r'NotImplementedError:\s'
     p3_1 = r'Could\snot\srun\s\'[A-Za-z0-9_:\.]*\'\swith\sarguments\sfrom\sthe\s\'[A-Za-z0-9_:\.]*\'\sbackend\.'
     p3_2 = r'Cannot\scopy\sout\sof\smeta\stensor;\sno\sdata!'
+    p3_3 = r'could\snot\sfind\skernel\sfor'
     p4 = r'AssertionError: False is not true'
     p4_1 = r'self\.assertTrue\(result\.device\s==\scuda_device\)'
     p4_2 = r'self\.assertTrue\(all\(t\.device\s==\scuda_device\sfor\st\sin\sresult\)\)'
+    p4_3 = r'self\.assertTrue\(all\(p\.device\s==\sdevice_'
+    p4_4 = r'self\.assertTrue\(all\(p\.device\.type\s==\sdevice_'
     p5 = r'AssertionError:\sTensor-likes\sare\snot\sclose!'
     p6 = r'RuntimeError:\s'
     p6_1 = r'RuntimeError:\sFFT_INVALID_DESCRIPTOR'
@@ -163,6 +166,11 @@ def collect_pytorch_rebase_details(testname, issued_cases, data):
     p6_62 = r'Cannot\sset\spreferred\sbackend\sto'
     p6_63 = r'different\selements'
     p6_64 = r'doesn\'t\smatch\sthe\sbroadcast\sshape'
+    p6_65 = r'Expected\seigenvectors\sto\sbe\ssafely\scastable\sfrom'
+    p6_66 = r'Expected\s[A-Za-z:0-9]*\s!=\s[A-Za-z:0-9]*\sto\sbe\strue,\sbut\sgot\sfalse'
+    p6_67 = r'Expected\sscalars\sto\sbe\son\sCPU,\sgot'
+    p6_68 = r'Original\sOpInfo\sis\sbroken'
+    p6_69 = r'self\smust\sbe\sa\smatrix'
     p7 = r'TypeError:\smodule,\sclass,\smethod,\sfunction,\straceback,\sframe,\sor\scode\sobject\swas\sexpected,\sgot\sbuiltin_function_or_method'
     p8 = r'AssertionError:\sUserWarning\snot\striggered\s:'
     p8_1 = r'Resized\sa\snon-empty\stensor\sbut\sdid\snot\swarn\sabout\sit\.'
@@ -181,17 +189,33 @@ def collect_pytorch_rebase_details(testname, issued_cases, data):
     p18 = r'AssertionError:\sShapes\s.*?\sand\s.*?are\snot\sequal!'
     p19 = r'AssertionError:\sScalars\sare\snot\sclose!'
     p20 = r'AssertionError:\sWarning:\sthis\storch\sapi\sxpu\sdoes\snot\ssupport'
-    p21 = r'AssertionError:\sObject\scomparison\sfailed:'
+    p20_1 = r'torch\.sparse_compressed_tensor'
+    p20_2 = r'torch\.sparse_bsc_tensor'
+    p20_3 = r'torch\.sparse_bsr_tensor'
+    p20_4 = r'torch\.sparse_csr_tensor'
+    p20_5 = r'torch\.sparse_csc_tensor'
+    p20_6 = r'test_sparse_compressed_constructor'
+    p21 = r'AssertionError:\sObject\scomparison\sfailed:\sdevice'
     p22 = r'The\sabove\squantities\srelating\sthe\snumerical\sand\sanalytical\sjacobians\sare\scomputed'
     p23 = r'AssertionError\n'
+    p24 = r'AssertionError:\sObject\scomparison\sfailed:\stensor'
+    p25 = r'torch\._dynamo'
+    p25_1 = r'isinstance\(\)\sarg\s2\smust\sbe\sa\stype\sor\stuple\sof\stypes'
+    p26 = r'AssertionError:\s[A-Za-z0-9\._:]*\sOperation:'
+    p27 = r'ValueError:\sAttempted\sto\suse\san\suninitialized\sparameter'
+    p28 = r'AssertionError:\sError:\sthe\sapi\s[A-Za-z:0-9\._]*\sis\snot\ssupported\sby'
+    p29 = r'AssertionError:\sObject\scomparison\sfailed:\s'
+    p30 = r'AssertionError:\sThe\slength\sof\sthe\ssequences\smismatch'
     p1s = [p1_1, p1_2, p1_3, p1_4, p1_5, p1_6, p1_7, p1_8, p1_9, p1_10, p1_11]
     p2s = [p2_1, p2_2, p2_3]
-    p3s = [p3_1, p3_2]
-    p4s = [p4_1, p4_2]
-    p6s = [p6_1, p6_2, p6_3, p6_4, p6_5, p6_6, p6_7, p6_8, p6_9, p6_10, p6_11, p6_12, p6_13, p6_14, p6_15, p6_16, p6_17, p6_18, p6_19, p6_20, p6_21, p6_22, p6_23, p6_24, p6_25, p6_26, p6_27, p6_28, p6_29, p6_30, p6_31, p6_32, p6_33, p6_34, p6_35, p6_36, p6_37, p6_38, p6_39, p6_40, p6_41, p6_42, p6_43, p6_44, p6_45, p6_46, p6_47, p6_48, p6_49, p6_50, p6_51, p6_52, p6_53, p6_54, p6_55, p6_56, p6_57, p6_58, p6_59, p6_60, p6_61, p6_62, p6_63, p6_64]
+    p3s = [p3_1, p3_2, p3_3]
+    p4s = [p4_1, p4_2, p4_3, p4_4]
+    p6s = [p6_1, p6_2, p6_3, p6_4, p6_5, p6_6, p6_7, p6_8, p6_9, p6_10, p6_11, p6_12, p6_13, p6_14, p6_15, p6_16, p6_17, p6_18, p6_19, p6_20, p6_21, p6_22, p6_23, p6_24, p6_25, p6_26, p6_27, p6_28, p6_29, p6_30, p6_31, p6_32, p6_33, p6_34, p6_35, p6_36, p6_37, p6_38, p6_39, p6_40, p6_41, p6_42, p6_43, p6_44, p6_45, p6_46, p6_47, p6_48, p6_49, p6_50, p6_51, p6_52, p6_53, p6_54, p6_55, p6_56, p6_57, p6_58, p6_59, p6_60, p6_61, p6_62, p6_63, p6_64, p6_65, p6_66, p6_67, p6_68, p6_69] 
     p8s = [p8_1]
     p13s = [p13_1, p13_2, p13_3]
-    pats = [(p1, p1s), (p2, p2s), (p3, p3s), (p4, p4s), (p5, ), (p6, p6s), (p7, ), (p8, p8s), (p9, ), (p10, ), (p11, ), (p12, ), (p13, p13s), (p14, ), (p15, ), (p16, ), (p17, ), (p18, ), (p19, ), (p20, ), (p21, ), (p22, ), (p23, )]
+    p20s = [p20_1, p20_2, p20_3, p20_4, p20_5, p20_6]
+    p25s = [p25_1]
+    pats = [(p1, p1s), (p2, p2s), (p3, p3s), (p4, p4s), (p5, ), (p6, p6s), (p7, ), (p8, p8s), (p9, ), (p10, ), (p11, ), (p12, ), (p13, p13s), (p14, ), (p15, ), (p16, ), (p17, ), (p18, ), (p19, ), (p20, p20s), (p21, ), (p22, ), (p23, ), (p24, ), (p25, p25s), (p26, ), (p27, ), (p28, ), (p29, ), (p30, )]
 
     results = re.findall(pattern, data, re_flags)
     #print(results)
@@ -256,7 +280,9 @@ def collect_pytorch_rebase_details(testname, issued_cases, data):
 
 def collect_detailed_issues(issued_cases, logfile, with_short=False, rebase=False):
     global re_flags
-    test_name = logfile.split('.')[0].split('/')[-1].replace('-', '/')
+    print(logfile)
+    #test_name = logfile.split('.')[0].split('/')[-1].replace('-', '/')
+    test_name = logfile.split('/')[-1].split('.')[0].replace('-', '/')
     data = read_file(logfile)
     if re.search(r"^=*\s*test session starts\s*=*$", data, re_flags):
         return collect_pytest_details(issued_cases, data, with_short)
@@ -311,6 +337,7 @@ def collect_pytorch_cases(data, test_file_name):
     global re_flags
     collected_cases = {"PASSED": [], "FAILED": [], "ERROR": [], "SKIPPED": [], "XFAIL": [], "XPASS": [], "NO_RESULT": []}
     pattern_case = r"^(?:  )?(test_\S+)\s\([^\.]*\.([^\.\)]*[^\)]*)\).*?\s+\.\.\..+?(ok|FAIL|ERROR|skipped|expected failure|Command)\s"
+    #pattern_case = r"^(test_\S+)\s\([^\.]*\.([^\.\)]*[^\)]*)\).*?\s+\.\.\..+?(ok|FAIL|ERROR|skipped|expected failure|Command)\s"
     #pattern_case = r"^(test_\S+)\s\([^\.]*\.([^\.\)]*)[^\)]*\)\s+\.\.\..+?(ok|FAIL|ERROR|skipped|expected failure|Command)\s"
     # pattern_xpass_case = # haven't found related cases while using pytorch test run.
 
@@ -339,7 +366,6 @@ def collect_pytorch_cases(data, test_file_name):
                 collected_cases["NO_RESULT"].append(full_case_name)
                 break
         count = count + 1
-
         if case[2] == 'ok':
             collected_cases["PASSED"].append(full_case_name)
         elif case[2] == 'FAIL':

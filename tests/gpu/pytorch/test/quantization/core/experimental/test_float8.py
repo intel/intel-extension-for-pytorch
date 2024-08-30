@@ -7,7 +7,6 @@ sys.path.append(test_root)
 import common.xpu_test_base
 # Owner(s): ["oncall: quantization"]
 
-import sys
 import unittest
 
 import torch
@@ -17,12 +16,14 @@ from torch.testing._internal.common_device_type import (
     instantiate_device_type_tests,
 )
 from torch.testing._internal.common_utils import (
+    DeterministicGuard,
     IS_WINDOWS,
     parametrize,
     run_tests,
     subtest,
     TestCase,
 )
+
 
 FLOAT8_DTYPES = [
     torch.float8_e5m2,
@@ -267,6 +268,14 @@ class TestFloat8Dtype(TestCase):
             ):
                 x + y
 
+    @dtypes(*FLOAT8_DTYPES)
+    @dtypesIfCUDA(*CUDA_FLOAT8_DTYPES)
+    def test_empty(self, dtype, device):
+        with DeterministicGuard(torch.are_deterministic_algorithms_enabled()):
+            for use_deterministic in (True, False):
+                torch.use_deterministic_algorithms(use_deterministic)
+                x = torch.empty(4, 4, device=device, dtype=dtype)
+
 
 instantiate_device_type_tests(TestFloat8Dtype, globals())
 
@@ -295,9 +304,6 @@ class TestFloat8DtypeCPUOnly(TestCase):
         self.assertEqual(mul8, mul8_simulated)
 
     @unittest.skipIf(IS_WINDOWS, "torch.compile not supported on Windows yet")
-    @unittest.skipIf(
-        sys.version_info >= (3, 12), "torch.compile is not supported on python 3.12+"
-    )
     @dtypes(*CUDA_FLOAT8_DTYPES)
     def test_pt2_traceable_aot_eager(self, dtype):
         @torch.compile(backend="aot_eager", fullgraph=True)

@@ -9,17 +9,19 @@ import common.xpu_test_base
 
 import torch
 import random
+import io
 import itertools
 import unittest
 import functools
-from torch.testing import make_tensor
+from contextlib import redirect_stderr
+from torch.testing import make_tensor, FileCheck
 from torch.testing._internal.common_cuda import SM53OrLater, SM80OrLater, TEST_CUSPARSE_GENERIC
 from torch.testing._internal.common_utils import \
     (TEST_WITH_TORCHINDUCTOR, TEST_WITH_ROCM, TEST_SCIPY, TEST_NUMPY, TEST_MKL, IS_WINDOWS, TestCase, run_tests,
      load_tests, coalescedonoff, parametrize, subtest, skipIfTorchDynamo, skipIfRocm, IS_FBCODE, IS_REMOTE_GPU)
 from torch.testing._internal.common_device_type import \
     (ops, instantiate_device_type_tests, dtypes, OpDTypes, dtypesIfCUDA, onlyCPU, onlyCUDA, skipCUDAIfNoSparseGeneric,
-     precisionOverride, skipMeta, skipCUDAIf, skipCUDAIfRocm, skipCPUIfNoMklSparse, skipCUDAIfRocmVersionLessThan,
+     precisionOverride, skipMeta, skipCUDAIf, skipCPUIfNoMklSparse, skipCUDAIfRocmVersionLessThan,
      largeTensorTest)
 from torch.testing._internal.common_methods_invocations import \
     (op_db, sparse_csr_unary_ufuncs, ReductionOpInfo)
@@ -28,7 +30,7 @@ from torch.testing._internal.common_dtype import (
     floating_types, all_types_and_complex_and, floating_and_complex_types, floating_types_and,
     all_types_and_complex, floating_and_complex_types_and)
 from torch.testing._internal.opinfo.definitions.sparse import validate_sample_input_sparse
-from test_sparse import CUSPARSE_SPMM_COMPLEX128_SUPPORTED
+from test_sparse import CUSPARSE_SPMM_COMPLEX128_SUPPORTED, HIPSPARSE_SPMM_COMPLEX128_SUPPORTED
 import operator
 
 if TEST_SCIPY:
@@ -345,6 +347,46 @@ class TestSparseCompressed(TestCase):
 
     @skipMeta
     @all_sparse_compressed_layouts()
+    @dtypes(*all_types_and_complex_and(torch.bool, torch.bfloat16, torch.half))
+    def test_sparse_compressed_tensor_with_dims(self, layout, device, dtype):
+
+        def get_sparse_compressed_tensor_properties(s):
+            if layout in {torch.sparse_csr, torch.sparse_bsr}:
+                compressed_indices, plain_indices = s.crow_indices(), s.col_indices()
+            else:
+                compressed_indices, plain_indices = s.ccol_indices(), s.row_indices()
+            values = s.values()
+            return dict(shape=s.shape, dtype=s.dtype, device=s.device, nnz=s._nnz(), layout=s.layout,
+                        compressed_indices_shape=compressed_indices.shape,
+                        compressed_indices_dtype=compressed_indices.dtype,
+                        compressed_indices_device=compressed_indices.device,
+                        plain_indices_shape=plain_indices.shape,
+                        plain_indices_dtype=plain_indices.dtype,
+                        plain_indices_device=plain_indices.device,
+                        values_shape=values.shape,
+                        values_dtype=values.dtype,
+                        values_device=values.device)
+
+        for index_dtype in [torch.int32, torch.int64]:
+            for t in self.generate_simple_inputs(layout, device=device, dtype=dtype, index_dtype=index_dtype):
+                dense_dim = t.dense_dim()
+                sparse_dim = t.sparse_dim()
+                batch_dim = t.ndim - sparse_dim - dense_dim
+                nnz = t.values().shape[batch_dim]
+                if layout in {torch.sparse_bsr, torch.sparse_bsc}:
+                    blocksize = t.values().shape[batch_dim + 1: batch_dim + 1 + sparse_dim]
+                else:
+                    blocksize = ()
+
+                e = torch.ops.aten._sparse_compressed_tensor_with_dims(nnz, dense_dim, t.shape, blocksize, index_dtype,
+                                                                       dtype=dtype, layout=layout, device=device)
+
+                e_prop, t_prop = get_sparse_compressed_tensor_properties(e), get_sparse_compressed_tensor_properties(t)
+                for k, v in e_prop.items():
+                    self.assertEqual(v, t_prop[k], lambda msg: f'{msg} when comparing {k}, expected {t_prop[k]}, got {v}')
+
+    @skipMeta
+    @all_sparse_compressed_layouts()
     @dtypes(*all_types_and_complex_and(torch.bool, torch.half, torch.bfloat16))
     def test_clone(self, layout, device, dtype):
         for sparse in self.generate_simple_inputs(
@@ -400,8 +442,7 @@ class TestSparseCompressed(TestCase):
                         basesize = size[batch_ndim:batch_ndim + base_ndim]
                         densesize = size[batch_ndim + base_ndim:]
                         assert len(densesize) == dense_ndim
-                        printed.append("########## {}/{}/size={}+{}+{} ##########".format(
-                            dtype, index_dtype, batchsize, basesize, densesize))
+                        printed.append(f"########## {dtype}/{index_dtype}/size={batchsize}+{basesize}+{densesize} ##########")
                         x = torch.sparse_compressed_tensor(compressed_indices,
                                                            plain_indices,
                                                            values, size, dtype=dtype, layout=layout, device=device)
@@ -2033,7 +2074,9 @@ class TestSparseCSR(TestCase):
     @dtypesIfCUDA(*floating_types_and(torch.complex64,
                                       *[torch.bfloat16] if SM80OrLater else [],
                                       *[torch.half] if SM53OrLater else [],
-                                      *[torch.complex128] if CUSPARSE_SPMM_COMPLEX128_SUPPORTED else []))
+                                      *[torch.complex128]
+                                      if CUSPARSE_SPMM_COMPLEX128_SUPPORTED or HIPSPARSE_SPMM_COMPLEX128_SUPPORTED
+                                      else []))
     @precisionOverride({torch.double: 1e-8, torch.float: 1e-4, torch.bfloat16: 0.6,
                         torch.half: 1e-1, torch.cfloat: 1e-4, torch.cdouble: 1e-8})
     def test_addmm_sizes_all_sparse_csr(self, device, dtype, m, n, k):
@@ -2476,9 +2519,9 @@ class TestSparseCSR(TestCase):
             self.assertEqual(a.grad, a1.grad)
             self.assertEqual(b.grad, b1.grad)
 
-    @skipCUDAIfRocm
     @onlyCUDA
-    @skipCUDAIf(True, "Causes CUDA memory exception, see https://github.com/pytorch/pytorch/issues/72177")
+    # It works on ROCm and CUDA issue is currently active
+    @skipCUDAIf(not TEST_WITH_ROCM, "Causes CUDA memory exception, see https://github.com/pytorch/pytorch/issues/72177")
     @skipCUDAIf(
         not _check_cusparse_sddmm_available(),
         "cuSparse Generic API SDDMM is not available"
@@ -4027,7 +4070,7 @@ class TestSparseCompressedTritonKernels(TestCase):
                     dump()  # this will update torch/sparse/_triton_ops_meta.py
 
             expected = reference(input, mat1, mat2, beta=beta, alpha=alpha)
-            kwargs = dict(bsr_dense_addmm=dict(beta=beta, alpha=alpha), bsr_dense_mm=dict(),
+            kwargs = dict(bsr_dense_addmm=dict(beta=beta, alpha=alpha), bsr_dense_mm={},
                           bsr_dense_linear=dict(bias=input.transpose(-1, -2)))[op]
 
             args = dict(bsr_dense_addmm=(input, bsr, mat2), bsr_dense_mm=(bsr, mat2),
@@ -4101,6 +4144,76 @@ class TestSparseCompressedTritonKernels(TestCase):
         expected = operation(*args)
         result = operation(*args, **dict(meta=meta))
         self.assertEqual(result, expected)
+
+    @onlyCUDA
+    @skipIfRocm
+    @unittest.skipIf(IS_FBCODE and IS_REMOTE_GPU, "Test requires Triton")
+    def test_triton_bsr_dense_addmm_meta(self, device):
+        from torch.sparse._triton_ops import bsr_dense_addmm_meta
+        from torch.sparse._triton_ops_meta import update as update_bsr_dense_addmm_meta
+
+        dtype = torch.float32
+        Ms = Ks = 16
+        beta = 0.0
+        alpha = 1.0
+
+        def get_meta(M, K, N, sparsity=None):
+            return bsr_dense_addmm_meta(M, K, N, Ms, Ks, beta, alpha, dtype=dtype, sparsity=sparsity,
+                                        _version="test_triton_bsr_dense_addmm_meta")
+
+        def update_meta(M, K, N, value, sparsity=0.5):
+            key = (M, K, N, Ms, Ks, beta == 0, beta == 1, alpha == 1)
+            update_bsr_dense_addmm_meta("bsr_dense_addmm", torch.cuda.get_device_name(),
+                                        ("test_triton_bsr_dense_addmm_meta", dtype, sparsity),
+                                        key, value)
+
+        def get_meta_with_checks(M, K, N, warn_count=0, sparsity=None):
+            f = io.StringIO()
+            with redirect_stderr(f):
+                result = get_meta(M, K, N, sparsity=sparsity)
+            msg = f.getvalue()
+            FileCheck().check_count(
+                str=f"UserWarning: bsr_dense_addmm uses non-optimal triton kernel parameters for M={M} K={K} N={N}",
+                count=warn_count, exactly=True
+            ).run(msg)
+            return result
+
+        # Test warn_once when requesting non-existing tuned parameters multiple times
+        f = io.StringIO()
+        with redirect_stderr(f):
+            for i in range(5):
+                get_meta(16, 16, 16)
+            for i in range(5):
+                get_meta(16, 16, 32)
+
+        msg = f.getvalue()
+        FileCheck().check_count(
+            str="UserWarning: bsr_dense_addmm uses non-optimal triton kernel parameters for M=16 K=16 N=16", count=1, exactly=True
+        ).run(msg)
+        FileCheck().check_count(
+            str="UserWarning: bsr_dense_addmm uses non-optimal triton kernel parameters for M=16 K=16 N=32", count=1, exactly=True
+        ).run(msg)
+
+        # Test warn_once when tuned parameters are missing
+        default_meta = dict(GROUP_SIZE_ROW=4, SPLIT_N=2, num_stages=1, num_warps=4)
+        self.assertEqual(get_meta_with_checks(32, 32, 32, warn_count=1), default_meta)
+
+        # Test (no)warn_once when tuned parameters are available
+        update_meta(32, 32, 48, (2, 8, 5, 6))
+        expected_meta = dict(GROUP_SIZE_ROW=2, SPLIT_N=8, num_stages=5, num_warps=6)
+        self.assertEqual(get_meta_with_checks(32, 32, 48, warn_count=0), expected_meta)
+
+        # Test non-existing tuned parameters with non-default sparsity
+        # while for default sparsity 0.5 the parameters are available
+        self.assertEqual(get_meta_with_checks(32, 32, 48, warn_count=0, sparsity=0.6), expected_meta)
+
+        # Test non-existing tuned parameters while there exists
+        # parameters with consistent N // SPLIT_N ratio:
+        self.assertEqual(get_meta_with_checks(32, 32, 72, warn_count=0),
+                         dict(GROUP_SIZE_ROW=2, SPLIT_N=12, num_stages=5, num_warps=6))
+        # ... or not:
+        self.assertEqual(get_meta_with_checks(32, 32, 64, warn_count=1),
+                         dict(GROUP_SIZE_ROW=4, SPLIT_N=4, num_stages=1, num_warps=4))
 
 
 # e.g., TestSparseCSRCPU and TestSparseCSRCUDA
