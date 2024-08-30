@@ -31,6 +31,9 @@ class TestTorchMethod(TestCase):
     @pytest.mark.skipif(
         not torch.xpu.has_2d_block_array(), reason="ipex build without xetla"
     )
+    @pytest.mark.skipif(
+        not pytest.importorskip("triton"), reason="triton is not available"
+    )
     def test_llama_sdp_fusion(self, dtype=torch.float16):
         query_states = torch.randn(
             (b, q, n, h), device=torch.device("xpu"), dtype=dtype, requires_grad=False
