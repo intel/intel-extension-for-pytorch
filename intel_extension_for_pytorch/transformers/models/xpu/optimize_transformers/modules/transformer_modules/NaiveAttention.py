@@ -48,13 +48,6 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         else:
             self.scale_attn = None
 
-        if self.use_causal_mask:
-            mask = torch.ones((self.max_position, self.max_position), dtype=torch.float)
-            mask = (
-                1 - torch.tril(mask).view(1, 1, self.max_position, self.max_position)
-            ) * (-66504.0)
-            IPEXTransformerAttnNaive.attention_mask = mask.to(self.config.device)
-
         self.qkv_proj = IPEXTransformerLinear()
 
         self.q_proj = IPEXTransformerLinear()
@@ -348,6 +341,12 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
 
     # ################################################################ sdp ##########################################
     def sdp(self, query, key, value, attention_mask, head_mask, alibi):
+        if IPEXTransformerAttnNaive.attention_mask is None and self.use_causal_mask:
+            mask = torch.ones((self.max_position, self.max_position), dtype=torch.float)
+            mask = (
+                1 - torch.tril(mask).view(1, 1, self.max_position, self.max_position)
+            ) * (-66504.0)
+            IPEXTransformerAttnNaive.attention_mask = mask.to(self.config.device)
         if self.is_beam_search():
             key, value, key_prompt, value_prompt = self.sdp_kv_preprocess(key, value)
             if not self.is_1st_token():

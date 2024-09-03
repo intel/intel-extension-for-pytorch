@@ -33,6 +33,7 @@ from .modules.llama import NewIPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
 from .modules.falcon import NewIPEXFalconBlock
 from .modules.qwen import NewIPEXQWENBlock
+from .modules.qwen2 import NewIPEXQWEN2DecoderLayer
 from .modules.chatglm import (
     NewIPEXCHATGLMBlock,
     prepare_inputs_for_generation,
@@ -57,6 +58,7 @@ def default_replaced_module_dict():
         # only support transformers version model, not in-library model
         transformers.models.falcon.modeling_falcon.FalconDecoderLayer: NewIPEXFalconBlock,
         transformers.models.bert.modeling_bert.BertSelfAttention: NewIPEXBertSelfAttention,
+        transformers.models.qwen2.modeling_qwen2.Qwen2DecoderLayer: NewIPEXQWEN2DecoderLayer,
         BasicTransformerBlock: NewIPEXBasicTransformerBlock,
     }
     return default_replace_modules
@@ -138,10 +140,10 @@ class ModuleReplacer:
             decoder_kwargs = dict()
             import transformers
 
-            if (
-                type(child)
-                == transformers.models.llama.modeling_llama.LlamaDecoderLayer
-            ):
+            if type(child) in [
+                transformers.models.llama.modeling_llama.LlamaDecoderLayer,
+                transformers.models.qwen2.modeling_qwen2.Qwen2DecoderLayer,
+            ]:
                 decoder_kwargs["layer_idx"] = child.self_attn.layer_idx
 
             if type(child) in self.module_dict.keys():

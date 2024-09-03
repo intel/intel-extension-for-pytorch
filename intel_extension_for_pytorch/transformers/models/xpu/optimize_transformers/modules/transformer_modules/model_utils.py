@@ -3,74 +3,79 @@ import intel_extension_for_pytorch as ipex  # noqa F401
 from .RoPE import apply_rotary_pos_emb
 
 
-def qwen_load_attn_params_fp16(self, qkv_layer, out_layer):
-    self.qkv_proj.weight = qkv_layer.weight
-    if qkv_layer.bias is not None:
-        self.qkv_proj.bias = qkv_layer.bias
-        self.qkv_proj.bias.data = self.qkv_proj.bias.reshape(3, -1).contiguous()
+def load_attn_fused_qkv_params(self, qkv_layer, out_layer, dtype):
+    if dtype == "fp16":
+        self.qkv_proj.weight = qkv_layer.weight
+        if qkv_layer.bias is not None:
+            self.qkv_proj.bias = qkv_layer.bias
+            self.qkv_proj.bias.data = self.qkv_proj.bias.reshape(3, -1).contiguous()
 
-    self.out_proj.weight = out_layer.weight
-    self.out_proj.bias = out_layer.bias
+        self.out_proj.weight = out_layer.weight
+        self.out_proj.bias = out_layer.bias
+    elif dtype == "int4":
+        self.qkv_proj_quant.set_weights_bias(qkv_layer.qweight, qkv_layer.bias)
+        self.qkv_proj_quant.set_scales_zps_gidx(qkv_layer.scales, qkv_layer.qzeros)
+        self.qkv_proj_quant.blocksize = qkv_layer.blocksize
 
+        self.out_proj_quant.set_weights_bias(out_layer.qweight, out_layer.bias)
+        self.out_proj_quant.set_scales_zps_gidx(out_layer.scales, out_layer.qzeros)
+        self.out_proj_quant.blocksize = out_layer.blocksize
 
-def qwen_transpose_attn_params_fp16(self):
-    self.qkv_proj.weight.data = (
-        self.qkv_proj.weight.reshape(3, -1, self.embed_dim)
-        .permute(0, 2, 1)
-        .contiguous()
-    )
-    self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
-    torch.xpu.synchronize()
+        qkv_layer.qweight = None
+        qkv_layer.bias = None
+        qkv_layer.scales = None
+        qkv_layer.qzeros = None
 
-
-def qwen_load_attn_params_int4(self, qkv_layer, out_layer):
-    self.qkv_proj_quant.set_weights_bias(qkv_layer.qweight, qkv_layer.bias)
-    self.qkv_proj_quant.set_scales_zps_gidx(qkv_layer.scales, qkv_layer.qzeros)
-    self.qkv_proj_quant.blocksize = qkv_layer.blocksize
-
-    self.out_proj_quant.set_weights_bias(out_layer.qweight, out_layer.bias)
-    self.out_proj_quant.set_scales_zps_gidx(out_layer.scales, out_layer.qzeros)
-    self.out_proj_quant.blocksize = out_layer.blocksize
-
-    qkv_layer.qweight = None
-    qkv_layer.bias = None
-    qkv_layer.scales = None
-    qkv_layer.qzeros = None
-
-    out_layer.qweight = None
-    out_layer.bias = None
-    out_layer.scales = None
-    out_layer.qzeros = None
+        out_layer.qweight = None
+        out_layer.bias = None
+        out_layer.scales = None
+        out_layer.qzeros = None
 
 
-def qwen_transpose_attn_params_int4(self):
-    if xpu_gemm_use_xetla():
-        self.qkv_proj_quant.qweight.data = self.qkv_proj_quant.qweight.t().contiguous()
-        self.qkv_proj_quant.scales.data = self.qkv_proj_quant.scales.t().contiguous()
-        if self.qkv_proj_quant.qzeros is not None:
-            self.qkv_proj_quant.qzeros.data = (
-                self.qkv_proj_quant.qzeros.t().contiguous()
-            )
-
-        self.out_proj_quant.qweight.data = self.out_proj_quant.qweight.t().contiguous()
-        self.out_proj_quant.scales.data = self.out_proj_quant.scales.t().contiguous()
-        if self.out_proj_quant.qzeros is not None:
-            self.out_proj_quant.qzeros.data = (
-                self.out_proj_quant.qzeros.t().contiguous()
-            )
-    else:
-        self.qkv_proj_quant.qweight.data = (
-            self.qkv_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+def transpose_attn_fused_qkv_params(self, dtype):
+    if dtype == "fp16":
+        self.qkv_proj.weight.data = (
+            self.qkv_proj.weight.reshape(3, -1, self.embed_dim)
+            .permute(0, 2, 1)
+            .contiguous()
         )
-        self.qkv_proj_quant.scales.data = self.qkv_proj_quant.scales
+        self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
+    elif dtype == "int4":
+        if xpu_gemm_use_xetla():
+            self.qkv_proj_quant.qweight.data = (
+                self.qkv_proj_quant.qweight.t().contiguous()
+            )
+            self.qkv_proj_quant.scales.data = (
+                self.qkv_proj_quant.scales.t().contiguous()
+            )
+            if self.qkv_proj_quant.qzeros is not None:
+                self.qkv_proj_quant.qzeros.data = (
+                    self.qkv_proj_quant.qzeros.t().contiguous()
+                )
 
-        self.qkv_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
+            self.out_proj_quant.qweight.data = (
+                self.out_proj_quant.qweight.t().contiguous()
+            )
+            self.out_proj_quant.scales.data = (
+                self.out_proj_quant.scales.t().contiguous()
+            )
+            if self.out_proj_quant.qzeros is not None:
+                self.out_proj_quant.qzeros.data = (
+                    self.out_proj_quant.qzeros.t().contiguous()
+                )
+        else:
+            self.qkv_proj_quant.qweight.data = (
+                self.qkv_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+            )
+            self.qkv_proj_quant.scales.data = self.qkv_proj_quant.scales
 
-        self.out_proj_quant.qweight.data = (
-            self.out_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
-        )
-        self.out_proj_quant.scales.data = self.out_proj_quant.scales
-        self.out_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
+            self.qkv_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
+
+            self.out_proj_quant.qweight.data = (
+                self.out_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+            )
+            self.out_proj_quant.scales.data = self.out_proj_quant.scales
+            self.out_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
     torch.xpu.synchronize()
 
 

@@ -282,7 +282,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
             ) as prof:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
                 output = model.generate(
-                    input_ids, max_new_tokens=int(args.max_new_tokens), **generate_kwargs
+                    input_ids, max_new_tokens=int(args.max_new_tokens), min_new_tokens=int(args.max_new_tokens), **generate_kwargs
                 )
                 gen_ids = output[0] if args.token_latency else output
                 gen_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)

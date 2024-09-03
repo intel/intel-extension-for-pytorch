@@ -1,7 +1,7 @@
 import torch
 from typing import Optional, Tuple, List
 from functools import partial
-from .transformer_modules.RoPE import QWenRotaryEmbedding
+from .transformer_modules.RoPE import Qwen2RotaryEmbedding
 from .transformer_modules.Norm import QWenRMSNorm
 
 
@@ -26,10 +26,8 @@ from .transformer_modules.QuantizedMlp import *  # noqa
 from .transformer_modules.model_utils import (
     qwen_post_qkv,
     qwen_sdp,
-    qwen_load_attn_params_fp16,
-    qwen_transpose_attn_params_fp16,
-    qwen_load_attn_params_int4,
-    qwen_transpose_attn_params_int4,
+    load_attn_fused_qkv_params,
+    transpose_attn_fused_qkv_params,
 )
 
 
@@ -91,8 +89,7 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
             max_positions=max(self.config.max_position_embeddings, MAX_SEQ_LEN),
             max_out_positions=MAX_OUT_SEQ_LEN,
             kv_channels=self.config.kv_channels,
-            rotary_embedding_class=QWenRotaryEmbedding,
-            rotary_emb_base=self.config.rotary_emb_base,
+            rotary_embedding_class=Qwen2RotaryEmbedding,
             rotary_pct=self.config.rotary_pct,
             rotary_dim=None,
             rotary_half=True,
@@ -119,7 +116,11 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
         )
 
     def port_attn_parameter(self):
-        self.attn.load_parameter(self.module.attn.c_attn, self.module.attn.c_proj)
+        self.attn.load_parameter(
+            self.module.attn.c_attn,
+            self.module.attn.c_proj,
+            dtype=self.ipex_config.dtype,
+        )
 
     def port_mlp_parameter(self):
         # IPEXTransformerMLPOptimizedFp16SiluQwen
@@ -134,25 +135,17 @@ class NewIPEXQWENBlock(IPEXTransformerBlock):
         self.post_attn_layernorm.weight = self.module.ln_2.weight
 
     def transpose_parameter(self):
-        self.attn.transpose_parameter()
+        self.attn.transpose_parameter(dtype=self.ipex_config.dtype)
         self.mlp.transpose_parameter()
 
     def port_all_parameters_to_new_module(self):
-        dtype = self.ipex_config.dtype
-        if dtype == "fp16":
-            self.attn.load_parameter = partial(qwen_load_attn_params_fp16, self.attn)
-            self.attn.transpose_parameter = partial(
-                qwen_transpose_attn_params_fp16, self.attn
-            )
-        elif dtype == "int4":
-            self.attn.load_parameter = partial(qwen_load_attn_params_int4, self.attn)
-            self.attn.transpose_parameter = partial(
-                qwen_transpose_attn_params_int4, self.attn
-            )
+        self.attn.load_parameter = partial(load_attn_fused_qkv_params, self.attn)
+        self.attn.transpose_parameter = partial(
+            transpose_attn_fused_qkv_params, self.attn
+        )
         super().port_all_parameters_to_new_module()
         if self.ipex_config.transpose:
             self.transpose_parameter()
-        # self.attn.cat_qkv()
 
     def forward(
         self,
