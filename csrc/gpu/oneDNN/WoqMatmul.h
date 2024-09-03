@@ -423,7 +423,7 @@ static Tensor& woq_matmul_fusion_variants(
     // original sizes: [4, 2] x [2, 6] -> [4, 6]
     // onednn sizes: [4, 2] x [2, 6] -> [4, 6]
     DimVector output_shape({tensor1.size(0), tensor2.size(1)});
-    if (!trans)
+    if (trans)
       output_shape[1] = tensor2.size(0);
 
     Tensor result =
@@ -505,7 +505,8 @@ at::Tensor woq_matmul_resmul(
     Tensor b_raw = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_resmul", std::vector<c10::IValue>({tensor1, tensor2}));
-  attr.append_post_binary(attr.kind_with_binary_mul, res);
+  auto res_flat = res.flatten(0, -2);
+  attr.append_post_binary(attr.kind_with_binary_mul, res_flat);
   bool is_fused;
   result = woq_matmul_fusion_variants(
       result,
@@ -519,7 +520,7 @@ at::Tensor woq_matmul_resmul(
       g_idx,
       is_fused);
   if (!is_fused) {
-    result = result * res.flatten(0, -2);
+    result = result * res;
   }
   return result;
 }
@@ -582,10 +583,12 @@ at::Tensor woq_matmul_bias_resadd_resadd(
   RECORD_FUNCTION(
       "woq_matmul_bias_resadd_resadd",
       std::vector<c10::IValue>({tensor1, tensor2}));
+  auto res0_flat = res0.flatten(0, -2);
+  auto res1_flat = res1.flatten(0, -2);
   bool is_fused;
   attr.append_post_binary(attr.kind_with_binary_add, bias);
-  attr.append_post_binary(attr.kind_with_binary_add, res0);
-  attr.append_post_binary(attr.kind_with_binary_add, res1);
+  attr.append_post_binary(attr.kind_with_binary_add, res0_flat);
+  attr.append_post_binary(attr.kind_with_binary_add, res1_flat);
   result = woq_matmul_fusion_variants(
       result,
       tensor1,
@@ -622,7 +625,8 @@ at::Tensor woq_matmul_silu_mul(
       /* alpha */ 1.f,
       /* beta */ 0.f,
       attr.kind_with_swish);
-  attr.append_post_binary(attr.kind_with_binary_mul, res);
+  auto res_flat = res.flatten(0, -2);
+  attr.append_post_binary(attr.kind_with_binary_mul, res_flat);
   bool is_fused;
   result = woq_matmul_fusion_variants(
       result,
@@ -658,7 +662,8 @@ at::Tensor woq_matmul_bias_silu_mul_int4(
       /* alpha */ 1.f,
       /* beta */ 0.f,
       attr.kind_with_swish);
-  attr.append_post_binary(attr.kind_with_binary_mul, res);
+  auto res_flat = res.flatten(0, -2);
+  attr.append_post_binary(attr.kind_with_binary_mul, res_flat);
   bool is_fused;
   result = woq_matmul_fusion_variants(
       result,
@@ -689,7 +694,8 @@ at::Tensor woq_matmul_add_int4(
     Tensor b_raw = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_add_int4", std::vector<c10::IValue>({tensor1, tensor2}));
-  attr.append_post_binary(attr.kind_with_binary_add, res);
+  auto res_flat = res.flatten(0, -2);
+  attr.append_post_binary(attr.kind_with_binary_add, res_flat);
   bool is_fused;
   result = woq_matmul_fusion_variants(
       result,
@@ -722,7 +728,8 @@ at::Tensor woq_matmul_bias_add_int4(
     Tensor bias = at::Tensor()) {
   RECORD_FUNCTION(
       "woq_matmul_bias_add_int4", std::vector<c10::IValue>({tensor1, tensor2}));
-  attr.append_post_binary(attr.kind_with_binary_add, res);
+  auto res_flat = res.flatten(0, -2);
+  attr.append_post_binary(attr.kind_with_binary_add, res_flat);
   bool is_fused;
   result = woq_matmul_fusion_variants(
       result,

@@ -494,27 +494,26 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
                 self.fc_in_quant.g_idx,
             )
         if self.fc_out_quant.bias is None:
-            hidden_states2 = torch.ops.torch_ipex.mm_int4(
+            return torch.ops.torch_ipex.mm_silu_mul_int4(
                 hidden_states,
                 self.fc_out_quant.qweight,
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                hidden_states1,
                 self.fc_out_quant.g_idx,
             )
         else:
-            hidden_states2 = torch.ops.torch_ipex.mm_bias_int4(
+            return torch.ops.torch_ipex.mm_bias_silu_mul_int4(
                 hidden_states,
                 self.fc_out_quant.qweight,
                 self.fc_out_quant.bias,
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                hidden_states1,
                 self.fc_out_quant.g_idx,
             )
-        # split due to the difference between onednn and torch with silu fusion
-        hidden_states2 = self.act(hidden_states2)
-        return hidden_states1 * hidden_states2
 
 
 class IPEXTransformerMLPOptimizedInt4SiluLlamaOneDNN(

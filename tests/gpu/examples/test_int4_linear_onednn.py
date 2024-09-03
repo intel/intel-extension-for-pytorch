@@ -111,17 +111,6 @@ class TestOneDNNInt4Linear(TestCase):
                 input, weight_ba, scales, zero_points, group_size, g_idx4kernel
             )
         out_torch = torch.matmul(input_torch, weight_fp)
-        print("m: ", m, "n: ", n, "k: ", k)
-        print("diff onednn: ", out_onednn.float().cpu() - out_torch.float())
-        print(
-            "diff onednn.min(): ", (out_onednn.float().cpu() - out_torch.float()).min()
-        )
-        print(
-            "diff onednn.max(): ", (out_onednn.float().cpu() - out_torch.float()).max()
-        )
-        print(
-            "*************************************************************************"
-        )
         self.assertEqual(
             out_onednn.cpu().float(),
             out_torch.float(),
@@ -135,21 +124,6 @@ class TestOneDNNInt4Linear(TestCase):
                 input, weight_ba, scales, zero_points, group_size, res0, g_idx4kernel
             )
         out_torch_res = out_torch + res0.cpu().float()
-        print(
-            "diff out_onednn_res: ",
-            out_onednn_res.float().cpu() - out_torch_res.float(),
-        )
-        print(
-            "diff out_onednn_res.min(): ",
-            (out_onednn_res.float().cpu() - out_torch_res.float()).min(),
-        )
-        print(
-            "diff out_onednn_res.max(): ",
-            (out_onednn_res.float().cpu() - out_torch_res.float()).max(),
-        )
-        print(
-            "*************************************************************************"
-        )
         self.assertEqual(
             out_onednn_res.cpu().float(),
             out_torch_res.float(),
@@ -164,21 +138,6 @@ class TestOneDNNInt4Linear(TestCase):
                 input, weight_ba, bias, scales, zero_points, group_size, g_idx4kernel
             )
         out_torch_bias = out_torch + bias.cpu().float()
-        print(
-            "diff out_onednn_bias: ",
-            out_onednn_bias.float().cpu() - out_torch_bias.float(),
-        )
-        print(
-            "diff out_onednn_bias.min(): ",
-            (out_onednn_bias.float().cpu() - out_torch_bias.float()).min(),
-        )
-        print(
-            "diff out_onednn_bias.max(): ",
-            (out_onednn_bias.float().cpu() - out_torch_bias.float()).max(),
-        )
-        print(
-            "*************************************************************************"
-        )
         self.assertEqual(
             out_onednn_bias.cpu().float(),
             out_torch_bias.float(),
@@ -199,27 +158,12 @@ class TestOneDNNInt4Linear(TestCase):
                 g_idx4kernel,
             )
         gelu_out = torch.nn.GELU(approximate="tanh")(out_torch_bias)
-        print(
-            "diff out_onednn_gelu: ", out_onednn_gelu.float().cpu() - gelu_out.float()
+        self.assertEqual(
+            out_onednn_gelu.cpu().float(),
+            gelu_out.float(),
+            atol=checking_atol,
+            rtol=checking_rtol,
         )
-        print(
-            "diff out_onednn_gelu.min(): ",
-            (out_onednn_gelu.float().cpu() - gelu_out.float()).min(),
-        )
-        print(
-            "diff out_onednn_gelu.max(): ",
-            (out_onednn_gelu.float().cpu() - gelu_out.float()).max(),
-        )
-        print(
-            "*************************************************************************"
-        )
-        # skip due to the difference between onednn and torch with gelu fusion
-        # self.assertEqual(
-        #     out_onednn_gelu.cpu().float(),
-        #     gelu_out.float(),
-        #     atol=checking_atol,
-        #     rtol=checking_rtol,
-        # )
 
         # check gemm + silu + mul
         res0 = torch.rand([m, n], device="xpu", dtype=dtype)
@@ -228,28 +172,12 @@ class TestOneDNNInt4Linear(TestCase):
                 input, weight_ba, scales, zero_points, group_size, res0, g_idx4kernel
             )
         silu_mul_out = torch.nn.SiLU()(out_torch) * res0.cpu().float()
-        print(
-            "diff out_onednn_silu: ",
-            out_onednn_silu.float().cpu() - silu_mul_out.float(),
+        self.assertEqual(
+            out_onednn_silu.cpu().float(),
+            silu_mul_out.float(),
+            atol=checking_atol,
+            rtol=checking_rtol,
         )
-        print(
-            "diff out_onednn_silu.min(): ",
-            (out_onednn_silu.float().cpu() - silu_mul_out.float()).min(),
-        )
-        print(
-            "diff out_onednn_silu.max(): ",
-            (out_onednn_silu.float().cpu() - silu_mul_out.float()).max(),
-        )
-        print(
-            "*************************************************************************"
-        )
-        # skip due to the difference between onednn and torch with silu fusion
-        # self.assertEqual(
-        #     out_onednn_silu.cpu().float(),
-        #     silu_mul_out.float(),
-        #     atol=checking_atol,
-        #     rtol=checking_rtol,
-        # )
 
         # check gemm + bias + residual + residual
         res0 = torch.rand([m, n], device="xpu", dtype=dtype)
@@ -267,21 +195,6 @@ class TestOneDNNInt4Linear(TestCase):
                 g_idx4kernel,
             )
         out_torch_bias_2res = out_torch_bias + res0.cpu().float() + res1.cpu().float()
-        print(
-            "diff out_onednn_bias_2res: ",
-            out_onednn_bias_2res.float().cpu() - out_torch_bias_2res.float(),
-        )
-        print(
-            "diff out_onednn_bias_2res.min(): ",
-            (out_onednn_bias_2res.float().cpu() - out_torch_bias_2res.float()).min(),
-        )
-        print(
-            "diff out_onednn_bias_2res.max(): ",
-            (out_onednn_bias_2res.float().cpu() - out_torch_bias_2res.float()).max(),
-        )
-        print(
-            "*************************************************************************"
-        )
         self.assertEqual(
             out_onednn_bias_2res.cpu().float(),
             out_torch_bias_2res.float(),
@@ -303,21 +216,6 @@ class TestOneDNNInt4Linear(TestCase):
                 g_idx4kernel,
             )
         out_torch_bias_add = out_torch_bias + res0.cpu().float()
-        print(
-            "diff out_onednn_bias_add: ",
-            out_onednn_bias_add.float().cpu() - out_torch_bias_add.float(),
-        )
-        print(
-            "diff out_onednn_bias_add.min(): ",
-            (out_onednn_bias_add.float().cpu() - out_torch_bias_add.float()).min(),
-        )
-        print(
-            "diff out_onednn_bias_add.max(): ",
-            (out_onednn_bias_add.float().cpu() - out_torch_bias_add.float()).max(),
-        )
-        print(
-            "*************************************************************************"
-        )
         self.assertEqual(
             out_onednn_bias_add.cpu().float(),
             out_torch_bias_add.float(),
