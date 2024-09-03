@@ -27,7 +27,7 @@ Run_llama3-8b_peft_singlecard() {
 
 Run_llama3-8b_peft_fsdp() {
 
-    accelerate launch --main_process_port "29800" --config_file "fsdp_config.yaml"  llama3_ft.py \
+    accelerate launch  --config_file "fsdp_config.yaml"  llama3_ft.py \
         --model_name_or_path ${model} \
         --use_flashattn True \
         --bf16 True \

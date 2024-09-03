@@ -1,2 +1,2 @@
-numpy<2
+numpy
 transformers==4.38.1

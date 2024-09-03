@@ -7,7 +7,7 @@ export TORCH_LLM_ALLREDUCE=1
 ## alpaca dataset full-ft
 Run_llama2-7b_fsdp_alpaca_dataset() {
 
-    accelerate launch --config_file "fsdp_config.yaml" train.py \
+    accelerate launch --config_file "fsdp_config.yaml" llama2_ft.py \
         --model_name_or_path ${model} \
         --data_path ./alpaca_data.json \
         --bf16 True \
@@ -33,7 +33,7 @@ Run_llama2-7b_fsdp_alpaca_dataset() {
 ## alpaca dataset peft lora
 Run_llama2-7b_fsdp_alpaca_dataset_peft() {
 
-    accelerate launch --config_file "fsdp_config.yaml" train.py \
+    accelerate launch --config_file "fsdp_config.yaml" llama2_ft.py \
         --model_name_or_path ${model} \
         --data_path ./alpaca_data.json \
         --bf16 True \
@@ -59,7 +59,7 @@ Run_llama2-7b_fsdp_alpaca_dataset_peft() {
 ## huggingface dataset full-ft
 Run_llama2-7b_fsdp_huggingface_dataset() {
 
-    accelerate launch --config_file "fsdp_config.yaml" train.py \
+    accelerate launch --config_file "fsdp_config.yaml" llama2_ft.py \
         --model_name_or_path ${model} \
         --bf16 True \
         --use_flashattn True \
@@ -85,7 +85,7 @@ Run_llama2-7b_fsdp_huggingface_dataset() {
 ## huggingface dataset peft lora
 Run_llama2-7b_fsdp_huggingface_dataset_peft() {
  
-    accelerate launch --config_file "fsdp_config.yaml" train.py \
+    accelerate launch --config_file "fsdp_config.yaml" llama2_ft.py \
         --model_name_or_path ${model} \
         --bf16 True \
         --use_flashattn True \

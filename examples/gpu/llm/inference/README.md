@@ -126,7 +126,7 @@ Check [WOQ INT4](../../../../docs/tutorials/llm/int4_weight_only_quantization.md
 #### Install intel-extension-for-transformers and intel-neural-compressor 
 
 ```
-pip install numpy==1.26.4
+pip install numpy<2
 git clone https://github.com/intel/neural-compressor.git -b v3.0
 cd neural-compressor
 python setup.py install
@@ -139,12 +139,6 @@ pip install -r requirements.txt
 python setup.py install
 ```
 
-#### Install other required packages
-
-
-```
-pip install tiktoken einops transformers_stream_generator
-```
 
 #### Run the weight only quantization and inference
 

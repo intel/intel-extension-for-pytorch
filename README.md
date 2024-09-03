@@ -46,17 +46,7 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 
 #### LLM fine-tuning
 
- **Note**: 
- Intel® Data Center Max 1550 GPU: support all the models in the model list above. Intel® Core™ Ultra Processors with Intel® Arc™ Graphics: support Llama 2 7B, Llama 3 8B and Phi-3-Mini 3.8B.
-
-| MODEL FAMILY | Verified < MODEL ID > (Hugging Face hub)| Mixed Precision (BF16+FP32) | Full fine-tuning | LoRA | Intel® Data Center Max 1550 GPU | Intel® Core™ Ultra Processors with Intel® Arc™ Graphics |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-|Llama 2 7B| "meta-llama/Llama-2-7b-hf" | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Llama 2 70B| "meta-llama/Llama-2-70b-hf" | 🟩 | 🟥 |🟩 | 🟩 | 🟥 |
-|Llama 3 8B| "meta-llama/Meta-Llama-3-8B" | 🟩 | 🟩 |🟩 | 🟩 | 🟩 |
-|Qwen 7B|"Qwen/Qwen-7B"| 🟩 | 🟩 |🟩 | 🟩| 🟥 |
-|Phi-3-mini 3.8B|"Phi-3-mini-4k-instruct"| 🟩 | 🟩 |🟩 | 🟥 | 🟩 |
-
+##### LLM fine-tuning optimized with Intel® Data Center Max 1550 GPU on Linux
 
 
 | Benchmark mode | Full fine-tuning | LoRA |
@@ -64,9 +54,31 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 |Single-GPU | 🟥 | 🟩 |
 |Multi-GPU (FSDP) |  🟩 | 🟩 |
 
+| MODEL FAMILY | Verified < MODEL ID > (Hugging Face hub)| Mixed Precision (BF16+FP32) | Full fine-tuning  | LoRA |  
+|---|:---:|:---:|:---:|:---:|
+|[Llama 2 7B](./Llama2/README.md)| "meta-llama/Llama-2-7b-hf" | 🟩 | 🟩 | 🟩 | 
+|[Llama 2 70B](./Llama2/README.md)| "meta-llama/Llama-2-70b-hf" | 🟩 | 🟥 |🟩 | 
+|[Llama 3 8B](./Llama3/README.md)| "meta-llama/Meta-Llama-3-8B" | 🟩 | 🟩 |🟩 | 
+|[Llama 3 70B](./Llama3/README.md)| "meta-llama/Meta-Llama-3-70B" | 🟩 | 🟥 |🟩 | 
+|[Qwen 7B](./Qwen/README.md)|"Qwen/Qwen-7B"| 🟩 | 🟩 |🟩 | 
+|[Phi-3-mini 3.8B](./Phi3/README.md#fine-tuning-on-intel-data-center-max-1550-gpu-on-linux)|"Phi-3-mini-4k-instruct"| 🟩 | 🟩 |🟩 | 
+
+
+\* Intel® Data Center Max 1550 GPU: support all the models in the model list above.
+
+##### LLM fine-tuning optimized with Intel® Core™ Ultra Processors with Intel® Arc™ Graphics 
+
+| MODEL FAMILY | Verified < MODEL ID > (Hugging Face hub)| Mixed Precision (BF16+FP32) | Full fine-tuning  | LoRA |  
+|---|:---:|:---:|:---:|:---:|
+|[Phi-3-mini 3.8B](./Phi3/README.md#fine-tuning-on-intel-core-ultra-processors-with-intel-arc-graphics)|"Phi-3-mini-4k-instruct"| 🟩 | 🟩 |🟩 | 
+
+
 - 🟩 signifies that it is supported.
 
 - 🟥 signifies that it is not supported yet.
+
+\* Intel® Core™ Ultra Processors with Intel® Arc™ Graphics: support Phi-3-Mini 3.8B.
+
 
 
 ## Installation

@@ -30,7 +30,7 @@ Run_phi3-mini_peft_singlecard() {
 
 Run_phi3-mini_peft_fsdp() {
 
-    accelerate launch --main_process_port "29800" --config_file "fsdp_config.yaml"  phi3_ft.py \
+    accelerate launch --config_file "fsdp_config.yaml"  phi3_ft.py \
         --model_name_or_path ${model} \
         --use_flashattn False \
         --bf16 True \

@@ -13,6 +13,9 @@ Intel® Extension for PyTorch\* now empowers users to seamlessly harness graph c
 - `intel_extension_for_pytorch` : v2.3
 - `triton` : >= v3.0.0
 
+
+Install [Intel® oneAPI Base Toolkit 2024.2.1](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html).
+
 Follow [Intel® Extension for PyTorch\* Installation](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) to install `torch` and `intel_extension_for_pytorch` firstly.
 
 Triton could be directly installed using the following command:
@@ -21,7 +24,16 @@ Triton could be directly installed using the following command:
 pip install --pre pytorch-triton-xpu==3.0.0+1b2f15840e --index-url https://download.pytorch.org/whl/nightly/xpu
 ```
 
+Remember to activate the oneAPI basekit by following commands.
+
+```bash
+# {dpcpproot} is the location for dpcpp ROOT path and it is where you installed oneAPI DPCPP, usually it is /opt/intel/oneapi/compiler/latest or ~/intel/oneapi/compiler/latest
+source {dpcpproot}/env/vars.sh
+```
+
+
 # Example Usage
+
 
 ## Inferenece with torch.compile
 
