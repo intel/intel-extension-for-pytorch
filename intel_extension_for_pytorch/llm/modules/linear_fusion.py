@@ -1,4 +1,6 @@
+import torch
 import torch.nn as nn
+from typing import Optional
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
 )
@@ -396,3 +398,83 @@ class LinearAddAdd(IPEXLinearFusion):
             self.init_on_device(x, IPEXCustomOpType.LINEAR_ADD_ADD)
 
         return self.linear_fusion(x, y, z)
+
+
+class GatedMLPMOE(nn.Module):
+    r"""
+    GatedMLPMOE layer for MoE models like Mixtral.
+
+    This layer contains both gate_up_proj (W13, or
+    gate_proj for W1 and up_proj for W3) and down_proj weights (W2).
+
+    Note: Mixtral uses W1, W2, and W3 for gate, up, and down_proj. We
+    copy that naming convention here.
+
+    `module init`
+
+    Args:
+        W13 (torch.Tensor): weights tensor of gate_up_proj, or gate_proj only
+                            if W3 is provided
+        W2 (torch.Tensor): weights tensor of down_proj
+        W3 (torch.Tensor): weights tensor of up_proj, default is None if provided
+                           with W1, i.e., W13).
+        use_prepack (bool): whether to use IPEX weights prepack optimizations or not,
+                            default is True.
+
+    `forward()`
+
+    Args:
+        hidden_states (torch.Tensor): Input hidden state of the transformer
+        use_grouped_topk (bool): whether to use grouped topk instead of topk only
+        top_k (int): Number of experts selected for each token
+        router_logits (torch.Tensor): The router_logits tensor after gate_proj
+        renomalize (bool): Whether to renormalize the logits in the fused_moe kernel
+        topk_group (int): The topk group num when using use_grouped_topk
+        num_expert_group (int): The expert group num when using use_grouped_topk
+
+    Examples:
+        >>> # module init:
+        >>> ipex_fusion = ipex.llm.modules.GatedMLPMOE(W13, W2, prepack=True)
+        >>> # module forward:
+        >>> result = ipex_fusion(hidden_states, False, top_k, router_logits, True)
+
+    """
+
+    def __init__(self, W13, W2, W3=None, use_prepack=True):
+        super().__init__()
+        self.W13 = W13
+        self.W2 = W2
+        self.W3 = W3
+        self.use_prepack = use_prepack
+        self.linear_fusion = None
+        self.device_type = None
+        self.runtime_ops = IPEXRuntimeCustomOps()
+
+    def init_on_device(self, x, op_type):
+        self.device_type = x.device.type
+        self.linear_fusion = self.runtime_ops.get_module_from_device(
+            self.device_type, op_type, False
+        )(self.W13, self.W2, self.W3, self.use_prepack)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        use_grouped_topk: bool,
+        top_k: int,
+        router_logits: torch.Tensor,
+        renormalize: bool,
+        topk_group: Optional[int] = None,
+        num_expert_group: Optional[int] = None,
+    ) -> torch.Tensor:
+        if self.device_type != hidden_states.device.type:
+            self.init_on_device(hidden_states, IPEXCustomOpType.LINEAR_MOE)
+
+        return self.linear_fusion(
+            hidden_states,
+            use_grouped_topk,
+            top_k,
+            router_logits,
+            renormalize,
+            topk_group,
+            num_expert_group,
+        )
