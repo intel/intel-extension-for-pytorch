@@ -607,7 +607,9 @@ $(document).ready(function() {
           });
         }
       }
-      commands.push(data.sanity_test);
+      if(data.sanity_test.extra_commands != null)
+        commands = commands.concat(data.sanity_test.extra_commands);
+      commands = commands.concat(data.sanity_test.commands);
       ret += $.code_gen(commands);
       m = data.version.match("v([0-9\\.]+\\+([a-zA-Z]+))");
       if(m != null && m.length == 3) {
