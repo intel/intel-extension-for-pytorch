@@ -37,13 +37,13 @@ class TestTorchMethod(TestCase):
         beta = 1.0
         max_len = 2048
 
-        query_layer = torch.randn(beam_width, q_len, num_heads, head_dim).xpu().half()
-        key_layer = torch.randn(beam_width, kv_len, num_heads, head_dim).xpu().half()
-        value_layer = torch.randn(beam_width, kv_len, num_heads, head_dim).xpu().half()
+        query_layer = torch.randn(beam_width, q_len, num_heads, head_dim)
+        key_layer = torch.randn(beam_width, kv_len, num_heads, head_dim)
+        value_layer = torch.randn(beam_width, kv_len, num_heads, head_dim)
 
         # attention_mask = torch.zeros(beam_width, 1, q_len, kv_len).half()
         # attention_mask[0][0][0] = -65504.
-        attention_mask = torch.zeros(beam_width, 1, q_len, kv_len).xpu().half()
+        attention_mask = torch.zeros(beam_width, 1, q_len, kv_len)
         attention_mask[0, 0, 0:q_len, 0] = -65504
         attention_mask[0, 0, 0:q_len, kv_len - 1 : kv_len] = -float("inf")
         attention_mask[0, 0, 0, kv_len - 3 : kv_len] = -float("inf")
@@ -68,11 +68,11 @@ class TestTorchMethod(TestCase):
         #     None,
         #     alpha)
         #
-        # ref_out_cpu, _ = naive_sdp(
-        #     query_layer.cpu().float().permute(1, 2, 0, 3),
-        #     key_layer.cpu().float().permute(1, 2, 0, 3),
-        #     value_layer.cpu().float().permute(1, 2, 0, 3),
-        #     attention_mask.cpu().float(),
+        # ref_out_xpu, _ = naive_sdp(
+        #     query_layer.permute(0, 2, 1, 3),
+        #     key_layer.permute(0, 2, 1, 3),
+        #     value_layer.permute(0, 2, 1, 3),
+        #     attention_mask,
         #     None,
         #     None,
         #     alpha)
@@ -80,9 +80,9 @@ class TestTorchMethod(TestCase):
         attention_mask_padded[:, :, :, 0:kv_len] = attention_mask
 
         res_out = torch.xpu.IpexSDP(
-            query_layer.to("xpu").permute(0, 2, 1, 3),
-            key_layer.to("xpu").permute(0, 2, 1, 3),
-            value_layer.to("xpu").permute(0, 2, 1, 3),
+            query_layer.half().to("xpu").permute(0, 2, 1, 3),
+            key_layer.half().to("xpu").permute(0, 2, 1, 3),
+            value_layer.half().to("xpu").permute(0, 2, 1, 3),
             None,
             attention_mask_padded.to("xpu"),
             None,
@@ -99,11 +99,7 @@ class TestTorchMethod(TestCase):
             "sdp half vs naive xpu half: ",
             torch.max(torch.abs(ref_out.cpu() - res_out.cpu())).item(),
         )
-        self.assertEqual(
-            ref_out.cpu().float(), res_out.cpu().float(), atol=1e-3, rtol=1e-4
-        )
+        self.assertEqual(ref_out, res_out.cpu().float(), atol=1e-3, rtol=1e-4)
         # print("sdp half vs sdp half non padded: ", torch.max(torch.abs(res_non_pad_out.cpu() - res_out.cpu())).item())
-        # print("sdp half vs naive cpu float: ", torch.max(torch.abs(res_out.cpu() - ref_out_cpu)).item())
         # print("sdp half vs naive xpu float: ", torch.max(torch.abs(res_out.cpu() - ref_out_float.cpu())).item())
-        # print("naive xpu half vs naive cpu float: ", torch.max(torch.abs(ref_out.cpu() - ref_out_cpu)).item())
         # print("naive xpu half vs naive xpu float: ", torch.max(torch.abs(ref_out.cpu() - ref_out_float.cpu())).item())
