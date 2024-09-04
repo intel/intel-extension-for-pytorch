@@ -11,6 +11,17 @@ This is an implementation of the Flash Attention algorithm
 #include "fmha_forward_kernel.hpp"
 #include "fmha_forward_policy.h"
 #include "fmha_utils.h"
+
+// 4 configurations for head size
+#define HEAD_SIZE_LIMIT_0 64
+#define HEAD_SIZE_LIMIT_1 128
+#define HEAD_SIZE_LIMIT_2 256
+#define HEAD_SIZE_LIMIT_3 512
+#define NUM_QUERIES_GREEDY 1
+#define NUM_QUERIES_LARGE 64
+#define NUM_KEYS_LIMIT_0 128
+#define NUM_KEYS_LIMIT_1 512
+
 namespace gpu::xetla {
 
 /// @brief Main execution function for flash mha forward.
@@ -47,16 +58,15 @@ class fmha_forward_kernel_policy {
     printf("\n%s\n", __PRETTY_FUNCTION__);
 #endif
 
-    // Xetla dropout requires the same policy for fwd and bwd
     if (kIsTraining && kIsDropout && !args.dropout_mask) {
       if constexpr (kIsTraining && kIsDropout && arch_tag == gpu_arch::XeHpc) {
-        if (args.head_size <= 64) {
+        if (args.head_size <= HEAD_SIZE_LIMIT_0) {
           return policy<fmha_policy_64x64x64>(args);
-        } else if (args.head_size <= 128) {
+        } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
           return policy<fmha_policy_128x128x128>(args);
-        } else if (args.head_size <= 256) {
+        } else if (args.head_size <= HEAD_SIZE_LIMIT_2) {
           return policy<fmha_policy_128x128x256>(args);
-        } else if (args.head_size <= 512) {
+        } else if (args.head_size <= HEAD_SIZE_LIMIT_3) {
           return policy<fmha_policy_64x128x512>(args);
         } else {
           assert(false);
@@ -67,31 +77,42 @@ class fmha_forward_kernel_policy {
         return {};
       }
     } else {
+      constexpr bool igpu_wo_dropout =
+          arch_tag == gpu_arch::XeLpg && !kIsDropout;
+      constexpr bool v2_available = igpu_wo_dropout && !kUseAlibi &&
+          !kIsCausal && !kIsTraining && !kIsDropout && !kIsVarlen;
       // roughly policy should match (num_queries)x(num_keys)x(head_size)
-      if (args.head_size <= 64) {
-        if (args.num_queries < 64) {
+      if (args.head_size <= HEAD_SIZE_LIMIT_0) {
+        if (v2_available && args.num_queries == NUM_QUERIES_GREEDY &&
+            args.head_size == HEAD_SIZE_LIMIT_0) {
+          // for extremely short query length
+          if constexpr (v2_available) {
+            assert(p.head_size == HEAD_SIZE_LIMIT_0);
+            return policy<std::integral_constant<int, HEAD_SIZE_LIMIT_0>>(args);
+          }
+        } else if (args.num_queries < NUM_QUERIES_LARGE) {
           // for short query length
           return policy<fmha_policy_8x128x64>(args);
         } else {
           // for long query length
           return policy<fmha_policy_64x128x64>(args);
         }
-      } else if (args.head_size <= 128) {
-        constexpr bool igpu_wo_dropout =
-            arch_tag == gpu_arch::XeLpg && !kIsDropout;
-        if (igpu_wo_dropout && args.num_queries == 1) {
-          // for extreamly short query length
-          if constexpr (igpu_wo_dropout) {
-            if (args.num_keys < 512) {
-              return policy<stage0<fmha_policy_1x256x128>>(args);
-            } else {
-              return policy<stage0<fmha_policy_1x512x128>>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
+        if (igpu_wo_dropout && args.num_queries == NUM_QUERIES_GREEDY) {
+          // for extremely short query length
+          if (args.num_keys >= NUM_KEYS_LIMIT_0 &&
+              args.head_size == HEAD_SIZE_LIMIT_1 && v2_available) {
+            if constexpr (v2_available) {
+              return policy<std::integral_constant<int, HEAD_SIZE_LIMIT_1>>(
+                  args);
             }
+          } else if constexpr (igpu_wo_dropout) {
+            return policy<stage0<fmha_policy_1x256x128>>(args);
           }
           return {};
-        } else if (args.num_queries < 64) {
+        } else if (args.num_queries < NUM_QUERIES_LARGE) {
           // for short query length
-          if (args.num_keys < 512) {
+          if (args.num_keys < NUM_KEYS_LIMIT_1) {
             return policy<fmha_policy_8x256x128>(args);
           } else {
             return policy<fmha_policy_8x512x128>(args);
@@ -107,8 +128,8 @@ class fmha_forward_kernel_policy {
         std::cout << "Larger head_size are experiencing problems on MTL...\n";
         assert(false);
         return {};
-      } else if (args.head_size <= 256) {
-        if (args.num_queries < 64) {
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_2) {
+        if (args.num_queries < NUM_QUERIES_LARGE) {
           // for short query length
           return policy<fmha_policy_8x256x256>(args);
         } else {
@@ -120,7 +141,8 @@ class fmha_forward_kernel_policy {
               return policy<fmha_policy_64x256x256>(args);
           }
         }
-      } else if (arch_tag == gpu_arch::XeHpc && args.head_size <= 512) {
+      } else if (
+          arch_tag == gpu_arch::XeHpc && args.head_size <= HEAD_SIZE_LIMIT_3) {
         if constexpr (arch_tag == gpu_arch::XeHpc)
           return policy<fmha_policy_64x128x512>(args);
         return {};

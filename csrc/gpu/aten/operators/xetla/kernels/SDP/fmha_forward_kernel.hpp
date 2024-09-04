@@ -68,41 +68,76 @@ struct dispatch_fmha_forward_args_t {
         offset_t(args.offset_t){};
 };
 
-template <typename fmha_forward_op_t, typename T>
+template <typename fmha_forward_op_t, typename T, bool USE_V2 = false>
 struct FmhaForwardKernelFunctor {
   KERNEL_MAIN void operator()(sycl::nd_item<3> item) const {
-    // init fmha forward op and arguments
     fmha_forward_op_t fmha_fwd_op;
-    using accscalar_t = fmha_forward_op_t::accum_t;
-    typename fmha_forward_op_t::arguments_t op_args(
-        args.query,
-        args.key,
-        args.value,
-        args.alibi,
-        args.attn_mask,
-        args.dropout_mask,
-        args.out,
-        (accscalar_t*)args.log_sumexp,
-        args.num_batches,
-        args.num_heads,
-        args.num_kv_heads,
-        args.head_size,
-        args.num_queries,
-        args.num_keys,
-        args.bias_strideB,
-        args.bias_strideN,
-        args.bias_strideF,
-        args.cu_seqlen_q,
-        args.cu_seqlen_k,
-        (accscalar_t)args.softmax_scale,
-        (accscalar_t)args.dropout_prob,
-        args.alibi_padded_block_size,
-        args.attn_mask_padded_block_size,
-        args.seed_t,
-        args.offset_t);
+    using accum_t = fmha_forward_op_t::accum_t;
+    if constexpr (USE_V2) {
+      static constexpr auto kSeqLast = true;
+      typename fmha_forward_op_t::arguments_t op_args = {
+          .query = args.query,
+          .key = args.key,
+          .value = args.value,
+          .mask = args.attn_mask,
+          .output = args.out,
 
-    // call the functor
-    fmha_fwd_op(item, op_args);
+          .num_batch = args.num_batches,
+          .num_heads = args.num_heads,
+          .num_kv_heads = args.num_kv_heads,
+          .ctx_len = args.num_keys,
+
+          .sm_scale = args.softmax_scale,
+
+          .q_batch_step = args.num_heads * args.head_size,
+          .q_head_step = args.head_size,
+          .k_batch_step = args.num_kv_heads * args.head_size,
+          .k_head_step = args.head_size,
+          .k_seq_step =
+              (kSeqLast ? args.num_batches * args.num_kv_heads * args.head_size
+                        : args.num_kv_heads * args.head_size),
+          .v_batch_step =
+              (kSeqLast ? args.num_kv_heads * args.head_size
+                        : args.num_keys * args.num_kv_heads * args.head_size),
+          .v_head_step = args.head_size,
+          .v_seq_step =
+              (kSeqLast ? args.num_batches * args.num_kv_heads * args.head_size
+                        : args.num_kv_heads * args.head_size),
+          .mask_batch_step = args.num_keys,
+          .mask_head_step = 0,
+          .out_batch_step = args.num_heads * args.head_size,
+          .out_head_step = args.head_size,
+      };
+      fmha_fwd_op(item, op_args);
+    } else {
+      typename fmha_forward_op_t::arguments_t op_args(
+          args.query,
+          args.key,
+          args.value,
+          args.alibi,
+          args.attn_mask,
+          args.dropout_mask,
+          args.out,
+          (accum_t*)args.log_sumexp,
+          args.num_batches,
+          args.num_heads,
+          args.num_kv_heads,
+          args.head_size,
+          args.num_queries,
+          args.num_keys,
+          args.bias_strideB,
+          args.bias_strideN,
+          args.bias_strideF,
+          args.cu_seqlen_q,
+          args.cu_seqlen_k,
+          (accum_t)args.softmax_scale,
+          (accum_t)args.dropout_prob,
+          args.alibi_padded_block_size,
+          args.attn_mask_padded_block_size,
+          args.seed_t,
+          args.offset_t);
+      fmha_fwd_op(item, op_args);
+    }
   }
   FmhaForwardKernelFunctor(const dispatch_fmha_forward_args_t<T>& args)
       : args(args) {}

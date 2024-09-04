@@ -8,6 +8,7 @@ This is an implementation of the Flash Attention algorithm
 
 #include "SDP/fmha_forward.hpp"
 #include "SDP/fmha_forward_kernel.hpp"
+#include "SDP/fmha_forward_v2.hpp"
 
 // clang-format off
 // macros to be filled in CMake 
@@ -26,6 +27,13 @@ This is an implementation of the Flash Attention algorithm
 namespace gpu::xetla {
 
 namespace fmha {
+
+template <typename fmha_policy>
+struct is_fmha_v2 : std::false_type {};
+
+template <int head_dim>
+struct is_fmha_v2<std::integral_constant<int, head_dim>> : std::true_type {};
+
 // The launcher of fmha forward kernel
 template <
     typename fmha_policy,
@@ -64,24 +72,37 @@ cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
       args.dropout_prob,
       kSeqLast);
 #endif
+  constexpr bool kUseV2 = is_fmha_v2<fmha_policy>::value;
   // fmha forward kernel
-  using fmha_forward_op_t = fmha_forward_t<
-      fmha_policy,
-      T,
-      arch_tag,
-      kUseAlibi,
-      kUseBias,
-      kIsCausal,
-      kSeqLast,
-      kIsTraining,
-      kIsDropout,
-      kVarlen>;
 
-  sycl::nd_range<3> NdRange = fmha_forward_op_t::get_nd_range(
-      args.num_batches * args.num_heads, args.num_queries);
+  if constexpr (!kUseV2) {
+    using fmha_forward_op_t = fmha_forward_t<
+        fmha_policy,
+        T,
+        arch_tag,
+        kUseAlibi,
+        kUseBias,
+        kIsCausal,
+        kSeqLast,
+        kIsTraining,
+        kIsDropout,
+        kVarlen>;
 
-  FmhaForwardKernelFunctor<fmha_forward_op_t, T> kfn(args);
-  return {[=](sycl::handler& cgh) { cgh.parallel_for(NdRange, kfn); }};
+    sycl::nd_range<3> NdRange = fmha_forward_op_t::get_nd_range(
+        args.num_batches * args.num_heads, args.num_queries);
+
+    FmhaForwardKernelFunctor<fmha_forward_op_t, T, kUseV2> kfn(args);
+    return {[=](sycl::handler& cgh) { cgh.parallel_for(NdRange, kfn); }};
+  } else {
+    using fmha_forward_op_t =
+        fmha_forward_v2_t<T, arch_tag, 64, fmha_policy::value, kUseBias>;
+
+    sycl::nd_range<3> NdRange =
+        fmha_forward_op_t::get_nd_range(args.num_batches, args.num_heads);
+
+    FmhaForwardKernelFunctor<fmha_forward_op_t, T, kUseV2> kfn(args);
+    return {[=](sycl::handler& cgh) { cgh.parallel_for(NdRange, kfn); }};
+  }
 }
 
 #define INSTANTIATE_POLICY(policy)           \
@@ -108,8 +129,11 @@ INSTANTIATE_POLICY(fmha_policy_8x128x64);
 INSTANTIATE_POLICY(fmha_policy_64x128x64);
 
 #if (!IMPL_KISDROPOUT && defined(GPU_ARCH_XeLpg))
+#define COMMA ,
 INSTANTIATE_POLICY(stage0<fmha_policy_1x256x128>);
 INSTANTIATE_POLICY(stage0<fmha_policy_1x512x128>);
+INSTANTIATE_POLICY(std::integral_constant<int COMMA 64>);
+INSTANTIATE_POLICY(std::integral_constant<int COMMA 128>);
 #endif
 
 INSTANTIATE_POLICY(fmha_policy_8x256x128);
