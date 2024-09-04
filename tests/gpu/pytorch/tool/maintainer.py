@@ -52,7 +52,7 @@ def check_ci_pass(cases_result, logfile):
             details.append(detail)
             return issued_cases, short_details, details
     for tag, cases in cases_result.items():
-        if tag == "PASSED":
+        if tag == "PASSED" or tag == "XFAIL":
             continue
         for case in cases:
             if tag == "SKIPPED":
@@ -60,6 +60,9 @@ def check_ci_pass(cases_result, logfile):
                     continue
             elif case in ref_dict["PASSED"]:
                 issued_cases.append(case)
+            #elif case not in ref_dict["FAILED"] and case not in ref_dict["ERROR"] and case not in ref_dict["XPASS"]:
+            #    issued_cases.append(case)
+
     if issued_cases:
         short_details, details = collect_detailed_issues(issued_cases, logfile, with_short=True)
     return issued_cases, short_details, details

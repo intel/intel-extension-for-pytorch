@@ -6,7 +6,7 @@ import sys
 import argparse
 from pathlib import Path
 import shutil
-#from tool.file_utils import load_from_yaml, save_to_yaml, read_file, write_file
+from tool.file_utils import load_from_yaml
 from tool.collector import collect_cases_from_logfile, collect_detailed_issues
 #from tool.skipper import add_dynamic_skipped_cases
 from tool.maintainer import update_reference, check_reference, check_ci_pass
@@ -14,7 +14,8 @@ from tool.reporter import report_configurations, report_details, report_diffs, r
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ref", type=str, help="specify the path of ref")
+    parser.add_argument("--ref", type=str, help="specify the path of raw logs folder of ref")
+    parser.add_argument("--ref_yaml", type=str, help="specify the path of yaml format of ref")
     parser.add_argument("--cur", type=str, help="specify the path of cur")
     return parser.parse_args()
 
@@ -34,15 +35,18 @@ casenames_total = {}
 if os.path.exists("details"):
     shutil.rmtree("details")
 
-for test in finished_tests_ref:
-    testcase = test.split(".")[0].replace("-", "/")
-    print(f"Loading {testcase} result from reference log file: {test}")
-    duration, cases_result = collect_cases_from_logfile(testcase, os.path.join(args.ref, test))
-    if testcase not in total_results_ref:
-        total_results_ref[testcase] = []
-    total_results_ref[testcase].append((duration, cases_result))
+if args.ref_yaml:
+    total_results_ref = load_from_yaml(args.ref_yaml)
+else:
+    for test in finished_tests_ref:
+        testcase = test.split(".")[0].replace("-", "/")
+        print(f"Loading {testcase} result from reference log file: {test}")
+        duration, cases_result = collect_cases_from_logfile(testcase, os.path.join(args.ref, test))
+        if testcase not in total_results_ref:
+            total_results_ref[testcase] = []
+        total_results_ref[testcase].append((duration, cases_result))
 
-update_reference(total_results_ref, "maintain")
+    update_reference(total_results_ref, "maintain")
 
 for test in finished_tests_cur:
     testcase = test.split(".")[0].replace("-", "/")
@@ -67,9 +71,14 @@ for test in finished_tests_cur:
             #print(subdetails)
             #print(subcasenames)
             #print("+++++++++++++++++++++++++++++++++")
-            if "New ERROR" in tag or "=> ERROR" in tag:
+            #if "New ERROR" in tag or "=> ERROR" in tag:
+            if "=> ERROR" in tag:
                 tagy = "Error"
-            elif "New FAILED" in tag or "=> FAILED" in tag:
+            elif "New ERROR" in tag:
+                tagy = "Errornew"
+            elif "New FAILED" in tag:
+                tagy = "FAILEDnew"
+            elif "=> FAILED" in tag:
                 tagy = "Failed"
             else:
                 tagy = "exception"
