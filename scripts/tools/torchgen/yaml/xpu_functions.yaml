@@ -167,12 +167,12 @@ supported:
   - bitwise_not_
 #  - bitwise_or.Tensor_out
 #  - bitwise_xor.Tensor_out
-  - bitwise_left_shift.Tensor_out
+#  - bitwise_left_shift.Tensor_out
   - bitwise_left_shift.Tensor_Scalar
   - bitwise_left_shift_.Tensor_Scalar
   - bitwise_left_shift.Tensor_Scalar_out
   - bitwise_left_shift.Scalar_Tensor
-  - bitwise_right_shift.Tensor_out
+#  - bitwise_right_shift.Tensor_out
   - bitwise_right_shift.Tensor_Scalar
   - bitwise_right_shift_.Tensor_Scalar
   - bitwise_right_shift.Tensor_Scalar_out
@@ -472,8 +472,8 @@ supported:
 #  - pow.Tensor_Scalar_out
 #  - pow.Tensor_Tensor
 #  - pow.Tensor_Tensor_out
-  - _prelu_kernel
-  - _prelu_kernel_backward
+#  - _prelu_kernel
+#  - _prelu_kernel_backward
 #  - prod
 #  - prod.dim_int
 #  - prod.int_out
@@ -695,14 +695,14 @@ supported:
 #  - linalg_vector_norm.out
 #  - complex.out
   - vdot
-  - __lshift__.Scalar
-  - __lshift__.Tensor
-  - __ilshift__.Scalar
-  - __ilshift__.Tensor
-  - __rshift__.Scalar
-  - __rshift__.Tensor
-  - __irshift__.Scalar
-  - __irshift__.Tensor
+#  - __lshift__.Scalar
+#  - __lshift__.Tensor
+#  - __ilshift__.Scalar
+#  - __ilshift__.Tensor
+#  - __rshift__.Scalar
+#  - __rshift__.Tensor
+#  - __irshift__.Scalar
+#  - __irshift__.Tensor
   - square.out
 #  - hardsigmoid.out
 #  - hardsigmoid_backward.grad_input
