@@ -45,6 +45,7 @@ def transpose_attn_fused_qkv_params(self, dtype):
             self.qkv_proj_quant.qweight.data = (
                 self.qkv_proj_quant.qweight.t().contiguous()
             )
+            self.qkv_proj_quant.use_optimum_format = False
             self.qkv_proj_quant.scales.data = (
                 self.qkv_proj_quant.scales.t().contiguous()
             )
@@ -56,6 +57,7 @@ def transpose_attn_fused_qkv_params(self, dtype):
             self.out_proj_quant.qweight.data = (
                 self.out_proj_quant.qweight.t().contiguous()
             )
+            self.out_proj_quant.use_optimum_format = False
             self.out_proj_quant.scales.data = (
                 self.out_proj_quant.scales.t().contiguous()
             )
@@ -67,6 +69,7 @@ def transpose_attn_fused_qkv_params(self, dtype):
             self.qkv_proj_quant.qweight.data = (
                 self.qkv_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
             )
+            self.qkv_proj_quant.use_optimum_format = False
             self.qkv_proj_quant.scales.data = self.qkv_proj_quant.scales
 
             self.qkv_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
@@ -74,6 +77,7 @@ def transpose_attn_fused_qkv_params(self, dtype):
             self.out_proj_quant.qweight.data = (
                 self.out_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
             )
+            self.out_proj_quant.use_optimum_format = False
             self.out_proj_quant.scales.data = self.out_proj_quant.scales
             self.out_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
     torch.xpu.synchronize()

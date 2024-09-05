@@ -238,6 +238,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
                     self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
                 )
             self.weight_transposed = True
+            self.use_optimum_format = False
 
         if xpu_gemm_use_xetla():
             return torch.ops.torch_ipex.mm_low_bits(

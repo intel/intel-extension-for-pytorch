@@ -41,9 +41,11 @@ class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
         self.fc_in_quant.qweight.data = self.fc_in_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.fc_in_quant.use_optimum_format = False
         self.fc_out_quant.qweight.data = self.fc_out_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.fc_out_quant.use_optimum_format = False
 
         self.fc_in_quant.scales.data = self.fc_in_quant.scales.transpose(
             0, 1
@@ -213,6 +215,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4):
         self.c_proj_quant.qweight.data = self.c_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.c_proj_quant.use_optimum_format = False
         self.c_proj_quant.scales.data = self.c_proj_quant.scales.transpose(
             0, 1
         ).contiguous()
@@ -396,9 +399,11 @@ class IPEXTransformerMLPOptimizedInt4OneDNN(IPEXTransformerMLPOptimizedInt4):
         self.fc_in_quant.qweight.data = (
             self.fc_in_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.fc_in_quant.use_optimum_format = False
         self.fc_out_quant.qweight.data = (
             self.fc_out_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.fc_out_quant.use_optimum_format = False
 
         self.fc_in_quant.scales.data = self.fc_in_quant.scales
         self.fc_out_quant.scales.data = self.fc_out_quant.scales
@@ -469,6 +474,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwenOneDNN(
         self.c_proj_quant.qweight.data = (
             self.c_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.c_proj_quant.use_optimum_format = False
         self.c_proj_quant.scales.data = self.c_proj_quant.scales
         self.c_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
         torch.xpu.synchronize()

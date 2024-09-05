@@ -80,15 +80,19 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         self.q_proj_quant.qweight.data = self.q_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.q_proj_quant.use_optimum_format = False
         self.k_proj_quant.qweight.data = self.k_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.k_proj_quant.use_optimum_format = False
         self.v_proj_quant.qweight.data = self.v_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.v_proj_quant.use_optimum_format = False
         self.out_proj_quant.qweight.data = self.out_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.out_proj_quant.use_optimum_format = False
 
         self.q_proj_quant.scales.data = self.q_proj_quant.scales.transpose(
             0, 1
@@ -355,15 +359,19 @@ class IPEXTransformerAttnOptimizedInt4OneDNN(IPEXTransformerAttnOptimizedInt4):
         self.q_proj_quant.qweight.data = (
             self.q_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.q_proj_quant.use_optimum_format = False
         self.k_proj_quant.qweight.data = (
             self.k_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.k_proj_quant.use_optimum_format = False
         self.v_proj_quant.qweight.data = (
             self.v_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.v_proj_quant.use_optimum_format = False
         self.out_proj_quant.qweight.data = (
             self.out_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.out_proj_quant.use_optimum_format = False
 
         self.q_proj_quant.scales.data = self.q_proj_quant.scales
         self.k_proj_quant.scales.data = self.k_proj_quant.scales
