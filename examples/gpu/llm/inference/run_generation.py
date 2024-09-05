@@ -243,7 +243,7 @@ if args.accuracy_only:
 
 ######################## run generation benchmark ########################
 current_path = pathlib.Path(__file__).parent.resolve()
-with open(str(current_path) + "/prompt.json") as f:
+with open(str(current_path) + "/prompt.json", encoding="utf8") as f:
     prompt_pool = json.load(f)
 
 def run_generate(num_tokens, num_input_tokens, num_beams):
@@ -269,7 +269,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         generate_kwargs["token_latency"] = True
 
     # Accuracy check, take the ref_prompt as reference for check
-    f1 = open(os.path.join(os.path.dirname(__file__), "ref_prompt.json"))
+    f1 = open(os.path.join(os.path.dirname(__file__), "ref_prompt.json"), encoding="utf8")
     prompt_json = json.load(f1)
     f1.close()
     ref_prompt=None
