@@ -164,75 +164,6 @@ class IPEXTransformerAttnOptimizedFp16Grouped(IPEXTransformerAttnOptimizedFp16):
         return key, value, key_prompt, value_prompt
 
 
-class IPEXTransformerAttnOptimizedFp16GroupedChatGLM(
-    IPEXTransformerAttnOptimizedFp16Grouped
-):
-    def __init__(self, config: IPEXTransformerConfig) -> None:
-        super().__init__(config)
-
-    def load_parameter(self, qkv_proj=None, out_proj=None):
-        embed_dim = self.embed_dim
-        num_head = self.num_attn_head
-        num_kv_head = self.num_kv_head
-        head_dim = self.head_dim
-        group = num_head // num_kv_head + 2
-        query_weight_size = head_dim * num_head
-        key_weight_size = value_weight_size = head_dim * num_kv_head
-
-        def helper(proj, begin, end, g):
-            weight = proj.weight[begin:end, ...].view(
-                num_kv_head, g, head_dim, embed_dim
-            )
-            if proj.bias is not None:
-                bias = proj.bias[begin:end, ...].view(num_kv_head, g, head_dim)
-            else:
-                bias = None
-            return weight, bias
-
-        wq, bq = helper(qkv_proj, 0, query_weight_size, group - 2)
-        wk, bk = helper(
-            qkv_proj, query_weight_size, query_weight_size + key_weight_size, 1
-        )
-        wv, bv = helper(
-            qkv_proj, query_weight_size + key_weight_size, qkv_proj.weight.shape[0], 1
-        )
-
-        del qkv_proj.weight
-        del qkv_proj.bias
-
-        self.qkv_proj.weight = torch.concat([wq, wk, wv], dim=1).contiguous()
-        if bq is not None:
-            self.qkv_proj.bias = torch.concat([bq, bk, bv], dim=1).contiguous()
-        else:
-            self.qkv_proj.bias = None
-
-        self.out_proj.weight = out_proj.weight
-        self.out_proj.bias = out_proj.bias
-
-        self.position_embed = self.config.rotary_embedding_class(
-            self.config, self.qkv_proj.weight.dtype
-        )
-
-    def post_qkv(self, query, key, value, rotary_pos_emb, layer_past, **kwargs):
-        bs_beam, seq, _ = self.get_runtime_shape(query)
-        seq = seq if layer_past is None else layer_past[0].size(2) + 1
-        query, key = self.position_embed(query, key, rotary_pos_emb)
-        query, key, value = self.combine_kv_cache_interface(query, key, value)
-        return query, key, value
-
-    def prepare_sdp_input(self, query, key, value, attention_mask, alibi):
-        (
-            dropout,
-            alpha,
-            beta,
-            is_causal,
-            blocked_attn_mask,
-            blocked_alibi,
-        ) = super().prepare_sdp_input(query, key, value, attention_mask, alibi)
-        is_causal = True if self.is_1st_token() else False
-        return dropout, alpha, beta, is_causal, blocked_attn_mask, blocked_alibi
-
-
 class IPEXTransformerAttnOptimizedInt4Grouped(IPEXTransformerAttnOptimizedInt4):
     def __init__(self, config: IPEXTransformerConfig) -> None:
         super().__init__(config)
@@ -343,44 +274,60 @@ class IPEXTransformerAttnOptimizedInt4GroupedOneDNN(
         self.num_kv_head = config.num_key_value_head // self.tp_size
         self.num_kv_group = self.num_attn_head // self.num_kv_head
 
-    # int4 grouped attention do not support fused_qkv computation so far
-
     def cat_qkv(self):
         pass
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
         if self.num_kv_group <= 1:
             return super().compute_qkv_gemm(hidden_states, query, key, value)
-
-        query = torch.ops.torch_ipex.mm_bias_int4(
-            hidden_states,
-            self.q_proj_quant.qweight,
-            self.q_proj_quant.bias,
-            self.q_proj_quant.scales,
-            self.q_proj_quant.qzeros,
-            self.q_proj_quant.blocksize,
-            self.q_proj_quant.g_idx,
-        )
-        key.copy_(
-            torch.ops.torch_ipex.mm_bias_int4(
+        if (
+            self.q_proj_quant.qweight is None
+            and self.qkv_proj_quant.qweight is not None
+        ):
+            qkv_out = torch.ops.torch_ipex.mm_bias_int4(
                 hidden_states,
-                self.k_proj_quant.qweight,
-                self.k_proj_quant.bias,
-                self.k_proj_quant.scales,
-                self.k_proj_quant.qzeros,
-                self.k_proj_quant.blocksize,
-                self.k_proj_quant.g_idx,
+                self.qkv_proj_quant.qweight,
+                self.qkv_proj_quant.bias,
+                self.qkv_proj_quant.scales,
+                self.qkv_proj_quant.qzeros,
+                self.qkv_proj_quant.blocksize,
+                self.qkv_proj_quant.g_idx,
             )
-        )
-        value.copy_(
-            torch.ops.torch_ipex.mm_bias_int4(
+            m_query = query.shape[-1]
+            m_key = key.shape[-1]
+            query = qkv_out[:, :, :m_query].contiguous()
+            key.copy_(qkv_out[:, :, m_query : m_query + m_key])
+            value.copy_(qkv_out[:, :, m_query + m_key :])
+        else:
+            query = torch.ops.torch_ipex.mm_bias_int4(
                 hidden_states,
-                self.v_proj_quant.qweight,
-                self.v_proj_quant.bias,
-                self.v_proj_quant.scales,
-                self.v_proj_quant.qzeros,
-                self.v_proj_quant.blocksize,
-                self.v_proj_quant.g_idx,
+                self.q_proj_quant.qweight,
+                self.q_proj_quant.bias,
+                self.q_proj_quant.scales,
+                self.q_proj_quant.qzeros,
+                self.q_proj_quant.blocksize,
+                self.q_proj_quant.g_idx,
             )
-        )
+            key.copy_(
+                torch.ops.torch_ipex.mm_bias_int4(
+                    hidden_states,
+                    self.k_proj_quant.qweight,
+                    self.k_proj_quant.bias,
+                    self.k_proj_quant.scales,
+                    self.k_proj_quant.qzeros,
+                    self.k_proj_quant.blocksize,
+                    self.k_proj_quant.g_idx,
+                )
+            )
+            value.copy_(
+                torch.ops.torch_ipex.mm_bias_int4(
+                    hidden_states,
+                    self.v_proj_quant.qweight,
+                    self.v_proj_quant.bias,
+                    self.v_proj_quant.scales,
+                    self.v_proj_quant.qzeros,
+                    self.v_proj_quant.blocksize,
+                    self.v_proj_quant.g_idx,
+                )
+            )
         return query, key, value

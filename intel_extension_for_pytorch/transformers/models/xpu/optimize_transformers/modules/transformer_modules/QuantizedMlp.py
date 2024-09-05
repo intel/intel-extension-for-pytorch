@@ -339,6 +339,66 @@ class IPEXTransformerMLPOptimizedInt4SiluLlama(IPEXTransformerMLPOptimizedInt4Si
         return super().load_parameter(c_proj, fc_in, fc_out)
 
 
+class IPEXTransformerMLPOptimizedInt4SiluChatGLM(
+    IPEXTransformerMLPOptimizedInt4SiluLlama
+):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def load_parameter(self, fc_in, fc_out):
+        qweight = torch.chunk(fc_in.qweight, 2, dim=1)
+        scales = torch.chunk(fc_in.scales, 2, dim=1)
+        bias = None
+        qzeros = None
+        g_idx = None
+        if fc_in.bias is not None:
+            bias = torch.chunk(fc_in.bias, 2, dim=0)
+        if fc_in.qzeros is not None:
+            qzeros = torch.chunk(fc_in.qzeros, 2, dim=0)
+        if fc_in.g_idx is not None:
+            g_idx = torch.chunk(fc_in.g_idx, 2, dim=0)
+        self.fc_out_quant.set_weights_bias(
+            qweight[0], bias[0] if bias is not None else None
+        )
+        self.fc_out_quant.set_scales_zps_gidx(
+            scales[0],
+            qzeros[0] if qzeros is not None else None,
+            g_idx[0] if g_idx is not None else None,
+        )
+        self.fc_out_quant.blocksize = fc_in.blocksize
+
+        self.fc_in_quant.set_weights_bias(
+            qweight[1], bias[1] if fc_in.bias is not None else None
+        )
+        self.fc_in_quant.set_scales_zps_gidx(
+            scales[1],
+            qzeros[1] if qzeros is not None else None,
+            g_idx[1] if g_idx is not None else None,
+        )
+        self.fc_in_quant.blocksize = fc_in.blocksize
+
+        self.c_proj_quant.set_weights_bias(fc_out.qweight, fc_out.bias)
+        self.c_proj_quant.set_scales_zps_gidx(
+            fc_out.scales, fc_out.qzeros, fc_out.g_idx
+        )
+        self.c_proj_quant.blocksize = fc_out.blocksize
+
+        fc_in.qweight = None
+        fc_in.bias = None
+        fc_in.scales = None
+        fc_in.qzeros = None
+
+        fc_out.qweight = None
+        fc_out.bias = None
+        fc_out.scales = None
+        fc_out.qzeros = None
+
+        qweight = None
+        bias = None
+        scales = None
+        qzeros = None
+
+
 class IPEXTransformerMLPOptimizedInt4SiluPhi3(IPEXTransformerMLPOptimizedInt4):
     def __init__(self, config):
         super().__init__(config)
@@ -531,6 +591,61 @@ class IPEXTransformerMLPOptimizedInt4SiluLlamaOneDNN(
     def load_parameter(self, fc_in, fc_out, c_proj):
         # gate_proj, down_proj, up_proj
         return super().load_parameter(c_proj, fc_in, fc_out)
+
+
+class IPEXTransformerMLPOptimizedInt4SiluChatGLMOneDNN(
+    IPEXTransformerMLPOptimizedInt4SiluLlamaOneDNN,
+    IPEXTransformerMLPOptimizedInt4SiluChatGLM,
+):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def load_parameter(self, fc_in, fc_out):
+        qweight = torch.chunk(fc_in.qweight, 2, dim=1)
+        scales = torch.chunk(fc_in.scales, 2, dim=1)
+        bias = None
+        qzeros = None
+        g_idx = None
+        if fc_in.bias is not None:
+            bias = torch.chunk(fc_in.bias, 2, dim=0)
+        if fc_in.g_idx is not None:
+            g_idx = torch.chunk(fc_in.g_idx, 2, dim=0)
+        self.fc_out_quant.set_weights_bias(
+            qweight[0], bias[0] if bias is not None else None
+        )
+        self.fc_out_quant.set_scales_zps_gidx(
+            scales[0], qzeros, g_idx[0] if g_idx is not None else None
+        )
+        self.fc_out_quant.blocksize = fc_in.blocksize
+
+        self.fc_in_quant.set_weights_bias(
+            qweight[1], bias[1] if fc_in.bias is not None else None
+        )
+        self.fc_in_quant.set_scales_zps_gidx(
+            scales[1], qzeros, g_idx[1] if g_idx is not None else None
+        )
+        self.fc_in_quant.blocksize = fc_in.blocksize
+
+        self.c_proj_quant.set_weights_bias(fc_out.qweight, fc_out.bias)
+        self.c_proj_quant.set_scales_zps_gidx(
+            fc_out.scales, fc_out.qzeros, fc_out.g_idx
+        )
+        self.c_proj_quant.blocksize = fc_out.blocksize
+
+        fc_in.qweight = None
+        fc_in.bias = None
+        fc_in.scales = None
+        fc_in.qzeros = None
+
+        fc_out.qweight = None
+        fc_out.bias = None
+        fc_out.scales = None
+        fc_out.qzeros = None
+
+        qweight = None
+        bias = None
+        scales = None
+        qzeros = None
 
 
 class IPEXTransformerMLPOptimizedInt4SiluPhi3OneDNN(

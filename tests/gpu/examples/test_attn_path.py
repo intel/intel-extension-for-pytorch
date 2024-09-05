@@ -35,12 +35,6 @@ ATTN_CLASS = {
         "Baichuan",
         False,
     ),
-    Attention.IPEXTransformerAttnOptimizedFp16ChatGLM: (
-        "fp16",
-        ImplementMode.optimized,
-        "ChatGLM",
-        False,
-    ),
     CrossedAttention.IPEXTransformerAttnOptimizedFp16Crossed: (
         "fp16",
         ImplementMode.optimized,
@@ -51,12 +45,6 @@ ATTN_CLASS = {
         "fp16",
         ImplementMode.optimized,
         None,
-        True,
-    ),
-    GroupedAttention.IPEXTransformerAttnOptimizedFp16GroupedChatGLM: (
-        "fp16",
-        ImplementMode.optimized,
-        "ChatGLM",
         True,
     ),
     GroupedAttention.IPEXTransformerAttnOptimizedInt4Grouped: (

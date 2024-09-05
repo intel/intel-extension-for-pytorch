@@ -1,11 +1,13 @@
 import torch
 from typing import Optional, Tuple
+from functools import partial
 from .transformer_modules.RoPE import ChatGLMRotaryEmbedding
 from .transformer_modules.Norm import LlamaRMSNorm
 
 
 from ._transformers import MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
+from .transformer_modules.Attention import IPEXTransformerAttnOptimizedFp16
 from .transformer_modules.Mlp import (  # noqa F401
     IPEXTransformerBaseMLP,
     IPEXTransformerMLPOptimizedFp16,
@@ -14,20 +16,18 @@ from ._transformer_configuration import (
     IPEXTransformerConfigChatGLM,
     SupportedActivation,
 )
-from .transformer_modules.Attention import (  # noqa F401
-    IPEXTransformerAttnOptimizedFp16ChatGLM,
-)
-from .transformer_modules.QuantizedAttention import (  # noqa F401
-    IPEXTransformerAttnOptimizedFp16,
-    IPEXTransformerAttnOptimizedInt4,
-)  # noqa
 from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
 from .transformer_modules.GroupedAttention import (  # noqa F401
     IPEXTransformerAttnOptimizedFp16Grouped,
-    IPEXTransformerAttnOptimizedFp16GroupedChatGLM,
 )
 from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
+from .transformer_modules.model_utils import (
+    chatglm_load_attn_params_grouped,
+    chatglm_post_qkv,
+    load_attn_fused_qkv_params,
+    transpose_attn_fused_qkv_params,
+)
 
 
 # return repeat_interleave of cache compared to original
@@ -116,6 +116,21 @@ def prepare_inputs_for_generation(
     }
 
 
+def chatglm_prepare_sdp_input(self, query, key, value, attention_mask, alibi):
+    (
+        dropout,
+        alpha,
+        beta,
+        is_causal,
+        blocked_attn_mask,
+        blocked_alibi,
+    ) = IPEXTransformerAttnOptimizedFp16.prepare_sdp_input(
+        self, query, key, value, attention_mask, alibi
+    )
+    is_causal = True if self.is_1st_token() else False
+    return dropout, alpha, beta, is_causal, blocked_attn_mask, blocked_alibi
+
+
 class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
     def __init__(
         self,
@@ -136,8 +151,10 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         grouped = False
         if self.ipex_config.multi_query_attention:
             grouped = True
-        self.attn = self.build_attention_from_config("ChatGLM", grouped=grouped)
+        self.attn = self.build_attention_from_config(grouped=grouped)
         self.mlp = self.build_mlp_from_config("ChatGLM")
+        self.attn.post_qkv = partial(chatglm_post_qkv, self.attn)
+        self.attn.prepare_sdp_input = partial(chatglm_prepare_sdp_input, self.attn)
 
         self.input_layernorm = LlamaRMSNorm(
             config.hidden_size,
@@ -207,8 +224,9 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
 
     def port_attn_parameter(self):
         self.attn.load_parameter(
-            qkv_proj=self.module.self_attention.query_key_value,
-            out_proj=self.module.self_attention.dense,
+            self.module.self_attention.query_key_value,
+            self.module.self_attention.dense,
+            dtype=self.ipex_config.dtype,
         )
 
     def port_mlp_parameter(self):
@@ -223,14 +241,32 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         self.post_attn_layernorm.weight = self.module.post_attention_layernorm.weight
 
     def transpose_parameter(self):
-        self.attn.transpose_parameter()
+        dtype = self.ipex_config.dtype
+        if self.ipex_config.multi_query_attention and dtype == "fp16":
+            self.attn.transpose_parameter()
+        else:
+            self.attn.transpose_parameter(dtype=dtype)
+
         self.mlp.transpose_parameter()
 
     def port_all_parameters_to_new_module(self):
+        dtype = self.ipex_config.dtype
+        if self.ipex_config.multi_query_attention:
+            self.attn.load_parameter = partial(
+                chatglm_load_attn_params_grouped, self.attn
+            )
+            if dtype == "int4":
+                self.attn.transpose_parameter = partial(
+                    transpose_attn_fused_qkv_params, self.attn
+                )
+        else:
+            self.attn.load_parameter = partial(load_attn_fused_qkv_params, self.attn)
+            self.attn.transpose_parameter = partial(
+                transpose_attn_fused_qkv_params, self.attn
+            )
         super().port_all_parameters_to_new_module()
         if self.ipex_config.transpose:
             self.transpose_parameter()
-        self.attn.cat_qkv()
 
     def forward(
         self,
