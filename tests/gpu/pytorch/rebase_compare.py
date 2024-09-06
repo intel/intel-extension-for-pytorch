@@ -65,21 +65,25 @@ for test in finished_tests_cur:
         print(tag)
         #print(cases)
         print("----------------------------------")
-        if "=> PASSED" not in tag and tag != "New PASSED" and tag != "New SKIPPED":
+        if "=> PASSED" not in tag and tag != "New PASSED" and tag != "New SKIPPED" and "=> XFAIL" not in tag:
             #details_msg_list.extend(collect_detailed_issues(cases, os.path.join(args.cur, test), True))
             subdetails, subcasenames = collect_detailed_issues(cases, os.path.join(args.cur, test), False, True)
             #print(subdetails)
             #print(subcasenames)
             #print("+++++++++++++++++++++++++++++++++")
             #if "New ERROR" in tag or "=> ERROR" in tag:
-            if "=> ERROR" in tag:
+            if "PASSED => ERROR" in tag or "XFAIL => ERROR" in tag:
                 tagy = "Error"
-            elif "New ERROR" in tag:
+            elif "New ERROR" in tag or "New XPASS" in tag:
                 tagy = "Errornew"
             elif "New FAILED" in tag:
                 tagy = "FAILEDnew"
-            elif "=> FAILED" in tag:
+            elif "PASSED => FAILED" in tag or "XFAIL => FAILED" in tag:
                 tagy = "Failed"
+            elif "=> ERROR" in tag:
+                tagy = "error_type_change"
+            elif "=> FAILED" in tag:
+                tagy = "fail_type_change"
             else:
                 tagy = "exception"
             for tag1, detail in subdetails.items():

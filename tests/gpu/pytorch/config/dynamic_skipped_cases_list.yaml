@@ -10252,3 +10252,4 @@
   - test_ops.py::TestMathBitsXPU::test_neg_view_sgn_xpu_float64
   - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float64
   - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float32
+  - test_decomp.py::TestDecompXPU::test_comprehensive_to_sparse_xpu_uint8
