@@ -27,6 +27,7 @@ MODEL_CLASSES = {
     "llama": (AutoModelForCausalLM, AutoTokenizer),
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
+    "chatglm3": (AutoModelForCausalLM, AutoTokenizer),
 }
 
 # args
