@@ -17,16 +17,30 @@ For more details, please check [installation guide](https://intel.github.io/inte
 
 ## Running Example Scripts
 
+Setting environment variables:
+
+Set the working directory as the root folder of `oneccl_bindings_for_pytorch` package.
+For a conda-based Python 3.10 environment, it should be 
+
 ```bash
-# Clone the repository and access to the training examples folder
-git clone https://github.com/intel/intel-extension-for-pytorch.git
-cd intel-extension-for-pytorch/examples/cpu/training/python-scripts
+cd <CONDA_ENV_ROOT>/lib/python3.10/site-packages/oneccl_bindings_for_pytorch
 ```
 
-Running ResNet50 distributed training example:
+in which `CONDA_ENV_ROOT` path can be checked via `conda env list`.
+
+Then run the environment variables activation script.
 
 ```bash
-source $(python -c "import oneccl_bindings_for_pytorch as torch_ccl;print(torch_ccl.cwd)")/env/setvars.sh
+source env/setvars.sh
+export FI_TCP_IFACE="$(ip -o -4 route show to default | awk '{print $5}')"
+```
+
+Clone the project repo if you haven't done so, access to the training examples folder and run the ResNet50 distributed training example:
+
+```bash
+git clone https://github.com/intel/intel-extension-for-pytorch.git
+cd intel-extension-for-pytorch/examples/cpu/training/python-scripts
+
 # This example command would utilize all the numa sockets of the processor, taking each socket as a rank.
 ipexrun --nnodes 1 distributed_data_parallel_training.py
 ```
