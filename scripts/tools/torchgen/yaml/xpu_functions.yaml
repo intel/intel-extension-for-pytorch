@@ -39,12 +39,12 @@ supported:
   - _fake_quantize_learnable_per_channel_affine_backward
   - _fake_quantize_learnable_per_tensor_affine_backward
   - _fake_quantize_per_tensor_affine_cachemask_tensor_qparams
-  - _fft_c2r
-  - _fft_r2c
-  - _fft_c2c
-  - _fft_c2r.out
-  - _fft_r2c.out
-  - _fft_c2c.out
+#  - _fft_c2r
+#  - _fft_r2c
+#  - _fft_c2c
+#  - _fft_c2r.out
+#  - _fft_r2c.out
+#  - _fft_c2c.out
   - _fused_adam_
   - _fused_adam_.tensor_lr
   - _fused_adamw_
@@ -54,13 +54,13 @@ supported:
   - _masked_scale
   - index_copy.out
 #  - _index_put_impl_
-  - linalg_qr.out
+#  - linalg_qr.out
 #  - _local_scalar_dense
   - _logcumsumexp
   - _logcumsumexp.out
 #  - _log_softmax.out
 #  - _log_softmax_backward_data.out
-  - _lu_with_info
+#  - _lu_with_info
   - _make_per_channel_quantized_tensor
   - _make_per_tensor_quantized_tensor
   - _masked_softmax
@@ -72,13 +72,13 @@ supported:
   - _sample_dirichlet
 #  - _softmax.out
 #  - _softmax_backward_data.out
-  - _linalg_svd.U
-  - linalg_inv_ex.inverse
-  - _linalg_solve_ex.result
-  - linalg_lu_factor_ex.out
-  - linalg_lu_solve.out
-  - linalg_lu.out
-  - linalg_matrix_exp
+#  - _linalg_svd.U
+#  - linalg_inv_ex.inverse
+#  - _linalg_solve_ex.result
+#  - linalg_lu_factor_ex.out
+#  - linalg_lu_solve.out
+#  - linalg_lu.out
+#  - linalg_matrix_exp
 #  - linalg_cross.out
 #  - _unique
 #  - _unique2
@@ -181,12 +181,12 @@ supported:
   - bmm.out # duplicated op
   - cauchy_
 #  - ceil.out
-  - cholesky
-  - cholesky.out
-  - cholesky_inverse
-  - cholesky_inverse.out
-  - _cholesky_solve_helper
-  - linalg_cholesky_ex.L
+#  - cholesky
+#  - cholesky.out
+#  - cholesky_inverse
+#  - cholesky_inverse.out
+#  - _cholesky_solve_helper
+#  - linalg_cholesky_ex.L
 #  - clamp.out
 #  - clamp_max.out
 #  - clamp_min.out
@@ -218,7 +218,7 @@ supported:
 #  - div.out
 #  - div_.Tensor
 #  - div.out_mode
-  - dot
+#  - dot
 #  - elu
 #  - elu.out
 #  - elu_
@@ -273,8 +273,8 @@ supported:
 #  - gelu_backward
 #  - gelu_backward.grad_input
   - geometric_
-  - geqrf
-  - geqrf.a
+#  - geqrf
+#  - geqrf.a
 #  - logit
 #  - logit_
 #  - logit.out
@@ -324,8 +324,8 @@ supported:
 #  - index_select
 #  - index_select.out
 #  - index_add.out
-  - inverse
-  - inverse.out
+#  - inverse
+#  - inverse.out
 #  - is_set_to
 #  - isin.Scalar_Tensor_out
 #  - isin.Tensor_Scalar_out
@@ -368,10 +368,10 @@ supported:
 #  - lt.Scalar_out
 #  - lt.Tensor
 #  - lt.Tensor_out
-  - lu_solve
-  - lu_solve.out
-  - lu_unpack
-  - lu_unpack.out
+#  - lu_solve
+#  - lu_solve.out
+#  - lu_unpack
+#  - lu_unpack.out
 #  - masked_fill_.Scalar
 #  - masked_fill_.Tensor
 #  - masked_scatter_
@@ -463,8 +463,8 @@ supported:
 #  - normal.float_Tensor
 #  - normal.float_Tensor_out
 #  - normal_
-  - ormqr
-  - ormqr.out
+#  - ormqr
+#  - ormqr.out
 #  - polygamma
 #  - polygamma.out
 #  - polygamma_
@@ -628,8 +628,8 @@ supported:
 #  - topk.values
 #  - trace
   - _transformer_encoder_layer_fwd
-  - triangular_solve
-  - triangular_solve.X
+#  - triangular_solve
+#  - triangular_solve.X
 #  - tril.out
 #  - tril_
   - tril_indices
@@ -672,29 +672,29 @@ supported:
   - xlogy.OutTensor
 #  - zero_
   - channel_shuffle
-  - _linalg_slogdet.sign
-  - _linalg_det.result
+#  - _linalg_slogdet.sign
+#  - _linalg_det.result
 #  - conj_physical.out
 #  - conj_physical_
   - angle
   - angle.out
-  - linalg_eig
-  - linalg_eig.out
-  - linalg_eigh
-  - linalg_eigh.eigvals
-  - linalg_eigvalsh
-  - linalg_eigvalsh.out
-  - _linalg_eigh.eigenvalues
-  - _linalg_eigvals
-  - linalg_eigvals.out
-  - linalg_householder_product
-  - linalg_householder_product.out
-  - linalg_solve_triangular
-  - linalg_solve_triangular.out
+#  - linalg_eig
+#  - linalg_eig.out
+#  - linalg_eigh
+#  - linalg_eigh.eigvals
+#  - linalg_eigvalsh
+#  - linalg_eigvalsh.out
+#  - _linalg_eigh.eigenvalues
+#  - _linalg_eigvals
+#  - linalg_eigvals.out
+#  - linalg_householder_product
+#  - linalg_householder_product.out
+#  - linalg_solve_triangular
+#  - linalg_solve_triangular.out
 #  - linalg_vector_norm
 #  - linalg_vector_norm.out
 #  - complex.out
-  - vdot
+#  - vdot
 #  - __lshift__.Scalar
 #  - __lshift__.Tensor
 #  - __ilshift__.Scalar

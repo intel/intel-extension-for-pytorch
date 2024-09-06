@@ -13,6 +13,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace torch_ipex::xpu::dpcpp;
 using namespace torch_ipex::xpu::dpcpp::detail;
@@ -914,3 +915,16 @@ Tensor _fft_c2c(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("_fft_r2c", TORCH_FN((&at::AtenIpexTypeXPU::_fft_r2c)));
+  m.impl("_fft_r2c.out", TORCH_FN((&at::AtenIpexTypeXPU::_fft_r2c_out)));
+  m.impl("_fft_c2r", TORCH_FN((&at::AtenIpexTypeXPU::_fft_c2r)));
+  m.impl("_fft_c2r.out", TORCH_FN((&at::AtenIpexTypeXPU::_fft_c2r_out)));
+  m.impl("_fft_c2c", TORCH_FN((&at::AtenIpexTypeXPU::_fft_c2c)));
+  m.impl("_fft_c2c.out", TORCH_FN((&at::AtenIpexTypeXPU::_fft_c2c_out)));
+}
+
+} // namespace
