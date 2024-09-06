@@ -3,8 +3,6 @@ import intel_extension_for_pytorch  # noqa
 from torch.testing._internal.common_utils import TestCase, IS_WINDOWS
 import torch.nn as nn
 
-import pytest
-
 
 class TestNet(nn.Module):
     def __init__(self, in_planes, out_planes, stride=1, affine=True):
@@ -112,9 +110,6 @@ class TestTorchMethod(TestCase):
             self.assertEqual(grad_dpcpp.is_contiguous(), True)
             self.assertEqual(grad, grad_dpcpp)
 
-    @pytest.mark.skip(
-        reason="PT2.5: Expected X.is_contiguous(memory_format) to be true, but got false.",
-    )
     def test_group_norm(self):
         shapes = [
             [2, 2560, 32, 32],

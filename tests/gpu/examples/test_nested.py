@@ -245,3 +245,21 @@ class TestTorchMethod(TestCase):
         _test_bmm(dpcpp_device, torch.float32)
         _test_bmm(dpcpp_device, torch.double)
         _test_bmm(dpcpp_device, torch.bfloat16)
+
+    @pytest.mark.skipif(
+        not torch.xpu.has_fp64_dtype(), reason="fp64 not support by this device"
+    )
+    def test_alias(self):
+        def _test_alias(device, dtype):
+            # error case: one is nested but the other is not
+            nt = torch.nested.nested_tensor(
+                [torch.randn(2), torch.randn(3)], device=cpu_device, dtype=dtype
+            )
+            aten = torch.ops.aten
+            expect = aten.alias(nt)
+            actual = aten.alias(nt.to(device)).to(cpu_device)
+            self.assertEqual(actual, expect)
+
+        _test_alias(dpcpp_device, torch.float32)
+        _test_alias(dpcpp_device, torch.double)
+        _test_alias(dpcpp_device, torch.bfloat16)

@@ -85,3 +85,4 @@ supported:
  - _nested_tensor_softmax_with_shape
  - to_padded_tensor
  - bmm
+ - alias
