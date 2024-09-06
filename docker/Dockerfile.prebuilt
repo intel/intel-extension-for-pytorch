@@ -58,22 +58,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf  /var/lib/apt/lists/*
 
-RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
-   | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null && \
-   echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
-   | tee /etc/apt/sources.list.d/oneAPI.list
-
-ARG DPCPP_VER
-ARG MKL_VER
-ARG CCL_VER
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        intel-oneapi-runtime-dpcpp-cpp=${DPCPP_VER} \
-        intel-oneapi-runtime-mkl=${MKL_VER} \
-        intel-oneapi-runtime-ccl=${CCL_VER} && \
-    apt-get clean && \
-    rm -rf  /var/lib/apt/lists/*
+ENV OCL_ICD_VENDORS=/etc/OpenCL/vendors 
 
 ARG PYTHON
 RUN apt-get update && apt install -y software-properties-common 
