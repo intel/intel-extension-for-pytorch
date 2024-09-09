@@ -715,9 +715,15 @@ Tensor _convolution_out(
       ? get_cl_tag_by_ndim(input.ndimension())
       : at::MemoryFormat::Contiguous;
   auto bias = bias_r.defined() ? bias_r.contiguous() : bias_r;
+
+#ifdef BUILD_CONV_CONTIGUOUS
+  input = contiguous_if_needed(input, mfmt);
+  weight = contiguous_if_needed(weight, mfmt);
+#else
   if (transposed_ || groups_ != 1 || conv_wgh_need_contiguous(weight, mfmt)) {
     weight = contiguous_if_needed(weight, mfmt);
   }
+#endif
 
   auto k = weight.ndimension();
   if (k == input.ndimension() + 1) {

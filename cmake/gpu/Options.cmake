@@ -35,6 +35,8 @@ option(BUILD_BY_PER_KERNEL "Build by DPC++ per_kernel option (exclusive with USE
 option(BUILD_INTERNAL_DEBUG "Use internal debug code path" OFF)
 option(BUILD_SEPARATE_OPS "Build each operator in separate library" OFF)
 option(BUILD_SIMPLE_TRACE "Build simple trace for each registered operator" ON)
+#FIXME: For now oneDNN is not ready to support strided source
+option(BUILD_CONV_CONTIGUOUS "Require contiguous in oneDNN conv" ON)
 set(BUILD_OPT_LEVEL "" CACHE STRING "Add build option -Ox, accept values: 0/1")
 set(BUILD_WITH_SANITIZER "" CACHE STRING "Build with sanitizer check. Support one of address, thread, and leak options at a time. The default option is address.") 
 
@@ -145,6 +147,7 @@ function (print_xpu_config_summary)
     message(STATUS "  BUILD_INTERNAL_DEBUG  : ${BUILD_INTERNAL_DEBUG}")
     message(STATUS "  BUILD_SEPARATE_OPS    : ${BUILD_SEPARATE_OPS}")
     message(STATUS "  BUILD_SIMPLE_TRACE    : ${BUILD_SIMPLE_TRACE}")
+    message(STATUS "  BUILD_CONV_CONTIGUOUS : ${BUILD_CONV_CONTIGUOUS}")
     message(STATUS "")
     message(STATUS "********************************")
 endfunction()
