@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
-
+#include <ATen/autocast_mode.h>
 #include <oneDNN/oneDNN.h>
 #include "Norm.h"
 #include "comm/RegistrationDeclarations.h"
@@ -12,6 +12,7 @@ using namespace at::AtenIpexTypeXPU::normalization;
 
 namespace at {
 namespace AtenIpexTypeXPU {
+using autocast::cached_cast;
 
 // Decalre the rms_norm_fwd from RMSNorm.cpp for naive implementation fallback
 void rms_norm_fw(
@@ -583,6 +584,32 @@ Tensor fast_layer_norm(
       epsilon);
 }
 
+Tensor fast_layer_norm_autocast(
+    const Tensor& input,
+    at::IntArrayRef normalized_shape,
+    const c10::optional<at::Tensor>& weight_opt,
+    const c10::optional<at::Tensor>& bias_opt,
+    double epsilon) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::AutocastXPU);
+  auto to_type = input.scalar_type();
+  if (input.scalar_type() == at::ScalarType::Half ||
+      weight_opt->scalar_type() == at::ScalarType::Half ||
+      bias_opt->scalar_type() == at::ScalarType::Half) {
+    to_type = at::ScalarType::Half;
+  } else if (
+      input.scalar_type() == at::ScalarType::BFloat16 ||
+      weight_opt->scalar_type() == at::ScalarType::BFloat16 ||
+      bias_opt->scalar_type() == at::ScalarType::BFloat16) {
+    to_type = at::ScalarType::BFloat16;
+  }
+  return fast_layer_norm(
+      cached_cast(to_type, input, c10::DeviceType::XPU),
+      normalized_shape,
+      cached_cast(to_type, *weight_opt, c10::DeviceType::XPU),
+      cached_cast(to_type, *bias_opt, c10::DeviceType::XPU),
+      epsilon);
+}
+
 Tensor add_add_rms_norm(
     const Tensor& add1,
     const Tensor& add2,
@@ -689,6 +716,12 @@ IPEX_LIBRARY_FRAGMENT() {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "fast_layer_norm", fast_layer_norm, c10::DispatchKey::XPU);
+}
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "fast_layer_norm",
+      fast_layer_norm_autocast,
+      c10::DispatchKey::AutocastXPU);
 }
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
