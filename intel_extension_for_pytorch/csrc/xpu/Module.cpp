@@ -11,6 +11,7 @@
 #include <include/xpu/Settings.h>
 #include <profiler/profiler_kineto.h>
 #include <pybind11/stl.h>
+#include <runtime/XPUGraph.h>
 #include <utils/Settings.h>
 #include "Module.h"
 
@@ -177,6 +178,19 @@ PyObject* THPModule_memorySnapshot(PyObject* _unused, PyObject* noargs) {
   END_HANDLE_TH_ERRORS
 }
 
+static PyObject* THXPModule_isCurrentStreamCapturing_wrap(
+    PyObject* self,
+    PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  using namespace torch_ipex::xpu::dpcpp;
+  if (currentQueueState() == QueueState::Recording) {
+    Py_RETURN_TRUE;
+  } else {
+    Py_RETURN_FALSE;
+  }
+  END_HANDLE_TH_ERRORS
+}
+
 static PyObject* set_autocast_xpu_enabled(PyObject* _unused, PyObject* arg) {
   HANDLE_TH_ERRORS
   TORCH_CHECK_TYPE(
@@ -240,6 +254,10 @@ static struct PyMethodDef _THPModule_methods[] = {
      (PyCFunction)THPModule_memorySnapshot,
      METH_NOARGS,
      nullptr},
+    {"_xpu_isCurrentStreamCapturing",
+     THXPModule_isCurrentStreamCapturing_wrap,
+     METH_NOARGS,
+     nullptr},
     {"set_autocast_xpu_enabled", set_autocast_xpu_enabled, METH_O, nullptr},
     {"is_autocast_xpu_enabled", is_autocast_xpu_enabled, METH_NOARGS, nullptr},
     {"set_autocast_xpu_dtype", set_autocast_xpu_dtype, METH_O, nullptr},
@@ -265,6 +283,49 @@ at::Scalar scalar_slow(PyObject* object) {
     return at::Scalar(THPUtils_unpackComplexDouble(object));
   }
   return at::Scalar(THPUtils_unpackDouble(object));
+}
+
+// Binding C++ class torch_ipex::xpu::dpcpp::XPUGraph to
+// python front-end class intel_extension_for_pytorch._C._XPUGraph
+// as well as graph APIs used inside _XPUGraph class
+
+template <typename T>
+using shared_ptr_class_ = py::class_<T, std::shared_ptr<T>>;
+
+void THXPGraph_init(PyObject* module) {
+  auto torch_ipex_C_m = py::handle(module).cast<py::module>();
+
+  using namespace torch_ipex::xpu::dpcpp;
+
+  torch_ipex_C_m.def("_graph_pool_handle", &graph_pool_handle);
+
+  shared_ptr_class_<XPUGraph>(torch_ipex_C_m, "_XPUGraph")
+      .def(py::init<>())
+      .def(
+          "capture_begin",
+          [](XPUGraph& self, c10::optional<MempoolId_t> pool_opt) {
+            MempoolId_t pool =
+                pool_opt.has_value() ? pool_opt.value() : MempoolId_t{0, 0};
+            return self.begin_recording(pool);
+          },
+          py::arg("pool"),
+          py::call_guard<py::gil_scoped_release>())
+      .def(
+          "capture_end",
+          torch::wrap_pybind_function_no_gil(&XPUGraph::end_recording))
+      .def("replay", torch::wrap_pybind_function_no_gil(&XPUGraph::replay))
+      .def("reset", torch::wrap_pybind_function_no_gil(&XPUGraph::reset))
+      .def("pool", torch::wrap_pybind_function_no_gil(&XPUGraph::pool))
+      .def(
+          "debug_dump",
+          torch::wrap_pybind_function_no_gil(&XPUGraph::print_graph))
+      .def(
+          "enable_debug_mode",
+          torch::wrap_pybind_function_no_gil(&XPUGraph::enable_debug_mode))
+      .def(
+          "debug_dump",
+          torch::wrap_pybind_function_no_gil(&XPUGraph::print_graph),
+          py::arg("debug_path"));
 }
 
 void init_xpu_module(pybind11::module& m) {
@@ -435,6 +496,8 @@ void init_xpu_module(pybind11::module& m) {
 
   auto module = m.ptr();
   PyModule_AddFunctions(module, _THPModule_methods);
+
+  THXPGraph_init(module);
 }
 
 } // namespace torch_ipex::xpu
