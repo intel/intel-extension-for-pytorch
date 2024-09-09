@@ -33,6 +33,7 @@ struct dispatch_fmha_forward_args_t {
   uint32_t head_size;
   uint32_t num_queries;
   uint32_t num_keys;
+  uint64_t q_strideF;
   uint32_t bias_strideB;
   uint32_t bias_strideN;
   uint32_t bias_strideF;
@@ -59,6 +60,7 @@ struct dispatch_fmha_forward_args_t {
         head_size(args.head_size),
         num_queries(args.num_queries),
         num_keys(args.num_keys),
+        q_strideF(args.q_strideF),
         bias_strideB(args.bias_strideB),
         bias_strideN(args.bias_strideN),
         bias_strideF(args.bias_strideF),
@@ -125,6 +127,7 @@ struct FmhaForwardKernelFunctor {
           args.head_size,
           args.num_queries,
           args.num_keys,
+          args.q_strideF,
           args.bias_strideB,
           args.bias_strideN,
           args.bias_strideF,

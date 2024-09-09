@@ -55,18 +55,17 @@ inline bool fp64_valid() {
 #define RECORD_FUNC_IMPLG(F)
 #endif
 
-static Tensor mm_common(const Tensor& a, const Tensor& b) {
+static void mm_common_out(const Tensor& a, const Tensor& b, Tensor& out) {
   auto af = a.flatten(0, -2);
   int m = af.sizes()[0];
   int n = b.sizes()[1];
   int k = b.sizes()[0];
-  auto output = at::empty({m, n}, a.options());
   torch_ipex::xpu::COMPUTE_ENG real_eng =
       choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, a, b);
   bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
   bool xetla_valid = fp64_valid() && compute_eng_valid;
-  auto policy = HGEMM_XETLA()
-                    .add_matrix_c(output)
+  auto policy = HGEMM_XETLA() //
+                    .add_matrix_c(out)
                     .add_matrix_a(a)
                     .add_matrix_b(b)
                     .build();
@@ -80,10 +79,17 @@ static Tensor mm_common(const Tensor& a, const Tensor& b) {
     RECORD_ONEDNN_FUNCTION_IMPL(mm_common)
     bool is_fused;
     Attr attr;
-    output = impl::matmul_fusion_variants(
-        output, a, b, true, attr, is_fused = false);
+    impl::matmul_fusion_variants(out, a, b, true, attr, is_fused = false);
   }
-  return matmul_resize(a, output);
+}
+
+static Tensor mm_common(const Tensor& a, const Tensor& b) {
+  auto af = a.flatten(0, -2);
+  int m = af.sizes()[0];
+  int n = b.sizes()[1];
+  auto out = at::empty({m, n}, a.options());
+  mm_common_out(a, b, out);
+  return matmul_resize(a, out);
 }
 
 static Tensor mm_resadd(
@@ -899,6 +905,7 @@ namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER("mm_.xpu", at::AtenIpexTypeXPU::mm_common);
   IPEX_OP_REGISTER("mm_common.xpu", at::AtenIpexTypeXPU::mm_common);
+  IPEX_OP_REGISTER("mm_common_out.xpu", at::AtenIpexTypeXPU::mm_common_out);
   IPEX_OP_REGISTER("mm_resadd.xpu", at::AtenIpexTypeXPU::mm_resadd);
   IPEX_OP_REGISTER(
       "mm_resadd_resadd.xpu", at::AtenIpexTypeXPU::mm_resadd_resadd);

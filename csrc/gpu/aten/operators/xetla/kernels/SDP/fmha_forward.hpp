@@ -49,6 +49,7 @@ class fmha_forward_t {
     uint32_t uH;
     uint32_t uF;
     uint32_t uT;
+    uint64_t q_strideF;
     uint32_t bias_strideB;
     uint32_t bias_strideN;
     uint32_t bias_strideF;
@@ -82,6 +83,7 @@ class fmha_forward_t {
         uint32_t head_size,
         uint32_t num_queries,
         uint32_t num_keys,
+        uint64_t q_strideF,
         uint32_t bias_strideB,
         uint32_t bias_strideN,
         uint32_t bias_strideF,
@@ -107,6 +109,7 @@ class fmha_forward_t {
           uH(head_size),
           uF(num_queries),
           uT(num_keys),
+          q_strideF(q_strideF),
           bias_strideB(bias_strideB),
           bias_strideN(bias_strideN),
           bias_strideF(bias_strideF),
@@ -267,9 +270,7 @@ class fmha_forward_t {
         uint32_t end_x = start_acc + args.uH;
 
         mem_desc_Qi.init(
-            args.Q_ptr,
-            {end_x, end_y, b_stride * args.uB},
-            {start_acc, start_y});
+            args.Q_ptr, {end_x, end_y, args.q_strideF}, {start_acc, start_y});
         mem_desc_Oi.init(
             args.O_ptr,
             {end_x, end_y, b_stride * args.uB},
@@ -299,12 +300,12 @@ class fmha_forward_t {
 
         int32_t start_acc = head_id * args.uH;
         uint32_t end_acc = start_acc + args.uH;
-        const uint32_t ld_qo = args.uH * args.uN;
+        const uint32_t ld_o = args.uH * args.uN;
 
         mem_desc_Qi.init(
-            args.Q_ptr, {end_acc, end_y, ld_qo}, {start_acc, start_y});
+            args.Q_ptr, {end_acc, end_y, args.q_strideF}, {start_acc, start_y});
         mem_desc_Oi.init(
-            args.O_ptr, {end_acc, end_y, ld_qo}, {start_acc, start_y});
+            args.O_ptr, {end_acc, end_y, ld_o}, {start_acc, start_y});
       }
 
       int32_t start_x_ml = item.get_group(1) * kBr + sg_idy * kSgBr;

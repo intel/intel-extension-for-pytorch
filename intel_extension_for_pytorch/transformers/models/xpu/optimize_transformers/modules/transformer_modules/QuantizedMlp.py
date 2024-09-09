@@ -3,7 +3,10 @@ import intel_extension_for_pytorch as ipex
 from .Mlp import IPEXTransformerMLP
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
+    dequant_gemm_block,
+    dequant_gemm_block_with_params,
 )
+from .model_utils import xpu_gemm_use_xetla
 
 
 class IPEXTransformerMLPOptimizedInt4(IPEXTransformerMLP):
@@ -226,6 +229,9 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4):
         torch.xpu.synchronize()
 
     def out_mm(self, hidden_states, residual=None):
+        if hidden_states.shape[0] > 1 and xpu_gemm_use_xetla():
+            hidden_states = dequant_gemm_block(hidden_states, self.c_proj_quant)
+            return hidden_states + residual
         if self.c_proj_quant.bias is None:
             hidden_states = torch.ops.torch_ipex.mm_add_int4(
                 hidden_states,
@@ -292,6 +298,27 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4):
             )
 
     def inter_mm(self, hidden_states):
+        if hidden_states.shape[0] > 1 and xpu_gemm_use_xetla():
+            hidden_states2 = dequant_gemm_block_with_params(
+                hidden_states,
+                self.mlp_silu_qweight[0],
+                self.mlp_silu_scales[0],
+                self.mlp_silu_qzeros[0] if self.mlp_silu_qzeros is not None else None,
+                self.fc_out_quant.blocksize,
+                bias=self.fc_out_quant.bias,
+                g_idx=self.fc_out_quant.g_idx,
+            )
+            hidden_states1 = dequant_gemm_block_with_params(
+                hidden_states,
+                self.mlp_silu_qweight[1],
+                self.mlp_silu_scales[1],
+                self.mlp_silu_qzeros[1] if self.mlp_silu_qzeros is not None else None,
+                self.fc_in_quant.blocksize,
+                bias=self.fc_in_quant.bias,
+                g_idx=self.fc_in_quant.g_idx,
+            )
+            hidden_states2 = self.act(hidden_states2)
+            return hidden_states1 * hidden_states2
         if self.fc_in_quant.g_idx is not None:
             # mlp fusion cannot apply actorder, so fallback
             return self.inter_mm_fallback(hidden_states)

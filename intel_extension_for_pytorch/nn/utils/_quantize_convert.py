@@ -241,6 +241,8 @@ class WeightOnlyQuantizedLinear(nn.Module):
             self.use_optimum_format = False
 
         if xpu_gemm_use_xetla():
+            if input.shape[1] > 1:
+                return dequant_gemm_block(input, self)
             return torch.ops.torch_ipex.mm_low_bits(
                 input,
                 self.qweight,
@@ -346,3 +348,63 @@ def convert_qmodel(model, dtype, group_size):
 
     convert_qmodel_recursive(model)
     return model
+
+
+def dequant_gemm_block(input, quant_layer, output=None):
+    if quant_layer.g_idx is not None:
+        input = input[:, :, quant_layer.g_idx]
+    if output is None:
+        output = torch.ops.torch_ipex.mm_common(
+            input,
+            torch.ops.torch_ipex.int4x8_dequantize(
+                quant_layer.qweight,
+                quant_layer.scales,
+                quant_layer.qzeros,
+                quant_layer.blocksize,
+            ),
+        )
+    else:
+        torch.ops.torch_ipex.mm_common_out(
+            input,
+            torch.ops.torch_ipex.int4x8_dequantize(
+                quant_layer.qweight,
+                quant_layer.scales,
+                quant_layer.qzeros,
+                quant_layer.blocksize,
+            ),
+            output,
+        )
+    if quant_layer.bias is not None:
+        output += quant_layer.bias
+    return output
+
+
+def dequant_gemm_block_with_params(
+    input, qweight, scales, qzeros, blocksize, bias=None, g_idx=None, output=None
+):
+    if g_idx is not None:
+        input = input[:, :, g_idx]
+    if output is None:
+        output = torch.ops.torch_ipex.mm_common(
+            input,
+            torch.ops.torch_ipex.int4x8_dequantize(
+                qweight,
+                scales,
+                qzeros,
+                blocksize,
+            ),
+        )
+    else:
+        torch.ops.torch_ipex.mm_common_out(
+            input,
+            torch.ops.torch_ipex.int4x8_dequantize(
+                qweight,
+                scales,
+                qzeros,
+                blocksize,
+            ),
+            output,
+        )
+    if bias is not None:
+        output += bias
+    return output

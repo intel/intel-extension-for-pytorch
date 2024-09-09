@@ -51,6 +51,7 @@ FILE(GLOB xetla_ops_src
   "operators/GRU.cpp"
   "operators/XEGEMM_INT4.cpp"
   "operators/XeGemm.cpp"
+  "operators/XeInt4Dequantize.cpp"
 )
 set(IPEX_ATEN_XETLA_OPS_SRCS "${xetla_ops_src}" PARENT_SCOPE)
 set(XETLA_LIBS ${XETLA_LIBS} PARENT_SCOPE)

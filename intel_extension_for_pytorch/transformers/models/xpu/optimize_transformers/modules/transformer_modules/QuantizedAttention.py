@@ -4,7 +4,9 @@ from .._transformer_configuration import IPEXTransformerConfig
 from .Attention import IPEXTransformerAttnOptimizedFp16
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
+    dequant_gemm_block,
 )
+from .model_utils import xpu_gemm_use_xetla
 
 
 class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
@@ -168,6 +170,22 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
         torch.xpu.synchronize()
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
+        if hidden_states.shape[0] > 1 and xpu_gemm_use_xetla():
+            # dequantize+gemm kernel can improve IPEX int4 linear performance of first token
+            if (
+                self.q_proj_quant.qweight is None
+                and self.qkv_proj_quant.qweight is not None
+            ):
+                qkv_out = dequant_gemm_block(hidden_states, self.qkv_proj_quant)
+                m = query.shape[-1]
+                query = qkv_out[:, :, :m]
+                key.copy_(qkv_out[:, :, m : 2 * m])
+                value.copy_(qkv_out[:, :, 2 * m :])
+            else:
+                dequant_gemm_block(hidden_states, self.q_proj_quant, output=query)
+                dequant_gemm_block(hidden_states, self.k_proj_quant, output=key)
+                dequant_gemm_block(hidden_states, self.v_proj_quant, output=value)
+            return query, key, value
         if self.q_proj_quant.g_idx is not None:
             # qkv fusion cannot apply actorder
             return self.compute_qkv_gemm_separate(hidden_states, query, key, value)
@@ -255,6 +273,12 @@ class IPEXTransformerAttnOptimizedInt4(IPEXTransformerAttnOptimizedFp16):
 
     def out_proj_compute(self, attn_output, residual=None):
         arch = 1 if ipex._C._has_2d_block_array(0) else 0
+        if attn_output.shape[0] > 1 and xpu_gemm_use_xetla():
+            # dequantize+gemm kernel can improve IPEX int4 linear performance of first token
+            attn_output = dequant_gemm_block(attn_output, self.out_proj_quant)
+            if residual is not None:
+                attn_output += residual
+            return attn_output
         if residual is None:
             if self.out_proj.bias is not None:
                 attn_output = torch.ops.torch_ipex.mm_bias_int4(

@@ -32,6 +32,7 @@ struct fmha_forward_kernel_args_t {
   uint32_t head_size;
   uint32_t num_queries;
   uint32_t num_keys;
+  uint64_t q_strideF;
   uint32_t bias_strideB;
   uint32_t bias_strideN;
   uint32_t bias_strideF;
