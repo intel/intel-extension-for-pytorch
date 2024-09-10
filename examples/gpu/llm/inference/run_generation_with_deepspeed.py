@@ -39,6 +39,11 @@ MODEL_CLASSES = {
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
+# Set console encoding to UTF-8
+if os.name == 'nt':
+    os.system('chcp 65001')
+    sys.stdout.reconfigure(encoding='utf-8')
+
 # the Deepspeed team made these so it's super fast to load (~1 minute), rather than wait 10-20min loading time.
 tp_presharded_models = ["microsoft/bloom-deepspeed-inference-int8", "microsoft/bloom-deepspeed-inference-fp16"]
 

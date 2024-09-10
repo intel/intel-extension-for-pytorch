@@ -34,6 +34,11 @@ MODEL_CLASSES = {
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
+# Set console encoding to UTF-8
+if os.name == 'nt':
+    os.system('chcp 65001')
+    sys.stdout.reconfigure(encoding='utf-8')
+
 # args
 parser = argparse.ArgumentParser("Generation script (fp32/bf16 path)", add_help=False)
 parser.add_argument(
