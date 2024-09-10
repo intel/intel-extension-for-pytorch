@@ -5,7 +5,7 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 The MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound because iterative decode and kv_cache require special management to reduce memory overheads. Intel® Extension for PyTorch* provides a lot of specific optimizations for these LLMs. 
 On the operator level, the extension provides highly efficient GEMM kernel to speed up Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant is enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.
 
-These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.optimize_transformers()`. Check `optimize_transformers <./llm/llm_optimize_transformers.md>`_ for more details.
+These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.llm.optimize()`. Check `ipex.llm.optimize <./llm/llm_optimize_transformers.md>`_ for more details.
 
 .. toctree::
    :hidden:
@@ -13,7 +13,7 @@ These LLM-specific optimizations can be automatically applied with a single fron
 
    llm/llm_optimize_transformers
 
-Optimized Models List
+Validated Models List
 ---------------------
 
 LLM Inference
@@ -207,5 +207,6 @@ For more detailed information, check `WOQ INT4 <llm/int4_weight_only_quantizatio
    :maxdepth: 1
 
    llm/int4_weight_only_quantization
+
 
 

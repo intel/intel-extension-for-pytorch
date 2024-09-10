@@ -16,7 +16,7 @@ huggingface-cli login --token <your_token_here>
 For Alpaca dataset, you can get here: [Alpaca dataset](https://github.com/tatsu-lab/stanford_alpaca/blob/main/alpaca_data.json).
 ```
 git clone https://github.com/tatsu-lab/stanford_alpaca
-cd standford_alpaca
+cd stanford_alpaca
 mv alpaca_data.json <Llama2_folder>
 ```
 

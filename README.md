@@ -23,7 +23,7 @@ The extension can be loaded as a Python module for Python programs or linked as 
 
 In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are introduced in the Intel® Extension for PyTorch\*. Check [LLM optimizations CPU](./examples/cpu/inference/python/llm) and [LLM optimizations GPU](./examples/gpu/llm) for details.
 
-### Optimized Model List 
+### Validated Model List 
 
 #### LLM Inference
 

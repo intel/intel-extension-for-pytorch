@@ -15,7 +15,7 @@ spdlog::level::level_enum get_log_level_from_int(int level) {
     return spdlog::level::critical;
   } else {
     throw std::runtime_error(
-        "USING error log level for IPEX_LOGGING, log level should be -1 to 5, but met " +
+        "USING error log level for IPEX_LOG, log level should be -1 to 5, but met " +
         std::string{level});
   }
 }
@@ -231,7 +231,7 @@ void EventLogger::print_result(int log_level) {
     if (this->message_queue.size() >= 2) {
       auto next_time = this->message_queue.front().timestamp;
       auto next_step = this->message_queue.front().step_id;
-      // inside IPEX_LOGGING we are using nanoseconds, 1ns = 0.001us, cast to us
+      // inside IPEX_LOG we are using nanoseconds, 1ns = 0.001us, cast to us
       // here
       auto time_step = static_cast<float>((next_time - this_time) / 1000);
       log_result_with_args(
@@ -283,3 +283,4 @@ void BasicLogger::update_logger() {
   logger->set_pattern("[%c %z] [%l] [thread %t] %v");
   spdlog::set_default_logger(logger);
 }
+

@@ -7,7 +7,7 @@ Here you can find the inference benchmarking scripts for large language models (
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
 
-## Optimized Models
+## Validated Models
 
 Currently, only support Transformers 4.38.1. Support for newer versions of Transformers and more models will be available in the future.
 

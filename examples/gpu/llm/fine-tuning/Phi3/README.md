@@ -68,7 +68,7 @@ Example: Phi-3 Mini 4k LoRA fine-tuning on single card. The default dataset `fin
 ```bash
 export TORCH_LLM_ALLREDUCE=1
 
-export model="meta-llama/Meta-Llama-3-8B"
+export model="microsoft/Phi-3-mini-4k-instruct"
 
 python phi3_ft.py \
     --model_name_or_path ${model} \

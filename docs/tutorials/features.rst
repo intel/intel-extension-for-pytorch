@@ -137,19 +137,6 @@ For more detailed information, check `torch.compile for GPU <features/torch_comp
 
    features/torch_compile_gpu
 
-Simple Trace Tool (Prototype)
------------------------------
-
-Simple Trace is a built-in debugging tool that lets you control printing out the call stack for a piece of code. Once enabled, it can automatically print out verbose messages of called operators in a stack format with indenting to distinguish the context. 
-
-For more detailed information, check `Simple Trace Tool <features/simple_trace.md>`_.
-
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-
-   features/simple_trace
-
 Kineto Supported Profiler Tool (Prototype)
 ------------------------------------------
 
@@ -178,18 +165,19 @@ For more detailed information, check `Compute Engine <features/compute_engine.md
    features/compute_engine
 
 
-``IPEX_LOGGING`` (Prototype feature for debug)
-----------------------------------------------
+``IPEX_LOG`` (Prototype feature for debug)
+------------------------------------------
 
 
-``IPEX_LOGGING`` provides the capability to log verbose information from Intel® Extension for PyTorch\* . Please use ``IPEX_LOGGING`` to get the log information or trace the execution from Intel® Extension for PyTorch\*. Please continue using PyTorch\* macros such as ``TORCH_CHECK``, ``TORCH_ERROR``, etc. to get the log information from PyTorch\*.
+``IPEX_LOG`` provides the capability to log verbose information from Intel® Extension for PyTorch\* . Please use ``IPEX_LOG`` to get the log information or trace the execution from Intel® Extension for PyTorch\*. Please continue using PyTorch\* macros such as ``TORCH_CHECK``, ``TORCH_ERROR``, etc. to get the log information from PyTorch\*.
 
-For more detailed information, check `IPEX_LOGGING <features/ipex_log.md>`_.
+For more detailed information, check `IPEX_LOG <features/ipex_log.md>`_.
 
 .. toctree::
    :hidden:
    :maxdepth: 1
 
    features/ipex_log
+
 
 

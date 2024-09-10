@@ -54,6 +54,7 @@ cd examples/gpu/llm
 bash ./tools/env_setup.sh 7
 conda deactivate
 conda activate llm
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 source ./tools/env_activate.sh [inference|fine-tuning]
 ```
 
@@ -105,6 +106,7 @@ bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> 
 
 conda deactivate
 conda activate llm
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 source ./tools/env_activate.sh [inference|fine-tuning]
 ```
 

@@ -160,7 +160,7 @@ function install-driver() {
         ${SUDO} dnf install -y intel-opencl-24.26.30049.10 \
         level-zero-1.17.6 \
         level-zero-devel-1.17.6 \
-        intel-level-zero-gpu-1.3.30049 \
+        intel-level-zero-gpu-1.3.30049.10 \
         intel-ocloc-24.26.30049.10 \
         xpu-smi-1.2.35
     fi
@@ -168,7 +168,7 @@ function install-driver() {
         ${SUDO} zypper install -y --oldpackage intel-opencl-24.26.30049.10 \
         level-zero-1.17.6 \
         level-zero-devel-1.17.6 \
-        intel-level-zero-gpu-1.3.30049 \
+        intel-level-zero-gpu-1.3.30049.10 \
         intel-ocloc-24.26.30049.10 \
         xpu-smi-1.2.35
     fi

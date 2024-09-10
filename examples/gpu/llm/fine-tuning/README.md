@@ -16,7 +16,7 @@ Our examples integrate with the popular tools and libraries from the ecosystem:
 - [Accelerate](https://github.com/huggingface/accelerate) for Multi-GPUs launch
 
 
-### LLM fine-tuning optimized with Intel® Data Center Max 1550 GPU on Linux
+### LLM fine-tuning validated with Intel® Data Center Max 1550 GPU on Linux
 
 **Note**:
 Here we mainly focus on the memory-constrained fine-tuning on single GPU, and provide examples for LoRA fine-tuning. If you want to take a try for full fine-tuning, you could set the number of GPU in distributed cases as 1, and make sure your GPU memory is large enough for model states (parameters, gradients, optimizer states) and residual states (activation, temporary buffers and unusable fragmented memory).
@@ -38,7 +38,7 @@ Here we mainly focus on the memory-constrained fine-tuning on single GPU, and pr
 
 \* Intel® Data Center Max 1550 GPU: support all the models in the model list above.
 
-### LLM fine-tuning optimized with Intel® Core™ Ultra Processors with Intel® Arc™ Graphics 
+### LLM fine-tuning validated with Intel® Core™ Ultra Processors with Intel® Arc™ Graphics 
 
 | MODEL FAMILY | Verified < MODEL ID > (Hugging Face hub)| Mixed Precision (BF16+FP32) | Full fine-tuning  | LoRA |  
 |---|:---:|:---:|:---:|:---:|
