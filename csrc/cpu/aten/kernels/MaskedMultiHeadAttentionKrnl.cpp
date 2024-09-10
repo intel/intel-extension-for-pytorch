@@ -697,7 +697,10 @@ scale_dot_product_for_indirect_access_kv_cache(
   long new_beam_idx[beam_batch][offset + query.size(1) + 1] = {};
   auto prompt_len = b_ptr[(max_cache_size - 2) * beam_batch];
   auto prompt_bs = b_ptr[(max_cache_size - 1) * beam_batch];
-  auto beam_size = beam_batch / prompt_bs;
+  auto beam_size = 1;
+  if (prompt_bs != 0) {
+    beam_size = beam_batch / prompt_bs;
+  }
   auto need_update_beam_idx = offset > 0 and beam_size > 1;
   if (need_update_beam_idx) {
     // according to last decoded token to get the target beam for the past
@@ -1036,7 +1039,10 @@ scale_dot_product_for_indirect_access_kv_cache_half(
   long new_beam_idx[beam_batch][offset + query.size(1) + 1] = {};
   auto prompt_len = b_ptr[(max_cache_size - 2) * beam_batch];
   auto prompt_bs = b_ptr[(max_cache_size - 1) * beam_batch];
-  auto beam_size = beam_batch / prompt_bs;
+  auto beam_size = 1;
+  if (prompt_bs != 0) {
+    beam_size = beam_batch / prompt_bs;
+  }
   auto need_update_beam_idx = offset > 0 and beam_size > 1;
   if (need_update_beam_idx) {
     // according to the last decoded token to get the target beam for the past
