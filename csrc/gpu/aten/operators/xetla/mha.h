@@ -45,6 +45,7 @@ struct fmha_forward_kernel_args_t {
   bool is_varlen;
   uint64_t seed_t;
   uint64_t offset_t;
+  float softcap = -1.;
 };
 
 struct paged_attention_fwd_kernel_args_t {

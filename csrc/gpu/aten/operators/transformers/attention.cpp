@@ -728,7 +728,8 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_varlen_math(
     double dropout_p,
     bool is_causal,
     const c10::optional<Tensor>& dropout_mask,
-    c10::optional<double> scale) {
+    c10::optional<double> scale,
+    c10::optional<double> softcap) {
   C10_LOG_API_USAGE_ONCE("torch.sdpa.math_fallback");
   if (query_.is_nested() || key.is_nested() || value.is_nested()) {
     TORCH_CHECK(
@@ -764,6 +765,10 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_varlen_math(
         sdp::convert_boolean_attn_mask(causal_mask, query.dtype()).value();
   }
   auto attn = at::matmul(query, key.transpose(-2, -1) * scaling_factor);
+  if (softcap.value() > 0.0) {
+    attn = c10::SymFloat(softcap.value()) *
+        at::tanh(attn / c10::SymFloat(softcap.value()));
+  }
   if (attn_mask.has_value() && !is_causal) {
     if (at::areAnyTensorSubclassLike({attn, *attn_mask})) {
       attn = attn.add(*attn_mask);
@@ -817,7 +822,8 @@ Tensor varlen_fwd_math_impl(
     const double softmax_scale,
     const bool zero_tensors,
     bool is_causal,
-    const bool return_softmax) {
+    const bool return_softmax,
+    const double softcap) {
   // Get the length of each sequences in query
   TORCH_CHECK(
       !alibi_slopes_.has_value(),
@@ -906,7 +912,8 @@ Tensor varlen_fwd_math_impl(
           p_dropout,
           is_causal,
           c10::nullopt,
-          softmax_scale));
+          softmax_scale,
+          softcap));
 
   // convert back to [batch, seqlen, num_heas, head_dim]
   out = out.permute({0, 2, 1, 3}).index({q_mask});
@@ -931,7 +938,8 @@ Tensor varlen_fwd(
     const bool zero_tensors,
     bool is_causal,
     const bool return_softmax,
-    c10::optional<at::Generator> gen_) {
+    c10::optional<at::Generator> gen_,
+    const double softcap = -1.) {
   // Check datatype
   TORCH_CHECK(
       !seqused_k.has_value(), "We do not support seqused_k feature currently!");
@@ -1047,7 +1055,8 @@ Tensor varlen_fwd(
         softmax_scale,
         zero_tensors,
         is_causal,
-        return_softmax);
+        return_softmax,
+        softcap);
   }
 
 #if defined(USE_XETLA)
@@ -1091,7 +1100,8 @@ Tensor varlen_fwd(
        /* use dropout */ p_dropout > 0.0 ? true : false,
        /* use varlen */ true,
        (uint64_t)*seed_t.data_ptr<int64_t>(),
-       (uint64_t)*offset_t.data_ptr<int64_t>()});
+       (uint64_t)*offset_t.data_ptr<int64_t>(),
+       softcap});
   DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
 #else
   AT_ERROR("XETLA VarlenAttention: xetla library not found in compilation");

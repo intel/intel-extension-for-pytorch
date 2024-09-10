@@ -66,6 +66,7 @@ class fmha_forward_t {
     uint64_t seed;
     uint64_t offset;
     bool is_bias_add;
+    accum_t softcap;
 
     inline arguments_t() = default;
     inline arguments_t(
@@ -94,7 +95,8 @@ class fmha_forward_t {
         uint32_t alibi_padded_block_size,
         uint32_t attn_mask_padded_block_size,
         uint64_t seed_t,
-        uint64_t offset_t)
+        uint64_t offset_t,
+        accum_t softcap = -1.)
         : Q_ptr(query),
           K_ptr(key),
           V_ptr(value),
@@ -122,7 +124,8 @@ class fmha_forward_t {
           uMT(attn_mask_padded_block_size),
           seed(seed_t),
           offset(offset_t),
-          is_bias_add(bias_strideF == 0) {}
+          is_bias_add(bias_strideF == 0),
+          softcap(softcap) {}
   };
 
  private:
@@ -142,6 +145,7 @@ class fmha_forward_t {
       (arch_has_xmx<arch_tag>),
       group::compute_policy_default_xmx<comp_attr, knobs, arch_tag>,
       group::compute_policy_default_fpu<comp_attr, knobs, arch_tag>>;
+  using tanh_t = typename subgroup::tanh_op_t;
   // ---------------- // Tile shape and Threads // ---------------- //
   static constexpr uint32_t kBr = fmha_policy::kBr;
   static constexpr uint32_t kBc = fmha_policy::kBc;
@@ -487,6 +491,12 @@ class fmha_forward_t {
     // Multiply by softmax scaling factor
     // bmm * alpha
     matAccSij.reg *= args.sm_scale;
+    if (args.softcap > 0.0) {
+      matAccSij.reg /= args.softcap;
+      tanh_t tanh;
+      tanh(matAccSij, 0);
+      matAccSij.reg *= args.softcap;
+    }
 
     // + beta * alibi
     if constexpr (kUseAlibi && !kVarlen) {

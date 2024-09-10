@@ -232,6 +232,7 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
         is_causal,
         return_softmax,
         gen_,
+        softcap=-1.0,
     ):
         _IPEXVarlenScaledDotProductXPU.apply_function_flash_varlen(
             query,
@@ -253,6 +254,7 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
             -1,
             return_softmax,
             gen_,
+            softcap,
         )
         return out
 
@@ -278,6 +280,7 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
         window_size_right,
         return_softmax,
         gen_,
+        softcap=-1,
     ):
         assert (
             window_size_left == -1 and window_size_right == -1
@@ -302,6 +305,7 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
                 is_causal,
                 return_softmax,
                 gen_,
+                softcap,
             )
         else:
             torch.xpu.varlen_fwd(
@@ -319,6 +323,7 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
                 is_causal,
                 return_softmax,
                 gen_,
+                softcap,
             )
         return out
 
@@ -338,6 +343,7 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
         is_causal,
         return_softmax,
         gen_,
+        softcap=-1.0,
     ):
         return self.apply_function(
             query,
@@ -354,6 +360,7 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
             is_causal,
             return_softmax,
             gen_,
+            softcap,
         )
 
 

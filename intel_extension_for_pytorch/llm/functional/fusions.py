@@ -249,6 +249,7 @@ def varlen_attention(
     is_causal: bool,
     return_softmax: bool,
     gen_: torch.Generator,
+    softcap: float = -1.0,
 ):
     r"""
     Applies PyTorch scaled_dot_product_attention on the inputs of query, key and value
@@ -293,6 +294,7 @@ def varlen_attention(
         is_causal,
         return_softmax,
         gen_,
+        softcap,
     )
 
 

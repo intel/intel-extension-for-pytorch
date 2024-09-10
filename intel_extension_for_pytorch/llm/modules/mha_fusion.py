@@ -326,6 +326,7 @@ class VarlenAttention(nn.Module):
             dropout is applied, default is 0.0.
         softmax_scale (float): scaling factor applied is prior to softmax.
         is_causal (bool): whether to apply causal attention masking, default is True.
+        softcap (float): the positive softcap value to apply on the attention weights, default is -1.
 
     Examples:
         >>> # module init:
@@ -372,6 +373,7 @@ class VarlenAttention(nn.Module):
         is_causal: bool,
         return_softmax: bool,
         gen_: torch.Generator,
+        softcap: float = -1,
     ):
         return cls.runtime_ops.get_module_from_device(
             query.device.type, IPEXCustomOpType.VARLEN_ATTENTION, False
@@ -390,6 +392,7 @@ class VarlenAttention(nn.Module):
             is_causal,
             return_softmax,
             gen_,
+            softcap,
         )
 
     @classmethod

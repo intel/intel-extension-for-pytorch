@@ -239,3 +239,77 @@ def test_varlen_fwd(
         None,
     )
     torch.testing.assert_close(out, out_ref, atol=1e-3, rtol=1e-3)
+
+
+SOFTCAP = 50.0
+
+
+@pytest.mark.parametrize("is_causal", [True, False])
+@pytest.mark.skipif(not torch.xpu.has_2d_block_array(), reason="fallback is required")
+def test_varlen_attention_softcap(
+    is_causal: bool,
+):
+    head_dim = 64
+    num_heads = 32
+    batch_size = 1
+    seqlen_range = 10
+    dtype = torch.float16
+
+    torch.manual_seed(15)
+    seqlen_list = torch.randint(1, seqlen_range, [batch_size], dtype=torch.int32)
+    if not is_causal:
+        seqlen_list = torch.ones(1, dtype=torch.int32)
+    max_seqlen = torch.max(seqlen_list)
+    cu_seqlen = torch.cumsum(seqlen_list, dim=0)
+    num_heads_query, num_heads_kv = num_heads, num_heads
+    cu_seqlen = (
+        torch.cat([torch.tensor([0]), cu_seqlen], dim=0).to(torch.int32).to("xpu")
+    )
+
+    query = torch.randn(
+        [cu_seqlen[-1], num_heads_query, head_dim], dtype=dtype, device="xpu"
+    )
+    key = torch.randn(
+        [cu_seqlen[-1], num_heads_kv, head_dim], dtype=dtype, device="xpu"
+    )
+    value = torch.randn(
+        [cu_seqlen[-1], num_heads_kv, head_dim], dtype=dtype, device="xpu"
+    )
+    out = query.clone()
+    softmax_scale = 1 / math.sqrt(head_dim)
+    ipex.llm.functional.varlen_attention(
+        query,
+        key,
+        value,
+        out,
+        cu_seqlen,
+        cu_seqlen,
+        max_seqlen,
+        max_seqlen,
+        0.0,
+        softmax_scale,
+        False,
+        is_causal,
+        False,
+        None,
+        softcap=SOFTCAP,
+    )
+    query = query.transpose(0, 1).to(torch.float32)
+    key = key.transpose(0, 1).to(torch.float32)
+    value = value.transpose(0, 1).to(torch.float32)
+
+    attn = query @ key.transpose(1, 2) * softmax_scale
+    attn = torch.tanh(attn / SOFTCAP) * SOFTCAP
+    if is_causal:
+        causal_mask = torch.full(
+            (query.shape[-2], query.shape[-2]),
+            fill_value=torch.finfo(dtype).min,
+            dtype=dtype,
+            device="xpu",
+        )
+        causal_mask = torch.triu(causal_mask, diagonal=1)
+        attn += causal_mask
+    attn = torch.nn.functional.softmax(attn, dim=-1)
+    out_ref = attn @ value
+    out_ref = out_ref.transpose(0, 1).to(dtype)
+    torch.testing.assert_close(out, out_ref, atol=1e-3, rtol=1e-3)

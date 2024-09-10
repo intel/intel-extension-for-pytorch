@@ -404,10 +404,12 @@ class _IPEXVarlenScaledDotProductCPU(nn.Module):
         is_causal=True,
         return_softmax=False,
         gen_=None,
+        softcap=-1.0,
     ):
         assert return_softmax is False, "ipex do not support return_softmax option"
         assert gen_ is None, "ipex do not support custom random generator"
         assert zero_tensors is False, "ipex varlen_fwd do not support zero tensors"
+        assert softcap < 0, "ipex do not support softcap on CPU"
 
         # Repeat kv if it is GQA.
         key = cls.repeat_kv(key, int(query.shape[1] / key.shape[1]))
