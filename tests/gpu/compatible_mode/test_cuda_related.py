@@ -16,3 +16,7 @@ class TestTorchMethod(TestCase):
     def test_is_bf16_supported(self):
         x = torch.cuda.is_bf16_supported()
         self.assertEqual(x, True)
+
+    def test_tensor_is_cuda(self):
+        x = torch.rand(2, 3, device="cuda")
+        self.assertEqual(x.is_cuda(), True)

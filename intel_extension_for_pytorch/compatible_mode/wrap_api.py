@@ -32,8 +32,6 @@ class WrapAPI:
                 elif args[1] is None and "pin_memory" in str(api):
                     # handle the case torch.Tensor.pin_memory(None)
                     new_args[1] = "xpu"
-            elif device is None and args_len == 1:
-                kwargs["device"] = "xpu"
             new_args = tuple(new_args)
             return api(*new_args, **kwargs)
 
@@ -52,7 +50,12 @@ class WrapAPI:
                 import oneccl_bindings_for_pytorch  # noqa:F401
 
                 kwargs["backend"] = "ccl"
-            elif backend is None and args_len > 0 and args[0] == "nccl":
+            elif (
+                backend is None
+                and args_len > 0
+                and isinstance(args[0], str)
+                and args[0] == "nccl"
+            ):
                 import oneccl_bindings_for_pytorch  # noqa:F401
 
                 new_args[0] = "ccl"

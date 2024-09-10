@@ -54,10 +54,7 @@ ddp_api:
 
 tensor_to_api:
   - torch.Tensor.to
-  - torch.Tensor.cuda
   - torch.Tensor.pin_memory
-  - torch.Tensor.is_cuda
-  - torch.nn.Module.cuda
   - torch.nested.to_padded_tensor
 
 pass_api:

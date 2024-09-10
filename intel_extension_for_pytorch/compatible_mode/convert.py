@@ -213,6 +213,20 @@ class WrapHelper:
         torch.autocast = fake_autocast
         torch.cuda.amp.autocast = fake_autocast
 
+        # here is corner case for tensor.cuda(), it will call .to method without device args()
+        def fake_cuda(tensor_input, index=-1):
+            if isinstance(index, str):
+                index = index.replace("cuda", "xpu")
+            return tensor_input.xpu(index) if index != -1 else tensor_input.xpu()
+
+        def is_cuda(input_args):
+            return input_args.is_xpu
+
+        set_attr(torch.Tensor, "cuda", fake_cuda)
+        set_attr(torch.nn.Module, "cuda", fake_cuda)
+        set_attr(torch.Tensor, "is_cuda", is_cuda)
+        set_attr(torch.nn.Module, "is_cuda", is_cuda)
+
     def convert_var(self):
         if self.target_device == "xpu":
             torch.has_cuda = True
