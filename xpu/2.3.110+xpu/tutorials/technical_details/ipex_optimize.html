@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ipex.optimize Frontend API &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.110+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Releases" href="../releases.html" />
+    <link rel="prev" title="Memory Management" href="memory_management.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.3.110+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../technical_details.html">Technical Details</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#optimizer-optimization-gpu">Optimizer Optimization [GPU]</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#ahead-of-time-compilation-aot-gpu">Ahead of Time Compilation (AOT) [GPU]</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../technical_details.html#memory-management-gpu">Memory Management [GPU]</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../technical_details.html#ipex-optimize-gpu"><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> [GPU]</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> Frontend API</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#automatic-channels-last">Automatic Channels Last</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#conv-bn-folding"><code class="docutils literal notranslate"><span class="pre">conv_bn_folding</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#linear-bn-folding"><code class="docutils literal notranslate"><span class="pre">linear_bn_folding</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#replace-dropout-with-identity"><code class="docutils literal notranslate"><span class="pre">replace_dropout_with_identity</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#split-master-weight-for-bf16"><code class="docutils literal notranslate"><span class="pre">split_master_weight_for_bf16</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#fuse-update-step">fuse_update_step</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/blogs.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.3.110%2bxpu">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../technical_details.html">Technical Details</a></li>
+      <li class="breadcrumb-item active"><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> Frontend API</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/technical_details/ipex_optimize.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ipex-optimize-frontend-api">
+<h1><code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> Frontend API<a class="headerlink" href="#ipex-optimize-frontend-api" title="Link to this heading"></a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> API is designed to optimize PyTorch* modules (<code class="docutils literal notranslate"><span class="pre">nn.modules</span></code>) and specific optimizers within Python modules. Its optimization options for Intel® GPU device include:</p>
+<ul class="simple">
+<li><p>Automatic Channels Last</p></li>
+<li><p>Fusing Convolutional Layers with Batch Normalization</p></li>
+<li><p>Fusing Linear Layers with Batch Normalization</p></li>
+<li><p>Replacing Dropout with Identity</p></li>
+<li><p>Splitting Master Weights</p></li>
+<li><p>Fusing Optimizer Update Step</p></li>
+</ul>
+<p>The original python modules will be replaced to optimized versions automatically during model execution, if <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> is called in the model running script.</p>
+<p>The following sections provide detailed descriptions for each optimization flag supported by <strong>XPU</strong> models on Intel® GPU. For CPU-specific flags, please refer to the <a class="reference external" href="../api_doc.html#ipex.optimize">API Docs page</a>.</p>
+<section id="automatic-channels-last">
+<h2>Automatic Channels Last<a class="headerlink" href="#automatic-channels-last" title="Link to this heading"></a></h2>
+<p>By default, <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> checks if current running GPU platform supports 2D Block Array Load or not. If it does, the <code class="docutils literal notranslate"><span class="pre">Conv*d</span></code> and <code class="docutils literal notranslate"><span class="pre">ConvTranspose*d</span></code> modules inside the model will be optimized for using channels last memory format. Use <code class="docutils literal notranslate"><span class="pre">ipex.enable_auto_channels_last</span></code> or <code class="docutils literal notranslate"><span class="pre">ipex.disable_auto_channels_last</span></code> before calling <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> to enable or disable this feature manually.</p>
+</section>
+<section id="conv-bn-folding">
+<h2><code class="docutils literal notranslate"><span class="pre">conv_bn_folding</span></code><a class="headerlink" href="#conv-bn-folding" title="Link to this heading"></a></h2>
+<p>This flag is applicable for model inference. Intel® Extension for PyTorch* tries to match all connected <code class="docutils literal notranslate"><span class="pre">nn.Conv(1/2/3)d</span></code> and <code class="docutils literal notranslate"><span class="pre">nn.BatchNorm(1/2/3)d</span></code> layers with matching dimensions in the model and fuses them to improve performance. If the fusion fails, the optimization process will be ended and the model will be executed automatically in normal path.</p>
+</section>
+<section id="linear-bn-folding">
+<h2><code class="docutils literal notranslate"><span class="pre">linear_bn_folding</span></code><a class="headerlink" href="#linear-bn-folding" title="Link to this heading"></a></h2>
+<p>This flag is applicable for model inference. Intel® Extension for PyTorch* tries to match all connected <code class="docutils literal notranslate"><span class="pre">nn.Linear</span></code> and <code class="docutils literal notranslate"><span class="pre">nn.BatchNorm(1/2/3)d</span></code> layers in the model and fuse them to improve performance. If the fusion fails, the optimization process will be ended and the model will be executed automatically in normal path.</p>
+</section>
+<section id="replace-dropout-with-identity">
+<h2><code class="docutils literal notranslate"><span class="pre">replace_dropout_with_identity</span></code><a class="headerlink" href="#replace-dropout-with-identity" title="Link to this heading"></a></h2>
+<p>This flag is applicable for model inference. All instances of <code class="docutils literal notranslate"><span class="pre">torch.nn.Dropout</span></code> will be replaced with <code class="docutils literal notranslate"><span class="pre">torch.nn.Identity</span></code>. The <code class="docutils literal notranslate"><span class="pre">Identity</span></code> modules will be ignored during the static graph generation. This optimization could potentially create additional fusion opportunities for the generated graph.</p>
+</section>
+<section id="split-master-weight-for-bf16">
+<h2><code class="docutils literal notranslate"><span class="pre">split_master_weight_for_bf16</span></code><a class="headerlink" href="#split-master-weight-for-bf16" title="Link to this heading"></a></h2>
+<p>This flag is applicable for model training. The optimization will be enabled once the following requirements are met:</p>
+<ul class="simple">
+<li><p>When calling <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code>, the <code class="docutils literal notranslate"><span class="pre">dtype</span></code> flag must be set to <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fuse_update_step</span></code> must be enabled.</p></li>
+</ul>
+<p>The optimization process is as follows:</p>
+<ul class="simple">
+<li><p>Wrap all parameters of this model with <code class="docutils literal notranslate"><span class="pre">ParameterWrapper</span></code>.</p></li>
+<li><p>Convert the parameters that meet the condition specified by <code class="docutils literal notranslate"><span class="pre">ipex.nn.utils._parameter_wrapper.can_cast_training</span></code>. This includes the original dtype <code class="docutils literal notranslate"><span class="pre">torch.float</span></code>, and module types defined in <code class="docutils literal notranslate"><span class="pre">ipex.nn.utils._parameter_wrapper.IPEX_WEIGHT_CONVERT_MODULE_XPU</span></code>.</p></li>
+<li><p>Convert the parameters wrapped by <code class="docutils literal notranslate"><span class="pre">ParameterWrapper</span></code> to the user-specified dtype. If <strong>split master weight</strong> is needed, the optimizer can only be SGD. The original parameters will be divided into top and bottom parts. The top part will be used for forward and backward computation. When updating weights, both the top and bottom parts will be updated simultaneously.</p></li>
+</ul>
+</section>
+<section id="fuse-update-step">
+<h2>fuse_update_step<a class="headerlink" href="#fuse-update-step" title="Link to this heading"></a></h2>
+<p>This flag is used to specify whether to replace the original optimizer step with a fused step for better performance. The supported optimizers can be referenced from <code class="docutils literal notranslate"><span class="pre">IPEX_FUSED_OPTIMIZER_LIST_XPU</span></code> in <code class="docutils literal notranslate"><span class="pre">ipex.optim._optimizer_utils</span></code>. During the optimization, the original step is saved as <code class="docutils literal notranslate"><span class="pre">optimizer._original_step</span></code>, <code class="docutils literal notranslate"><span class="pre">optimizer.step</span></code> is replaced with a SYCL-written kernel, and the <code class="docutils literal notranslate"><span class="pre">optimizer.fused</span></code> parameter is set to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="memory_management.html" class="btn btn-neutral float-left" title="Memory Management" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../releases.html" class="btn btn-neutral float-right" title="Releases" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f2c093342b0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

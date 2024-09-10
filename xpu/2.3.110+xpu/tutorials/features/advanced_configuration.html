@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Advanced Configuration &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.110+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Fully Sharded Data Parallel (FSDP)" href="FSDP.html" />
+    <link rel="prev" title="DPC++ Extension" href="DPC%2B%2B_Extension.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.3.110+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Advanced Configuration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#build-time-configuration">Build Time Configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#runtime-configuration">Runtime Configuration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ipex-log-prototype-feature-for-debug"><code class="docutils literal notranslate"><span class="pre">IPEX_LOG</span></code> (Prototype feature for debug)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/blogs.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.3.110%2bxpu">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">Advanced Configuration</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/advanced_configuration.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="advanced-configuration">
+<h1>Advanced Configuration<a class="headerlink" href="#advanced-configuration" title="Link to this heading"></a></h1>
+<p>The default settings for Intel® Extension for PyTorch* are sufficient for most use cases. However, if users want to customize Intel® Extension for PyTorch*, advanced configuration is available at build time and runtime.</p>
+<section id="build-time-configuration">
+<h2>Build Time Configuration<a class="headerlink" href="#build-time-configuration" title="Link to this heading"></a></h2>
+<p>The following build options are supported by Intel® Extension for PyTorch*. Users who install Intel® Extension for PyTorch* via source compilation could override the default configuration by explicitly setting a build option ON or OFF, and then build.</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th><strong>Build Option</strong></th>
+<th><strong>Default<br>Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>USE_ONEMKL</td>
+<td>ON</td>
+<td>Use oneMKL BLAS</td>
+</tr>
+<tr>
+<td>USE_CHANNELS_LAST_1D</td>
+<td>ON</td>
+<td>Use channels last 1d</td>
+</tr>
+<tr>
+<td>USE_PERSIST_STREAM</td>
+<td>ON</td>
+<td>Use persistent oneDNN stream</td>
+</tr>
+<tr>
+<td>USE_SCRATCHPAD_MODE</td>
+<td>ON</td>
+<td>Use oneDNN scratchpad mode</td>
+</tr>
+<tr>
+<td>USE_PRIMITIVE_CACHE</td>
+<td>ON</td>
+<td>Cache oneDNN primitives by FRAMEWORK for specific operators</td>
+</tr>
+<tr>
+<td>USE_QUEUE_BARRIER</td>
+<td>ON</td>
+<td>Use queue submit_barrier, otherwise use dummy kernel</td>
+</tr>
+<tr>
+<td>USE_PTI</td>
+<td>ON</td>
+<td>Build XPU Profiler with PTI support.</td>
+</tr>
+<tr>
+<td>USE_DS_KERNELS</td>
+<td>ON</td>
+<td>Build deepspeed kernels</td>
+</tr>
+<tr>
+<td>USE_SYCL_ASSERT</td>
+<td>OFF</td>
+<td>Enables assert in sycl kernel</td>
+</tr>
+<tr>
+<td>USE_ITT_ANNOTATION</td>
+<td>OFF</td>
+<td>Enables ITT annotation in sycl kernel</td>
+</tr>
+<tr>
+<td>USE_SPLIT_FP64_LOOPS</td>
+<td>ON</td>
+<td>Split FP64 loops into separate kernel for element-wise kernels</td>
+</tr>
+<tr>
+<td>BUILD_BY_PER_KERNEL</td>
+<td>OFF</td>
+<td>Build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)</td>
+</tr>
+<tr>
+<td>BUILD_INTERNAL_DEBUG</td>
+<td>OFF</td>
+<td>Use internal debug code path</td>
+</tr>
+<tr>
+<td>BUILD_SEPARATE_OPS</td>
+<td>OFF</td>
+<td>Build each operator in separate library</td>
+</tr>
+<tr>
+<td>BUILD_SIMPLE_TRACE</td>
+<td>ON</td>
+<td>Build simple trace for each registered operator</td>
+</tr>
+<tr>
+<td>USE_AOT_DEVLIST</td>
+<td>""</td>
+<td>Set device list for AOT build</td>
+</tr>
+<tr>
+<td>USE_XETLA</td>
+<td>"ON"</td>
+<td>Use XeTLA based customer kernels; Specify a comma-sep list of gpu architectures (e.g. xe_lpg,xe_hpg) to only enable kernels for specific platforms</td>
+</tr>
+<tr>
+<td>USE_ONEDNN_DIR</td>
+<td>""</td>
+<td>Specify oneDNN source path which contains its include directory and lib directory</td>
+</tr>
+<tr>
+<td>USE_XETLA_SRC</td>
+<td>"${IPEX_GPU_ROOT_DIR}/aten/operators/xetla/kernels/"</td>
+<td>Specify XETLA source path which contains its include dir</td>
+</tr>
+<tr>
+<td>BUILD_OPT_LEVEL</td>
+<td>""</td>
+<td>Add build option -Ox, accept values: 0/1</td>
+</tr>
+<tr>
+<td>BUILD_WITH_SANITIZER</td>
+<td>""</td>
+<td>Build with sanitizer check. Support one of address, thread, and leak options at a time. The default option is address.</td>
+</tr>
+</tbody>
+</table><p>For above build options which can be configured to ON or OFF, users can configure them to 1 or 0 also, while ON equals to 1 and OFF equals to 0.</p>
+</section>
+<section id="runtime-configuration">
+<h2>Runtime Configuration<a class="headerlink" href="#runtime-configuration" title="Link to this heading"></a></h2>
+<p>The following launch options are supported in Intel® Extension for PyTorch*. Users who execute AI models on XPU could override the default configuration by explicitly setting the option value at runtime using environment variables, and then launch the execution.</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th><strong>Launch Option<br>CPU, GPU</strong></th>
+<th><strong>Default<br>Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IPEX_FP32_MATH_MODE</td>
+<td>FP32</td>
+<td>Set values for FP32 math mode (valid values: FP32, TF32, BF32). Refer to <a class="reference internal" href="../api_doc.html#_CPPv4N3xpu18set_fp32_math_modeE14FP32_MATH_MODE">API Documentation</a> for details.</td>
+</tr>
+</tbody>
+</table><table border="1" class="docutils">
+<thead>
+<tr>
+<th><strong>Launch Option<br>GPU ONLY</strong></th>
+<th><strong>Default<br>Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IPEX_VERBOSE</td>
+<td>0</td>
+<td>Set verbose level with synchronization execution mode, will be deprecated very soon. Please use IPEX_LOG_LEVEL instead.</td>
+</tr>
+<tr>
+<td>IPEX_XPU_SYNC_MODE</td>
+<td>0</td>
+<td>Set 1 to enforce synchronization execution mode, will be deprecated very soon.</td>
+</tr>
+<tr>
+<td>IPEX_LOG_LEVEL</td>
+<td>-1</td>
+<td>Set log level to trace the execution and get log information, pls refer to 'ipex_log.md' for different log level.</td>
+</tr>
+<tr>
+<td>IPEX_LOG_COMPONENT</td>
+<td>"ALL"</td>
+<td>Set IPEX_LOG_COMPONENT = ALL to log all component message. Use ';' as separator to log more than one components, such as "OPS;RUNTIME". Use '/' as separator to log subcomponents.</td>
+</tr>
+<tr>
+<td>IPEX_LOG_ROTATE_SIZE</td>
+<td>-1</td>
+<td>Set Rotate file size in MB for IPEX_LOG, less than 0 means unuse this setting.</td>
+</tr>
+<tr>
+<td>IPEX_LOG_SPLIT_SIZE</td>
+<td>-1</td>
+<td>Set split file size in MB for IPEX_LOG, less than 0 means unuse this setting.</td>
+</tr>
+<tr>
+<td>IPEX_LOG_OUTPUT</td>
+<td>""</td>
+<td>Set output file path for IPEX_LOG, default is null</td>
+</tr>
+</tbody>
+</table><table border="1" class="docutils">
+<thead>
+<tr>
+<th><strong>Launch Option<br>Experimental</strong></th>
+<th><strong>Default<br>Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IPEX_SIMPLE_TRACE</td>
+<td>0</td>
+<td>Set 1 to enable simple trace for all operators*, will be deprecated very soon. Please use IPEX_LOG_LEVEL instead.</td>
+</tr>
+</tbody>
+</table><table border="1" class="docutils">
+<thead>
+<tr>
+<th><strong>Distributed Option<br>GPU ONLY</strong></th>
+<th><strong>Default<br>Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TORCH_LLM_ALLREDUCE</td>
+<td>0</td>
+<td>This is a prototype feature to provide better scale-up performance by enabling optimized collective algorithms in oneCCL and asynchronous execution in torch-ccl. This feature requires XeLink enabled for cross-cards communication. By default, this feature is not enabled with setting 0.</td>
+</tr>
+<tr>
+<td>CCL_BLOCKING_WAIT</td>
+<td>0</td>
+<td>This is a prototype feature to control over whether collectives execution on XPU is host blocking or non-blocking. By default, setting 0 enables blocking behavior.</td>
+</tr>
+<tr>
+<td>CCL_SAME_STREAM</td>
+<td>0</td>
+<td>This is a prototype feature to allow using a computation stream as communication stream to minimize overhead for streams synchronization. By default, setting 0 uses separate streams for communication.</td>
+</tr>
+</tbody>
+</table><p>For above launch options which can be configured to 1 or 0, users can configure them to ON or OFF also, while ON equals to 1 and OFF equals to 0.</p>
+<p>Examples to configure the launch options:</br></p>
+<ul class="simple">
+<li><p>Set one or more options before running the model</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">IPEX_LOG_LEVEL</span><span class="o">=</span><span class="m">1</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">IPEX_FP32_MATH_MODE</span><span class="o">=</span>TF32
+...
+python<span class="w"> </span>ResNet50.py
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Set one option when running the model</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">IPEX_LOG_LEVEL</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>ResNet50.py
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Set more than one options when running the model</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">IPEX_LOG_LEVEL</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">IPEX_FP32_MATH_MODE</span><span class="o">=</span>TF32<span class="w"> </span>python<span class="w"> </span>ResNet50.py
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="DPC%2B%2B_Extension.html" class="btn btn-neutral float-left" title="DPC++ Extension" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="FSDP.html" class="btn btn-neutral float-right" title="Fully Sharded Data Parallel (FSDP)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f2c09e60070> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

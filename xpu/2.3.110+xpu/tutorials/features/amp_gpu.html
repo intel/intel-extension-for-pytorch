@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auto Mixed Precision (AMP) on GPU &mdash; Intel&amp;#174 Extension for PyTorch* 2.3.110+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Intel® Extension for PyTorch* Optimizations for Quantization [GPU]" href="int8_overview_xpu.html" />
+    <link rel="prev" title="Auto Channels Last" href="auto_channels_last.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+              <div class="version">
+                <a href="../../../../">2.3.110+xpu ▼</a>
+                <p>Click link above to switch version</p>
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#channels-last">Channels Last</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Auto Mixed Precision (AMP) on GPU</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#use-case">Use Case</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#default-precision">Default Precision</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#inference-with-imperative-path">Inference with Imperative Path</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#inference-with-torchscript-path">Inference with TorchScript Path</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#training-support">Training Support</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#autocast-op-reference">Autocast Op Reference</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#op-eligibility">Op Eligibility</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#op-specific-behavior">Op-Specific Behavior</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#ops-that-can-autocast-to-bfloat16">Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#ops-that-can-autocast-to-float16">Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">float16</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#ops-that-can-autocast-to-float32">Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">float32</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#ops-that-promote-to-the-widest-input-type">Ops that promote to the widest input type</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#quantization">Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#distributed-training">Distributed Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dlpack-solution">DLPack Solution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#dpc-extension">DPC++ Extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#advanced-configuration">Advanced Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#ipex-log-prototype-feature-for-debug"><code class="docutils literal notranslate"><span class="pre">IPEX_LOG</span></code> (Prototype feature for debug)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/blogs.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.3.110%2bxpu">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">Auto Mixed Precision (AMP) on GPU</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/amp_gpu.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="auto-mixed-precision-amp-on-gpu">
+<h1>Auto Mixed Precision (AMP) on GPU<a class="headerlink" href="#auto-mixed-precision-amp-on-gpu" title="Link to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">torch.xpu.amp</span></code> provides convenience for auto data type conversion at runtime. Deep learning workloads can benefit from lower-precision floating point data types such as <code class="docutils literal notranslate"><span class="pre">torch.float16</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>, because of its lighter calculation workload and smaller memory usage. Accuracy is sacrificed when using lower-precision floating point data types so there’s a trade-off between accuracy and performance. Thus, some operations should use the slower but more accurate <code class="docutils literal notranslate"><span class="pre">torch.float32</span></code>, while others can be converted to use the faster but less accurate <code class="docutils literal notranslate"><span class="pre">torch.float16</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> data type. The Auto Mixed Precision (AMP) feature automates the tuning of data type conversions over all operators.</p>
+<p>Inference workloads using <code class="docutils literal notranslate"><span class="pre">torch.xpu.amp</span></code> support <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.float16</span></code>. Training workloads using <code class="docutils literal notranslate"><span class="pre">torch.xpu.amp</span></code> support <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code>. <code class="docutils literal notranslate"><span class="pre">torch.bfloat16</span></code> is the default lower precision floating point data type when <code class="docutils literal notranslate"><span class="pre">torch.xpu.amp</span></code> is enabled.</p>
+</section>
+<section id="use-case">
+<h2>Use Case<a class="headerlink" href="#use-case" title="Link to this heading"></a></h2>
+<p>The following simple network should show a speedup with mixed precision.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">SimpleNet</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">SimpleNet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">padding</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<section id="default-precision">
+<h3>Default Precision<a class="headerlink" href="#default-precision" title="Link to this heading"></a></h3>
+<p>Without <code class="docutils literal notranslate"><span class="pre">torch.xpu.amp</span></code>, the network executes all operators with default precision (<code class="docutils literal notranslate"><span class="pre">torch.float32</span></code>).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="inference-with-imperative-path">
+<h3>Inference with Imperative Path<a class="headerlink" href="#inference-with-imperative-path" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">torch.xpu.amp.autocast</span></code> is designed to be a context manager that allow scopes of your script to run with mixed precision. In these scopes, operations run in a data type chosen by the <code class="docutils literal notranslate"><span class="pre">autocast</span></code> class to improve performance while maintaining accuracy. See the operations category section for details on what precision the <code class="docutils literal notranslate"><span class="pre">autocast</span></code> class chooses for each operator, and under what circumstances.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">):</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="inference-with-torchscript-path">
+<h3>Inference with TorchScript Path<a class="headerlink" href="#inference-with-torchscript-path" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">torch.xpu.amp.autocast</span></code> can be used with <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code> to apply graph optimization. Due to PyTorch limitation, only <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code> is supported.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">):</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="training-support">
+<h3>Training Support<a class="headerlink" href="#training-support" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">torch.xpu.amp.autocast</span></code> can be used in training to improve performance.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">SimpleNet</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.001</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">images</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">train_loader</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">amp</span><span class="o">.</span><span class="n">autocast</span><span class="p">():</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">criterion</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)),</span> <span class="n">label</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">))</span>
+    <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="autocast-op-reference">
+<h2>Autocast Op Reference<a class="headerlink" href="#autocast-op-reference" title="Link to this heading"></a></h2>
+<section id="op-eligibility">
+<h3>Op Eligibility<a class="headerlink" href="#op-eligibility" title="Link to this heading"></a></h3>
+<p>Ops that run in <code class="docutils literal notranslate"><span class="pre">float64</span></code> or non-floating-point dtypes are not eligible for mixed precision, and will run in these types whether or not autocast is enabled.</p>
+<p>Only out-of-place ops and Tensor methods are eligible for mixed precision. In-place variants and calls that explicitly supply an <code class="docutils literal notranslate"><span class="pre">out=...</span></code> Tensor
+are allowed in autocast-enabled regions, but won’t go through autocasting. For example, in an autocast-enabled region <code class="docutils literal notranslate"><span class="pre">a.addmm(b,</span> <span class="pre">c)</span></code> can autocast, but <code class="docutils literal notranslate"><span class="pre">a.addmm_(b,</span> <span class="pre">c)</span></code> and <code class="docutils literal notranslate"><span class="pre">a.addmm(b,</span> <span class="pre">c,</span> <span class="pre">out=d)</span></code> cannot. For best performance and stability, use out-of-place ops in autocast-enabled regions.</p>
+</section>
+<section id="op-specific-behavior">
+<h3>Op-Specific Behavior<a class="headerlink" href="#op-specific-behavior" title="Link to this heading"></a></h3>
+<p>The following lists describe the behavior of eligible ops in autocast-enabled regions. These ops always go through autocasting whether they are invoked as part of a <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>, as a function, or as a <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code> method. If functions are exposed in multiple namespaces, they go through autocasting regardless of the namespace.</p>
+<p>Ops not listed below do not go through autocasting. They run in the type defined by their inputs. However, autocasting may still change the type in which unlisted ops run if they’re downstream from autocasted ops.</p>
+<p>If an op is unlisted, we assume it’s numerically stable in <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code> or <code class="docutils literal notranslate"><span class="pre">float16</span></code>. If you believe that an unlisted op is numerically unstable in <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code> or <code class="docutils literal notranslate"><span class="pre">float16</span></code>, file a <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/issues">GitHub issue</a>.</p>
+<section id="ops-that-can-autocast-to-bfloat16">
+<h4>Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code><a class="headerlink" href="#ops-that-can-autocast-to-bfloat16" title="Link to this heading"></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">conv1d</span></code>, <code class="docutils literal notranslate"><span class="pre">conv2d</span></code>, <code class="docutils literal notranslate"><span class="pre">conv3d</span></code>, <code class="docutils literal notranslate"><span class="pre">_convolution</span></code>, <code class="docutils literal notranslate"><span class="pre">convolution</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_tbc</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_transpose1d</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_transpose1d</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_transpose3d</span></code>, <code class="docutils literal notranslate"><span class="pre">prelu</span></code>, <code class="docutils literal notranslate"><span class="pre">addmm</span></code>, <code class="docutils literal notranslate"><span class="pre">addmv</span></code>, <code class="docutils literal notranslate"><span class="pre">addr</span></code>, <code class="docutils literal notranslate"><span class="pre">linear</span></code>, <code class="docutils literal notranslate"><span class="pre">matmul</span></code>, <code class="docutils literal notranslate"><span class="pre">mm</span></code>, <code class="docutils literal notranslate"><span class="pre">mv</span></code>, <code class="docutils literal notranslate"><span class="pre">bmm</span></code>, <code class="docutils literal notranslate"><span class="pre">baddbmm</span></code>, <code class="docutils literal notranslate"><span class="pre">addbmm</span></code>, <code class="docutils literal notranslate"><span class="pre">chain_matmul</span></code>, <code class="docutils literal notranslate"><span class="pre">linalg_multi_dot</span></code>, <code class="docutils literal notranslate"><span class="pre">_thnn_fused_gru_cell</span></code>, <code class="docutils literal notranslate"><span class="pre">gru_cell</span></code>, <code class="docutils literal notranslate"><span class="pre">scaled_dot_product_attention</span></code></p>
+</section>
+<section id="ops-that-can-autocast-to-float16">
+<h4>Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">float16</span></code><a class="headerlink" href="#ops-that-can-autocast-to-float16" title="Link to this heading"></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">conv1d</span></code>, <code class="docutils literal notranslate"><span class="pre">conv2d</span></code>, <code class="docutils literal notranslate"><span class="pre">conv3d</span></code>, <code class="docutils literal notranslate"><span class="pre">_convolution</span></code>, <code class="docutils literal notranslate"><span class="pre">convolution</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_tbc</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_transpose1d</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_transpose1d</span></code>, <code class="docutils literal notranslate"><span class="pre">conv_transpose3d</span></code>, <code class="docutils literal notranslate"><span class="pre">prelu</span></code>, <code class="docutils literal notranslate"><span class="pre">addmm</span></code>, <code class="docutils literal notranslate"><span class="pre">addmv</span></code>, <code class="docutils literal notranslate"><span class="pre">addr</span></code>, <code class="docutils literal notranslate"><span class="pre">linear</span></code>, <code class="docutils literal notranslate"><span class="pre">matmul</span></code>, <code class="docutils literal notranslate"><span class="pre">mm</span></code>, <code class="docutils literal notranslate"><span class="pre">mv</span></code>, <code class="docutils literal notranslate"><span class="pre">bmm</span></code>, <code class="docutils literal notranslate"><span class="pre">baddbmm</span></code>, <code class="docutils literal notranslate"><span class="pre">addbmm</span></code>, <code class="docutils literal notranslate"><span class="pre">chain_matmul</span></code>, <code class="docutils literal notranslate"><span class="pre">linalg_multi_dot</span></code>, <code class="docutils literal notranslate"><span class="pre">_thnn_fused_gru_cell</span></code>, <code class="docutils literal notranslate"><span class="pre">gru_cell</span></code>, <code class="docutils literal notranslate"><span class="pre">scaled_dot_product_attention</span></code></p>
+</section>
+<section id="ops-that-can-autocast-to-float32">
+<h4>Ops that can autocast to <code class="docutils literal notranslate"><span class="pre">float32</span></code><a class="headerlink" href="#ops-that-can-autocast-to-float32" title="Link to this heading"></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">binary_cross_entropy</span></code>, <code class="docutils literal notranslate"><span class="pre">binary_cross_entropy_with_logits</span></code>, <code class="docutils literal notranslate"><span class="pre">log_softmax</span></code>, <code class="docutils literal notranslate"><span class="pre">nll_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">nll_loss2d</span></code>, <code class="docutils literal notranslate"><span class="pre">nll_loss_nd</span></code>, <code class="docutils literal notranslate"><span class="pre">cross_entropy_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_fft</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_ifft</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_fft2</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_ifft2</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_fftn</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_ifftn</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_rfft</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_irfft</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_rfft2</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_irfft2</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_rfftn</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_irfftn</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_hfft</span></code>, <code class="docutils literal notranslate"><span class="pre">fft_ihfft</span></code>, <code class="docutils literal notranslate"><span class="pre">reciprocal</span></code>, <code class="docutils literal notranslate"><span class="pre">pow</span></code>, <code class="docutils literal notranslate"><span class="pre">frobenius_norm</span></code>, <code class="docutils literal notranslate"><span class="pre">nuclear_norm</span></code>, <code class="docutils literal notranslate"><span class="pre">cosine_similarity</span></code>, <code class="docutils literal notranslate"><span class="pre">poisson_nll_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">cosine_embedding_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">hinge_embedding_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">kl_div</span></code>, <code class="docutils literal notranslate"><span class="pre">l1_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">smooth_l1_loss</span> </code>, <code class="docutils literal notranslate"><span class="pre">huber_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">mse_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">margin_ranking_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">multilabel_margin_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">soft_margin_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">triplet_margin_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">multi_margin_loss</span></code>, <code class="docutils literal notranslate"><span class="pre">dist</span></code>, <code class="docutils literal notranslate"><span class="pre">pdist</span></code>, <code class="docutils literal notranslate"><span class="pre">cdist</span></code>, <code class="docutils literal notranslate"><span class="pre">renorm</span></code></p>
+</section>
+<section id="ops-that-promote-to-the-widest-input-type">
+<h4>Ops that promote to the widest input type<a class="headerlink" href="#ops-that-promote-to-the-widest-input-type" title="Link to this heading"></a></h4>
+<p>These ops don’t require a particular dtype for stability, but take multiple inputs and require that the inputs’ dtypes match.  If all of the inputs are <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code>, the op runs in <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code>.  If any of the inputs is <code class="docutils literal notranslate"><span class="pre">float32</span></code>, autocast casts all inputs to <code class="docutils literal notranslate"><span class="pre">float32</span></code> and runs the op in <code class="docutils literal notranslate"><span class="pre">float32</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cat</span></code>, <code class="docutils literal notranslate"><span class="pre">stack</span></code>, <code class="docutils literal notranslate"><span class="pre">addcdiv</span></code>, <code class="docutils literal notranslate"><span class="pre">addcmul</span></code>, <code class="docutils literal notranslate"><span class="pre">atan2</span></code>, <code class="docutils literal notranslate"><span class="pre">bilinear</span></code>, <code class="docutils literal notranslate"><span class="pre">cross</span></code>, <code class="docutils literal notranslate"><span class="pre">dot</span></code>, <code class="docutils literal notranslate"><span class="pre">grid_sampler</span></code>, <code class="docutils literal notranslate"><span class="pre">index_put</span></code>, <code class="docutils literal notranslate"><span class="pre">tensordot</span></code>, <code class="docutils literal notranslate"><span class="pre">scatter_add</span></code></p>
+<p>Some ops not listed here (e.g., binary ops such as <code class="docutils literal notranslate"><span class="pre">add</span></code>) natively promote inputs without autocasting’s intervention.  If inputs are a mixture of <code class="docutils literal notranslate"><span class="pre">bfloat16</span></code> and <code class="docutils literal notranslate"><span class="pre">float32</span></code>, these ops run in <code class="docutils literal notranslate"><span class="pre">float32</span></code> and produce <code class="docutils literal notranslate"><span class="pre">float32</span></code> output, regardless of whether autocast is enabled.</p>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="auto_channels_last.html" class="btn btn-neutral float-left" title="Auto Channels Last" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="int8_overview_xpu.html" class="btn btn-neutral float-right" title="Intel® Extension for PyTorch* Optimizations for Quantization [GPU]" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x7f2c093756c0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
