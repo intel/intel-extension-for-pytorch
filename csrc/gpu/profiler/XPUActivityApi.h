@@ -20,6 +20,19 @@ using namespace libkineto;
 
 using Onepti_Activity = pti_view_record_base;
 
+#if PTI_VERSION_MAJOR > 0 || PTI_VERSION_MINOR > 9
+#define AT_XPU_PTI_CHECK(returnCode)                       \
+  {                                                        \
+    TORCH_CHECK(                                           \
+        returnCode == PTI_SUCCESS,                         \
+        "Kineto Profiler on XPU got error from function ", \
+        __func__,                                          \
+        ". The error code is ",                            \
+        returnCode,                                        \
+        ". The error message is ",                         \
+        ptiResultTypeToString(returnCode));                \
+  }
+#else
 #define AT_XPU_PTI_CHECK(returnCode)                       \
   {                                                        \
     TORCH_CHECK(                                           \
@@ -29,6 +42,7 @@ using Onepti_Activity = pti_view_record_base;
         ". The error code is ",                            \
         returnCode);                                       \
   }
+#endif
 
 class XPUActivityApi {
  public:
