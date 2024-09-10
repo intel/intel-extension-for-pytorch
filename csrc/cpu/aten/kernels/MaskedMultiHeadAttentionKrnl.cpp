@@ -49,7 +49,9 @@ inline void reduce_head(
   }
   attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
   for (; hsi < head_size; hsi++) {
-    k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+    if (store_key) {
+      k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+    }
     attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
   }
   return;
@@ -80,7 +82,9 @@ inline void reduce_head(
   }
   attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
   for (; hsi < head_size; hsi++) {
-    k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+    if (store_key) {
+      k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+    }
     attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
   }
   return;
@@ -111,7 +115,9 @@ inline void reduce_head(
   }
   attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
   for (; hsi < head_size; hsi++) {
-    k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+    if (store_key) {
+      k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+    }
     attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
   }
   return;
@@ -139,7 +145,9 @@ inline void reduce_head_half(
   }
   attn_w_pos[0] += _mm512_reduce_add_ph(qk_sum_vec);
   for (; hsi < head_size; hsi++) {
-    k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+    if (store_key) {
+      k_cache_start[hsi] = k_ptr_start[hsi]; // cat the key into the key_cache.
+    }
     attn_w_pos[0] += q_ptr_start[hsi] * k_ptr_start[hsi];
   }
 }
