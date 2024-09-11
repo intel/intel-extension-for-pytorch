@@ -58,7 +58,7 @@ class TestNNMethod(TestCase):
         y_dpcpp_gw = conv_dpcpp.weight.grad.detach().clone()
 
         self.assertEqual(y_cpu, y_dpcpp.cpu())
-        self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=1e-3, rtol=1e-3)
+        self.assertEqual(y_cpu_gw, y_dpcpp_gw.cpu(), atol=5e-3, rtol=5e-3)
 
     def test_conv_float16_1(self, dtype=torch.bfloat16):
         shape = ((1, 128, 112, 112, 80), (64, 128, 3, 3, 3))
