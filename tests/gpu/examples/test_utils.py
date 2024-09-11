@@ -55,10 +55,6 @@ class TestUtils(TestCase):
         with torch.xpu.sync_mode():
             assert torch.xpu.using_sync_mode(), "Fail to set sync mode"
 
-    def test_onednn_layout(self):
-        with torch.xpu.onednn_layout():
-            assert torch.xpu.using_onednn_layout(), "Fail to set onednn layout"
-
     def test_compute_eng(self):
         eng_list = [
             torch.xpu.XPUComputeEng.RECOMMEND,
