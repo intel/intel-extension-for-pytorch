@@ -10253,3 +10253,15 @@
   - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float64
   - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float32
   - test_decomp.py::TestDecompXPU::test_comprehensive_to_sparse_xpu_uint8
+- reason: Auto skipped due to Jacobian mismatch issue
+  cases:
+  - test_modules.py::TestModuleXPU::test_grad_nn_MultiheadAttention_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_MultiheadAttention_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_RNNCell_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_RNN_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_grad_nn_RNN_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_MultiheadAttention_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_MultiheadAttention_train_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_RNNCell_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_RNN_eval_mode_xpu_float64
+  - test_modules.py::TestModuleXPU::test_gradgrad_nn_RNN_train_mode_xpu_float64

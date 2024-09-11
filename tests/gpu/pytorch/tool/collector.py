@@ -61,13 +61,13 @@ def collect_pytorch_details(issued_cases, data, with_short=False):
         short_details = []
         for detail in details:
             # this code should be open when the assertion issue is fixed.
-            # detail_search = re.search(r'^\S+Error:.+?$', detail, re_flags)
-            # if detail_search:
-            #    short_detail = detail_search.group(0)
-            # else:
-                # short_detail = "Assertion error or Runtime error with no details"
+            detail_search = re.search(r'^\S+Error:.+?$', detail, re_flags)
+            if detail_search:
+                short_detail = detail_search.group(0)
+            else:
+                short_detail = "Assertion error or Runtime error with no details"
                 # print(f'the detail is {detail}')
-            short_detail = re.search(r'^\S+Error:.+?$', detail, re_flags).group(0)
+            #short_detail = re.search(r'^\S+Error:.+?$', detail, re_flags).group(0)
             short_details.append(short_detail)
         return short_details, details
     return details
