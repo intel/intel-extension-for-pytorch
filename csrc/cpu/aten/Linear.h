@@ -205,37 +205,6 @@ at::Tensor woq_linear_unpackB_impl(const at::Tensor& weight);
 
 } // namespace
 
-using woq_gemm_kernel_fn = void (*)(
-    const at::Tensor&,
-    const at::Tensor&,
-    const at::Tensor&,
-    const at::Tensor&,
-    const at::Tensor&,
-    int64_t,
-    at::Tensor&);
-
-using woq_gemm_eltwise_kernel_fn = void (*)(
-    const at::Tensor&,
-    const at::Tensor&,
-    const at::Tensor&,
-    const at::Tensor&,
-    const at::Tensor&,
-    const c10::string_view&,
-    const torch::List<c10::optional<at::Scalar>>&,
-    const c10::optional<c10::string_view>&,
-    int64_t,
-    at::Tensor&);
-
-using woq_linear_packB_fn =
-    at::Tensor (*)(const at::Tensor&, const at::Tensor&, const at::Tensor&);
-
-using woq_linear_unpackB_fn = at::Tensor (*)(const at::Tensor&);
-
-IPEX_DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_gemm_kernel_stub);
-IPEX_DECLARE_DISPATCH(woq_gemm_eltwise_kernel_fn, woq_gemm_eltwise_kernel_stub);
-IPEX_DECLARE_DISPATCH(woq_linear_packB_fn, woq_linear_packB_stub);
-IPEX_DECLARE_DISPATCH(woq_linear_unpackB_fn, woq_linear_unpackB_stub);
-
 using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     const at::Tensor&,
     const at::Tensor&,
