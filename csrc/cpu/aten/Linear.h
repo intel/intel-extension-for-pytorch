@@ -283,6 +283,8 @@ IPEX_DECLARE_DISPATCH(
 #define WOQ_FUSE_ADD_ADD 0x20
 #define WOQ_FUSE_MUL 0x30
 
+#define WOQ_N_BLOCK_SIZE 32
+
 #endif
 
 } // namespace cpu

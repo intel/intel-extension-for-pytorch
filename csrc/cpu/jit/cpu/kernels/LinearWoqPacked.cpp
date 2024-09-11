@@ -14,7 +14,8 @@ namespace cpu {
 namespace detail {
 namespace woq_linear {
 
-#define SMALL_BATCH_THRESHOLD 32
+static int SMALL_BATCH_THRESHOLD =
+    torch_ipex::tpp::env2int("IPEX_WOQ_WEIGHT_CACHE_BATCH_THRESHOLD", 64);
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     at::Tensor&& weight,

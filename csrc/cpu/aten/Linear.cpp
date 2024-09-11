@@ -357,7 +357,6 @@ at::Tensor ipex_linear_eltwise(
 }
 
 #ifdef USE_LIBXSMM
-#define BLOCK_N 32
 static size_t get_block_k(
     int64_t weight_dtype,
     int64_t lowp_mode,
@@ -386,7 +385,7 @@ at::Tensor woq_linear_pack_weight(
   auto N = weight_shape[0], K = weight_shape[1];
   // For TPP kernel, we only consider even K
   if (K % 2 == 0) {
-    size_t block_n = BLOCK_N;
+    size_t block_n = WOQ_N_BLOCK_SIZE;
     size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
     if (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4) {
       if (block_k % 4 && lowp_mode == 3) {
@@ -432,10 +431,11 @@ at::Tensor woq_linear_compute_compensation(
   // We assume zero points to be zero here (sym quant of weight)
   TORCH_CHECK(weight.dim() == 2);
   auto N = weight.size(0), K = weight.size(1);
-  if (N % BLOCK_N == 0 && weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+  if (N % WOQ_N_BLOCK_SIZE == 0 && weight_dtype == WOQ_DTYPE_INT8 &&
+      lowp_mode == 3) {
     size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
-    int64_t Nc = N / BLOCK_N, Kc = K / block_k;
-    auto weight_reshaped = weight.reshape({Nc, BLOCK_N, Kc, block_k});
+    int64_t Nc = N / WOQ_N_BLOCK_SIZE, Kc = K / block_k;
+    auto weight_reshaped = weight.reshape({Nc, WOQ_N_BLOCK_SIZE, Kc, block_k});
     auto compensation = at::sum(
         weight_reshaped, /*dim*/ -1, /*keepdim*/ false, /*dtype*/ c10::kInt);
     compensation = compensation.permute({0, 2, 1}).contiguous();

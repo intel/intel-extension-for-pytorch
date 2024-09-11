@@ -1617,11 +1617,11 @@ class DequantGemmTPP<
           qB, K, N, zps, B[0][0], compensation);
       (*pgemm)((int8_t*)qA[0], B[0][0], qC[0], 1, no_tile_cfg);
       if constexpr (PREFETCH_K_DIST > 0) {
-        _mm_prefetch(qB + K * N, _MM_HINT_T0);
-        _mm_prefetch(A + K * M, _MM_HINT_T0);
+        _mm_prefetch(qB + N * K / 2, _MM_HINT_T0);
+        _mm_prefetch(A + K, _MM_HINT_T0);
       }
       // post-op and convert back to C
-      for (long m = 0; m < M; ++m) {
+      auto convert_one_row = [&](long m) {
 #pragma omp simd
         for (long n = 0; n < N; ++n) {
           float* scale_a_m;
@@ -1654,6 +1654,16 @@ class DequantGemmTPP<
             C[m * ldc + n] = c;
           }
         }
+      };
+      long m = 0;
+      for (; m < M - 4; m += 4) {
+        convert_one_row(m);
+        convert_one_row(m + 1);
+        convert_one_row(m + 2);
+        convert_one_row(m + 3);
+      }
+      for (; m < M; ++m) {
+        convert_one_row(m);
       }
     }
   }
@@ -1739,14 +1749,14 @@ class NoDequantGemmTPP {
       int kc_start = 0,
       int quant_block_multiple = 1) {
     auto qA = GetVLAPtr<uint8_t>(A, {lda});
-    constexpr const int N_GROUP_SIZE = 16;
     int32_t qC[M][N];
+    (*pgemm)((int8_t*)qA[0], B, qC[0], 1, no_tile_cfg);
     if constexpr (PREFETCH_K_DIST > 0) {
       _mm_prefetch(B + N * K, _MM_HINT_T0);
+      _mm_prefetch(A + K, _MM_HINT_T0);
     }
-    (*pgemm)((int8_t*)qA[0], B, qC[0], 1, no_tile_cfg);
     // post-op and convert back to C
-    for (long m = 0; m < M; ++m) {
+    auto convert_one_row = [&](long m) {
 #pragma omp simd
       for (long n = 0; n < N; ++n) {
         float* scale_a_m;
@@ -1779,6 +1789,16 @@ class NoDequantGemmTPP {
           C[m * ldc + n] = c;
         }
       }
+    };
+    long m = 0;
+    for (; m < M - 4; m += 4) {
+      convert_one_row(m);
+      convert_one_row(m + 1);
+      convert_one_row(m + 2);
+      convert_one_row(m + 3);
+    }
+    for (; m < M; ++m) {
+      convert_one_row(m);
     }
   }
 
@@ -1869,7 +1889,7 @@ void qlinear_woq_affine_dequant_upfront_impl(
       std::tuple</*qw_type*/ int, /*BLOCK_N*/ long>,
       std::tuple<
           enumerate_dispatcher<int, QINT8, QINT4, NF4>,
-          enumerate_dispatcher<long, 32>>>::
+          enumerate_dispatcher<long, WOQ_N_BLOCK_SIZE>>>::
       call(
           std::make_tuple(qw_type, Nb),
           [&](auto tuple) {
@@ -2245,11 +2265,8 @@ void qlinear_woq_affine_impl(
   // select BLOCK_M according to M
   // TODO(jgong5): improve the heuristic
   auto BLOCK_M = [&]() -> long {
-    if (M < 32) {
+    if (M <= 48) {
       return M;
-    } else if (M < 48) {
-      int64_t block_size = (M + 1) / 2;
-      return block_size % 2 == 0 ? block_size : block_size + 1;
     } else if (M < 64) {
       return 32;
     } else if (M < 96) {
@@ -2442,7 +2459,7 @@ void qlinear_woq_affine_impl(
   product_dispatcher<
       std::tuple</*BLOCK_N*/ long, /*qw_type*/ int, /*no_dequant_weight*/ bool>,
       std::tuple<
-          enumerate_dispatcher<long, 32>,
+          enumerate_dispatcher<long, WOQ_N_BLOCK_SIZE>,
           enumerate_dispatcher<int, QINT8, QINT4, NF4>,
           enumerate_dispatcher<bool, false, true>>>::
       call(
@@ -3917,7 +3934,8 @@ at::Tensor quantize_per_block<bfloat16>(
                             float scale_,
                             int zp_) {
     int k;
-    for (k = 0; k < block_k / vecsize * vecsize; k += vecsize) {
+    int k_limit = block_k / vecsize * vecsize;
+    for (k = 0; k < k_limit; k += vecsize) {
       auto in_ptr0 = in_ptr + k;
       auto out_ptr0 = out_ptr + k;
       auto tmp0 = at::vec::Vectorized<at::BFloat16>::loadu(in_ptr0, vecsize);
@@ -3972,7 +3990,8 @@ at::Tensor quantize_per_block<bfloat16>(
                                 float scale_,
                                 int zp_) {
     int k;
-    for (k = 0; k < block_k / vecsize * vecsize; k += vecsize) {
+    int k_limit = block_k / vecsize * vecsize;
+    for (k = 0; k < k_limit; k += vecsize) {
       auto in_ptr0 = in_ptr + k;
       auto out_ptr0 = out_ptr + k;
       auto tmp0 = at::vec::Vectorized<at::BFloat16>::loadu(in_ptr0, vecsize);
