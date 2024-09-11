@@ -338,7 +338,7 @@ It means there is no need to further apply optimization like torchscirpt. Defaul
 </dl>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Please invoke <code class="docutils literal notranslate"><span class="pre">optimize_transformers</span></code> function AFTER invoking DeepSpeed in Tensor Parallel
+<p>Please invoke <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> function AFTER invoking DeepSpeed in Tensor Parallel
 inference scenario.</p>
 </div>
 <p class="rubric">Examples</p>
@@ -346,7 +346,7 @@ inference scenario.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="o">...</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">PATH</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize_transformers</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">optimized_model</span><span class="o">.</span><span class="n">generate</span><span class="p">()</span>
 </pre></div>
 </div>
