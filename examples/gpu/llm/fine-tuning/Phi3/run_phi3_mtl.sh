@@ -1,3 +1,7 @@
+# proxy set for downloading dataset error
+# export http_proxy="http://child-jf.intel.com:912"
+# export https_proxy="http://child-jf.intel.com:912"
+
 # For MTL platform not support flash attention
 Run_phi3-mini_peft() {
 
@@ -20,7 +24,7 @@ Run_phi3-mini_peft() {
 
 main() {
 
-    model='microsoft/Phi-3-mini-4k-instruct'
+    model='/path_to_Phi-3-mini-4k/'
 
     Run_phi3-mini_peft
 

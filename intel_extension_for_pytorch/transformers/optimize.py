@@ -1420,7 +1420,7 @@ def optimize_transformers(
         optimized model object for model.generate(), also workable with model.forward
 
     .. warning::
-        Please invoke ``ipex.llm.optimize`` function AFTER invoking DeepSpeed in Tensor Parallel
+        Please invoke ``optimize_transformers`` function AFTER invoking DeepSpeed in Tensor Parallel
         inference scenario.
 
     Examples:
@@ -1429,7 +1429,7 @@ def optimize_transformers(
         >>> model = ...
         >>> model.load_state_dict(torch.load(PATH))
         >>> model.eval()
-        >>> optimized_model = ipex.llm.optimize(model, dtype=torch.bfloat16)
+        >>> optimized_model = ipex.optimize_transformers(model, dtype=torch.bfloat16)
         >>> optimized_model.generate()
 
     """

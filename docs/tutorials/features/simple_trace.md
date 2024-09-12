@@ -1,5 +1,5 @@
-Simple Trace Tool (Deprecated)
-==============================
+Simple Trace Tool (Prototype)
+=============================
 
 ## Introduction
 

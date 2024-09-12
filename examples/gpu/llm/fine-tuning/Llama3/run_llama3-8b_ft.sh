@@ -1,3 +1,7 @@
+# proxy set for downloading dataset error
+# export http_proxy="http://child-jf.intel.com:912"
+# export https_proxy="http://child-jf.intel.com:912"
+
 # export ZE_AFFINITY_MASK=4
 
 # export PROFILE=1
@@ -27,7 +31,7 @@ Run_llama3-8b_peft_singlecard() {
 
 Run_llama3-8b_peft_fsdp() {
 
-    accelerate launch  --config_file "fsdp_config.yaml"  llama3_ft.py \
+    accelerate launch --main_process_port "29800" --config_file "fsdp_config.yaml"  llama3_ft.py \
         --model_name_or_path ${model} \
         --use_flashattn True \
         --bf16 True \
@@ -49,7 +53,7 @@ Run_llama3-8b_peft_fsdp() {
 
 main() {
 
-    model='meta-llama/Meta-Llama-3-8B'
+    model='/path_to_llama3/llama3-8b'
 
     Run_llama3-8b_peft_singlecard
     Run_llama3-8b_peft_fsdp

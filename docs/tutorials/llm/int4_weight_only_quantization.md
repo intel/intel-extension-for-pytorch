@@ -91,18 +91,18 @@ In Weight-Only Quantization INT4 case, when using `AutoModelForCausalLM.from_pre
                                                 scale_dtype=convert_dtype_str2torch("fp16"))
 ```
 
-When running on Intel® GPU, it will replace the linear in the model with `WeightOnlyQuantizedLinear`. After that, the model linear weight loaded by `ipex.llm.optimize` is in INT4 format, and it contains not only weight and bias information, but also scales, zero_points, and blocksize information. When optimizing transformers at the front end, Intel® Extension for PyTorch\* will use `WeightOnlyQuantizedLinear` to initialize these information in the model if they are present, otherwise, it will use `IPEXTransformerLinear` to initialize the linear parameters in the model.
+When running on Intel® GPU, it will replace the linear in the model with `WeightOnlyQuantizedLinear`. After that, the model linear weight loaded by `ipex.optimize_transformers` is in INT4 format, and it contains not only weight and bias information, but also scales, zero_points, and blocksize information. When optimizing transformers at the front end, Intel® Extension for PyTorch\* will use `WeightOnlyQuantizedLinear` to initialize these information in the model if they are present, otherwise, it will use `IPEXTransformerLinear` to initialize the linear parameters in the model.
 
 
 ### Weight-Only Quantization Runtime
-On Intel® GPU, after using `ipex.llm.optimize`, Intel® Extension for PyTorch\* will automatically replace the original attention module with `IPEXTransformerAttnOptimizedInt4` and the original mlp module with `IPEXTransformerMLPOptimizedInt4` in the model.
+On Intel® GPU, after using `ipex.optimize_transformers`, Intel® Extension for PyTorch\* will automatically replace the original attention module with `IPEXTransformerAttnOptimizedInt4` and the original mlp module with `IPEXTransformerMLPOptimizedInt4` in the model.
 
-The major changes between `IPEXTransformerAttnOptimizedInt4` for INT4 scenario and `ipex.llm.optimize` for FP16 scenario include: replace the linear used to calculate qkv with `torch.ops.torch_ipex.mm_qkv_out_int4` and out_linear with `torch.ops.torch_ipex.mm_bias_int4`.
+The major changes between `IPEXTransformerAttnOptimizedInt4` for INT4 scenario and `ipex.optimize_transformers` for FP16 scenario include: replace the linear used to calculate qkv with `torch.ops.torch_ipex.mm_qkv_out_int4` and out_linear with `torch.ops.torch_ipex.mm_bias_int4`.
 
-The major changes between `IPEXTransformerMLPOptimizedInt4` for INT4 scenario and `ipex.llm.optimize` for FP16 scenario include: replace the linear used in mlp with `torch.ops.torch_ipex.mm_bias_int4`, if activation is used in the mlp module, then correspondingly, it will be replaced with our fused linear+activation kernel, such as `torch.ops.torch_ipex.mm_silu_mul_int4`.
+The major changes between `IPEXTransformerMLPOptimizedInt4` for INT4 scenario and `ipex.optimize_transformers` for FP16 scenario include: replace the linear used in mlp with `torch.ops.torch_ipex.mm_bias_int4`, if activation is used in the mlp module, then correspondingly, it will be replaced with our fused linear+activation kernel, such as `torch.ops.torch_ipex.mm_silu_mul_int4`.
 
 ### Weight-Only Quantization Linear Dispatch
-As explained before, after applying `ipex.llm.optimize`, The linear kernel that Intel® Extension for PyTorch* has registered to substitute the original linear will be used in the model.
+As explained before, after applying `ipex.optimize_transformers`, The linear kernel that Intel® Extension for PyTorch* has registered to substitute the original linear will be used in the model.
 
 The method is: 
 
@@ -149,7 +149,7 @@ inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
 qmodel = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, device_map="xpu", trust_remote_code=True)
 
 # optimize the model with Intel® Extension for PyTorch*, it will improve performance.
-qmodel = ipex.llm.optimize(qmodel, inplace=True, dtype=torch.float16, woq=True, device="xpu")
+qmodel = ipex.optimize_transformers(qmodel, inplace=True, dtype=torch.float16, woq=True, device="xpu")
 
 output = qmodel.generate(inputs)
 ```
@@ -164,14 +164,14 @@ from intel_extension_for_transformers.transformers.modeling import AutoModelForC
 
 qmodel = AutoModelForCausalLM.from_pretrained("Qwen/Qwen-7B", load_in_4bit=True, device_map="xpu", trust_remote_code=True)
 
-# Please note, saving model should be executed before ipex.llm.optimize function is called. 
+# Please note, saving model should be executed before ipex.optimize_transformers function is called. 
 model.save_pretrained("saved_dir")
 
 # Load model
 loaded_model = AutoModelForCausalLM.from_pretrained("saved_dir", trust_remote_code=True)
 
-# Before executed the loaded model, you can call ipex.llm.optimize function.
-loaded_model = ipex.llm.optimize(loaded_model, inplace=True, dtype=torch.float16, woq=True, device="xpu")
+# Before executed the loaded model, you can call ipex.optimize_transformers function.
+loaded_model = ipex.optimize_transformers(loaded_model, inplace=True, dtype=torch.float16, woq=True, device="xpu")
 
 output = loaded_model.generate(inputs)
 
@@ -184,6 +184,5 @@ bash run_benchmark_woq.sh
 ```
 
 >Note:
-> * Do save quantized model before call `ipex.llm.optimize` function.
-> * The `ipex.llm.optimize` function is designed to optimize transformer-based models within frontend python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. Please refer to [Transformers Optimization Frontend API](../../tutorials/llm/llm_optimize_transformers.md) for the detail of `ipex.llm.optimize`.
-
+> * Do save quantized model before call `optimize_transformers` function.
+> * The optimize_transformers function is designed to optimize transformer-based models within frontend python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. Please refer to [Transformers Optimization Frontend API](../../tutorials/llm/llm_optimize_transformers.md) for the detail of `optimize_transformers`.

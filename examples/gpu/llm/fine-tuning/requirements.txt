@@ -1,8 +1,11 @@
+numpy
 peft
 rouge_score
 fire
-transformers==4.41.2
+datasets
+transformers>=4.41.2
+torch
+sentencepiece
 tokenizers>=0.13.3
-wandb==0.17.5
+wandb
 trl==0.9.4
-accelerate==0.28.0

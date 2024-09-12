@@ -1,3 +1,7 @@
+# proxy set for downloading dataset error
+# export http_proxy="http://child-jf.intel.com:912"
+# export https_proxy="http://child-jf.intel.com:912"
+
 # export ZE_AFFINITY_MASK=4
 
 # export PROFILE=1
@@ -30,7 +34,7 @@ Run_phi3-mini_peft_singlecard() {
 
 Run_phi3-mini_peft_fsdp() {
 
-    accelerate launch --config_file "fsdp_config.yaml"  phi3_ft.py \
+    accelerate launch --main_process_port "29800" --config_file "fsdp_config.yaml"  phi3_ft.py \
         --model_name_or_path ${model} \
         --use_flashattn False \
         --bf16 True \

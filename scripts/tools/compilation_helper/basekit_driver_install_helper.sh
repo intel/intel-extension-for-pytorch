@@ -150,26 +150,26 @@ function install-driver() {
             POSTFIX="24.04"
         fi
         ${SUDO} apt update
-        ${SUDO} apt install -y intel-opencl-icd=24.26.30049.10-950~${POSTFIX} \
-        libze1=1.17.6-950~${POSTFIX} \
-        libze-dev=1.17.6-950~${POSTFIX} \
-        intel-level-zero-gpu=1.3.30049.10-950~${POSTFIX} \
-        xpu-smi=1.2.35-59~${POSTFIX}
+        ${SUDO} apt install -y intel-opencl-icd=24.22.29735.27-914~${POSTFIX} \
+        libze1=1.17.6-914~${POSTFIX} \
+        libze-dev=1.17.6-914~${POSTFIX} \
+        intel-level-zero-gpu=1.3.29735.27-914~${POSTFIX} \
+        xpu-smi=1.2.35-56~${POSTFIX}
     fi
     if [[ " rhel centos " =~ " ${OS_ID} " ]]; then
-        ${SUDO} dnf install -y intel-opencl-24.26.30049.10 \
+        ${SUDO} dnf install -y intel-opencl-24.22.29735.27 \
         level-zero-1.17.6 \
         level-zero-devel-1.17.6 \
-        intel-level-zero-gpu-1.3.30049.10 \
-        intel-ocloc-24.26.30049.10 \
+        intel-level-zero-gpu-1.3.29735 \
+        intel-ocloc-24.22.29735.27 \
         xpu-smi-1.2.35
     fi
     if [ "${OS_ID}" = "opensuse-leap" ]; then
-        ${SUDO} zypper install -y --oldpackage intel-opencl-24.26.30049.10 \
+        ${SUDO} zypper install -y --oldpackage intel-opencl-24.22.29735.27 \
         level-zero-1.17.6 \
         level-zero-devel-1.17.6 \
-        intel-level-zero-gpu-1.3.30049.10 \
-        intel-ocloc-24.26.30049.10 \
+        intel-level-zero-gpu-1.3.29735 \
+        intel-ocloc-24.22.29735.27 \
         xpu-smi-1.2.35
     fi
 }
@@ -192,22 +192,25 @@ function install-dev() {
             POSTFIX="24.04"
         fi
         ${SUDO} apt update
-        ${SUDO} apt install -y intel-oneapi-dpcpp-cpp-2024.2=2024.2.1-1079 \
+        ${SUDO} apt install -y intel-level-zero-gpu-dev=1.3.29735.27-914~${POSTFIX} \
+        intel-oneapi-dpcpp-cpp-2024.2=2024.2.1-1079 \
         intel-oneapi-mkl-devel=2024.2.1-103 \
         intel-oneapi-ccl-devel=2021.13.1-31 \
-        intel-pti-dev=0.9.0-35
+        intel-pti-dev
     fi
     if [[ " rhel centos " =~ " ${OS_ID} " ]]; then
-        ${SUDO} dnf install -y intel-oneapi-dpcpp-cpp-2024.2-2024.2.1 \
+        ${SUDO} dnf install -y intel-level-zero-gpu-devel-1.3.29735 \
+        intel-oneapi-dpcpp-cpp-2024.2-2024.2.1 \
         intel-oneapi-mkl-devel-2024.2.1 \
         intel-oneapi-ccl-devel-2021.13.1 \
-        intel-pti-dev-0.9.0
+        intel-pti-dev
     fi
     if [ "${OS_ID}" = "opensuse-leap" ]; then
-        ${SUDO} zypper install -y --oldpackage intel-oneapi-dpcpp-cpp-2024.2-2024.2.1 \
+        ${SUDO} zypper install -y --oldpackage intel-level-zero-gpu-devel-1.3.29735 \
+        intel-oneapi-dpcpp-cpp-2024.2-2024.2.1 \
         intel-oneapi-mkl-devel-2024.2.1 \
         intel-oneapi-ccl-devel-2021.13.1 \
-        intel-pti-dev-0.9.0
+        intel-pti-dev
     fi
 }
 

@@ -2,7 +2,7 @@
 
 Here you can find benchmarking scripts for large language models (LLM) text generation. These scripts:
 
-- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other models such as ChatGLMv3-6B, Baichuan2-13B and Phi3-mini. 
+- Support Llama 2, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as ChatGLMv3-6B and Baichuan2-13B. 
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
@@ -33,7 +33,7 @@ source ./tools/env_activate.sh [inference|fine-tuning]
 
 ### Conda-based environment setup with compilation from source
 
-Make sure the driver and Base Toolkit are installed. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.3.110%2Bxpu&os=linux%2Fwsl2&package=source).
+Make sure the driver and Base Toolkit are installed without using a docker container. Refer to [Installation Guide](https://intel.github.io/intel-extension-for-pytorch/#installation?platform=gpu&version=v2.1.40%2Bxpu&os=linux%2Fwsl2&package=source).
 
 ```bash
 
@@ -51,18 +51,14 @@ conda activate llm
 # Setup the environment with the provided script
 cd examples/gpu/llm
 # If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
-# e.g. bash ./tools/env_setup.sh 3 /opt/intel/oneapi/compiler/latest /opt/intel/oneapi/mkl/latest /opt/intel/oneapi/ccl/latest /opt/intel/oneapi/mpi/latest /opt/intel/oneapi/pti/latest pvc
-bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <PTI_ROOT> <AOT>
-
+bash ./tools/env_setup.sh 3 <DPCPP_ROOT> <ONEMKL_ROOT> <ONECCL_ROOT> <MPI_ROOT> <AOT>
 conda deactivate
 conda activate llm
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 source ./tools/env_activate.sh [inference|fine-tuning]
 ```
 
 where <br />
-- `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. For example 'pvc,ats-m150' for the Platform Intel® Data Center GPU Max Series, Intel® Data Center GPU Flex Series and Intel® Arc™ A-Series Graphics (A770). Check [tutorial](../../../docs/tutorials/technical_details/AOT.md) for details.<br />
-
+- `AOT` is a text string to enable `Ahead-Of-Time` compilation for specific GPU models. Check [tutorial](../../../../../docs/tutorials/technical_details/AOT.md) for details.<br />
 
 <br />
  

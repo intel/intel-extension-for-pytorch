@@ -1,11 +1,11 @@
-`IPEX_LOG` (Prototype)
+`IPEX_LOGGING` (Prototype)
 ==========================
 
 ## Introduction
 
-`IPEX_LOG` provides the capability to log verbose information from Intel® Extension for PyTorch\* . Please use `IPEX_LOG` to get the log information or trace the execution from Intel® Extension for PyTorch\*. Please continue using PyTorch\* macros such as `TORCH_CHECK`, `TORCH_ERROR`, etc. to get the log information from PyTorch\*.
+`IPEX_LOGGING` provides the capability to log verbose information from Intel® Extension for PyTorch\* . Please use `IPEX_LOGGING` to get the log information or trace the execution from Intel® Extension for PyTorch\*. Please continue using PyTorch\* macros such as `TORCH_CHECK`, `TORCH_ERROR`, etc. to get the log information from PyTorch\*.
 
-## `IPEX_LOG` Definition
+## `IPEX_LOGGING` Definition
 ### Log Level
 The supported log levels are defined as follows, default log level is `DISABLED`:
 
@@ -81,4 +81,3 @@ Use `torch.xpu.set_log_level(0)` to get logs to replace the previous usage in `I
 
 ## Replace `IPEX_VERBOSE`
 Use `torch.xpu.set_log_level(1)` to get logs to replace the previous usage in `IPEX_VERBOSE`.
-
