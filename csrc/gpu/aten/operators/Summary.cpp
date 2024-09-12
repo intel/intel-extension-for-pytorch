@@ -273,9 +273,9 @@ Tensor histc_template(
     input_t max) {
   input_t minvalue = min;
   input_t maxvalue = max;
-  if (min == max) {
-    minvalue = self.min().item<input_t>();
-    maxvalue = self.max().item<input_t>();
+  if (min == max && self.numel() > 0) {
+    minvalue = *self.min().cpu().const_data_ptr<input_t>();
+    maxvalue = *self.max().cpu().const_data_ptr<input_t>();
   }
   if (minvalue == maxvalue) {
     minvalue = minvalue - 1;

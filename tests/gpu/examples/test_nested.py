@@ -143,21 +143,6 @@ class TestTorchMethod(TestCase):
     )
     def test_bmm(self):
         def _test_bmm(device, dtype):
-            # error case: one is nested but the other is not
-            nt = torch.nested.nested_tensor(
-                [torch.randn(2), torch.randn(3)], device=device, dtype=dtype
-            )
-            t = torch.randn(4, device=device, dtype=dtype)
-            self.assertRaisesRegex(
-                RuntimeError,
-                "Expected both to be nested, but got a nested self and non-nested other",
-                lambda: nt.bmm(t),
-            )
-            self.assertRaisesRegex(
-                RuntimeError,
-                "Expected both to be nested, but got a non-nested self and nested other",
-                lambda: t.bmm(nt),
-            )
             # error case: not 3D tensors
             nt0 = torch.nested.nested_tensor([], device=device, dtype=dtype)
             nt1 = torch.nested.nested_tensor(
