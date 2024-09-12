@@ -79,7 +79,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
 
   const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
   auto xeType = sdp::aten_to_Xetla_dtype(query);
-  gpu_arch xeArch = sdp::aten_to_Xetla_arch();
+  static gpu::xetla::gpu_arch xeArch = gpu::xetla::get_device_gpu_arch();
   auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,
       xeType,
@@ -1064,7 +1064,7 @@ Tensor varlen_fwd(
       dpcppGetDeviceHasXMX(),
       "SDP kernel requires XMX, but the current platform has no XMX ...");
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
-  gpu_arch xeArch = sdp::aten_to_Xetla_arch();
+  static gpu::xetla::gpu_arch xeArch = gpu::xetla::get_device_gpu_arch();
   auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,
       xeType,
@@ -1144,11 +1144,13 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   char str__[100];
   sprintf(
       str__,
-      "xetla_fsdp_forward_atten_mask_alibi_strided(Nq=%ld, Nkv=%ld, M=%ld, N=%ld)",
+      "xetla_fsdp_fwd(B=%ld, Nq=%ld, Nkv=%ld, M=%ld, N=%ld, H=%ld)",
+      B,
       num_heads_q,
       num_heads_k,
       M,
-      N);
+      N,
+      head_dim);
   RECORD_FUNCTION(str__, {});
 
   // check alibi padded
@@ -1179,7 +1181,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
 #if defined(USE_XETLA)
   auto xeType = sdp::aten_to_Xetla_dtype(query);
-  gpu_arch xeArch = sdp::aten_to_Xetla_arch();
+  static gpu::xetla::gpu_arch xeArch = gpu::xetla::get_device_gpu_arch();
   auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,
       xeType,
@@ -1275,7 +1277,7 @@ Tensor xetla_fsdp_index_forward(
 
   // check attn_mask padded
   uint32_t attn_mask_padding = 0;
-  bool is_broadcast = false;
+  [[maybe_unused]] bool is_broadcast = false;
   if (attn_mask.has_value()) {
     attn_mask_padding = attn_mask.value().size(-1);
     TORCH_CHECK(
@@ -1364,7 +1366,7 @@ void xetla_paged_attention_impl_v1(
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
 #if defined(USE_XETLA)
-  gpu_arch arch_tag = sdp::aten_to_Xetla_arch();
+  static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   auto cgfs = gpu::xetla::paged_attention_v1(
       arch_tag,
@@ -1450,7 +1452,7 @@ void xetla_paged_attention_impl_v2(
 
   auto dpcpp_queue = dpcppGetCurrentQueue();
 #if defined(USE_XETLA)
-  gpu_arch arch_tag = sdp::aten_to_Xetla_arch();
+  static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   auto cgfs = gpu::xetla::paged_attention_v2(
       arch_tag,

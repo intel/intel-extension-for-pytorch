@@ -102,17 +102,6 @@ inline XetlaType aten_to_Xetla_dtype(const Tensor& input) {
   return xeType;
 }
 
-inline gpu_arch aten_to_Xetla_arch() {
-  bool has_2d_block = dpcppGetDeviceHas2DBlock();
-  bool has_xmx = dpcppGetDeviceHasXMX();
-  if (has_2d_block && has_xmx) {
-    return gpu_arch::XeHpc;
-  } else if (has_xmx) {
-    return gpu_arch::XeHpg;
-  } else { // TODO(Yi): distinguish PVC-VG from MTL which supports 2d-block
-    return gpu_arch::XeLpg;
-  }
-}
 #endif
 
 inline bool xetla_supported(sdp::sdp_params params) {

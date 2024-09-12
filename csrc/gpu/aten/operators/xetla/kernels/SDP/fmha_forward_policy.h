@@ -6,8 +6,6 @@ namespace gpu::xetla {
 
 struct fmha_policy_base {
   static constexpr uint32_t accum_step = 32;
-  static constexpr uint32_t stages = 3;
-  static constexpr uint32_t sync_freq = 0;
 };
 
 /*
@@ -106,7 +104,18 @@ struct fmha_policy_64x128x512 : fmha_policy_base {
   static constexpr uint32_t kSgHm = 128;
   static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
 };
+
 struct fmha_policy_64x64x64 : fmha_policy_base {
+  static constexpr uint32_t kBr = 64;
+  static constexpr uint32_t kSgBr = 16;
+  static constexpr uint32_t kBc = 64;
+  static constexpr uint32_t kSgBc = 32;
+  static constexpr uint32_t kHm = 64;
+  static constexpr uint32_t kSgHm = 16;
+  static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
+};
+
+struct fmha_policy_128x128x64 : fmha_policy_base {
   static constexpr uint32_t kBr = 128;
   static constexpr uint32_t kSgBr = 16;
   static constexpr uint32_t kBc = 128;
@@ -168,8 +177,4 @@ struct fmha_policy_32x128x128 : fmha_policy_base {
   static constexpr uint32_t thread_num = (kBr / kSgBr) * (kBc / kSgBc);
 };
 
-template <typename P>
-struct stage0 : P {
-  static constexpr uint32_t stages = 0;
-};
 } // namespace gpu::xetla

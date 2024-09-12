@@ -23,6 +23,15 @@
 
 namespace gpu::xetla::subgroup {
 
+struct tile_add {
+  template <typename dtype, int vec_len>
+  static xetla_vector<dtype, vec_len> inline func(
+      xetla_vector<dtype, vec_len> vec_data,
+      dtype data) {
+    return vec_data + data;
+  }
+};
+
 struct tile_minus {
   template <typename dtype, int vec_len>
   static xetla_vector<dtype, vec_len> inline func(
@@ -38,6 +47,15 @@ struct tile_div {
       xetla_vector<dtype, vec_len> vec_data,
       dtype data) {
     return vec_data / data;
+  }
+};
+
+struct tile_mul {
+  template <typename dtype, int vec_len>
+  static xetla_vector<dtype, vec_len> inline func(
+      xetla_vector<dtype, vec_len> vec_data,
+      dtype data) {
+    return vec_data * data;
   }
 };
 

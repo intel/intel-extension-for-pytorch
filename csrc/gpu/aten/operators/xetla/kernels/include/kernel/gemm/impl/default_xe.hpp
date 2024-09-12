@@ -187,8 +187,8 @@ class gemm_universal_t<
   __XETLA_API static constexpr uint32_t get_barrier_count() {
     constexpr uint32_t count =
         gemm_t::barrier_count + epilogue_t::barrier_count;
-    static_assert(
-        count <= 32, "The named_barrier count should be less than 32!");
+    static_assert(count <= 32, "The barrier count should be less than 32!");
+
     return count;
   }
 
@@ -200,18 +200,17 @@ class gemm_universal_t<
     static_assert(
         size <= arch_attr_t<arch_tag>::local_mem_size,
         "The local memory size excess!");
+
     return size;
   };
 
   /// @brief Host helper function to get the expected local range under the
   /// current GEMM_UNIVERSAL config.
   /// @return Expected local range.
-  static cl::sycl::range<3> get_local_range() {
-    uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
-    uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
-    std::cout << "Local range: {" << 1 << ", " << local_range_m << ", "
-              << local_range_n << "} \n";
-    assert(local_range_m * local_range_n <= 32);
+  static inline cl::sycl::range<3> get_local_range() {
+    constexpr uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
+    constexpr uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
+    static_assert(local_range_m * local_range_n <= 32);
     return cl::sycl::range<3>{1, local_range_m, local_range_n};
   };
 
@@ -222,14 +221,12 @@ class gemm_universal_t<
   /// @param matrix_n Is the size of the n dimension of the matrix
   /// multiplication (m x k x n).
   /// @return Expected group range.
-  static cl::sycl::range<3> get_group_range(
+  static inline cl::sycl::range<3> get_group_range(
       uint32_t matrix_m,
       uint32_t matrix_n) {
     uint32_t group_range_m = (matrix_m + wg_tile_m - 1) / wg_tile_m;
     uint32_t group_range_n = (matrix_n + wg_tile_n - 1) / wg_tile_n;
     group_swizzle_t::update_group_range(group_range_m, group_range_n);
-    std::cout << "Group range: {" << 1 << ", " << group_range_m << ", "
-              << group_range_n << "} \n";
     return cl::sycl::range<3>{1, group_range_m, group_range_n};
   };
 
@@ -238,11 +235,35 @@ class gemm_universal_t<
   /// @param args Is the GEMM_UNIVERSAL arguments for application-related
   /// runtime variables.
   /// @return Expected nd_range.
-  static cl::sycl::nd_range<3> get_nd_range(arguments_t& args) {
+  static inline cl::sycl::nd_range<3> get_nd_range(arguments_t& args) {
     cl::sycl::range<3> local_range = get_local_range();
     cl::sycl::range<3> group_range =
         get_group_range(args.matrix_m, args.matrix_n);
     return cl::sycl::nd_range<3>{group_range * local_range, local_range};
+  };
+
+  static cl::sycl::nd_range<3> get_nd_range(
+      uint32_t matrix_m,
+      uint32_t matrix_n) {
+    cl::sycl::range<3> local_range = get_local_range();
+    cl::sycl::range<3> group_range = get_group_range(matrix_m, matrix_n);
+    return cl::sycl::nd_range<3>{group_range * local_range, local_range};
+  };
+
+  /// @brief Host helper function to get the expected  acc buffer size of the
+  /// current GEMM_UNIVERSAL config.
+  static size_t get_acc_buf_size(
+      [[maybe_unused]] uint32_t matrix_m,
+      [[maybe_unused]] uint32_t matrix_n) {
+    return 0;
+  };
+
+  /// @brief Host helper function to get the expected counter buffer size of the
+  /// current GEMM_UNIVERSAL config.
+  static size_t get_cnt_buf_size(
+      [[maybe_unused]] uint32_t matrix_m,
+      [[maybe_unused]] uint32_t matrix_n) {
+    return 0;
   };
 
   /// @brief Check if the arguments can be implemented.

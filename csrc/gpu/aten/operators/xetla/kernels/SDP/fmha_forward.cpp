@@ -61,7 +61,7 @@ class fmha_forward_kernel_policy {
     if (kIsTraining && kIsDropout && !args.dropout_mask) {
       if constexpr (kIsTraining && kIsDropout && arch_tag == gpu_arch::XeHpc) {
         if (args.head_size <= HEAD_SIZE_LIMIT_0) {
-          return policy<fmha_policy_64x64x64>(args);
+          return policy<fmha_policy_128x128x64>(args);
         } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
           return policy<fmha_policy_128x128x128>(args);
         } else if (args.head_size <= HEAD_SIZE_LIMIT_2) {
@@ -107,7 +107,7 @@ class fmha_forward_kernel_policy {
                   args);
             }
           } else if constexpr (igpu_wo_dropout) {
-            return policy<stage0<fmha_policy_1x256x128>>(args);
+            return policy<fmha_policy_1x256x128>(args);
           }
           return {};
         } else if (args.num_queries < NUM_QUERIES_LARGE) {
@@ -120,7 +120,7 @@ class fmha_forward_kernel_policy {
         } else {
           // for long query length
           if constexpr (arch_tag == gpu_arch::XeLpg)
-            return policy<stage0<fmha_policy_32x128x128>>(args);
+            return policy<fmha_policy_32x128x128>(args);
           else
             return policy<fmha_policy_64x128x128>(args);
         }
@@ -155,7 +155,6 @@ class fmha_forward_kernel_policy {
 };
 
 template <typename T, gpu_arch arch_tag, bool... Bs>
-
 cgfs_t dispatch_fmha_forward(
     const fmha::dispatch_fmha_forward_args_t<T>& args) {
   return fmha_forward_kernel_policy<T, arch_tag, Bs...>::run(args);

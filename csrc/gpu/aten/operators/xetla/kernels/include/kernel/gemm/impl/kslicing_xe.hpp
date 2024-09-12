@@ -291,12 +291,10 @@ class gemm_universal_t<
   /// @brief Host helper function to get the expected local range under the
   /// current GEMM_UNIVERSAL config.
   /// @return Expected local range.
-  static cl::sycl::range<3> get_local_range() {
-    uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
-    uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
-    std::cout << "Local range: {" << num_local_kslicing << ", " << local_range_m
-              << ", " << local_range_n << "} \n";
-    assert(local_range_m * local_range_n * num_local_kslicing <= 32);
+  static inline cl::sycl::range<3> get_local_range() {
+    constexpr uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
+    constexpr uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
+    static_assert(local_range_m * local_range_n * num_local_kslicing <= 32);
     return cl::sycl::range<3>{num_local_kslicing, local_range_m, local_range_n};
   };
 
@@ -307,14 +305,12 @@ class gemm_universal_t<
   /// @param matrix_n Is the size of the n dimension of the matrix
   /// multiplication (m x k x n).
   /// @return Expected group range.
-  static cl::sycl::range<3> get_group_range(
+  static inline cl::sycl::range<3> get_group_range(
       uint32_t matrix_m,
       uint32_t matrix_n) {
     uint32_t group_range_m = (matrix_m + wg_tile_m - 1) / wg_tile_m;
     uint32_t group_range_n = (matrix_n + wg_tile_n - 1) / wg_tile_n;
     group_swizzle_t::update_group_range(group_range_m, group_range_n);
-    std::cout << "Group range: {" << num_global_kslicing << ", "
-              << group_range_m << ", " << group_range_n << "} \n";
     return cl::sycl::range<3>{
         num_global_kslicing, group_range_m, group_range_n};
   };
@@ -324,10 +320,18 @@ class gemm_universal_t<
   /// @param args Is the GEMM_UNIVERSAL arguments for application-related
   /// runtime variables.
   /// @return Expected nd_range.
-  static cl::sycl::nd_range<3> get_nd_range(arguments_t& args) {
+  static inline cl::sycl::nd_range<3> get_nd_range(arguments_t& args) {
     cl::sycl::range<3> local_range = get_local_range();
     cl::sycl::range<3> group_range =
         get_group_range(args.matrix_m, args.matrix_n);
+    return cl::sycl::nd_range<3>{group_range * local_range, local_range};
+  };
+
+  static inline cl::sycl::nd_range<3> get_nd_range(
+      uint32_t matrix_m,
+      uint32_t matrix_n) {
+    cl::sycl::range<3> local_range = get_local_range();
+    cl::sycl::range<3> group_range = get_group_range(matrix_m, matrix_n);
     return cl::sycl::nd_range<3>{group_range * local_range, local_range};
   };
 

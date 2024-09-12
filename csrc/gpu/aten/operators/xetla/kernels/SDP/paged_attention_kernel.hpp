@@ -984,7 +984,8 @@ class paged_attention_reduce {
   // This boolean variable will determine whether the kernel will execute 2d
   // load path, Ideally, the 2d load path always be the default choice for
   // machine which support 2d load instruction for better performance.
-  static constexpr bool has_2d_ld_st = arch_tag >= gpu_arch::XeHpc;
+  static constexpr bool has_2d_ld_st =
+      gpu::xetla::arch_has_2d_load_store<arch_tag>;
   ;
 
   // -------------------- // Context // -------------------- //

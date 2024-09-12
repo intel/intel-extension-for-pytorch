@@ -281,21 +281,6 @@ struct bias_op_t {
   }
 };
 
-struct silu_op_t {
-  struct arguments_t {};
-  template <typename matAcc_t, typename coord_t>
-  __XETLA_API KERNEL_FUNC void operator()(
-      matAcc_t& matAcc,
-      const coord_t& coord,
-      const arguments_t& args,
-      uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
-    using dtype = typename matAcc_t::dtype;
-    matAcc.reg =
-        matAcc.reg / (1.f + xetla_exp<dtype>(dtype(-1.f) * matAcc.reg));
-  }
-};
-
 } // namespace epilogue_impl
 
 } // namespace torch_ipex::xpu::xetla

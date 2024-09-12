@@ -119,7 +119,7 @@ cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
       IMPL_KISVARLEN>(const dispatch_fmha_forward_args_t<IMPL_T>& args)
 
 #if (IMPL_KISTRAINING && IMPL_KISDROPOUT && defined(GPU_ARCH_XeHpc))
-INSTANTIATE_POLICY(fmha_policy_64x64x64);
+INSTANTIATE_POLICY(fmha_policy_128x128x64);
 INSTANTIATE_POLICY(fmha_policy_128x128x128);
 INSTANTIATE_POLICY(fmha_policy_128x128x256);
 INSTANTIATE_POLICY(fmha_policy_64x128x512);
@@ -130,8 +130,8 @@ INSTANTIATE_POLICY(fmha_policy_64x128x64);
 
 #if (!IMPL_KISDROPOUT && defined(GPU_ARCH_XeLpg))
 #define COMMA ,
-INSTANTIATE_POLICY(stage0<fmha_policy_1x256x128>);
-INSTANTIATE_POLICY(stage0<fmha_policy_1x512x128>);
+INSTANTIATE_POLICY(fmha_policy_1x256x128);
+INSTANTIATE_POLICY(fmha_policy_1x512x128);
 INSTANTIATE_POLICY(std::integral_constant<int COMMA 64>);
 INSTANTIATE_POLICY(std::integral_constant<int COMMA 128>);
 #endif
@@ -140,7 +140,7 @@ INSTANTIATE_POLICY(fmha_policy_8x256x128);
 INSTANTIATE_POLICY(fmha_policy_8x512x128);
 
 #if defined(GPU_ARCH_XeLpg)
-INSTANTIATE_POLICY(stage0<fmha_policy_32x128x128>);
+INSTANTIATE_POLICY(fmha_policy_32x128x128);
 #else
 INSTANTIATE_POLICY(fmha_policy_64x128x128);
 #endif

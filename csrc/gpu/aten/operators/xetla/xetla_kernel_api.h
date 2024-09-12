@@ -3,6 +3,7 @@
 #include <sycl/sycl.hpp>
 #include <functional>
 #include <vector>
+#include "kernels/xetla_arch.h"
 
 namespace torch_ipex::xpu::xetla {
 // Type alias for a vector of CGFs

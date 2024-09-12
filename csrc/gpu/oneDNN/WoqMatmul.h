@@ -22,6 +22,23 @@ using namespace torch_ipex::xpu::oneDNN;
 namespace torch_ipex::xpu {
 namespace oneDNN {
 
+#ifdef USE_PTI
+#define RECORD_WOQ_FUNCTION_IMPL(F, m, n, k, group_size, m2_trans) \
+  char str__[100];                                                 \
+  sprintf(                                                         \
+      str__,                                                       \
+      "woq_%s(%d, %d, %d, s=%d, wt=%d)",                           \
+      "" #F,                                                       \
+      m,                                                           \
+      n,                                                           \
+      k,                                                           \
+      group_size,                                                  \
+      m2_trans);                                                   \
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+#else
+#define RECORD_WOQ_FUNCTION_IMPL(F, m, n, k, group_size, m2_trans)
+#endif
+
 inline Tensor resize_as_onednn_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);
   int n = output_.sizes()[1];
@@ -51,6 +68,7 @@ static Tensor woq_matmul_int4(
   int m = mat1.sizes()[0];
   int n = mat2.sizes()[1];
   int k = mat1.sizes()[1];
+  RECORD_WOQ_FUNCTION_IMPL(matmul_int4, m, n, k, group_size, m2_trans);
   result = at::empty({m, n}, mat1_.options());
   size_t dims = result.dim();
   TORCH_CHECK(

@@ -5,6 +5,20 @@ namespace gpu::xetla {
 
 namespace fmha {
 
+template <gpu_arch arch_tag>
+class fmha_perf_knob_t {
+ public:
+  static constexpr uint32_t periodic_sync_interval = 0;
+  static constexpr uint32_t prefetch_distance = 0;
+};
+
+template <>
+class fmha_perf_knob_t<gpu_arch::XeHpc> {
+ public:
+  static constexpr uint32_t periodic_sync_interval = 0;
+  static constexpr uint32_t prefetch_distance = 3;
+};
+
 template <typename mat_t>
 struct tile_mask_t {
   using accum_t = typename mat_t::dtype;
@@ -392,15 +406,6 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_element> {
         dst_reg += bias_reg;
       }
     }
-  }
-};
-
-struct tile_mul {
-  template <typename dtype, int vec_len>
-  static xetla_vector<dtype, vec_len> inline func(
-      xetla_vector<dtype, vec_len> vec_data,
-      dtype data) {
-    return vec_data * data;
   }
 };
 

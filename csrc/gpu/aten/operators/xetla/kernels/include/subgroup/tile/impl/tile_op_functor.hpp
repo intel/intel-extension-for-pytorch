@@ -254,17 +254,13 @@ struct silu_op_t {
 #pragma unroll
     for (int i = 0; i < rounds; ++i) {
       auto sub_vec = matAcc.reg.xetla_select<elems, 1>(elems * i);
-      xetla_vector<typename matAcc_t::dtype, elems> sigmoid_value =
-          xetla_sigmoid<typename matAcc_t::dtype, elems>(sub_vec);
-      sub_vec = sub_vec * sigmoid_value;
+      sub_vec = xetla_silu<typename matAcc_t::dtype, elems>(sub_vec);
     }
     constexpr int remaining_elems = matAcc_t::tile_desc::tile_elems % elems;
     if constexpr (remaining_elems != 0) {
       auto sub_vec = matAcc.reg.xetla_select<remaining_elems, 1>(
           elems * (matAcc_t::tile_elems / elems));
-      xetla_vector<typename matAcc_t::dtype, remaining_elems> sigmoid_value =
-          xetla_sigmoid<typename matAcc_t::dtype, remaining_elems>(sub_vec);
-      sub_vec = sub_vec * sigmoid_value;
+      sub_vec = xetla_silu<typename matAcc_t::dtype, remaining_elems>(sub_vec);
     }
   }
 };

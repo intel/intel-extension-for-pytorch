@@ -122,8 +122,10 @@ class fmha_backward_t {
  private:
   // -------------------- // Compute policy // -------------------- //
   static constexpr uint32_t accum_step = fmha_policy::accum_step;
-  static constexpr uint32_t stages = fmha_policy::stages;
-  static constexpr uint32_t sync_freq = fmha_policy::sync_freq;
+  static constexpr uint32_t stages =
+      fmha_perf_knob_t<arch_tag>::prefetch_distance;
+  static constexpr uint32_t sync_freq =
+      fmha_perf_knob_t<arch_tag>::periodic_sync_interval;
 
   using compute_attr = group::compute_attr_t<scalar_t, scalar_t, accum_t>;
   using perf_tuning_knob =

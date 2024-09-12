@@ -1215,7 +1215,7 @@ inline cgfs_t hgemm_silu_wint4(
   using data_type_zp = int4x8;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
-  using post_op = subgroup::chained_tile_op_t<epilogue_impl::silu_op_t>;
+  using post_op = subgroup::chained_tile_op_t<subgroup::silu_op_t>;
   using hgemm_wint4_functor = hgemm_wint4_func<
       data_type_a,
       data_type_b,
@@ -1286,7 +1286,7 @@ inline cgfs_t hgemm_silu_mul_wint4(
   using data_type_acc = float;
   using data_type_mul = scalar_t;
   using post_op = subgroup::chained_tile_op_t<
-      epilogue_impl::silu_op_t,
+      subgroup::silu_op_t,
       subgroup::elemwise_reduce_op_t<
           reduce_op::prod,
           data_type_mul,
@@ -1370,7 +1370,7 @@ inline cgfs_t hgemm_bias_silu_mul_wint4(
               mem_space::global,
               DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>,
           static_cast<gpu_arch>(ARCH)>,
-      epilogue_impl::silu_op_t,
+      subgroup::silu_op_t,
       subgroup::elemwise_reduce_op_t<
           reduce_op::prod,
           data_type_mul,

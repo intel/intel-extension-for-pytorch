@@ -23,18 +23,6 @@ bool choose_recommand_compute_eng() {
          compute_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
 }
 
-int8_t GetGpuArchId() noexcept {
-  DeviceId curDevID = at::xpu::current_device();
-  bool is_2d_block = dpcppGetDeviceHas2DBlock(curDevID);
-  bool is_xmx = dpcppGetDeviceHasXMX(curDevID);
-  if (is_2d_block && is_xmx) {
-    return static_cast<int8_t>(gpu::xetla::gpu_arch::XeHpc);
-  } else if (is_xmx) {
-    return static_cast<int8_t>(gpu::xetla::gpu_arch::XeHpg);
-  } else { // TODO(Yi): distinguish PVC-VG from MTL which supports 2d-block
-    return static_cast<int8_t>(gpu::xetla::gpu_arch::XeLpg);
-  }
-}
 static void mm_qkv_out_wint4(
     const Tensor& input_,
     const Tensor& weight_,
@@ -75,6 +63,7 @@ static void mm_qkv_out_wint4(
         weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
         weight.scalar_type() == kChar || weight.scalar_type() == kInt)
 
+    static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
     auto policy = HGEMMXetla_INT4()
                       .add_matrix_out(out0)
                       .add_matrix_out(out1)
@@ -87,7 +76,7 @@ static void mm_qkv_out_wint4(
       policy.add_epilogue(bias_.value(), HGEMMXetla_INT4::EpilogueType::BIAS);
     policy.add_epilogue(Tensor(), HGEMMXetla_INT4::EpilogueType::SPLIT3)
         .add_group_size(group_size)
-        .add_arch(GetGpuArchId())
+        .add_arch(arch_tag)
         .build();
     TORCH_CHECK(
         policy.fallback() == false,
@@ -241,6 +230,7 @@ static inline HGEMMXetla_INT4 mlp_mul_dispatch(
       gate_up_wei.scalar_type() == kQUInt8 ||
       gate_up_wei.scalar_type() == kInt);
 
+  static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
   auto dispatcher = HGEMMXetla_INT4()
                         .add_matrix_out(*output)
                         .add_matrix_inp(input)
@@ -256,7 +246,7 @@ static inline HGEMMXetla_INT4 mlp_mul_dispatch(
   }
   dispatcher //
       .add_group_size(group_size)
-      .add_arch(GetGpuArchId())
+      .add_arch(arch_tag)
       .build();
   TORCH_CHECK(dispatcher.fallback() == false, "mlp_mul: invalid gemm config");
   dispatcher.run();
@@ -451,6 +441,7 @@ static inline HGEMMXetla_INT4 mm_int4_dispatch(
   int n = weight_flat.sizes()[0];
   *output = output->defined() ? output->flatten(0, -2)
                               : at::empty({m, n}, input.options());
+  static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
   auto dispatcher = HGEMMXetla_INT4()
                         .add_matrix_out(*output)
                         .add_matrix_inp(input_flat)
@@ -458,7 +449,7 @@ static inline HGEMMXetla_INT4 mm_int4_dispatch(
                         .add_matrix_scl(weight_scl)
                         .add_matrix_zp(weight_zp)
                         .add_group_size(group_size)
-                        .add_arch(GetGpuArchId());
+                        .add_arch(arch_tag);
   for (auto& [epilogue_, epilogue_type] : epilogues) {
     dispatcher.add_epilogue(epilogue_, epilogue_type);
   }
@@ -982,6 +973,7 @@ Tensor _weight_int4pack_mm(
   auto q_zeros = q_scale_and_zeros_vec[1].reshape({-1, N}).contiguous();
   TORCH_CHECK(A.dim() == 2 && b_recast.dim() == 2);
 
+  static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
   auto policy = HGEMMXetla_INT4()
                     .add_matrix_out(C)
                     .add_matrix_inp(A)
@@ -989,7 +981,7 @@ Tensor _weight_int4pack_mm(
                     .add_matrix_scl(q_scale)
                     .add_matrix_zp(q_zeros)
                     .add_group_size(qGroupSize)
-                    .add_arch(GetGpuArchId())
+                    .add_arch(arch_tag)
                     .build();
   TORCH_CHECK(policy.fallback() == false, "mm int4: invalid gemm shape");
   policy.run();

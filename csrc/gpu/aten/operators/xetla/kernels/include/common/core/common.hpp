@@ -20,9 +20,9 @@
 #pragma once
 
 #include <CL/sycl.hpp>
-#include <common/core/common_types.hpp>
 #include <ext/intel/esimd.hpp>
 #include <version.hpp>
+#include "./common_types.hpp"
 
 template <class T>
 using remove_const_t = typename std::remove_const<T>::type;

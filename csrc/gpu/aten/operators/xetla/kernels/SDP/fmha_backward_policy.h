@@ -6,8 +6,6 @@ namespace gpu::xetla {
 
 struct fmha_bwd_policy_base {
   static constexpr uint32_t accum_step = 16;
-  static constexpr uint32_t stages = 3;
-  static constexpr uint32_t sync_freq = 0;
 };
 
 /*

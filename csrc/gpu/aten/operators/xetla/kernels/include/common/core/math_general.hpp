@@ -546,6 +546,42 @@ __XETLA_API T xetla_sigmoid(T src) {
   return (src <= -10) ? 0 : ret;
 }
 
+/// @brief Calculate silu value for each element of the input vector.
+/// @tparam T element type of the input and return vectors.
+/// @tparam SZ size of the input and returned vectors.
+/// @param src the input vector.
+/// @return vector of silu of component-wise elements.
+template <typename T, int SZ>
+__XETLA_API xetla_vector<T, SZ> xetla_silu(xetla_vector<T, SZ> src) {
+  static_assert(
+      (std::is_same<remove_const_t<T>, float>::value) ||
+          (std::is_same<remove_const_t<T>, fp16>::value),
+      "Only support fp32 and fp16");
+  xetla_mask<SZ> mask = src <= -10;
+  xetla_vector<T, SZ> exp = xetla_exp<T, SZ>(-src);
+  xetla_vector<T, SZ> ret_sub = 1.f / (exp + 1.f);
+  ret_sub *= src;
+  ret_sub.xetla_merge(0, mask);
+
+  return ret_sub;
+}
+
+/// @brief Calculate silu of a scalar.
+/// @tparam T element type of the input and return a scalar.
+/// @param src the scalar value.
+/// @return silu value.
+template <typename T>
+__XETLA_API T xetla_silu(T src) {
+  static_assert(
+      (std::is_same<remove_const_t<T>, float>::value) ||
+          (std::is_same<remove_const_t<T>, fp16>::value),
+      "Only support fp32 and fp16");
+  T exp = xetla_exp<T>(-src);
+  T ret = 1.f / (exp + 1.f);
+  ret *= src;
+  return (src <= -10) ? 0 : ret;
+}
+
 /// Add two unsigned integer vectors, return the result and in-place update the
 /// carry.
 /// @tparam T element type of the src, should be uint32_t.

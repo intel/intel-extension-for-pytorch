@@ -663,7 +663,7 @@ inline cgfs_t hgemm_silu(
     const int m,
     const int n,
     const int k) {
-  using tile_op_t = chained_tile_op_t<epilogue_impl::silu_op_t>;
+  using tile_op_t = chained_tile_op_t<subgroup::silu_op_t>;
   auto caller = hgemm_caller<
       scalar_t,
       WG_M,

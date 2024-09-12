@@ -1019,7 +1019,7 @@ class HGEMMXetla_INT4 final {
   int m_, n_, k_;
   int offset_n_k = 0, offset_n_v = 0; // n-dim offset, for qkv fusion
   int64_t group_size_;
-  int8_t arch_ = static_cast<int>(gpu::xetla::gpu_arch::XeHpc);
+  gpu::xetla::gpu_arch arch_ = gpu::xetla::gpu_arch::XeHpc;
   template <uint32_t a, uint32_t b>
   struct gcd {
     static constexpr uint32_t value = gcd<b, a % b>::value;
@@ -1066,7 +1066,7 @@ class HGEMMXetla_INT4 final {
   bool fallback() const {
     return fallback_;
   }
-  HGEMMXetla_INT4& add_arch(int8_t arch) {
+  HGEMMXetla_INT4& add_arch(gpu::xetla::gpu_arch arch) {
     arch_ = arch;
     return *this;
   }
@@ -1311,19 +1311,19 @@ class HGEMMXetla_INT4 final {
   void run() {
     auto& q = dpcppGetCurrentQueue();
 #ifdef USE_XETLA_XE_HPC
-    if (arch_ == static_cast<int>(gpu_arch::XeHpc)) {
+    if (arch_ == gpu_arch::XeHpc) {
       dispatch<gpu_arch::XeHpc>(q);
       return;
     }
 #endif
 #ifdef USE_XETLA_XE_HPG
-    if (arch_ == static_cast<int>(gpu_arch::XeHpg)) {
+    if (arch_ == gpu_arch::XeHpg) {
       dispatch<gpu_arch::XeHpg>(q);
       return;
     }
 #endif
 #ifdef USE_XETLA_XE_LPG
-    if (arch_ == static_cast<int>(gpu_arch::XeLpg)) {
+    if (arch_ == gpu_arch::XeLpg) {
       dispatch<gpu_arch::XeLpg>(q);
       return;
     }

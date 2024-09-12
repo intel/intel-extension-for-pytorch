@@ -131,8 +131,10 @@ class fmha_forward_t {
  private:
   // -------------------- // Compute policy // -------------------- //
   static constexpr uint32_t accum_step = fmha_policy::accum_step;
-  static constexpr uint32_t stages = fmha_policy::stages;
-  static constexpr uint32_t sync_freq = fmha_policy::sync_freq;
+  static constexpr uint32_t stages =
+      fmha_perf_knob_t<arch_tag>::prefetch_distance;
+  static constexpr uint32_t sync_freq =
+      fmha_perf_knob_t<arch_tag>::periodic_sync_interval;
 
   using comp_attr = group::compute_attr_t<scalar_t, scalar_t, accum_t>;
   using knobs = group::perf_tuning_knob_t<accum_step, stages, sync_freq>;
@@ -240,6 +242,11 @@ class fmha_forward_t {
     mem_desc_Dp_Mask_t mem_desc_Dpij;
     dropout_fd_t dropout_op;
 
+    uint32_t gid;
+    uint32_t batch_id;
+    uint32_t head_id;
+    uint32_t head_id_kv;
+
     inline context_t() = default;
 
     /// @brief Initialize invariant variables in the flash mha loop
@@ -256,9 +263,10 @@ class fmha_forward_t {
       softmax_l = 0.f;
 
       // mem desc variables
-      uint32_t gid = item.get_group(0);
-      uint32_t batch_id = gid / args.uN; // get batch idx
-      uint32_t head_id = gid % args.uN; // get head idx
+      gid = item.get_group(0);
+      batch_id = gid / args.uN; // get batch idx
+      head_id = gid % args.uN; // get head idx
+      head_id_kv = head_id / (args.uN / args.uNkv); // get head idx for kv
 
       if constexpr (kSeqLast) { // 2d mem: [F, BxNxH]
         // startF
@@ -327,12 +335,6 @@ class fmha_forward_t {
         nd_item<3>& item,
         arguments_t& args,
         uint32_t startT) {
-      uint32_t gid = item.get_group(0);
-      uint32_t batch_id = gid / args.uN; // get batch idx
-      uint32_t head_id = gid % args.uN; // get head idx
-      uint32_t head_id_kv =
-          head_id / (args.uN / args.uNkv); // get head idx for kv
-
       // TODO: what's this startT for
 
       if constexpr (kSeqLast) {
@@ -681,14 +683,11 @@ class fmha_forward_t {
     // rescale operands of matmuls
     xetla_vector<accum_t, kSgBr> o_scale =
         xetla_exp<accum_t, kSgBr>(ctx.softmax_m - m_new);
-    subgroup::tile_broadcast_op<tile_mul, matAccOi_t>(matAccOi, o_scale);
+    subgroup::tile_broadcast_op<subgroup::tile_mul, matAccOi_t>(
+        matAccOi, o_scale);
     // update m and l for the next step
     ctx.softmax_m = m_new;
     ctx.softmax_l = l_new;
-
-    if constexpr (kIsTraining) {
-      // TODO: save m and l to global
-    }
 
     if constexpr (kIsDropout) {
       if (args.Dp_ptr) {
@@ -755,7 +754,7 @@ class fmha_forward_t {
   inline void rescale_then_store_Oi(
       matAccOi_t& matAccOi,
       [[maybe_unused]] arguments_t& args) {
-    subgroup::tile_broadcast_op<tile_mul, matAccOi_t>(
+    subgroup::tile_broadcast_op<subgroup::tile_mul, matAccOi_t>(
         matAccOi, 1 / ctx.softmax_l);
     using epilogue_t = group::epilogue_t<
         group::epilogue_policy_default<arch_tag>,
@@ -947,8 +946,7 @@ class fmha_forward_t {
 
     // initialize context for flash mha loops
     ctx.init_context(item, args);
-    uint32_t gid = item.get_group(0);
-    uint32_t batch_id = gid / args.uN; // get batch idx
+    uint32_t batch_id = ctx.batch_id; // get batch idx
     // Early exit when current thread access data exceed actual seqlen in varlen
     // fwd
     if constexpr (kVarlen) {
@@ -967,14 +965,17 @@ class fmha_forward_t {
 
     uint32_t startF = item.get_group(1) /* 0 */ * kBr /* 64 */;
     uint32_t endF = std::min(startF + kBr, args.uF);
+    int32_t actual_seqlen = 0;
+    if constexpr (kVarlen) {
+      actual_seqlen =
+          args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
+    }
 
     // iterate through the keys
     for (uint32_t startT = 0; startT < args.uT; startT += kBc) {
       // Early leave for varlen_fwd if we found current seqlen exceed the actual
       // seqlen.
       if constexpr (kVarlen) {
-        int32_t actual_seqlen =
-            args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
         if (startT >= actual_seqlen) {
           break;
         }
