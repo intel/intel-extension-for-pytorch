@@ -63,7 +63,7 @@ We provide optimized LLAMA, GPT-J and OPT modeling files on the basis of [huggin
 
 ## Running example script
 
-Please refer to the [instructions](../llm/README.md#3-environment-setup) for environment setup.
+Please refer to the [instructions](../../../llm/README.md#2-environment-setup) for environment setup.
 
 The detail usage of `run.py` can be obtained by running
 
