@@ -5,7 +5,7 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 The MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound because iterative decode and kv_cache require special management to reduce memory overheads. Intel® Extension for PyTorch* provides a lot of specific optimizations for these LLMs. 
 On the operator level, the extension provides highly efficient GEMM kernel to speed up Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant is enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.
 
-These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.optimize_transformers()`. Check `optimize_transformers <./llm/llm_optimize_transformers.md>`_ for more details.
+These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, `ipex.llm.optimize()`. Check `ipex.llm.optimize <./llm/llm_optimize_transformers.md>`_ for more details.
 
 .. toctree::
    :hidden:
@@ -13,8 +13,11 @@ These LLM-specific optimizations can be automatically applied with a single fron
 
    llm/llm_optimize_transformers
 
-Optimized Models
-----------------
+Validated Models List
+---------------------
+
+LLM Inference
+~~~~~~~~~~~~~
 
 .. list-table::
    :widths: auto
@@ -26,6 +29,14 @@ Optimized Models
      - INT4 WOQ
    * - Llama2
      - "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf"
+     - ✅
+     - ✅
+   * - Llama3
+     - "meta-llama/Meta-Llama-3-8B"
+     - ✅
+     - ✅
+   * - Phi-3 mini
+     - "microsoft/Phi-3-mini-128k-instruct"
      - ✅
      - ✅
    * - GPT-J
@@ -56,7 +67,63 @@ Optimized Models
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp16). For other LLMs families, we are working in progress to cover those optimizations, which will expand the model list above.
 
-Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.1.30/examples/gpu/inference/python/llm>`_ for instructions to install/setup environment and example scripts..
+LLM fine-tuning on Intel® Data Center Max 1550 GPU
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+
+   * - Model Family
+     - Verified < MODEL ID > (Huggingface hub)
+     - Mixed Precision (BF16+FP32)
+     - Full fine-tuning
+     - LoRA
+   * - Llama2
+     - "meta-llama/Llama-2-7b-hf"
+     - ✅
+     - ✅
+     - ✅
+   * - Llama2
+     - "meta-llama/Llama-2-70b-hf",
+     - ✅
+     - ❎
+     - ✅
+   * - Llama3
+     - "meta-llama/Meta-Llama-3-8B"
+     - ✅
+     - ✅
+     - ✅
+   * - Qwen
+     - "Qwen/Qwen-7B"
+     - ✅
+     - ✅
+     - ✅
+   * - Phi-3-mini 3.8B
+     - "Phi-3-mini-4k-instruct"
+     - ✅
+     - ✅
+     - ✅
+
+LLM fine-tuning on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+
+   * - Model Family
+     - Verified < MODEL ID > (Huggingface hub)
+     - Mixed Precision (BF16+FP32)
+     - Full fine-tuning
+     - LoRA
+   * - Phi-3-mini 3.8B
+     - "Phi-3-mini-4k-instruct"
+     - ✅
+     - ✅
+     - ✅
+
+Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.3.110/examples/gpu/llm>`_ for instructions to install/setup environment and example scripts..
 
 Optimization Methodologies
 --------------------------
@@ -140,5 +207,6 @@ For more detailed information, check `WOQ INT4 <llm/int4_weight_only_quantizatio
    :maxdepth: 1
 
    llm/int4_weight_only_quantization
+
 
 

@@ -6,65 +6,11 @@ General
 
 .. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: optimize
-.. autofunction:: optimize_transformers
+.. currentmodule:: intel_extension_for_pytorch.llm
+.. autofunction:: optimize
+.. currentmodule:: intel_extension_for_pytorch
 .. autofunction:: get_fp32_math_mode
 .. autofunction:: set_fp32_math_mode
-
-
-Miscellaneous
-=============
-
-.. currentmodule:: intel_extension_for_pytorch.xpu
-.. StreamContext
-.. can_device_access_peer
-.. current_blas_handle
-.. autofunction:: current_device
-.. autofunction:: current_stream
-.. default_stream
-.. autoclass:: device
-.. autofunction:: device_count
-.. autoclass:: device_of
-.. autofunction:: get_device_name
-.. autofunction:: get_device_properties
-.. get_gencode_flags
-.. get_sync_debug_mode
-.. autofunction:: init
-.. ipc_collect
-.. autofunction:: is_available
-.. autofunction:: is_initialized
-.. memory_usage
-.. autofunction:: set_device
-.. set_stream
-.. autofunction:: stream
-.. autofunction:: synchronize
-
-.. currentmodule:: intel_extension_for_pytorch.xpu.fp8.fp8
-.. autofunction:: fp8_autocast
-
-
-Random Number Generator
-=======================
-
-.. currentmodule:: intel_extension_for_pytorch.xpu
-.. autofunction:: get_rng_state
-.. autofunction:: get_rng_state_all
-.. autofunction:: set_rng_state
-.. autofunction:: set_rng_state_all
-.. autofunction:: manual_seed
-.. autofunction:: manual_seed_all
-.. autofunction:: seed
-.. autofunction:: seed_all
-.. autofunction:: initial_seed
-
-Streams and events
-==================
-
-.. currentmodule:: intel_extension_for_pytorch.xpu
-.. autoclass:: Stream
-    :members: 
-.. ExternalStream
-.. autoclass:: Event
-    :members: 
 
 Memory management
 =================
@@ -92,9 +38,17 @@ Memory management
 .. autofunction:: memory_stats_as_nested_dict
 .. autofunction:: reset_accumulated_memory_stats
 
+
+Quantization
+============
+
+.. currentmodule:: intel_extension_for_pytorch.quantization.fp8
+.. autofunction:: fp8_autocast
+
+
 C++ API
 =======
 
-.. doxygenenum:: xpu::FP32_MATH_MODE
+.. doxygenenum:: torch_ipex::xpu::FP32_MATH_MODE
 
-.. doxygenfunction:: xpu::set_fp32_math_mode
+.. doxygenfunction:: torch_ipex::xpu::set_fp32_math_mode

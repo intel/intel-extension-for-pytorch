@@ -2,18 +2,20 @@
 
 Here you can find the inference benchmarking scripts for large language models (LLM) text generation. These scripts:
 
-- Support Llama 2, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as ChatGLMv3-6B and Baichuan2-13B. 
+- Support Llama, GPT-J, Qwen, OPT, Bloom model families and some other Chinese models such as ChatGLMv3-6B, Baichuan2-13B and Phi3-mini. 
 - Include both single instance and distributed (DeepSpeed) use cases for FP16 optimization.
 - Cover model generation inference with low precision cases for different models with best performance and accuracy (fp16 AMP and weight only quantization)
 
 
-## Optimized Models
+## Validated Models
 
-Currently, only support Transformers 4.31.0. Support for newer versions of Transformers and more models will be available in the future.
+Currently, only support Transformers 4.38.1. Support for newer versions of Transformers and more models will be available in the future.
 
-| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Arc™ A-Series Graphics (A770) |
+| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics |
 |---|:---:|:---:|:---:|:---:|:---:|
 |Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |🟩| 🟩|🟩|🟩|
+|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |🟩| 🟩|🟩|🟩|
+|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct" |🟩| 🟩|🟩|🟩|
 |GPT-J| "EleutherAI/gpt-j-6b" | 🟩 | 🟩 |🟩 | 🟩|
 |Qwen|"Qwen/Qwen-7B"|🟩 | 🟩 |🟩 | 🟩|
 |OPT|"facebook/opt-6.7b", "facebook/opt-30b"| 🟩 | 🟥 |🟩 | 🟥 |
@@ -30,7 +32,8 @@ Currently, only support Transformers 4.31.0. Support for newer versions of Trans
 
 ## Supported Platforms
 
-\* Intel® Data Center GPU Max Series (1550/1100) and Optimized on Intel® Arc™ A-Series Graphics (A770) : support all the models in the model list above.<br />
+\* Intel® Data Center GPU Max Series (1550/1100) : support all the models in the model list above.<br />
+\* Intel® Core™ Ultra Processors with Intel® Arc™ Graphics : support Llama2-7B, Llama3-8B, Qwen-7B, Phi3-mini-128k, Phi3-mini-4k.<br />
 
 ## Run Models
 
@@ -43,7 +46,11 @@ Currently, only support Transformers 4.31.0. Support for newer versions of Trans
 
 - 🟥 signifies that it is not supported yet.
 
-Note: During the execution, you may need to log in your Hugging Face account to access model files. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
+**Note**: During the execution, you may need to log in your Hugging Face account to access model files. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
+
+```
+huggingface-cli login --token <your_token_here>
+```
 
 ### Run with Bash Script
 
@@ -54,7 +61,7 @@ bash run_benchmark.sh
 
 #### Single Instance Performance
 
-Note: We only support LLM optimizations with datatype float16, so please don't change datatype to float32 or bfloat16.
+**Note**: Only support LLM optimizations with datatype float16, so please don't change datatype to float32 or bfloat16.
 
 ```bash
 # fp16 benchmark
@@ -62,6 +69,8 @@ python -u run_generation.py --benchmark -m ${model} --num-beams ${beam} --num-it
 ```
 
 **Note**: By default, generations are based on `bs = 1`, input token size = 1024, output toke size = 128, iteration num = 10 and `beam search`, and beam size = 4. For beam size = 1 and other settings, please export env settings, such as: `beam=1`, `input=32`, `output=32`, `iter=5`.
+
+**Note**: Don't support beam=4 for model Phi3 mini. 
 
 #### Distributed Performance with DeepSpeed
 
@@ -79,6 +88,11 @@ mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchma
 
 ## Advanced Usage
 
+**Note**: Unset the variable before running.
+```bash
+# Adding this variable to run multi-tile cases might cause an Out Of Memory (OOM) issue. 
+unset TORCH_LLM_ALLREDUCE
+```
 
 ### Single Instance Accuracy
 
@@ -107,21 +121,24 @@ LLM_ACC_TEST=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspe
 
 Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 may result in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. You may generate modified weights and quantization info (scales, zero points) for a Llama 2/GPT-J/Qwen models with a dataset for specified tasks by such algorithms. We recommend intel extension for transformer to quantize the LLM model.
 
-Check [WOQ INT4](../../../../../docs/tutorials/llm/int4_weight_only_quantization.md) for more details.
+Check [WOQ INT4](../../../../docs/tutorials/llm/int4_weight_only_quantization.md) for more details.
 
 #### Install intel-extension-for-transformers and intel-neural-compressor 
 
 ```
-pip install neural-compressor
-pip install intel-extension-for-transformers
+pip install numpy<2
+git clone https://github.com/intel/neural-compressor.git -b v3.0
+cd neural-compressor
+python setup.py install
+cd ..
+ 
+git clone https://github.com/intel/intel-extension-for-transformers.git
+cd intel-extension-for-transformers
+git checkout c263d09f0899741142b35ebed3159e9425b1ac8f
+pip install -r requirements.txt
+python setup.py install
 ```
 
-#### Install other required packages
-
-
-```
-pip install tiktoken einops transformers_stream_generator
-```
 
 #### Run the weight only quantization and inference
 
@@ -131,6 +148,6 @@ bash run_benchmark_woq.sh
 
 >Note:
 > * Saving quantized model should be executed before the optimize_transformers function is called.
-> * The optimize_transformers function is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. The detail of `optimize_transformers`, please refer to [Transformers Optimization Frontend API](../../../../../docs/tutorials/llm/llm_optimize_transformers.md).
+> * The optimize_transformers function is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. The detail of `optimize_transformers`, please refer to [Transformers Optimization Frontend API](../../../../docs/tutorials/llm/llm_optimize_transformers.md).
 
 

@@ -1,14 +1,11 @@
 #!/bin/bash
 
-export HF_HOME=/home/sdp/.cache/huggingface/
-#export HF_DATASETS_OFFLINE=1
-#export TRANSFORMERS_OFFLINE=1
 
 model="Qwen/Qwen1.5-7B"
 data="./dataset.json"
 
 Run_fsdp_dummy_dataset_sequence_length_256() {
-    accelerate launch --config_file "fsdp_config.yaml" train_qwen2.py \
+    accelerate launch --config_file "fsdp_config.yaml" qwen2_ft.py \
     --model_name_or_path $model \
     --data_path $data \
     --bf16 True \
@@ -33,7 +30,7 @@ Run_fsdp_dummy_dataset_sequence_length_256() {
 }
 
 Run_fsdp_dummy_dataset_lora_sequence_length_256() {
-    accelerate launch --config_file "fsdp_config.yaml" train_qwen2.py \
+    accelerate launch --config_file "fsdp_config.yaml" qwen2_ft.py \
     --model_name_or_path $model \
     --data_path $data \
     --bf16 True \
@@ -59,7 +56,7 @@ Run_fsdp_dummy_dataset_lora_sequence_length_256() {
 }
 
 Run_fsdp_dummy_dataset_sequence_length_2048() {
-    accelerate launch --config_file "fsdp_config.yaml" train_qwen2.py \
+    accelerate launch --config_file "fsdp_config.yaml" qwen2_ft.py \
     --model_name_or_path $model \
     --data_path $data \
     --bf16 True \
@@ -84,7 +81,7 @@ Run_fsdp_dummy_dataset_sequence_length_2048() {
 }
 
 Run_fsdp_dummy_dataset_lora_sequence_length_2048() {
-    accelerate launch --config_file "fsdp_config.yaml" train_qwen2.py \
+    accelerate launch --config_file "fsdp_config.yaml" qwen2_ft.py \
     --model_name_or_path $model \
     --data_path $data \
     --bf16 True \

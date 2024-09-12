@@ -7,11 +7,11 @@ pytorch:
   version: 2.3.1+cxx11.abi
   commit: v2.3.1
 torchaudio:
-  version: 2.3.0+cxx11.abi
-  commit: v2.3.0
+  version: 2.3.1+cxx11.abi
+  commit: v2.3.1
 torchvision:
-  version: 0.18.0+cxx11.abi
-  commit: v0.18.0
+  version: 0.18.1+cxx11.abi
+  commit: v0.18.1
 torch-ccl:
   repo: https://github.com/intel/torch-ccl.git
   commit: master

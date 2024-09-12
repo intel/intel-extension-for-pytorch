@@ -32,9 +32,9 @@ model = ipex.optimize(model, dtype=dtype)
 ########## FP32 ############
 with torch.no_grad():
 ####### BF16 on CPU ########
-with torch.no_grad(), with torch.cpu.amp.autocast():
+with torch.no_grad(), torch.cpu.amp.autocast():
 ##### BF16/FP16 on GPU #####
-with torch.no_grad(), with torch.xpu.amp.autocast(enabled=True, dtype=dtype, cache_enabled=False):
+with torch.no_grad(), torch.xpu.amp.autocast(enabled=True, dtype=dtype, cache_enabled=False):
 ############################
   ###### Torchscript #######
   model = torch.jit.trace(model, data)
@@ -49,13 +49,14 @@ More examples, including training and usage of low precision data types are avai
 
 ## Execution
 
-Execution requires an active Intel® oneAPI environment. Suppose you have the Intel® oneAPI Base Toolkit installed in `/opt/intel/oneapi` directory, activating the environment is as simple as sourcing its environment activation bash scripts.
-
 There are some environment variables in runtime that can be used to configure executions on GPU. Please check [Advanced Configuration](./features/advanced_configuration.html#runtime-configuration) for more detailed information.
 
+Set `OCL_ICD_VENDORS` with default path `/etc/OpenCL/vendors`.
+Set `CCL_ROOT` if you are using multi-GPU.
+
 ```bash
-source /opt/intel/oneapi/compiler/latest/env/vars.sh
-source /opt/intel/oneapi/mkl/latest/env/vars.sh
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
+export CCL_ROOT=${CONDA_PREFIX} 
 python <script>
 ```
 
