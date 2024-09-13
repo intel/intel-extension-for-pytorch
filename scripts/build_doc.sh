@@ -221,7 +221,7 @@ elif [[ ${DEVICE} == "gpu" ]]; then
     parse_example "../examples/gpu/inference/cpp/example-usm/CMakeLists.txt" ${MDEXAMPLE} "(marker_cppsdk_cmake_usm)" "cmake"
 
     cp ${MDCONF} tutorials/features/advanced_configuration.md.bk
-    sed -i "/^| [[:alnum:]_-]/d" ${MDCONF}
+    #sed -i "/^| [[:alnum:]_-]/d" ${MDCONF}
     parse_build_options "../cmake/gpu/Options.cmake" ${MDCONF}
     parse_launch_options "../csrc/gpu/utils/Settings.cpp" ${MDCONF} "==========ALL=========="
     parse_launch_options "../csrc/gpu/utils/Settings.cpp" ${MDCONF} "==========GPU=========="

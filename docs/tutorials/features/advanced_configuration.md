@@ -8,7 +8,6 @@ The default settings for Intel® Extension for PyTorch\* are sufficient for most
 The following build options are supported by Intel® Extension for PyTorch\*. Users who install Intel® Extension for PyTorch\* via source compilation could override the default configuration by explicitly setting a build option ON or OFF, and then build. 
 
 | **Build Option** | **Default<br>Value** | **Description** |
-| ------ | ------ | ------ |
 
 For above build options which can be configured to ON or OFF, users can configure them to 1 or 0 also, while ON equals to 1 and OFF equals to 0.
 
@@ -17,13 +16,10 @@ For above build options which can be configured to ON or OFF, users can configur
 The following launch options are supported in Intel® Extension for PyTorch\*. Users who execute AI models on XPU could override the default configuration by explicitly setting the option value at runtime using environment variables, and then launch the execution.
 
 | **Launch Option<br>CPU, GPU** | **Default<br>Value** | **Description** |
-| ------ | ------ | ------ |
 
 | **Launch Option<br>GPU ONLY** | **Default<br>Value** | **Description** |
-| ------ | ------ | ------ |
 
 | **Launch Option<br>Experimental** | **Default<br>Value** | **Description** |
-| ------ | ------ | ------ |
 
 | **Distributed Option<br>GPU ONLY** | **Default<br>Value** | **Description** |
 | ------ | ------ | ------ |

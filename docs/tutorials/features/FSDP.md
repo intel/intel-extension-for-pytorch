@@ -12,7 +12,7 @@ To install Intel® oneCCL Bindings for Pytorch\*, follow the same installation s
 
 FSDP is designed to align with PyTorch conventions. To use FSDP with Intel® Extension for PyTorch\*, make the following modifications to your model script:
 
-1. Import the necessary packages.
+* Import the necessary packages.
 ```python
 import torch
 import intel_extension_for_pytorch 
@@ -20,12 +20,12 @@ import oneccl_bindings_for_pytorch
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 ```
 
-2. Initialize the process group with ccl backend.
+* Initialize the process group with ccl backend.
 ```python
 dist.init_process_group(backend='ccl')
 ``` 
 
-3. For FSDP with each process exclusively working on a single GPU, set the device ID as `local rank`.
+* For FSDP with each process exclusively working on a single GPU, set the device ID as `local rank`.
 ```python
 torch.xpu.set_device("xpu:{}".format(rank))
 # or
@@ -33,7 +33,7 @@ device = "xpu:{}".format(args.local_rank)
 torch.xpu.set_device(device)
 ```
 
-4. Wrap model by FSDP.
+* Wrap model by FSDP.
 ```python
 model = model.to(device)
 model = FSDP(model, device_id=device)
@@ -45,7 +45,7 @@ model = FSDP(model, device_id=device)
 
 Here's an example based on [PyTorch FSDP Tutorial](https://pytorch.org/tutorials/intermediate/FSDP_tutorial.html) to illustrate the usage of FSDP on XPU and the necessary changes to switch from CUDA to an XPU case.
 
-1. Import necessary packages:
+* Import necessary packages:
 
 ```python
 """
@@ -82,7 +82,7 @@ from torch.distributed.fsdp.wrap import (
 )
 ```
 
-2. Set up distributed training:
+* Set up distributed training:
 
 ```python
 """
@@ -99,7 +99,7 @@ def cleanup():
     dist.destroy_process_group()
 ```
 
-3. Define the toy model for handwritten digit classification:
+* Define the toy model for handwritten digit classification:
 
 ```python
 class Net(nn.Module):
@@ -129,7 +129,7 @@ class Net(nn.Module):
         return output
 ```
 
-4. Define a training function:
+* Define a training function:
 
 ```python
 """
@@ -156,7 +156,7 @@ def train(args, model, rank, world_size, train_loader, optimizer, epoch, sampler
         print('Train Epoch: {} \tLoss: {:.6f}'.format(epoch, ddp_loss[0] / ddp_loss[1]))
 ```
 
-5. Define a validation function:
+* Define a validation function:
 
 ```python
 """
@@ -185,7 +185,7 @@ def test(model, rank, world_size, test_loader):
             100. * ddp_loss[1] / ddp_loss[2]))
 ```
 
-6. Define a distributed training function that wraps the model in FSDP:
+* Define a distributed training function that wraps the model in FSDP:
 
 ```python
 """
@@ -256,7 +256,7 @@ def fsdp_main(rank, world_size, args):
     cleanup()
 ```
 
-7. Finally, parse the arguments and set the main function:
+* Finally, parse the arguments and set the main function:
 
 ```python
 """
@@ -292,7 +292,7 @@ if __name__ == '__main__':
         join=True)
 ```
 
-8. Put the above code snippets to a python script `FSDP_mnist_xpu.py`, and run:
+* Put the above code snippets to a python script `FSDP_mnist_xpu.py`, and run:
 
 ```bash
 python FSDP_mnist_xpu.py

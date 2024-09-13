@@ -1,7 +1,3 @@
-# proxy set for downloading dataset error
-# export http_proxy="http://child-jf.intel.com:912"
-# export https_proxy="http://child-jf.intel.com:912"
-
 # For MTL platform not support flash attention
 Run_llama3-8b_peft() {
 
@@ -23,7 +19,7 @@ Run_llama3-8b_peft() {
 
 main() {
 
-    model='/path_to_llama3-8b' 
+    model='meta-llama/Meta-Llama-3-8B' 
 
     Run_llama3-8b_peft
 

@@ -100,7 +100,7 @@ import shutil
 import subprocess
 import sys
 import re
-import yaml
+import json
 import errno
 
 
@@ -226,8 +226,8 @@ pytorch_install_dir = get_pytorch_install_dir()
 
 
 def _get_basekit_rt():
-    with open("dependency_version.yml", "r") as f:
-        result = yaml.load(f.read(), Loader=yaml.FullLoader)
+    with open("dependency_version.json", "r") as f:
+        result = json.load(f)
         return result["basekit"]
 
 

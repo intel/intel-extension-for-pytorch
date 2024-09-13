@@ -21,7 +21,7 @@ For more detailed information, check [Installation Guide](https://intel.github.i
 #### [Recommended] Install from prebuilt wheels
 
 
-1. Install `oneccl_bindings_for_pytorch`
+* Install `oneccl_bindings_for_pytorch`
 
 ```
 # Generic Python* for CPU
@@ -58,22 +58,22 @@ Note: Make sure you have installed [basekit](https://www.intel.com/content/www/u
 
 DDP follows its usage in PyTorch. To use DDP with Intel® Extension for PyTorch\*, make the following modifications to your model script:
 
-1. Import the necessary packages.
+* Import the necessary packages.
 ```python
 import torch
 import intel_extension_for_pytorch 
 import oneccl_bindings_for_pytorch
 ```      
-2. Initialize the process group with ccl backend.
+* Initialize the process group with ccl backend.
 ```python
 dist.init_process_group(backend='ccl')
 ```        
-3. For DDP with each process exclusively works on a single GPU, set the device ID as `local rank`. This step is not required for usage on CPU.
+* For DDP with each process exclusively works on a single GPU, set the device ID as `local rank`. This step is not required for usage on CPU.
 ```python 
 device = "xpu:{}".format(args.local_rank)
 torch.xpu.set_device(device)
 ```
-4. Wrap model by DDP.
+* Wrap model by DDP.
 ```python
 model = model.to(device)
 model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[device])
@@ -188,7 +188,7 @@ train_dataset: dataset for training
 
 If you have a model running on a single tile, you only need to make minor changes to enable the DDP training by following these steps:
 
-1. Import the API:
+* Import the API:
 
 ```python
 try:
@@ -197,27 +197,27 @@ except ImportError:
     raise ImportError("single_card_dist not available!")
 ```
 
-2. Use multi_process_spawn launcher as a torch.multiprocessing wrapper.
+* Use multi_process_spawn launcher as a torch.multiprocessing wrapper.
 
 ```python
 single_card_dist.multi_process_spawn(main_worker, (args, )) # put arguments of main_worker into a tuple
 ```
 
-3. Usage of this API:
+* Usage of this API:
 
 ```python
 dist = single_card_dist(model, train_dataset)
 local_rank, model, train_sampler = dist.rank, dist.model, dist.train_sampler
 ```
 
-4. Set in the model training:
+* Set in the model training:
 
 ```python
 for epoch in range ...
     train_sampler.set_epoch(epoch)
 ```
 
-5. Adjust the model to call `local_rank`, `model`, and `train_sampler` as shown here:
+* Adjust the model to call `local_rank`, `model`, and `train_sampler` as shown here:
 
 - device: get the xpu information used in model training
 

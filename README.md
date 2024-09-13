@@ -25,15 +25,48 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 
 ### Optimized Model List 
 
+#### LLM Inference
+
 | MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Arc™ A-Series Graphics (A770) |
 |---|:---:|:---:|:---:|:---:|:---:|
-|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" | ✅ | ✅|✅ | ✅|
-|GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ |✅ | ✅|
-|Qwen|"Qwen/Qwen-7B"| ✅ | ✅ |✅ | ✅|
-|OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ | ❎ |✅ | ❎ |
-|Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ | ❎ |✅ | ❎ |
-|ChatGLM3-6B|"THUDM/chatglm3-6b"| ✅ | ❎ |✅ | ❎ |
-|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| ✅ | ❎ |✅ | ❎ |
+|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |🟩| 🟩|🟩|🟩|
+|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |🟩| 🟩|🟩|🟩|
+|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct" |🟩| 🟩|🟩|🟩|
+|GPT-J| "EleutherAI/gpt-j-6b" | 🟩 | 🟩 |🟩 | 🟩|
+|Qwen|"Qwen/Qwen-7B"|🟩 | 🟩 |🟩 | 🟩|
+|OPT|"facebook/opt-6.7b", "facebook/opt-30b"| 🟩 | 🟥 |🟩 | 🟥 |
+|Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| 🟩 | 🟥 |🟩 | 🟥 |
+|ChatGLM3-6B|"THUDM/chatglm3-6b"| 🟩 | 🟥 |🟩 | 🟥 |
+|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| 🟩 | 🟥 |🟩 | 🟥 |
+
+| Benchmark mode | FP16 | Weight only quantization INT4 |
+|---|:---:|:---:|
+|Single instance | 🟩 | 🟩 |
+| Distributed (autotp) |  🟩 | 🟥 |
+
+#### LLM fine-tuning
+
+ **Note**: 
+ Intel® Data Center Max 1550 GPU: support all the models in the model list above. Intel® Core™ Ultra Processors with Intel® Arc™ Graphics: support Llama 2 7B, Llama 3 8B and Phi-3-Mini 3.8B.
+
+| MODEL FAMILY | Verified < MODEL ID > (Hugging Face hub)| Mixed Precision (BF16+FP32) | Full fine-tuning | LoRA | Intel® Data Center Max 1550 GPU | Intel® Core™ Ultra Processors with Intel® Arc™ Graphics |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+|Llama 2 7B| "meta-llama/Llama-2-7b-hf" | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Llama 2 70B| "meta-llama/Llama-2-70b-hf" | 🟩 | 🟥 |🟩 | 🟩 | 🟥 |
+|Llama 3 8B| "meta-llama/Meta-Llama-3-8B" | 🟩 | 🟩 |🟩 | 🟩 | 🟩 |
+|Qwen 7B|"Qwen/Qwen-7B"| 🟩 | 🟩 |🟩 | 🟩| 🟥 |
+|Phi-3-mini 3.8B|"Phi-3-mini-4k-instruct"| 🟩 | 🟩 |🟩 | 🟥 | 🟩 |
+
+
+
+| Benchmark mode | Full fine-tuning | LoRA |
+|---|:---:|:---:|
+|Single-GPU | 🟥 | 🟩 |
+|Multi-GPU (FSDP) |  🟩 | 🟩 |
+
+- 🟩 signifies that it is supported.
+
+- 🟥 signifies that it is not supported yet.
 
 
 ## Installation
@@ -60,13 +93,10 @@ Compilation instruction of the latest CPU code base `main` branch can be found i
 You can install Intel® Extension for PyTorch\* for GPU via command below.
 
 ```bash
-python -m pip install torch==2.1.0.post3 torchvision==0.16.0.post3 torchaudio==2.1.0.post3 intel-extension-for-pytorch==2.1.40+xpu oneccl_bind_pt==2.1.400+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ 
+python -m pip install torch==2.3.1+cxx11.abi torchvision==0.18.1+cxx11.abi torchaudio==2.3.1+cxx11.abi intel-extension-for-pytorch==2.3.110+xpu oneccl_bind_pt==2.3.100+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
 # for PRC user, you can check with the following link
-python -m pip install torch==2.1.0.post3 torchvision==0.16.0.post3 torchaudio==2.1.0.post3 intel-extension-for-pytorch==2.1.40+xpu oneccl_bind_pt==2.1.400+xpu  --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/
-
+python -m pip install torch==2.3.1+cxx11.abi torchvision==0.18.1+cxx11.abi torchaudio==2.3.1+cxx11.abi intel-extension-for-pytorch==2.3.110+xpu oneccl_bind_pt==2.3.100+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/
 ```
-
-**Note:** The patched PyTorch 2.1.0 is required to work with Intel® Extension for PyTorch\* on Intel® graphics card for now.
 
 More installation methods can be found at [GPU Installation Guide](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/installation.html).
 
