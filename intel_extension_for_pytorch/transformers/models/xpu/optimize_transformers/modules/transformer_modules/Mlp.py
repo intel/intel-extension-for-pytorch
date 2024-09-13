@@ -4,7 +4,7 @@ import torch.distributed as dist
 
 from .Activation import ACT2FN
 from .Linear import IPEXTransformerLinear, matmul_add_add
-from .model_utils import xpu_gemm_use_xetla
+from .model_utils import need_transpose_contiguous_weight_layout
 
 
 class IPEXTransformerBaseMLP(nn.Module):
@@ -59,7 +59,7 @@ class IPEXTransformerMLP(IPEXTransformerBaseMLP):
         self.fc_out.bias = fc_out.bias
 
     def transpose_parameter(self):
-        if xpu_gemm_use_xetla():
+        if need_transpose_contiguous_weight_layout():
             self.fc_in.weight.data = self.fc_in.weight.transpose(0, 1).contiguous()
             self.fc_out.weight.data = self.fc_out.weight.transpose(0, 1).contiguous()
         else:
@@ -187,7 +187,7 @@ class IPEXTransformerMLPOptimizedFp16SiluLlama(IPEXTransformerMLPOptimizedFp16Si
 
     def transpose_parameter(self):
         super().transpose_parameter()
-        if xpu_gemm_use_xetla():
+        if need_transpose_contiguous_weight_layout():
             self.up_proj.weight.data = self.up_proj.weight.transpose(0, 1).contiguous()
             # Note: synchronize to ensure the completion of contiguous
             torch.xpu.synchronize()
@@ -243,7 +243,7 @@ class IPEXTransformerMLPOptimizedFp16SiluQwen(IPEXTransformerMLPOptimizedFp16Sil
 
     def transpose_parameter(self):
         super().transpose_parameter()
-        if xpu_gemm_use_xetla():
+        if need_transpose_contiguous_weight_layout():
             self.c_proj.weight.data = self.c_proj.weight.transpose(0, 1).contiguous()
             # Note: synchronize to ensure the completion of contiguous
             torch.xpu.synchronize()

@@ -276,3 +276,14 @@ def xpu_gemm_use_xetla():
         and compute_eng
         in (torch.xpu.XPUComputeEng.RECOMMEND, torch.xpu.XPUComputeEng.XETLA)
     )
+
+
+def need_transpose_contiguous_weight_layout():
+    return (
+        torch.xpu.has_xetla()
+        and (not torch.xpu.using_onednn_layout())
+        and (
+            torch.xpu.get_compute_eng()
+            in (torch.xpu.XPUComputeEng.RECOMMEND, torch.xpu.XPUComputeEng.XETLA)
+        )
+    )

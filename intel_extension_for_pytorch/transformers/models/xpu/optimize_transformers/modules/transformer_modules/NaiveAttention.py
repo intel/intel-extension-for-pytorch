@@ -6,7 +6,7 @@ import torch.distributed as dist
 from .._transformer_configuration import IPEXTransformerConfig
 from .Linear import IPEXTransformerLinear  # noqa
 from .BaseAttention import IPEXTransformerAttn, IPEXRuntimeAttnCache
-from .model_utils import xpu_gemm_use_xetla
+from .model_utils import need_transpose_contiguous_weight_layout
 import os
 
 enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in [
@@ -87,7 +87,7 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
         )
 
     def transpose_parameter(self):
-        if xpu_gemm_use_xetla():
+        if need_transpose_contiguous_weight_layout():
             self.q_proj.weight.data = self.q_proj.weight.transpose(0, 1).contiguous()
             self.k_proj.weight.data = self.k_proj.weight.transpose(0, 1).contiguous()
             self.v_proj.weight.data = self.v_proj.weight.transpose(0, 1).contiguous()
