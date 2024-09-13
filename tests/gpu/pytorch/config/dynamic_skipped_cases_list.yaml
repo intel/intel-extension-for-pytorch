@@ -10265,3 +10265,14 @@
   - test_modules.py::TestModuleXPU::test_gradgrad_nn_RNNCell_xpu_float64
   - test_modules.py::TestModuleXPU::test_gradgrad_nn_RNN_eval_mode_xpu_float64
   - test_modules.py::TestModuleXPU::test_gradgrad_nn_RNN_train_mode_xpu_float64
+- reason: Auto skipped due to cow feature not support
+  cases:
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_cat_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_column_stack_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_dstack_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_einsum_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_hstack_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_linalg_multi_dot_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_meshgrid_list_of_tensors_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_stack_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_vstack_xpu_float32
