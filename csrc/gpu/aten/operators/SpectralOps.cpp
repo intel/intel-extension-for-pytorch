@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
+#include <ATen/core/op_registration/adaption.h>
 #include <ATen/native/SpectralOpsUtils.h>
 #include <core/Allocator.h>
 #include <core/detail/ListUtils.h>
@@ -734,6 +735,13 @@ Tensor& _fft_r2c_out(
     int64_t normalization,
     bool onesided,
     Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  c10::impl::check_and_update_common_device(
+      common_device, out, "_fft_r2c_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "_fft_r2c_out", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
   auto result = at::AtenIpexTypeXPU::_fft_r2c(
       self, dim, normalization, /*onesided=*/true);
   if (onesided) {
@@ -757,6 +765,13 @@ Tensor& _fft_c2r_out(
     int64_t normalization,
     int64_t last_dim_size,
     Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  c10::impl::check_and_update_common_device(
+      common_device, out, "_fft_c2r_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "_fft_c2r_out", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
   auto result =
       at::AtenIpexTypeXPU::_fft_c2r(self, dim, normalization, last_dim_size);
   resize_output(out, result.sizes());
@@ -769,6 +784,13 @@ Tensor& _fft_c2c_out(
     int64_t normalization,
     bool forward,
     Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  c10::impl::check_and_update_common_device(
+      common_device, out, "_fft_c2c_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "_fft_c2c_out", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
   auto result =
       at::AtenIpexTypeXPU::_fft_c2c(self, dim, normalization, forward);
   resize_output(out, result.sizes());
@@ -780,6 +802,11 @@ Tensor _fft_c2r(
     IntArrayRef dim,
     int64_t normalization,
     int64_t last_dim_size) {
+  c10::optional<Device> common_device = nullopt;
+  c10::impl::check_and_update_common_device(
+      common_device, self, "_fft_c2r", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
   TORCH_CHECK(self.is_complex());
   auto input = self;
 
@@ -814,6 +841,11 @@ Tensor _fft_r2c(
     IntArrayRef dim,
     int64_t normalization,
     bool onesided) {
+  c10::optional<Device> common_device = nullopt;
+  c10::impl::check_and_update_common_device(
+      common_device, self, "_fft_r2c", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
   TORCH_CHECK(self.is_floating_point());
   auto input_sizes = self.sizes();
   DimVector out_sizes(input_sizes.begin(), input_sizes.end());
@@ -877,6 +909,11 @@ Tensor _fft_c2c(
     IntArrayRef dim,
     int64_t normalization,
     bool forward) {
+  c10::optional<Device> common_device = nullopt;
+  c10::impl::check_and_update_common_device(
+      common_device, self, "_fft_c2c", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
   TORCH_CHECK(self.is_complex());
   auto sorted_dims = impl::_sort_dims(self, dim);
   auto out_sizes = self.sizes();
