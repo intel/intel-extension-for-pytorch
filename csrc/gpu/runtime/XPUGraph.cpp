@@ -250,12 +250,14 @@ void XPUGraphImpl::end_recording() {
       "when recording began");
   wholegraph_increment_ = recording_gen_->graph_recording_epilogue();
 
+#if defined(SYCL_EXT_ONEAPI_GRAPH_FUSION)
   size_t numXPUGraphNodes = graph_->get_nodes().size();
   if (numXPUGraphNodes == 0) {
     TORCH_WARN(
         "The XPU Graph is empty. This usually means that the graph was ",
         "attempted to be recorded on wrong device or queue.");
   }
+#endif
 
   // check if debug path is set
   if (!_xpu_graphs_debug) {
