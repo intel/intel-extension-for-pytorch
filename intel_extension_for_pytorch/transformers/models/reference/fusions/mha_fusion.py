@@ -301,6 +301,7 @@ class _IPEXRopeRef(nn.Module):
                 x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "LlavaLlamaForCausalLM",
@@ -447,6 +448,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.attn_dropout = module.attn_dropout
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",
@@ -665,6 +667,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             )
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",

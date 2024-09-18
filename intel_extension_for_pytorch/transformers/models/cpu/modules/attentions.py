@@ -28,8 +28,9 @@ class _IPEXAttentionCPU(nn.Module):
                 "GitForCausalLM",
                 "WhisperForConditionalGeneration",
             ]
-            or self.model_backbone == "BaichuanForCausalLM"
-            and hasattr(module, "rotary_emb")
+            or (self.model_backbone == "BaichuanForCausalLM"
+            and hasattr(module, "rotary_emb"))
+            and not self.is_mllama_cross_attention
         ):
             extra_inputs = {}
             if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
@@ -69,6 +70,7 @@ class _IPEXAttentionCPU(nn.Module):
         if self.model_backbone in [
             "GPTJForCausalLM",
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "PhiForCausalLM",
@@ -84,6 +86,9 @@ class _IPEXAttentionCPU(nn.Module):
         self.text_max_length = (
             config.text_max_length if hasattr(config, "text_max_length") else 2048
         )
-        self._IPEXScaleDotProduct = _IPEXScaleDotProductCPU(
-            text_max_length=self.text_max_length
-        )
+        if self.is_mllama_cross_attention:
+            pass
+        else:
+            self._IPEXScaleDotProduct = _IPEXScaleDotProductCPU(
+                text_max_length=self.text_max_length
+            )
