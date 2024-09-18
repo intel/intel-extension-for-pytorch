@@ -692,7 +692,7 @@ class IPEXCPPLibBuild(build_clib, object):
         if IS_WINDOWS:
             use_ninja = True
             build_option_common["PYTHON_LIBRARIES"] = os.path.join(
-                sys.prefix,
+                sys.base_prefix,
                 "libs",
                 f"python{sys.version_info.major}{sys.version_info.minor}.lib",
             )
