@@ -292,7 +292,7 @@ def collect_pytorch_rebase_details(testname, issued_cases, data):
 
 def collect_detailed_issues(issued_cases, logfile, with_short=False, rebase=False):
     global re_flags
-    print(logfile)
+    #print(logfile)
     #test_name = logfile.split('.')[0].split('/')[-1].replace('-', '/')
     test_name = logfile.split('/')[-1].split('.')[0].replace('-', '/')
     data = read_file(logfile)

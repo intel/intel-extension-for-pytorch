@@ -10236,23 +10236,7 @@
   - test_linalg.py::TestLinalgXPU::test__int4_mm_m_64_k_64_n_64_xpu
 - reason: Auto skipped due to page fault issue
   cases:
-  - test_ops_jit.py::TestJitXPU::test_variant_consistency_jit_sgn_xpu_float32
-  - test_linalg.py::TestLinalgXPU::test_cholesky_inverse_xpu_float32
-  - test_linalg.py::TestLinalgXPU::test_cholesky_inverse_xpu_float64
-  - test_ops.py::TestCommonXPU::test_noncontiguous_samples_sgn_xpu_float32
-  - test_ops.py::TestCommonXPU::test_out_index_add_xpu_float32
   - test_ops.py::TestCommonXPU::test_out_index_copy_xpu_float32
-  - test_ops.py::TestCommonXPU::test_out_log_softmax_with_dtype_xpu_float32
-  - test_ops.py::TestCommonXPU::test_out_log_softmax_xpu_float32
-  - test_ops.py::TestCommonXPU::test_out_softmax_with_dtype_xpu_float32
-  - test_ops.py::TestCommonXPU::test_out_softmax_xpu_float32
-  - test_ops.py::TestCommonXPU::test_variant_consistency_eager_sgn_xpu_float32
-  - test_ops.py::TestCommonXPU::test_out_baddbmm_xpu_float32
-  - test_ops.py::TestCompositeComplianceXPU::test_backward_sgn_xpu_float32
-  - test_ops.py::TestMathBitsXPU::test_neg_view_sgn_xpu_float64
-  - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float64
-  - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float32
-  - test_decomp.py::TestDecompXPU::test_comprehensive_to_sparse_xpu_uint8
 - reason: Auto skipped due to Jacobian mismatch issue
   cases:
   - test_modules.py::TestModuleXPU::test_grad_nn_MultiheadAttention_eval_mode_xpu_float64
