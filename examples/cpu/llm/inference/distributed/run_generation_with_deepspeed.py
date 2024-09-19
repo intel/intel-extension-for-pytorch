@@ -61,6 +61,9 @@ parser.add_argument(
     help="the huggingface mdoel id",
 )
 parser.add_argument(
+    "--vision-text-model", action="store_true", help="whether or not it is vision-text multi-model structure"
+)
+parser.add_argument(
     "--dtype",
     type=str,
     help="float16 or bfloat16",

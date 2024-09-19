@@ -1448,7 +1448,6 @@ def model_convert_lowering(
                     pixel_values = torch.rand(1, 1, 4, 3, 448, 448)
                     aspect_ratio_mask = torch.tensor([[[1, 1, 1, 1]]])
                     aspect_ratio_ids = torch.tensor([[6]])
-                    pixel_values = torch.rand(1, 1, 4, 3, 448, 448)
                     sample_inputs["pixel_values"] = pixel_values
                     sample_inputs["aspect_ratio_mask"] = aspect_ratio_mask
                     sample_inputs["aspect_ratio_ids"] = aspect_ratio_ids
@@ -1719,6 +1718,12 @@ def optimize(
         # model quantization if needed
         if is_quantization:
             if not is_woq:  # static quantization
+                if model.config.architectures[0] in ["MllamaForConditionalGeneration"]:
+                    logger.warning(
+                        "ipex.llm.optimize does not support static quantizations on MLlama, fallback to origin model..."
+                    )
+                    return model
+
                 deployment_mode = False
 
                 if qconfig_summary_file is not None:

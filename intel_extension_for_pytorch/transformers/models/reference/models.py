@@ -586,12 +586,12 @@ def MllamaForConditionalGeneration_forward(
         self,
         input_ids: torch.LongTensor = None, #first #next  
         attention_mask: Optional[List[List[List[int]]]] = None,#first #next    
+        past_key_values: Optional[List[torch.FloatTensor]] = None, #first #next  
         position_ids: Optional[torch.LongTensor] = None, #first #next  
+        cross_attention_mask: Optional[torch.Tensor] = None,
         pixel_values: Optional[torch.FloatTensor] = None, #first
         aspect_ratio_mask: Optional[List[List[int]]] = None, #first
         aspect_ratio_ids: Optional[torch.Tensor] = None, #first
-        cross_attention_mask: Optional[torch.Tensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None, #first #next  
         cross_attention_states: Optional[torch.Tensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,

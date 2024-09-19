@@ -32,6 +32,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         help="huggingface model id or local directory containing model files",
     )
     parser.add_argument(
+        "--vision-text-model", action="store_true", help="whether or not it is vision-text multi-model structure"
+    )
+    parser.add_argument(
         "--config-file",
         default=None,
         type=str,
@@ -320,7 +323,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-iter", str(args.num_iter)])
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
-
+            if args.vision_text_model:
+                infer_cmd.extend(["--vision-text-model"])
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
             if args.streaming:
@@ -364,6 +368,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 quant_cmd.extend(["--output-dir", str(args.output_dir)])
                 quant_cmd.extend(["--input-tokens", str(args.input_tokens)])
                 quant_cmd.extend(["--max-new-tokens", str(args.max_new_tokens)])
+                if args.vision_text_model:
+                    quant_cmd.extend(["--vision-text-model"])
                 if args.config_file is not None:
                     quant_cmd.extend(["--config-file", str(args.config_file)])
                 if args.quant_with_amp:
@@ -497,7 +503,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-iter", str(args.num_iter)])
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
-
+            if args.vision_text_model:
+                infer_cmd.extend(["--vision-text-model"])
             if args.quant_with_amp:
                 infer_cmd.extend(["--quant-with-amp"])
             if args.greedy:
@@ -625,7 +632,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--image-url", str(args.image_url)])
         if args.audio is not None:
             infer_cmd.extend(["--audio", str(args.audio)])
-
+        if args.vision_text_model:
+            infer_cmd.extend(["--vision-text-model"])
         if args.prompt is not None:
             infer_cmd.extend(["--prompt", str(args.prompt)])
         if args.config_file is not None:

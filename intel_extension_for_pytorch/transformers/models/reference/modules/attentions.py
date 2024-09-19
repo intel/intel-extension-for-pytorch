@@ -2308,6 +2308,8 @@ def _MllamaTextCrossAttention_forward(
 
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+        else:
+            causal_mask=None
 
         attn_output = torch.nn.functional.scaled_dot_product_attention(
             query_states,

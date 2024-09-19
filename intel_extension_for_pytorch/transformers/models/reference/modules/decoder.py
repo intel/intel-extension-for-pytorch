@@ -1489,7 +1489,7 @@ def MllamaCrossAttentionDecoderLayer_forward(
 
         mlp_gate = self.linear_silu_mul(hidden_states)
         hidden_states = self.mlp.down_proj(mlp_gate)
-        hidden_states = residual + hidden_states
+
 
         if full_text_row_masked_out_mask is not None:
             hidden_states = full_text_row_masked_out_mask[:, 0] * hidden_states  # type: ignore
