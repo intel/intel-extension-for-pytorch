@@ -175,6 +175,7 @@ def _beam_sample(
         if self.model_backbone in [
             "GPTJForCausalLM",
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "GPTNeoXForCausalLM",
             "OPTForCausalLM",
             "FalconForCausalLM",
@@ -322,6 +323,8 @@ def _beam_sample(
                     num_hidden_layers = self.config.n_layer
                 elif hasattr(self.config, "num_hidden_layers"):
                     num_hidden_layers = self.config.num_hidden_layers
+                elif hasattr(self.config.text_config, "num_hidden_layers"):
+                    num_hidden_layers = self.config.text_config.num_hidden_layers
                 elif hasattr(self.config, "num_layers"):
                     num_hidden_layers = self.config.num_layers
                 elif hasattr(self.config, "n_layers"):
@@ -329,17 +332,39 @@ def _beam_sample(
                 beam_idx_tmp = torch.zeros(
                     (2048, int(batch_size * num_beams)), dtype=torch.long
                 ).contiguous()
-                model_inputs["past_key_values"] = tuple(
-                    [
-                        (
-                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            beam_idx_tmp,
-                        )
-                        for i in range(num_hidden_layers)
-                    ]
-                )
+                if self.model_backbone == "MllamaForConditionalGeneration":
+                    head_dim = self.config.text_config.hidden_size // (self.config.text_config.num_hidden_layers - len(self.config.text_config.cross_attention_layers))
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                (
+                                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    beam_idx_tmp,
+                                ) 
+                                if i not in  self.config.text_config.cross_attention_layers 
+                                else
+                                (
+                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                )
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
+                else:
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
             model_inputs.pop("use_cache", None)
             model_inputs.pop("token_type_ids", None)
             if "return_last_logit" in model_inputs:
@@ -399,9 +424,10 @@ def _beam_sample(
         )  # (batch_size * num_beams, vocab_size)
 
         next_token_scores_processed = logits_processor(input_ids, next_token_scores)
-        next_token_scores_processed = logits_warper(
-            input_ids, next_token_scores_processed
-        )
+        if logits_warper is not None:
+            next_token_scores_processed = logits_warper(
+                input_ids, next_token_scores_processed
+            )
         next_token_scores = next_token_scores_processed + beam_scores[
             :, None
         ].expand_as(next_token_scores_processed)

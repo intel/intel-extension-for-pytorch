@@ -1026,6 +1026,7 @@ def get_dummy_input(_model, return_dict=False):
 
     input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
     attention_mask = torch.ones_like(input_ids)
+
     # prepare_inputs_for_generation is just for checking if position_ids should be in the model inputs,
     # input input_ids and attention_mask to make sure this func can generate the correct position_ids.
     model_inputs = _model.prepare_inputs_for_generation(
@@ -1211,6 +1212,12 @@ def get_dummy_input(_model, return_dict=False):
             sample_inputs["return_last_logit"] = torch.tensor(True)
         else:
             sample_inputs = sample_inputs + (torch.tensor(True),)
+    if _model.config.architectures[0] == "MllamaForConditionalGeneration":
+        cross_attention_mask = torch.ones(1,32,1,4)
+        if return_dict:
+            sample_inputs["cross_attention_mask"] = cross_attention_mask
+        else:
+            sample_inputs = sample_inputs + (cross_attention_mask,)
     return sample_inputs
 
 
@@ -1441,6 +1448,7 @@ def model_convert_lowering(
                     pixel_values = torch.rand(1, 1, 4, 3, 448, 448)
                     aspect_ratio_mask = torch.tensor([[[1, 1, 1, 1]]])
                     aspect_ratio_ids = torch.tensor([[6]])
+                    pixel_values = torch.rand(1, 1, 4, 3, 448, 448)
                     sample_inputs["pixel_values"] = pixel_values
                     sample_inputs["aspect_ratio_mask"] = aspect_ratio_mask
                     sample_inputs["aspect_ratio_ids"] = aspect_ratio_ids
@@ -1600,8 +1608,7 @@ def optimize(
 
     validate_device_avaliable(device)
 
-    if True:
-    # try:
+    try:
         well_supported_model = False
         if hasattr(model, "config") and hasattr(model.config, "architectures"):
             well_supported_model = model.config.architectures[0] in [
@@ -1819,12 +1826,12 @@ def optimize(
             _model.register_forward_hook(output_hook, with_kwargs=True)
         return _model
 
-    # except RuntimeError as e:
-    #     logger.warning(
-    #         f"fail to apply ipex.llm.optimize due to: {e}, fallback to the origin model",
-    #         _type=WarningType.NotSupported,
-    #     )
-    #     return model
+    except RuntimeError as e:
+        logger.warning(
+            f"fail to apply ipex.llm.optimize due to: {e}, fallback to the origin model",
+            _type=WarningType.NotSupported,
+        )
+        return model
 
     return model
 

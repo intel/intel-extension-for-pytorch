@@ -2296,67 +2296,27 @@ def _MllamaTextCrossAttention_forward(
 
             key_states = self.k_norm(key_states)
             past_key_value = (key_states, value_states)
-            # if past_key_value is not None:
-            #     # if we have a new image + new tokens, we only computed key_states on that new image
-            #     # we still update the cross key states, past_image, new_image. And use it!
-            #     key_states, value_states = past_key_value.update(
-            #         key_states, value_states, self.layer_idx, {"cache_position": cache_position}
-            #     )
-
-            #     # Update the number of seen tokens
-            #     if layer_idx == 0:
-            #         self._seen_tokens += key_states.shape[-2]
-
-            #     # Update the cache
-            #     if len(self.key_cache) <= layer_idx:
-            #         self.key_cache.append(key_states)
-            #         self.value_cache.append(value_states)
-            #     elif self.key_cache[layer_idx] == []:
-            #         self.key_cache[layer_idx] = key_states
-            #         self.value_cache[layer_idx] = value_states
-            #     else:
-            #         self.key_cache[layer_idx] = torch.cat([self.key_cache[layer_idx], key_states], dim=-2)
-            #         self.value_cache[layer_idx] = torch.cat([self.value_cache[layer_idx], value_states], dim=-2)
-
-            #     return self.key_cache[layer_idx], self.value_cache[layer_idx]
-
 
         elif past_key_value[0].shape[2] != 0:
             key_states, value_states = past_key_value
-            # key_states, value_states = (
-            #     past_key_value.key_cache[self.layer_idx],
-            #     past_key_value.value_cache[self.layer_idx],
-            # )
+
         else:
             raise ValueError(
                 "Cross attention layer can't find neither `cross_attn_states` nor cached values for key/values!"
             )
 
 
+        if attention_mask is not None:  # no matter the length, we just slice it
+            causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
 
-        causal_mask = attention_mask
-        if attention_mask is not None:
-            causal_mask = causal_mask[:, :, :, : key_states.shape[-2]]
-
-        is_causal = False
         attn_output = torch.nn.functional.scaled_dot_product_attention(
             query_states,
             key_states,
             value_states,
             attn_mask=causal_mask,
             dropout_p=0.0,
-            is_causal=is_causal,
+            is_causal=False,
         )
-
-
-        # attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-
-        # if attention_mask is not None:  # no matter the length, we just slice it
-        #     causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
-        #     attn_weights = attn_weights + causal_mask
-        # attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-        # attn_weights = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
-        # attn_output = torch.matmul(attn_weights, value_states)
 
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.reshape(bsz, q_len, -1)
@@ -3000,8 +2960,14 @@ def _reorder_cache(
     if (
         len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1
     ):  # discrete kv_cache
+        idx=0
+        cross_attention_layers = []
+        if hasattr(self, "config") and hasattr(self.config, "text_config") and hasattr(self.config.text_config, "cross_attention_layers"):
+            cross_attention_layers = self.config.text_config.cross_attention_layers
         for layer_past in past_key_values:
-            layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
+            if idx not in cross_attention_layers:
+                layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
+            idx = idx + 1 
         return past_key_values
     elif len(past_key_values[0]) == 8:
         for layer_past in past_key_values:

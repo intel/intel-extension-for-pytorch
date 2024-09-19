@@ -586,12 +586,12 @@ def MllamaForConditionalGeneration_forward(
         self,
         input_ids: torch.LongTensor = None, #first #next  
         attention_mask: Optional[List[List[List[int]]]] = None,#first #next    
-        past_key_values: Optional[List[torch.FloatTensor]] = None, #first #next  
         position_ids: Optional[torch.LongTensor] = None, #first #next  
         pixel_values: Optional[torch.FloatTensor] = None, #first
         aspect_ratio_mask: Optional[List[List[int]]] = None, #first
         aspect_ratio_ids: Optional[torch.Tensor] = None, #first
         cross_attention_mask: Optional[torch.Tensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None, #first #next  
         cross_attention_states: Optional[torch.Tensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
@@ -623,7 +623,6 @@ def MllamaForConditionalGeneration_forward(
             cross_attention_states = self.vision_model(pixel_values, aspect_ratio_ids, aspect_ratio_mask)
 
             cross_attention_states = self.multi_modal_projector(cross_attention_states.reshape(-1, cross_attention_states.shape[-2],  cross_attention_states.shape[-1]))
-
         cross_attention_mask, full_text_row_masked_out_mask = _prepare_cross_attention_mask(
             cross_attention_mask,
             past_key_values=past_key_values,
@@ -634,10 +633,10 @@ def MllamaForConditionalGeneration_forward(
             dtype=self.dtype,
         )
 
+        cache_position = position_ids[0] if cache_position is None else cache_position
         if cross_attention_mask is not None and cache_position is not None:
             cross_attention_mask = cross_attention_mask[:, :, cache_position]
             full_text_row_masked_out_mask = full_text_row_masked_out_mask[:, :, cache_position]
-
         outputs = self.language_model(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -655,7 +654,6 @@ def MllamaForConditionalGeneration_forward(
             cache_position=cache_position,
             num_logits_to_keep=num_logits_to_keep,
         )
-
         return outputs
 
 def GPTNeoXForCausalLM_forward(
@@ -4530,11 +4528,13 @@ def prepare_inputs_for_generation_mllama(
         model_inputs = {"input_ids": input_ids}
 
     model_inputs.update(
-        {
-            "position_ids": position_ids,
-            "past_key_values": past_key_values,
-            "use_cache": kwargs.get("use_cache"),
-            "attention_mask": attention_mask,
+        { 
+        "position_ids": position_ids,
+        "cache_position": cache_position,
+        "past_key_values": past_key_values,
+        "use_cache": use_cache,
+        "attention_mask": attention_mask,
+        "cross_attention_mask": cross_attention_mask,
         }
     )
 

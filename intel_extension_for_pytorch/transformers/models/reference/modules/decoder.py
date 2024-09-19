@@ -1532,11 +1532,6 @@ class _IPEXDecoderLayerRef(nn.Module):
             self.is_cross_decoder = False
             if self.model_backbone == "MllamaForConditionalGeneration" and module._get_name() == "MllamaCrossAttentionDecoderLayer":
                 self.is_cross_decoder = True
-                # if not self.distributed:
-                #     self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
-                #     self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
-                #     del self.__dict__["_modules"]["self_attn"].o_proj
-                #     del self.__dict__["_modules"]["mlp"].down_proj
             else:
                 if not self.distributed:
                     self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)

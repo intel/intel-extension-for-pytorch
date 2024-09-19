@@ -277,7 +277,7 @@ def _greedy_search(
                         ]
                     )
 
-            if first_token:
+            if first_token and self.model_backbone:
                 if hasattr(self.config, "n_layer"):
                     num_hidden_layers = self.config.n_layer
                 elif hasattr(self.config, "num_hidden_layers"):
