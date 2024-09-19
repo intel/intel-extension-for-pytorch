@@ -202,14 +202,16 @@ tile_load(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t ii = 0; ii < block_size_y / ld_blk_size_y; ++ii) {
         constexpr uint32_t load_elems = ld_blk_size_y * block_size_x * arr_len;
-
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_tload_global<
             load_dtype,
-            ld_blk_height * block_size_x * arr_len / scale_factor,
-            L1,
-            L2,
+            block_size_x / scale_factor,
+            ld_blk_height,
+            arr_len,
             trans,
             mem_transform,
+            L1,
+            L2,
+            tmp_size / scale_factor,
             arch_tag>(tdesc);
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)
@@ -258,11 +260,14 @@ tile_load(tile_t& tile, payload_t& payload) {
         reg_blk.xetla_select<load_elems, 1>(remained_start)
             .xetla_format<native_type_t<load_dtype>>() = xetla_tload_global<
             load_dtype,
-            (load_elems / scale_factor),
-            L1,
-            L2,
+            block_size_x / scale_factor,
+            remained_blk_size_y,
+            arr_len,
             trans,
             mem_transform,
+            L1,
+            L2,
+            load_elems / scale_factor,
             arch_tag>(tdesc);
       }
     }
@@ -303,11 +308,14 @@ tile_load(tile_t& tile, payload_t& payload) {
 
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_tload_global<
             load_dtype,
-            (ld_blk_height * block_size_x * arr_len / scale_factor),
-            L1,
-            L2,
+            block_size_x / scale_factor,
+            ld_blk_height,
+            arr_len,
             trans,
             mem_transform,
+            L1,
+            L2,
+            load_elems / scale_factor,
             arch_tag>(tdesc);
 
         if constexpr (reg_transpose && trans) {
@@ -351,14 +359,18 @@ tile_load(tile_t& tile, payload_t& payload) {
             (block_width - 1) | ((block_height - 1) << 8);
         gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
             tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
+
         reg_blk.xetla_select<final_load_elems, 1>(final_start)
             .xetla_format<native_type_t<load_dtype>>() = xetla_tload_global<
             load_dtype,
-            final_load_elems / scale_factor,
-            L1,
-            L2,
+            block_size_x / scale_factor,
+            final_ld_blk_size_y,
+            arr_len,
             trans,
             mem_transform,
+            L1,
+            L2,
+            final_load_elems / scale_factor,
             arch_tag>(tdesc);
       }
     }
@@ -426,7 +438,8 @@ tile_load(tile_t& tile, payload_t& payload) {
 
 /// @brief This function loads data from unaligned-2D memory surface.
 /// Loads an array of rectangular regions (X,Y)..(X+W,Y+H) from memory into
-/// registers. Each block will be loaded serially by its corresponding payload.
+/// registers. Each block will be loaded serially by its corresponding
+/// payload.
 /// @tparam tile_t Is the tile_t struct contains registers.
 /// These registers will be the destination of load operation.
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
@@ -550,7 +563,8 @@ tile_load(tile_t& tile, payload_t& payload) {
 
 /// @brief This function loads data from unaligned-2D memory surface.
 /// Loads an array of rectangular regions (X,Y)..(X+W,Y+H) from memory into
-/// registers. Each block will be loaded serially by its corresponding payload.
+/// registers. Each block will be loaded serially by its corresponding
+/// payload.
 /// @tparam tile_t Is the tile_t struct contains registers.
 /// These registers will be the destination of load operation.
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
@@ -615,7 +629,8 @@ tile_load(tile_t& tile, payload_t& payload) {
 
 /// @brief This function loads data from unaligned-2D memory surface.
 /// Loads an array of rectangular regions (X,Y)..(X+W,Y+H) from memory into
-/// registers. Each block will be loaded serially by its corresponding payload.
+/// registers. Each block will be loaded serially by its corresponding
+/// payload.
 /// @tparam tile_t Is the tile_t struct contains registers.
 /// These registers will be the destination of load operation.
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
@@ -755,8 +770,8 @@ tile_load(
 }
 
 /// @brief Is the data load func from local shared memory to register file,
-/// which supports the memory surface is 1d or 2d scenario. And we always assume
-/// data in SLM is row major.
+/// which supports the memory surface is 1d or 2d scenario. And we always
+/// assume data in SLM is row major.
 /// @tparam tile_t Is the tile_t struct contains registers
 /// These registers will be the destination of load operation.
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
@@ -838,8 +853,8 @@ tile_load(tile_t& tile, payload_t& payload) {
 }
 
 /// @brief Is the data load func from shared local memory to register file,
-/// which supports the memory surface is 1d scenario. And the src memory layout
-/// is always row major.
+/// which supports the memory surface is 1d scenario. And the src memory
+/// layout is always row major.
 /// @tparam tile_t Is the tile_t struct contains registers.
 /// These registers will be the destination of load operation.
 /// @tparam payload_t Is the mem_payload_t struct describing the memory

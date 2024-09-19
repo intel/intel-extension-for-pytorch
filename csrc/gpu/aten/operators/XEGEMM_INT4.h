@@ -11,65 +11,44 @@
 
 using namespace torch_ipex::xpu::xetla;
 
-#define RECORD_FUNCTION_IMPL(                                       \
-    F,                                                              \
-    WG_M,                                                           \
-    WG_N,                                                           \
-    SG_M,                                                           \
-    SG_N,                                                           \
-    SG_K,                                                           \
-    GZ,                                                             \
-    SLM_KS,                                                         \
-    L3_KS,                                                          \
-    SYNC_FREQ,                                                      \
-    STAGES,                                                         \
-    ARCH)                                                           \
-  char str__[100];                                                  \
-  sprintf(                                                          \
-      str__,                                                        \
-      "%s(%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d)", \
-      "" #F,                                                        \
-      WG_M,                                                         \
-      WG_N,                                                         \
-      SG_M,                                                         \
-      SG_N,                                                         \
-      SG_K,                                                         \
-      GZ,                                                           \
-      SLM_KS,                                                       \
-      L3_KS,                                                        \
-      SYNC_FREQ,                                                    \
-      STAGES,                                                       \
-      ARCH,                                                         \
-      m_,                                                           \
-      n_,                                                           \
-      k_);                                                          \
+#define RECORD_FUNCTION_IMPL(                                          \
+    F,                                                                 \
+    QUANT_MODE,                                                        \
+    WG_M,                                                              \
+    WG_N,                                                              \
+    SG_M,                                                              \
+    SG_N,                                                              \
+    SG_K,                                                              \
+    GZ,                                                                \
+    SLM_KS,                                                            \
+    L3_KS,                                                             \
+    SYNC_FREQ,                                                         \
+    STAGES,                                                            \
+    ARCH)                                                              \
+  char str__[100];                                                     \
+  sprintf(                                                             \
+      str__,                                                           \
+      "%s(%d,%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d)", \
+      "" #F,                                                           \
+      int(QUANT_MODE),                                                 \
+      WG_M,                                                            \
+      WG_N,                                                            \
+      SG_M,                                                            \
+      SG_N,                                                            \
+      SG_K,                                                            \
+      GZ,                                                              \
+      SLM_KS,                                                          \
+      L3_KS,                                                           \
+      SYNC_FREQ,                                                       \
+      STAGES,                                                          \
+      ARCH,                                                            \
+      m_,                                                              \
+      n_,                                                              \
+      k_);                                                             \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
 
-#define HGEMM_INT4_DISPATCH(                                \
-    F,                                                      \
-    WG_M,                                                   \
-    WG_N,                                                   \
-    SG_M,                                                   \
-    SG_N,                                                   \
-    SG_K,                                                   \
-    GZ,                                                     \
-    SLM_KS,                                                 \
-    L3_KS,                                                  \
-    SYNC_FREQ,                                              \
-    STAGES,                                                 \
-    ARCH)                                                   \
-  F<scalar_t,                                               \
-    WG_M,                                                   \
-    WG_N,                                                   \
-    SG_M,                                                   \
-    SG_N,                                                   \
-    SG_K,                                                   \
-    GZ,                                                     \
-    SLM_KS,                                                 \
-    L3_KS,                                                  \
-    SYNC_FREQ,                                              \
-    STAGES,                                                 \
-    ARCH>(                                                  \
+#define HGEMM_INT4_DISPATCH(F, ...)                         \
+  F<scalar_t, __VA_ARGS__>(                                 \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()), \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),      \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),     \
@@ -81,31 +60,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                   \
       k_);
 
-#define HGEMM_INT4_BIAS_DISPATCH(                             \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_BIAS_DISPATCH(F, ...)                      \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -118,31 +74,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_BIAS_RES_RES_DISPATCH(                     \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_BIAS_RES_RES_DISPATCH(F, ...)              \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -157,31 +90,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_BIAS_GELU_DISPATCH(                        \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_BIAS_GELU_DISPATCH(F, ...)                 \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -194,31 +104,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_RES_DISPATCH(                              \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_RES_DISPATCH(F, ...)                       \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -231,31 +118,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_RESMUL_DISPATCH(                           \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_RESMUL_DISPATCH(F, ...)                    \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -268,31 +132,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_MLP_SILU_MUL_DISPATCH(                   \
-    F,                                                      \
-    WG_M,                                                   \
-    WG_N,                                                   \
-    SG_M,                                                   \
-    SG_N,                                                   \
-    SG_K,                                                   \
-    GZ,                                                     \
-    SLM_KS,                                                 \
-    L3_KS,                                                  \
-    SYNC_FREQ,                                              \
-    STAGES,                                                 \
-    ARCH)                                                   \
-  F<scalar_t,                                               \
-    WG_M,                                                   \
-    WG_N,                                                   \
-    SG_M,                                                   \
-    SG_N,                                                   \
-    SG_K,                                                   \
-    GZ,                                                     \
-    SLM_KS,                                                 \
-    L3_KS,                                                  \
-    SYNC_FREQ,                                              \
-    STAGES,                                                 \
-    ARCH>(                                                  \
+#define HGEMM_INT4_MLP_SILU_MUL_DISPATCH(F, ...)            \
+  F<scalar_t, __VA_ARGS__>(                                 \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()), \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),      \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),     \
@@ -304,31 +145,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                   \
       k_);
 
-#define HGEMM_INT4_MLP_BIAS_SILU_MUL_DISPATCH(                \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_MLP_BIAS_SILU_MUL_DISPATCH(F, ...)         \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -340,31 +158,8 @@ using namespace torch_ipex::xpu::xetla;
       m_,                                                     \
       n_,                                                     \
       k_);
-#define HGEMM_INT4_MLP_SILU_MUL_BIAS_DISPATCH(                \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_MLP_SILU_MUL_BIAS_DISPATCH(F, ...)         \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -376,31 +171,8 @@ using namespace torch_ipex::xpu::xetla;
       m_,                                                     \
       n_,                                                     \
       k_);
-#define HGEMM_INT4_MLP_BIAS_SILU_MUL_BIAS_DISPATCH(           \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_MLP_BIAS_SILU_MUL_BIAS_DISPATCH(F, ...)    \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -414,31 +186,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_QKV_DISPATCH(                            \
-    F,                                                      \
-    WG_M,                                                   \
-    WG_N,                                                   \
-    SG_M,                                                   \
-    SG_N,                                                   \
-    SG_K,                                                   \
-    GZ,                                                     \
-    SLM_KS,                                                 \
-    L3_KS,                                                  \
-    SYNC_FREQ,                                              \
-    STAGES,                                                 \
-    ARCH)                                                   \
-  F<scalar_t,                                               \
-    WG_M,                                                   \
-    WG_N,                                                   \
-    SG_M,                                                   \
-    SG_N,                                                   \
-    SG_K,                                                   \
-    GZ,                                                     \
-    SLM_KS,                                                 \
-    L3_KS,                                                  \
-    SYNC_FREQ,                                              \
-    STAGES,                                                 \
-    ARCH>(                                                  \
+#define HGEMM_INT4_QKV_DISPATCH(F, ...)                     \
+  F<scalar_t, __VA_ARGS__>(                                 \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()), \
       outputs_[0]->stride(0),                               \
       offset_n_k,                                           \
@@ -457,31 +206,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                   \
       k_);
 
-#define HGEMM_INT4_SILU_MUL_DISPATCH(                         \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_SILU_MUL_DISPATCH(F, ...)                  \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -494,31 +220,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_BIAS_SILU_MUL_DISPATCH(                    \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_BIAS_SILU_MUL_DISPATCH(F, ...)             \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -532,31 +235,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_BIAS_ADD_DISPATCH(                         \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_BIAS_ADD_DISPATCH(F, ...)                  \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),        \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),       \
@@ -570,31 +250,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_QKV_BIAS_DISPATCH(                         \
-    F,                                                        \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH)                                                     \
-  F<scalar_t,                                                 \
-    WG_M,                                                     \
-    WG_N,                                                     \
-    SG_M,                                                     \
-    SG_N,                                                     \
-    SG_K,                                                     \
-    GZ,                                                       \
-    SLM_KS,                                                   \
-    L3_KS,                                                    \
-    SYNC_FREQ,                                                \
-    STAGES,                                                   \
-    ARCH>(                                                    \
+#define HGEMM_INT4_QKV_BIAS_DISPATCH(F, ...)                  \
+  F<scalar_t, __VA_ARGS__>(                                   \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()),   \
       outputs_[0]->stride(0),                                 \
       offset_n_k,                                             \
@@ -614,31 +271,8 @@ using namespace torch_ipex::xpu::xetla;
       n_,                                                     \
       k_);
 
-#define HGEMM_INT4_SILU_DISPATCH(                           \
-    F,                                                      \
-    WG_M,                                                   \
-    WG_N,                                                   \
-    SG_M,                                                   \
-    SG_N,                                                   \
-    SG_K,                                                   \
-    GZ,                                                     \
-    SLM_KS,                                                 \
-    L3_KS,                                                  \
-    SYNC_FREQ,                                              \
-    STAGES,                                                 \
-    ARCH)                                                   \
-  F<scalar_t,                                               \
-    WG_M,                                                   \
-    WG_N,                                                   \
-    SG_M,                                                   \
-    SG_N,                                                   \
-    SG_K,                                                   \
-    GZ,                                                     \
-    SLM_KS,                                                 \
-    L3_KS,                                                  \
-    SYNC_FREQ,                                              \
-    STAGES,                                                 \
-    ARCH>(                                                  \
+#define HGEMM_INT4_SILU_DISPATCH(F, ...)                    \
+  F<scalar_t, __VA_ARGS__>(                                 \
       reinterpret_cast<scalar_t*>(outputs_[0]->data_ptr()), \
       reinterpret_cast<scalar_t*>(input_->data_ptr()),      \
       reinterpret_cast<uint32_t*>(weight_->data_ptr()),     \
@@ -657,279 +291,98 @@ using namespace torch_ipex::xpu::xetla;
     DPCPP_Q_SUBMIT_CGFS(q, cgfs);                           \
   }
 
-#define HGEMM_INT4_COMMON_DISPATCH(                                           \
-    WG_M, WG_N, SG_M, SG_N, SG_K, GZ, SLM_KS, L3_KS, SYNC_FREQ, STAGES, ARCH) \
-  {                                                                           \
-    if (num_epilogues_ == 0)                                                  \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_DISPATCH,                                                \
-          hgemm_wint4,                                                        \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)                \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_BIAS_DISPATCH,                                           \
-          hgemm_bias_wint4,                                                   \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (                                                                 \
-        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                   \
-        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)         \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_BIAS_RES_RES_DISPATCH,                                   \
-          hgemm_bias_res_res_wint4,                                           \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (                                                                 \
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                   \
-        epilogue_type_[1] == GELU)                                            \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_BIAS_GELU_DISPATCH,                                      \
-          hgemm_bias_gelu_wint4,                                              \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)             \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_RES_DISPATCH,                                            \
-          hgemm_res_wint4,                                                    \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)             \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_RESMUL_DISPATCH,                                         \
-          hgemm_mul_wint4,                                                    \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3)              \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_QKV_DISPATCH,                                            \
-          hgemm_qkv_wint4,                                                    \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU)                \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_SILU_DISPATCH,                                           \
-          hgemm_silu_wint4,                                                   \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (                                                                 \
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                   \
-        epilogue_type_[1] == SPLIT3)                                          \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_QKV_BIAS_DISPATCH,                                       \
-          hgemm_qkv_bias_wint4,                                               \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (                                                                 \
-        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                   \
-        epilogue_type_[1] == RES_ADD)                                         \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_BIAS_ADD_DISPATCH,                                       \
-          hgemm_bias_add_wint4,                                               \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (                                                                 \
-        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                   \
-        epilogue_type_[1] == SILU && epilogue_type_[2] == RES_MUL)            \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_BIAS_SILU_MUL_DISPATCH,                                  \
-          hgemm_bias_silu_mul_wint4,                                          \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (                                                                 \
-        num_epilogues_ == 2 && epilogue_type_[0] == SILU &&                   \
-        epilogue_type_[1] == RES_MUL)                                         \
-      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                        \
-          HGEMM_INT4_SILU_MUL_DISPATCH,                                       \
-          hgemm_silu_mul_wint4,                                               \
-          WG_M,                                                               \
-          WG_N,                                                               \
-          SG_M,                                                               \
-          SG_N,                                                               \
-          SG_K,                                                               \
-          GZ,                                                                 \
-          SLM_KS,                                                             \
-          L3_KS,                                                              \
-          SYNC_FREQ,                                                          \
-          STAGES,                                                             \
-          ARCH)                                                               \
-    else if (std::any_of(                                                     \
-                 epilogue_type_,                                              \
-                 epilogue_type_ + num_epilogues_,                             \
-                 [](EpilogueType epi_type) {                                  \
-                   return epi_type == GATE_UP_MUL;                            \
-                 })) {                                                        \
-      if (num_epilogues_ == 2 && epilogue_type_[0] == SILU &&                 \
-          epilogue_type_[1] == GATE_UP_MUL)                                   \
-        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                      \
-            HGEMM_INT4_MLP_SILU_MUL_DISPATCH,                                 \
-            hgemm_mlp_silu_mul_wint4,                                         \
-            WG_M,                                                             \
-            WG_N,                                                             \
-            SG_M,                                                             \
-            SG_N,                                                             \
-            SG_K,                                                             \
-            GZ,                                                               \
-            SLM_KS,                                                           \
-            L3_KS,                                                            \
-            SYNC_FREQ,                                                        \
-            STAGES,                                                           \
-            ARCH)                                                             \
-      else if (                                                               \
-          num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                 \
-          epilogue_type_[1] == SILU && epilogue_type_[2] == GATE_UP_MUL)      \
-        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                      \
-            HGEMM_INT4_MLP_BIAS_SILU_MUL_DISPATCH,                            \
-            hgemm_mlp_bias_silu_mul_wint4,                                    \
-            WG_M,                                                             \
-            WG_N,                                                             \
-            SG_M,                                                             \
-            SG_N,                                                             \
-            SG_K,                                                             \
-            GZ,                                                               \
-            SLM_KS,                                                           \
-            L3_KS,                                                            \
-            SYNC_FREQ,                                                        \
-            STAGES,                                                           \
-            ARCH)                                                             \
-      else if (                                                               \
-          num_epilogues_ == 3 && epilogue_type_[0] == SILU &&                 \
-          epilogue_type_[1] == GATE_UP_MUL && epilogue_type_[2] == BIAS)      \
-        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                      \
-            HGEMM_INT4_MLP_SILU_MUL_BIAS_DISPATCH,                            \
-            hgemm_mlp_silu_mul_bias_wint4,                                    \
-            WG_M,                                                             \
-            WG_N,                                                             \
-            SG_M,                                                             \
-            SG_N,                                                             \
-            SG_K,                                                             \
-            GZ,                                                               \
-            SLM_KS,                                                           \
-            L3_KS,                                                            \
-            SYNC_FREQ,                                                        \
-            STAGES,                                                           \
-            ARCH)                                                             \
-      else if (                                                               \
-          num_epilogues_ == 4 && epilogue_type_[0] == BIAS &&                 \
-          epilogue_type_[1] == SILU && epilogue_type_[2] == GATE_UP_MUL &&    \
-          epilogue_type_[3] == BIAS)                                          \
-        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                      \
-            HGEMM_INT4_MLP_BIAS_SILU_MUL_BIAS_DISPATCH,                       \
-            hgemm_mlp_bias_silu_mul_bias_wint4,                               \
-            WG_M,                                                             \
-            WG_N,                                                             \
-            SG_M,                                                             \
-            SG_N,                                                             \
-            SG_K,                                                             \
-            GZ,                                                               \
-            SLM_KS,                                                           \
-            L3_KS,                                                            \
-            SYNC_FREQ,                                                        \
-            STAGES,                                                           \
-            ARCH)                                                             \
-      else                                                                    \
-        TORCH_CHECK(false, "Unsupported gate_up epilogue type");              \
-    } else                                                                    \
-      TORCH_CHECK(false, "Unsupported epilogue type");                        \
+#define HGEMM_INT4_COMMON_DISPATCH(...)                                      \
+  {                                                                          \
+    if (num_epilogues_ == 0)                                                 \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_DISPATCH, hgemm_wint4, __VA_ARGS__)                     \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == BIAS)               \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_BIAS_DISPATCH, hgemm_bias_wint4, __VA_ARGS__)           \
+    else if (                                                                \
+        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                  \
+        epilogue_type_[1] == RES_ADD && epilogue_type_[2] == RES_ADD)        \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_BIAS_RES_RES_DISPATCH,                                  \
+          hgemm_bias_res_res_wint4,                                          \
+          __VA_ARGS__)                                                       \
+    else if (                                                                \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
+        epilogue_type_[1] == GELU)                                           \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_BIAS_GELU_DISPATCH, hgemm_bias_gelu_wint4, __VA_ARGS__) \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_ADD)            \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_RES_DISPATCH, hgemm_res_wint4, __VA_ARGS__)             \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == RES_MUL)            \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_RESMUL_DISPATCH, hgemm_mul_wint4, __VA_ARGS__)          \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SPLIT3)             \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_QKV_DISPATCH, hgemm_qkv_wint4, __VA_ARGS__)             \
+    else if (num_epilogues_ == 1 && epilogue_type_[0] == SILU)               \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_SILU_DISPATCH, hgemm_silu_wint4, __VA_ARGS__)           \
+    else if (                                                                \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
+        epilogue_type_[1] == SPLIT3)                                         \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_QKV_BIAS_DISPATCH, hgemm_qkv_bias_wint4, __VA_ARGS__)   \
+    else if (                                                                \
+        num_epilogues_ == 2 && epilogue_type_[0] == BIAS &&                  \
+        epilogue_type_[1] == RES_ADD)                                        \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_BIAS_ADD_DISPATCH, hgemm_bias_add_wint4, __VA_ARGS__)   \
+    else if (                                                                \
+        num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                  \
+        epilogue_type_[1] == SILU && epilogue_type_[2] == RES_MUL)           \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_BIAS_SILU_MUL_DISPATCH,                                 \
+          hgemm_bias_silu_mul_wint4,                                         \
+          __VA_ARGS__)                                                       \
+    else if (                                                                \
+        num_epilogues_ == 2 && epilogue_type_[0] == SILU &&                  \
+        epilogue_type_[1] == RES_MUL)                                        \
+      HGEMM_INT4_COMMON_DISPATCH_IMPL(                                       \
+          HGEMM_INT4_SILU_MUL_DISPATCH, hgemm_silu_mul_wint4, __VA_ARGS__)   \
+    else if (std::any_of(                                                    \
+                 epilogue_type_,                                             \
+                 epilogue_type_ + num_epilogues_,                            \
+                 [](EpilogueType epi_type) {                                 \
+                   return epi_type == GATE_UP_MUL;                           \
+                 })) {                                                       \
+      if (num_epilogues_ == 2 && epilogue_type_[0] == SILU &&                \
+          epilogue_type_[1] == GATE_UP_MUL)                                  \
+        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                     \
+            HGEMM_INT4_MLP_SILU_MUL_DISPATCH,                                \
+            hgemm_mlp_silu_mul_wint4,                                        \
+            __VA_ARGS__)                                                     \
+      else if (                                                              \
+          num_epilogues_ == 3 && epilogue_type_[0] == BIAS &&                \
+          epilogue_type_[1] == SILU && epilogue_type_[2] == GATE_UP_MUL)     \
+        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                     \
+            HGEMM_INT4_MLP_BIAS_SILU_MUL_DISPATCH,                           \
+            hgemm_mlp_bias_silu_mul_wint4,                                   \
+            __VA_ARGS__)                                                     \
+      else if (                                                              \
+          num_epilogues_ == 3 && epilogue_type_[0] == SILU &&                \
+          epilogue_type_[1] == GATE_UP_MUL && epilogue_type_[2] == BIAS)     \
+        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                     \
+            HGEMM_INT4_MLP_SILU_MUL_BIAS_DISPATCH,                           \
+            hgemm_mlp_silu_mul_bias_wint4,                                   \
+            __VA_ARGS__)                                                     \
+      else if (                                                              \
+          num_epilogues_ == 4 && epilogue_type_[0] == BIAS &&                \
+          epilogue_type_[1] == SILU && epilogue_type_[2] == GATE_UP_MUL &&   \
+          epilogue_type_[3] == BIAS)                                         \
+        HGEMM_INT4_COMMON_DISPATCH_IMPL(                                     \
+            HGEMM_INT4_MLP_BIAS_SILU_MUL_BIAS_DISPATCH,                      \
+            hgemm_mlp_bias_silu_mul_bias_wint4,                              \
+            __VA_ARGS__)                                                     \
+      else                                                                   \
+        TORCH_CHECK(false, "Unsupported gate_up epilogue type");             \
+    } else                                                                   \
+      TORCH_CHECK(false, "Unsupported epilogue type");                       \
   }
 
 struct GemmWint4Config {
@@ -1004,8 +457,7 @@ class HGEMMXetla_INT4 final {
     MAX_EPILOGUES = 4,
   };
   Tensor *input_ = nullptr, *weight_ = nullptr, *weight_scl_ = nullptr,
-         *acc_tensor_ = nullptr, *cnt_tensor_ = nullptr;
-  uint32_t* weight_zp_ptr_ = nullptr;
+         *weight_zp_ = nullptr, *acc_tensor_ = nullptr, *cnt_tensor_ = nullptr;
   std::vector<Tensor*> outputs_;
   Tensor* epilogues_[MAX_EPILOGUES];
   EpilogueType epilogue_type_[MAX_EPILOGUES];
@@ -1020,13 +472,11 @@ class HGEMMXetla_INT4 final {
   int offset_n_k = 0, offset_n_v = 0; // n-dim offset, for qkv fusion
   int64_t group_size_;
   gpu::xetla::gpu_arch arch_ = gpu::xetla::gpu_arch::XeHpc;
+  gpu::xetla::quant_mode quant_mode_ = gpu::xetla::quant_mode::I4_ASYM;
   template <uint32_t a, uint32_t b>
   struct gcd {
     static constexpr uint32_t value = gcd<b, a % b>::value;
   };
-  /// @brief
-  ///
-  /// @tparam a
   template <uint32_t a>
   struct gcd<a, 0> {
     static constexpr uint32_t value = a;
@@ -1087,9 +537,7 @@ class HGEMMXetla_INT4 final {
     return *this;
   }
   HGEMMXetla_INT4& add_matrix_zp(const Tensor& zero_points) {
-    Tensor* weight_zp_ = const_cast<Tensor*>(&zero_points);
-    if (weight_zp_->defined())
-      weight_zp_ptr_ = reinterpret_cast<uint32_t*>(weight_zp_->data_ptr());
+    weight_zp_ = const_cast<Tensor*>(&zero_points);
     return *this;
   }
   HGEMMXetla_INT4& add_group_size(int64_t group_size) {
@@ -1151,6 +599,16 @@ class HGEMMXetla_INT4 final {
       std::cout << "weight dim check fail!" << std::endl;
       return *this;
     }
+    if (weight_zp_ == nullptr || !weight_zp_->defined()) {
+      quant_mode_ = gpu::xetla::quant_mode::I4_SYM;
+    } else if (weight_zp_->scalar_type() == weight_->scalar_type()) {
+      quant_mode_ = gpu::xetla::quant_mode::I4_ASYM;
+    } else if (weight_zp_->scalar_type() == input_->scalar_type()) {
+      quant_mode_ = gpu::xetla::quant_mode::I4_ASYM_FP_ZERO;
+    } else {
+      std::cout << "weight_zp check fail!" << std::endl;
+      return *this;
+    }
     is_a_row_major_ = input_->is_contiguous();
     is_a_col_major_ = input_->transpose(0, 1).is_contiguous();
     is_b_row_major_ = weight_->is_contiguous();
@@ -1162,6 +620,7 @@ class HGEMMXetla_INT4 final {
     // Normalize calibration group size.
     if (group_size_ == -1 || group_size_ == k_)
       group_size_ = 0;
+    const auto group_num = (group_size_ == 0) ? 1 : (k_ / group_size_);
     // Set correct n dim.
     n_ = b_sizes[has_gate_up ? 1 : 0];
 
@@ -1175,6 +634,25 @@ class HGEMMXetla_INT4 final {
         return *this;
       }
     }
+
+    const auto zp_sizes = weight_zp_->sizes();
+    if (quant_mode_ == gpu::xetla::quant_mode::I4_ASYM) {
+      const auto pack_ratio = k_ / b_sizes[has_gate_up ? 2 : 1];
+      const auto packed_n = n_ / pack_ratio;
+      if (has_gate_up
+              ? (zp_sizes != std::vector<int64_t>{2, group_num, packed_n})
+              : (zp_sizes != std::vector<int64_t>{group_num, packed_n})) {
+        std::cout << "weight_zp shape check fail!" << std::endl;
+        return *this;
+      }
+    } else if (quant_mode_ == gpu::xetla::quant_mode::I4_ASYM_FP_ZERO) {
+      if (has_gate_up ? (zp_sizes != std::vector<int64_t>{2, group_num, n_})
+                      : (zp_sizes != std::vector<int64_t>{group_num, n_})) {
+        std::cout << "weight_zp shape check fail!" << std::endl;
+        return *this;
+      }
+    }
+
     for (int i = 0; i < num_epilogues_; i++) {
       switch (epilogue_type_[i]) {
         case BIAS: {
@@ -1217,8 +695,14 @@ class HGEMMXetla_INT4 final {
 
   using DispatchResult = std::pair<std::function<void()>, bool>;
   using gpu_arch = gpu::xetla::gpu_arch;
+  using quant_mode = gpu::xetla::quant_mode;
 
-  template <typename scalar_t, gpu_arch arch_tag, int gz, int idx = 0>
+  template <
+      typename scalar_t,
+      gpu_arch arch_tag,
+      quant_mode q_mode,
+      int gz,
+      int idx = 0>
   void search_and_run(sycl::queue& q) {
     static constexpr auto ConfigsTuple = ordered_config_set<arch_tag>;
     if constexpr (idx >= ConfigsTuple.size()) {
@@ -1258,7 +742,12 @@ class HGEMMXetla_INT4 final {
         acc_tensor_ = const_cast<Tensor*>(&null_tensor_float);
         cnt_tensor_ = const_cast<Tensor*>(&null_tensor_byte);
       }
+      auto weight_zp_ptr_ = q_mode == quant_mode::I4_SYM
+          ? nullptr
+          : reinterpret_cast<uint32_t*>(weight_zp_->data_ptr());
+
       HGEMM_INT4_COMMON_DISPATCH(
+          q_mode,
           wg_m,
           wg_n,
           sg_m,
@@ -1271,19 +760,36 @@ class HGEMMXetla_INT4 final {
           stages,
           arch);
     } else {
-      search_and_run<scalar_t, arch_tag, gz, idx + 1>(q);
+      search_and_run<scalar_t, arch_tag, q_mode, gz, idx + 1>(q);
     }
   }
-  template <typename scalar_t, gpu_arch arch_tag, int idx = 0>
+  template <typename scalar_t, gpu_arch arch_tag, quant_mode qm, int idx = 0>
   void dispatch(sycl::queue& q) {
     static constexpr std::array supported_gzs = {
         0, 32, 64, 128, 256, 512, 1024};
     if constexpr (idx >= supported_gzs.size()) {
       TORCH_CHECK(false, "No available implementation for current gz!")
     } else if (group_size_ == supported_gzs[idx]) {
-      search_and_run<scalar_t, arch_tag, supported_gzs[idx]>(q);
+      search_and_run<scalar_t, arch_tag, qm, supported_gzs[idx]>(q);
     } else {
-      dispatch<scalar_t, arch_tag, idx + 1>(q);
+      dispatch<scalar_t, arch_tag, qm, idx + 1>(q);
+    }
+  }
+  template <typename scalar_t, gpu_arch arch_tag>
+  void dispatch(sycl::queue& q) {
+    switch (quant_mode_) {
+      case quant_mode::I4_ASYM:
+        return dispatch<scalar_t, arch_tag, quant_mode::I4_ASYM>(q);
+      case quant_mode::I4_SYM:
+        return dispatch<scalar_t, arch_tag, quant_mode::I4_SYM>(q);
+      case quant_mode::I4_ASYM_FP_ZERO:
+        return dispatch<scalar_t, arch_tag, quant_mode::I4_ASYM_FP_ZERO>(q);
+      default:
+        TORCH_CHECK(
+            false,
+            "No implementation for current quant_mode: ",
+            int(quant_mode_))
+        return;
     }
   }
   template <gpu_arch arch_tag>

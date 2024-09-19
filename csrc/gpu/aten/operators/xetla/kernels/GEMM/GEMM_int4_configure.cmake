@@ -1,12 +1,15 @@
 function(GEMM_int4_configure XETLA_USED_ARCHS)
 set(GEMM_INT4_LIBS)
 
-# set(L_QUANT_MODE "I4_SYM" "I4_ASYM_ZERO_NO_DEGRAD")
-set(L_QUANT_MODE "I4_SYM")
+set(L_QUANT_MODE)
+list(APPEND L_QUANT_MODE "I4_ASYM")
+list(APPEND L_QUANT_MODE "I4_SYM")
+list(APPEND L_QUANT_MODE "I4_ASYM_FP_ZERO")
 
 # avoid too long file name
-set(QUANT_MODE_FLAG_I4_SYM "qmode1")
-set(QUANT_MODE_FLAG_I4_ASYM_ZERO_NO_DEGRAD "qmode2")
+set(QUANT_MODE_FLAG_I4_ASYM         "qmode0")
+set(QUANT_MODE_FLAG_I4_SYM          "qmode1")
+set(QUANT_MODE_FLAG_I4_ASYM_FP_ZERO "qmode2")
 
 # cmake arch to gpu_arch::xxxx
 set(gpu_arch_xe_lpg "XeLpg")
@@ -37,9 +40,6 @@ foreach(QUANT_MODE ${L_QUANT_MODE})
     endif()
 
     if(ARCH STREQUAL "xe_lpg")
-        if(QUANT_MODE STREQUAL "I4_ASYM_ZERO_NO_DEGRAD")
-            continue()
-        endif()
         configure_("${DTYPES}" ${arch_tag} "${aot_tag}" ${QUANT_MODE} 1   1   1  1  512  1 1 0 0 FALSE)
         configure_("${DTYPES}" ${arch_tag} "${aot_tag}" ${QUANT_MODE} 1   1   1  1  256  1 1 0 0 FALSE)
         configure_("${DTYPES}" ${arch_tag} "${aot_tag}" ${QUANT_MODE} 1   1   1  1  128  1 1 0 0 FALSE)

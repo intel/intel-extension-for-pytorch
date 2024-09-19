@@ -18,6 +18,14 @@ namespace mlp {
        args.quant_param.zero_pt_ld / pack_ratio},     \
       {start_x_zero_pt, start_y_zero_pt});
 
+#define DEF_ZP_FP_MEM_DESC(NAME, PTR)                 \
+  mem_desc_zero_pt_t NAME(                            \
+      args.quant_param.PTR,                           \
+      {args.matrix_n,                                 \
+       ((args.matrix_k + dequant_s - 1) / dequant_s), \
+       args.quant_param.zero_pt_ld},                  \
+      {start_x_zero_pt, start_y_zero_pt});
+
 #define DEF_COL_MAJOR_WEI_MEM_DESC(NAME, PTR)                           \
   NAME.init(                                                            \
       args.PTR,                                                         \
@@ -537,7 +545,10 @@ class mlp_gate_mul_up_int4_fwd_t {
     int start_x_scale = start_n;
     int start_y_scale = start_k / dequant_s;
 
-    int start_x_zero_pt = start_n / pack_ratio;
+    int start_x_zero_pt =
+        gemm_t::compute_policy::quant_mode == quant_mode::I4_ASYM_FP_ZERO
+        ? start_n
+        : start_n / pack_ratio;
     int start_y_zero_pt = start_k / dequant_s;
 
     // set up arguments
@@ -602,8 +613,22 @@ class mlp_gate_mul_up_int4_fwd_t {
           mem_desc_gate_proj,
           mem_desc_gate_proj_scale,
           mem_desc_gate_zero_pt)
+    } else if constexpr (
+        gemm_t::compute_policy::quant_mode == quant_mode::I4_ASYM_FP_ZERO) {
+      DEF_ZP_FP_MEM_DESC(mem_desc_up_zero_pt, up_proj_zero_pt_base)
+      DEF_ZP_FP_MEM_DESC(mem_desc_gate_zero_pt, gate_proj_zero_pt_base)
+      ASSIGN_ASYM_GEMM_ARG(
+          up_proj_args,
+          mem_desc_up_proj,
+          mem_desc_up_proj_scale,
+          mem_desc_up_zero_pt)
+      ASSIGN_ASYM_GEMM_ARG(
+          gate_proj_args,
+          mem_desc_gate_proj,
+          mem_desc_gate_proj_scale,
+          mem_desc_gate_zero_pt)
     } else {
-      assert(0);
+      static_assert(false, "Unsupported quant mode");
     }
     matAcc_t mat_up_proj_Acc, mat_gate_proj_Acc;
     mat_slice_t up_proj_out, gate_proj_out;

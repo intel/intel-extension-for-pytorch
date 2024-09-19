@@ -8,6 +8,10 @@
 namespace torch_ipex::xpu::xetla {
 using namespace gpu::xetla;
 
+template <quant_mode q_mode, typename scalar_t>
+using dtype_zp =
+    std::conditional_t<q_mode == quant_mode::I4_ASYM_FP_ZERO, scalar_t, int4x8>;
+
 template <
     typename dtype_a,
     typename dtype_b,
@@ -15,6 +19,7 @@ template <
     typename dtype_zero_pt,
     typename dtype_scale,
     typename dtype_acc,
+    quant_mode q_mode,
     uint32_t wg_m,
     uint32_t wg_n,
     uint32_t sg_m,
@@ -56,7 +61,7 @@ struct hgemm_wint4_func {
       : mma_engine::xmx;
 
   static constexpr quant_info quant_info{
-      quant_mode::I4_SYM,
+      q_mode,
       dequant_s == 0 ? 131072 : dequant_s,
       mem_layout::col_major};
 
@@ -116,23 +121,51 @@ struct hgemm_wint4_func {
       dtype_zero_pt* zero_pt_ptr,
       dtype_scale* scale_ptr,
       typename epilogue_t::arguments_t epilogue_args = {}) {
-    op_args_t<gemm_op_t> gemm_arg(
-        mat_m,
-        mat_k,
-        mat_n,
-        A,
-        mat_k, // mat_k
-        B,
-        mat_k,
-        C,
-        mat_n,
-        scale_ptr,
-        dequant_s == 0 ? 1 : (mat_k / compute_policy::dequant_s),
-        acc_ptr,
-        cnt_ptr,
-        epilogue_args);
-    sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
+    op_args_t<gemm_op_t> gemm_arg;
+    const uint32_t ld_scale =
+        (dequant_s == 0 ? 1 : (mat_k / compute_policy::dequant_s));
+    if constexpr (q_mode == quant_mode::I4_SYM) {
+      gemm_arg = {
+          mat_m,
+          mat_k,
+          mat_n,
+          A,
+          mat_k, // mat_k
+          B,
+          mat_k,
+          C,
+          mat_n,
+          scale_ptr,
+          ld_scale,
+          acc_ptr,
+          cnt_ptr,
+          epilogue_args};
+    } else if constexpr (
+        q_mode == quant_mode::I4_ASYM ||
+        q_mode == quant_mode::I4_ASYM_FP_ZERO) {
+      const auto ld_zp = mat_n;
+      gemm_arg = {
+          mat_m,
+          mat_k,
+          mat_n,
+          A,
+          mat_k, // mat_k
+          B,
+          mat_k,
+          C,
+          mat_n,
+          scale_ptr,
+          ld_scale,
+          zero_pt_ptr,
+          ld_zp,
+          acc_ptr,
+          cnt_ptr,
+          epilogue_args};
+    } else {
+      static_assert(false, "Unsupported quant_mode");
+    }
 
+    sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
     GEMMFunctor<gemm_op_t> kfn(gemm_arg);
     return [=](sycl::handler& cgh) {
       cgh.parallel_for<decltype(kfn)>(NDRange, kfn);
@@ -183,21 +216,50 @@ struct hgemm_wint4_func {
     assert(offset_n1 % sg_n == 0);
     assert(offset_n2 % sg_n == 0);
     assert(mat_n % sg_n == 0);
-    op_args_t<gemm_op_t> gemm_arg(
-        mat_m,
-        mat_k,
-        mat_n,
-        A,
-        mat_k, // mat_k
-        B,
-        mat_k,
-        C0,
-        mat_n,
-        scale_ptr,
-        dequant_s == 0 ? 1 : (mat_k / compute_policy::dequant_s),
-        acc_ptr,
-        cnt_ptr,
-        epilogue_args);
+    op_args_t<gemm_op_t> gemm_arg;
+    const uint32_t ld_scale =
+        (dequant_s == 0 ? 1 : (mat_k / compute_policy::dequant_s));
+    if constexpr (q_mode == quant_mode::I4_SYM) {
+      gemm_arg = {
+          mat_m,
+          mat_k,
+          mat_n,
+          A,
+          mat_k, // mat_k
+          B,
+          mat_k,
+          C0,
+          mat_n,
+          scale_ptr,
+          ld_scale,
+          acc_ptr,
+          cnt_ptr,
+          epilogue_args};
+    } else if constexpr (
+        q_mode == quant_mode::I4_ASYM ||
+        q_mode == quant_mode::I4_ASYM_FP_ZERO) {
+      const auto ld_zp = mat_n;
+      gemm_arg = {
+          mat_m,
+          mat_k,
+          mat_n,
+          A,
+          mat_k, // mat_k
+          B,
+          mat_k,
+          C0,
+          mat_n,
+          scale_ptr,
+          ld_scale,
+          zero_pt_ptr,
+          ld_zp,
+          acc_ptr,
+          cnt_ptr,
+          epilogue_args};
+    } else {
+      static_assert(false, "Unsupported quant_mode");
+    }
+
     sycl::nd_range<3> NDRange = gemm_op_t::get_nd_range(gemm_arg);
     QKVFunctor<gemm_op_t> kfn{
         gemm_arg,
@@ -217,6 +279,7 @@ template <
     typename dtype_zero_pt,
     typename dtype_scale,
     typename dtype_acc,
+    quant_mode q_mode,
     uint32_t wg_m,
     uint32_t wg_n,
     uint32_t sg_m,
@@ -259,7 +322,7 @@ struct hgemm_mlp_gate_mul_up_wint4_func {
       : mma_engine::xmx;
 
   static constexpr quant_info quant_info{
-      quant_mode::I4_SYM,
+      q_mode,
       dequant_s == 0 ? 131072 : dequant_s,
       mem_layout::col_major};
 
@@ -321,6 +384,9 @@ struct hgemm_mlp_gate_mul_up_wint4_func {
       dtype_scale* scale_up,
       typename post_ops_gate_t::arguments_t post_ops_gate_args = {},
       typename post_ops_up_t::arguments_t post_ops_up_args = {}) {
+    const uint32_t ld_scale =
+        (dequant_s == 0 ? 1 : (mat_k / compute_policy::dequant_s));
+    const auto ld_zp = mat_n;
     typename mlp_op_t::arguments_t mlp_arg(
         mat_m,
         mat_k,
@@ -335,14 +401,7 @@ struct hgemm_mlp_gate_mul_up_wint4_func {
         acc_ptr + mlp_op_t::get_acc_buf_size(mat_m, mat_n),
         acc_ptr,
         cnt_ptr,
-        {scale_up,
-         scale_gate,
-         zp_up,
-         zp_gate,
-         // scale_ld
-         dequant_s == 0 ? 1 : (mat_k / compute_policy::dequant_s),
-         // zp_ld
-         dequant_s == 0 ? 1 : mat_n},
+        {scale_up, scale_gate, zp_up, zp_gate, ld_scale, ld_zp},
         post_ops_up_args,
         post_ops_gate_args);
 
@@ -356,6 +415,7 @@ struct hgemm_mlp_gate_mul_up_wint4_func {
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -382,7 +442,7 @@ inline cgfs_t hgemm_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using hgemm_wint4_functor = hgemm_wint4_func<
@@ -392,6 +452,7 @@ inline cgfs_t hgemm_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -405,7 +466,7 @@ inline cgfs_t hgemm_wint4(
       STAGES,
       subgroup::chained_tile_op_t<>>;
 
-  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const auto b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
   return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
@@ -422,6 +483,7 @@ inline cgfs_t hgemm_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -448,7 +510,7 @@ inline cgfs_t hgemm_bias_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
@@ -467,6 +529,7 @@ inline cgfs_t hgemm_bias_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -479,7 +542,7 @@ inline cgfs_t hgemm_bias_wint4(
       SYNC_FREQ,
       STAGES,
       post_op>;
-  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const auto b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   return {hgemm_wint4_functor::run(
@@ -498,6 +561,7 @@ inline cgfs_t hgemm_bias_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -525,7 +589,7 @@ inline cgfs_t hgemm_bias_gelu_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
@@ -545,6 +609,7 @@ inline cgfs_t hgemm_bias_gelu_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -558,7 +623,7 @@ inline cgfs_t hgemm_bias_gelu_wint4(
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const auto b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   return {hgemm_wint4_functor::run(
@@ -577,6 +642,7 @@ inline cgfs_t hgemm_bias_gelu_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -605,7 +671,7 @@ inline cgfs_t hgemm_res_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_res = scalar_t;
@@ -620,6 +686,7 @@ inline cgfs_t hgemm_res_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -633,7 +700,7 @@ inline cgfs_t hgemm_res_wint4(
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const auto b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   return {hgemm_wint4_functor::run(
@@ -652,6 +719,7 @@ inline cgfs_t hgemm_res_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -680,7 +748,7 @@ inline cgfs_t hgemm_mul_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_mul = scalar_t;
@@ -695,6 +763,7 @@ inline cgfs_t hgemm_mul_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -708,7 +777,7 @@ inline cgfs_t hgemm_mul_wint4(
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const auto b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   return {hgemm_wint4_functor::run(
@@ -727,6 +796,7 @@ inline cgfs_t hgemm_mul_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -756,7 +826,7 @@ inline cgfs_t hgemm_bias_res_res_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
@@ -784,6 +854,7 @@ inline cgfs_t hgemm_bias_res_res_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -797,8 +868,8 @@ inline cgfs_t hgemm_bias_res_res_wint4(
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const int4x8*>(b);
-  const data_type_b* b_zp_alias = reinterpret_cast<const int4x8*>(b_zp);
+  const auto b_alias = reinterpret_cast<const int4x8*>(b);
+  const auto b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
@@ -818,6 +889,7 @@ inline cgfs_t hgemm_bias_res_res_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -852,7 +924,7 @@ inline cgfs_t hgemm_qkv_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using post_op = subgroup::chained_tile_op_t<>;
@@ -863,6 +935,7 @@ inline cgfs_t hgemm_qkv_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -876,8 +949,8 @@ inline cgfs_t hgemm_qkv_wint4(
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const int4x8*>(b);
-  const data_type_b* b_zp_alias = reinterpret_cast<const int4x8*>(b_zp);
+  const auto b_alias = reinterpret_cast<const int4x8*>(b);
+  const auto b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   uint32_t weight_offset = k * n / 8;
 
@@ -885,7 +958,6 @@ inline cgfs_t hgemm_qkv_wint4(
   if constexpr (DQUANT_S != 0) {
     group_num = k / DQUANT_S;
   }
-  uint32_t zp_offset = group_num * n / 8;
   uint32_t scale_offset = group_num * n;
 
   return {hgemm_wint4_functor::run_qkv(
@@ -912,6 +984,7 @@ template <
     bool has_bias_gate,
     bool has_bias_up,
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -940,7 +1013,7 @@ inline cgfs_t hgemm_mlp_silu_mul_wint4_helper(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using bias_op_t = subgroup::bias_add_op_t<
@@ -965,6 +1038,7 @@ inline cgfs_t hgemm_mlp_silu_mul_wint4_helper(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -987,15 +1061,17 @@ inline cgfs_t hgemm_mlp_silu_mul_wint4_helper(
     post_ops_up_args = {{const_cast<scalar_t*>(bias_up), {n, 1, n}}};
   }
 
-  const data_type_b* b_alias = reinterpret_cast<const int4x8*>(b);
-  const data_type_b* b_zp_alias = reinterpret_cast<const int4x8*>(b_zp);
+  const auto b_alias = reinterpret_cast<const int4x8*>(b);
+  const auto b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   uint32_t group_num = 1;
   if constexpr (DQUANT_S != 0) {
     group_num = k / DQUANT_S;
   }
   uint32_t b_offset = k * n / 8;
-  uint32_t zp_offset = group_num * n / 8;
+  uint32_t zp_offset = (q_mode == quant_mode::I4_ASYM_FP_ZERO)
+      ? group_num * n
+      : group_num * n / 8;
   uint32_t scale_offset = group_num * n;
   return {hgemm_mlp_gate_mul_up_wint4_functor::run(
       const_cast<scalar_t*>(a),
@@ -1016,7 +1092,7 @@ inline cgfs_t hgemm_mlp_silu_mul_wint4_helper(
       post_ops_up_args)};
 }
 
-template <typename scalar_t, int... CONFIG_ARGS>
+template <typename scalar_t, gpu::xetla::quant_mode q_mode, int... CONFIG_ARGS>
 inline cgfs_t hgemm_mlp_silu_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
@@ -1032,10 +1108,11 @@ inline cgfs_t hgemm_mlp_silu_mul_wint4(
       false,
       false,
       scalar_t,
+      q_mode,
       CONFIG_ARGS...>(
       out, a, b, b_zp, b_scale, acc_ptr, cnt_ptr, m, n, k, nullptr, nullptr);
 }
-template <typename scalar_t, int... CONFIG_ARGS>
+template <typename scalar_t, gpu::xetla::quant_mode q_mode, int... CONFIG_ARGS>
 inline cgfs_t hgemm_mlp_bias_silu_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
@@ -1048,10 +1125,15 @@ inline cgfs_t hgemm_mlp_bias_silu_mul_wint4(
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
-  return hgemm_mlp_silu_mul_wint4_helper<true, false, scalar_t, CONFIG_ARGS...>(
+  return hgemm_mlp_silu_mul_wint4_helper<
+      true,
+      false,
+      scalar_t,
+      q_mode,
+      CONFIG_ARGS...>(
       out, a, b, b_zp, b_scale, acc_ptr, cnt_ptr, m, n, k, bias_gate, nullptr);
 }
-template <typename scalar_t, int... CONFIG_ARGS>
+template <typename scalar_t, gpu::xetla::quant_mode q_mode, int... CONFIG_ARGS>
 inline cgfs_t hgemm_mlp_silu_mul_bias_wint4(
     scalar_t* out,
     const scalar_t* a,
@@ -1064,10 +1146,15 @@ inline cgfs_t hgemm_mlp_silu_mul_bias_wint4(
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
-  return hgemm_mlp_silu_mul_wint4_helper<false, true, scalar_t, CONFIG_ARGS...>(
+  return hgemm_mlp_silu_mul_wint4_helper<
+      false,
+      true,
+      scalar_t,
+      q_mode,
+      CONFIG_ARGS...>(
       out, a, b, b_zp, b_scale, acc_ptr, cnt_ptr, m, n, k, nullptr, bias_up);
 }
-template <typename scalar_t, int... CONFIG_ARGS>
+template <typename scalar_t, gpu::xetla::quant_mode q_mode, int... CONFIG_ARGS>
 inline cgfs_t hgemm_mlp_bias_silu_mul_bias_wint4(
     scalar_t* out,
     const scalar_t* a,
@@ -1081,12 +1168,18 @@ inline cgfs_t hgemm_mlp_bias_silu_mul_bias_wint4(
     const uint32_t m,
     const uint32_t n,
     const uint32_t k) {
-  return hgemm_mlp_silu_mul_wint4_helper<true, true, scalar_t, CONFIG_ARGS...>(
+  return hgemm_mlp_silu_mul_wint4_helper<
+      true,
+      true,
+      scalar_t,
+      q_mode,
+      CONFIG_ARGS...>(
       out, a, b, b_zp, b_scale, acc_ptr, cnt_ptr, m, n, k, bias_gate, bias_up);
 }
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -1121,7 +1214,7 @@ inline cgfs_t hgemm_qkv_bias_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_bias = scalar_t;
@@ -1139,6 +1232,7 @@ inline cgfs_t hgemm_qkv_bias_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -1152,8 +1246,8 @@ inline cgfs_t hgemm_qkv_bias_wint4(
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const int4x8*>(b);
-  const data_type_b* b_zp_alias = reinterpret_cast<const int4x8*>(b_zp);
+  const auto b_alias = reinterpret_cast<const int4x8*>(b);
+  const auto b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   uint32_t weight_offset = k * n / 8;
   uint32_t bias_offset = k * n / 8;
@@ -1162,7 +1256,6 @@ inline cgfs_t hgemm_qkv_bias_wint4(
   if constexpr (DQUANT_S != 0) {
     group_num = k / DQUANT_S;
   }
-  uint32_t zp_offset = group_num * n / 8;
   uint32_t scale_offset = group_num * n;
   return {hgemm_wint4_functor::run_qkv(
       const_cast<scalar_t*>(a),
@@ -1187,6 +1280,7 @@ inline cgfs_t hgemm_qkv_bias_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -1212,7 +1306,7 @@ inline cgfs_t hgemm_silu_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using post_op = subgroup::chained_tile_op_t<subgroup::silu_op_t>;
@@ -1223,6 +1317,7 @@ inline cgfs_t hgemm_silu_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -1235,7 +1330,7 @@ inline cgfs_t hgemm_silu_wint4(
       SYNC_FREQ,
       STAGES,
       post_op>;
-  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const auto b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   return {hgemm_wint4_functor::run(
@@ -1254,6 +1349,7 @@ inline cgfs_t hgemm_silu_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -1281,7 +1377,7 @@ inline cgfs_t hgemm_silu_mul_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_mul = scalar_t;
@@ -1298,6 +1394,7 @@ inline cgfs_t hgemm_silu_mul_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -1311,7 +1408,7 @@ inline cgfs_t hgemm_silu_mul_wint4(
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const auto b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
   return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
@@ -1329,6 +1426,7 @@ inline cgfs_t hgemm_silu_mul_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -1357,7 +1455,7 @@ inline cgfs_t hgemm_bias_silu_mul_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_mul = scalar_t;
@@ -1382,6 +1480,7 @@ inline cgfs_t hgemm_bias_silu_mul_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -1395,7 +1494,7 @@ inline cgfs_t hgemm_bias_silu_mul_wint4(
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const auto b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
   return {hgemm_wint4_functor::run(
       const_cast<scalar_t*>(a),
@@ -1415,6 +1514,7 @@ inline cgfs_t hgemm_bias_silu_mul_wint4(
 
 template <
     typename scalar_t,
+    quant_mode q_mode,
     int WG_M,
     int WG_N,
     int SG_M,
@@ -1444,7 +1544,7 @@ inline cgfs_t hgemm_bias_add_wint4(
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
-  using data_type_zp = int4x8;
+  using data_type_zp = dtype_zp<q_mode, scalar_t>;
   using data_type_scale = scalar_t;
   using data_type_acc = float;
   using data_type_res = scalar_t;
@@ -1468,6 +1568,7 @@ inline cgfs_t hgemm_bias_add_wint4(
       data_type_zp,
       data_type_scale,
       data_type_acc,
+      q_mode,
       WG_M,
       WG_N,
       SG_M,
@@ -1481,7 +1582,7 @@ inline cgfs_t hgemm_bias_add_wint4(
       STAGES,
       post_op>;
 
-  const data_type_b* b_alias = reinterpret_cast<const data_type_b*>(b);
+  const auto b_alias = reinterpret_cast<const data_type_b*>(b);
   const data_type_zp* b_zp_alias = reinterpret_cast<const data_type_zp*>(b_zp);
 
   return {hgemm_wint4_functor::run(

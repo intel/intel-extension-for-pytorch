@@ -256,6 +256,85 @@ __XETLA_API std::
   return ret.xetla_select<N, 1>(0);
 }
 
+/// 2D USM pointer block load.
+/// Supported platforms: PVC
+///
+/// Collects elements located at specified address and returns them
+/// as a single \ref simd object.
+///
+/// @tparam T is element type.
+/// @tparam BlockWidth is the block width in number of elements.
+/// @tparam BlockHeight is the block height in number of elements.
+/// @tparam NBlocks is the number of blocks.
+/// @tparam Transposed is the transposed version or not.
+/// @tparam Transformed is apply VNNI transform or not.
+/// @tparam L1H is L1 cache hint.
+/// @tparam L2H is L2 cache hint.
+/// @tparam N is the data size
+/// @param Ptr is the surface base address for this operation.
+/// @param SurfaceWidth is the surface width minus 1 in bytes
+/// @param SurfaceHeight is the surface height minus 1 in rows
+/// @param SurfacePitch is the surface pitch minus 1 in bytes
+/// @param X is zero based X-coordinate of the left upper rectangle corner in
+/// number of elements.
+/// @param Y is zero based Y-coordinate of the left upper rectangle corner in
+/// rows.
+/// @return is a vector of type T and size N, where N is
+///  BlockWidth * BlockHeight * NBlocks, if transformed;
+///  otherwise,
+///  N = roundUpNextMultiple(BlockHeight, 4 / sizeof(T)) *
+///   getNextPowerOf2(BlockWidth) * NBlocks
+///
+template <
+    typename T,
+    int BlockWidth,
+    int BlockHeight = 1,
+    int NBlocks = 1,
+    bool Transposed = false,
+    bool Transformed = false,
+    cache_hint L1H = cache_hint::none,
+    cache_hint L2H = cache_hint::none,
+    int N = __ESIMD_ENS::detail::get_lsc_block_2d_data_size<
+        T,
+        NBlocks,
+        BlockHeight,
+        BlockWidth,
+        Transposed,
+        Transformed>(),
+    gpu_arch arch_tag = gpu_arch::XeHpc>
+__XETLA_API xetla_vector<T, N> xetla_tload_global(xetla_tdescriptor& tdesc) {
+  if constexpr (BlockWidth * sizeof(T) < sizeof(uint32_t)) {
+    // When loading int8, out_of_mem may occur. For example, if there are 65
+    // int8s, 64 are loaded each time. The last time it will load according to
+    // the blockwidth, it may exceed the boundary
+    int32_t X = detail::xetla_get_tensor_offset_x(tdesc);
+    int32_t Y = detail::xetla_get_tensor_offset_y(tdesc);
+    int32_t SurfaceHeight = detail::xetla_get_tensor_width_y(tdesc) + 1;
+    int32_t SurfacePitch = detail::xetla_get_tensor_pitch_x(tdesc) + 1;
+    T* Ptr = (T*)detail::xetla_get_tensor_base_address(tdesc);
+
+    xetla_vector<uint32_t, BlockHeight> byte_offsets =
+        xetla_vector<uint32_t, BlockHeight>(
+            X * sizeof(T) + Y * SurfacePitch, SurfacePitch);
+
+    xetla_mask<BlockHeight> mask = Y + BlockHeight > SurfaceHeight
+        ? (xetla_vector<uint32_t, BlockHeight>(Y, 1) < SurfaceHeight)
+        : 1;
+    // use gather load
+    return xetla_load_global<T, N, BlockWidth, L1H, L2H>(
+        Ptr, byte_offsets, mask, 0); // 0 is the value of the pass_thru
+  } else {
+    return xetla_tload_global<
+        T,
+        N,
+        L1H,
+        L2H,
+        Transposed,
+        Transformed,
+        arch_tag>(tdesc);
+  }
+}
+
 ///
 /// @brief Tensor store API.
 /// Tensor store API is to store a n-d (e.g. n=2) tensor into global using

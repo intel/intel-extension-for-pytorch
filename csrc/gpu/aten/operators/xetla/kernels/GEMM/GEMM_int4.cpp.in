@@ -13,7 +13,7 @@
 #define SYNC_FREQ ${SYNC_FREQ}
 #define STAGES ${STAGES}
 #define ARCH static_cast<int>(gpu_arch::${ARCH})
-// #define QUANT_MODE quant_mode::${QUANT_MODE}
+#define QUANT_MODE quant_mode::${QUANT_MODE}
 // clang-format on
 
 namespace torch_ipex::xpu::xetla {
@@ -242,6 +242,7 @@ using bf16 = gpu::xetla::bf16;
 #define HGEMM_WINT4_ASTR_IMPL_FUNC_GZ(DEQUANT_S) \
   HGEMM_WINT4_ASTR_IMPL_FUNC(                    \
       SCALAR_T,                                  \
+      QUANT_MODE,                                \
       WG_M,                                      \
       WG_N,                                      \
       SG_M,                                      \

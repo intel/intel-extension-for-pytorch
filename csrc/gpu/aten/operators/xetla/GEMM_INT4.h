@@ -7,6 +7,7 @@
 namespace torch_ipex::xpu::xetla {
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -32,6 +33,7 @@ XETLA_KERNEL_API cgfs_t hgemm_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -58,6 +60,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -84,6 +87,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_gelu_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -110,6 +114,7 @@ XETLA_KERNEL_API cgfs_t hgemm_mul_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -135,6 +140,7 @@ XETLA_KERNEL_API cgfs_t hgemm_silu_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -161,7 +167,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_res_res_wint4(
     const uint32_t n,
     const uint32_t k);
 
-template <typename scalar_t, int... CONFIG_ARGS>
+template <typename scalar_t, gpu::xetla::quant_mode q_mode, int... CONFIG_ARGS>
 XETLA_KERNEL_API cgfs_t hgemm_mlp_silu_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
@@ -173,7 +179,7 @@ XETLA_KERNEL_API cgfs_t hgemm_mlp_silu_mul_wint4(
     const uint32_t m,
     const uint32_t n,
     const uint32_t k);
-template <typename scalar_t, int... CONFIG_ARGS>
+template <typename scalar_t, gpu::xetla::quant_mode q_mode, int... CONFIG_ARGS>
 XETLA_KERNEL_API cgfs_t hgemm_mlp_bias_silu_mul_wint4(
     scalar_t* out,
     const scalar_t* a,
@@ -186,7 +192,7 @@ XETLA_KERNEL_API cgfs_t hgemm_mlp_bias_silu_mul_wint4(
     const uint32_t m,
     const uint32_t n,
     const uint32_t k);
-template <typename scalar_t, int... CONFIG_ARGS>
+template <typename scalar_t, gpu::xetla::quant_mode q_mode, int... CONFIG_ARGS>
 XETLA_KERNEL_API cgfs_t hgemm_mlp_silu_mul_bias_wint4(
     scalar_t* out,
     const scalar_t* a,
@@ -199,7 +205,7 @@ XETLA_KERNEL_API cgfs_t hgemm_mlp_silu_mul_bias_wint4(
     const uint32_t m,
     const uint32_t n,
     const uint32_t k);
-template <typename scalar_t, int... CONFIG_ARGS>
+template <typename scalar_t, gpu::xetla::quant_mode q_mode, int... CONFIG_ARGS>
 XETLA_KERNEL_API cgfs_t hgemm_mlp_bias_silu_mul_bias_wint4(
     scalar_t* out,
     const scalar_t* a,
@@ -216,6 +222,7 @@ XETLA_KERNEL_API cgfs_t hgemm_mlp_bias_silu_mul_bias_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -248,6 +255,7 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,
@@ -281,6 +289,7 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv_bias_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 64,
     int SG_M = 8,
@@ -307,6 +316,7 @@ XETLA_KERNEL_API cgfs_t hgemm_silu_mul_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 64,
     int SG_M = 8,
@@ -334,6 +344,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_silu_mul_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 64,
     int SG_M = 8,
@@ -361,6 +372,7 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_add_wint4(
 
 template <
     typename scalar_t,
+    gpu::xetla::quant_mode q_mode,
     int WG_M = 8,
     int WG_N = 32,
     int SG_M = 8,

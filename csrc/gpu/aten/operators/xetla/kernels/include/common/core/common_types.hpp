@@ -40,7 +40,16 @@ enum class grf_mode : uint8_t { normal_grf = 0, double_grf = 1 };
 
 enum class mem_layout : uint8_t { row_major = 0, col_major = 1 };
 
-enum class quant_mode : uint8_t { I4_ASYM = 0, I4_SYM = 1 };
+enum class quant_mode : uint8_t {
+  // Asymmetric quantization with zero point of the same dtype as the weight
+  I4_ASYM = 0,
+
+  // Symmetric quantization without zero point
+  I4_SYM = 1,
+
+  // Asymmetric quantization with zero point of the same dtype as the input
+  I4_ASYM_FP_ZERO = 2
+};
 
 struct quant_info {
   quant_mode quant_mode;

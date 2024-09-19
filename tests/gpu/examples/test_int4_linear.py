@@ -3,6 +3,7 @@ import intel_extension_for_pytorch  # noqa
 import pytest
 from intel_extension_for_pytorch.nn.utils._quantize_convert import GPTQShuffle
 
+from enum import Enum
 
 from torch.testing._internal.common_utils import (
     TestCase,
@@ -12,8 +13,14 @@ from torch.testing._internal.common_utils import (
 )
 
 
-checking_atol = 1e-2
-checking_rtol = 2e-2
+class QuantMode(Enum):
+    SYM = 1
+    ASYM = 2
+    ASYM_FP_ZP = 3
+
+
+base_atol = 1e-2
+base_rtol = 2e-2
 skip_bf16_input = not torch.xpu.has_2d_block_array() and not torch.xpu.has_xmx()
 COMPILER_VERSION = torch.xpu.get_compiler_version()
 
@@ -33,13 +40,15 @@ class TestInt4Linear(TestCase):
             .unsqueeze(0)
             .to("xpu")
         )
-        zeros = torch.bitwise_right_shift(
-            torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits), wf.unsqueeze(0)
-        ).to(torch.int16 if bits == 8 else torch.int8)
-        torch.bitwise_and(zeros, (2**bits) - 1, out=zeros)
+        zeros = qzeros
+        if qzeros is not None and not qzeros.dtype.is_floating_point:
+            zeros = torch.bitwise_right_shift(
+                torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits), wf.unsqueeze(0)
+            ).to(torch.int16 if bits == 8 else torch.int8)
+            torch.bitwise_and(zeros, (2**bits) - 1, out=zeros)
 
-        zeros = zeros + 1
-        zeros = zeros.reshape(scales.shape)
+            # zeros = zeros + 1  # TODO(Yi): confirm dequant logic
+            zeros = zeros.reshape(scales.shape)
 
         weight = torch.bitwise_right_shift(
             torch.unsqueeze(qweight, 1).expand(-1, 32 // bits, -1), wf.unsqueeze(-1)
@@ -54,18 +63,19 @@ class TestInt4Linear(TestCase):
         weight, gptq_scales, gptq_zeros = TestInt4Linear.unpack_weight(
             qweight, scales, qzeros, q_config
         )
-        gptq_zeros = (torch.ones_like(gptq_zeros) * 8).to("xpu")  # TODO: hard code zp
         if len(weight.shape) > 2:
             weight = weight.reshape(-1, weight.shape[-1])
         infeatures = weight.shape[0]
         if g_idx is None:
-            g_idx = torch.tensor(
-                [i // q_config["group_size"] for i in range(infeatures)],
-                dtype=torch.int32,
+            g_idx = g_idx = (
+                torch.arange(infeatures, dtype=torch.int32) // q_config["group_size"]
             )
-        scale_zeros = gptq_zeros * gptq_scales
-        weight = gptq_scales[g_idx.long()] * weight - scale_zeros[g_idx.long()]
-        return weight
+        if gptq_zeros is None:
+            return (weight - 8) * gptq_scales[g_idx]
+        elif gptq_zeros.dtype.is_floating_point:
+            return (weight - 8) * gptq_scales[g_idx] + gptq_zeros[g_idx]
+        else:
+            return (weight - gptq_zeros[g_idx]) * gptq_scales[g_idx]
 
     @staticmethod
     def rand_int4(size, dtype=torch.int32, device="xpu"):
@@ -75,13 +85,16 @@ class TestInt4Linear(TestCase):
     # qkv per-channel not used && TODO: Mismatched elements: 1 / 9216
     @parametrize("per_channel", [False], lambda k: "per_channel" * k)
     @parametrize("dtype", [torch.float16, torch.bfloat16])
+    @parametrize("qmode", list(QuantMode), lambda k: k.name)
     @parametrize(
         "m,n_q, n_kv ,k",
         [(1, 3072, 3072, 3072), (1, 4096, 1024, 4096), (129, 4096, 1024, 4096)],
     )
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
     @parametrize("inplace", [False, True])
-    def test_qkv_int4(self, m, n_q, n_kv, k, per_channel, dtype, inplace):
+    def test_qkv_int4(
+        self, m, n_q, n_kv, k, per_channel, qmode: QuantMode, dtype, inplace
+    ):
         if (dtype == torch.bfloat16) and skip_bf16_input:
             pytest.skip("bf16 input is not available on mtl")
         elif (dtype == torch.bfloat16) and (COMPILER_VERSION < 20240200):
@@ -96,17 +109,29 @@ class TestInt4Linear(TestCase):
             torch.randint(0, 1112111, [k // 8, n], device="xpu").to(torch.int32)
             for n in (n_q, n_kv, n_kv)
         ]
+        checking_atol = base_atol
+        checking_rtol = base_rtol
 
-        group_num = int(k / group_size)
+        group_num = k // group_size
 
         scales = [
             torch.rand([group_num, n], device="xpu", dtype=dtype)
             for n in (n_q, n_kv, n_kv)
         ]
-        zero_points = [
-            torch.zeros([group_num, n // 8], device="xpu").to(torch.int32)
-            for n in (n_q, n_kv, n_kv)
-        ]
+        if qmode == QuantMode.SYM:
+            zero_points = (None,) * 3
+        elif qmode == QuantMode.ASYM:
+            zero_points = [
+                self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
+                    group_num, n // 8
+                )
+                for n in (n_q, n_kv, n_kv)
+            ]
+        elif qmode == QuantMode.ASYM_FP_ZP:
+            zero_points = [
+                torch.rand([group_num, n], device="xpu", dtype=dtype)
+                for n in (n_q, n_kv, n_kv)
+            ]
 
         weight_fp16 = [
             self.dequantize(weight[i], scales[i], zero_points[i], group_size).to(dtype)
@@ -129,7 +154,11 @@ class TestInt4Linear(TestCase):
                     input,
                     torch.cat([w.t() for w in weight]).contiguous(),
                     torch.cat([s.t() for s in scales]).contiguous(),
-                    None,
+                    (
+                        None
+                        if qmode == QuantMode.SYM
+                        else torch.cat(zero_points, dim=1).contiguous()
+                    ),
                     torch.cat(bias).contiguous(),
                     *out_xetla,
                     group_size,
@@ -139,7 +168,11 @@ class TestInt4Linear(TestCase):
                     input,
                     torch.cat([w.t() for w in weight]).contiguous(),
                     torch.cat([s.t() for s in scales]).contiguous(),
-                    None,
+                    (
+                        None
+                        if qmode == QuantMode.SYM
+                        else torch.cat(zero_points, dim=1).contiguous()
+                    ),
                     torch.cat(bias).contiguous(),
                     n_kv,
                     n_kv,
@@ -154,14 +187,21 @@ class TestInt4Linear(TestCase):
 
     @parametrize("per_channel", [False], lambda k: "per_channel" * k)
     @parametrize("dtype", [torch.float16, torch.bfloat16])
+    @parametrize("qmode", list(QuantMode), lambda k: k.name)
     @parametrize("act_order", [False, True])
     @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
-    def test_gemm_int4(self, m, n, k, per_channel, act_order, dtype):
+    def test_gemm_int4(self, m, n, k, per_channel, act_order, qmode: QuantMode, dtype):
         if (dtype == torch.bfloat16) and skip_bf16_input:
             pytest.skip("bf16 input is not available on mtl")
         elif (dtype == torch.bfloat16) and (COMPILER_VERSION < 20240200):
             pytest.skip("bf16 input is only available on OneAPI 2024.2 and above")
+
+        checking_atol = base_atol
+        checking_rtol = base_rtol
+        if qmode == QuantMode.ASYM:  # sym needs more tolerance
+            checking_atol = 2e-1
+            checking_rtol = 5e-2
         input = torch.rand([m, k], device="xpu", dtype=dtype)
         input_torch = input.cpu()
         weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
@@ -169,12 +209,18 @@ class TestInt4Linear(TestCase):
         group_size = min(128, k)
         if per_channel:
             group_size = k
-        group_num = int(k / group_size)
+        group_num = k // group_size
 
         scales = -torch.rand([group_num, n], device="xpu", dtype=dtype)
-        zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
-            group_num, n // 8
-        )
+        if qmode == QuantMode.SYM:
+            zero_points = None
+        elif qmode == QuantMode.ASYM:
+            zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
+                group_num, n // 8
+            )
+        elif qmode == QuantMode.ASYM_FP_ZP:
+            zero_points = torch.rand([group_num, n], device="xpu", dtype=dtype)
+
         if act_order:
             g_idx = torch.randperm(k, dtype=torch.int32) // group_size
             shuf_weight = GPTQShuffle(bits=4, blocksize=group_size)
@@ -193,7 +239,7 @@ class TestInt4Linear(TestCase):
                 input,
                 shuffled_weight.t().contiguous(),
                 scales.t().contiguous(),
-                None,
+                zero_points,
                 group_size,
                 g_idx4kernel,
             )
@@ -212,7 +258,7 @@ class TestInt4Linear(TestCase):
                 input,
                 shuffled_weight.t().contiguous(),
                 scales.t().contiguous(),
-                None,
+                zero_points,
                 group_size,
                 res0,
                 g_idx4kernel,
@@ -233,7 +279,7 @@ class TestInt4Linear(TestCase):
                 shuffled_weight.t().contiguous(),
                 bias,
                 scales.t().contiguous(),
-                None,
+                zero_points,
                 group_size,
                 g_idx4kernel,
             )
@@ -251,7 +297,7 @@ class TestInt4Linear(TestCase):
                 input,
                 shuffled_weight.t().contiguous(),
                 scales.t().contiguous(),
-                None,
+                zero_points,
                 bias,
                 group_size,
                 "tanh",
@@ -272,7 +318,7 @@ class TestInt4Linear(TestCase):
                 input,
                 shuffled_weight.t().contiguous(),
                 scales.t().contiguous(),
-                None,
+                zero_points,
                 group_size,
                 res0,
                 g_idx4kernel,
@@ -296,7 +342,7 @@ class TestInt4Linear(TestCase):
                 res0,
                 res1,
                 scales.t().contiguous(),
-                None,
+                zero_points,
                 group_size,
                 g_idx4kernel,
             )
@@ -316,7 +362,7 @@ class TestInt4Linear(TestCase):
                 shuffled_weight.t().contiguous(),
                 bias,
                 scales.t().contiguous(),
-                None,
+                zero_points,
                 group_size,
                 res0,
                 g_idx4kernel,
@@ -330,50 +376,70 @@ class TestInt4Linear(TestCase):
         )
 
     @parametrize("per_channel", [False], lambda k: "per_channel" * k)
-    @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
     @parametrize("dtype", [torch.float16, torch.bfloat16])
+    @parametrize("qmode", list(QuantMode), lambda k: k.name)
+    @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
-    def test_mlp_int4(self, m, n, k, per_channel, dtype):
+    def test_mlp_int4(self, m, n, k, per_channel, qmode: QuantMode, dtype):
         if (dtype == torch.bfloat16) and skip_bf16_input:
             pytest.skip("bf16 input is not available on mtl")
         elif (dtype == torch.bfloat16) and (COMPILER_VERSION < 20240200):
             pytest.skip("bf16 input is only available on OneAPI 2024.2 and above")
-        input = torch.rand([m, k], device="xpu", dtype=dtype)
+        checking_atol = 10  # elt mul will introduce more error
+        checking_rtol = base_rtol * 5
+        if dtype == torch.bfloat16:
+            checking_atol *= 5  # bf16 has larger error
+        input = torch.rand([m, k], device="xpu", dtype=dtype) - 0.5
         input_torch = input.cpu()
         weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
 
         group_size = min(128, k)
         if per_channel:
             group_size = k
-        group_num = int(k / group_size)
+        group_num = k // group_size
 
-        scales = -torch.rand([group_num, n], device="xpu", dtype=dtype)
-        zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
-            group_num, n // 8
-        )
-        bias = torch.rand([1, n], device="xpu", dtype=dtype)
+        scales = torch.rand([group_num, n], device="xpu", dtype=dtype)
+        if qmode == QuantMode.SYM:
+            zero_points = None
+        elif qmode == QuantMode.ASYM:
+            zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
+                group_num, n // 8
+            )
+        elif qmode == QuantMode.ASYM_FP_ZP:
+            zero_points = torch.rand([group_num, n], device="xpu", dtype=dtype)
+
+        bias = torch.rand([1, n], device="xpu", dtype=dtype) - 0.5
 
         weight_fp = self.dequantize(weight, scales, zero_points, group_size).cpu()
         out_torch = torch.matmul(input_torch, weight_fp)
-        out_torch_bias = out_torch + bias.cpu().float()
+        out_torch_bias = out_torch + bias.cpu()
 
         # mlp silu mul
         weight_up = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
-        scales_up = torch.rand([group_num, n], device="xpu", dtype=dtype) / (k / 8)
-        zero_points_up = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
-            group_num, n // 8
-        )
-        weight_up_fp16 = self.dequantize(
+        scales_up = torch.rand([group_num, n], device="xpu", dtype=dtype)
+        if qmode == QuantMode.SYM:
+            zero_points_up = None
+        elif qmode == QuantMode.ASYM:
+            zero_points_up = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
+                group_num, n // 8
+            )
+        elif qmode == QuantMode.ASYM_FP_ZP:
+            zero_points_up = torch.rand([group_num, n], device="xpu", dtype=dtype)
+        weight_up_fp = self.dequantize(
             weight_up, scales_up, zero_points_up, group_size
         ).cpu()
         out_torch_silu = torch.nn.SiLU()(out_torch)
-        out_torch_up = torch.matmul(input_torch, weight_up_fp16)
+        out_torch_up = torch.matmul(input_torch, weight_up_fp)
         out_torch_mlp_silu_mul = out_torch_silu * out_torch_up
         xetla_mlp_args_common = (
             input,
             torch.stack((weight.t(), weight_up.t())).contiguous(),
             torch.stack((scales.t(), scales_up.t())).contiguous(),
-            None,
+            (
+                None
+                if zero_points is None
+                else torch.stack((zero_points, zero_points_up)).contiguous()
+            ),
         )
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
             out_xetla_mlp_silu_mul = torch.ops.torch_ipex.mlp_silu_mul_int4(
@@ -383,8 +449,8 @@ class TestInt4Linear(TestCase):
         self.assertEqual(
             out_xetla_mlp_silu_mul.cpu().float(),
             out_torch_mlp_silu_mul.float(),
-            atol=checking_atol * 3,  # elt mul will introduce more error
-            rtol=checking_rtol * 5,
+            atol=checking_atol,
+            rtol=checking_rtol,
         )
 
         # mlp bias silu mul
@@ -399,13 +465,13 @@ class TestInt4Linear(TestCase):
         self.assertEqual(
             out_xetla_mlp_bias_silu_mul.cpu().float(),
             out_torch_mlp_bias_silu_mul.float(),
-            atol=checking_atol * 3,  # elt mul will introduce more error
-            rtol=checking_rtol * 5,
+            atol=checking_atol,
+            rtol=checking_rtol,
         )
 
         # mlp silu mul bias
-        bias_up = -torch.rand([1, n], device="xpu", dtype=dtype)
-        out_torch_bias_up = out_torch_up + bias_up.cpu().float()
+        bias_up = torch.rand([1, n], device="xpu", dtype=dtype) - 0.5
+        out_torch_bias_up = out_torch_up + bias_up.cpu()
         out_torch_mlp_silu_mul_bias = out_torch_silu * out_torch_bias_up
         with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
             out_xetla_mlp_silu_mul_bias = torch.ops.torch_ipex.mlp_silu_mul_bias_int4(
@@ -416,8 +482,8 @@ class TestInt4Linear(TestCase):
         self.assertEqual(
             out_xetla_mlp_silu_mul_bias.cpu().float(),
             out_torch_mlp_silu_mul_bias.float(),
-            atol=checking_atol * 3,  # elt mul will introduce more error
-            rtol=checking_rtol * 5,
+            atol=checking_atol,
+            rtol=checking_rtol,
         )
 
         # mlp bias silu mul bias
@@ -434,8 +500,8 @@ class TestInt4Linear(TestCase):
         self.assertEqual(
             out_xetla_mlp_bias_silu_mul_bias.cpu().float(),
             out_torch_mlp_bias_silu_mul_bias.float(),
-            atol=checking_atol * 3,  # elt mul will introduce more error
-            rtol=checking_rtol * 5,
+            atol=checking_atol,
+            rtol=checking_rtol,
         )
 
 

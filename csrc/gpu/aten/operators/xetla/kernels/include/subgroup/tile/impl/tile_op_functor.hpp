@@ -144,7 +144,9 @@ struct dequant_int4_weight_t {
               cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
                   zero_pt_i8;
-            } else if constexpr (quant_mode == quant_mode::I4_SYM) {
+            } else if constexpr (
+                quant_mode == quant_mode::I4_SYM ||
+                quant_mode == quant_mode::I4_ASYM_FP_ZERO) {
               cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
                   int8_t(8);
@@ -152,7 +154,18 @@ struct dequant_int4_weight_t {
             dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
                 cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
                 scale.reg[scale_idx];
-
+            if constexpr (quant_mode == quant_mode::I4_ASYM_FP_ZERO) {
+              uint32_t zero_pt_idx =
+                  offset_y_in_tile / dequant_s * zero_pt_t::block_size_x +
+                  offset_x_in_tile;
+              // xetla_vector<fp16, 1> zero_pt_pack = zero_pt.reg[zero_pt_idx];
+              // dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+              //     dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) +
+              //     zero_pt_pack[0];
+              dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                  dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) +
+                  zero_pt.reg[zero_pt_idx];
+            }
             // sycl::ext::oneapi::experimental::printf(
             //     "scale[%d] %f \n",
             //     scale_idx,
