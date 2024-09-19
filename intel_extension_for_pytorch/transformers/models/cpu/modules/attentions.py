@@ -28,8 +28,10 @@ class _IPEXAttentionCPU(nn.Module):
                 "GitForCausalLM",
                 "WhisperForConditionalGeneration",
             ]
-            or (self.model_backbone == "BaichuanForCausalLM"
-            and hasattr(module, "rotary_emb"))
+            or (
+                self.model_backbone == "BaichuanForCausalLM"
+                and hasattr(module, "rotary_emb")
+            )
             and not self.is_mllama_cross_attention
         ):
             extra_inputs = {}

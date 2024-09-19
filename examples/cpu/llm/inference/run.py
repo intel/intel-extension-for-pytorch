@@ -32,7 +32,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         help="huggingface model id or local directory containing model files",
     )
     parser.add_argument(
-        "--vision-text-model", action="store_true", help="whether or not it is vision-text multi-model structure"
+        "--vision-text-model",
+        action="store_true",
+        help="whether or not it is vision-text multi-model structure",
     )
     parser.add_argument(
         "--config-file",

@@ -352,22 +352,28 @@ def _beam_search(
                 elif hasattr(self.config, "n_layers"):
                     num_hidden_layers = self.config.n_layers
                 beam_idx_tmp = torch.zeros(
-                    (2048, int(batch_size * num_beams)), dtype=torch.long)
+                    (2048, int(batch_size * num_beams)), dtype=torch.long
+                )
 
                 if self.model_backbone == "MllamaForConditionalGeneration":
-                    head_dim = self.config.text_config.hidden_size // (self.config.text_config.num_hidden_layers - len(self.config.text_config.cross_attention_layers))
+                    head_dim = self.config.text_config.hidden_size // (
+                        self.config.text_config.num_hidden_layers
+                        - len(self.config.text_config.cross_attention_layers)
+                    )
                     model_inputs["past_key_values"] = tuple(
                         [
                             (
                                 (
-                                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                    torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
                                     torch.zeros([1, 1, 1, 1]).contiguous(),
                                     torch.zeros([1, 1, 1, 1]).contiguous(),
                                     beam_idx_tmp,
-                                ) 
-                                if i not in  self.config.text_config.cross_attention_layers 
-                                else
-                                (
+                                )
+                                if i
+                                not in self.config.text_config.cross_attention_layers
+                                else (
                                     torch.zeros([1, 1, 1, head_dim]).contiguous(),
                                     torch.zeros([1, 1, 1, head_dim]).contiguous(),
                                 )
@@ -388,10 +394,14 @@ def _beam_search(
                         ]
                     )
                 if self.model_backbone != "MllamaForConditionalGeneration":
-                    new_attention_mask = model_inputs["attention_mask"][:batch_size].clone()
+                    new_attention_mask = model_inputs["attention_mask"][
+                        :batch_size
+                    ].clone()
                     new_input_ids = model_inputs["input_ids"][:batch_size].clone()
                     if has_position_id:
-                        new_position_ids = model_inputs["position_ids"][:batch_size].clone()
+                        new_position_ids = model_inputs["position_ids"][
+                            :batch_size
+                        ].clone()
                     for i in range(batch_size):
                         new_attention_mask[i] = model_inputs["attention_mask"][
                             i * num_beams

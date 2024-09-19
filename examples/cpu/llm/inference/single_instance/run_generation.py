@@ -101,7 +101,9 @@ parser.add_argument(
     " Otherwise, it has no effect.",
 )
 parser.add_argument(
-    "--vision-text-model", action="store_true", help="whether or not it is vision-text multi-model structure"
+    "--vision-text-model",
+    action="store_true",
+    help="whether or not it is vision-text multi-model structure",
 )
 
 args = parser.parse_args()
@@ -198,7 +200,8 @@ elif re.search("t5", model.config.architectures[0], re.IGNORECASE):
     generate_kwargs["max_length"] = generate_kwargs["max_new_tokens"]
     generate_kwargs.pop("max_new_tokens")
 elif re.search("git", model.config.architectures[0], re.IGNORECASE) or re.search(
-    "llava", model.config.architectures[0], re.IGNORECASE):
+    "llava", model.config.architectures[0], re.IGNORECASE
+):
     from PIL import Image
     import requests
     from io import BytesIO
@@ -212,15 +215,19 @@ elif re.search("git", model.config.architectures[0], re.IGNORECASE) or re.search
         else:
             image = Image.open(image_file).convert("RGB")
         return image
+
 elif re.search("mllama", model.config.architectures[0], re.IGNORECASE):
     from PIL import Image
+
     def load_image(image_file):
         if image_file.startswith("http://") or image_file.startswith("https://"):
             import requests
+
             raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
         else:
             raw_image = Image.open(image_file)
         return raw_image
+
 
 if re.search("llava", model.config.architectures[0], re.IGNORECASE):
     model_name = get_model_name_from_path(args.model_id)
@@ -361,7 +368,7 @@ if args.benchmark:
                 raw_image = load_image(args.image_url)
                 raw_image = [raw_image] * args.batch_size
                 inputs = tokenizer(prompt, raw_image, return_tensors="pt")
-                input_ids = inputs['input_ids']
+                input_ids = inputs["input_ids"]
                 output = model.generate(**inputs, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids

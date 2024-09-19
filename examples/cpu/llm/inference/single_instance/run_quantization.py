@@ -48,7 +48,9 @@ parser.add_argument(
     "-m", "--model-id", default=None, type=str, required=True, help="your llm model"
 )
 parser.add_argument(
-    "--vision-text-model", action="store_true", help="whether or not it is vision-text multi-model structure"
+    "--vision-text-model",
+    action="store_true",
+    help="whether or not it is vision-text multi-model structure",
 )
 parser.add_argument(
     "--max-new-tokens", default=32, type=int, help="output max new tokens"
@@ -311,17 +313,20 @@ elif re.search("GPTJ", config.architectures[0], re.IGNORECASE):
 elif re.search("llama", config.architectures[0], re.IGNORECASE) and not re.search(
     "llava", config.architectures[0], re.IGNORECASE
 ):
-    
+
     if args.vision_text_model:
         model = MLLAMAConfig(args.model_id)
         from PIL import Image
+
         def load_image(image_file):
             if image_file.startswith("http://") or image_file.startswith("https://"):
                 import requests
+
                 raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
             else:
                 raw_image = Image.open(image_file)
             return raw_image
+
     else:
         model = LLAMAConfig(args.model_id)
 
@@ -478,6 +483,7 @@ def _get_target_nums(names):
     print(f"Not found target {names[0]}")
     exit(0)
 
+
 if model.name != "mllama":
     num_heads_names = ["num_attention_heads", "n_head", "num_heads", "n_heads"]
     num_layers_names = ["num_hidden_layers", "n_layer", "num_layers", "n_layers"]
@@ -509,7 +515,10 @@ if model.name == "yuan":
         ]
     )
 if model.name == "mllama":
-    head_dim = user_model.config.text_config.hidden_size // (user_model.config.text_config.num_hidden_layers - len(user_model.config.text_config.cross_attention_layers))
+    head_dim = user_model.config.text_config.hidden_size // (
+        user_model.config.text_config.num_hidden_layers
+        - len(user_model.config.text_config.cross_attention_layers)
+    )
     global_past_key_value = tuple(
         [
             (
@@ -518,10 +527,9 @@ if model.name == "mllama":
                     torch.zeros([1, 1, 1, 1]).contiguous(),
                     torch.zeros([1, 1, 1, 1]).contiguous(),
                     torch.zeros(1, 4, dtype=torch.long),
-                ) 
-                if i not in  user_model.config.text_config.cross_attention_layers 
-                else
-                (
+                )
+                if i not in user_model.config.text_config.cross_attention_layers
+                else (
                     torch.zeros([1, 1, 1, head_dim]).contiguous(),
                     torch.zeros([1, 1, 1, head_dim]).contiguous(),
                 )
@@ -529,6 +537,8 @@ if model.name == "mllama":
             for i in range(user_model.config.text_config.num_hidden_layers)
         ]
     )
+
+
 def get_example_inputs(model):
     if model.use_global_past_key_value:
         global global_past_key_value
@@ -560,7 +570,7 @@ def get_example_inputs(model):
             position_ids.unsqueeze(0),
         )
         if model.name == "mllama":
-            cross_attention_mask = torch.ones(1,32,1,4)
+            cross_attention_mask = torch.ones(1, 32, 1, 4)
             example_inputs = example_inputs + (cross_attention_mask,)
 
     elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_MASK:
@@ -1291,7 +1301,7 @@ if args.benchmark:
             elif model.name == "mllama":
                 raw_image = [load_image(args.image_url)] * args.batch_size
                 inputs = tokenizer(prompt, raw_image, return_tensors="pt")
-                input_ids = inputs['input_ids']
+                input_ids = inputs["input_ids"]
                 output = user_model.generate(**inputs, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
@@ -1361,7 +1371,7 @@ if args.benchmark:
                 elif model.name == "mllama":
                     raw_image = [load_image(args.image_url)] * args.batch_size
                     inputs = tokenizer(prompt, raw_image, return_tensors="pt")
-                    input_ids = inputs['input_ids']
+                    input_ids = inputs["input_ids"]
                     output = user_model.generate(**inputs, **generate_kwargs)
                 else:
                     input_ids = tokenizer(prompt, return_tensors="pt").input_ids

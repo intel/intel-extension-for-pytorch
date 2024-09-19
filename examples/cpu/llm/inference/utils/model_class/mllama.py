@@ -14,7 +14,6 @@ class MLLAMAConfig(LLMConfig):
         self.example_inputs_mode = EXAMPLE_INPUTS_MODE.MASK_KV_POS
         self.use_global_past_key_value = True
 
-
     def get_user_model(self, config, benchmark):
         if benchmark:
             try:

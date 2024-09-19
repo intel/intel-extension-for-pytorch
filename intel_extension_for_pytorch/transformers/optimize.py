@@ -310,7 +310,7 @@ def model_convert_reference(_model):
             "prepare_inputs_for_generation",
             prepare_inputs_for_generation_mllama,
         )
-        
+
     elif (
         hasattr(_model, "__class__")
         and _model.__class__
@@ -966,7 +966,9 @@ def get_dummy_input(_model, return_dict=False):
                             [
                                 32,
                                 1,
-                                _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
+                                _model.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.n_heads,
                                 _model.decoder.block[i]
                                 .layer[1]
                                 .EncDecAttention.key_value_proj_dim,
@@ -976,7 +978,9 @@ def get_dummy_input(_model, return_dict=False):
                             [
                                 32,
                                 1,
-                                _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
+                                _model.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.n_heads,
                                 _model.decoder.block[i]
                                 .layer[1]
                                 .EncDecAttention.key_value_proj_dim,
@@ -989,7 +993,10 @@ def get_dummy_input(_model, return_dict=False):
             ]
         )
     elif _model.config.architectures[0] == "MllamaForConditionalGeneration":
-        head_dim = _model.config.text_config.hidden_size // (_model.config.text_config.num_hidden_layers - len(_model.config.text_config.cross_attention_layers))
+        head_dim = _model.config.text_config.hidden_size // (
+            _model.config.text_config.num_hidden_layers
+            - len(_model.config.text_config.cross_attention_layers)
+        )
         past_key_values = tuple(
             [
                 (
@@ -998,10 +1005,9 @@ def get_dummy_input(_model, return_dict=False):
                         torch.zeros([1, 1, 1, 1]).contiguous(),
                         torch.zeros([1, 1, 1, 1]).contiguous(),
                         torch.zeros(1, 4, dtype=torch.long),
-                    ) 
-                    if i not in  _model.config.text_config.cross_attention_layers 
-                    else
-                    (
+                    )
+                    if i not in _model.config.text_config.cross_attention_layers
+                    else (
                         torch.zeros([1, 1, 1, head_dim]).contiguous(),
                         torch.zeros([1, 1, 1, head_dim]).contiguous(),
                     )
@@ -1213,7 +1219,7 @@ def get_dummy_input(_model, return_dict=False):
         else:
             sample_inputs = sample_inputs + (torch.tensor(True),)
     if _model.config.architectures[0] == "MllamaForConditionalGeneration":
-        cross_attention_mask = torch.ones(1,32,1,4)
+        cross_attention_mask = torch.ones(1, 32, 1, 4)
         if return_dict:
             sample_inputs["cross_attention_mask"] = cross_attention_mask
         else:
