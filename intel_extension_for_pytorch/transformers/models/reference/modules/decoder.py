@@ -1475,7 +1475,6 @@ def MllamaCrossAttentionDecoderLayer_forward(
     ) -> torch.Tensor:
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
-
         hidden_states, attn_weights, past_key_value = self.cross_attn(
             hidden_states=hidden_states,
             attention_mask=cross_attention_mask,
@@ -1531,7 +1530,7 @@ class _IPEXDecoderLayerRef(nn.Module):
             "Qwen2ForCausalLM",
         ]:
             self.is_cross_decoder = False
-            if self.model_backbone == "MllamaForConditionalGeneration" and hasattr(self,"layer_idx") and self.layer_idx in config.cross_attention_layers:
+            if self.model_backbone == "MllamaForConditionalGeneration" and module._get_name() == "MllamaCrossAttentionDecoderLayer":
                 self.is_cross_decoder = True
                 # if not self.distributed:
                 #     self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)

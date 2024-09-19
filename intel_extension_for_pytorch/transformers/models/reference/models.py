@@ -400,32 +400,11 @@ def MllamaTextModel_forward(
                 past_key_values_length,
             )
 
-
-
-        # if inputs_embeds is None:
-        #     inputs_embeds = self.embed_tokens(input_ids)
-
-        # hidden_states = inputs_embeds
-
-        # if cache_position is None:
-        #     past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
-        #     cache_position = torch.arange(
-        #         past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
-        #     )
-        # if position_ids is None:
-        #     position_ids = cache_position.unsqueeze(0)
-
-        # causal_mask = self._update_causal_mask(
-        #     attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions
-        # )
-
-        # create position embeddings to be shared across the decoder layers
-        # position_embeddings = self.rotary_emb(hidden_states, position_ids)
-
+        hidden_states = inputs_embeds
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
-        next_decoder_cache = None
+        next_decoder_cache = () if use_cache else None
 
         for idx, decoder_layer in enumerate(self.layers):
             if output_hidden_states:
@@ -436,11 +415,11 @@ def MllamaTextModel_forward(
                 and cross_attention_states is None
                 and (
                     past_key_values is None
-                    or (past_key_values is not None and past_key_values.get_seq_length(idx) == 0)
+                    or (past_key_values is not None and past_key_values[idx][0].shape[2] == 0)
                 )
             ):
                 continue
-
+            past_key_value = past_key_values[idx] if past_key_values is not None else None
             layer_outputs = decoder_layer(
                 hidden_states,
                 cross_attention_states=cross_attention_states,
@@ -448,7 +427,7 @@ def MllamaTextModel_forward(
                 attention_mask=attention_mask,
                 full_text_row_masked_out_mask=full_text_row_masked_out_mask,
                 position_ids=position_ids,
-                past_key_value=past_key_values,
+                past_key_value=past_key_value,
                 output_attentions=output_attentions,
                 use_cache=use_cache,
                 # cache_position=cache_position,
@@ -458,7 +437,7 @@ def MllamaTextModel_forward(
             hidden_states = layer_outputs[0]
 
             if use_cache:
-                next_decoder_cache = layer_outputs[2 if output_attentions else 1]
+                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
@@ -551,6 +530,133 @@ def MllamaForCausalLM_forward(
         output = (logits,) + outputs[1:]
         return (loss,) + output if loss is not None else output
 
+
+def _prepare_cross_attention_mask(
+    cross_attention_mask: torch.Tensor,
+    past_key_values: Optional[List[torch.FloatTensor]],
+    num_vision_tokens: int,
+    cross_attention_states: torch.Tensor,
+    cross_attention_layers: List[int],
+    device: str,
+    dtype: str,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    if cross_attention_mask is None:
+        # should we raise error or prepare a full attn mask with all ones?
+        return None, None
+    else:
+        # reshape so it can be used by attn module
+        batch_size, text_total_length, *_ = cross_attention_mask.shape
+        cross_attention_mask = cross_attention_mask.repeat_interleave(num_vision_tokens, dim=3)
+        cross_attention_mask = cross_attention_mask.view(batch_size, text_total_length, -1)
+        cross_attention_mask = cross_attention_mask.unsqueeze(1)
+
+    # invert the mask
+    inverted_cross_attn_mask = (1.0 - cross_attention_mask).to(dtype)
+    cross_attention_mask = inverted_cross_attn_mask.masked_fill(
+        inverted_cross_attn_mask.to(torch.bool), torch.finfo(dtype).min
+    )
+
+    # apply full-row bias, which return 4D tensor of shape [B, H, S1, 1] where value is 0 if the a full row in cross attn mask's
+    # last dimension contains negative infinity values, otherwise it's 1
+    negative_inf_value = torch.finfo(dtype).min
+    full_text_row_masked_out_mask = (
+        (cross_attention_mask != negative_inf_value).any(dim=-1).type_as(cross_attention_mask)[..., None]
+    )
+    cross_attention_mask *= full_text_row_masked_out_mask
+
+    # In case we receive a new image but already have previous cross-attention key/values in cache,
+    # then we need to extend the attention-mask and add previous images' lengths
+    if (
+        past_key_values is not None
+        and cross_attention_states is not None
+        and past_key_values[cross_attention_layers[0]][0].shape[2] != 0
+    ):
+        # make all zeros mask for cross-attn-mask from previuos cached hidden_states, all zeros right?
+        # i.e. extend current cross-attn-mask on image-seq-length dimension to account for past_seen_tokens
+        past_cross_attn_kv_length = past_key_values[cross_attention_layers[0]][0].shape[2]
+        past_cross_attn_mask = torch.zeros(
+            (*cross_attention_mask.shape[:-1], past_cross_attn_kv_length), dtype=dtype, device=device
+        )
+        # concatenate both on image-seq-length dimension
+        cross_attention_mask = torch.cat([past_cross_attn_mask, cross_attention_mask], dim=-1)
+
+    return cross_attention_mask, full_text_row_masked_out_mask
+
+def MllamaForConditionalGeneration_forward(
+        self,
+        input_ids: torch.LongTensor = None, #first #next  
+        attention_mask: Optional[List[List[List[int]]]] = None,#first #next    
+        past_key_values: Optional[List[torch.FloatTensor]] = None, #first #next  
+        position_ids: Optional[torch.LongTensor] = None, #first #next  
+        pixel_values: Optional[torch.FloatTensor] = None, #first
+        aspect_ratio_mask: Optional[List[List[int]]] = None, #first
+        aspect_ratio_ids: Optional[torch.Tensor] = None, #first
+        cross_attention_mask: Optional[torch.Tensor] = None,
+        cross_attention_states: Optional[torch.Tensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        cache_position: Optional[torch.LongTensor] = None, #? 
+        num_logits_to_keep: int = 0,  #?
+    ) -> Union[Tuple, CausalLMOutputWithPast]:
+
+        if (input_ids is None) ^ (inputs_embeds is not None):
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time, and must specify either one"
+            )
+
+        if pixel_values is not None and inputs_embeds is not None:
+            raise ValueError(
+                "You cannot specify both pixel_values and inputs_embeds at the same time, and must specify either one"
+            )
+
+        if pixel_values is not None and cross_attention_states is not None:
+            raise ValueError("`pixel_values` and `cross_attention_states` cannot be provided simultaneously")
+
+        if pixel_values is not None:
+            if aspect_ratio_ids is None:
+                raise ValueError("`aspect_ratio_ids` must be provided if `pixel_values` is provided")
+            # get vision tokens from vision model
+            cross_attention_states = self.vision_model(pixel_values, aspect_ratio_ids, aspect_ratio_mask)
+
+            cross_attention_states = self.multi_modal_projector(cross_attention_states.reshape(-1, cross_attention_states.shape[-2],  cross_attention_states.shape[-1]))
+
+        cross_attention_mask, full_text_row_masked_out_mask = _prepare_cross_attention_mask(
+            cross_attention_mask,
+            past_key_values=past_key_values,
+            num_vision_tokens=self.vision_model.num_patches,
+            cross_attention_layers=self.language_model.model.cross_attention_layers,
+            cross_attention_states=cross_attention_states,
+            device=self.device,
+            dtype=self.dtype,
+        )
+
+        if cross_attention_mask is not None and cache_position is not None:
+            cross_attention_mask = cross_attention_mask[:, :, cache_position]
+            full_text_row_masked_out_mask = full_text_row_masked_out_mask[:, :, cache_position]
+
+        outputs = self.language_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            cross_attention_states=cross_attention_states,
+            cross_attention_mask=cross_attention_mask,
+            full_text_row_masked_out_mask=full_text_row_masked_out_mask,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+            inputs_embeds=inputs_embeds,
+            labels=labels,
+            output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions,
+            return_dict=return_dict,
+            cache_position=cache_position,
+            num_logits_to_keep=num_logits_to_keep,
+        )
+
+        return outputs
 
 def GPTNeoXForCausalLM_forward(
     self,
@@ -4377,6 +4483,67 @@ def prepare_inputs_for_generation_llama(
     )
     return model_inputs
 
+
+def prepare_inputs_for_generation_mllama(
+    self,
+    input_ids=None,
+    inputs_embeds=None,
+    attention_mask=None,
+    position_ids=None,
+    pixel_values=None,
+    aspect_ratio_ids=None,
+    aspect_ratio_mask=None,
+    cross_attention_mask=None,
+    past_key_values=None,
+    use_cache=False,
+    cache_position=None,
+    num_logits_to_keep=None,
+    **kwargs,
+):
+    if past_key_values is not None:
+        past_length = past_key_values[0][0].shape[2]
+
+        # Keep only the unprocessed tokens:
+        # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
+        # some of the inputs are exclusively passed as part of the cache (e.g. when passing input_embeds as
+        # input)
+        if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
+            input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
+        # 2 - If the past_length is smaller than input_ids', then input_ids holds all input tokens. We can discard
+        # input_ids based on the past_length.
+        elif past_length < input_ids.shape[1]:
+            input_ids = input_ids[:, past_length:]
+        # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
+
+    position_ids = kwargs.get("position_ids", None)
+    if attention_mask is not None and position_ids is None:
+        # create position_ids on the fly for batch generation
+        position_ids = attention_mask.long().cumsum(-1) - 1
+        position_ids.masked_fill_(attention_mask == 0, 1)
+        if past_key_values:
+            position_ids = position_ids[:, -input_ids.shape[1] :]
+
+    # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+    if inputs_embeds is not None and past_key_values is None:
+        model_inputs = {"inputs_embeds": inputs_embeds}
+    else:
+        model_inputs = {"input_ids": input_ids}
+
+    model_inputs.update(
+        {
+            "position_ids": position_ids,
+            "past_key_values": past_key_values,
+            "use_cache": kwargs.get("use_cache"),
+            "attention_mask": attention_mask,
+        }
+    )
+
+    if (input_ids == self.config.image_token_index).any():
+        model_inputs["pixel_values"] = pixel_values
+        model_inputs["aspect_ratio_ids"] = aspect_ratio_ids
+        model_inputs["aspect_ratio_mask"] = aspect_ratio_mask
+
+    return model_inputs
 
 def prepare_inputs_for_generation_gptbigcode(
     self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs

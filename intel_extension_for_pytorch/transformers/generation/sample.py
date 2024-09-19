@@ -389,6 +389,7 @@ def _sample(
                     output_hidden_states=output_hidden_states,
                 )
         else:
+            breakpoint()
             outputs = self(
                 **model_inputs,
                 return_dict=True,

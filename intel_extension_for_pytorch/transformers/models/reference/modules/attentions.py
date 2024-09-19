@@ -2281,7 +2281,6 @@ def _MllamaTextCrossAttention_forward(
         output_attentions: bool = False,
         use_cache: bool = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
-        """Input shape: Batch x Time x Channel"""
         bsz, q_len, _ = hidden_states.size()
         query_states = self.q_proj(hidden_states)
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
@@ -2290,43 +2289,81 @@ def _MllamaTextCrossAttention_forward(
         if cross_attention_states is not None:
             key_states = self.k_proj(cross_attention_states)
             value_states = self.v_proj(cross_attention_states)
-            key_states = key_states.view(bsz, -1, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-            value_states = value_states.view(bsz, -1, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-            key_states = repeat_kv(key_states, self.num_key_value_groups)
-            value_states = repeat_kv(value_states, self.num_key_value_groups)
+            key_states = key_states.view(bsz, -1, self.num_key_value_heads, self.head_dim)
+            value_states = value_states.view(bsz, -1, self.num_key_value_heads, self.head_dim)
+            key_states = repeat_kv(key_states, self.num_key_value_groups).transpose(1, 2)
+            value_states = repeat_kv(value_states, self.num_key_value_groups).transpose(1, 2)
 
             key_states = self.k_norm(key_states)
-            if past_key_value is not None:
-                # if we have a new image + new tokens, we only computed key_states on that new image
-                # we still update the cross key states, past_image, new_image. And use it!
-                key_states, value_states = past_key_value.update(
-                    key_states, value_states, self.layer_idx, {"cache_position": cache_position}
-                )
-        elif past_key_value.get_seq_length(self.layer_idx) != 0:
-            key_states, value_states = (
-                past_key_value.key_cache[self.layer_idx],
-                past_key_value.value_cache[self.layer_idx],
-            )
+            past_key_value = (key_states, value_states)
+            # if past_key_value is not None:
+            #     # if we have a new image + new tokens, we only computed key_states on that new image
+            #     # we still update the cross key states, past_image, new_image. And use it!
+            #     key_states, value_states = past_key_value.update(
+            #         key_states, value_states, self.layer_idx, {"cache_position": cache_position}
+            #     )
+
+            #     # Update the number of seen tokens
+            #     if layer_idx == 0:
+            #         self._seen_tokens += key_states.shape[-2]
+
+            #     # Update the cache
+            #     if len(self.key_cache) <= layer_idx:
+            #         self.key_cache.append(key_states)
+            #         self.value_cache.append(value_states)
+            #     elif self.key_cache[layer_idx] == []:
+            #         self.key_cache[layer_idx] = key_states
+            #         self.value_cache[layer_idx] = value_states
+            #     else:
+            #         self.key_cache[layer_idx] = torch.cat([self.key_cache[layer_idx], key_states], dim=-2)
+            #         self.value_cache[layer_idx] = torch.cat([self.value_cache[layer_idx], value_states], dim=-2)
+
+            #     return self.key_cache[layer_idx], self.value_cache[layer_idx]
+
+
+        elif past_key_value[0].shape[2] != 0:
+            key_states, value_states = past_key_value
+            # key_states, value_states = (
+            #     past_key_value.key_cache[self.layer_idx],
+            #     past_key_value.value_cache[self.layer_idx],
+            # )
         else:
             raise ValueError(
                 "Cross attention layer can't find neither `cross_attn_states` nor cached values for key/values!"
             )
 
-        attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
-        if attention_mask is not None:  # no matter the length, we just slice it
-            causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
-            attn_weights = attn_weights + causal_mask
 
-        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-        attn_weights = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
-        attn_output = torch.matmul(attn_weights, value_states)
+        causal_mask = attention_mask
+        if attention_mask is not None:
+            causal_mask = causal_mask[:, :, :, : key_states.shape[-2]]
+
+        is_causal = False
+        attn_output = torch.nn.functional.scaled_dot_product_attention(
+            query_states,
+            key_states,
+            value_states,
+            attn_mask=causal_mask,
+            dropout_p=0.0,
+            is_causal=is_causal,
+        )
+
+
+        # attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+
+        # if attention_mask is not None:  # no matter the length, we just slice it
+        #     causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+        #     attn_weights = attn_weights + causal_mask
+        # attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+        # attn_weights = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
+        # attn_output = torch.matmul(attn_weights, value_states)
+
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.reshape(bsz, q_len, -1)
         attn_output = self.o_proj(attn_output)
 
-        if not output_attentions:
-            attn_weights = None
+        # if not output_attentions:
+        attn_weights = None
 
         return attn_output, attn_weights, past_key_value
 
@@ -2501,7 +2538,8 @@ class _IPEXAttentionRef(nn.Module):
                 supported_linear_types.extend(ds_modules)
             supported_linear_types = tuple(supported_linear_types)
             if (
-                hasattr(module, "q_proj")
+                module._get_name() != "MllamaTextCrossAttention"
+                and hasattr(module, "q_proj")
                 and hasattr(module, "k_proj")
                 and hasattr(module, "v_proj")
                 and (isinstance(module.q_proj, supported_linear_types))
