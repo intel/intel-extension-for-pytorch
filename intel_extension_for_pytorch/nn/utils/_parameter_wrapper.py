@@ -476,11 +476,39 @@ class ParameterWrapper(object):
         ) or module.weight.is_contiguous(memory_format=torch.channels_last_3d)
         self.weight_channels_last = module.weight_channels_last
         module.weight_size = module.weight.size()
-        module._real_padding = (
-            module.padding
-            if module.padding_mode == "zeros"
-            else tuple([0] * (len(module.weight_size) - 2))
-        )
+        if module.padding_mode == "zeros":
+            if module.padding == "same":
+                padding: List[int] = []
+                dilation = module.dilation
+                kernel_size = module.kernel_size
+
+                def conv_picker(func, conv1dOpt, conv2dOpt, conv3dOpt):
+                    if isinstance(func, torch.nn.Conv1d):
+                        return conv1dOpt
+                    if isinstance(func, torch.nn.Conv2d):
+                        return conv2dOpt
+                    else:
+                        assert isinstance(func, torch.nn.Conv3d)
+                        return conv3dOpt
+
+                def get_dilation(i):
+                    return dilation[i] if isinstance(dilation, tuple) else dilation
+
+                def conv_padding_for_same(dilation, kernel_size):
+                    total_pad = dilation * (kernel_size - 1)
+                    left_pad = total_pad // 2
+                    right_pad = total_pad - left_pad
+                    return left_pad, right_pad
+
+                for i in range(conv_picker(module, 0, 1, 2), -1, -1):
+                    padding += conv_padding_for_same(get_dilation(i), kernel_size[i])
+                module._real_padding = padding[: len(module.weight_size) - 2]
+            elif module.padding == "valid":
+                module._real_padding = tuple([0] * (len(module.weight_size) - 2))
+            else:
+                module._real_padding = module.padding
+        else:
+            module._real_padding = tuple([0] * (len(module.weight_size) - 2))
         self.op_ctx = torch.ops.ipex_prepack.convolution_prepack(
             module.weight,
             module.bias,

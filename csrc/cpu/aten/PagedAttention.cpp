@@ -85,15 +85,15 @@ namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
   m.def(
-      "single_query_cached_kv_attention(Tensor (a!)out, Tensor (a!)query, Tensor (a!)key_cache, Tensor (a!)value_cache,\
-       Tensor(a!) head_mapping, float scale, Tensor(a!) block_tables, Tensor(a!) context_lens, int block_size, int max_context_len,\
+      "single_query_cached_kv_attention(Tensor (a!)out, Tensor query, Tensor key_cache, Tensor value_cache,\
+       Tensor head_mapping, float scale, Tensor block_tables, Tensor context_lens, int block_size, int max_context_len,\
        Tensor? alibi_slopes)-> ()");
   m.impl(
       "single_query_cached_kv_attention",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::single_query_cached_kv_attention_forward_cpu);
   m.def(
-      "reshape_and_cache(Tensor (a!)key, Tensor (a!)value, Tensor (a!)key_cache, Tensor (a!)value_cache, Tensor(a!) slot_mapping)-> ()");
+      "reshape_and_cache(Tensor key, Tensor value, Tensor (a!)key_cache, Tensor (a!)value_cache, Tensor slot_mapping)-> ()");
   m.impl(
       "reshape_and_cache",
       c10::DispatchKey::CPU,

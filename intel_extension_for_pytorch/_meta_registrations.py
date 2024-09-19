@@ -129,6 +129,28 @@ def is_channels_last_3d(ten):
     return torch._prims_common.suggest_memory_format(ten) == torch.channels_last_3d
 
 
+@register_meta("reshape_and_cache")
+def meta_reshape_and_cache(key, value, key_cache, value_cache, slot_mapping):
+    return None
+
+
+@register_meta("single_query_cached_kv_attention")
+def meta_single_query_cached_kv_attention(
+    output,
+    query,
+    key_cache,
+    value_cache,
+    head_mapping,
+    scale,
+    block_tables,
+    context_lens,
+    block_size,
+    max_context_len,
+    alibi_slopes,
+):
+    return None
+
+
 @register_meta("convolution_forward")
 def meta_convolution_forward(
     input,
