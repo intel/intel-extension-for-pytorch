@@ -256,9 +256,9 @@ export PYTORCH_BUILD_NUMBER=0
 # Ensure cmake can find python packages when using conda or virtualenv
 CMAKE_PREFIX_PATH_BK=${CMAKE_PREFIX_PATH}
 if [ -n "${CONDA_PREFIX-}" ]; then
-    export CMAKE_PREFIX_PATH+=${CONDA_PREFIX:-"$(dirname $(command -v conda))/../"}
+    export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(command -v conda))/../'};${CMAKE_PREFIX_PATH}"
 elif [ -n "${VIRTUAL_ENV-}" ]; then
-    export CMAKE_PREFIX_PATH+=${VIRTUAL_ENV:-"$(dirname $(command -v python))/../"}
+    export CMAKE_PREFIX_PATH="${CONDA_PREFIX:-'$(dirname $(command -v python))/../'};${CMAKE_PREFIX_PATH}"
 fi
 export USE_STATIC_MKL=1
 export _GLIBCXX_USE_CXX11_ABI=${ABI}
