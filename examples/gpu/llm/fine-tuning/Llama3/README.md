@@ -1,6 +1,7 @@
 ## Llama3 fine-tuning
 
-
+### Environment Set Up
+Set up environment by following [LLM Environment Set Up](../../README.md).
 
 ### Download a Model
 During the execution, you may need to log in your Hugging Face account to download model files from online mode. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
@@ -25,6 +26,7 @@ Full-finetuning on single card will cause OOM.
 Example: Llama 3 8B LoRA fine-tuning on single card. The default dataset `financial_phrasebank` is loaded in `llama3_ft.py`.
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export TORCH_LLM_ALLREDUCE=1
 
 export model="meta-llama/Meta-Llama-3-8B"
@@ -48,13 +50,14 @@ python llama3_ft.py \
 ### Fine-tuning on multi-GPU
 
 **Note**:
-The default `fsdp_config.yml` is set with 1 machine with 4 cards 8 tiles, If you are using different setting, please change the `num_process` accordingly.
+The default `fsdp_config.yml` is set with 1 machine with 4 cards 8 tiles, If you are using different setting, please change the `num_processes: 8` accordingly. For example, to use 8 cards 16 tiles, the line in `fsdp_config.yml` should be changed to `num_processes: 16`.
 
 
 Example: Llama 3 8B full fine-tuning, you can change the model name/path for another Llama3 Model.
 
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 
@@ -82,6 +85,7 @@ Example: Llama 3 8B LoRA fine-tuning, you can change the model name/path for ano
 
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 

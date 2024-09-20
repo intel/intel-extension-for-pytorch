@@ -1,6 +1,7 @@
 ## Llama2 fine-tuning
 
-
+### Environment Set Up
+Set up environment by following [LLM Environment Set Up](../../README.md).
 
 ### Download a Model
 During the execution, you may need to log in your Hugging Face account to download model files from online mode. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
@@ -29,7 +30,7 @@ wandb login
 ### Fine-tuning on multi-GPU
 
 **Note**:
-The default `fsdp_config.yml` is set with 1 machine with 4 cards 8 tiles, If you are using different setting, please change the `num_process` accordingly.
+The default `fsdp_config.yml` is set with 1 machine with 4 cards 8 tiles, If you are using different setting, please change the `num_processes: 8` accordingly. For example, to use 8 cards 16 tiles, the line in `fsdp_config.yml` should be changed to `num_processes: 16`.
 
 #### Full-finetuning 
 
@@ -44,6 +45,7 @@ Remove the flags `--data_path` in fine-tuning command will load the guanaco-llam
 
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 
@@ -82,6 +84,7 @@ Remove the flags `--data_path` in fine-tuning command will load the guanaco-llam
 
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 
