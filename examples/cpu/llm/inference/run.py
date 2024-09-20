@@ -576,12 +576,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 ),
                 "auto",
             )
+
             work_path = Path(str(args.output_dir))
             if not work_path.exists():
                 Path.mkdir(work_path)
                 model_path = Path(str(args.output_dir) + str(MODEL_CLASSES[model_type]))
                 if not model_path.exists():
                     Path.mkdir(model_path)
+            if args.vision_text_model:
+                shard_cmd.extend(["--vision-text-model"])
             shard_cmd.extend(
                 ["--save-path", str(args.output_dir) + str(MODEL_CLASSES[model_type])]
             )
