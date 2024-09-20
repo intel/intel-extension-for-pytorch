@@ -343,7 +343,7 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
 
     print("\n", "-" * 10, "Summary:", "-" * 10)
     latency = total_time / (num_iter - num_warmup)
-    print("Inference latency: %.3f sec." % latency)
+    print("Inference latency: %.5f sec." % latency)
 
     if args.token_latency:
         import numpy as np
@@ -355,8 +355,8 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         average_2n_latency = np.mean(average_2n)
         #p90_latency = average_2n[int(len(average_2n) * 0.9)]
         #p99_latency = average_2n[int(len(average_2n) * 0.99)]
-        print("First token average latency: %.3f sec." % first_latency)
-        print("Average 2... latency: %.3f sec." % average_2n_latency)
+        print("First token average latency: %.5f sec." % first_latency)
+        print("Average 2... latency: %.5f sec." % average_2n_latency)
         #print("P90 2... latency: %.3f sec." % p90_latency)
         #print("P99 2... latency: %.3f sec." % p99_latency)
 
