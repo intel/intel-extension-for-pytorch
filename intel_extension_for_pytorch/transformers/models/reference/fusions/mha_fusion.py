@@ -5,7 +5,7 @@ import math
 from torch.nn import functional as F
 
 
-@torch.library.impl("myops::longrope", "cpu")
+@torch.library.impl("myops::longrope", "CPU")
 def longrope(
     inv_freq,
     max_seq_len_cached,

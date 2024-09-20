@@ -232,7 +232,7 @@ class _IPEXConv3d(_IPEXConvNd):
         super(_IPEXConv3d, self).__init__()
 
 
-@torch.library.impl("torch_ipex::choose_tpp_linear_weight", "cpu")
+@torch.library.impl("torch_ipex::choose_tpp_linear_weight", "CPU")
 def choose_tpp_linear_weight(x, weight, weight_for_large_batch):
     M = x.numel() // x.size(-1)
     return (
