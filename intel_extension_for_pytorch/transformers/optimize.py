@@ -1451,7 +1451,14 @@ def model_convert_lowering(
                 )
                 trace_model = torch.jit.freeze(trace_model)
                 if _model.config.architectures[0] == "MllamaForConditionalGeneration":
-                    pixel_values = torch.rand(1, 1, 4, 3, 448, 448)
+                    pixel_values = torch.rand(
+                        1,
+                        1,
+                        4,
+                        3,
+                        _model.config.vision_config.image_size,
+                        _model.config.vision_config.image_size,
+                    )
                     aspect_ratio_mask = torch.tensor([[[1, 1, 1, 1]]])
                     aspect_ratio_ids = torch.tensor([[6]])
                     sample_inputs["pixel_values"] = pixel_values

@@ -1170,7 +1170,14 @@ elif args.ipex_weight_only_quantization:
             self_jit_first = torch.jit.freeze(self_jit_first.eval())
             self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
         elif model.name == "mllama":
-            pixel_values = torch.rand(1, 1, 4, 3, 448, 448)
+            pixel_values = torch.rand(
+                1,
+                1,
+                4,
+                3,
+                user_model.config.vision_config.image_size,
+                user_model.config.vision_config.image_size,
+            )
             aspect_ratio_mask = torch.tensor([[[1, 1, 1, 1]]])
             aspect_ratio_ids = torch.tensor([[6]])
             example_inputs = example_inputs + (pixel_values,)
