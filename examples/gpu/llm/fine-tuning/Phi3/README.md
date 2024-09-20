@@ -1,5 +1,8 @@
 ## Phi3 fine-tuning
 
+### Environment Set Up
+Set up environment by following [LLM Environment Set Up](../../README.md).
+
 ### Download a Model
 During the execution, you may need to log in your Hugging Face account to download model files from online mode. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
 
@@ -18,6 +21,7 @@ wandb login
 **Note**: Not support full finetuning and flash attention on this platform.
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export model="microsoft/Phi-3-mini-4k-instruct"
 
 python phi3_ft.py \
@@ -43,6 +47,7 @@ python phi3_ft.py \
 Example: Phi-3 Mini 4k full fine-tuning on single card. The default dataset `financial_phrasebank` is loaded in `phi3_ft.py`.
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export TORCH_LLM_ALLREDUCE=1
 
 export model="microsoft/Phi-3-mini-4k-instruct"
@@ -66,6 +71,7 @@ python phi3_ft.py \
 Example: Phi-3 Mini 4k LoRA fine-tuning on single card. The default dataset `financial_phrasebank` is loaded in `phi3_ft.py`.
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export TORCH_LLM_ALLREDUCE=1
 
 export model="microsoft/Phi-3-mini-4k-instruct"
@@ -89,13 +95,14 @@ python phi3_ft.py \
 #### Fine-tuning on multi-GPU
 
 **Note**:
-The default `fsdp_config.yml` is set with 1 machine with 4 cards 8 tiles, If you are using a machine with different number of tiles, please change the `num_process` accordingly.
+The default `fsdp_config.yml` is set with 1 machine with 4 cards 8 tiles, If you are using different setting, please change the `num_processes: 8` accordingly. For example, to use 8 cards 16 tiles, the line in `fsdp_config.yml` should be changed to `num_processes: 16`.
 
 
 Example: Phi-3 Mini 4k full fine-tuning.
 
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 

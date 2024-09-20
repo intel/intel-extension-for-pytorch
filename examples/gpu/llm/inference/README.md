@@ -52,10 +52,16 @@ Currently, only support Transformers 4.38.1. Support for newer versions of Trans
 huggingface-cli login --token <your_token_here>
 ```
 
+### Environment Set Up
+Set up environment by following [LLM Environment Set Up](../README.md).
+
+**Note**: Before running script with weight only quantization, make sure [Install intel-extension-for-transformers and intel-neural-compressor](#install-intel-extension-for-transformers-and-intel-neural-compressor)
+
 ### Run with Bash Script
 
 Run all inference cases with the one-click bash script `run_benchmark.sh`:
 ```
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 bash run_benchmark.sh
 ```
 
@@ -64,6 +70,7 @@ bash run_benchmark.sh
 **Note**: Only support LLM optimizations with datatype float16, so please don't change datatype to float32 or bfloat16.
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 # fp16 benchmark
 python -u run_generation.py --benchmark -m ${model} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${output} --device xpu --ipex --dtype float16 --token-latency
 ```
@@ -76,10 +83,12 @@ python -u run_generation.py --benchmark -m ${model} --num-beams ${beam} --num-it
 
 For all distributed inference cases, run LLM with the one-click bash script `run_benchmark_ds.sh`:
 ```
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 bash run_benchmark_ds.sh
 ```
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 # fp16 benchmark
 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${output} --device xpu --ipex --dtype float16 --token-latency
 ```
@@ -90,6 +99,7 @@ mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchma
 
 **Note**: Unset the variable before running.
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 # Adding this variable to run multi-tile cases might cause an Out Of Memory (OOM) issue. 
 unset TORCH_LLM_ALLREDUCE
 ```
@@ -97,6 +107,7 @@ unset TORCH_LLM_ALLREDUCE
 ### Single Instance Accuracy
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 Accuracy test {TASK_NAME}, choice in this [link](https://github.com/EleutherAI/lm-evaluation-harness/blob/master/docs/task_table.md), by default we use "lambada_standard"
 
 # one-click bash script
@@ -109,6 +120,7 @@ LLM_ACC_TEST=1 python -u run_generation.py -m ${model} --ipex --dtype float16 --
 ### Distributed Accuracy with DeepSpeed
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 # one-click bash script
 bash run_accuracy_ds.sh
 
@@ -143,6 +155,7 @@ python setup.py install
 #### Run the weight only quantization and inference
 
 ```python
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 bash run_benchmark_woq.sh
 ```
 
