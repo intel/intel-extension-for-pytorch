@@ -141,6 +141,12 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
                     source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
                     source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
                 fi
+                set +e
+                echo ${LD_LIBRARY_PATH} | grep "${CONDA_PREFIX}/lib:" > /dev/null
+                if [ $? -gt 0 ]; then
+                    export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+                fi
+                set -e
             fi
         fi
 

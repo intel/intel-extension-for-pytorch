@@ -69,63 +69,6 @@ git submodule sync
 git submodule update --init --recursive
 cd ..
 
-function ver_compare() {
-    VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
-    VER_MINOR_CUR=$(echo $1 | cut -d "." -f 2)
-    VER_PATCH_CUR=$(echo $1 | cut -d "." -f 3)
-    VER_MAJOR_REQ=$(echo $2 | cut -d "." -f 1)
-    VER_MINOR_REQ=$(echo $2 | cut -d "." -f 2)
-    VER_PATCH_REQ=$(echo $2 | cut -d "." -f 3)
-    RET=0
-    if [[ ${VER_MAJOR_CUR} -lt ${VER_MAJOR_REQ} ]]; then
-        RET=1
-    else
-        if [[ ${VER_MAJOR_CUR} -eq ${VER_MAJOR_REQ} ]] &&
-           [[ ${VER_MINOR_CUR} -lt ${VER_MINOR_REQ} ]]; then
-            RET=2
-        else
-            if [[ ${VER_MAJOR_CUR} -eq ${VER_MAJOR_REQ} ]] &&
-               [[ ${VER_MINOR_CUR} -eq ${VER_MINOR_REQ} ]] &&
-               [[ ${VER_PATCH_CUR} -lt ${VER_PATCH_REQ} ]]; then
-                RET=3
-            fi
-        fi
-    fi
-    echo ${RET}
-}
-set +e
-command -v conda > /dev/null
-EXIST_CONDA=$?
-
-GCC_CONDA=0
-command -v gcc > /dev/null
-EXIST_CC=$?
-command -v g++ > /dev/null
-EXIST_CXX=$?
-set -e
-if [ ${EXIST_CC} -gt 0 ] || [ ${EXIST_CXX} -gt 0 ]; then
-    echo -e '\a'
-    echo "Warning: GCC not found."
-    echo "         Installing gcc and g++ 12.3 from conda..."
-    echo ""
-    GCC_CONDA=1
-else
-    VER_COMP=$(ver_compare $(gcc -dumpfullversion) ${VER_GCC})
-    if [ ${VER_COMP} -ne 0 ]; then
-        echo -e '\a'
-        echo "Warning: GCC version equal to or newer than ${VER_GCC} is required."
-        echo "         Found GCC version $(gcc -dumpfullversion)."
-        echo "         Installing gcc and g++ 12.3 from conda..."
-        echo ""
-        GCC_CONDA=1
-    else
-        DIR_GCC=$(which gcc)
-        if [ ! -z ${CONDA_PREFIX} ] && [[ ${DIR_GCC} =~ ${CONDA_PREFIX} ]]; then
-            GCC_CONDA=2
-        fi
-    fi
-fi
-
 MAX_JOBS_VAR=$(nproc)
 if [ -z "${MAX_JOBS}" ]; then
     export MAX_JOBS=${MAX_JOBS_VAR}
@@ -210,7 +153,64 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
 fi
 ABI=$(python -c "import torch; print(int(torch._C._GLIBCXX_USE_CXX11_ABI))")
 
-# Compile individual component
+# Check gcc version
+function ver_compare() {
+    VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
+    VER_MINOR_CUR=$(echo $1 | cut -d "." -f 2)
+    VER_PATCH_CUR=$(echo $1 | cut -d "." -f 3)
+    VER_MAJOR_REQ=$(echo $2 | cut -d "." -f 1)
+    VER_MINOR_REQ=$(echo $2 | cut -d "." -f 2)
+    VER_PATCH_REQ=$(echo $2 | cut -d "." -f 3)
+    RET=0
+    if [[ ${VER_MAJOR_CUR} -lt ${VER_MAJOR_REQ} ]]; then
+        RET=1
+    else
+        if [[ ${VER_MAJOR_CUR} -eq ${VER_MAJOR_REQ} ]] &&
+           [[ ${VER_MINOR_CUR} -lt ${VER_MINOR_REQ} ]]; then
+            RET=2
+        else
+            if [[ ${VER_MAJOR_CUR} -eq ${VER_MAJOR_REQ} ]] &&
+               [[ ${VER_MINOR_CUR} -eq ${VER_MINOR_REQ} ]] &&
+               [[ ${VER_PATCH_CUR} -lt ${VER_PATCH_REQ} ]]; then
+                RET=3
+            fi
+        fi
+    fi
+    echo ${RET}
+}
+set +e
+command -v conda > /dev/null
+EXIST_CONDA=$?
+
+GCC_CONDA=0
+command -v gcc > /dev/null
+EXIST_CC=$?
+command -v g++ > /dev/null
+EXIST_CXX=$?
+set -e
+if [ ${EXIST_CC} -gt 0 ] || [ ${EXIST_CXX} -gt 0 ]; then
+    echo -e '\a'
+    echo "Warning: GCC not found."
+    echo "         Installing gcc and g++ 12.3 from conda..."
+    echo ""
+    GCC_CONDA=1
+else
+    VER_COMP=$(ver_compare $(gcc -dumpfullversion) ${VER_GCC})
+    if [ ${VER_COMP} -ne 0 ]; then
+        echo -e '\a'
+        echo "Warning: GCC version equal to or newer than ${VER_GCC} is required."
+        echo "         Found GCC version $(gcc -dumpfullversion)."
+        echo "         Installing gcc and g++ 12.3 from conda..."
+        echo ""
+        GCC_CONDA=1
+    else
+        DIR_GCC=$(which gcc)
+        if [ ! -z ${CONDA_PREFIX} ] && [[ ${DIR_GCC} =~ ${CONDA_PREFIX} ]]; then
+            GCC_CONDA=2
+        fi
+    fi
+fi
+
 if [ ${GCC_CONDA} -eq 1 ]; then
     if [ ${EXIST_CONDA} -gt 0 ]; then
         echo "Command \"conda\" not found. Exit."
@@ -225,6 +225,12 @@ if [ ${GCC_CONDA} -ge 1 ]; then
         source ${CONDA_PREFIX}/etc/conda/activate.d/activate-gxx_linux-64.sh
         source ${CONDA_PREFIX}/etc/conda/activate.d/activate-binutils_linux-64.sh
     fi
+    set +e
+    echo ${LD_LIBRARY_PATH} | grep "${CONDA_PREFIX}/lib:" > /dev/null
+    if [ $? -gt 0 ]; then
+        export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
+    fi
+    set -e
 fi
 if [[ ! -z ${LDFLAGS} ]]; then
     read -a ldflags <<< "${LDFLAGS}"
@@ -238,6 +244,7 @@ if [[ ! -z ${LDFLAGS} ]]; then
     export LDFLAGS=$(join ' ' "${ldflags[@]}")
 fi
 
+# Compile individual component
 #  LLVM
 LLVM_ROOT="$(pwd)/llvm-release"
 if [ $((${MODE} & 0x08)) -ne 0 ]; then
@@ -266,8 +273,8 @@ fi
 cd ..
 PATH_BK=${PATH}
 LD_LIBRARY_PATH_BK=${LD_LIBRARY_PATH}
-export PATH=${LLVM_ROOT}/bin:$PATH
-export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:$LD_LIBRARY_PATH
+export PATH=${LLVM_ROOT}/bin:${PATH}
+export LD_LIBRARY_PATH=${LLVM_ROOT}/lib:${LD_LIBRARY_PATH}
 #  Intel® Extension for PyTorch*
 cd intel-extension-for-pytorch
 python -m pip install -r requirements.txt
