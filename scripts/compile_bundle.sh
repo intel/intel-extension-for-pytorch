@@ -50,7 +50,7 @@ VER_TORCH=$(python tools/dep_ver_utils.py -f dependency_version.json -k pytorch:
 VER_TORCHVISION=$(python tools/dep_ver_utils.py -f dependency_version.json -k torchvision:version)
 VER_TORCHAUDIO=$(python tools/dep_ver_utils.py -f dependency_version.json -k torchaudio:version)
 COMMIT_TORCHCCL=$(python tools/dep_ver_utils.py -f dependency_version.json -k torch-ccl:commit)
-VER_LLVM=$(python tools/dep_ver_utils.py -f dependency_version.json -k llvm:commit)
+COMMIT_LLVM=$(python tools/dep_ver_utils.py -f dependency_version.json -k llvm:commit)
 VER_GCC=$(python tools/dep_ver_utils.py -f dependency_version.json -k gcc:min-version)
 cd ..
 
@@ -58,12 +58,12 @@ if [ ! -d llvm-project ]; then
     git clone https://github.com/llvm/llvm-project.git
 fi
 cd llvm-project
-if [ ! -z "${VER_LLVM}" ]; then
+if [ ! -z "${COMMIT_LLVM}" ]; then
     rm -rf * > /dev/null
     git checkout . > /dev/null
     git checkout main > /dev/null
     git pull > /dev/null
-    git checkout ${VER_LLVM}
+    git checkout ${COMMIT_LLVM}
 fi
 git submodule sync
 git submodule update --init --recursive
