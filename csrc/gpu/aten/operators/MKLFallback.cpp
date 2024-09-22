@@ -32,28 +32,18 @@ TORCH_LIBRARY_IMPL(aten, XPU, m) {
 
   std::vector<std::string> fallback_list = {
       "_linalg_eigvals",
-      "_lu_with_info",
       "cholesky",
       "cholesky.out",
       "cholesky_inverse",
       "cholesky_inverse.out",
       "dot",
       "geqrf.a",
-      "inverse",
-      "inverse.out",
       "linalg_eig.out",
-      "linalg_eigh",
       "linalg_eigh.eigvals",
       "linalg_eigvals.out",
-      "linalg_eigvalsh",
-      "linalg_eigvalsh.out",
       "linalg_householder_product.out",
       "linalg_solve_triangular.out",
-      "lu_solve",
-      "lu_solve.out",
-      "lu_unpack",
       "ormqr.out",
-      "triangular_solve",
   };
 
   for (auto& op_name : fallback_list) {

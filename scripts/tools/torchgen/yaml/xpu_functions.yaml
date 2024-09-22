@@ -74,7 +74,7 @@ supported:
 #  - _softmax_backward_data.out
 #  - _linalg_svd.U
 #  - linalg_inv_ex.inverse
-#  - _linalg_solve_ex.result
+  - _linalg_solve_ex.result
 #  - linalg_lu_factor_ex.out
 #  - linalg_lu_solve.out
 #  - linalg_lu.out
@@ -672,8 +672,8 @@ supported:
   - xlogy.OutTensor
 #  - zero_
   - channel_shuffle
-#  - _linalg_slogdet.sign
-#  - _linalg_det.result
+  - _linalg_slogdet.sign
+  - _linalg_det.result
 #  - conj_physical.out
 #  - conj_physical_
   - angle
