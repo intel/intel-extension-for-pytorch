@@ -236,5 +236,5 @@ class IPEXLmHeadLinearAllreduceWithPaddingBaichuan(
     def forward(self, input):
         if self.first_flag:
             self.first_flag = False
-            self.weight.data = torch.nn.functional.normalize(self.weight)
+            self.weight.data = torch.nn.functional.normalize(self.weight, dim=0)
         return super().forward(input)
