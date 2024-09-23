@@ -727,6 +727,9 @@ class IPEXCPPLibBuild(build_clib, object):
                     # fall through
                 build_option_common[var] = val
 
+        if IS_WINDOWS and build_with_cpu:
+            raise NotImplementedError("IPEX CPU don't support build on Windows.")
+
         nproc = min(int(os.environ.get("MAX_JOBS", os.cpu_count())), os.cpu_count())
         if sequential_build:
             nproc = 1
