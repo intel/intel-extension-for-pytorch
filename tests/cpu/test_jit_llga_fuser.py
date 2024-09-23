@@ -222,7 +222,8 @@ class TestOp(JitLlgaTestCase):
         m = M()
         x = torch.rand(8, 12, 12, 12)
         graph, _ = self.checkTrace(m, [x])
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
+        # One partition for softmax & another for TypeCast
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 2)
 
     def _gen_binary_inputs(self, gen_permute=True):
         for xshape, yshape in [
@@ -507,8 +508,8 @@ class TestOp(JitLlgaTestCase):
             m = M(dst_dtype)
 
             graph, _ = self.checkTrace(m, [x])
-            # we do not rewrite single to
-            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+            # Even a single TypeCast is mapped to oneDNN Graph
+            self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
     def test_typecheck(self):
@@ -834,8 +835,9 @@ class TestFusionPattern(JitLlgaTestCase):
         graph, _ = self.checkTrace(m, [x])
         self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
+    # oneDNN Graph DNNL backend now supports standalone Select op
     @llga_fp32_bf16_test_env
-    def test_do_not_map_select(self):
+    def test_map_select(self):
         class M(nn.Module):
             def __init__(
                 self,
@@ -851,7 +853,7 @@ class TestFusionPattern(JitLlgaTestCase):
         x = torch.randn(3, 32, 32, 32)
         y = torch.randn(3, 32, 32, 1).to(torch.bool)
         graph, _ = self.checkTrace(m, [x, y])
-        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 0)
+        self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
     @llga_fp32_bf16_test_env
     def test_avg_pool2d_add(self):

@@ -1,0 +1,9 @@
+torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu
+torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cpu
+torchaudio==2.3.0 --index-url https://download.pytorch.org/whl/cpu
+intel_extension_for_pytorch==2.3.0
+transformers==4.43.2
+tritonclient[all]==2.41.1
+intel-openmp==2024.0.2
+configargparse==1.7
+numpy==1.26.3

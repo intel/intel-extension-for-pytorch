@@ -87,6 +87,8 @@ class CPUFeature {
   MICRO_CLASS_MEMBER_DECL(avx512_bf16);
   MICRO_CLASS_MEMBER_DECL(avx512_vp2intersect);
 
+  MICRO_CLASS_MEMBER_DECL(mcdt_on);
+
  public:
   MICRO_CLASS_CHECK_FUNC(avx512_f);
   MICRO_CLASS_CHECK_FUNC(avx512_cd);
@@ -107,6 +109,8 @@ class CPUFeature {
   MICRO_CLASS_CHECK_FUNC(avx512_fp16);
   MICRO_CLASS_CHECK_FUNC(avx512_bf16);
   MICRO_CLASS_CHECK_FUNC(avx512_vp2intersect);
+
+  MICRO_CLASS_CHECK_FUNC(mcdt_on);
 
   // AMX
  private:

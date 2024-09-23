@@ -15,6 +15,17 @@ IPEX_DEFINE_DISPATCH(tpp_linear_relu_kernel_stub);
 IPEX_DEFINE_DISPATCH(tpp_linear_add_kernel_stub);
 IPEX_DEFINE_DISPATCH(tpp_linear_mul_kernel_stub);
 IPEX_DEFINE_DISPATCH(tpp_linear_add_add_kernel_stub);
+IPEX_DEFINE_DISPATCH(tpp_gelu_tanh_bf16_kernel_stub);
+
+void tpp_gelu_tanh_bf16_forward_cpu(
+    at::BFloat16* in,
+    at::BFloat16* out,
+    int M,
+    int N,
+    int ldi,
+    int ldo) {
+  tpp_gelu_tanh_bf16_kernel_stub(kCPU, in, out, M, N, ldi, ldo);
+}
 
 at::Tensor tpp_linear_nobias_forward_cpu(
     const at::Tensor& t_in,
@@ -36,7 +47,15 @@ at::Tensor tpp_linear_gelu_forward_cpu(
     const at::Tensor& t_wt,
     const at::Tensor& t_bias,
     c10::optional<int64_t> out_features) {
-  return tpp_linear_gelu_kernel_stub(kCPU, t_in, t_wt, t_bias);
+  return tpp_linear_gelu_kernel_stub(kCPU, t_in, t_wt, t_bias, "none");
+}
+
+at::Tensor tpp_linear_gelu_tanh_forward_cpu(
+    const at::Tensor& t_in,
+    const at::Tensor& t_wt,
+    const at::Tensor& t_bias,
+    c10::optional<int64_t> out_features) {
+  return tpp_linear_gelu_kernel_stub(kCPU, t_in, t_wt, t_bias, "tanh");
 }
 
 at::Tensor tpp_fused_gate_up_proj_forward_cpu(
@@ -127,6 +146,15 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "tpp_linear_gelu",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::tpp_linear_gelu_forward_cpu);
+}
+
+TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
+  m.def(
+      "tpp_linear_gelu_tanh(Tensor t_in, Tensor t_wt, Tensor t_bias, int? out_features=None)-> Tensor out");
+  m.impl(
+      "tpp_linear_gelu_tanh",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::tpp_linear_gelu_tanh_forward_cpu);
 }
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {

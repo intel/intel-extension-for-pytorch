@@ -1,6 +1,7 @@
 import unittest
 import torch
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 import sys
 import subprocess
 import os
@@ -138,6 +139,13 @@ supported_models = [
         lambda m: m.transformer.h[0].__class__,
     ),
     model_info(
+        "qwen2",
+        transformers.models.qwen2.modeling_qwen2.Qwen2ForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
         "git",
         transformers.models.git.modeling_git.GitForCausalLM,
         False,
@@ -169,6 +177,20 @@ supported_models = [
         "phi3",
         Phi3ForCausalLM,
         True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
+        "whisper",
+        transformers.models.whisper.modeling_whisper.WhisperForConditionalGeneration,
+        False,
+        lambda m: m.model.decoder.layers[0].self_attn.__class__,
+        lambda m: m.model.decoder.layers[0].__class__,
+    ),
+    model_info(
+        "llama3",
+        transformers.models.llama.modeling_llama.LlamaForCausalLM,
+        False,
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
     ),
@@ -246,12 +268,24 @@ class OptimizeTransformersNightlyTester(TestCase):
         if re.search("t5", model.config.architectures[0], re.IGNORECASE):
             input_dict["decoder_input_ids"] = decoder_input_ids.unsqueeze(0)
         if m.name == "git":
+            input_dict["input_ids"] = torch.ones(1, 1).to(torch.long)
+            input_dict["attention_mask"] = torch.ones(1, 1)
             input_dict["pixel_values"] = torch.zeros(1, 3, 224, 224)
+        if m.name == "whisper":
+            last_hidden_state = torch.rand([1, 32, 1280])
+            input_dict = {
+                "decoder_input_ids": torch.ones(4).to(torch.long).unsqueeze(0),
+                "encoder_outputs": (last_hidden_state,),
+            }
 
-        with torch.no_grad():
+        with torch.no_grad(), torch.cpu.amp.autocast(
+            enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
+            dtype=dtype,
+        ):
             key_hf = ref_m(**input_dict)
         with torch.no_grad(), torch.cpu.amp.autocast(
-            enabled=True if dtype is torch.bfloat16 else False
+            enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
+            dtype=dtype,
         ):
             key_ipex = ipex_m(**input_dict)
         error_message = f"model={m.name}, deployment_mode={deployment_mode}, torchcompile={torchcompile}, return_dict={return_dict}"
@@ -266,6 +300,8 @@ class OptimizeTransformersNightlyTester(TestCase):
 
     def test_model_replacement(self):
         dtypes = [torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         enable_torchcompile = [False, True]
         deployment_mode = [True, False]
         return_dict = [False, True]

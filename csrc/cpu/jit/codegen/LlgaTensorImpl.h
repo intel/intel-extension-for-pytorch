@@ -220,7 +220,7 @@ struct LlgaTensorDesc {
   }
 
   bool operator!=(const LlgaTensorDesc& desc) const {
-    return *this != desc;
+    return !(*this == desc);
   }
 
   static size_t hash(const LlgaTensorDesc& desc) {

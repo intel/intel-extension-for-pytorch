@@ -5,5 +5,5 @@ DISTRIBUTED_EMB=${DIR}/test_distributed_merged_emb.py
 for w_size in 2 4 8 16
 do
     export W_SIZE=$w_size
-    python -m intel_extension_for_pytorch.cpu.launch --ccl_worker_count=1 --nproc_per_node=$W_SIZE --distributed --nnodes 1 $DISTRIBUTED_EMB
+    python -m intel_extension_for_pytorch.cpu.launch --ccl-worker-count=1 --nprocs-per-node=$W_SIZE --distributed --nnodes 1 $DISTRIBUTED_EMB
 done

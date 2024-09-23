@@ -1,0 +1,11 @@
+cpuid
+accelerate
+datasets
+sentencepiece
+mkl
+protobuf==3.20.3
+transformers_stream_generator
+tiktoken
+unzip
+librosa
+soundfile

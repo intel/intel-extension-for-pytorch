@@ -371,7 +371,8 @@ using SerializationTypeWoqLinearPrePack = std::tuple<
     c10::optional<int64_t>, // batch size
     int64_t, // group size
     int64_t, // lowp_mode
-    int64_t>; // act_quant_mode
+    int64_t, // act_quant_mode
+    bool>; // cache_weight_for_large_batch
 
 class WoqLinearOpContext : public torch::jit::CustomClassHolder {
  protected:
@@ -397,25 +398,23 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
         batch_size_,
         this->get_context().group_size_,
         this->get_context().lowp_mode_,
-        this->get_context().act_quant_mode_);
+        this->get_context().act_quant_mode_,
+        this->get_context().cache_weight_for_large_batch_);
   }
 
   virtual at::Tensor get_data_handle() = 0;
 
   virtual at::Tensor run(const at::Tensor& input) = 0;
 
-  virtual at::Tensor run_eltwise(
+  virtual at::Tensor run_unary(
       const at::Tensor& input,
       const c10::string_view& post_op,
       const torch::List<c10::optional<at::Scalar>>& scalars,
       const c10::optional<c10::string_view>& algorithm) = 0;
 
-  virtual at::Tensor run_add(
+  virtual at::Tensor run_binary(
       const at::Tensor& input,
-      const std::vector<at::Tensor>& others) = 0;
-
-  virtual at::Tensor run_add_add(
-      const at::Tensor& input,
+      const c10::string_view& post_op,
       const std::vector<at::Tensor>& others) = 0;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) = 0;
@@ -431,6 +430,8 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
   virtual c10::optional<at::Tensor> get_zero_points() = 0;
 
   virtual std::vector<int64_t> get_weight_shape() = 0;
+
+  virtual c10::optional<at::Tensor> get_cached_weight() = 0;
 
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
 
@@ -462,18 +463,15 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
 
   virtual at::Tensor run(const at::Tensor& input) override;
 
-  virtual at::Tensor run_eltwise(
+  virtual at::Tensor run_unary(
       const at::Tensor& input,
       const c10::string_view& post_op,
       const torch::List<c10::optional<at::Scalar>>& scalars,
       const c10::optional<c10::string_view>& algorithm) override;
 
-  virtual at::Tensor run_add(
+  virtual at::Tensor run_binary(
       const at::Tensor& input,
-      const std::vector<at::Tensor>& others) override;
-
-  virtual at::Tensor run_add_add(
-      const at::Tensor& input,
+      const c10::string_view& post_op,
       const std::vector<at::Tensor>& others) override;
 
   virtual at::Tensor to_public(const at::Tensor& tensor) override;
@@ -490,6 +488,8 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
 
   virtual std::vector<int64_t> get_weight_shape() override;
 
+  virtual c10::optional<at::Tensor> get_cached_weight() override;
+
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 
   virtual detail::ContextLinearWoq& get_context() override;
@@ -505,7 +505,8 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
       c10::optional<int64_t> batch_size,
       int64_t group_size,
       int64_t lowp_mode,
-      int64_t act_quant_mode);
+      int64_t act_quant_mode,
+      bool cache_weight_for_large_batch);
 
   virtual void load_from_ctx(
       c10::intrusive_ptr<WoqLinearOpContext> other) override;

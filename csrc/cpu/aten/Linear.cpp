@@ -357,6 +357,22 @@ at::Tensor ipex_linear_eltwise(
 }
 
 #ifdef USE_LIBXSMM
+static size_t get_block_k(
+    int64_t weight_dtype,
+    int64_t lowp_mode,
+    int64_t group_size,
+    int64_t K) {
+  size_t default_block_k = lowp_mode == 3 ? 128 : 64;
+  size_t block_k = group_size > 0
+      ? std::min((size_t)group_size, default_block_k)
+      : default_block_k;
+  while (K % block_k != 0) {
+    block_k /= 2;
+  }
+  TORCH_CHECK(block_k > 0);
+  return block_k;
+}
+
 IPEX_DEFINE_DISPATCH(woq_tpp_gemm_packB_stub);
 at::Tensor woq_linear_pack_weight(
     const at::Tensor& weight,
@@ -369,12 +385,8 @@ at::Tensor woq_linear_pack_weight(
   auto N = weight_shape[0], K = weight_shape[1];
   // For TPP kernel, we only consider even K
   if (K % 2 == 0) {
-    size_t block_n = 32;
-    size_t block_k = group_size > 0 ? std::min(group_size, (int64_t)64) : 64;
-    while (K % block_k != 0) {
-      block_k /= 2;
-    }
-    assert(block_k > 0);
+    size_t block_n = WOQ_N_BLOCK_SIZE;
+    size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
     if (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4) {
       if (block_k % 4 && lowp_mode == 3) {
         // This case is not supported by kernel
@@ -409,14 +421,64 @@ at::Tensor woq_linear_pack_weight(
   return weight;
 }
 
+at::Tensor woq_linear_compute_compensation(
+    const at::Tensor& weight,
+    int64_t weight_dtype,
+    int64_t group_size,
+    int64_t lowp_mode) {
+  // Compensation for INT8 GEMM.
+  // Compensation = Σ(k)(W[k][n] - ZP[n]) for each block.
+  // We assume zero points to be zero here (sym quant of weight)
+  TORCH_CHECK(weight.dim() == 2);
+  auto N = weight.size(0), K = weight.size(1);
+  if (N % WOQ_N_BLOCK_SIZE == 0 && weight_dtype == WOQ_DTYPE_INT8 &&
+      lowp_mode == 3) {
+    size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
+    int64_t Nc = N / WOQ_N_BLOCK_SIZE, Kc = K / block_k;
+    auto weight_reshaped = weight.reshape({Nc, WOQ_N_BLOCK_SIZE, Kc, block_k});
+    auto compensation = at::sum(
+        weight_reshaped, /*dim*/ -1, /*keepdim*/ false, /*dtype*/ c10::kInt);
+    compensation = compensation.permute({0, 2, 1}).contiguous();
+    return compensation;
+  }
+  return at::Tensor();
+}
+
 IPEX_DEFINE_DISPATCH(woq_tpp_gemm_unpackB_stub);
 at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
     int64_t weight_dtype,
     int64_t lowp_mode) {
+  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+    // Unpack weight for INT8 GEMM.
+    // weight is packed in 5d (Nc, Kc, block_k / 4, block_n, 4)
+    // but viewd as 4d (Nc, Kc, block_k, block_n)
+    // Unpack to 2d (N, K)
+    if (weight.dim() == 2) {
+      return weight;
+    }
+    TORCH_CHECK(
+        weight.dim() == 4,
+        "Unpack WOQ weight: Expect weight to be 4d but got ",
+        weight.dim(),
+        "d");
+    auto weight_5d = weight.view(
+        {weight.size(0),
+         weight.size(1),
+         weight.size(2) / 4,
+         weight.size(3),
+         4});
+    auto Nc = weight.size(0), Kc = weight.size(1), block_k = weight.size(2),
+         block_n = weight.size(3);
+    auto weight_unpacked = weight_5d.permute({0, 3, 1, 2, 4})
+                               .contiguous()
+                               .reshape({Nc * block_n, Kc * block_k});
+    return weight_unpacked;
+  }
   return woq_tpp_gemm_unpackB_stub(kCPU, weight, weight_dtype, lowp_mode);
 }
 
+#define PAD_M_THRESHOLD 32
 IPEX_DEFINE_DISPATCH(woq_tpp_gemm_kernel_stub);
 at::Tensor woq_linear_kernel(
     const at::Tensor& self,
@@ -427,11 +489,22 @@ at::Tensor woq_linear_kernel(
     const std::vector<at::Tensor>& bias_list,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation) {
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
-  return woq_tpp_gemm_kernel_stub(
+  auto K = self.size(-1);
+  auto M = self.numel() / K;
+  auto in = self;
+  // Big performance regression is found with some odd M
+  // So, we pad M to the nearest even number
+  bool m_padded = false;
+  if (M >= PAD_M_THRESHOLD && M % 2 == 1) {
+    in = at::pad(in.view({M, K}), {0, 0, 0, 1}, "constant", 0);
+    m_padded = true;
+  }
+  auto y = woq_tpp_gemm_kernel_stub(
       kCPU,
-      self,
+      in,
       weight,
       scales_list,
       zps_list,
@@ -442,7 +515,14 @@ at::Tensor woq_linear_kernel(
       std::vector<at::Tensor>(),
       act_quant_mode,
       quant_w_mode,
-      group_size);
+      group_size,
+      compensation);
+  if (m_padded) {
+    auto out_size = self.sizes().vec();
+    out_size.back() = y.size(-1);
+    y = y.narrow(0, 0, M).view(out_size);
+  }
+  return y;
 }
 
 at::Tensor woq_linear_forward(
@@ -453,7 +533,7 @@ at::Tensor woq_linear_forward(
       ->run(input);
 }
 
-at::Tensor woq_linear_eltwise_kernel(
+at::Tensor woq_linear_unary_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
     int64_t weight_dtype,
@@ -465,19 +545,34 @@ at::Tensor woq_linear_eltwise_kernel(
     const c10::optional<c10::string_view>& algorithm,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation) {
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
   if (post_op == "gelu") {
     if (algorithm == "none") {
-      post_op_fusion_type = WOQ_FUSE_GELU;
+      post_op_fusion_type = WOQ_FUSE_GELU_ERF;
     } else if (algorithm == "tanh") {
-      post_op_fusion_type = WOQ_FUSE_NEW_GELU;
+      post_op_fusion_type = WOQ_FUSE_GELU_TANH;
     }
+  } else if (post_op == "relu") {
+    post_op_fusion_type = WOQ_FUSE_RELU;
+  } else if (post_op == "silu") {
+    post_op_fusion_type = WOQ_FUSE_SILU;
   }
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
-  return woq_tpp_gemm_kernel_stub(
+  auto K = self.size(-1);
+  auto M = self.numel() / K;
+  auto in = self;
+  // Big performance regression is found with some odd M
+  // So, we pad M to the nearest even number
+  bool m_padded = false;
+  if (M >= PAD_M_THRESHOLD && M % 2 == 1) {
+    in = at::pad(in.view({M, K}), {0, 0, 0, 1}, "constant", 0);
+    m_padded = true;
+  }
+  auto y = woq_tpp_gemm_kernel_stub(
       kCPU,
-      self,
+      in,
       weight,
       scales_list,
       zps_list,
@@ -488,7 +583,14 @@ at::Tensor woq_linear_eltwise_kernel(
       std::vector<at::Tensor>(),
       act_quant_mode,
       quant_w_mode,
-      group_size);
+      group_size,
+      compensation);
+  if (m_padded) {
+    auto out_size = self.sizes().vec();
+    out_size.back() = y.size(-1);
+    y = y.narrow(0, 0, M).view(out_size);
+  }
+  return y;
 }
 
 at::Tensor woq_linear_gelu_forward(
@@ -496,7 +598,7 @@ at::Tensor woq_linear_gelu_forward(
     const at::Tensor& op_context) {
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run_eltwise(
+      ->run_unary(
           input, "gelu", torch::List<c10::optional<at::Scalar>>(), "none");
 }
 
@@ -505,39 +607,27 @@ at::Tensor woq_linear_new_gelu_forward(
     const at::Tensor& op_context) {
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run_eltwise(
+      ->run_unary(
           input, "gelu", torch::List<c10::optional<at::Scalar>>(), "tanh");
 }
 
-at::Tensor woq_linear_add_kernel(
-    const at::Tensor& self,
-    const at::Tensor& weight,
-    int64_t weight_dtype,
-    const std::vector<at::Tensor>& scales_list,
-    const std::vector<at::Tensor>& zps_list,
-    const std::vector<at::Tensor>& bias_list,
-    int64_t group_size,
-    int64_t lowp_mode,
-    const std::vector<at::Tensor>& others,
-    int64_t act_quant_mode) {
-  int64_t quant_w_mode = group_size > 0 ? 1 : 0;
-  return woq_tpp_gemm_kernel_stub(
-      kCPU,
-      self,
-      weight,
-      scales_list,
-      zps_list,
-      bias_list,
-      weight_dtype,
-      lowp_mode,
-      WOQ_FUSE_ADD, // post op add
-      others,
-      act_quant_mode,
-      quant_w_mode,
-      group_size);
+at::Tensor woq_linear_relu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexWoqLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_unary(input, "relu", torch::List<c10::optional<at::Scalar>>(), "");
 }
 
-at::Tensor woq_linear_add_add_kernel(
+at::Tensor woq_linear_silu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  return reinterpret_cast<IpexWoqLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_unary(input, "silu", torch::List<c10::optional<at::Scalar>>(), "");
+}
+
+at::Tensor woq_linear_binary_kernel(
     const at::Tensor& self,
     const at::Tensor& weight,
     int64_t weight_dtype,
@@ -546,23 +636,50 @@ at::Tensor woq_linear_add_add_kernel(
     const std::vector<at::Tensor>& bias_list,
     int64_t group_size,
     int64_t lowp_mode,
+    const c10::string_view& post_op,
     const std::vector<at::Tensor>& others,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation) {
+  int64_t post_op_fusion_type = WOQ_FUSE_NONE;
+  if (post_op == "add") {
+    post_op_fusion_type = WOQ_FUSE_ADD;
+  } else if (post_op == "add_add") {
+    post_op_fusion_type = WOQ_FUSE_ADD_ADD;
+  } else if (post_op == "mul") {
+    post_op_fusion_type = WOQ_FUSE_MUL;
+  }
   int64_t quant_w_mode = group_size > 0 ? 1 : 0;
-  return woq_tpp_gemm_kernel_stub(
+  auto K = self.size(-1);
+  auto M = self.numel() / K;
+  auto in = self;
+  // Big performance regression is found with some odd M
+  // So, we pad M to the nearest even number
+  bool m_padded = false;
+  if (M >= PAD_M_THRESHOLD && M % 2 == 1) {
+    in = at::pad(in.view({M, K}), {0, 0, 0, 1}, "constant", 0);
+    m_padded = true;
+  }
+  auto y = woq_tpp_gemm_kernel_stub(
       kCPU,
-      self,
+      in,
       weight,
       scales_list,
       zps_list,
       bias_list,
       weight_dtype,
       lowp_mode,
-      WOQ_FUSE_ADD_ADD, // post op add-add
+      post_op_fusion_type,
       others,
       act_quant_mode,
       quant_w_mode,
-      group_size);
+      group_size,
+      compensation);
+  if (m_padded) {
+    auto out_size = self.sizes().vec();
+    out_size.back() = y.size(-1);
+    y = y.narrow(0, 0, M).view(out_size);
+  }
+  return y;
 }
 
 at::Tensor woq_linear_add_forward(
@@ -571,7 +688,7 @@ at::Tensor woq_linear_add_forward(
     const std::vector<at::Tensor>& others) {
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run_add(input, others);
+      ->run_binary(input, "add", others);
 }
 
 at::Tensor woq_linear_add_add_forward(
@@ -580,77 +697,18 @@ at::Tensor woq_linear_add_add_forward(
     const std::vector<at::Tensor>& others) {
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
-      ->run_add_add(input, others);
+      ->run_binary(input, "add_add", others);
+}
+
+at::Tensor woq_linear_mul_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context,
+    const std::vector<at::Tensor>& others) {
+  return reinterpret_cast<IpexWoqLinearOpContext*>(
+             op_context.data_ptr<int64_t>()[0])
+      ->run_binary(input, "mul", others);
 }
 #endif
-
-at::Tensor matmul_i8i8i32(const at::Tensor& input, const at::Tensor& weight) {
-  // x:s8 * w:s8 -> y:s32
-  // No bias
-  TORCH_CHECK(
-      input.scalar_type() == c10::kChar,
-      "matmul_i8i8i32: input dtype should be signed int8 but found ",
-      input.scalar_type());
-  TORCH_CHECK(
-      weight.scalar_type() == c10::kChar,
-      "matmul_i8i8i32: weight dtype should be signed int8 but found ",
-      weight.scalar_type());
-  TORCH_CHECK(
-      input.dim() == 2 && weight.dim() == 2,
-      "matmul_i8i8i32: Expect Input and weight are 2d but got ",
-      input.dim(),
-      " and ",
-      weight.dim());
-  TORCH_CHECK(
-      input.size(1) == weight.size(1),
-      "matmul_i8i8i32: Input shape and weight shape do not match, got ",
-      input.sizes(),
-      " and ",
-      weight.sizes());
-  auto output_shape = input.sizes().vec();
-  output_shape.back() = weight.size(0);
-  auto output = at::empty(output_shape, input.options().dtype(c10::kInt));
-  auto input_contig = input.contiguous();
-  auto weight_contig = weight.t().contiguous();
-  // Create ideep tensors for oneDNN computation
-  auto src = ideep::tensor(
-      {input_contig.sizes().vec(),
-       ideep::tensor::data_type::s8,
-       input_contig.strides().vec()},
-      input_contig.data_ptr());
-  auto wei = ideep::tensor(
-      {weight_contig.sizes().vec(),
-       ideep::tensor::data_type::s8,
-       weight_contig.strides().vec()},
-      weight_contig.data_ptr());
-  auto dst = ideep::tensor(
-      {output.sizes().vec(),
-       ideep::tensor::data_type::s32,
-       output.strides().vec()},
-      output.data_ptr());
-  // Create primitive desc
-  auto engine = ideep::engine::cpu_engine();
-  ideep::attr_t op_attr;
-  op_attr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-  auto src_desc = src.get_desc();
-  auto wei_desc = wei.get_desc();
-  auto dst_desc = dst.get_desc();
-  auto prim_desc = dnnl::matmul::primitive_desc(
-      engine, src_desc, wei_desc, dst_desc, op_attr);
-  // Reorder weight
-  auto expected_weight = wei.reorder_if_differ_in(prim_desc.weights_desc());
-  // Prepare args for primitive
-  ideep::tensor scratchpad(prim_desc.scratchpad_desc());
-  ideep::exec_args args;
-  args.insert({DNNL_ARG_SRC, src});
-  args.insert({DNNL_ARG_WEIGHTS, expected_weight});
-  args.insert({DNNL_ARG_DST, dst});
-  args.insert({DNNL_ARG_SCRATCHPAD, scratchpad});
-  // Create primitve and execute
-  auto primitive = dnnl::matmul(prim_desc);
-  primitive.execute(ideep::stream::default_stream(), args);
-  return output;
-}
 
 } // namespace cpu
 } // namespace torch_ipex
@@ -698,8 +756,9 @@ at::Tensor ipex_linear_eltwise(
   auto target_type = get_autocast_dtype();
   TORCH_CHECK(
       weight.scalar_type() == at::kBFloat16 ||
+          weight.scalar_type() == at::kHalf ||
           weight.scalar_type() == at::kFloat,
-      "ipex_linear_eltwise only support bfloat16 and float autocast dtype");
+      "ipex_linear_eltwise only support bfloat16, float16 and float autocast dtype");
   // should not autocast weight/bias here since we are using it from op_context,
   // The cast for weight/bias should be only handled in ipex.optimize
   return op.call(
@@ -745,6 +804,28 @@ at::Tensor woq_linear_new_gelu_forward(
   return op.call(cpu_cached_cast(target_type, input), op_context);
 }
 
+at::Tensor woq_linear_relu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::woq_linear_relu", "")
+                       .typed<decltype(woq_linear_relu_forward)>();
+  auto target_type = get_autocast_dtype();
+  return op.call(cpu_cached_cast(target_type, input), op_context);
+}
+
+at::Tensor woq_linear_silu_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::woq_linear_silu", "")
+                       .typed<decltype(woq_linear_silu_forward)>();
+  auto target_type = get_autocast_dtype();
+  return op.call(cpu_cached_cast(target_type, input), op_context);
+}
+
 at::Tensor woq_linear_add_forward(
     const at::Tensor& input,
     const at::Tensor& op_context,
@@ -774,16 +855,22 @@ at::Tensor woq_linear_add_add_forward(
       op_context,
       cpu_cached_cast(target_type, others));
 }
-#endif
 
-at::Tensor matmul_i8i8i32(const at::Tensor& input, const at::Tensor& weight) {
+at::Tensor woq_linear_mul_forward(
+    const at::Tensor& input,
+    const at::Tensor& op_context,
+    const std::vector<at::Tensor>& others) {
   c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
   static auto op = torch::Dispatcher::singleton()
-                       .findSchemaOrThrow("torch_ipex::matmul_i8i8i32", "")
-                       .typed<decltype(matmul_i8i8i32)>();
-  // input is int8. Don't cast to autocast dtype
-  return op.call(input, weight);
+                       .findSchemaOrThrow("torch_ipex::woq_linear_mul", "")
+                       .typed<decltype(woq_linear_mul_forward)>();
+  auto target_type = get_autocast_dtype();
+  return op.call(
+      cpu_cached_cast(target_type, input),
+      op_context,
+      cpu_cached_cast(target_type, others));
 }
+#endif
 
 } // namespace autocast
 } // namespace torch_ipex
@@ -829,6 +916,24 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "woq_linear_new_gelu",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_new_gelu_forward);
+  m.def("woq_linear_relu(Tensor input, Tensor W_prepack) -> Tensor");
+  m.impl(
+      "woq_linear_relu",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::woq_linear_relu_forward);
+  m.impl(
+      "woq_linear_relu",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::woq_linear_relu_forward);
+  m.def("woq_linear_silu(Tensor input, Tensor W_prepack) -> Tensor");
+  m.impl(
+      "woq_linear_silu",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::woq_linear_silu_forward);
+  m.impl(
+      "woq_linear_silu",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::woq_linear_silu_forward);
   m.def(
       "woq_linear_add(Tensor input, Tensor W_prepack, Tensor[] others) -> Tensor");
   m.impl(
@@ -849,6 +954,16 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "woq_linear_add_add",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_add_add_forward);
+  m.def(
+      "woq_linear_mul(Tensor input, Tensor W_prepack, Tensor[] others) -> Tensor");
+  m.impl(
+      "woq_linear_mul",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::woq_linear_mul_forward);
+  m.impl(
+      "woq_linear_mul",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::woq_linear_mul_forward);
 #endif
   // fuse eltwise
   m.def(
@@ -881,14 +996,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "linear_eltwise_backward",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::linear_eltwise_backward);
-  // bnb
-  m.def("matmul_i8i8i32(Tensor input, Tensor weight) -> Tensor");
-  m.impl(
-      "matmul_i8i8i32", c10::DispatchKey::CPU, torch_ipex::cpu::matmul_i8i8i32);
-  m.impl(
-      "matmul_i8i8i32",
-      c10::DispatchKey::AutocastCPU,
-      torch_ipex::autocast::matmul_i8i8i32);
 }
 
 } // namespace

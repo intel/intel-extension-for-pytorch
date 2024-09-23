@@ -1,6 +1,7 @@
 import unittest
 import torch
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 import sys
 import subprocess
 import os
@@ -16,7 +17,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.38.1"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.43.2"]
     )
     import transformers
     from transformers import AutoConfig
@@ -29,8 +30,8 @@ torch.manual_seed(128)
 curpath = os.path.abspath(os.path.dirname(__file__))
 
 
-def _get_gptj_example_inputs():
-    input_ids = torch.ones(8).to(torch.long)
+def _get_gptj_example_inputs(batch_size=8):
+    input_ids = torch.ones(batch_size).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
     past_key_values = tuple(
@@ -145,7 +146,8 @@ class OptimizeTransformersTester(TestCase):
         with torch.no_grad():
             key_hf = ref_m(**input_dict)
         with torch.no_grad(), torch.cpu.amp.autocast(
-            enabled=True if dtype is torch.bfloat16 else False
+            enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
+            dtype=dtype,
         ):
             key_ipex = ipex_m(**input_dict)
         error_message = f"model={m.name}, deployment_mode={deployment_mode}, torchcompile={torchcompile}, return_dict={return_dict}"
@@ -160,6 +162,8 @@ class OptimizeTransformersTester(TestCase):
 
     def test_model_replacement(self):
         dtypes = [torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         enable_torchcompile = [False, True]
         deployment_mode = [True, False]
         return_dict = [False, True]
@@ -242,6 +246,66 @@ class OptimizeTransformersTester(TestCase):
         )
         m = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
         self._model_replacement_check_woq(m)
+
+    def test_weight_only_quant_cache_weight_for_large_batch(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptj", return_dict=False
+        )
+        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+
+        weight_dtype_list = [
+            ipex.quantization.WoqWeightDtype.INT8,
+            ipex.quantization.WoqWeightDtype.INT4,
+            ipex.quantization.WoqWeightDtype.NF4,
+        ]
+        lowp_mode_list = [
+            ipex.quantization.WoqLowpMode.BF16,
+            ipex.quantization.WoqLowpMode.INT8,
+        ]
+        cases = itertools.product(weight_dtype_list, lowp_mode_list)
+        for weight_dtype, lowp_mode in cases:
+            if (
+                weight_dtype != ipex.quantization.WoqWeightDtype.INT4
+                and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+            ):
+                continue
+            qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=weight_dtype,
+                lowp_mode=lowp_mode,
+            )
+            model_ref = ipex.llm.optimize(
+                copy.deepcopy(m),
+                dtype=torch.bfloat16,
+                quantization_config=qconfig_mapping,
+                deployment_mode=True,
+                cache_weight_for_large_batch=False,
+            )
+            model = ipex.llm.optimize(
+                copy.deepcopy(m),
+                dtype=torch.bfloat16,
+                quantization_config=qconfig_mapping,
+                deployment_mode=True,
+                cache_weight_for_large_batch=True,
+            )
+            linear_list = [
+                model.transformer.h[0].attn.concat_qkv.concat_linear,
+                model.transformer.h[0].attn.out_proj,
+                model.transformer.h[0].linear_add_add.linear,
+                model.transformer.h[0].linear_gelu.linear,
+            ]
+            with torch.no_grad(), torch.cpu.amp.autocast(enabled=True):
+                example_inputs = _get_gptj_example_inputs(batch_size=128)
+                y = model(*example_inputs)
+                y_ref = model_ref(*example_inputs)
+                for l in linear_list:
+                    if l._op_context.get_weight().ndim == 4:
+                        assert l._op_context.get_cached_weight() is not None
+                tol = (
+                    1.5e-1
+                    if weight_dtype == ipex.quantization.WoqWeightDtype.NF4
+                    else 5e-2
+                )
+                self.assertEqual(y[0], y_ref[0], prec=tol)
 
     def test_static_quant_flow(self):
         config = AutoConfig.from_pretrained(
@@ -404,46 +468,84 @@ class OptimizeTransformersTester(TestCase):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
         )
-        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
-        ref_m = copy.deepcopy(m)
-        ipex_m = ipex.llm.optimize(
-            m, dtype=torch.bfloat16, deployment_mode=True, inplace=True
+        dtypes = [torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+        for dtype in dtypes:
+            m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+            ref_m = copy.deepcopy(m)
+            ipex_m = ipex.llm.optimize(
+                m, dtype=dtype, deployment_mode=True, inplace=True
+            )
+            input_ids = torch.ones(8).unsqueeze(0).to(torch.long)
+            # beam_search, beam=4
+            generate_kwargs_beam = dict(
+                do_sample=False,
+                temperature=0.9,
+                num_beams=4,
+                max_new_tokens=2,
+                min_new_tokens=2,
+            )
+            # greedy_search
+            generate_kwargs_greedy = dict(
+                do_sample=False, temperature=0.9, max_new_tokens=2, min_new_tokens=2
+            )
+            # sample, use a temperature of 0.001 to constrain text generation diversity in UT.
+            generate_kwargs_sample = dict(
+                do_sample=True, temperature=0.001, max_new_tokens=2, min_new_tokens=2
+            )
+            # beam_sample, use a temperature of 0.001 to constrain text generation diversity in UT.
+            generate_kwargs_beam_sample = dict(
+                do_sample=True,
+                temperature=0.001,
+                num_beams=4,
+                max_new_tokens=2,
+                min_new_tokens=2,
+            )
+            for generate_kwargs in [
+                generate_kwargs_beam,
+                generate_kwargs_greedy,
+                generate_kwargs_sample,
+                generate_kwargs_beam_sample,
+            ]:
+                with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
+                    enabled=True, dtype=dtype
+                ):
+                    ipex_res = ipex_m.generate(input_ids, **generate_kwargs)
+                    ref_res = ref_m.generate(input_ids, **generate_kwargs)
+                    self.assertEqual(ipex_res, ref_res)
+
+    def test_cache_weight_for_large_batch(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptj", return_dict=False
         )
-        input_ids = torch.ones(8).unsqueeze(0).to(torch.long)
-        # beam_search, beam=4
-        generate_kwargs_beam = dict(
-            do_sample=False,
-            temperature=0.9,
-            num_beams=4,
-            max_new_tokens=2,
-            min_new_tokens=2,
+        model = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+        model_ref = ipex.llm.optimize(
+            copy.deepcopy(model),
+            dtype=torch.bfloat16,
+            deployment_mode=True,
+            cache_weight_for_large_batch=False,
         )
-        # greedy_search
-        generate_kwargs_greedy = dict(
-            do_sample=False, temperature=0.9, max_new_tokens=2, min_new_tokens=2
+
+        model = ipex.llm.optimize(
+            model,
+            dtype=torch.bfloat16,
+            deployment_mode=True,
+            cache_weight_for_large_batch=True,
         )
-        # sample, use a temperature of 0.01 to constrain text generation diversity in UT.
-        generate_kwargs_sample = dict(
-            do_sample=True, temperature=0.01, max_new_tokens=2, min_new_tokens=2
-        )
-        # beam_sample, use a temperature of 0.01 to constrain text generation diversity in UT.
-        generate_kwargs_sample = dict(
-            do_sample=True,
-            temperature=0.01,
-            num_beams=4,
-            max_new_tokens=2,
-            min_new_tokens=2,
-        )
-        for generate_kwargs in [
-            generate_kwargs_beam,
-            generate_kwargs_greedy,
-            generate_kwargs_sample,
-            generate_kwargs_sample,
-        ]:
-            with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast():
-                ipex_res = ipex_m.generate(input_ids, **generate_kwargs)
-                ref_res = ref_m.generate(input_ids, **generate_kwargs)
-                self.assertEqual(ipex_res, ref_res)
+        linear_list = [
+            model.transformer.h[0].attn.concat_qkv.concat_linear,
+            model.transformer.h[0].attn.out_proj,
+            model.transformer.h[0].linear_add_add.linear,
+            model.transformer.h[0].linear_gelu.linear,
+        ]
+        with torch.no_grad(), torch.cpu.amp.autocast(enabled=True):
+            example_inputs = _get_gptj_example_inputs(batch_size=512)
+            y = model(*example_inputs)
+            y_ref = model_ref(*example_inputs)
+            assert all(hasattr(l, "weight_for_large_batch") for l in linear_list)
+            assert all(l.weight_for_large_batch is not None for l in linear_list)
+            self.assertEqual(y[0], y_ref[0])
 
 
 if __name__ == "__main__":

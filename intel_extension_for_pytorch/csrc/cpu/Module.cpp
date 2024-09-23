@@ -36,6 +36,7 @@
 
 #include "TaskModule.h"
 #include "aten/EmbeddingBag.h"
+#include "aten/TPPShmAllReduceAdd.h"
 #include "comm/comm.h"
 #include "runtime/CPUPool.h"
 #include "runtime/TaskExecutor.h"
@@ -166,6 +167,15 @@ void InitIpexModuleBindings(py::module m) {
   m.def("get_jit_linear_repack", []() {
     return AutoOptConfig::singleton().get_jit_repack_for_linear();
   });
+  m.def("disable_jit_concat_linear", []() {
+    AutoOptConfig::singleton().set_jit_concat_linear(false);
+  });
+  m.def("enable_jit_concat_linear", []() {
+    AutoOptConfig::singleton().set_jit_concat_linear(true);
+  });
+  m.def("get_jit_concat_linear", []() {
+    return AutoOptConfig::singleton().get_jit_concat_linear();
+  });
 
   // BF32
   py::enum_<FP32MathMode>(m, "FP32MathMode")
@@ -271,6 +281,7 @@ void InitIpexModuleBindings(py::module m) {
 
   // communication related
   m.def("get_rank", &torch_ipex::cpu::get_rank);
+  m.def("tpp_shm_allreduce", &torch_ipex::cpu::tpp_shmallreduce_forward);
   m.def("get_world_size", &torch_ipex::cpu::get_world_size);
   m.def("barrier", &torch_ipex::cpu::barrier);
 

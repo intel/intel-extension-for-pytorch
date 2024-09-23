@@ -6,7 +6,6 @@ import torch.nn.functional as F
 import random
 import itertools
 import intel_extension_for_pytorch as ipex
-import intel_extension_for_pytorch._C as core
 from common_utils import TestCase
 import torch.autograd.functional as autogradF
 from copy import deepcopy
@@ -1403,16 +1402,10 @@ class CPUOPsTester(TestCase):
             self.assertTrue(y7.size() == torch.Size([8, 2]))
             self.assertTrue(y7.dtype == datatype)
 
-    def test_flash_attention(self):
-        dtypes = [torch.float, torch.double, torch.bfloat16]
-        if core.isa_has_amx_fp16_support():
-            dtypes.append(torch.float16)
+    def test_flash_attention_without_mask(self):
+        dtypes = [torch.float, torch.double, torch.bfloat16, torch.float16]
         for dtype in dtypes:
-            for causal, has_attention_mask in [
-                [False, False],
-                [True, False],
-                [False, True],
-            ]:
+            for causal in [True, False]:
                 for batch_size, seq_len, n_head, head_dim in itertools.product(
                     [2, 12], [1, 129, 267, 533, 1030], [1, 3, 4], [7, 8, 16]
                 ):
@@ -1450,30 +1443,18 @@ class CPUOPsTester(TestCase):
                     q2 = q2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
                     v2 = v2.view(batch_size, seq_len, n_head, head_dim).transpose(1, 2)
 
-                    mask = (
-                        torch.randn(
-                            (batch_size, 1, seq_len, seq_len),
-                            device="cpu",
-                            dtype=dtype,
-                            requires_grad=False,
-                        )
-                        if has_attention_mask
-                        else None
-                    )
                     actual = torch.ops.torch_ipex.flash_attention(
                         q,
                         k,
                         v,
                         dropout_p=0.0,
                         is_causal=causal,
-                        attention_mask=mask,
                     )[0]
                     math_ref = (
                         torch._scaled_dot_product_attention_math(
                             q2,
                             k2,
                             v2,
-                            attn_mask=mask,
                             dropout_p=0.0,
                             is_causal=causal,
                         )
@@ -1482,6 +1463,129 @@ class CPUOPsTester(TestCase):
                     if dtype in [torch.bfloat16, torch.float16]:
                         math_ref = math_ref.to(dtype)
                     torch.testing.assert_close(actual, math_ref, atol=atol, rtol=rtol)
+
+    def test_flash_attention_with_mask(self):
+        import math
+
+        dtypes = [torch.float, torch.double, torch.bfloat16, torch.float16]
+        for dtype in dtypes:
+            for is_causal in [True, False]:
+                for mask_dim in [2, 4]:
+                    batch_size, seq_len, n_head, head_dim = 2, 129, 4, 8
+                    atol = 1e-5
+                    rtol = 5e-6
+                    if dtype is torch.bfloat16:
+                        atol = 2e-2
+                        rtol = 2e-2
+                    if dtype is torch.float16:
+                        atol = 1e-2
+                        rtol = 1e-2
+                    attn_mask_dtypes = (
+                        [dtype, torch.bool, torch.float]
+                        if dtype in [torch.bfloat16, torch.float16]
+                        else [dtype, torch.bool]
+                    )
+                    for attn_mask_dtype in attn_mask_dtypes:
+                        for attn_mask_shape in (
+                            itertools.product([seq_len, 1], [seq_len, 1])
+                            if mask_dim == 2
+                            else itertools.product(
+                                [batch_size, 1], [n_head, 1], [seq_len, 1], [seq_len, 1]
+                            )
+                        ):
+                            n_embd = n_head * head_dim
+                            x = torch.randn(
+                                (batch_size, seq_len, 3 * n_head * head_dim),
+                                device="cpu",
+                                dtype=dtype,
+                                requires_grad=False,
+                            )
+                            x2 = x.clone()
+
+                            q, k, v = x.split(n_embd, dim=2)
+                            q2, k2, v2 = x2.split(n_embd, dim=2)
+
+                            if dtype in [torch.bfloat16, torch.float16]:
+                                q2 = q2.float()
+                                k2 = k2.float()
+                                v2 = v2.float()
+
+                            # (B, nh, T, hs)
+                            k = k.view(batch_size, seq_len, n_head, head_dim).transpose(
+                                1, 2
+                            )
+                            q = q.view(batch_size, seq_len, n_head, head_dim).transpose(
+                                1, 2
+                            )
+                            v = v.view(batch_size, seq_len, n_head, head_dim).transpose(
+                                1, 2
+                            )
+                            k2 = k2.view(
+                                batch_size, seq_len, n_head, head_dim
+                            ).transpose(1, 2)
+                            q2 = q2.view(
+                                batch_size, seq_len, n_head, head_dim
+                            ).transpose(1, 2)
+                            v2 = v2.view(
+                                batch_size, seq_len, n_head, head_dim
+                            ).transpose(1, 2)
+
+                            if attn_mask_dtype == torch.bool:
+                                mask = torch.ones(
+                                    attn_mask_shape,
+                                    dtype=torch.bool,
+                                    device="cpu",
+                                    requires_grad=False,
+                                ).tril(diagonal=0)
+                                # _scaled_dot_product_attention_math does the type conversion outside
+                                mask2 = torch.zeros_like(mask, dtype=dtype)
+                                mask2[mask == False] = -float("inf")  # noqa: E712
+                            else:
+                                mask = torch.randn(
+                                    attn_mask_shape,
+                                    dtype=attn_mask_dtype,
+                                    device="cpu",
+                                    requires_grad=False,
+                                )
+                                mask2 = mask
+                            actual = torch.ops.torch_ipex.flash_attention(
+                                q,
+                                k,
+                                v,
+                                dropout_p=0.0,
+                                attention_mask=mask,
+                                is_causal=is_causal,
+                            )[0]
+                            # math ref path with both is_causal and attn mask
+                            attn_mask_shape = list(attn_mask_shape)
+                            attn_mask_shape[-2] = q2.size(-2)
+                            attn_mask_shape[-1] = k2.size(-2)
+                            scale_factor = 1 / math.sqrt(q2.size(-1))
+                            attn_bias = torch.zeros(attn_mask_shape, dtype=q2.dtype)
+                            if is_causal:
+                                temp_mask = torch.ones(
+                                    attn_mask_shape, dtype=torch.bool
+                                ).tril(diagonal=0)
+                                attn_bias.masked_fill_(
+                                    temp_mask.logical_not(), float("-inf")
+                                )
+                                attn_bias.to(q2.dtype)
+                            if mask2.dtype == torch.bool:
+                                attn_bias.masked_fill_(
+                                    mask2.logical_not(), float("-inf")
+                                )
+                            else:
+                                attn_bias += mask2
+                            attn_weight = q2 @ k2.transpose(-2, -1) * scale_factor
+                            attn_weight += attn_bias
+                            attn_weight = torch.softmax(attn_weight, dim=-1)
+                            math_ref = attn_weight @ v2
+
+                        if dtype in [torch.bfloat16, torch.float16]:
+                            math_ref = math_ref.to(dtype)
+                            torch.testing.assert_close(
+                                actual, math_ref, atol=atol, rtol=rtol
+                            )
 
     def test_flash_attention_stride0(self):
         input_shape = (

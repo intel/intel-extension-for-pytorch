@@ -4,6 +4,7 @@ import unittest
 import random
 from typing import List, Optional, Tuple
 from itertools import product
+import intel_extension_for_pytorch._C as core
 
 
 class PagedAttentionTest(TestCase):
@@ -141,10 +142,6 @@ class PagedAttentionTest(TestCase):
             dim=1,
         )
         query = query.view(num_seqs, num_query_heads, head_size)
-        # import pdb
-
-        # pdb.set_trace()
-        print(query.shape, query.stride())
         query.uniform_(-scale, scale)
         assert num_query_heads % num_kv_head == 0
         num_queries_per_kv = num_query_heads // num_kv_head
@@ -210,6 +207,8 @@ class PagedAttentionTest(TestCase):
     def test_paged_attention(self):
         num_blocks = 128
         dtypes = [torch.bfloat16, torch.float]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         num_gen_seqs = [7]  # Arbitrary values for testing
         num_heads = [(40, 40), (64, 16)]  # Arbitrary values for testing
         head_sizes = [64, 80, 128, 96, 112, 128, 256]
@@ -301,6 +300,8 @@ class PagedAttentionTest(TestCase):
         head_sizes = [64, 80, 128, 96, 112, 128, 256]
         block_sizes = [16, 32]
         dtypes = [torch.bfloat16, torch.float]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         seeds = [0]
         for (
             num_token,

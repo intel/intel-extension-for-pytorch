@@ -8,101 +8,13 @@
 
 #include <ATen/Tensor.h>
 #include <aten/FlashAttention.h>
+#include <aten/utils/mkl_gemm.h>
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
 #include <limits>
 #include "../cpu/utils/isa_utils.h"
 #include "csrc/cpu/tpp/woq/tla.h"
-#include "mkl.h"
 #include "vec/vec.h"
-
-inline void _mkl_gemm(
-    const CBLAS_LAYOUT layout,
-    const CBLAS_TRANSPOSE transa,
-    const CBLAS_TRANSPOSE transb,
-    const int& m,
-    const int& n,
-    const int& k,
-    const float& alpha,
-    const float* a,
-    const int& lda,
-    const float* b,
-    const int& ldb,
-    const float& beta,
-    float* c,
-    const int& ldc) {
-  cblas_sgemm(
-      layout, transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
-}
-
-inline void _mkl_gemm(
-    const CBLAS_LAYOUT layout,
-    const CBLAS_TRANSPOSE transa,
-    const CBLAS_TRANSPOSE transb,
-    const int& m,
-    const int& n,
-    const int& k,
-    const double& alpha,
-    const double* a,
-    const int& lda,
-    const double* b,
-    const int& ldb,
-    const double& beta,
-    double* c,
-    const int& ldc) {
-  cblas_dgemm(
-      layout, transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
-}
-
-inline void _mkl_gemm(
-    const CBLAS_LAYOUT layout,
-    const CBLAS_TRANSPOSE transa,
-    const CBLAS_TRANSPOSE transb,
-    const int& m,
-    const int& n,
-    const int& k,
-    const float& alpha,
-    const at::BFloat16* a,
-    const int& lda,
-    const at::BFloat16* b,
-    const int& ldb,
-    const float& beta,
-    float* c,
-    const int& ldc) {
-  cblas_gemm_bf16bf16f32(
-      layout,
-      transa,
-      transb,
-      m,
-      n,
-      k,
-      alpha,
-      (const MKL_BF16*)(a),
-      lda,
-      (const MKL_BF16*)(b),
-      ldb,
-      beta,
-      c,
-      ldc);
-}
-
-inline void _mkl_gemm(
-    const CBLAS_LAYOUT layout,
-    const CBLAS_TRANSPOSE transa,
-    const CBLAS_TRANSPOSE transb,
-    const int& m,
-    const int& n,
-    const int& k,
-    const float& alpha,
-    const at::Half* a,
-    const int& lda,
-    const at::Half* b,
-    const int& ldb,
-    const float& beta,
-    float* c,
-    const int& ldc) {
-  TORCH_CHECK(false, "_mkl_gemm does not support FP16 yet");
-}
 
 namespace torch_ipex {
 using namespace tpp;
@@ -283,82 +195,52 @@ inline Vectorized<float> exp_u20(Vectorized<float> data) {
 #endif
 
 // out = val * a + b
-template <typename T1, typename T2>
+// is_b_stride_zero: If the stride of b is 0 (mask broadcasting case),
+//                take b as a scalar pointer.
+template <bool is_b_stride_zero, typename T1, typename T2>
 inline void _scale_attn_mask_fusion_kernel(
     T1* a,
     T2* b,
     const int& size,
     T1* out,
     T1& val) {
-  TORCH_CHECK(false, "Not implemented.");
-}
-
-// out = val * a + b
-template <
-    typename T1,
-    typename std::enable_if_t<
-        at::vec::CPU_CAPABILITY::is_reduced_floating_point_v<T1>,
-        int> = 0>
-inline void _scale_attn_mask_fusion_kernel(
-    float* a,
-    T1* b,
-    const int& size,
-    float* out,
-    float& val) {
-  auto vec_size = at::vec::Vectorized<float>::size();
-  auto vec_scale = at::vec::Vectorized<float>(val);
-  at::vec::Vectorized<float> res_vec1(0);
-  at::vec::Vectorized<float> res_vec2(0);
-  for (long i = 0; i < vec_size * (size / vec_size); i += vec_size) {
-    auto tmp0 = at::vec::Vectorized<float>::loadu(a + i);
-    auto tmp1 = at::vec::Vectorized<T1>::loadu(b + i);
-    std::tie(res_vec1, res_vec2) = at::vec::convert_to_float<T1>(tmp1);
-    auto tmp2 = tmp0 * vec_scale + res_vec1;
-    _store(out + i, tmp2);
-  }
-  for (long i = vec_size * (size / vec_size); i < size; i++) {
-    auto tmp0 = a[i];
-    auto tmp1 = (float)b[i];
-    out[i] = tmp0 * val + tmp1;
-  }
-}
-
-// out = val * a + b
-template <typename T1>
-inline void _scale_attn_mask_fusion_kernel(
-    T1* a,
-    T1* b,
-    const int& size,
-    T1* out,
-    T1& val) {
-  auto vec_size = at::vec::Vectorized<T1>::size();
-  auto vec_scale = at::vec::Vectorized<T1>(val);
-  for (long i = 0; i < vec_size * (size / vec_size); i += vec_size) {
-    auto tmp0 = at::vec::Vectorized<T1>::loadu(a + i);
-    auto tmp1 = at::vec::Vectorized<T1>::loadu(b + i);
-    auto tmp2 = tmp0 * vec_scale + tmp1;
-    _store(out + i, tmp2);
-  }
-  for (long i = vec_size * (size / vec_size); i < size; i++) {
-    auto tmp0 = a[i];
-    auto tmp1 = b[i];
-    out[i] = tmp0 * val + tmp1;
-  }
-}
-
-// out = b ? val * a : -inf
-template <typename T1>
-inline void _scale_attn_mask_fusion_kernel(
-    T1* a,
-    bool* b,
-    const int& size,
-    T1* out,
-    T1& val) {
-  auto neg_inf = -std::numeric_limits<T1>::infinity();
-  for (long i = 0; i < size; i++) {
-    auto tmp0 = a[i];
-    auto tmp1 = b[i];
-    out[i] = tmp1 ? tmp0 * val : neg_inf;
+  const auto vec_size1 = at::vec::Vectorized<T1>::size();
+  const auto vec_size2 = at::vec::Vectorized<T2>::size();
+  constexpr int64_t T1_n =
+      (vec_size2 == vec_size1 * 2 && is_reduced_floating_point_v<T2>) ? 2 : 1;
+  constexpr int64_t T2_n = 1;
+  auto vec_scale = at::vec::VectorizedN<T1, T1_n>(val);
+  int64_t i = 0;
+  if (is_b_stride_zero) {
+    auto b_first_val = (T1)b[0];
+    auto b_first_vec = at::vec::VectorizedN<T2, T2_n>(b_first_val);
+    for (; i < size - (size % vec_size2); i += vec_size2) {
+      auto a_n = at::vec::VectorizedN<T1, T1_n>::loadu(a + i);
+      auto b_n = b_first_vec;
+      at::vec::VectorizedN<T1, T1_n> b_n_convert =
+          at::vec::convert<T1, T1_n, T2, T2_n, true>(b_n);
+      auto res = a_n * vec_scale + b_n_convert;
+      res.store(out + i);
+    }
+    for (; i < size; i++) {
+      auto tmp0 = a[i];
+      auto tmp1 = b_first_val;
+      out[i] = tmp0 * val + tmp1;
+    }
+  } else {
+    for (; i < size - (size % vec_size2); i += vec_size2) {
+      auto a_n = at::vec::VectorizedN<T1, T1_n>::loadu(a + i);
+      auto b_n = at::vec::VectorizedN<T2, T2_n>::loadu(b + i);
+      at::vec::VectorizedN<T1, T1_n> b_n_convert =
+          at::vec::convert<T1, T1_n, T2, T2_n, true>(b_n);
+      auto res = a_n * vec_scale + b_n_convert;
+      res.store(out + i);
+    }
+    for (; i < size; i++) {
+      auto tmp0 = a[i];
+      auto tmp1 = (T1)b[i];
+      out[i] = tmp0 * val + tmp1;
+    }
   }
 }
 
@@ -431,6 +313,82 @@ inline void _mul_reduce_max_fusion_kernel(
           vec_tmp_max));
 }
 
+// This function is used to produce an attn_mask in a standard format
+inline std::optional<at::Tensor> convert_boolean_attn_mask(
+    const std::optional<at::Tensor>& attn_mask,
+    caffe2::TypeMeta dtype) {
+  // Pass through
+  if (!attn_mask.has_value()) {
+    return c10::nullopt;
+  }
+  // Convert boolean mask to additive mask
+  if (attn_mask->dtype() == at::kBool) {
+    auto new_attn_mask = at::zeros_like(attn_mask.value(), dtype);
+    new_attn_mask.masked_fill_(
+        attn_mask->logical_not(), -std::numeric_limits<double>::infinity());
+    return new_attn_mask;
+  }
+  // Otherwise, attn_mask represents an additive attention tensor
+  return attn_mask;
+}
+
+// Support mask shapes:
+// 2d: ({Q_seq_len, 1}  x {KV_seq_len, 1})
+// 4d: ({Batch, 1} x {Num_heads, 1} x {Q_seq_len, 1}  x {KV_seq_len, 1})
+inline bool check_attn_mask_shape(
+    at::Tensor& attn_mask,
+    int64_t batchSize,
+    int64_t num_head,
+    int64_t qSize,
+    int64_t kvSize) {
+  if (attn_mask.size(-2) != qSize && attn_mask.size(-2) != 1) {
+    return false;
+  }
+  if (attn_mask.size(-1) != kvSize && attn_mask.size(-1) != 1) {
+    return false;
+  }
+  if (attn_mask.dim() == 2) {
+    return true;
+  } else if (attn_mask.dim() == 4) {
+    if ((attn_mask.size(0) == 1 || attn_mask.size(0) == batchSize) &&
+        (attn_mask.size(1) == 1 || attn_mask.size(1) == num_head)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Reshape attention mask to 4d
+inline void reshape_attn_mask_to_4d(
+    at::Tensor& attn_mask,
+    int64_t batchSize,
+    int64_t num_head,
+    int64_t qSize,
+    int64_t kvSize) {
+  TORCH_CHECK(
+      check_attn_mask_shape(attn_mask, batchSize, num_head, qSize, kvSize),
+      "IPEX flash_attention: Please use the following attn mask shapes: ",
+      "2d - ({Q_seq_len, 1}  x {KV_seq_len, 1}); ",
+      "4d - ({Batch, 1} x {Num_heads, 1} x {Q_seq_len, 1}  x {KV_seq_len, 1})");
+  int64_t attn_mask_size_0 = 1;
+  int64_t attn_mask_size_1 = 1;
+  if (attn_mask.dim() == 4) {
+    if (attn_mask.size(0) == batchSize) {
+      attn_mask_size_0 = batchSize;
+    }
+    if (attn_mask.size(1) == num_head) {
+      attn_mask_size_1 = num_head;
+    }
+  }
+  attn_mask = attn_mask
+                  .view(
+                      {attn_mask_size_0,
+                       attn_mask_size_1,
+                       attn_mask.size(-2),
+                       attn_mask.size(-1)})
+                  .expand({attn_mask_size_0, attn_mask_size_1, qSize, kvSize});
+}
+
 /*
  *Caculate the flash attention SDPA.
  *@template scalar_t: q/k/v data type
@@ -486,6 +444,12 @@ cpu_flash_attention(
   int64_t num_head = query.size(2);
   int64_t headSize = query.size(3);
 
+  // reshape mask
+  if (attention_mask.has_value()) {
+    reshape_attn_mask_to_4d(
+        attention_mask.value(), batchSize, num_head, qSize, kvSize);
+  }
+
   // Strides
   int64_t qStrideB = query.stride(0);
   int64_t qStrideM = query.stride(1);
@@ -511,7 +475,13 @@ cpu_flash_attention(
       ? attention_mask.value().stride(1)
       : 0;
   int64_t mStrideM =
-      attention_mask.has_value() ? attention_mask.value().stride(2) : 0;
+      (attention_mask.has_value() && attention_mask.value().size(2) > 1)
+      ? attention_mask.value().stride(2)
+      : 0;
+  int64_t mStrideN =
+      (attention_mask.has_value() && attention_mask.value().size(3) > 1)
+      ? attention_mask.value().stride(3)
+      : 0;
 
   int64_t qSplitSize = q_split_size > qSize ? qSize : q_split_size;
   int64_t kvSplitSize = kv_split_size > kvSize ? kvSize : kv_split_size;
@@ -602,15 +572,24 @@ cpu_flash_attention(
             // And apply scaling factor
             if (attention_mask.has_value()) {
               for (int64_t row = 0; row < qBlockSize; ++row) {
-                // qk <- attn_mask ? qk : -inf, if attn_mask is bool
-                // qk <- qk + attn_mask, else
-                _scale_attn_mask_fusion_kernel(
-                    qk_data + row * kvBlockSize,
-                    mask_data + i * mStrideB + j * mStrideH +
-                        (m + row) * mStrideM + n,
-                    kvBlockSize,
-                    qk_data + row * kvBlockSize,
-                    scaling_factor);
+                // qk <- qk * scaling_factor + attn_mask, else
+                if (mStrideN == 0) {
+                  _scale_attn_mask_fusion_kernel</*is_stride_zero*/ true>(
+                      qk_data + row * kvBlockSize,
+                      mask_data + i * mStrideB + j * mStrideH +
+                          (m + row) * mStrideM,
+                      kvBlockSize,
+                      qk_data + row * kvBlockSize,
+                      scaling_factor);
+                } else {
+                  _scale_attn_mask_fusion_kernel</*is_stride_zero*/ false>(
+                      qk_data + row * kvBlockSize,
+                      mask_data + i * mStrideB + j * mStrideH +
+                          (m + row) * mStrideM + n,
+                      kvBlockSize,
+                      qk_data + row * kvBlockSize,
+                      scaling_factor);
+                }
               }
             }
             // Update coefficients with Softmax
@@ -726,9 +705,8 @@ cpu_flash_attention(
   const auto dtype = query.scalar_type();
   const auto accumulate_dtype = at::toOpMathType(dtype);
   const bool is_fp16 = dtype == at::kHalf;
-  TORCH_CHECK(
-      !is_fp16 || (is_fp16 && utils::isa_has_amx_fp16_support()),
-      "scaled_dot_product_attention_flash_attention does not support FP16 on the platforms without amx_fp16 support");
+  const int vnni_pack =
+      (!is_fp16 || (is_fp16 && utils::isa_has_amx_fp16_support())) ? 1 : 0;
 
   using accum_t = at::opmath_type<scalar_t>;
   using Vec = at::vec::Vectorized<accum_t>;
@@ -743,6 +721,12 @@ cpu_flash_attention(
   int64_t kvSize = value.size(1);
   int64_t num_head = query.size(2);
   int64_t headSize = query.size(3);
+
+  // reshape mask
+  if (attention_mask.has_value()) {
+    reshape_attn_mask_to_4d(
+        attention_mask.value(), batchSize, num_head, qSize, kvSize);
+  }
 
   // Strides
   int64_t qStrideB = query.stride(0);
@@ -769,7 +753,13 @@ cpu_flash_attention(
       ? attention_mask.value().stride(1)
       : 0;
   int64_t mStrideM =
-      attention_mask.has_value() ? attention_mask.value().stride(2) : 0;
+      (attention_mask.has_value() && attention_mask.value().size(2) > 1)
+      ? attention_mask.value().stride(2)
+      : 0;
+  int64_t mStrideN =
+      (attention_mask.has_value() && attention_mask.value().size(3) > 1)
+      ? attention_mask.value().stride(3)
+      : 0;
 
   int64_t qSplitSize = q_split_size > qSize ? qSize : q_split_size;
   int64_t kvSplitSize = kv_split_size > kvSize ? kvSize : kv_split_size;
@@ -821,7 +811,8 @@ cpu_flash_attention(
       /*ldc*/ kvSplitSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto qk_gemm_ktail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ kvTail,
@@ -833,7 +824,8 @@ cpu_flash_attention(
       /*ldc*/ kvTail,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto qk_gemm_qtail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qTail,
       /*N*/ kvSplitSize,
@@ -845,7 +837,8 @@ cpu_flash_attention(
       /*ldc*/ kvSplitSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto qk_gemm_qktail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qTail,
       /*N*/ kvTail,
@@ -857,7 +850,8 @@ cpu_flash_attention(
       /*ldc*/ kvTail,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
 
   // Create tpp kernels for Attention @ Value
   bool av_gemm_K_even = kvSplitSize % 2 == 0;
@@ -871,51 +865,55 @@ cpu_flash_attention(
   auto av_gemm = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ av_gemm_K,
+      /*K*/ vnni_pack ? av_gemm_K : kvSplitSize,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K,
-      /*ldb*/ headSize,
+      /*ldb*/ vnni_pack ? headSize : vStrideN,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto av_gemm_tail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ av_gemm_K_tail,
+      /*K*/ vnni_pack ? av_gemm_K_tail : kvTail,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K_tail,
-      /*ldb*/ headSize,
+      /*ldb*/ vnni_pack ? headSize : vStrideN,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto av_gemm_bias = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ av_gemm_K,
+      /*K*/ vnni_pack ? av_gemm_K : kvSplitSize,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K,
-      /*ldb*/ headSize,
+      /*ldb*/ vnni_pack ? headSize : vStrideN,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
   auto av_gemm_bias_tail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ av_gemm_K_tail,
+      /*K*/ vnni_pack ? av_gemm_K_tail : kvTail,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K_tail,
-      /*ldb*/ headSize,
+      /*ldb*/ vnni_pack ? headSize : vStrideN,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1)));
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ vnni_pack)));
 
   // Buffer to store Key and Value after transforms
   at::Tensor key_t_reorder = at::empty(
@@ -962,7 +960,8 @@ cpu_flash_attention(
           /*out_cols*/ kvSplitSize,
           /*ldi*/ headSize_even ? kStrideN : qk_gemm_K,
           /*ldo*/ kvSplitSize,
-          /*xtype*/ XformTPP::XFORM_XPOSE_N2V_TPP,
+          /*xtype*/
+          vnni_pack ? XformTPP::XFORM_XPOSE_N2V_TPP : XformTPP::XFORM_XPOSE_TPP,
           /*ignore_vnni_for_fp32*/ true),
       XPOSE);
   auto k_xform_tail = SCOPEIT(
@@ -973,7 +972,8 @@ cpu_flash_attention(
           /*out_cols*/ kvTail,
           /*ldi*/ headSize_even ? kStrideN : qk_gemm_K,
           /*ldo*/ kvTail,
-          /*xtype*/ XformTPP::XFORM_XPOSE_N2V_TPP,
+          /*xtype*/
+          vnni_pack ? XformTPP::XFORM_XPOSE_N2V_TPP : XformTPP::XFORM_XPOSE_TPP,
           /*ignore_vnni_for_fp32*/ true),
       XPOSE);
   // Create tpp transforms for Value
@@ -1034,24 +1034,26 @@ cpu_flash_attention(
                       j * qk_gemm_K * kvSize + n * qk_gemm_K);
             }
             if (!av_gemm_K_even) {
-              // padding
-              // [kvSplitSize, headSize] -> [kvSplitSize + 1, headSize]
-              pad_row_zero(
-                  v_data + i * vStrideB + j * vStrideH + n * vStrideN,
-                  value_padding_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize,
-                  av_gemm_K,
-                  headSize,
-                  vStrideN);
-              v_xform(
-                  value_padding_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize,
-                  value_reorder_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize);
-            } else {
+              if (is_fp16 && vnni_pack) {
+                // padding
+                // [kvSplitSize, headSize] -> [kvSplitSize + 1, headSize]
+                pad_row_zero(
+                    v_data + i * vStrideB + j * vStrideH + n * vStrideN,
+                    value_padding_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    av_gemm_K,
+                    headSize,
+                    vStrideN);
+                v_xform(
+                    value_padding_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    value_reorder_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize);
+              }
+            } else if (vnni_pack) {
               v_xform(
                   v_data + i * vStrideB + j * vStrideH + n * vStrideN,
                   value_reorder_ptr +
@@ -1082,24 +1084,26 @@ cpu_flash_attention(
                       j * qk_gemm_K * kvSize + n * qk_gemm_K);
             }
             if (!av_gemm_K_tail_even) {
-              // padding
-              // [kvtail, headSize] -> [kvtail + 1, headSize]
-              pad_row_zero(
-                  v_data + i * vStrideB + j * vStrideH + n * vStrideN,
-                  value_padding_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize,
-                  av_gemm_K_tail,
-                  headSize,
-                  vStrideN);
-              v_xform_tail(
-                  value_padding_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize,
-                  value_reorder_ptr +
-                      i * num_head * kv_padding_size * headSize +
-                      j * kv_padding_size * headSize + psize * headSize);
-            } else {
+              if (is_fp16 && vnni_pack) {
+                // padding
+                // [kvtail, headSize] -> [kvtail + 1, headSize]
+                pad_row_zero(
+                    v_data + i * vStrideB + j * vStrideH + n * vStrideN,
+                    value_padding_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    av_gemm_K_tail,
+                    headSize,
+                    vStrideN);
+                v_xform_tail(
+                    value_padding_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    value_reorder_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize);
+              }
+            } else if (vnni_pack) {
               v_xform_tail(
                   v_data + i * vStrideB + j * vStrideH + n * vStrideN,
                   value_reorder_ptr +
@@ -1234,15 +1238,24 @@ cpu_flash_attention(
             // And apply scaling factor
             if (attention_mask.has_value()) {
               for (int64_t row = 0; row < qBlockSize; ++row) {
-                // qk <- attn_mask ? qk : -inf, if attn_mask is bool
-                // qk <- qk + attn_mask, else
-                _scale_attn_mask_fusion_kernel(
-                    qk_data + row * kvBlockSize,
-                    mask_data + i * mStrideB + j * mStrideH +
-                        (m + row) * mStrideM + n,
-                    kvBlockSize,
-                    qk_data + row * kvBlockSize,
-                    scaling_factor);
+                // qk <- qk * scaling_factor + attn_mask, else
+                if (mStrideN == 0) {
+                  _scale_attn_mask_fusion_kernel</*is_stride_zero*/ true>(
+                      qk_data + row * kvBlockSize,
+                      mask_data + i * mStrideB + j * mStrideH +
+                          (m + row) * mStrideM,
+                      kvBlockSize,
+                      qk_data + row * kvBlockSize,
+                      scaling_factor);
+                } else {
+                  _scale_attn_mask_fusion_kernel</*is_stride_zero*/ false>(
+                      qk_data + row * kvBlockSize,
+                      mask_data + i * mStrideB + j * mStrideH +
+                          (m + row) * mStrideM + n,
+                      kvBlockSize,
+                      qk_data + row * kvBlockSize,
+                      scaling_factor);
+                }
               }
             }
             // Update coefficients with Softmax
@@ -1306,18 +1319,24 @@ cpu_flash_attention(
                 if (n == 0) {
                   av_gemm(
                       qk_reduced_data,
-                      value_reorder_ptr +
-                          i * num_head * kv_padding_size * headSize +
-                          j * kv_padding_size * headSize + psize * headSize,
+                      vnni_pack
+                          ? (value_reorder_ptr +
+                             i * num_head * kv_padding_size * headSize +
+                             j * kv_padding_size * headSize + psize * headSize)
+                          : (v_data + i * vStrideB + j * vStrideH +
+                             n * vStrideN),
                       dst_data,
                       1);
                 } else {
                   // bias
                   av_gemm_bias(
                       qk_reduced_data,
-                      value_reorder_ptr +
-                          i * num_head * kv_padding_size * headSize +
-                          j * kv_padding_size * headSize + psize * headSize,
+                      vnni_pack
+                          ? (value_reorder_ptr +
+                             i * num_head * kv_padding_size * headSize +
+                             j * kv_padding_size * headSize + psize * headSize)
+                          : (v_data + i * vStrideB + j * vStrideH +
+                             n * vStrideN),
                       dst_data,
                       1);
                 }
@@ -1326,18 +1345,24 @@ cpu_flash_attention(
                 if (n == 0) {
                   av_gemm_tail(
                       qk_reduced_data,
-                      value_reorder_ptr +
-                          i * num_head * kv_padding_size * headSize +
-                          j * kv_padding_size * headSize + psize * headSize,
+                      vnni_pack
+                          ? (value_reorder_ptr +
+                             i * num_head * kv_padding_size * headSize +
+                             j * kv_padding_size * headSize + psize * headSize)
+                          : (v_data + i * vStrideB + j * vStrideH +
+                             n * vStrideN),
                       dst_data,
                       1);
                 } else {
                   // bias
                   av_gemm_bias_tail(
                       qk_reduced_data,
-                      value_reorder_ptr +
-                          i * num_head * kv_padding_size * headSize +
-                          j * kv_padding_size * headSize + psize * headSize,
+                      vnni_pack
+                          ? (value_reorder_ptr +
+                             i * num_head * kv_padding_size * headSize +
+                             j * kv_padding_size * headSize + psize * headSize)
+                          : (v_data + i * vStrideB + j * vStrideH +
+                             n * vStrideN),
                       dst_data,
                       1);
                 }
@@ -1539,6 +1564,8 @@ std::tuple<at::Tensor, at::Tensor> flash_attention_kernel(
            attention_mask.value().stride(-1) == 1),
       "IPEX flash_attention: Q/K/V/Mask should be continuous on the last dim");
 
+  std::optional<at::Tensor> attn_mask =
+      convert_boolean_attn_mask(attention_mask, query.dtype());
   at::Tensor output =
       at::empty({batchSize, qSize, num_head, headSize}, query.options());
   const auto accumulate_dtype = at::toOpMathType(dtype);
@@ -1553,7 +1580,7 @@ std::tuple<at::Tensor, at::Tensor> flash_attention_kernel(
       value,
       dropout_p,
       is_causal,
-      attention_mask,
+      attn_mask,
       scale);
 
   output = output.transpose(1, 2);

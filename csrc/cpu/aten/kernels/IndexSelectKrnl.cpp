@@ -262,8 +262,9 @@ void index_select_contig_kernel(
     const at::Tensor& self,
     int64_t dim,
     const at::Tensor& index) {
-  AT_DISPATCH_FLOATING_TYPES_AND(
+  AT_DISPATCH_FLOATING_TYPES_AND2(
       at::ScalarType::BFloat16,
+      at::ScalarType::Half,
       result.scalar_type(),
       "index_select_contig",
       [&result, &self, &dim, &index] {

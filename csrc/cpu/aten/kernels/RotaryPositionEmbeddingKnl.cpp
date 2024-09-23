@@ -43,6 +43,274 @@ bool is_fused_qkv(at::Tensor& t_in, int64_t hidden_size) {
  * @param rotary_dim The rotary dimension.
  * @return A tuple containing the query, key, and value tensors.
  */
+
+template <typename scalar_t>
+inline void apply_rotary_embedding(
+    const scalar_t* __restrict__ arr,
+    const float* __restrict__ cos_ptr,
+    const float* __restrict__ sin_ptr,
+    scalar_t* __restrict__ out,
+    int embed_dim) {
+  using Vec = Vectorized<scalar_t>;
+  const int kVecSize = Vec::size();
+  const int len = embed_dim - (embed_dim % kVecSize);
+
+  // GPT-J style rotary embedding.
+  // format: {d, 2}, stride-2 access need permute to be vectorized.
+  int d = 0;
+  for (; d < len; d += kVecSize) {
+    Vec x = Vec::loadu(arr + 2 * d + 0 * kVecSize);
+    Vec y = Vec::loadu(arr + 2 * d + 1 * kVecSize);
+    Vec cos = Vec::loadu(cos_ptr + d);
+    Vec sin = Vec::loadu(sin_ptr + d);
+    // x: {x0, y0, x1, y1, x2, y2, x3, y3}
+    // y: {x4, y4, x5, y5, x6, y6, x7, y7}
+    // x1: {x0, x1, x2, x3, x4, x5, x6, x7}
+    // y1: {y0, y1, y2, y3, y4, y5, y6, y7}
+    auto xy = deinterleave2(x, y);
+    Vec x1 = std::get<0>(xy);
+    Vec y1 = std::get<1>(xy);
+    Vec x2 = x1 * cos - y1 * sin;
+    Vec y2 = y1 * cos + x1 * sin;
+    // x2: {x0, x1, x2, x3, x4, x5, x6, x7}
+    // y2: {y0, y1, y2, y3, y4, y5, y6, y7}
+    // x_out: {x0, y0, x1, y1, x2, y2, x3, y3}
+    // y_out: {x4, y4, x5, y5, x6, y6, x7, y7}
+    xy = interleave2(x2, y2);
+    Vec x_out = std::get<0>(xy);
+    Vec y_out = std::get<1>(xy);
+    x_out.store(out + 2 * d + 0 * kVecSize);
+    y_out.store(out + 2 * d + 1 * kVecSize);
+  }
+  for (; d < embed_dim; d++) {
+    scalar_t x = arr[2 * d + 0];
+    scalar_t y = arr[2 * d + 1];
+    scalar_t x_out = x * cos_ptr[d] - y * sin_ptr[d];
+    scalar_t y_out = y * cos_ptr[d] + x * sin_ptr[d];
+    out[2 * d + 0] = x_out;
+    out[2 * d + 1] = y_out;
+  }
+}
+
+template <>
+inline void apply_rotary_embedding<at::BFloat16>(
+    const at::BFloat16* __restrict__ arr,
+    const float* __restrict__ cos_ptr,
+    const float* __restrict__ sin_ptr,
+    at::BFloat16* __restrict__ out,
+    int embed_dim) {
+  using fVec = Vectorized<float>;
+  using bVec = Vectorized<at::BFloat16>;
+
+  const int kVecSize = bVec::size();
+  const int len = 2 * embed_dim - (2 * embed_dim % kVecSize);
+
+  // GPT-J style rotary embedding.
+  // format: {d, 2}, stride-2 access need permute to be vectorized.
+  int d = 0;
+  for (; d < len; d += kVecSize) {
+    bVec a = bVec::loadu(arr + d);
+    fVec x, y;
+    std::tie(x, y) = convert_bfloat16_float(a);
+    fVec cos = fVec::loadu(cos_ptr + d / 2);
+    fVec sin = fVec::loadu(sin_ptr + d / 2);
+    // x: {x0, y0, x1, y1, x2, y2, x3, y3}
+    // y: {x4, y4, x5, y5, x6, y6, x7, y7}
+    // x1: {x0, x1, x2, x3, x4, x5, x6, x7}
+    // y1: {y0, y1, y2, y3, y4, y5, y6, y7}
+    auto xy = deinterleave2(x, y);
+    fVec x1 = std::get<0>(xy);
+    fVec y1 = std::get<1>(xy);
+    fVec x2 = x1 * cos - y1 * sin;
+    fVec y2 = y1 * cos + x1 * sin;
+    // x2: {x0, x1, x2, x3, x4, x5, x6, x7}
+    // y2: {y0, y1, y2, y3, y4, y5, y6, y7}
+    // x_out: {x0, y0, x1, y1, x2, y2, x3, y3}
+    // y_out: {x4, y4, x5, y5, x6, y6, x7, y7}
+    xy = interleave2(x2, y2);
+    fVec x_out = std::get<0>(xy);
+    fVec y_out = std::get<1>(xy);
+    bVec a_out = convert_float_bfloat16(x_out, y_out);
+    a_out.store(out + d);
+  }
+  for (; d < embed_dim; d++) {
+    float x = static_cast<float>(arr[2 * d + 0]);
+    float y = static_cast<float>(arr[2 * d + 1]);
+    float x_out = x * cos_ptr[d] - y * sin_ptr[d];
+    float y_out = y * cos_ptr[d] + x * sin_ptr[d];
+    out[2 * d + 0] = static_cast<at::BFloat16>(x_out);
+    out[2 * d + 1] = static_cast<at::BFloat16>(y_out);
+  }
+}
+
+template <typename scalar_t>
+inline void RotateEveryTwo(
+    const scalar_t* in_query_ptr,
+    const scalar_t* in_key_ptr,
+    scalar_t* out_query_ptr,
+    scalar_t* out_key_ptr,
+    const float* sin_start,
+    const float* cos_start,
+    const int HR,
+    const int offset,
+    const bool calc_key) {
+  // TODO: remove overhead for loading sin and cos
+  int embed_dim = HR / 2;
+  apply_rotary_embedding<scalar_t>(
+      in_query_ptr, cos_start, sin_start, out_query_ptr, embed_dim);
+
+  if (calc_key) {
+    apply_rotary_embedding<scalar_t>(
+        in_key_ptr, cos_start, sin_start, out_key_ptr, embed_dim);
+  }
+}
+
+template <>
+inline void RotateEveryTwo<at::BFloat16>(
+    const at::BFloat16* in_query_ptr,
+    const at::BFloat16* in_key_ptr,
+    at::BFloat16* out_query_ptr,
+    at::BFloat16* out_key_ptr,
+    const float* sin_ptr,
+    const float* cos_ptr,
+    const int HR,
+    const int offset,
+    const bool calc_key) {
+  int embed_dim = HR / 2;
+
+  using fVec = Vectorized<float>;
+  using bVec = Vectorized<at::BFloat16>;
+
+  const int kVecSize = bVec::size();
+  const int len = HR - (HR % kVecSize);
+
+  // GPT-J style rotary embedding.
+  // format: {d, 2}, stride-2 access need permute to be vectorized.
+  int d = 0;
+  for (; d < len; d += kVecSize) {
+    bVec in_query = bVec::loadu(in_query_ptr + d);
+    fVec x, y;
+    std::tie(x, y) = convert_bfloat16_float(in_query);
+    fVec cos = fVec::loadu(cos_ptr + d / 2);
+    fVec sin = fVec::loadu(sin_ptr + d / 2);
+    // x: {x0, y0, x1, y1, x2, y2, x3, y3}
+    // y: {x4, y4, x5, y5, x6, y6, x7, y7}
+    // x1: {x0, x1, x2, x3, x4, x5, x6, x7}
+    // y1: {y0, y1, y2, y3, y4, y5, y6, y7}
+    auto xy = deinterleave2(x, y);
+    fVec x1 = std::get<0>(xy);
+    fVec y1 = std::get<1>(xy);
+    fVec x2 = x1 * cos - y1 * sin;
+    fVec y2 = y1 * cos + x1 * sin;
+    // x2: {x0, x1, x2, x3, x4, x5, x6, x7}
+    // y2: {y0, y1, y2, y3, y4, y5, y6, y7}
+    // x_out: {x0, y0, x1, y1, x2, y2, x3, y3}
+    // y_out: {x4, y4, x5, y5, x6, y6, x7, y7}
+    xy = interleave2(x2, y2);
+    fVec x_out = std::get<0>(xy);
+    fVec y_out = std::get<1>(xy);
+    bVec a_out = convert_float_bfloat16(x_out, y_out);
+    a_out.store(out_query_ptr + d);
+    if (calc_key) {
+      bVec in_key = bVec::loadu(in_key_ptr + d);
+      fVec x, y;
+      std::tie(x, y) = convert_bfloat16_float(in_key);
+      // x: {x0, y0, x1, y1, x2, y2, x3, y3}
+      // y: {x4, y4, x5, y5, x6, y6, x7, y7}
+      // x1: {x0, x1, x2, x3, x4, x5, x6, x7}
+      // y1: {y0, y1, y2, y3, y4, y5, y6, y7}
+      auto xy = deinterleave2(x, y);
+      fVec x1 = std::get<0>(xy);
+      fVec y1 = std::get<1>(xy);
+      fVec x2 = x1 * cos - y1 * sin;
+      fVec y2 = y1 * cos + x1 * sin;
+      // x2: {x0, x1, x2, x3, x4, x5, x6, x7}
+      // y2: {y0, y1, y2, y3, y4, y5, y6, y7}
+      // x_out: {x0, y0, x1, y1, x2, y2, x3, y3}
+      // y_out: {x4, y4, x5, y5, x6, y6, x7, y7}
+      xy = interleave2(x2, y2);
+      fVec x_out = std::get<0>(xy);
+      fVec y_out = std::get<1>(xy);
+      bVec a_out = convert_float_bfloat16(x_out, y_out);
+      a_out.store(out_key_ptr + d);
+    }
+  }
+  for (; d < embed_dim; d++) {
+    float x = static_cast<float>(in_query_ptr[2 * d + 0]);
+    float y = static_cast<float>(in_query_ptr[2 * d + 1]);
+    float cos = cos_ptr[d];
+    float sin = sin_ptr[d];
+    float x_out = x * cos - y * sin;
+    float y_out = y * cos + x * sin;
+    out_query_ptr[2 * d + 0] = static_cast<at::BFloat16>(x_out);
+    out_query_ptr[2 * d + 1] = static_cast<at::BFloat16>(y_out);
+    if (calc_key) {
+      float x = static_cast<float>(in_key_ptr[2 * d + 0]);
+      float y = static_cast<float>(in_key_ptr[2 * d + 1]);
+      float x_out = x * cos - y * sin;
+      float y_out = y * cos + x * sin;
+      out_key_ptr[2 * d + 0] = static_cast<at::BFloat16>(x_out);
+      out_key_ptr[2 * d + 1] = static_cast<at::BFloat16>(y_out);
+    }
+  }
+}
+
+template <typename scalar_t>
+inline void RotateEveryTwoNaive(
+    const scalar_t* in_query_ptr,
+    const scalar_t* in_key_ptr,
+    scalar_t* out_query_ptr,
+    scalar_t* out_key_ptr,
+    const float* sin_start,
+    const float* cos_start,
+    const int HR,
+    const int offset,
+    const bool calc_key) {
+  int embed_dim = HR / 2;
+  for (int h = 0, h2 = 0; h < HR; h += 2, h2++) {
+    float sin = sin_start[h2];
+    float cos = cos_start[h2];
+    float in0 = in_query_ptr[h];
+    float in1 = in_query_ptr[h + offset];
+    float out0 = in0 * cos - in1 * sin;
+    float out1 = in1 * cos + in0 * sin;
+    out_query_ptr[h] = out0;
+    out_query_ptr[h + offset] = out1;
+    if (calc_key) {
+      in0 = in_key_ptr[h];
+      in1 = in_key_ptr[h + offset];
+      out0 = in0 * cos - in1 * sin;
+      out1 = in1 * cos + in0 * sin;
+      out_key_ptr[h] = out0;
+      out_key_ptr[h + offset] = out1;
+    }
+  }
+}
+
+template <>
+inline void RotateEveryTwo<at::Half>(
+    const at::Half* in_query_ptr,
+    const at::Half* in_key_ptr,
+    at::Half* out_query_ptr,
+    at::Half* out_key_ptr,
+    const float* sin_start,
+    const float* cos_start,
+    const int HR,
+    const int offset,
+    const bool calc_key) {
+  // TODO: vectorized
+  RotateEveryTwoNaive<Half>(
+      in_query_ptr,
+      in_key_ptr,
+      out_query_ptr,
+      out_key_ptr,
+      sin_start,
+      cos_start,
+      HR,
+      offset,
+      calc_key);
+}
+
 template <typename T>
 std::tuple<at::Tensor, at::Tensor, at::Tensor> ApplyROPEKernel(
     at::Tensor& t_in,
@@ -65,7 +333,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ApplyROPEKernel(
 
   if (is_fused_qkv(t_in, N * H)) {
     TORCH_CHECK(
-        in_stride_s == HS,
+        t_in.dim() == 3,
         "The shape of input tensor of rotary_position_embedding should be in (batch, seq_len, qkv_hidden_size) when using fused qkv)");
     N_KV = (HS - N * H) / (2 * H);
   }
@@ -140,24 +408,16 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ApplyROPEKernel(
             }
           } else { // used by GPT-J 6B & CodeGen & ChatGLM
                    // logic is like to the rotate_every_two in python code
-            for (int h = 0, h2 = 0; h < HR; h += 2, h2++) {
-              float sin = sin_start[h2];
-              float cos = cos_start[h2];
-              float in0 = in_ptr[in_offset_q + h];
-              float in1 = in_ptr[in_offset_q + h + offset];
-              float out0 = in0 * cos - in1 * sin;
-              float out1 = in1 * cos + in0 * sin;
-              query_ptr[out_offset_q + h] = out0;
-              query_ptr[out_offset_q + h + offset] = out1;
-              if (concat_qkv && n < N_KV) {
-                in0 = in_ptr[in_offset_k + h];
-                in1 = in_ptr[in_offset_k + h + offset];
-                out0 = in0 * cos - in1 * sin;
-                out1 = in1 * cos + in0 * sin;
-                key_ptr[out_offset_k + h] = out0;
-                key_ptr[out_offset_k + h + offset] = out1;
-              }
-            }
+            RotateEveryTwo<T>(
+                &in_ptr[in_offset_q],
+                &in_ptr[in_offset_k],
+                &query_ptr[out_offset_q],
+                &key_ptr[out_offset_k],
+                sin_start,
+                cos_start,
+                HR,
+                offset,
+                (concat_qkv && n < N_KV));
           }
           // step 2) copy the rest of the input tensor to query/key (query_pass
           // & key_pass)

@@ -64,6 +64,7 @@ class TestLauncher(TestCase):
             ":".join(launcher.ld_preload) if len(launcher.ld_preload) > 0 else ""
         )
         jemalloc_enabled = "libjemalloc.so" in ld_preload
+
         self.assertEqual(find_jemalloc, jemalloc_enabled)
         if jemalloc_enabled:
             self.assertTrue("MALLOC_CONF" in launcher.environ_set)
@@ -172,6 +173,7 @@ class TestLauncher(TestCase):
             ninstances=nprocs_per_node,
             ncores_per_instance=(8 + ccl_worker_count) * nprocs_per_node,
             use_logical_cores=True,
+            bind_numa_node=True,
         )
         pin_domain_affinity = launcher.get_pin_domain_affinity(
             launcher.cpuinfo.pools_ondemand, ccl_worker_count
@@ -210,7 +212,6 @@ class TestLauncher(TestCase):
 
     def verify_affinity(self, pools, ground_truth):
         self.assertEqual(len(pools), ground_truth["ninstances"])
-        self.assertEqual(len(pools[0]), ground_truth["ncores_per_instance"])
         self.assertEqual(
             len(set([c.cpu for p in pools for c in p])), ground_truth["num_cores_sum"]
         )
@@ -238,7 +239,6 @@ class TestLauncher(TestCase):
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         ground_truth = {
             "ninstances": 1,
-            "ncores_per_instance": 112,
             "num_cores_sum": 112,
             "num_nodes_sum": 2,
             "num_cores": [112],
@@ -251,7 +251,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=2)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 28,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [28, 28],
@@ -264,7 +263,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=4)
         ground_truth = {
             "ninstances": 4,
-            "ncores_per_instance": 14,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [14, 14, 14, 14],
@@ -277,7 +275,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ncores_per_instance=28)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 28,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [28, 28],
@@ -290,7 +287,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ncores_per_instance=14)
         ground_truth = {
             "ninstances": 4,
-            "ncores_per_instance": 14,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [14, 14, 14, 14],
@@ -303,10 +299,9 @@ class TestLauncher(TestCase):
         cores_list_local = []
         cores_list_local.extend(list(i for i in range(14, 28)))
         cores_list_local.extend(list(i for i in range(42, 56)))
-        cpuinfo.gen_pools_ondemand(cores_list=cores_list_local)
+        cpuinfo.gen_pools_ondemand(cores_list=cores_list_local, use_logical_cores=True)
         ground_truth = {
             "ninstances": 1,
-            "ncores_per_instance": 28,
             "num_cores_sum": 28,
             "num_nodes_sum": 1,
             "num_cores": [28],
@@ -324,7 +319,6 @@ class TestLauncher(TestCase):
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         ground_truth = {
             "ninstances": 1,
-            "ncores_per_instance": 112,
             "num_cores_sum": 112,
             "num_nodes_sum": 4,
             "num_cores": [112],
@@ -337,7 +331,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(nodes_list=[1, 2])
         ground_truth = {
             "ninstances": 1,
-            "ncores_per_instance": 28,
             "num_cores_sum": 28,
             "num_nodes_sum": 2,
             "num_cores": [28],
@@ -356,7 +349,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=2)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 28,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [28, 28],
@@ -376,7 +368,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=1)
         ground_truth = {
             "ninstances": 1,
-            "ncores_per_instance": 56,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [56],
@@ -389,7 +380,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=2)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 28,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [28, 28],
@@ -402,7 +392,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=4)
         ground_truth = {
             "ninstances": 4,
-            "ncores_per_instance": 14,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [14, 14, 14, 14],
@@ -415,7 +404,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ncores_per_instance=28)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 28,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [28, 28],
@@ -428,7 +416,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ncores_per_instance=14)
         ground_truth = {
             "ninstances": 4,
-            "ncores_per_instance": 14,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [14, 14, 14, 14],
@@ -444,7 +431,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=2, cores_list=cores_list_local)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 14,
             "num_cores_sum": 28,
             "num_nodes_sum": 2,
             "num_cores": [14, 14],
@@ -463,7 +449,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=2, nodes_list=[1, 2])
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 14,
             "num_cores_sum": 28,
             "num_nodes_sum": 2,
             "num_cores": [14, 14],
@@ -482,7 +467,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=2)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 28,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [28, 28],
@@ -502,7 +486,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=2)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 28,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [28, 28],
@@ -518,7 +501,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=4)
         ground_truth = {
             "ninstances": 4,
-            "ncores_per_instance": 14,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [14, 14, 14, 14],
@@ -536,7 +518,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ncores_per_instance=28)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 28,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [28, 28],
@@ -552,7 +533,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ncores_per_instance=14)
         ground_truth = {
             "ninstances": 4,
-            "ncores_per_instance": 14,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [14, 14, 14, 14],
@@ -570,7 +550,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=3)
         ground_truth = {
             "ninstances": 3,
-            "ncores_per_instance": 18,
             "num_cores_sum": 54,
             "num_nodes_sum": 2,
             "num_cores": [18, 18, 18],
@@ -587,10 +566,11 @@ class TestLauncher(TestCase):
         cores_list_local = []
         cores_list_local.extend(list(i for i in range(14, 28)))
         cores_list_local.extend(list(i for i in range(98, 112)))
-        cpuinfo.gen_pools_ondemand(ninstances=2, cores_list=cores_list_local)
+        cpuinfo.gen_pools_ondemand(
+            ninstances=2, cores_list=cores_list_local, use_logical_cores=True
+        )
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 14,
             "num_cores_sum": 28,
             "num_nodes_sum": 2,
             "num_cores": [14, 14],
@@ -609,7 +589,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(nodes_list=[1, 2])
         ground_truth = {
             "ninstances": 1,
-            "ncores_per_instance": 28,
             "num_cores_sum": 28,
             "num_nodes_sum": 2,
             "num_cores": [28],
@@ -630,7 +609,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=2)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 28,
             "num_cores_sum": 56,
             "num_nodes_sum": 2,
             "num_cores": [28, 28],
@@ -653,7 +631,6 @@ class TestLauncher(TestCase):
         cpuinfo.gen_pools_ondemand(ninstances=2, use_logical_cores=True)
         ground_truth = {
             "ninstances": 2,
-            "ncores_per_instance": 56,
             "num_cores_sum": 112,
             "num_nodes_sum": 2,
             "num_cores": [56, 56],
@@ -663,27 +640,26 @@ class TestLauncher(TestCase):
         }
         self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
 
-    def test_core_affinity_with_skip_cross_node_cores(self):
+    def test_core_affinity_with_bind_numa_node(self):
         num_nodes = 2
         n_phycores_per_node = 28
         lscpu_txt = construct_numa_config(
             num_nodes, n_phycores_per_node, enable_ht=True, numa_mode=1
         )
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
-        cpuinfo.gen_pools_ondemand(ninstances=3, skip_cross_node_cores=True)
+        cpuinfo.gen_pools_ondemand(ninstances=3, bind_numa_node=True)
         ground_truth = {
             "ninstances": 3,
-            "ncores_per_instance": 14,
-            "num_cores_sum": 42,
+            "num_cores_sum": 56,
             "num_nodes_sum": 2,
-            "num_cores": [14, 14, 14],
+            "num_cores": [28, 14, 14],
             "num_nodes": [1, 1, 1],
-            "pools_cores": ["0-13", "14-27", "28-41"],
-            "pools_nodes": ["0", "0", "1"],
+            "pools_cores": ["0-27", "28-41", "42-55"],
+            "pools_nodes": ["0", "1", "1"],
         }
         self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
 
-    def test_core_affinity_with_skip_cross_node_cores_and_use_logical_core(self):
+    def test_core_affinity_with_bind_numa_node_and_use_logical_core(self):
         num_nodes = 2
         n_phycores_per_node = 28
         lscpu_txt = construct_numa_config(
@@ -691,29 +667,28 @@ class TestLauncher(TestCase):
         )
         cpuinfo = CPUPoolList(lscpu_txt=lscpu_txt)
         cpuinfo.gen_pools_ondemand(
-            ninstances=7, use_logical_cores=True, skip_cross_node_cores=True
+            ninstances=7, use_logical_cores=True, bind_numa_node=True
         )
         ground_truth = {
             "ninstances": 7,
-            "ncores_per_instance": 14,
-            "num_cores_sum": 98,
+            "num_cores_sum": 110,
             "num_nodes_sum": 2,
-            "num_cores": [14, 14, 14, 14, 14, 14, 14],
+            "num_cores": [18, 18, 18, 14, 14, 14, 14],
             "num_nodes": [1, 1, 1, 1, 1, 1, 1],
             "pools_cores": [
-                "0-6,56-62",
-                "7-13,63-69",
-                "14-20,70-76",
-                "21-27,77-83",
+                "0-8,56-64",
+                "9-17,65-73",
+                "18-26,74-82",
                 "28-34,84-90",
                 "35-41,91-97",
                 "42-48,98-104",
+                "49-55,105-111",
             ],
-            "pools_nodes": ["0", "0", "0", "0", "1", "1", "1"],
+            "pools_nodes": ["0", "0", "0", "1", "1", "1", "1"],
         }
         self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
 
-    def test_core_affinity_with_skip_cross_node_cores_and_node_id_use_logical_core(
+    def test_core_affinity_with_bind_numa_node_and_node_id_use_logical_core(
         self,
     ):
         num_nodes = 4
@@ -726,17 +701,16 @@ class TestLauncher(TestCase):
             ninstances=3,
             nodes_list=[1, 2],
             use_logical_cores=True,
-            skip_cross_node_cores=True,
+            bind_numa_node=True,
         )
         ground_truth = {
             "ninstances": 3,
-            "ncores_per_instance": 14,
-            "num_cores_sum": 42,
+            "num_cores_sum": 56,
             "num_nodes_sum": 2,
-            "num_cores": [14, 14, 14],
+            "num_cores": [28, 14, 14],
             "num_nodes": [1, 1, 1],
-            "pools_cores": ["14-20,70-76", "21-27,77-83", "28-34,84-90"],
-            "pools_nodes": ["1", "1", "2"],
+            "pools_cores": ["14-27,70-83", "28-34,84-90", "35-41,91-97"],
+            "pools_nodes": ["1", "2", "2"],
         }
         self.verify_affinity(cpuinfo.pools_ondemand, ground_truth)
 

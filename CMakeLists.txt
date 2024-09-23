@@ -19,6 +19,7 @@ set(IPEX_CSRC_ROOT_DIR ${IPEX_ROOT_DIR}/csrc)
 set(IPEX_CPU_ROOT_DIR ${IPEX_ROOT_DIR}/csrc/cpu)
 set(IPEX_GPU_ROOT_DIR ${IPEX_ROOT_DIR}/csrc/gpu)
 set(IPEX_THIRD_PARTY_ROOT "${PROJECT_SOURCE_DIR}/third_party")
+set(IPEX_CPU_EXAMPLE_ROOT_DIR ${IPEX_ROOT_DIR}/examples/cpu)
 set(IPEX_FRONT_END_ROOT_DIR ${IPEX_ROOT_DIR}/intel_extension_for_pytorch/csrc)
 list(APPEND CMAKE_MODULE_PATH ${IPEX_ROOT_DIR}/cmake/Modules)
 

@@ -372,7 +372,8 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
     c10::optional<int64_t> batch_size,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    bool cache_weight_for_large_batch) {
   auto op_context = torch_ipex::cpu::detail::woq_linear::create(
       weight,
       weight_dtype,
@@ -384,7 +385,8 @@ c10::intrusive_ptr<WoqLinearOpContext> IpexWoqLinearOpContext::create_context(
       batch_size,
       group_size,
       lowp_mode,
-      act_quant_mode);
+      act_quant_mode,
+      cache_weight_for_large_batch);
   return c10::make_intrusive<IpexWoqLinearOpContext>(
       batch_size, std::move(op_context));
 }
@@ -399,27 +401,21 @@ at::Tensor IpexWoqLinearOpContext::run(const at::Tensor& input) {
   return torch_ipex::cpu::detail::woq_linear::run(op_context_, input);
 }
 
-at::Tensor IpexWoqLinearOpContext::run_eltwise(
+at::Tensor IpexWoqLinearOpContext::run_unary(
     const at::Tensor& input,
     const c10::string_view& post_op,
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm) {
-  return torch_ipex::cpu::detail::woq_linear::run_eltwise(
+  return torch_ipex::cpu::detail::woq_linear::run_unary(
       op_context_, input, post_op, scalars, algorithm);
 }
 
-at::Tensor IpexWoqLinearOpContext::run_add(
+at::Tensor IpexWoqLinearOpContext::run_binary(
     const at::Tensor& input,
+    const c10::string_view& post_op,
     const std::vector<at::Tensor>& others) {
-  return torch_ipex::cpu::detail::woq_linear::run_add(
-      op_context_, input, others);
-}
-
-at::Tensor IpexWoqLinearOpContext::run_add_add(
-    const at::Tensor& input,
-    const std::vector<at::Tensor>& others) {
-  return torch_ipex::cpu::detail::woq_linear::run_add_add(
-      op_context_, input, others);
+  return torch_ipex::cpu::detail::woq_linear::run_binary(
+      op_context_, input, post_op, others);
 }
 
 at::Tensor IpexWoqLinearOpContext::to_public(const at::Tensor& tensor) {
@@ -436,6 +432,10 @@ c10::optional<at::Tensor> IpexWoqLinearOpContext::get_at_bias() {
 
 c10::optional<at::Tensor> IpexWoqLinearOpContext::get_g_idx() {
   return op_context_.g_idx_;
+}
+
+c10::optional<at::Tensor> IpexWoqLinearOpContext::get_cached_weight() {
+  return op_context_.cached_weight_;
 }
 
 at::Tensor IpexWoqLinearOpContext::get_scales() {

@@ -68,7 +68,8 @@ at::Tensor& index_select_out_cpu_(
 
     const auto st = self.scalar_type();
     if (result.is_contiguous() &&
-        (st == at::kFloat || st == at::kDouble || st == at::kBFloat16)) {
+        (st == at::kFloat || st == at::kDouble || st == at::kBFloat16 ||
+         st == at::kHalf)) {
       auto self_contig = self.contiguous();
       index_select_contig_stub(kCPU, result, self_contig, dim, index_contig);
       return result;

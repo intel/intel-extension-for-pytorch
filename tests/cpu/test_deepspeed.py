@@ -8,7 +8,6 @@ import torch.nn as nn
 from torch.testing._internal.jit_utils import JitTestCase
 from torch.testing import FileCheck
 import intel_extension_for_pytorch as ipex
-from intel_extension_for_pytorch.cpu import comm as ipex_comm
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
     _IPEXLinear,
@@ -33,13 +32,11 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.38.1"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.43.2"]
     )
     import transformers
     from transformers import AutoConfig
 
-has_ccl = ipex_comm.has_ccl()
-world_size = 0 if not has_ccl else ipex_comm.get_world_size()
 
 class MyAttention(nn.Module):
     def __init__(self):
@@ -172,7 +169,6 @@ class GPTJTestM(nn.Module):
         return z
 
 
-@unittest.skipIf(not (has_ccl and world_size > 1), "oneccl is not built")
 class DeepspeedTester(JitTestCase):
     def _get_ds_model(self, m_linear):
         import deepspeed
@@ -219,7 +215,12 @@ class DeepspeedTester(JitTestCase):
             if False:  # if check_lm_head:
                 self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
 
-            optimized = ipex.optimize(ds_model.eval(), inplace=True)
+            optimized = ipex.optimize(
+                ds_model.eval(),
+                inplace=True,
+                conv_bn_folding=False,
+                linear_bn_folding=False,
+            )
 
             with torch.no_grad():
                 y_optimized = optimized(x)
@@ -353,6 +354,8 @@ class DeepspeedTester(JitTestCase):
                     ds_model.eval(),
                     inplace=True,
                     auto_kernel_selection=True if krnl == "onednn" else False,
+                    conv_bn_folding=False,
+                    linear_bn_folding=False,
                 )
                 with torch.no_grad():
                     y = optimized(x)

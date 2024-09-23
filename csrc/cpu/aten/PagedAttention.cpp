@@ -1,13 +1,13 @@
 #include "PagedAttention.h"
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
-#include "csrc/utils/CustomOperatorRegistration.h"
 
 namespace torch_ipex {
 namespace cpu {
 
 IPEX_DEFINE_DISPATCH(single_query_cached_kv_attention_kernel_stub);
 IPEX_DEFINE_DISPATCH(reshape_and_cache_kernel_stub);
+IPEX_DEFINE_DISPATCH(flash_attn_var_len_kernel_stub);
 
 /*
  *Caculate the masked multihead attention for decoder layer in decoder only
@@ -49,6 +49,35 @@ void reshape_and_cache_cpu(
       kCPU, key, value, key_cache, value_cache, slot_mapping);
 }
 
+void flash_attn_varlen_cpu(
+    at::Tensor& out,
+    at::Tensor& query,
+    at::Tensor& key,
+    at::Tensor& value,
+    at::Tensor& cu_seqlens_q,
+    at::Tensor& cu_seqlens_kv,
+    int64_t max_seqlen_q,
+    int64_t max_seqlen_kv,
+    const double softmax_scale,
+    bool is_causal,
+    at::Tensor& block_table,
+    const c10::optional<at::Tensor>& alibi_slopes) {
+  return flash_attn_var_len_kernel_stub(
+      kCPU,
+      out,
+      query,
+      key,
+      value,
+      cu_seqlens_q,
+      cu_seqlens_kv,
+      max_seqlen_q,
+      max_seqlen_kv,
+      softmax_scale,
+      is_causal,
+      block_table,
+      alibi_slopes);
+}
+
 } // namespace cpu
 } // namespace torch_ipex
 
@@ -63,9 +92,20 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "single_query_cached_kv_attention",
       c10::DispatchKey::CPU,
       torch_ipex::cpu::single_query_cached_kv_attention_forward_cpu);
-  IPEX_OP_REGISTER_DISPATCH(
+  m.def(
+      "reshape_and_cache(Tensor (a!)key, Tensor (a!)value, Tensor (a!)key_cache, Tensor (a!)value_cache, Tensor(a!) slot_mapping)-> ()");
+  m.impl(
       "reshape_and_cache",
-      torch_ipex::cpu::reshape_and_cache_cpu,
-      c10::DispatchKey::CPU);
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::reshape_and_cache_cpu);
+  m.def(
+      "flash_attn_varlen_func(Tensor (a!)out, Tensor (a!)query, Tensor (a!)key, Tensor (a!)value, Tensor(a!) cu_seqlens_q,\
+         Tensor(a!) cu_seqlens_kv, int max_seqlen_q, int max_seqlen_kv, float softmax_scale, bool is_causal, Tensor(a!) block_table, \
+         Tensor? alibi_slopes)-> ()");
+
+  m.impl(
+      "flash_attn_varlen_func",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::flash_attn_varlen_cpu);
 }
 } // namespace

@@ -2,6 +2,7 @@ import unittest
 import torch
 import math
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from torch.testing._internal.common_utils import TestCase
 import copy
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
@@ -191,6 +192,104 @@ def gelu_mul(
     return out
 
 
+class MixtralMoE(torch.nn.Module):
+
+    def __init__(
+        self, num_local_experts, num_experts_per_tok, hidden_size, intermediate_size
+    ):
+        super().__init__()
+        self.num_total_experts = num_local_experts
+        self.top_k = num_experts_per_tok
+
+        self.gate = torch.nn.Linear(hidden_size, self.num_total_experts, bias=False)
+        self.gate.weight = torch.nn.Parameter(
+            torch.rand(self.num_total_experts, hidden_size),
+            requires_grad=False,
+        )
+        self.w1_weight = torch.nn.Parameter(
+            torch.rand(num_local_experts, intermediate_size, hidden_size),
+            requires_grad=False,
+        )
+        self.w3_weight = torch.nn.Parameter(
+            torch.rand(num_local_experts, intermediate_size, hidden_size),
+            requires_grad=False,
+        )
+        self.w2_weight = torch.nn.Parameter(
+            torch.rand(num_local_experts, hidden_size, intermediate_size),
+            requires_grad=False,
+        )
+
+        self.ipex_moe = ipex.llm.modules.GatedMLPMOE(
+            copy.deepcopy(self.w1_weight),
+            copy.deepcopy(self.w2_weight),
+            copy.deepcopy(self.w3_weight),
+            use_prepack=False,
+        )
+        self.ipex_moe_with_prepack = ipex.llm.modules.GatedMLPMOE(
+            copy.deepcopy(self.w1_weight),
+            copy.deepcopy(self.w2_weight),
+            copy.deepcopy(self.w3_weight),
+            use_prepack=True,
+        )
+        self.act_fn = torch.nn.SiLU()
+
+    def forward_mlp(self, hidden_states: torch.Tensor, expert_id: int) -> torch.Tensor:
+        w1_out = torch.nn.functional.linear(hidden_states, self.w1_weight[expert_id])
+        w1_out = self.act_fn(w1_out)
+        w3_out = torch.nn.functional.linear(hidden_states, self.w3_weight[expert_id])
+        current_hidden_states = w1_out * w3_out
+        current_hidden_states = torch.nn.functional.linear(
+            current_hidden_states, self.w2_weight[expert_id]
+        )
+        return current_hidden_states
+
+    def forward(
+        self, hidden_states: torch.Tensor, use_ipex_api=False, use_ipex_prepack=False
+    ) -> torch.Tensor:
+        num_tokens, hidden_dim = hidden_states.shape
+        hidden_states = hidden_states.view(-1, hidden_dim)
+        # router_logits: (num_tokens, n_experts)
+        router_logits = self.gate(hidden_states)
+        if not use_ipex_api:
+            routing_weights = torch.nn.functional.softmax(
+                router_logits, dim=1, dtype=torch.float
+            )
+            routing_weights, selected_experts = torch.topk(
+                routing_weights, self.top_k, dim=-1
+            )
+            routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
+            routing_weights = routing_weights.to(hidden_states.dtype)
+            final_hidden_states = torch.zeros(
+                (num_tokens, hidden_dim),
+                dtype=hidden_states.dtype,
+                device=hidden_states.device,
+            )
+            expert_mask = torch.nn.functional.one_hot(
+                selected_experts, num_classes=self.num_total_experts
+            ).permute(2, 1, 0)
+            for expert_idx in range(self.num_total_experts):
+                idx, top_x = torch.where(expert_mask[expert_idx])
+                current_state = hidden_states[None, top_x].reshape(-1, hidden_dim)
+                current_hidden_states = (
+                    self.forward_mlp(current_state, expert_idx)
+                    * routing_weights[top_x, idx, None]
+                )
+                final_hidden_states.index_add_(
+                    0, top_x, current_hidden_states.to(hidden_states.dtype)
+                )
+        else:
+            if use_ipex_prepack:
+                final_hidden_states = self.ipex_moe_with_prepack(
+                    hidden_states, False, self.top_k, router_logits, True
+                )
+            else:
+                final_hidden_states = self.ipex_moe(
+                    hidden_states, False, self.top_k, router_logits, True
+                )
+
+        return final_hidden_states.view(num_tokens, hidden_dim)
+
+
 class TestLLMModules(TestCase):
     def test_linearfusion_args0(self):
         x1 = torch.rand(1, 4, 4096)
@@ -209,16 +308,19 @@ class TestLLMModules(TestCase):
             ipex.llm.modules.LinearRelu,
             ipex.llm.modules.Linear2SiluMul,
         ]
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         with torch.no_grad():
             for i in range(len(ref_scope)):
-                for dtype in [torch.float32, torch.bfloat16]:
+                for dtype in dtypes:
                     for use_ipex_optimize in [True, False]:
                         for use_tpp in [True, False]:
                             model = ref_scope[i]().eval().to(dtype)
                             ref_out = model(x1.to(dtype))
                             if use_ipex_optimize:
                                 if use_tpp:
-                                    if dtype == torch.bfloat16:
+                                    if dtype in [torch.bfloat16, torch.float16]:
                                         _enable_tpp()
                                     else:
                                         continue
@@ -231,7 +333,15 @@ class TestLLMModules(TestCase):
                             else:
                                 model = ipex_scope[i](model.linear_1, model.linear_2)
                             out = model(x2.to(dtype))
-                            self.assertEqual(out, ref_out)
+                            atol = None
+                            rtol = None
+                            if dtype is torch.float16:
+                                atol = 1e-3
+                                rtol = 1e-3
+                            elif dtype is torch.bfloat16:
+                                atol = 1e-3
+                                rtol = 0.016
+                            self.assertEqual(out, ref_out, atol=atol, rtol=rtol)
                             _disable_tpp()
 
     def test_linearfusion_args1(self):
@@ -243,16 +353,19 @@ class TestLLMModules(TestCase):
             ipex.llm.modules.LinearAdd,
             ipex.llm.modules.LinearSiluMul,
         ]
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         with torch.no_grad():
             for i in range(len(ref_scope)):
-                for dtype in [torch.float32, torch.bfloat16]:
+                for dtype in dtypes:
                     for use_ipex_optimize in [True, False]:
                         for use_tpp in [True, False]:
                             model = ref_scope[i]().eval().to(dtype)
                             ref_out = model(x1.to(dtype), x1.to(dtype))
                             if use_ipex_optimize:
                                 if use_tpp:
-                                    if dtype == torch.bfloat16:
+                                    if dtype in [torch.bfloat16, torch.float16]:
                                         _enable_tpp()
                                     else:
                                         continue
@@ -264,7 +377,12 @@ class TestLLMModules(TestCase):
                             model = ipex_scope[i](model.linear)
 
                             out = model(x2.to(dtype), x2.to(dtype))
-                            self.assertEqual(out, ref_out)
+                            atol = None
+                            rtol = None
+                            if dtype is torch.float16:
+                                atol = 1e-3
+                                rtol = 1e-3
+                            self.assertEqual(out, ref_out, atol=atol, rtol=rtol)
                             _disable_tpp()
 
     def test_linearfusion_args2(self):
@@ -272,16 +390,19 @@ class TestLLMModules(TestCase):
         x2 = copy.deepcopy(x1)
         ref_scope = [Linear_add_add]
         ipex_scope = [ipex.llm.modules.LinearAddAdd]
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
         with torch.no_grad():
             for i in range(len(ref_scope)):
-                for dtype in [torch.float32, torch.bfloat16]:
+                for dtype in dtypes:
                     for use_ipex_optimize in [True, False]:
                         for use_tpp in [True, False]:
                             model = ref_scope[i]().eval().to(dtype)
                             ref_out = model(x1.to(dtype), x1.to(dtype), x1.to(dtype))
                             if use_ipex_optimize:
                                 if use_tpp:
-                                    if dtype == torch.bfloat16:
+                                    if dtype in [torch.bfloat16, torch.float16]:
                                         _enable_tpp()
                                     else:
                                         continue
@@ -293,7 +414,12 @@ class TestLLMModules(TestCase):
                             model = ipex_scope[i](model.linear)
 
                             out = model(x2.to(dtype), x2.to(dtype), x2.to(dtype))
-                            self.assertEqual(out, ref_out)
+                            atol = None
+                            rtol = None
+                            if dtype is torch.float16:
+                                atol = 1e-4
+                                rtol = 1e-3
+                            self.assertEqual(out, ref_out, atol=atol, rtol=rtol)
                             _disable_tpp()
 
     def test_rmsnorm(self):
@@ -301,7 +427,10 @@ class TestLLMModules(TestCase):
         x2 = copy.deepcopy(x1)
         ref_m = LlamaRMSNorm(4096)
         target_m = ipex.llm.modules.RMSNorm(4096)
-        for dtype in [torch.float32, torch.bfloat16]:
+        dtypes = [torch.float32, torch.bfloat16]
+        if core.onednn_has_fp16_support():
+            dtypes.append(torch.float16)
+        for dtype in dtypes:
             ref_m = LlamaRMSNorm(4096).eval().to(dtype)
             target_m = ipex.llm.modules.RMSNorm(4096).to(dtype)
             ref_out = ref_m(x1.to(dtype))
@@ -359,7 +488,7 @@ class TestLLMModules(TestCase):
 
     def test_add_layernorm(self):
         for add_back in [True, False]:
-            for dtype in [torch.float, torch.bfloat16]:
+            for dtype in [torch.float, torch.bfloat16, torch.float16]:
                 for residual_is_none in [True, False]:
                     weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
                     eps = 1e-6
@@ -387,7 +516,7 @@ class TestLLMModules(TestCase):
 
     def test_add_rmsnorm(self):
         for add_back in [True, False]:
-            for dtype in [torch.float, torch.bfloat16]:
+            for dtype in [torch.float, torch.bfloat16, torch.float16]:
                 for residual_is_none in [True, False]:
                     weight = torch.nn.Parameter(torch.randn(4096)).to(dtype)
                     eps = 1e-6
@@ -414,7 +543,7 @@ class TestLLMModules(TestCase):
                     self.assertEqual(ref_out, ipex_out)
 
     def test_gelu_mul(self):
-        for dtype in [torch.float, torch.bfloat16]:
+        for dtype in [torch.float, torch.bfloat16, torch.float16]:
             for approximate in ["tanh", "none"]:
                 x = torch.rand(1, 32, 4096).to(dtype)
                 x_ = copy.deepcopy(x)
@@ -423,12 +552,25 @@ class TestLLMModules(TestCase):
                 self.assertEqual(ref_out, ipex_out)
 
     def test_silu_mul(self):
-        for dtype in [torch.float, torch.bfloat16]:
+        for dtype in [torch.float, torch.bfloat16, torch.float16]:
             x = torch.rand(1, 32, 4096).to(dtype)
             x_ = copy.deepcopy(x)
             ref_out = silu_mul(x_, x_)
             ipex_out = ipex.llm.functional.silu_mul(x_, x_)
             self.assertEqual(ref_out, ipex_out)
+
+    def test_moe_fusion(self):
+        with torch.no_grad():
+            for dtype in [torch.float, torch.bfloat16]:
+                for prepack in [True, False]:
+                    moe_module = MixtralMoE(4, 2, 1024, 4096).eval().to(dtype)
+                    x = torch.rand(1, 1024).to(dtype)
+                    x_ = copy.deepcopy(x)
+                    ref_out = moe_module(x)
+                    ipex_out = moe_module(
+                        x_, use_ipex_api=True, use_ipex_prepack=prepack
+                    )
+                    self.assertEqual(ref_out, ipex_out)
 
 
 if __name__ == "__main__":

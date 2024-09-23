@@ -3,6 +3,9 @@
 #include <ideep.hpp>
 #include "aten/Linear.h"
 #include "aten/WeightPack.h"
+#include "aten/utils/woq.h"
+#include "csrc/cpu/aten/TPPGEMM.h"
+#include "csrc/cpu/tpp/utils.h"
 #include "csrc/cpu/tpp/woq/tla.h"
 #include "ideep/IDeepConversions.h"
 
@@ -10,6 +13,9 @@ namespace torch_ipex {
 namespace cpu {
 namespace detail {
 namespace woq_linear {
+
+static int SMALL_BATCH_THRESHOLD =
+    torch_ipex::tpp::env2int("IPEX_WOQ_WEIGHT_CACHE_BATCH_THRESHOLD", 64);
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     at::Tensor&& weight,
@@ -22,7 +28,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
     c10::optional<int64_t> batch_size,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    bool cache_weight_for_large_batch) {
   RECORD_FUNCTION(
       "ipex_prepack::createWoqLinearPrePackOpContext",
       c10::ArrayRef<c10::IValue>({}));
@@ -38,7 +45,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
       batch_size,
       group_size,
       lowp_mode,
-      act_quant_mode);
+      act_quant_mode,
+      cache_weight_for_large_batch);
 }
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
@@ -50,7 +58,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     c10::optional<int64_t> batch_size,
     int64_t group_size, // group_size along input channel
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    bool cache_weight_for_large_batch) {
   RECORD_FUNCTION(
       "ipex_prepack::createWoqLinearPrePackOpContextInt4",
       c10::ArrayRef<c10::IValue>({}));
@@ -166,7 +175,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
       batch_size,
       group_size,
       lowp_mode,
-      act_quant_mode);
+      act_quant_mode,
+      cache_weight_for_large_batch);
 }
 
 at::Tensor woq_linear_run(
@@ -189,7 +199,8 @@ ContextLinearWoq create(
     const c10::optional<int64_t> batch_size,
     int64_t group_size,
     int64_t lowp_mode,
-    int64_t act_quant_mode) {
+    int64_t act_quant_mode,
+    bool cache_weight_for_large_batch) {
   at::Tensor packed_weight;
   int64_t N = weight_shape[0];
   int64_t K = weight_shape[1];
@@ -246,13 +257,14 @@ ContextLinearWoq create(
         std::move(g_idx),
         group_size,
         lowp_mode,
-        act_quant_mode);
+        act_quant_mode,
+        cache_weight_for_large_batch);
   }
   c10::optional<at::Tensor> zero_points_float = c10::nullopt;
   if (zero_points.has_value() && zero_points.value().defined()) {
     zero_points_float = c10::make_optional(zero_points.value().to(c10::kFloat));
   }
-  return ContextLinearWoq(
+  auto context = ContextLinearWoq(
       std::move(packed_weight),
       weight_dtype,
       std::move(weight_shape),
@@ -262,7 +274,15 @@ ContextLinearWoq create(
       std::move(g_idx),
       group_size,
       lowp_mode,
-      act_quant_mode);
+      act_quant_mode,
+      cache_weight_for_large_batch);
+  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+    auto compensation = woq_linear_compute_compensation(
+        weight, weight_dtype, group_size, lowp_mode);
+    context.cached_compensation_ =
+        c10::make_optional<at::Tensor>(std::move(compensation));
+  }
+  return context;
 }
 
 static at::Tensor _shuffle_input_channels_if_needed(
@@ -275,13 +295,105 @@ static at::Tensor _shuffle_input_channels_if_needed(
     auto& g_idx = context.g_idx_.value();
     auto K = input.size(-1);
     std::vector<int64_t> input_shape = {input.numel() / K, K};
-    return woq_shuffle_tensor_by_group_idx(
+    return woq_shuffle_tensor_by_group_idx</* is_4bit */ false>(
         input, input_shape, g_idx, context.group_size_);
   }
   return input;
 }
 
+IPEX_DEFINE_DISPATCH(woq_dequant_int4_to_int8_packed_stub);
+// Dequantize WOQ Linear weight and cache it in context
+// Lowp_mode != 3:
+//     Unpack weight to plain format, dequantize it, then repack it to
+//     blocked format for BF16 computation.
+// Lowp_mode == 3:
+//     Dequantize weight to INT8 and compute compensation.
+static void _dequant_weight_and_cache_in_context(ContextLinearWoq& context) {
+  if (context.lowp_mode_ == 2) {
+    // Requres g_idx disabled, and N/K divisible by block size
+    auto N = context.weight_shape_[0];
+    auto K = context.weight_shape_[1];
+    bool supported = !context.g_idx_.has_value() && K % 64 == 0 &&
+        (N % 100 == 0 || N % 64 == 0);
+    if (!supported)
+      return;
+    auto unpacked_weight = unpack(context, context.at_weight_);
+    auto block_weight = [&](const at::Tensor& weight, int64_t Nb, int64_t Kb) {
+      return weight.reshape({N / Nb, Nb, K / Kb, Kb / 2, 2})
+          .permute({0, 2, 3, 1, 4})
+          .contiguous()
+          .to(c10::kBFloat16);
+    };
+    at::Tensor scale, zp;
+    scale = context.scales_list_[0].unsqueeze(-1);
+    if (context.weight_dtype_ != WOQ_DTYPE_NF4) {
+      zp = context.zero_points_list_[0].unsqueeze(-1);
+    }
+    int64_t quant_w_mode = context.group_size_ > 0 ? 1 : 0;
+    auto dequant_weight = torch_ipex::cpu::dequantize_woq_weight(
+        unpacked_weight,
+        context.weight_shape_,
+        scale,
+        zp,
+        context.weight_dtype_,
+        context.group_size_);
+    auto new_weight = N % 100 == 0
+        ? block_weight(dequant_weight, 100, 64).to(c10::kBFloat16)
+        : block_weight(dequant_weight, 64, 64).to(c10::kBFloat16);
+    context.cached_weight_ =
+        c10::make_optional<at::Tensor>(std::move(new_weight));
+  } else if (context.lowp_mode_ == 3) {
+    if (context.at_weight_.dim() != 4)
+      return;
+    auto w_sizes = context.at_weight_.sizes();
+    auto Nc = w_sizes[0];
+    auto Kc = w_sizes[1];
+    auto Kb = w_sizes[2];
+    auto Nb = w_sizes[3] * 2;
+    at::Tensor compensation =
+        at::empty({Nc, Kc, Nb}, device(c10::kCPU).dtype(c10::kInt));
+    int64_t quant_w_mode = context.group_size_ > 0 ? 1 : 0;
+    auto new_weight = woq_dequant_int4_to_int8_packed_stub(
+        kCPU,
+        context.at_weight_,
+        context.scales_list_[0], // float
+        context.zero_points_list_[3], // int8
+        context.group_size_,
+        quant_w_mode,
+        compensation);
+
+    context.cached_weight_ =
+        c10::make_optional<at::Tensor>(std::move(new_weight));
+    context.cached_compensation_ =
+        c10::make_optional<at::Tensor>(std::move(compensation));
+  }
+}
+
 at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
+  if (context.cache_weight_for_large_batch_ &&
+      !context.cached_weight_.has_value()) {
+    _dequant_weight_and_cache_in_context(context);
+  }
+  auto M = input.numel() > 0 ? input.numel() / input.size(-1) : 0;
+  bool fast_path_lowp_mode_3 = false;
+  if (M >= SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
+      context.cached_weight_.value().defined()) {
+    if (context.lowp_mode_ == 2) {
+      auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
+      auto out = tpp_linear_bias_forward_cpu(
+          input_reshaped.to(c10::kBFloat16).contiguous(),
+          context.cached_weight_.value(),
+          context.bias_list_[2],
+          c10::nullopt);
+      return input.dim() == 2 ? out.squeeze(0) : out;
+    } else if (
+        context.lowp_mode_ == 3 && context.cached_compensation_.has_value() &&
+        context.cached_compensation_.value().defined()) {
+      fast_path_lowp_mode_3 = true;
+    }
+  }
+  bool use_cached_compensation = fast_path_lowp_mode_3 ||
+      (context.weight_dtype_ == WOQ_DTYPE_INT8 && context.lowp_mode_ == 3);
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
@@ -296,14 +408,16 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
   input_ = _shuffle_input_channels_if_needed(context, input_);
   auto res = woq_linear_kernel(
       input_,
-      context.at_weight_,
+      fast_path_lowp_mode_3 ? context.cached_weight_.value()
+                            : context.at_weight_,
       context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
       context.bias_list_,
       context.group_size_,
       context.lowp_mode_,
-      context.act_quant_mode_);
+      context.act_quant_mode_,
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
     return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
@@ -311,18 +425,67 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
   return res;
 }
 
-// Called by IpexWoqLinearOpContext::run_eltwise
-at::Tensor run_eltwise(
+// Called by IpexWoqLinearOpContext::run_unary
+at::Tensor run_unary(
     ContextLinearWoq& context,
     const at::Tensor& input,
     const c10::string_view& post_op,
     const torch::List<c10::optional<at::Scalar>>& scalars,
     const c10::optional<c10::string_view>& algorithm) {
+  if (context.cache_weight_for_large_batch_ &&
+      !context.cached_weight_.has_value()) {
+    _dequant_weight_and_cache_in_context(context);
+  }
+  auto M = input.numel() > 0 ? input.numel() / input.size(-1) : 0;
+  bool fast_path_lowp_mode_3 = false;
+  if (M >= SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
+      context.cached_weight_.value().defined()) {
+    if (context.lowp_mode_ == 2) {
+      auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
+      if (post_op == "gelu") {
+        if (algorithm == "none") {
+          auto out = tpp_linear_gelu_forward_cpu(
+              input_reshaped.to(c10::kBFloat16).contiguous(),
+              context.cached_weight_.value(),
+              context.bias_list_[2],
+              c10::nullopt);
+          return input.dim() == 2 ? out.squeeze(0) : out;
+        } else if (algorithm == "tanh") {
+          auto out = tpp_linear_gelu_tanh_forward_cpu(
+              input_reshaped.to(c10::kBFloat16).contiguous(),
+              context.cached_weight_.value(),
+              context.bias_list_[2],
+              c10::nullopt);
+          return input.dim() == 2 ? out.squeeze(0) : out;
+        }
+      } else if (post_op == "silu") {
+        auto out = tpp_linear_silu_forward_cpu(
+            input_reshaped.to(c10::kBFloat16).contiguous(),
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      } else if (post_op == "relu") {
+        auto out = tpp_linear_relu_forward_cpu(
+            input_reshaped.to(c10::kBFloat16).contiguous(),
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      }
+    } else if (
+        context.lowp_mode_ == 3 && context.cached_compensation_.has_value() &&
+        context.cached_compensation_.value().defined()) {
+      fast_path_lowp_mode_3 = true;
+    }
+  }
+  bool use_cached_compensation = fast_path_lowp_mode_3 ||
+      (context.weight_dtype_ == WOQ_DTYPE_INT8 && context.lowp_mode_ == 3);
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
       input.size(input.dim() - 1) == w_k,
-      "WOQ linear: input and weight shapes do not match, got k = ",
+      "WOQ linear_unary: input and weight shapes do not match, got k = ",
       input.size(input.dim() - 1),
       " and ",
       w_k,
@@ -330,9 +493,10 @@ at::Tensor run_eltwise(
   auto input_ = input.contiguous();
   // handle GPTQ with act-order
   input_ = _shuffle_input_channels_if_needed(context, input_);
-  return woq_linear_eltwise_kernel(
+  auto res = woq_linear_unary_kernel(
       input_,
-      context.at_weight_,
+      fast_path_lowp_mode_3 ? context.cached_weight_.value()
+                            : context.at_weight_,
       context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
@@ -342,19 +506,72 @@ at::Tensor run_eltwise(
       algorithm,
       context.group_size_,
       context.lowp_mode_,
-      context.act_quant_mode_);
+      context.act_quant_mode_,
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+  if (res.size(-1) != context.weight_shape_[0]) {
+    int64_t N = context.weight_shape_[0];
+    return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
+  }
+  return res;
 }
 
-// Called by IpexWoqLinearOpContext::run_add
-at::Tensor run_add(
+// Called by IpexWoqLinearOpContext::run_binary
+at::Tensor run_binary(
     ContextLinearWoq& context,
     const at::Tensor& input,
+    const c10::string_view& post_op,
     const std::vector<at::Tensor>& others) {
+  auto M = input.numel() > 0 ? input.numel() / input.size(-1) : 0;
+  if (context.cache_weight_for_large_batch_ &&
+      !context.cached_weight_.has_value()) {
+    _dequant_weight_and_cache_in_context(context);
+  }
+  bool fast_path_lowp_mode_3 = false;
+  if (M >= SMALL_BATCH_THRESHOLD && context.cached_weight_.has_value() &&
+      context.cached_weight_.value().defined()) {
+    if (context.lowp_mode_ == 2) {
+      auto input_reshaped = input.dim() == 2 ? input.unsqueeze(0) : input;
+      if (post_op == "add") {
+        auto out = tpp_linear_add_forward_cpu(
+            input_reshaped.to(c10::kBFloat16).contiguous(),
+            others[0],
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            1.0,
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      } else if (post_op == "add_add") {
+        auto out = tpp_linear_add_add_forward_cpu(
+            input_reshaped.to(c10::kBFloat16),
+            others[0],
+            others[1],
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            1.0,
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      } else if (post_op == "mul") {
+        auto out = tpp_linear_mul_forward_cpu(
+            input_reshaped.to(c10::kBFloat16),
+            others[0],
+            context.cached_weight_.value(),
+            context.bias_list_[2],
+            c10::nullopt);
+        return input.dim() == 2 ? out.squeeze(0) : out;
+      }
+    } else if (
+        context.lowp_mode_ == 3 && context.cached_compensation_.has_value() &&
+        context.cached_compensation_.value().defined()) {
+      fast_path_lowp_mode_3 = true;
+    }
+  }
+  bool use_cached_compensation = fast_path_lowp_mode_3 ||
+      (context.weight_dtype_ == WOQ_DTYPE_INT8 && context.lowp_mode_ == 3);
   // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
   auto w_k = context.weight_shape_[1];
   TORCH_CHECK(
       input.size(input.dim() - 1) == w_k,
-      "WOQ linear: input and weight shapes do not match, got k = ",
+      "WOQ linear_binary: input and weight shapes do not match, got k = ",
       input.size(input.dim() - 1),
       " and ",
       w_k,
@@ -362,47 +579,25 @@ at::Tensor run_add(
   auto input_ = input.contiguous();
   // handle GPTQ with act-order
   input_ = _shuffle_input_channels_if_needed(context, input_);
-  return woq_linear_add_kernel(
+  auto res = woq_linear_binary_kernel(
       input_,
-      context.at_weight_,
+      fast_path_lowp_mode_3 ? context.cached_weight_.value()
+                            : context.at_weight_,
       context.weight_dtype_,
       context.scales_list_,
       context.zero_points_list_,
       context.bias_list_,
       context.group_size_,
       context.lowp_mode_,
+      post_op,
       others,
-      context.act_quant_mode_);
-}
-
-// Called by IpexWoqLinearOpContext::run_add_add
-at::Tensor run_add_add(
-    ContextLinearWoq& context,
-    const at::Tensor& input,
-    const std::vector<at::Tensor>& others) {
-  // TPP kernel packs weight to 4d (Nc, Kc, block_k, block_n)
-  auto w_k = context.weight_shape_[1];
-  TORCH_CHECK(
-      input.size(input.dim() - 1) == w_k,
-      "WOQ linear: input and weight shapes do not match, got k = ",
-      input.size(input.dim() - 1),
-      " and ",
-      w_k,
-      " respectively.");
-  auto input_ = input.contiguous();
-  // handle GPTQ with act-order
-  input_ = _shuffle_input_channels_if_needed(context, input_);
-  return woq_linear_add_add_kernel(
-      input_,
-      context.at_weight_,
-      context.weight_dtype_,
-      context.scales_list_,
-      context.zero_points_list_,
-      context.bias_list_,
-      context.group_size_,
-      context.lowp_mode_,
-      others,
-      context.act_quant_mode_);
+      context.act_quant_mode_,
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+  if (res.size(-1) != context.weight_shape_[0]) {
+    int64_t N = context.weight_shape_[0];
+    return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
+  }
+  return res;
 }
 
 at::Tensor pack(ContextLinearWoq& context, const at::Tensor& tensor) {

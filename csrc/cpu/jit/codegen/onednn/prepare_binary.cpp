@@ -90,6 +90,31 @@ void handleBinaryOpInputs(Node* node, int first_input, int second_input) {
   }
 }
 
+static void ReplaceTypeAsWithTo(Block* block) {
+  for (auto node : block->nodes()) {
+    for (auto sub : node->blocks()) {
+      ReplaceTypeAsWithTo(sub);
+    }
+
+    if (node->kind() == aten::type_as) {
+      auto nodeOutputTypePtr = node->output()->type()->expect<TensorType>();
+      c10::optional<at::ScalarType> outputDtype =
+          nodeOutputTypePtr->scalarType();
+      // Sometimes, JIT IR may not have input dtype
+      auto nodeInputTypePtr = node->input(0)->type()->expect<TensorType>();
+      c10::optional<at::ScalarType> inputDtype = nodeInputTypePtr->scalarType();
+      if (outputDtype.has_value() && inputDtype.has_value()) {
+        auto g = node->prev()->owningGraph();
+        auto replacementNodeOutput =
+            g->insert(aten::to, {node->input(0), outputDtype.value()});
+        replacementNodeOutput->setType(
+            nodeOutputTypePtr->withScalarType(outputDtype.value()));
+        node->outputs()[0]->replaceAllUsesWith(replacementNodeOutput);
+      }
+    }
+  }
+}
+
 static void ConvertScalarToTensor(Block* block) {
   for (auto node : block->nodes()) {
     for (auto sub : node->blocks()) {
@@ -223,43 +248,6 @@ static void replaceWithSelectOp(Block* block) {
   }
 }
 
-void removeSelectOpNode(Node* node) {
-  WithInsertPoint guard(node);
-  auto g = node->owningGraph();
-  auto dtype = node->output()->type()->cast<TensorType>()->scalarType().value();
-  // The sequence of ops in the graph is like this -
-  // if_tensor = aten::as_tensor(%if_value, %, %)
-  // if_tensor = aten::unsqueeze(%if_tensor, %57)
-  // llga::Select(mask, if_tensor, then_tensor)
-  auto as_tensor_node = node->input(1)->node()->input(0)->node();
-  auto expand_as_output =
-      g->insert(aten::expand_as, {node->input(0), node->input(2)});
-  expand_as_output->setType(node->input(2)->type());
-  auto masked_fill_output = g->insert(
-      aten::masked_fill,
-      {node->input(2), expand_as_output, as_tensor_node->input(0)});
-  masked_fill_output->setType(node->input(2)->type());
-  node->output()->replaceAllUsesWith(masked_fill_output);
-}
-
-static void mayRemoveLLGASelect(Block* block) {
-  for (auto nodeIterator = block->nodes().begin();
-       nodeIterator != block->nodes().end();
-       ++nodeIterator) {
-    Node* node = *nodeIterator;
-    for (auto blockIterator = node->blocks().begin();
-         blockIterator != node->blocks().end();
-         ++blockIterator) {
-      Block* body_block = *blockIterator;
-      mayRemoveLLGASelect(body_block);
-    }
-    if (node->kind().toQualString() == std::string("llga::Select")) {
-      removeSelectOpNode(node);
-      nodeIterator.destroyCurrent();
-    }
-  }
-}
-
 static void EliminateIdentityMulAddDiv(Block* block) {
   for (auto node : block->nodes()) {
     for (auto sub : node->blocks()) {
@@ -283,6 +271,8 @@ void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
   EliminateDeadCode(graph);
   // ConvertScalarToTensor must be placed after EliminateIdentityMulAddDiv
   replaceWithSelectOp(graph->block());
+  ReplaceTypeAsWithTo(graph->block());
+  EliminateDeadCode(graph);
   ConvertScalarToTensor(graph->block());
   // TODO: after conv-bn folding, bias will become bias? (Optional) after this
   // pass and will lose it when using mustNotBeNone to check Optional Bias
@@ -292,7 +282,6 @@ void PrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
 void RevertPrepareBinaryForLLGA(const std::shared_ptr<Graph>& graph) {
   ConvertTensorToScalar(graph->block());
   mayRevertDtypeAttributeInsertion(graph->block());
-  mayRemoveLLGASelect(graph->block());
   EliminateDeadCode(graph);
 }
 

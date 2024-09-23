@@ -9,6 +9,7 @@
 #include <libxsmm_intrinsics_x86.h>
 #include <string>
 #include <unordered_map>
+#include "csrc/cpu/aten/TPPGEMM.h"
 
 namespace torch_ipex {
 namespace tpp {
@@ -667,8 +668,8 @@ class ConvertTPP {
  private:
   int rows = 0;
   int cols = 0;
-  int ldi;
-  int ldo;
+  int ldi = 0;
+  int ldo = 0;
   UnaryTPP kernel;
   bool init_done = false;
 };
@@ -884,34 +885,39 @@ class AddBiasTPP {
   ConvertTPP<T, float> cvt;
 };
 
-template <typename Tin, typename Tout = Tin>
+template <typename Tin, typename Tout = Tin, typename Tin2 = Tin>
 class AddTPP {
  public:
   AddTPP() {}
   AddTPP(int N) : AddTPP(1, N) {}
   AddTPP(int rows, int cols) : AddTPP(rows, cols, cols, cols) {}
   AddTPP(int rows, int cols, int ldi, int ldo)
+      : AddTPP(rows, cols, ldi, ldi, ldo) {}
+  AddTPP(int rows, int cols, int ldi0, int ldi1, int ldo)
       : rows(rows),
         cols(cols),
-        ldi(ldi),
+        ldi0(ldi0),
+        ldi1(ldi1),
         ldo(ldo),
         kernel(
             rows,
             cols,
-            ldi,
+            ldi0,
+            ldi1,
             ldo,
             XsmmDtype<Tin>(),
+            XsmmDtype<Tin2>(),
             XsmmDtype<Tout>(),
             LIBXSMM_DATATYPE_F32,
             LIBXSMM_MELTW_FLAG_BINARY_NONE,
             LIBXSMM_MELTW_TYPE_BINARY_ADD) {}
-  void operator()(Tin* in0, Tin* in1, Tout* out) {
+  void operator()(Tin* in0, Tin2* in1, Tout* out) {
     kernel((void*)in0, (void*)in1, (void*)out);
   }
-  void ref(Tin* in0, Tin* in1, Tout* out) {
+  void ref(Tin* in0, Tin2* in1, Tout* out) {
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
-        out[r * ldo + c] = (float)in0[r * ldi + c] + (float)in1[r * ldi + c];
+        out[r * ldo + c] = (float)in0[r * ldi0 + c] + (float)in1[r * ldi1 + c];
       }
     }
   }
@@ -919,7 +925,8 @@ class AddTPP {
  private:
   int rows = 0;
   int cols = 0;
-  int ldi;
+  int ldi0;
+  int ldi1;
   int ldo;
   BinaryTPP kernel;
 };
@@ -1873,7 +1880,8 @@ class BrgemmTPP {
       float beta,
       int a_trans,
       int unroll_hint,
-      int b_vnni = 1)
+      int b_vnni = 1,
+      bool is_s8s8 = false)
       : M(M),
         N(N),
         K(K),
@@ -1886,6 +1894,7 @@ class BrgemmTPP {
         a_trans(a_trans),
         unroll_hint(unroll_hint),
         b_vnni(b_vnni),
+        is_s8s8(is_s8s8),
         k_gemm_with_tc(this, 0),
         k_cfg(this, 1),
         k_rls(this, 2),
@@ -1998,7 +2007,7 @@ class BrgemmTPP {
 
    protected:
     uint64_t hash_int() override {
-      std::array<int, 14> params = {
+      std::array<int, 15> params = {
           p->M,
           p->N,
           p->K,
@@ -2012,8 +2021,9 @@ class BrgemmTPP {
           p->ldb,
           p->ldc,
           config,
-          p->b_vnni};
-      uint64_t hash_value = string_to_hash_int<14>("brgemm", params);
+          p->b_vnni,
+          p->is_s8s8};
+      uint64_t hash_value = string_to_hash_int<15>("brgemm", params);
       return hash_value;
     }
     void* build_kernel() override {
@@ -2062,7 +2072,9 @@ class BrgemmTPP {
       l_shape.comp_type = LIBXSMM_DATATYPE_F32;
       // TODO(jgong5): we should not always assume u8*i8 for int8 gemm
       if (std::is_same<Tin, int8_t>()) {
-        l_flags |= LIBXSMM_GEMM_FLAG_B_UNSIGNED;
+        if (!p->is_s8s8) {
+          l_flags |= LIBXSMM_GEMM_FLAG_B_UNSIGNED;
+        }
         l_shape.comp_type = LIBXSMM_DATATYPE_I32;
       }
       l_shape.out_type = XsmmDtype<Tout>();
@@ -2114,6 +2126,7 @@ class BrgemmTPP {
   int64_t brgemm_type = -1;
   int unroll_hint;
   int b_vnni;
+  bool is_s8s8;
   BrgemmKernel k_gemm_with_tc;
   BrgemmKernel k_cfg;
   BrgemmKernel k_rls;
@@ -2191,43 +2204,50 @@ class GeluTanhFwdTPP {
       : M(M), N(N), ldi(ldi), ldo(ldo) {}
 
   void operator()(Tin* in, Tout* out) {
+    if constexpr (
+        std::is_same<Tin, bfloat16>() && std::is_same<Tout, bfloat16>()) {
+      torch_ipex::cpu::tpp_gelu_tanh_bf16_forward_cpu(in, out, M, N, ldi, ldo);
+    } else {
 #ifdef __AVX512F__
-    const __m512 c1 = _mm512_set1_ps((float)0.7978846);
-    const __m512 c2 = _mm512_set1_ps((float)0.0356814);
-    const __m512 c_half = _mm512_set1_ps((float)0.5);
-    for (int j = 0; j < M; j++) {
-      int i;
-      for (i = 0; i < ALIGNDOWN(N, 16); i += 16) {
-        auto vin = _mm512_loadu_ps_auto(&in[j * ldi + i]);
-        __m512 x_half = _mm512_mul_ps(vin, c_half);
-        __m512 x_sq = _mm512_mul_ps(vin, vin);
-        __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
-        __m512 tanh_poly_x = LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
-        __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
-        _mm512_storeu_ps_auto(&out[j * ldo + i], vout);
+      const __m512 c1 = _mm512_set1_ps((float)0.7978846);
+      const __m512 c2 = _mm512_set1_ps((float)0.0356814);
+      const __m512 c_half = _mm512_set1_ps((float)0.5);
+      for (int j = 0; j < M; j++) {
+        int i;
+        for (i = 0; i < ALIGNDOWN(N, 16); i += 16) {
+          auto vin = _mm512_loadu_ps_auto(&in[j * ldi + i]);
+          __m512 x_half = _mm512_mul_ps(vin, c_half);
+          __m512 x_sq = _mm512_mul_ps(vin, vin);
+          __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
+          __m512 tanh_poly_x =
+              LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
+          __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
+          _mm512_storeu_ps_auto(&out[j * ldo + i], vout);
+        }
+        if (i < N) {
+          int rem = N - i;
+          __mmask16 mask = (1 << rem) - 1;
+          auto vin = _mm512_maskz_loadu_ps_auto(mask, &in[j * ldi + i]);
+          __m512 x_half = _mm512_mul_ps(vin, c_half);
+          __m512 x_sq = _mm512_mul_ps(vin, vin);
+          __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
+          __m512 tanh_poly_x =
+              LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
+          __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
+          _mm512_mask_storeu_ps_auto(&out[j * ldo + i], mask, vout);
+        }
       }
-      if (i < N) {
-        int rem = N - i;
-        __mmask16 mask = (1 << rem) - 1;
-        auto vin = _mm512_maskz_loadu_ps_auto(mask, &in[j * ldi + i]);
-        __m512 x_half = _mm512_mul_ps(vin, c_half);
-        __m512 x_sq = _mm512_mul_ps(vin, vin);
-        __m512 poly_x1 = _mm512_mul_ps(vin, _mm512_fmadd_ps(x_sq, c2, c1));
-        __m512 tanh_poly_x = LIBXSMM_INTRINSICS_MM512_TANH_PS_MINIMAX3(poly_x1);
-        __m512 vout = _mm512_fmadd_ps(tanh_poly_x, x_half, x_half);
-        _mm512_mask_storeu_ps_auto(&out[j * ldo + i], mask, vout);
-      }
-    }
 #else
-    for (int j = 0; j < M; j++) {
-      for (int i = 0; i < N; i++) {
-        float x = in[j * ldi + i];
-        out[j * ldo + i] =
-            ((tanh(sqrt(2 / M_PI) * (x + 0.044715 * std::pow(x, 3)))) + 1) * x *
-            0.5;
+      for (int j = 0; j < M; j++) {
+        for (int i = 0; i < N; i++) {
+          float x = in[j * ldi + i];
+          out[j * ldo + i] =
+              ((tanh(sqrt(2 / M_PI) * (x + 0.044715 * std::pow(x, 3)))) + 1) *
+              x * 0.5;
+        }
       }
-    }
 #endif
+    }
   }
 
   void ref(Tin* in, Tout* out) {

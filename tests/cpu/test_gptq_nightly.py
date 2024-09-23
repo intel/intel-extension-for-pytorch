@@ -124,6 +124,114 @@ class GPTQLLMTester(TestCase):
                     # the optimized model is ipex_m.trace_graph
                     model(*example_inputs)
 
+    def test_gptq_falcon_7b(self):
+        class GPTQLLMDataLoader:
+            def __init__(self):
+                self.batch_size = 1
+
+            def __iter__(self):
+                for i in range(10):
+                    yield torch.randint(1, 512, [1, 512], dtype=torch.long)
+
+        def _get_falcon_example_inputs():
+            input_ids = torch.ones(8).to(torch.long)
+            attention_mask = torch.ones(len(input_ids))
+            position_ids = torch.arange(len(input_ids))
+            past_key_values = tuple(
+                [
+                    (
+                        torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
+                    for i in range(1)
+                ]
+            )
+            return (
+                input_ids.unsqueeze(0),
+                attention_mask.unsqueeze(0),
+                past_key_values,
+                position_ids.unsqueeze(0),
+            )
+
+        dataloader = GPTQLLMDataLoader()
+        curpath = os.path.abspath(os.path.dirname(__file__))
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/falcon-7b", return_dict=False
+        )
+        falcon = transformers.models.falcon.modeling_falcon.FalconForCausalLM(
+            config
+        ).eval()
+        with torch.no_grad():
+            ipex.nn.utils._model_convert.replace_customized_linear_with_linear(
+                falcon.eval()
+            )
+        with tempfile.TemporaryDirectory() as work_dir:
+            for act_order in [False, True]:
+                model = copy.deepcopy(falcon)
+                model.eval()
+                compressed_model = ipex.quantization.gptq(
+                    model,
+                    dataloader=dataloader,
+                    wbits=4,
+                    group_size=128,
+                    act_order=act_order,
+                    use_max_length=True,
+                    pad_max_length=512,
+                    scale_dtype=torch.float16,
+                    save_dir=work_dir,
+                )
+                self.assertTrue(isinstance(compressed_model, torch.nn.Module))
+                input = torch.ones([1, 512], dtype=torch.long)
+                out0 = model(input)
+                out1 = compressed_model(input)
+                self.assertTrue(torch.allclose(out0[0], out1[0], atol=1e-05))
+
+                low_precision_checkpoint = torch.load(
+                    work_dir + "/gptq_checkpoint_g128.pt"
+                )
+                qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                    weight_dtype=WoqWeightDtype.INT4,
+                    lowp_mode=WoqLowpMode.INT8,
+                )
+                model = copy.deepcopy(falcon)
+                model.eval()
+                model = ipex.llm.optimize(
+                    model,
+                    dtype=torch.float,
+                    quantization_config=qconfig,
+                    inplace=True,
+                    low_precision_checkpoint=low_precision_checkpoint,
+                    deployment_mode=False,
+                )
+                _IPEXAttentionCPU = (
+                    ipex.transformers.models.cpu.modules.attentions._IPEXAttentionCPU
+                )
+                _IPEXDecoderLayerCPU = (
+                    ipex.transformers.models.cpu.modules.decoder._IPEXDecoderLayerCPU
+                )
+                WeightOnlyQuantizedLinear = ipex.nn.modules.WeightOnlyQuantizedLinear
+                assert (
+                    model.transformer.h[0].self_attention.__class__ is _IPEXAttentionCPU
+                )
+                assert model.transformer.h[0].__class__ is _IPEXDecoderLayerCPU
+                layers_to_check = [
+                    model.transformer.h[0].self_attention.dense,
+                    model.transformer.h[0].self_attention.query_key_value,
+                    model.transformer.h[0].linear_gelu.linear,
+                    model.transformer.h[0].linear_add_add.linear,
+                ]
+                assert all(
+                    mod.__class__ is WeightOnlyQuantizedLinear
+                    for mod in layers_to_check
+                )
+
+                # Ensure model can run without errors
+                with torch.no_grad():
+                    example_inputs = _get_falcon_example_inputs()
+                    model(*example_inputs)
+
 
 if __name__ == "__main__":
     test = unittest.main()
