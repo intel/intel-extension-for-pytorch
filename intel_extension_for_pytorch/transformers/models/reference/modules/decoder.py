@@ -1750,9 +1750,9 @@ class _IPEXDecoderLayerRef(nn.Module):
     def forward(
         self,
         hidden_states: Optional[torch.FloatTensor],
-        cross_attention_states: torch.Tensor,
-        cross_attention_mask: torch.Tensor,
-        full_text_row_masked_out_mask: Tuple[torch.Tensor, torch.Tensor],
+        cross_attention_states: torch.Tensor = None,
+        cross_attention_mask: torch.Tensor = None,
+        full_text_row_masked_out_mask: Tuple[torch.Tensor, torch.Tensor] = None,
         layer_past: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[torch.FloatTensor] = None,
         layer_head_mask: Optional[torch.Tensor] = None,
