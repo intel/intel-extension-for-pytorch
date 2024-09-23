@@ -61,3 +61,11 @@ class TestTorchMethod(TestCase):
         model = toy_model().cuda()
         for param in model.parameters():
             self.assertEqual(param.device.type, "xpu")
+
+    def test_cuda(self):
+        item = torch.rand(1, 2, 3).cuda()
+        self.assertEqual(item.device.type, "xpu")
+
+        item_index = torch.rand(1, 2, 3).cuda(0)
+        self.assertEqual(item_index.device.type, "xpu")
+        self.assertEqual(item_index.device.index, 0)
