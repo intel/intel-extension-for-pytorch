@@ -133,7 +133,17 @@ def _xpu_deserialize(obj, location):
             return _xpu(obj, device=device)
 
 
-_register_submodule_white_list = {"empty_cache"}
+_register_submodule_white_list = {
+    "empty_cache",
+    "max_memory_allocated",
+    "max_memory_reserved",
+    "memory_allocated",
+    "memory_reserved",
+    "memory_stats",
+    "memory_stats_as_nested_dict",
+    "reset_accumulated_memory_stats",
+    "reset_peak_memory_stats",
+}
 _register_submodule_black_list = {"mem_get_info"}
 
 
