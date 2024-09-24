@@ -2,6 +2,7 @@ import warnings
 from .frontend import optimize
 from . import modules
 from . import functional
+from . import quantization
 
 try:
     from . import generation

@@ -1,5 +1,5 @@
 import torch
-import intel_extension_for_pytorch  # noqa
+import intel_extension_for_pytorch as ipex  # noqa
 import pytest
 from intel_extension_for_pytorch.nn.utils._quantize_convert import GPTQShuffle
 
@@ -181,6 +181,61 @@ class TestInt4Linear(TestCase):
         self.assertEqual(
             torch.cat([out_xetla[i].cpu().float() for i in range(3)], dim=-1),
             torch.cat(out_torch_bias, dim=-1),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
+
+    @parametrize("per_channel", [False], lambda k: "per_channel" * k)
+    @parametrize("dtype", [torch.float16])
+    @parametrize("act_order", [False, True])
+    @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
+    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    def test_woqlinear_interface(
+        self, m, n, k, per_channel, act_order, dtype=torch.float16
+    ):
+        input = torch.rand([m, k], device="xpu", dtype=dtype)
+        input_torch = input.cpu()
+        weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
+        group_size = min(128, k)
+        checking_atol = base_atol
+        checking_rtol = base_rtol
+        if act_order:
+            g_idx = torch.randperm(k, dtype=torch.int32) // group_size
+            shuf_weight = GPTQShuffle(bits=4, blocksize=group_size)
+            shuffled_weight, g_idx4kernel = shuf_weight(weight, g_idx)
+        else:
+            g_idx = None
+            g_idx4kernel = None
+            shuffled_weight = weight
+        if per_channel:
+            group_size = k
+        group_num = int(k / group_size)
+
+        scales = -torch.rand([group_num, n], device="xpu", dtype=dtype)
+        zero_points = None
+        zero_points_kernel = None
+
+        weight_fp16 = self.dequantize(
+            weight, scales, zero_points, group_size, g_idx
+        ).cpu()
+        woqlinear = ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight(
+            shuffled_weight,
+            scales,
+            zero_points_kernel,
+            k,
+            n,
+            None,
+            None,
+            group_size,
+            g_idx4kernel,
+            ipex.llm.quantization.QuantMethod.GPTQ_GEMM,
+            ipex.llm.quantization.QuantDtype.INT4,
+        )
+        out_xetla = woqlinear(input)
+        out_torch = torch.matmul(input_torch, weight_fp16)
+        self.assertEqual(
+            out_xetla.cpu().float(),
+            out_torch.float(),
             atol=checking_atol,
             rtol=checking_rtol,
         )
