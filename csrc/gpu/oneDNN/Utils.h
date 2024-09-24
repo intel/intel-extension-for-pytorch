@@ -35,6 +35,17 @@ using namespace dnnl;
         dnnl::sycl_interop::execute((prim), (stream), ##__VA_ARGS__)); \
   }
 
+#define DPCPP_ONEDNN_EXEC_WITH_ARGHANDLES(                           \
+    prim_ext, stream, engine, arg_handles, ...)                      \
+  {                                                                  \
+    auto q = dnnl::sycl_interop::get_queue((stream));                \
+    DPCPP_EXT_SUBMIT(                                                \
+        (q),                                                         \
+        "onednn_ext_kernel",                                         \
+        prim_ext.execute(                                            \
+            stream, engine, std::move(arg_handles), ##__VA_ARGS__)); \
+  }
+
 #define DPCPP_ONEDNN_EXEC_WITH_EVENT(prim, stream, args, deps, output_event) \
   auto q = dnnl::sycl_interop::get_queue((stream));                          \
   DPCPP_ONEDNN_EXT_SUBMIT(                                                   \

@@ -5,7 +5,11 @@
 #include <ATen/record_function.h>
 #include <runtime/Utils.h>
 #include "comm/ATDispatch.h"
+#ifndef USE_PRIMITIVE_CACHE
 #include "oneDNN/WoqMatmul.h"
+#else
+#include "oneDNN/DnnlMatmulQuant.h"
+#endif
 #include "utils/CustomOperatorRegistration.h"
 
 namespace at {
@@ -87,6 +91,7 @@ static void mm_qkv_out_wint4(
     Attr attr;
     if (bias_.has_value()) {
       auto bias = bias_.value();
+#ifndef USE_PRIMITIVE_CACHE
       out0_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out0_,
           input_,
@@ -120,7 +125,40 @@ static void mm_qkv_out_wint4(
           attr,
           std::nullopt,
           bias[2]);
+#else // USE_PRIMITIVE_CACHE
+      out0_ = torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+          out0_,
+          input_,
+          weight_[0],
+          bias[0],
+          weight_scl[0],
+          weight_zp[0],
+          group_size,
+          false,
+          std::nullopt);
+      out1_ = torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+          out1_,
+          input_,
+          weight_[1],
+          bias[1],
+          weight_scl[1],
+          weight_zp[1],
+          group_size,
+          false,
+          std::nullopt);
+      out2_ = torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+          out2_,
+          input_,
+          weight_[2],
+          bias[2],
+          weight_scl[2],
+          weight_zp[2],
+          group_size,
+          false,
+          std::nullopt);
+#endif // USE_PRIMITIVE_CACHE
     } else {
+#ifndef USE_PRIMITIVE_CACHE
       out0_ = torch_ipex::xpu::oneDNN::woq_matmul_int4(
           out0_,
           input_,
@@ -151,6 +189,38 @@ static void mm_qkv_out_wint4(
           false,
           attr,
           std::nullopt);
+#else // USE_PRIMITIVE_CACHE
+      out0_ = torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+          out0_,
+          input_,
+          weight_[0],
+          std::nullopt,
+          weight_scl[0],
+          weight_zp[0],
+          group_size,
+          false,
+          std::nullopt);
+      out1_ = torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+          out1_,
+          input_,
+          weight_[1],
+          std::nullopt,
+          weight_scl[1],
+          weight_zp[1],
+          group_size,
+          false,
+          std::nullopt);
+      out2_ = torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+          out2_,
+          input_,
+          weight_[2],
+          std::nullopt,
+          weight_scl[2],
+          weight_zp[2],
+          group_size,
+          false,
+          std::nullopt);
+#endif // USE_PRIMITIVE_CACHE
     }
   }
 }
@@ -481,6 +551,7 @@ static Tensor mm_bias_int4(
         g_idx);
     return resize_as_mat1(input, out);
   } else {
+#ifndef USE_PRIMITIVE_CACHE
     Attr attr;
     torch_ipex::xpu::oneDNN::woq_matmul_int4(
         out,
@@ -493,6 +564,18 @@ static Tensor mm_bias_int4(
         attr,
         g_idx,
         bias_);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+        out,
+        input,
+        weight,
+        bias_,
+        weight_scl,
+        weight_zp,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
@@ -510,6 +593,7 @@ static Tensor mm_int4(
         input, weight, weight_scl, weight_zp, group_size, {}, &out, g_idx);
     return resize_as_mat1(input, out);
   } else {
+#ifndef USE_PRIMITIVE_CACHE
     at::Tensor bias = Tensor();
     Attr attr;
     torch_ipex::xpu::oneDNN::woq_matmul_int4(
@@ -523,6 +607,18 @@ static Tensor mm_int4(
         attr,
         g_idx,
         bias);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+        out,
+        input,
+        weight,
+        std::nullopt,
+        weight_scl,
+        weight_zp,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
@@ -541,6 +637,7 @@ static void mm_int4_out(
     return;
   } else {
     Attr attr;
+#ifndef USE_PRIMITIVE_CACHE
     torch_ipex::xpu::oneDNN::woq_matmul_int4(
         out,
         input,
@@ -551,6 +648,18 @@ static void mm_int4_out(
         false,
         attr,
         g_idx);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16(
+        out,
+        input,
+        weight,
+        std::nullopt,
+        weight_scl,
+        weight_zp,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return;
   }
 }
@@ -575,6 +684,7 @@ static Tensor mm_silu_int4(
         g_idx);
     return resize_as_mat1(input, out);
   } else {
+#ifndef USE_PRIMITIVE_CACHE
     at::Tensor bias = Tensor();
     Attr attr;
     torch_ipex::xpu::oneDNN::woq_matmul_silu(
@@ -588,6 +698,18 @@ static Tensor mm_silu_int4(
         attr,
         g_idx,
         bias);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_silu(
+        out,
+        input,
+        weight,
+        std::nullopt,
+        weight_scl,
+        weight_zp,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
@@ -615,6 +737,7 @@ static Tensor mm_resmul_int4(
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
+#ifndef USE_PRIMITIVE_CACHE
     torch_ipex::xpu::oneDNN::woq_matmul_resmul(
         out,
         input,
@@ -626,6 +749,19 @@ static Tensor mm_resmul_int4(
         false,
         attr,
         g_idx);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_resmul(
+        out,
+        input,
+        weight,
+        std::nullopt,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
@@ -655,6 +791,7 @@ static Tensor mm_bias_gelu_int4(
         g_idx);
     return resize_as_mat1(input, out);
   } else {
+#ifndef USE_PRIMITIVE_CACHE
     Attr attr;
     torch_ipex::xpu::oneDNN::woq_matmul_bias_gelu(
         out,
@@ -668,6 +805,19 @@ static Tensor mm_bias_gelu_int4(
         attr,
         g_idx,
         bias);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_bias_gelu(
+        out,
+        input,
+        weight,
+        bias,
+        weight_scl,
+        weight_zp,
+        group_size,
+        approximate,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
@@ -700,6 +850,7 @@ static Tensor mm_bias_resadd_resadd_int4(
         g_idx);
     return resize_as_mat1(input, out);
   } else {
+#ifndef USE_PRIMITIVE_CACHE
     Attr attr;
     torch_ipex::xpu::oneDNN::woq_matmul_bias_resadd_resadd(
         out,
@@ -714,6 +865,20 @@ static Tensor mm_bias_resadd_resadd_int4(
         attr,
         g_idx,
         bias);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_bias_resadd_resadd(
+        out,
+        input,
+        weight,
+        bias,
+        weight_scl,
+        weight_zp,
+        res0,
+        res1,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
@@ -759,6 +924,7 @@ static Tensor mm_silu_mul_int4(
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
+#ifndef USE_PRIMITIVE_CACHE
     torch_ipex::xpu::oneDNN::woq_matmul_silu_mul(
         out,
         input,
@@ -770,6 +936,19 @@ static Tensor mm_silu_mul_int4(
         false,
         attr,
         g_idx);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_silu_mul(
+        out,
+        input,
+        weight,
+        std::nullopt,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
@@ -800,6 +979,7 @@ static Tensor mm_bias_silu_mul_int4(
         g_idx);
     return resize_as_mat1(input, out);
   } else {
+#ifndef USE_PRIMITIVE_CACHE
     Attr attr;
     torch_ipex::xpu::oneDNN::woq_matmul_bias_silu_mul_int4(
         out,
@@ -813,6 +993,19 @@ static Tensor mm_bias_silu_mul_int4(
         attr,
         g_idx,
         bias);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_bias_silu_mul(
+        out,
+        input,
+        weight,
+        bias,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
@@ -840,6 +1033,7 @@ static Tensor mm_add_int4(
     return resize_as_mat1(input, out);
   } else {
     Attr attr;
+#ifndef USE_PRIMITIVE_CACHE
     torch_ipex::xpu::oneDNN::woq_matmul_add_int4(
         out,
         input,
@@ -851,6 +1045,19 @@ static Tensor mm_add_int4(
         false,
         attr,
         g_idx);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_add(
+        out,
+        input,
+        weight,
+        std::nullopt,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
@@ -880,6 +1087,7 @@ static Tensor mm_bias_add_int4(
         g_idx);
     return resize_as_mat1(input, out);
   } else {
+#ifndef USE_PRIMITIVE_CACHE
     Attr attr;
     torch_ipex::xpu::oneDNN::woq_matmul_bias_add_int4(
         out,
@@ -893,6 +1101,19 @@ static Tensor mm_bias_add_int4(
         attr,
         g_idx,
         bias);
+#else // USE_PRIMITIVE_CACHE
+    torch_ipex::xpu::oneDNN::dnnl_matmul_w4a16_and_bias_add(
+        out,
+        input,
+        weight,
+        bias,
+        weight_scl,
+        weight_zp,
+        res,
+        group_size,
+        false,
+        g_idx);
+#endif // USE_PRIMITIVE_CACHE
     return out;
   }
 }
