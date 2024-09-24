@@ -1,6 +1,6 @@
 # Intel® Extension for PyTorch\* Large Language Model (LLM) Feature Get Started For Llama 3.2 models
 
-Intel® Extension for PyTorch\* provides dedicated optimization for running Llama 3.2 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization INT8/INT4 (prototype), etc.
+Intel® Extension for PyTorch\* provides dedicated optimization for running Llama 3.2 models faster, including technical points like paged attention, ROPE fusion, etc. And a set of data types are supported for various scenarios, including BF16, Weight Only Quantization INT4 (prototype), etc.
 
 # 1. Environment Setup
 
