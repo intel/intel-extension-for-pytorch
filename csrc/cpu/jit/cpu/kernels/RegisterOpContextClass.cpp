@@ -17,6 +17,8 @@ using detail::mkl_sgemm::createLinearMKLPrePackOpContext;
 #ifdef USE_LIBXSMM
 using detail::woq_linear::createWoqLinearPrePackOpContext;
 using detail::woq_linear::createWoqLinearPrePackOpContextInt4;
+using detail::woq_linear::packWoqLinearWeight;
+using detail::woq_linear::unpackWoqLinearWeight;
 #endif
 
 TORCH_LIBRARY(ipex_prepack, m) {
@@ -159,6 +161,9 @@ TORCH_LIBRARY(ipex_prepack, m) {
       .def(
           "get_cached_weight",
           &torch_ipex::cpu::WoqLinearOpContext::get_cached_weight)
+      .def(
+          "get_cached_compensation",
+          &torch_ipex::cpu::WoqLinearOpContext::get_cached_compensation)
       .def("pack", &torch_ipex::cpu::WoqLinearOpContext::pack)
       .def("to_public", &torch_ipex::cpu::WoqLinearOpContext::to_public)
       .def(
@@ -190,6 +195,12 @@ TORCH_LIBRARY(ipex_prepack, m) {
   m.def(
       "weight_only_qlinear_prepack_int4(Tensor W, Tensor scales, Tensor? zeros, Tensor? B, Tensor? g_idx, int? batch_size, int group_size, int lowp_mode, int act_quant_mode, bool cache_weight_for_large_batch = False) "
       "-> __torch__.torch.classes.ipex_prepack.WoqLinearOpContext");
+  m.def(
+      "woq_linear_pack_weight(Tensor W, str W_dtype, int[] W_shape, Tensor scales, Tensor? zero_points, Tensor? B, Tensor? g_idx, int group_size, int lowp_mode) "
+      "-> (Tensor, Tensor[], Tensor[]?, Tensor[]?, Tensor?)");
+  m.def(
+      "woq_linear_unpack_weight(Tensor W, str W_dtype, int[] W_shape, int lowp_mode) "
+      "-> Tensor");
 #endif
 }
 
@@ -204,11 +215,11 @@ TORCH_LIBRARY_IMPL(ipex_prepack, CPU, m) {
 TORCH_LIBRARY_IMPL(ipex_prepack, CPU, m) {
   m.impl(
       "weight_only_qlinear_prepack", TORCH_FN(createWoqLinearPrePackOpContext));
-}
-TORCH_LIBRARY_IMPL(ipex_prepack, CPU, m) {
   m.impl(
       "weight_only_qlinear_prepack_int4",
       TORCH_FN(createWoqLinearPrePackOpContextInt4));
+  m.impl("woq_linear_pack_weight", TORCH_FN(packWoqLinearWeight));
+  m.impl("woq_linear_unpack_weight", TORCH_FN(unpackWoqLinearWeight));
 }
 #endif
 } // namespace cpu

@@ -193,6 +193,78 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
       cache_weight_for_large_batch);
 }
 
+static const std::map<c10::string_view, int64_t> WOQ_DTYPE_MAP = {
+    {"int8", WOQ_DTYPE_INT8},
+    {"int4", WOQ_DTYPE_INT4},
+    {"nf4", WOQ_DTYPE_NF4},
+};
+
+// output:
+// 0: packed weight, 1: scales, 2: zero_points, 3: bias, 4: compensation
+std::tuple<
+    at::Tensor,
+    std::vector<at::Tensor>,
+    c10::optional<std::vector<at::Tensor>>,
+    c10::optional<std::vector<at::Tensor>>,
+    c10::optional<at::Tensor>>
+packWoqLinearWeight(
+    at::Tensor&& weight,
+    c10::string_view&& weight_dtype,
+    std::vector<int64_t>&& weight_shape,
+    at::Tensor&& scales,
+    c10::optional<at::Tensor>&& zero_points,
+    c10::optional<at::Tensor>&& bias,
+    c10::optional<at::Tensor>&& g_idx,
+    int64_t group_size,
+    int64_t lowp_mode) {
+  bool has_zeros = zero_points.has_value();
+  bool has_bias = bias.has_value();
+  // Flags like act_quant_mode and cache_weight_for_large_batch are not used
+  auto&& context = create(
+      weight,
+      WOQ_DTYPE_MAP.at(weight_dtype),
+      weight_shape,
+      scales,
+      zero_points,
+      bias,
+      g_idx,
+      /* batch_size */ c10::nullopt,
+      group_size,
+      lowp_mode,
+      /*act_quant_mode*/ 0,
+      /*cache_weight_for_large_batch*/ false);
+  auto& packed_weight = context.at_weight_;
+  auto& new_scales = context.scales_list_;
+  auto& new_zeros = context.zero_points_list_;
+  auto& new_bias = context.bias_list_;
+  c10::optional<std::vector<at::Tensor>> optional_zeros =
+      has_zeros ? c10::make_optional(new_zeros) : c10::nullopt;
+  c10::optional<std::vector<at::Tensor>> optional_bias =
+      has_bias ? c10::make_optional(new_bias) : c10::nullopt;
+  auto compensation = context.cached_compensation_;
+  return std::make_tuple(
+      packed_weight, new_scales, optional_zeros, optional_bias, compensation);
+}
+
+at::Tensor unpackWoqLinearWeight(
+    at::Tensor&& weight,
+    c10::string_view&& weight_dtype,
+    std::vector<int64_t>&& weight_shape,
+    int64_t lowp_mode) {
+  int64_t w_dtype = WOQ_DTYPE_MAP.at(weight_dtype);
+  auto unpacked_weight = woq_linear_unpack_weight(weight, w_dtype, lowp_mode);
+  int64_t N = weight_shape[0];
+  int64_t K = weight_shape[1];
+  if (w_dtype == WOQ_DTYPE_INT4 || w_dtype == WOQ_DTYPE_NF4) {
+    K = (K + 1) / 2;
+  }
+  if (unpacked_weight.size(0) != N || unpacked_weight.size(1) != K) {
+    // narrow unpacked weight to original shape
+    return unpacked_weight.narrow(0, 0, N).narrow(1, 0, K).contiguous();
+  }
+  return unpacked_weight;
+}
+
 at::Tensor woq_linear_run(
     const at::Tensor& input,
     c10::intrusive_ptr<WoqLinearOpContext> op_context) {

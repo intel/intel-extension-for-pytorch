@@ -438,6 +438,10 @@ c10::optional<at::Tensor> IpexWoqLinearOpContext::get_cached_weight() {
   return op_context_.cached_weight_;
 }
 
+c10::optional<at::Tensor> IpexWoqLinearOpContext::get_cached_compensation() {
+  return op_context_.cached_compensation_;
+}
+
 at::Tensor IpexWoqLinearOpContext::get_scales() {
   if (op_context_.group_size_ > 0 && op_context_.at_weight_.dim() == 4) {
     // [#block_n, #block_k, n_block_size] -> [#block_n, n_block_size, #block_k]

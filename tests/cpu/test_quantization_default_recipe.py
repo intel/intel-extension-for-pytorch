@@ -2082,6 +2082,103 @@ class WeightOnlyQuantizationTester(TestCase):
                 enable_autocast,
             )
 
+    def test_weight_only_quantization_without_op_context(self):
+        class M(nn.Module):
+            def __init__(self, input_channel, output_channel, has_bias):
+                super(M, self).__init__()
+                self.linear = torch.nn.Linear(input_channel, output_channel, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(feature, has_bias, w_dtype, lowp_mode, enable_amp):
+            if w_dtype == WoqWeightDtype.NF4 and lowp_mode == WoqLowpMode.INT8:
+                return
+            model = M(feature[1], feature[2], has_bias)
+            m = model.eval()
+            data = torch.rand(feature[0], feature[1])
+            weight = model.linear.weight.clone()
+            bias = model.linear.bias
+            weight_shape = weight.shape
+            group_size = 128
+            sym_quant = (
+                w_dtype == WoqWeightDtype.INT8 and lowp_mode == WoqLowpMode.INT8
+            ) or w_dtype == WoqWeightDtype.NF4
+            qweight, w_scales, w_zero_points = quantize_per_block(
+                weight, w_dtype, group_size, sym_quant=sym_quant
+            )
+            dtype_to_str = {
+                WoqWeightDtype.INT8: "int8",
+                WoqWeightDtype.INT4: "int4",
+                WoqWeightDtype.NF4: "nf4",
+            }
+            packed_weight, new_scales, new_zeros, new_bias, compensation = (
+                torch.ops.ipex_prepack.woq_linear_pack_weight(
+                    qweight,
+                    dtype_to_str[w_dtype],
+                    weight_shape,
+                    w_scales,
+                    w_zero_points,
+                    bias,
+                    None,
+                    group_size,
+                    lowp_mode,
+                )
+            )
+            unpacked_weight = torch.ops.ipex_prepack.woq_linear_unpack_weight(
+                packed_weight,
+                dtype_to_str[w_dtype],
+                weight_shape,
+                lowp_mode,
+            )
+            assert torch.equal(unpacked_weight, qweight)
+
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=w_dtype,
+                lowp_mode=lowp_mode,
+                group_size=group_size,
+            )
+            prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
+            with torch.no_grad(), torch.autocast(
+                device_type="cpu", enabled=enable_amp, dtype=torch.bfloat16
+            ):
+                woq_model = convert(prepared_model)
+                output_ref = woq_model(data)
+                output = torch.ops.torch_ipex.woq_linear(
+                    data,
+                    packed_weight,
+                    dtype_to_str[w_dtype],
+                    weight_shape,
+                    new_scales,
+                    new_zeros,
+                    new_bias,
+                    None,
+                    group_size,
+                    lowp_mode,
+                    WoqActQuantMode.PER_IC_BLOCK,
+                    compensation,
+                )
+                torch.testing.assert_close(output, output_ref)
+
+        shape_list = [
+            [4, 1024, 1024],
+            [1024, 512, 512],
+        ]
+        use_bias_list = [True, False]
+        w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4]
+        lowp_mode_list = lowp_mode_list = [
+            WoqLowpMode.NONE,
+            WoqLowpMode.FP16,
+            WoqLowpMode.BF16,
+            WoqLowpMode.INT8,
+        ]
+        enable_amp_list = [True, False]
+        cases = itertools.product(
+            shape_list, use_bias_list, w_dtype_list, lowp_mode_list, enable_amp_list
+        )
+        for shape, use_bias, w_dtype, lowp_mode, enable_amp in cases:
+            test(shape, use_bias, w_dtype, lowp_mode, enable_amp)
+
 
 if __name__ == "__main__":
     test = unittest.main()

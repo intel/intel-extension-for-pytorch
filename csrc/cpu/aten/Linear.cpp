@@ -398,16 +398,8 @@ at::Tensor woq_linear_pack_weight(
       // Note that weight is already compressed
       int64_t K_int4_compressed = K / 2;
       int64_t N_int4 = N % block_n ? N / block_n * block_n + block_n : N;
-      at::Tensor weight_int4 = at::empty(
-          {N_int4, K_int4_compressed}, device(c10::kCPU).dtype(c10::kByte));
-      int64_t weight_size_bytes = weight.numel();
-      int64_t weight_int4_size_bytes = weight_int4.numel();
-      int64_t pad_size_bytes = weight_int4_size_bytes - weight_size_bytes;
-      std::memcpy(weight_int4.data_ptr(), weight.data_ptr(), weight_size_bytes);
-      std::fill_n(
-          (uint8_t*)weight_int4.data_ptr() + weight_size_bytes,
-          pad_size_bytes,
-          0);
+      at::Tensor weight_int4 =
+          at::pad(weight, {0, 0, 0, N_int4 - N}, "constant", 0);
       return woq_tpp_gemm_packB_stub(
           kCPU, weight_int4, weight_dtype, block_n, block_k, lowp_mode);
     }
@@ -533,6 +525,63 @@ at::Tensor woq_linear_forward(
   return reinterpret_cast<IpexWoqLinearOpContext*>(
              op_context.data_ptr<int64_t>()[0])
       ->run(input);
+}
+
+at::Tensor woq_linear_forward_v2(
+    const at::Tensor& input,
+    const at::Tensor& qweight,
+    const c10::string_view& weight_dtype,
+    const std::vector<int64_t>& weight_shape,
+    const std::vector<at::Tensor>& weight_scales,
+    const c10::optional<std::vector<at::Tensor>>& weight_zeros,
+    const c10::optional<std::vector<at::Tensor>>& bias,
+    const c10::optional<at::Tensor>& g_idx,
+    int64_t group_size,
+    int64_t lowp_mode,
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation) {
+  static const std::map<c10::string_view, int64_t> WOQ_DTYPE_MAP = {
+      {"int8", WOQ_DTYPE_INT8},
+      {"int4", WOQ_DTYPE_INT4},
+      {"nf4", WOQ_DTYPE_NF4},
+  };
+  TORCH_CHECK(
+      WOQ_DTYPE_MAP.find(weight_dtype) != WOQ_DTYPE_MAP.end(),
+      "Unsupported weight dtype: ",
+      weight_dtype);
+  if (WOQ_DTYPE_MAP.at(weight_dtype) == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+    TORCH_CHECK(compensation.has_value() && compensation.value().defined());
+  }
+  static const at::Tensor empty_tensor = at::Tensor();
+  // zp list of all dtypes = {fp32, fp16, bf16, int8}
+  static const std::vector<at::Tensor> empty_zp_list = {
+      empty_tensor, empty_tensor, empty_tensor, empty_tensor};
+  // bias list of all dtypes = {fp32, fp16, bf16}
+  static const std::vector<at::Tensor> empty_bias_list = {
+      empty_tensor, empty_tensor, empty_tensor};
+  if (weight_zeros.has_value()) {
+    TORCH_CHECK(
+        weight_zeros.value().size() == 4,
+        "IPEX WOQ: expect list of zeros has length 4");
+  }
+  auto& zeros_list =
+      weight_zeros.has_value() ? weight_zeros.value() : empty_zp_list;
+  if (bias.has_value()) {
+    TORCH_CHECK(
+        bias.value().size() == 3, "IPEX WOQ: expect list of bias has length 3");
+  }
+  auto& bias_list = bias.has_value() ? bias.value() : empty_bias_list;
+  return woq_linear_kernel(
+      input,
+      qweight,
+      WOQ_DTYPE_MAP.at(weight_dtype),
+      weight_scales,
+      zeros_list,
+      bias_list,
+      group_size,
+      lowp_mode,
+      act_quant_mode,
+      compensation);
 }
 
 at::Tensor woq_linear_unary_kernel(
@@ -788,6 +837,39 @@ at::Tensor woq_linear_forward(
   return op.call(cpu_cached_cast(target_type, input), op_context);
 }
 
+at::Tensor woq_linear_forward_v2(
+    const at::Tensor& input,
+    const at::Tensor& qweight,
+    const c10::string_view& weight_dtype,
+    const std::vector<int64_t>& weight_shape,
+    const std::vector<at::Tensor>& weight_scales,
+    const c10::optional<std::vector<at::Tensor>>& weight_zeros,
+    const c10::optional<std::vector<at::Tensor>>& bias,
+    const c10::optional<at::Tensor>& g_idx,
+    int64_t group_size,
+    int64_t lowp_mode,
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation) {
+  c10::impl::ExcludeDispatchKeyGuard no_autocastCPU(DispatchKey::AutocastCPU);
+  static auto op = torch::Dispatcher::singleton()
+                       .findSchemaOrThrow("torch_ipex::woq_linear", "")
+                       .typed<decltype(woq_linear_forward_v2)>();
+  auto target_type = get_autocast_dtype();
+  return op.call(
+      cpu_cached_cast(target_type, input),
+      qweight,
+      weight_dtype,
+      weight_shape,
+      weight_scales,
+      weight_zeros,
+      bias,
+      g_idx,
+      group_size,
+      lowp_mode,
+      act_quant_mode,
+      compensation);
+}
+
 at::Tensor woq_linear_gelu_forward(
     const at::Tensor& input,
     const at::Tensor& op_context) {
@@ -970,6 +1052,19 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "woq_linear_mul",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_mul_forward);
+  // the version without op_context
+  m.def(
+      "woq_linear(Tensor input, Tensor qweight, str weight_dtype, int[] weight_shape, Tensor[] weight_scales, "
+      "Tensor[]? weight_zeros, Tensor[]? bias, Tensor? g_idx, int group_size, int lowp_mode, int act_quant_mode, "
+      "Tensor? compensation = None) -> Tensor");
+  m.impl(
+      "woq_linear",
+      c10::DispatchKey::CPU,
+      torch_ipex::cpu::woq_linear_forward_v2);
+  m.impl(
+      "woq_linear",
+      c10::DispatchKey::AutocastCPU,
+      torch_ipex::autocast::woq_linear_forward_v2);
 #endif
   // fuse eltwise
   m.def(

@@ -433,6 +433,8 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
 
   virtual c10::optional<at::Tensor> get_cached_weight() = 0;
 
+  virtual c10::optional<at::Tensor> get_cached_compensation() = 0;
+
   virtual at::Tensor pack(const at::Tensor& tensor) = 0;
 
   virtual detail::ContextLinearWoq& get_context() = 0;
@@ -489,6 +491,8 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
   virtual std::vector<int64_t> get_weight_shape() override;
 
   virtual c10::optional<at::Tensor> get_cached_weight() override;
+
+  virtual c10::optional<at::Tensor> get_cached_compensation() override;
 
   virtual at::Tensor pack(const at::Tensor& tensor) override;
 

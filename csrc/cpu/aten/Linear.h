@@ -84,6 +84,20 @@ at::Tensor woq_linear_forward(
     const at::Tensor& input,
     const at::Tensor& op_context);
 
+at::Tensor woq_linear_forward_v2(
+    const at::Tensor& input,
+    const at::Tensor& qweight,
+    const c10::string_view& weight_dtype,
+    const std::vector<int64_t>& weight_shape,
+    const std::vector<at::Tensor>& weight_scales,
+    const c10::optional<std::vector<at::Tensor>>& weight_zeros,
+    const c10::optional<std::vector<at::Tensor>>& bias,
+    const c10::optional<at::Tensor>& g_idx,
+    int64_t group_size,
+    int64_t lowp_mode,
+    int64_t act_quant_mode,
+    const c10::optional<at::Tensor>& compensation);
+
 at::Tensor woq_linear_gelu_forward(
     const at::Tensor& input,
     const at::Tensor& op_context);
