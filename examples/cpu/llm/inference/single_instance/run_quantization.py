@@ -260,6 +260,12 @@ parser.add_argument(
     " This feature is not compatible with lambada_openai accuracy test. If you want to run"
     " lambada_openai accuracy test with the quantized model afterwards, don't turn this feature on.",
 )
+parser.add_argument(
+    "--woq-sym-quant-weight",
+    action="store_true",
+    help="Quantize weight symmetrically for weight only quantization. It usually brings better latency at"
+    " the cost of accuracy. It has not effect if you are loading low-precision checkpoints.",
+)
 args = parser.parse_args()
 
 
@@ -990,7 +996,10 @@ if args.ipex_smooth_quant:
                 self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
 
 elif args.ipex_weight_only_quantization:
-    from intel_extension_for_pytorch.quantization import WoqWeightDtype
+    from intel_extension_for_pytorch.quantization import (
+        WoqWeightDtype,
+        WoqWeightQScheme,
+    )
 
     if args.weight_dtype == "INT8":
         weight_dtype = WoqWeightDtype.INT8
@@ -1024,11 +1033,17 @@ elif args.ipex_weight_only_quantization:
         "PER_BATCH_SYM": ipex.quantization.WoqActQuantMode.PER_BATCH_SYM,
         "PER_BATCH_IC_BLOCK_SYM": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
     }
+    weight_qscheme = (
+        WoqWeightQScheme.SYMMETRIC
+        if args.woq_sym_quant_weight
+        else WoqWeightQScheme.UNDEFINED
+    )
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype,
         lowp_mode=lowp_mode,
         act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
         group_size=args.group_size,
+        weight_qscheme=weight_qscheme,
     )
     if args.low_precision_checkpoint != "":
         pathname = args.low_precision_checkpoint

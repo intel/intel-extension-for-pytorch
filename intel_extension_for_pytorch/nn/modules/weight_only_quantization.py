@@ -11,6 +11,7 @@ from intel_extension_for_pytorch.quantization import (
     quantize_per_channel,
     quantize_per_block,
     WoqWeightDtype,
+    WoqWeightQScheme,
 )
 from intel_extension_for_pytorch.nn.utils._model_convert import (
     prepack_awq_weight,
@@ -22,6 +23,7 @@ from intel_extension_for_pytorch.quantization._qconfig import (
     WOQ_LOWP_MODE_TO_STR,
     WOQ_ACT_QUANT_MODE_TO_STR,
     WOQ_DTYPE_TO_STR,
+    WOQ_QSCHEME_TO_STR,
 )
 
 
@@ -49,6 +51,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self._act_quant_mode = 0
         self._group_size = -1
         self._cache_weight_for_large_batch = False
+        self._weight_qscheme = WoqWeightQScheme.ASYMMETRIC
 
     def pre_ipex_gemm(self, input):
         return input
@@ -78,6 +81,9 @@ class WeightOnlyQuantizedLinear(nn.Module):
         extra_repr_str += ", group_size={}".format(self._group_size)
         extra_repr_str += ", cache_weight_for_large_batch={}".format(
             self._cache_weight_for_large_batch
+        )
+        extra_repr_str += ", weight_qscheme={}".format(
+            WOQ_QSCHEME_TO_STR[self._weight_qscheme]
         )
         return extra_repr_str
 
@@ -115,7 +121,13 @@ class WeightOnlyQuantizedLinear(nn.Module):
         group_size = qconfig.group_size
         # if dtype = int8, lowp-mode = int8, we want zero points to be 0
         # otherwise, it may overflow when we subtract zero points from int8 weight.
-        sym_quant = dtype == WoqWeightDtype.INT8 and lowp_mode == 3
+        sym_quant = qconfig.weight_qscheme == WoqWeightQScheme.SYMMETRIC
+        if dtype == WoqWeightDtype.NF4 or (
+            dtype == WoqWeightDtype.INT8 and lowp_mode == 3
+        ):
+            assert (
+                sym_quant is True
+            ), "WOQ NF4 and INT8 with lowp-mode 3 must use symmetric quantization"
 
         if group_size == -1:
             qweight, scales, zero_points = quantize_per_channel(
@@ -234,6 +246,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
         qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch
+        qlinear._weight_qscheme = (
+            WoqWeightQScheme.ASYMMETRIC
+            if zero_points is not None
+            else WoqWeightQScheme.SYMMETRIC
+        )
         del qweight
         return qlinear
 
@@ -322,6 +339,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
         qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch
+        qlinear._weight_qscheme = (
+            WoqWeightQScheme.ASYMMETRIC
+            if zero_points is not None
+            else WoqWeightQScheme.SYMMETRIC
+        )
         del qweight
         return qlinear
 
@@ -417,6 +439,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
         qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch
+        qlinear._weight_qscheme = (
+            WoqWeightQScheme.ASYMMETRIC
+            if zero_points is not None
+            else WoqWeightQScheme.SYMMETRIC
+        )
         return qlinear
 
 

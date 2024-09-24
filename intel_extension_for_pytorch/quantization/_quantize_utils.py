@@ -862,6 +862,9 @@ def quantize_per_channel(
     Args:
         input: The tensor to be quantized
         dtype: data type of the quantized tensor, int8, int4 or nf4
+        scales: Scales for quantization. If None, find by min/max.
+        zero_points: zero points for quantization. If None, find by min/max.
+        sym_quant: symmetric or asymmetric quantization
 
     Returns:
         A tuple of
@@ -871,14 +874,18 @@ def quantize_per_channel(
     """
     assert t.ndim == 2
     assert dtype in (WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4)
+    assert not (
+        dtype == WoqWeightDtype.NF4 and not sym_quant
+    ), "NF4 must be symmetric quant"
 
     def get_qparams(scales, zps):
-        if scales is not None and zps is not None:
+        if scales is not None and (sym_quant or zps is not None):
             return scales, zps
         eps = torch.tensor([torch.finfo(torch.float32).eps])
         zeros = torch.zeros(t.shape[0], dtype=t.dtype, device=t.device)
         mins = torch.minimum(t.min(dim=1)[0], zeros)
         maxs = torch.maximum(t.max(dim=1)[0], zeros)
+        zps = None
         if dtype == WoqWeightDtype.INT8:
             if sym_quant:
                 scales = torch.maximum(torch.abs(maxs), torch.abs(mins)) / 127
@@ -889,9 +896,13 @@ def quantize_per_channel(
                 zps = -torch.round(mins / scales)
                 zps -= 128
         elif dtype == WoqWeightDtype.INT4:
-            scales = (maxs - mins) / 15
-            scales = torch.max(scales, eps)
-            zps = -torch.round(mins / scales)
+            if sym_quant:
+                scales = torch.maximum(torch.abs(maxs), torch.abs(mins)) / 7
+                scales = torch.max(scales, eps)
+            else:
+                scales = (maxs - mins) / 15
+                scales = torch.max(scales, eps)
+                zps = -torch.round(mins / scales)
         else:  # NF4
             scales = torch.maximum(torch.abs(maxs), torch.abs(mins))
             scales = torch.max(scales, eps)
@@ -902,30 +913,33 @@ def quantize_per_channel(
     if dtype == WoqWeightDtype.INT8:
         qmin = -128
         qmax = 127
-        if sym_quant:
-            zps = torch.zeros_like(scales)
         qt = torch.clamp(
-            torch.round(t * inv_scales) + zps.unsqueeze(1), min=qmin, max=qmax
+            torch.round(t * inv_scales) + (zps.unsqueeze(1) if zps is not None else 0),
+            min=qmin,
+            max=qmax,
         ).to(torch.int8)
     elif dtype == WoqWeightDtype.INT4:
         qmin = 0
         qmax = 15
+        # for sym_quant, shift to 0-15 for storage
         qt = torch.clamp(
-            torch.round(t * inv_scales) + zps.unsqueeze(1), min=qmin, max=qmax
+            torch.round(t * inv_scales) + (zps.unsqueeze(1) if not sym_quant else 8),
+            min=qmin,
+            max=qmax,
         ).to(torch.uint8)
     else:  # NF4
         qt = map_float_tensor_to_nf4(t * inv_scales)
     if is_4bit(dtype):
         if qt.size(-1) % 2:
             qt = torch.nn.functional.pad(qt, (0, 1), value=0)
-        qt = qt[:, 1::2].bitwise_left_shift(4).bitwise_or_(qt[:, ::2])
+        qt = qt[:, 1::2].bitwise_left_shift(4).bitwise_or_(qt[:, ::2].bitwise_and(0xF))
     return qt.contiguous(), scales, zps
 
 
 def dequantize_per_channel(
     qt: torch.Tensor,
     scales: torch.Tensor,
-    zps: torch.Tensor,
+    zps: Optional[torch.Tensor],
     dtype,
     weight_shape=None,
 ):
@@ -948,7 +962,13 @@ def dequantize_per_channel(
     assert qt.ndim == 2
     assert dtype in (WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4)
     scales = scales.squeeze()
-    if not is_sym_quant(dtype):
+    sym_quant = zps is None
+    if sym_quant:
+        zps = torch.zeros_like(scales)
+        if dtype == WoqWeightDtype.INT4:
+            # shift from [0, 15] to [-8, 7]
+            zps += 8
+    else:
         zps = zps.squeeze()
     if dtype == WoqWeightDtype.INT8:
         return (qt.to(torch.float) - zps.unsqueeze(-1)) * scales.unsqueeze(-1)
@@ -994,6 +1014,7 @@ def quantize_per_block(
         group_size: Size of group along input channel
         scales: Scales for quantization. If None, find by min/max.
         zero_points: zero points for quantization. If None, find by min/max.
+        sym_quant: symmetric or asymmetric quantization
 
     Returns:
         A tuple of
@@ -1006,32 +1027,39 @@ def quantize_per_block(
     ), f"{__name__}: Expect input has 2 dimensions but got {input.dim()}"
     assert group_size > 0, f"{__name__}: Expect group_size > 0 but got {group_size}"
     assert dtype in (WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4)
+    assert not (
+        dtype == WoqWeightDtype.NF4 and not sym_quant
+    ), "NF4 must be symmetric quant"
     N = input.size(0)
     K = input.size(1)
     k_rem = K % group_size
     has_rem = k_rem != 0
 
     def get_qparams(scales, zps):
-        if scales is not None and zps is not None:
+        if scales is not None and (sym_quant or zps is not None):
             return scales, zps
         eps = torch.tensor([torch.finfo(torch.float32).eps])
         t_com = input[:, : K - k_rem].view(N, K // group_size, group_size)
         mins = torch.minimum(t_com.min(dim=-1)[0], torch.tensor([0]))
         maxs = torch.maximum(t_com.max(dim=-1)[0], torch.tensor([0]))
+        zps = None
         if dtype == WoqWeightDtype.INT8:
             if sym_quant:
                 scales = torch.maximum(torch.abs(maxs), torch.abs(mins)) / 127
                 scales = torch.max(scales, eps)
-                zps = torch.zeros_like(scales)
             else:
                 scales = (maxs - mins) / 255
                 scales = torch.max(scales, eps)
                 zps = -torch.round(mins / scales)
                 zps -= 128
         elif dtype == WoqWeightDtype.INT4:
-            scales = (maxs - mins) / 15
-            scales = torch.max(scales, eps)
-            zps = -torch.round(mins / scales)
+            if sym_quant:
+                scales = torch.maximum(torch.abs(maxs), torch.abs(mins)) / 7
+                scales = torch.max(scales, eps)
+            else:
+                scales = (maxs - mins) / 15
+                scales = torch.max(scales, eps)
+                zps = -torch.round(mins / scales)
         else:  # NF4
             scales = torch.maximum(torch.abs(maxs), torch.abs(mins))
             scales = torch.max(scales, eps)
@@ -1039,27 +1067,34 @@ def quantize_per_block(
             t_rem = input[:, K - k_rem :].view(N, 1, k_rem)
             mins_rem = torch.minimum(t_rem.min(dim=-1)[0], torch.tensor([0]))
             maxs_rem = torch.maximum(t_rem.max(dim=-1)[0], torch.tensor([0]))
+            zps_rem = None
             if dtype == WoqWeightDtype.INT8:
                 if sym_quant:
                     scales_rem = (
                         torch.maximum(torch.abs(maxs_rem), torch.abs(mins_rem)) / 127
                     )
                     scales_rem = torch.max(scales_rem, eps)
-                    zps_rem = torch.zeros_like(scales_rem)
                 else:
                     scales_rem = (maxs_rem - mins_rem) / 255
                     scales_rem = torch.max(scales_rem, eps)
                     zps_rem = -torch.round(mins_rem / scales_rem)
                     zps_rem -= 128
             elif dtype == WoqWeightDtype.INT4:
-                scales_rem = (maxs_rem - mins_rem) / 15
-                scales_rem = torch.max(scales_rem, eps)
-                zps_rem = -torch.round(mins_rem / scales_rem)
+                if sym_quant:
+                    scales_rem = (
+                        torch.maximum(torch.abs(maxs_rem), torch.abs(mins_rem)) / 7
+                    )
+                    scales_rem = torch.max(scales_rem, eps)
+                else:
+                    scales_rem = (maxs_rem - mins_rem) / 15
+                    scales_rem = torch.max(scales_rem, eps)
+                    zps_rem = -torch.round(mins_rem / scales_rem)
             else:  # NF4
                 scales_rem = torch.maximum(torch.abs(maxs_rem), torch.abs(mins_rem))
                 scales_rem = torch.max(scales_rem, eps)
             scales = torch.cat([scales, scales_rem], dim=-1)
-            if not is_sym_quant(dtype):
+            if not sym_quant:
+                assert zps is not None and zps_rem is not None
                 zps = torch.cat([zps, zps_rem], dim=-1)
         return scales, zps
 
@@ -1068,21 +1103,27 @@ def quantize_per_block(
     t_com = input[:, : K - k_rem].view(N, K // group_size, group_size)
     scales_com = scales[:, : Kc - has_rem]
     inv_scales_com = 1 / scales_com.unsqueeze(-1)
-    if not is_sym_quant(dtype):
+    if not sym_quant:
+        assert zps is not None
         zps_com = zps[:, : Kc - has_rem]
+    else:
+        zps_com = None
     if dtype == WoqWeightDtype.INT8:
         qmin = -128
         qmax = 127
         qt = torch.clamp(
-            torch.round(t_com * inv_scales_com) + zps_com.unsqueeze(-1),
+            torch.round(t_com * inv_scales_com)
+            + (zps_com.unsqueeze(-1) if zps_com is not None else 0),
             min=qmin,
             max=qmax,
         )
     elif dtype == WoqWeightDtype.INT4:
         qmin = 0
         qmax = 15
+        # for sym_quant, shift to 0-15 for storage
         qt = torch.clamp(
-            torch.round(t_com * inv_scales_com) + zps_com.unsqueeze(-1),
+            torch.round(t_com * inv_scales_com)
+            + (zps_com.unsqueeze(-1) if zps_com is not None else 8),
             min=qmin,
             max=qmax,
         )
@@ -1093,19 +1134,23 @@ def quantize_per_block(
         t_rem = input[:, K - k_rem :].view(N, 1, k_rem)
         scales_rem = scales[:, Kc - has_rem :]
         inv_scales_rem = 1 / scales_rem.unsqueeze(-1)
-        if not is_sym_quant(dtype):
+        if not sym_quant:
+            assert zps is not None
             zps_rem = zps[:, Kc - has_rem :]
+        else:
+            zps_rem = None
         if dtype == WoqWeightDtype.INT8:
-            assert zps_rem is not None
             qt_rem = torch.clamp(
-                torch.round(t_rem * inv_scales_rem) + zps_rem.unsqueeze(-1),
+                torch.round(t_rem * inv_scales_rem)
+                + (zps_rem.unsqueeze(-1) if zps_rem is not None else 0),
                 min=qmin,
                 max=qmax,
             )
         elif dtype == WoqWeightDtype.INT4:
-            assert zps_rem is not None
+            # for sym_quant, shift to 0-15 for storage
             qt_rem = torch.clamp(
-                torch.round(t_rem * inv_scales_rem) + zps_rem.unsqueeze(-1),
+                torch.round(t_rem * inv_scales_rem)
+                + (zps_rem.unsqueeze(-1) if zps_rem is not None else 8),
                 min=qmin,
                 max=qmax,
             )
@@ -1113,7 +1158,10 @@ def quantize_per_block(
             qt_rem = map_float_tensor_to_nf4(t_rem * inv_scales_rem)
         qt_rem = qt_rem.view(N, k_rem)
         qt = torch.cat([qt, qt_rem], dim=1).contiguous()
-    qt = qt.to(torch.uint8) if is_4bit(dtype) else qt.to(torch.int8)
+    # INT8 weight: always store in int8
+    # INT4 weight: store in int8 if sym_quant, otherwise in uint8
+    # NF4 weight: always store in uint8
+    qt = qt.to(torch.uint8 if is_4bit(dtype) else torch.int8)
     qt = qt.view(N, K)
     if is_4bit(dtype):
         if qt.size(-1) % 2:
@@ -1125,7 +1173,7 @@ def quantize_per_block(
 def dequantize_per_block(
     qt: torch.Tensor,
     scales: torch.Tensor,
-    zps: torch.Tensor,
+    zps: Optional[torch.Tensor],
     dtype,
     group_size,
     weight_shape=None,
@@ -1150,6 +1198,12 @@ def dequantize_per_block(
     K = qt.size(1) * 2 if is_4bit(dtype) else qt.size(1)
     if scales.dim() > 2:
         scales = scales.squeeze()
+    if zps is None:
+        zps = torch.zeros_like(scales)
+        if dtype == WoqWeightDtype.INT4:
+            # shift from [0, 15] to [-8, 7]
+            zps += 8
+    if zps.dim() > 2:
         zps = zps.squeeze()
     if is_4bit(dtype):
         t = torch.empty(

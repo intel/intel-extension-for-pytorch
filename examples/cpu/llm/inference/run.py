@@ -244,6 +244,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
         " It brings better performance at the cost of higher memory usage. It is only valid for full bf16 path"
         " and weight-only quantization with lowp-mode=BF16. Otherwise, it has no effect.",
     )
+    parser.add_argument(
+        "--woq-sym-quant-weight",
+        action="store_true",
+        help="Quantize weight symmetrically for weight only quantization. It usually brings better latency at"
+        " the cost of accuracy. It has not effect if you are loading low-precision checkpoints.",
+    )
 
     # inference related arguments.
     parser.add_argument(
@@ -444,6 +450,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         # No need to set group size if args.gptq is true
                         # Group size is read from the checkpoint
                         quant_cmd.extend(["--group-size", str(group_size)])
+                        if args.woq_sym_quant_weight:
+                            quant_cmd.extend(["--woq-sym-quant-weight"])
                 else:
                     quant_cmd.extend(["--ipex-smooth-quant"])
                     quant_cmd.extend(["--calib-len", str(args.calib_len)])

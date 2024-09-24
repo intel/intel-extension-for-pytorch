@@ -26,6 +26,8 @@ from intel_extension_for_pytorch.quantization import (
     quantize_per_block,
     WoqWeightDtype,
     WoqLowpMode,
+    WoqWeightQScheme,
+    WoqActQuantMode,
 )
 
 
@@ -991,7 +993,7 @@ class WeightOnlyQuantizationTester(TestCase):
             data = torch.rand(feature[0], feature[1])
             weight = model.linear.weight
             weight_int4, w_scales, w_zero_points = quantize_per_channel(
-                weight, WoqWeightDtype.NF4
+                weight, WoqWeightDtype.NF4, sym_quant=True
             )
             weight_fp32 = dequantize_per_channel(
                 weight_int4, w_scales, w_zero_points, WoqWeightDtype.NF4, weight.shape
@@ -1580,16 +1582,17 @@ class WeightOnlyQuantizationTester(TestCase):
                 # Quantize activation to int8 at runtime
                 # Convert weight and its zero points to INT8 for computation
                 w = copy.deepcopy(m.linear.weight.data)
+                sym_quant = w_dtype == WoqWeightDtype.NF4
                 if group_size == -1:
                     qw, w_scales, w_zero_points = quantize_per_channel(
-                        w, w_dtype, None, None
+                        w, w_dtype, None, None, sym_quant
                     )
                     fake_quant_w = dequantize_per_channel(
                         qw, w_scales, w_zero_points, w_dtype, w.shape
                     )
                 else:
                     qw, w_scales, w_zero_points = quantize_per_block(
-                        w, w_dtype, group_size, None, None
+                        w, w_dtype, group_size, None, None, sym_quant
                     )
                     fake_quant_w = dequantize_per_block(
                         qw,
@@ -1894,11 +1897,16 @@ class WeightOnlyQuantizationTester(TestCase):
                 w = copy.deepcopy(m.linear.weight.data)
                 if group_size > 0:
                     qw, _, _ = quantize_per_block(
-                        w, WoqWeightDtype.INT8, group_size, w_scales, w_zero_points
+                        w,
+                        WoqWeightDtype.INT8,
+                        group_size,
+                        w_scales,
+                        w_zero_points,
+                        sym_quant=True,
                     )
                 else:
                     qw, _, _ = quantize_per_channel(
-                        w, WoqWeightDtype.INT8, w_scales, w_zero_points
+                        w, WoqWeightDtype.INT8, w_scales, w_zero_points, sym_quant=True
                     )
                 if group_size > 0:
                     fake_quant_w = dequantize_per_block(
@@ -1911,7 +1919,7 @@ class WeightOnlyQuantizationTester(TestCase):
                     )
                 else:
                     fake_quant_w = dequantize_per_channel(
-                        qw, w_scales, w_zero_points.int(), WoqWeightDtype.INT8, w.shape
+                        qw, w_scales, w_zero_points, WoqWeightDtype.INT8, w.shape
                     )
                 m.linear.weight.data = fake_quant_w
                 y_ref = m(fake_quant_x).to(dtype)
@@ -1936,6 +1944,143 @@ class WeightOnlyQuantizationTester(TestCase):
         )
         for has_bias, quant_mode, M, group_size in cases:
             test(has_bias, quant_mode, M, group_size)
+
+    def test_weight_only_quantization_sym_quant_weight(self):
+
+        class Mod(nn.Module):
+            def __init__(self, has_bias):
+                super(Mod, self).__init__()
+                self.linear = torch.nn.Linear(K, N, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(
+            weight_dtype,
+            lowp_mode,
+            group_size,
+            has_bias,
+            act_quant_mode,
+            M,
+            enable_autocast,
+        ):
+            amp_dtype = torch.bfloat16
+            model = Mod(has_bias)
+            m = model.eval()
+            m2 = copy.deepcopy(m)
+            data = torch.rand(M, K) * 0.5
+            qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=weight_dtype,
+                lowp_mode=lowp_mode,
+                act_quant_mode=act_quant_mode,
+                group_size=group_size,
+                weight_qscheme=WoqWeightQScheme.SYMMETRIC,
+            )
+            x = data
+            prepared_model = prepare(m2, qconfig_mapping, inplace=True)
+            with torch.no_grad(), torch.autocast(
+                device_type="cpu",
+                enabled=enable_autocast,
+                dtype=amp_dtype if enable_autocast else None,
+            ):
+                woq_model = convert(prepared_model)
+                # Behavior of WOQ Linear to simulate:
+                # Quantize weight to int4 by float qparams at quantization time
+                # Quantize activation to int8 at runtime
+                # Convert weight and its zero points to INT8 for computation
+                packed_weight = woq_model.linear._op_context.get_weight()
+                qw = woq_model.linear._op_context.to_public(packed_weight)
+                w_scales = woq_model.linear._op_context.get_scales()
+                w_zero_points = woq_model.linear._op_context.get_zero_points()
+                w = copy.deepcopy(m.linear.weight.data)
+                if group_size <= 0:
+                    qw, _, _ = quantize_per_channel(
+                        w, weight_dtype, w_scales, w_zero_points, sym_quant=True
+                    )
+                    fake_quant_w = dequantize_per_channel(
+                        qw, w_scales, w_zero_points, weight_dtype, w.shape
+                    )
+                else:
+                    qw, _, _ = quantize_per_block(
+                        w,
+                        weight_dtype,
+                        group_size,
+                        w_scales,
+                        w_zero_points,
+                        sym_quant=True,
+                    )
+                    fake_quant_w = dequantize_per_block(
+                        qw, w_scales, w_zero_points, weight_dtype, group_size, w.shape
+                    )
+                m.linear.weight.data = fake_quant_w
+                if lowp_mode == WoqLowpMode.INT8:
+                    if packed_weight.dim() == 4:
+                        block_k = packed_weight.size(2)
+                        groupsize = group_size if group_size > 0 else block_k
+                        fake_quant_x = (
+                            self._fakequant_by_group(data, act_quant_mode, groupsize)
+                            if act_quant_mode < 4
+                            else self._fakequant_by_group_sym(
+                                data, act_quant_mode, groupsize
+                            )
+                        )
+                        x = fake_quant_x
+                y_ref = m(x)
+                y = woq_model(data)
+                try:
+                    torch.testing.assert_close(y, y_ref, atol=1e-2 * 5, rtol=1e-1 * 2)
+                except Exception:
+                    # The fallback kernel does not support act quant mode
+                    # It computes in fp32 by dequantizing weight.
+                    fake_quant_w = qw.dequantize()
+                    y_ref = data @ fake_quant_w.T + (m.linear.bias if has_bias else 0)
+                    y_ref = y_ref
+                    torch.testing.assert_close(y, y_ref, atol=1e-2, rtol=1e-1)
+
+        N, K = 64, 256
+        weight_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4]
+        lowp_mode_list = [WoqLowpMode.FP16, WoqLowpMode.BF16, WoqLowpMode.INT8]
+        group_size_list = [-1, 64]
+        has_bias_list = [False, True]
+        quant_a_mode_list = [
+            WoqActQuantMode.PER_TENSOR,
+            WoqActQuantMode.PER_IC_BLOCK,
+            WoqActQuantMode.PER_BATCH,
+            WoqActQuantMode.PER_BATCH_IC_BLOCK,
+            WoqActQuantMode.PER_TENSOR_SYM,
+            WoqActQuantMode.PER_IC_BLOCK_SYM,
+            WoqActQuantMode.PER_BATCH_SYM,
+            WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
+        ]
+        batch_size_list = [4, 1024]
+        enable_autocast_list = [False, True]
+        cases = itertools.product(
+            weight_dtype_list,
+            lowp_mode_list,
+            group_size_list,
+            has_bias_list,
+            quant_a_mode_list,
+            batch_size_list,
+            enable_autocast_list,
+        )
+        for (
+            weight_dtype,
+            lowp_mode,
+            group_size,
+            has_bias,
+            quant_a_mode,
+            M,
+            enable_autocast,
+        ) in cases:
+            test(
+                weight_dtype,
+                lowp_mode,
+                group_size,
+                has_bias,
+                quant_a_mode,
+                M,
+                enable_autocast,
+            )
 
 
 if __name__ == "__main__":

@@ -136,6 +136,10 @@ WOQ_ACT_QUANT_MODE_TO_STR = {
     WoqActQuantMode.PER_IC_BLOCK: "per_ic_block",
     WoqActQuantMode.PER_BATCH: "per_batch",
     WoqActQuantMode.PER_BATCH_IC_BLOCK: "per_batch_ic_block",
+    WoqActQuantMode.PER_TENSOR_SYM: "per_tensor_sym",
+    WoqActQuantMode.PER_IC_BLOCK_SYM: "per_ic_block_sym",
+    WoqActQuantMode.PER_BATCH_SYM: "per_batch_sym",
+    WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM: "per_batch_ic_block_sym",
 }
 
 
@@ -153,6 +157,19 @@ WOQ_DTYPE_TO_STR = {
 }
 
 
+class WoqWeightQScheme(IntEnum):
+    UNDEFINED = 0
+    ASYMMETRIC = 1
+    SYMMETRIC = 2
+
+
+WOQ_QSCHEME_TO_STR = {
+    WoqWeightQScheme.UNDEFINED: "undefined",
+    WoqWeightQScheme.ASYMMETRIC: "asymmetric",
+    WoqWeightQScheme.SYMMETRIC: "symmetric",
+}
+
+
 QConfigWoq = namedtuple(
     "QConfigWoq",
     [
@@ -162,6 +179,7 @@ QConfigWoq = namedtuple(
         "weight_dtype",
         "group_size",
         "cache_weight_for_large_batch",
+        "weight_qscheme",
     ],
 )
 
@@ -172,6 +190,7 @@ def get_weight_only_quant_qconfig_mapping(
     lowp_mode: int = WoqLowpMode.NONE,
     act_quant_mode: int = WoqActQuantMode.PER_IC_BLOCK,
     group_size: int = -1,
+    weight_qscheme: int = WoqWeightQScheme.UNDEFINED,
 ):
     """
     Configuration for weight-only quantization (WOQ) for LLM.
@@ -207,6 +226,14 @@ def get_weight_only_quant_qconfig_mapping(
                             or PER_BATCH_IC_BLOCK, weight is grouped along IC by group_size.
                             The IC_BLOCK for activation is determined by group_size automatically.
                             Each group has its own quantization parameters.
+        weight_qscheme: Specify how to quantize weight, asymmetrically or symmetrically. Generally,
+                        asymmetric quantization has better accuracy than symmetric quantization at
+                        the cost of performance. Symmetric quantization is faster but may have worse
+                        accuracy. Default is undefined and determined by weight dtype: asymmetric in
+                        most cases and symmetric if
+                            (1) weight_dtype is NF4, or
+                            (2) weight_dtype is INT8 and lowp_mode is INT8.
+                        One must use WoqWeightQScheme.SYMMETRIC in the above two cases.
     """
     assert group_size == -1 or (
         group_size > 0 and (group_size & (group_size - 1)) == 0
@@ -229,6 +256,21 @@ def get_weight_only_quant_qconfig_mapping(
     if lowp_mode != WoqLowpMode.INT8:
         act_quant_mode = WoqActQuantMode.NONE
 
+    if (weight_dtype == WoqWeightDtype.NF4) or (
+        weight_dtype == WoqWeightDtype.INT8 and lowp_mode == WoqLowpMode.INT8
+    ):
+        assert (
+            weight_qscheme != WoqWeightQScheme.ASYMMETRIC
+        ), "Asymmetric quantization of weight is not supported when "
+        "(1) weight_dtype is NF4 or (2) weight_dtype is INT8 and lowp_mode is INT8."
+    if weight_qscheme == WoqWeightQScheme.UNDEFINED:
+        weight_qscheme = (
+            WoqWeightQScheme.SYMMETRIC
+            if weight_dtype == WoqWeightDtype.NF4
+            or (weight_dtype == WoqWeightDtype.INT8 and lowp_mode == WoqLowpMode.INT8)
+            else WoqWeightQScheme.ASYMMETRIC
+        )
+
     _weight_only_quant_qconfig = QConfigWoq(
         activation=PlaceholderObserver.with_args(dtype=torch.float, is_dynamic=False),
         weight=PerChannelMinMaxObserver(),
@@ -237,6 +279,7 @@ def get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype,
         group_size=group_size,
         cache_weight_for_large_batch=False,
+        weight_qscheme=weight_qscheme,
     )
     weight_only_quant_qconfig_mapping = QConfigMapping().set_global(
         _weight_only_quant_qconfig

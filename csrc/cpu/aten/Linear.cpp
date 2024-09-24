@@ -491,7 +491,9 @@ at::Tensor woq_linear_kernel(
     int64_t lowp_mode,
     int64_t act_quant_mode,
     const c10::optional<at::Tensor>& compensation) {
-  int64_t quant_w_mode = group_size > 0 ? 1 : 0;
+  int64_t quant_w_mode = zps_list[0].defined()
+      ? (group_size > 0 ? QUANT_W_PER_K_BLOCK : QUANT_W_PER_CHANNEL)
+      : (group_size > 0 ? QUANT_W_PER_K_BLOCK_SYM : QUANT_W_PER_CHANNEL_SYM);
   auto K = self.size(-1);
   auto M = self.numel() / K;
   auto in = self;
@@ -559,7 +561,9 @@ at::Tensor woq_linear_unary_kernel(
   } else if (post_op == "silu") {
     post_op_fusion_type = WOQ_FUSE_SILU;
   }
-  int64_t quant_w_mode = group_size > 0 ? 1 : 0;
+  int64_t quant_w_mode = zps_list[0].defined()
+      ? (group_size > 0 ? QUANT_W_PER_K_BLOCK : QUANT_W_PER_CHANNEL)
+      : (group_size > 0 ? QUANT_W_PER_K_BLOCK_SYM : QUANT_W_PER_CHANNEL_SYM);
   auto K = self.size(-1);
   auto M = self.numel() / K;
   auto in = self;
@@ -648,7 +652,9 @@ at::Tensor woq_linear_binary_kernel(
   } else if (post_op == "mul") {
     post_op_fusion_type = WOQ_FUSE_MUL;
   }
-  int64_t quant_w_mode = group_size > 0 ? 1 : 0;
+  int64_t quant_w_mode = zps_list[0].defined()
+      ? (group_size > 0 ? QUANT_W_PER_K_BLOCK : QUANT_W_PER_CHANNEL)
+      : (group_size > 0 ? QUANT_W_PER_K_BLOCK_SYM : QUANT_W_PER_CHANNEL_SYM);
   auto K = self.size(-1);
   auto M = self.numel() / K;
   auto in = self;

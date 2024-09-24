@@ -252,6 +252,12 @@ IPEX_DECLARE_DISPATCH(
 #define WOQ_FUSE_ADD_ADD 0x20
 #define WOQ_FUSE_MUL 0x30
 
+// weight quant mode
+#define QUANT_W_PER_CHANNEL 0
+#define QUANT_W_PER_K_BLOCK 1
+#define QUANT_W_PER_CHANNEL_SYM 2
+#define QUANT_W_PER_K_BLOCK_SYM 3
+
 #define WOQ_N_BLOCK_SIZE 32
 
 #endif

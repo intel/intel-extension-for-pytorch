@@ -172,6 +172,12 @@ parser.add_argument(
     " It brings better performance at the cost of higher memory usage. It is only valid for full bf16 path"
     " and weight-only quantization with lowp-mode=BF16. Otherwise, it has no effect.",
 )
+parser.add_argument(
+    "--woq-sym-quant-weight",
+    action="store_true",
+    help="Quantize weight symmetrically for weight only quantization. It usually brings better latency at"
+    " the cost of accuracy. It has not effect if you are loading low-precision checkpoints.",
+)
 args = parser.parse_args()
 print(args)
 
@@ -301,7 +307,10 @@ if args.ipex:
         cache_weight_for_large_batch=args.cache_weight_for_large_batch,
     )
 elif args.ipex_weight_only_quantization:
-    from intel_extension_for_pytorch.quantization import WoqWeightDtype
+    from intel_extension_for_pytorch.quantization import (
+        WoqWeightDtype,
+        WoqWeightQScheme,
+    )
 
     if args.weight_dtype == "INT8":
         weight_dtype = WoqWeightDtype.INT8
@@ -331,11 +340,17 @@ elif args.ipex_weight_only_quantization:
         "PER_BATCH": ipex.quantization.WoqActQuantMode.PER_BATCH,
         "PER_BATCH_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK,
     }
+    weight_qscheme = (
+        WoqWeightQScheme.SYMMETRIC
+        if args.woq_sym_quant_weight
+        else WoqWeightQScheme.UNDEFINED
+    )
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype,
         lowp_mode=lowp_mode,
         act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
         group_size=args.group_size,
+        weight_qscheme=weight_qscheme,
     )
     if args.low_precision_checkpoint != "":
         low_precision_checkpoint = torch.load(args.low_precision_checkpoint)

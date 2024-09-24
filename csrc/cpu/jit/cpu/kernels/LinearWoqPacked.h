@@ -27,7 +27,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     at::Tensor&& weight,
     at::Tensor&& scales,
-    at::Tensor&& zero_points,
+    c10::optional<at::Tensor>&& zeros,
     c10::optional<at::Tensor>&& bias,
     c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
