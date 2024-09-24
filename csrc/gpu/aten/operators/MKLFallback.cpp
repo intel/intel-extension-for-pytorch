@@ -4,6 +4,27 @@ namespace {
 
 static bool DEBUG_XPU_FALLBACK = false;
 
+void check_input_devices(
+    const c10::OperatorHandle& op,
+    torch::jit::Stack* stack) {
+  auto& schema_args = op.schema().arguments();
+  const auto num_arguments = schema_args.size();
+  auto arguments = torch::jit::last(stack, num_arguments);
+
+  if (!arguments[0].isTensor() || !arguments[1].isTensor())
+    return;
+
+  auto& self = arguments[0].toTensor();
+  auto& other = arguments[1].toTensor();
+
+  if (!self.defined() || !other.defined())
+    return;
+
+  TORCH_CHECK(self.device() == other.device(),
+      "Expected all tensors to be on the same device, but found at least two devices, ",
+      self.device(), " and ", other.device(), "!");
+}
+
 static void xpu_fallback_impl(
     const c10::OperatorHandle& op,
     torch::jit::Stack* stack) {
@@ -17,6 +38,13 @@ static void xpu_fallback_impl(
         "The operator '",
         op.schema().operator_name(),
         " on the XPU backend is falling back to run on the CPU.");
+  }
+
+  // dot and vdot require input device check on all devices except CPU.
+  // The original check was generated in the wrapper.
+  auto op_aten_name = toString(op.schema().operator_name());
+  if (op_aten_name == "aten::dot" || op_aten_name == "aten::vdot") {
+    check_input_devices(op, stack);
   }
 
   at::native::cpu_fallback(op, stack, true);
@@ -44,6 +72,7 @@ TORCH_LIBRARY_IMPL(aten, XPU, m) {
       "linalg_householder_product.out",
       "linalg_solve_triangular.out",
       "ormqr.out",
+      "vdot",
   };
 
   for (auto& op_name : fallback_list) {
