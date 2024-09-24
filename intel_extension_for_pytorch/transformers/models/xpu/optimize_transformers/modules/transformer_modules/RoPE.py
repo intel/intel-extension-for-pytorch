@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from .._transformer_configuration import IPEXTransformerConfig
+from .CacheUtils import CacheFormat
 
 
 class PositionalEmbedding(nn.Module):
@@ -486,30 +487,24 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
         query.copy_(q_embed)
         key.copy_(k_embed)
 
-    def get_sin_cos(self, position_ids, layer_id, beam_size, kv_seq_len):
+    def get_sin_cos(self, position_ids, layer_id, beam_size, kv_seq_len, cache_format):
         if kv_seq_len >= LlamaRotaryEmbedding.max_position_embedding:
             new_cache_length = kv_seq_len + self.dynamic_cache_stride
             self.create_sin_cos_cache(new_cache_length)
             LlamaRotaryEmbedding.max_position_embedding = new_cache_length
-        # position_ids [bs*beam, seq_len]
-        first_token = position_ids.shape[-1] > 1
+
         if layer_id == 0:
-            LlamaRotaryEmbedding.position_ids = position_ids.transpose(
-                0, 1
-            ).contiguous()
+            LlamaRotaryEmbedding.position_ids = position_ids
             LlamaRotaryEmbedding.sin = self.sin_cached[
                 LlamaRotaryEmbedding.position_ids
             ].unsqueeze(2)
             LlamaRotaryEmbedding.cos = self.cos_cached[
                 LlamaRotaryEmbedding.position_ids
             ].unsqueeze(2)
+            if cache_format == CacheFormat.FBNH:
+                LlamaRotaryEmbedding.sin = LlamaRotaryEmbedding.sin.permute(1, 0, 2, 3)
+                LlamaRotaryEmbedding.cos = LlamaRotaryEmbedding.cos.permute(1, 0, 2, 3)
 
-            if first_token and beam_size > 1:
-                # 1st token
-                # convert sin/cos from shape [seq, bs*beam, num_head, head_dim]
-                # to shape [bs*beam, seq, num_head, head_dim]
-                LlamaRotaryEmbedding.sin = LlamaRotaryEmbedding.sin.transpose(0, 1)
-                LlamaRotaryEmbedding.cos = LlamaRotaryEmbedding.cos.transpose(0, 1)
             LlamaRotaryEmbedding.sin = LlamaRotaryEmbedding.sin.contiguous()
             LlamaRotaryEmbedding.cos = LlamaRotaryEmbedding.cos.contiguous()
 
@@ -525,8 +520,19 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
         x2 = x[..., x.shape[-1] // 2 :]
         return torch.cat((-x2, x1), dim=-1)
 
-    def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
-        sin, cos = self.get_sin_cos(position_ids, layer_id, beam_size, kv_seq_len)
+    def forward(
+        self,
+        query,
+        key,
+        position_ids,
+        layer_id,
+        beam_size,
+        kv_seq_len,
+        cache_format=CacheFormat.BFNH,
+    ):
+        sin, cos = self.get_sin_cos(
+            position_ids, layer_id, beam_size, kv_seq_len, cache_format
+        )
         self.apply_rotary_pos_emb(query, key, sin, cos)
         return query, key
 

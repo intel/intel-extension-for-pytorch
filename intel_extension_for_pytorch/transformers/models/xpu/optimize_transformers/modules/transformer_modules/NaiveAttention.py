@@ -23,6 +23,7 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
     expanded_beam_idx_cache = None
     timestep = 0
     attention_mask = None
+    prompt_length = 0
 
     def __init__(self, config: IPEXTransformerConfig) -> None:
         super().__init__(config)
@@ -71,6 +72,10 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
     @staticmethod
     def update_beam_idx(beam_idx):
         IPEXTransformerAttnNaive.beam_idx = beam_idx
+
+    @staticmethod
+    def update_prompt_length(self, prompt_length):
+        IPEXTransformerAttnNaive.prompt_length = prompt_length
 
     def load_parameter(self, q_proj, k_proj, v_proj, out_proj):
         self.q_proj.weight = q_proj.weight

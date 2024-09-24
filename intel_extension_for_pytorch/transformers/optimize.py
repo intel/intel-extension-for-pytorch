@@ -1188,7 +1188,7 @@ def model_convert_lowering(
         print("xpu optimize_transformers function is activated")
         from .models.xpu.optimize_transformers.Converter import Converter
         from .models.xpu.optimize_transformers.modules.gptj import NewIPEXGPTJBlock
-        from .models.xpu.optimize_transformers.modules.llama import NewIPEXLLAMABlock
+        from .models.xpu.optimize_transformers.modules.llama import IPEXLLAMABlock
         from .models.xpu.optimize_transformers.modules.opt import NewIPEXOPTBlock
         from .models.xpu.optimize_transformers.modules.bloom import NewIPEXBloomBlock
         from .models.xpu.optimize_transformers.modules.falcon import NewIPEXFalconBlock
@@ -1200,7 +1200,7 @@ def model_convert_lowering(
             if re.search("GPTJ", _model.config.architectures[0], re.IGNORECASE):
                 replace_block = NewIPEXGPTJBlock
             elif re.search("LLAMA", _model.config.architecture[0], re.IGNORECASE):
-                replace_block = NewIPEXLLAMABlock
+                replace_block = IPEXLLAMABlock
             elif re.search("OPT", _model.config.architecture[0], re.IGNORECASE):
                 replace_block = NewIPEXOPTBlock
             elif re.search("BLOOM", _model.config.architecture[0], re.IGNORECASE):

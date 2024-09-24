@@ -209,6 +209,7 @@ if args.ipex:
 
 num_beams = 1 if args.greedy else args.num_beams
 # generate args
+# generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams, cache_implementation='static')
 generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
 
 

@@ -2,6 +2,8 @@ from .modules.Functions import (
     ipex_convert_to_bloom_cache,
     ipex_prepare_model_inputs,
     ipex_beam_search,
+    ipex_beam_search_new,
+    ipex_prepare_inputs_for_generation,
     ipex_beam_sample,
     gptj_forward_hook,
     llama_forward_hook,
@@ -29,7 +31,7 @@ from intel_extension_for_pytorch.nn.utils._quantize_convert import (
 )
 from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
-from .modules.llama import NewIPEXLLAMABlock
+from .modules.llama import IPEXLLAMABlock
 from .modules.opt import NewIPEXOPTBlock
 from .modules.falcon import NewIPEXFalconBlock
 from .modules.qwen import NewIPEXQWENBlock
@@ -52,7 +54,7 @@ def default_replaced_module_dict():
 
     default_replace_modules = {
         transformers.models.gptj.modeling_gptj.GPTJBlock: NewIPEXGPTJBlock,
-        transformers.models.llama.modeling_llama.LlamaDecoderLayer: NewIPEXLLAMABlock,
+        transformers.models.llama.modeling_llama.LlamaDecoderLayer: IPEXLLAMABlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer: NewIPEXOPTBlock,
         transformers.models.bloom.modeling_bloom.BloomBlock: NewIPEXBloomBlock,
         # only support transformers version model, not in-library model
@@ -85,6 +87,8 @@ def default_override_function_list() -> List:
         ipex_convert_to_bloom_cache,
         ipex_prepare_model_inputs,
         ipex_beam_search,
+        ipex_prepare_inputs_for_generation,
+        ipex_beam_search_new,
         ipex_beam_sample,
         gptj_forward_hook,
         llama_forward_hook,
@@ -249,12 +253,6 @@ class ModuleReplacer:
     def replace_op(self, model):
         if model.__class__.__name__ == "ChatGLMForConditionalGeneration":
             model.prepare_inputs_for_generation = prepare_inputs_for_generation.__get__(
-                model, model.__class__
-            )
-        if model.__class__.__name__ == "LlamaModel":
-            from .modules.llama import _update_causal_mask
-
-            model._update_causal_mask = _update_causal_mask.__get__(
                 model, model.__class__
             )
         for name, child in model.named_children():
