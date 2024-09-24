@@ -83,7 +83,7 @@ python run.py --help # for more detailed usages
 
 The _\<LLAMA3_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Llama 3.2 model you will run, which can be found from [HuggingFace Models](https://huggingface.co/models).
 
-### 2.1.1 Run generation with multiple instances on multiple CPU numa nodes
+### 2.1.1 Run vision-text generation with Llama 3.2 11B models using BF16 autoTP (tensor parallel) on multiple CPU numa nodes
 
 #### 2.1.1.1 Prepare:
 
@@ -96,40 +96,20 @@ In the DeepSpeed cases below, we recommend "--shard-model" to shard model weight
 If using "--shard-model", it will save a copy of the shard model weights file in the path of "--output-dir" (default path is "./saved_results" if not provided).
 If you have used "--shard-model" and generated such a shard model path (or your model weights files are already well sharded), in further repeated benchmarks, please remove "--shard-model", and replace "-m <LLAMA3_MODEL_ID_OR_LOCAL_PATH>" with "-m <shard model path>" to skip the repeated shard steps.
 
-Besides, the standalone shard model function/scripts are also provided in section 2.1.1.4, in case you would like to generate the shard model weights files in advance before running distributed inference.
+Besides, the standalone shard model function/scripts are also provided in section 2.1.1.3, in case you would like to generate the shard model weights files in advance before running distributed inference.
 
-#### 2.1.1.2 BF16:
+#### 2.1.1.2 Commands:
 
 - Command:
 ```bash
-# Text generation task
-deepspeed --bind_cores_to_rank  run.py --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --dtype bfloat16 --ipex  --greedy --input-tokens <INPUT_LENGTH> --autotp --shard-model
+# Vision-Text generation inference
+deepspeed --bind_cores_to_rank  run.py --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --dtype bfloat16 --ipex  --greedy --autotp --shard-model --vision-text-model  --prompt <PROMPT_TEXT>  --image-url <IMAGE_URL>
 
-# Vision-Text generation task
-deepspeed --bind_cores_to_rank  run.py --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --dtype bfloat16 --ipex  --greedy --autotp --shard-model --vision-text-model  --prompt <PROMPT_TEXT> --greedy --image-url <IMAGE_URL>
 <PROMPT_TEXT> example:  "<|image|><|begin_of_text|>Describe all of the images briefly."
 <IMAGE_URL> example "https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg"
 ```
 
-#### 2.1.1.3 Weight-only quantization (INT8):
-
-By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
-For weight-only quantization with deepspeed, we quantize the model then run the benchmark. The quantized model won't be saved.
-
-- Command:
-```bash
-# Text generation task
-deepspeed --bind_cores_to_rank run.py  --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --greedy --input-tokens <INPUT_LENGTH>  --autotp --shard-model --output-dir "saved_results"
-
-# Vision-Text generation task
-deepspeed --bind_cores_to_rank run.py  --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --ipex --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --greedy  --autotp --shard-model --output-dir "saved_results" --vision-text-model  --prompt <PROMPT_TEXT> --greedy --image-url <IMAGE_URL>
-<PROMPT_TEXT> example:  "<|image|><|begin_of_text|>Describe all of the images briefly."
-<IMAGE_URL> example "https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg"
-
-# Note: you can add "--group-size" to tune good accuracy, suggested range as one of [32, 64, 128, 256, 512].
-```
-
-#### 2.1.1.4 How to Shard Model weight files for Distributed Inference with DeepSpeed
+#### 2.1.1.3 How to Shard Model weight files for Distributed Inference with DeepSpeed
 
 To save memory usage, we could shard the model weights files under the local path before we launch distributed tests with DeepSpeed.
 
@@ -140,40 +120,9 @@ python create_shard_model.py -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH>  --save-path ./l
 # After sharding the model, using "-m ./local_llama3_model_shard" in later tests
 ```
 
-### 2.1.2 Run generation with one socket inference
-#### 2.1.2.1 BF16:
+### 2.1.2 Run text generation with Llama 3.2 3B models using Weight-only quantization (INT4) per CPU numa node
 
-- Command:
-
-```bash
-# Text generation task
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --dtype bfloat16 --ipex --greedy --input-tokens <INPUT_LENGTH>
-
-# Vision-Text generation task
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list> python run.py --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --dtype bfloat16 --ipex --greedy  --vision-text-model --prompt <PROMPT_TEXT> --greedy --image-url <IMAGE_URL>
-<PROMPT_TEXT> example:  "<|image|><|begin_of_text|>Describe all of the images briefly."
-<IMAGE_URL> example "https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg"
-```
-
-#### 2.1.2.2 Weight-only quantization (INT8):
-
-By default, for weight-only quantization, we use quantization with [Automatic Mixed Precision](https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html) inference ("--quant-with-amp") to get peak performance and fair accuracy.
-
-- Command:
-
-```bash
-# Text generation task
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results"  --greedy --input-tokens <INPUT_LENGTH>
-
-# Vision-Text generation task
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp --output-dir "saved_results"  --greedy --vision-text-model --prompt <PROMPT_TEXT> --greedy --image-url <IMAGE_URL>
-<PROMPT_TEXT> example:  "<|image|><|begin_of_text|>Describe all of the images briefly."
-<IMAGE_URL> example "https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg"
-
-# Note: you can add "--group-size" to tune good accuracy, suggested range as one of [32, 64, 128, 256, 512].
-```
-
-#### 2.1.2.3 Weight-only quantization (INT4):
+#### 2.1.2.1 Commands:
 You can use auto-round (part of INC) to generate INT4 WOQ model with following steps.
 - Environment installation:
 ```bash
@@ -191,15 +140,10 @@ python3 main.py --model_name  $model_name --device cpu --sym --nsamples 512 --it
 - Command (benchmark):
 ```bash
 cd <LLM_DIR>
-# Text generation task
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --ipex-weight-only-quantization --weight-dtype INT4 --quant-with-amp --output-dir "saved_results"  --greedy --input-tokens <INPUT_LENGTH> --cache-weight-for-large-batch --low-precision-checkpoint <INT4_MODEL_SAVE_PATH>
+# Text generation inference
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --ipex-weight-only-quantization --weight-dtype INT4 --quant-with-amp --output-dir "saved_results"  --greedy --input-tokens <INPUT_LENGTH> --low-precision-checkpoint <INT4_MODEL_SAVE_PATH>
 
-# Vision-Text generation task
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list>  python run.py  --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --ipex-weight-only-quantization --weight-dtype INT4 --quant-with-amp --output-dir "saved_results"  --greedy  --low-precision-checkpoint <INT4_MODEL_SAVE_PATH> --vision-text-model --prompt <PROMPT_TEXT> --greedy --image-url <IMAGE_URL>
-<PROMPT_TEXT> example:  "<|image|><|begin_of_text|>Describe all of the images briefly."
-<IMAGE_URL> example "https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg"
-
-#Note: export IPEX_WOQ_GEMM_LOOP_SCHEME=ACB or add flag in Command "--cache-weight-for-large-batch" may bring better performance, you can have a try.
+# Note that to get best throughput on multiple CPU numa nodes, we could further tune how many cores per instance and batch sizes (according to the latency requirement) to run multiple instances at the same time. 
 ```
 
 #### 2.1.2.4 Notes:
