@@ -101,9 +101,9 @@ supported:
 #  - add.out
 #  - add_.Scalar
 #  - add_.Tensor
-#  - addbmm # duplicated op
-#  - addbmm_ # duplicated op
-#  - addbmm.out # duplicated op
+  - addbmm # duplicated op
+  - addbmm_ # duplicated op
+  - addbmm.out # duplicated op
 #  - addcdiv.out
 #  - addcmul.out
   - _addmm_activation.out # duplicated op

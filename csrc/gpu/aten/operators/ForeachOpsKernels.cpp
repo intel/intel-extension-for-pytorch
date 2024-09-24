@@ -326,9 +326,13 @@ void _foreach_zero_(TensorList tensors) {
   }
   std::vector<std::vector<at::Tensor>> tensor_lists;
   tensor_lists.emplace_back(tensors.vec());
-
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND1(
-      ScalarType::Half, tensors[0].scalar_type(), "foreach_zero_xpu_", [&]() {
+  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
+      ScalarType::Half,
+      ScalarType::BFloat16,
+      ScalarType::Bool,
+      tensors[0].scalar_type(),
+      "foreach_zero_xpu_",
+      [&]() {
         multi_tensor_apply<1>(
             tensor_lists,
             ZeroFunctor<

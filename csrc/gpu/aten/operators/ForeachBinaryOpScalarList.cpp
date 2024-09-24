@@ -240,12 +240,12 @@ FOREACH_BINARY_OP_SCALARLIST(
     all_types_half_bfloat16,
     clamp_max,
     foreach_internal::minimum,
-    false);
+    true);
 FOREACH_BINARY_OP_SCALARLIST(
     all_types_half_bfloat16,
     clamp_min,
     foreach_internal::maximum,
-    false);
+    true);
 
 std::vector<Tensor> _foreach_minimum(
     TensorList tensors,

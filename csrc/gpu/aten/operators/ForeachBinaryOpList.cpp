@@ -237,12 +237,12 @@ FOREACH_BINARY_OP_LIST(
     all_types_half_bfloat16,
     clamp_max,
     foreach_internal::minimum,
-    /*division_op*/ false);
+    /*division_op*/ true);
 FOREACH_BINARY_OP_LIST(
     all_types_half_bfloat16,
     clamp_min,
     foreach_internal::maximum,
-    /*division_op*/ false);
+    /*division_op*/ true);
 // NOTE(crcrpar): [Why is foreach_pow's division_op=true?]
 // To push integer inputs to slow path. This is because with integer type inputs
 // the fast path behaves differently from the slow one. Need to investigate
