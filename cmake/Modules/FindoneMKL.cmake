@@ -122,21 +122,21 @@ else()
   set(MKL_THREAD "${LIB_PREFIX}mkl_intel_thread${LIB_SUFFIX}")
 endif()
 find_library(MKL_LIB_THREAD ${MKL_THREAD} HINTS ${mkl_root_hint}
-    PATH_SUFFIXES lib lib/intel64 NO_DEFAULT_PATH)
+    PATH_SUFFIXES lib NO_DEFAULT_PATH)
 if(NOT MKL_THREAD)
   message(FATAL_ERROR "oneMKL library ${MKL_THREAD} not found")
 endif()
 
 set(MKL_LP64 "${LIB_PREFIX}mkl_intel_lp64${LIB_SUFFIX}")
 find_library(MKL_LIB_LP64 ${MKL_LP64} HINTS ${mkl_root_hint}
-    PATH_SUFFIXES lib lib/intel64 NO_DEFAULT_PATH)
+    PATH_SUFFIXES lib NO_DEFAULT_PATH)
 if(NOT MKL_LP64)
   message(FATAL_ERROR "oneMKL library ${MKL_LP64} not found")
 endif()
 
 set(MKL_CORE "${LIB_PREFIX}mkl_core${LIB_SUFFIX}")
 find_library(MKL_LIB_CORE ${MKL_CORE} HINTS ${mkl_root_hint}
-    PATH_SUFFIXES lib lib/intel64 NO_DEFAULT_PATH)
+    PATH_SUFFIXES lib NO_DEFAULT_PATH)
 if(NOT MKL_CORE)
   message(FATAL_ERROR "oneMKL library ${MKL_CORE} not found")
 endif()
@@ -144,7 +144,7 @@ endif()
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
   set(MKL_SYCL "${LIB_PREFIX}mkl_sycl${LIB_SUFFIX}")
   find_library(MKL_LIB_SYCL ${MKL_SYCL} HINTS ${mkl_root_hint}
-      PATH_SUFFIXES lib lib/intel64 NO_DEFAULT_PATH)
+      PATH_SUFFIXES lib NO_DEFAULT_PATH)
   if(NOT MKL_LIB_SYCL)
     message(FATAL_ERROR "oneMKL library ${MKL_SYCL} not found")
   endif()
