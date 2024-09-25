@@ -65,11 +65,10 @@ if [ ${MODE} == "inference" ]; then
     export PATH=${PATH}:${JAVA_HOME}/bin
     cd ${MODE}
 
-    python -m pip install -r requirements.txt
     if [ -f prompt.json ]; then
         rm -f prompt.json
     fi
-    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+    wget -O prompt.json https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt-llama31.json
     cd single_instance
     if [ -f prompt.json ]; then
         rm -f prompt.json

@@ -12,21 +12,22 @@ There are several environment setup methodologies provided. You can choose eithe
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout 2.4-llama-3
+git checkout 2.6-llama-3
 git submodule sync
 git submodule update --init --recursive
 
-# Build an image with the provided Dockerfile by installing from Intel® Extension for PyTorch\* prebuilt wheel files
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.4.0 .
+# Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
+# To have a custom ssh server port for multi-nodes run, please add --build-arg PORT_SSH=<CUSTOM_PORT> ex: 2345, otherwise use the default 22 SSH port
+docker build -f examples/cpu/llm/Dockerfile --build-arg COMPILE=ON --build-arg PORT_SSH=2345 -t ipex-llm:2.6.0-preview .
 
 # Run the container with command below
-docker run --rm -it --privileged ipex-llm:2.4.0 bash
+docker run --rm -it --privileged -v /dev/shm:/dev/shm ipex-llm:2.6.0-preview bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
 
-# Activate environment variables
-source ./tools/env_activate.sh
+# Activate environment variables for infernece
+source ./tools/env_activate.sh inference
 ```
 
 ## 1.2 Conda-based environment setup with pre-built wheels
@@ -35,7 +36,7 @@ source ./tools/env_activate.sh
 # Get the Intel® Extension for PyTorch\* source code
 git clone https://github.com/intel/intel-extension-for-pytorch.git
 cd intel-extension-for-pytorch
-git checkout 2.4-llama-3
+git checkout 2.6-llama-3
 git submodule sync
 git submodule update --init --recursive
 
@@ -44,12 +45,11 @@ conda create -n llm python=3.10 -y
 conda activate llm
 
 # Setup the environment with the provided script
-# A sample "prompt.json" file for benchmarking is also downloaded
-cd examples/cpu/inference/python/llm
+cd examples/cpu/llm
 bash ./tools/env_setup.sh 7
 
-# Activate environment variables
-source ./tools/env_activate.sh
+# Activate environment variables for infernece
+source ./tools/env_activate.sh inference
 ```
 <br>
 

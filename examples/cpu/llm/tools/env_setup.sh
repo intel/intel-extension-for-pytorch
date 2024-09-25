@@ -80,20 +80,10 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        set +e
-        echo "${VER_TORCH}" | grep "dev" > /dev/null
-        TORCH_DEV=$?
-        set -e
-        if [ ${TORCH_DEV} -eq 0 ]; then
-            echo ""
-            echo "Error: Detected dependent PyTorch is a nightly built version. Installation from prebuilt wheel files is not supported. Run again to compile from source."
-            exit 4
-        else
-            echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
-            echo "python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/" >> ${AUX_INSTALL_SCRIPT}
-            python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
-            python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
-        fi
+        echo "python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20240918%2Bcpu-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgit689db64-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
+        python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20240918%2Bcpu-cp310-cp310-linux_x86_64.whl
+        python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgit689db64-cp310-cp310-linux_x86_64.whl
     else
         function ver_compare() {
             VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
@@ -144,15 +134,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             fi
         fi
 
-        set +e
-        echo ${VER_TORCH} | grep "dev" > /dev/null
-        TORCH_DEV=$?
-        set -e
-        URL_NIGHTLY=""
-        if [ ${TORCH_DEV} -eq 0 ]; then
-            URL_NIGHTLY="nightly/"
-        fi
-        echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20240918%2Bcpu-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
         # Install PyTorch and Intel® Extension for PyTorch*
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
@@ -163,35 +145,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     fi
 
     echo "python -m pip install -r ./requirements.txt" >> ${AUX_INSTALL_SCRIPT}
-
-    # Used for accuracy test only
-    if [ -d lm-evaluation-harness ]; then
-        rm -rf lm-evaluation-harness
-    fi
-    git clone https://github.com/EleutherAI/lm-evaluation-harness.git
-    cd lm-evaluation-harness
-    git checkout ${COMMIT_LM_EVA}
-    python setup.py bdist_wheel
-    cp dist/*.whl ${WHEELFOLDER}
-    cd ..
-    rm -rf lm-evaluation-harness
-
-    # Install DeepSpeed
-    if [ $((${MODE} & 0x08)) -ne 0 ]; then
-        if [ -d DeepSpeed ]; then
-            rm -rf DeepSpeed
-        fi
-        git clone https://github.com/microsoft/DeepSpeed.git
-        cd DeepSpeed
-        git checkout ${COMMIT_DS_SYCL}
-        python -m pip install -r requirements/requirements.txt
-        python setup.py bdist_wheel
-        cp dist/*.whl ${WHEELFOLDER}
-        cd ..
-        rm -rf DeepSpeed
-    else
-        echo "python -m pip install deepspeed==${VER_DS_SYCL}" >> ${AUX_INSTALL_SCRIPT}
-    fi
 
     # Install OneCCL
     if [ -d oneCCL ]; then
@@ -209,6 +162,37 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     rm -rf oneCCL
 
     cd ${BASEFOLDER}/..
+
+    # Install transformers from source
+    git clone https://github.com/huggingface/transformers
+    cd transformers
+    python setup.py install
+    cd ..
+    rm -rf transformers
+
+    # Used for accuracy test only
+    if [ -d lm-evaluation-harness ]; then
+        rm -rf lm-evaluation-harness
+    fi
+    git clone https://github.com/EleutherAI/lm-evaluation-harness.git
+    cd lm-evaluation-harness
+    git checkout ${COMMIT_LM_EVA}
+    python setup.py bdist_wheel
+    cp dist/*.whl ${WHEELFOLDER}
+    cd ..
+    rm -rf lm-evaluation-harness
+
+    # Install DeepSpeed
+    if [ -d DeepSpeed ]; then
+        rm -rf DeepSpeed
+    fi
+    git clone https://github.com/Yejing-Lai/DeepSpeed -b lyj/llama
+    cd DeepSpeed
+    python -m pip install -r requirements/requirements.txt
+    python setup.py bdist_wheel
+    cp dist/*.whl ${WHEELFOLDER}
+    cd ..
+    rm -rf DeepSpeed
 fi
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
     set +e
