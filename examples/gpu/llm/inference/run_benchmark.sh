@@ -101,6 +101,33 @@ Run_benchmark_llama3-8b() {
 }
 
 
+## Llama3.2-1b
+Run_benchmark_llama3.2-1b() {
+    model=Llama-3.2-1B-model-id
+    sub_model_name=llama3-8b
+    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
+
+## Llama3.2-3b
+Run_benchmark_llama3.2-3b() {
+    model=Llama-3.2-3B-model-id
+    sub_model_name=llama3-8b
+    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
 ## OPT
 Run_benchmark_opt-6.7b() {
     model=facebook/opt-6.7b
@@ -177,7 +204,7 @@ Run_benchmark_qwen2-7b() {
     sub_model_name=qwen2-7b
     dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
-    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --disable_static_cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
     mv log_e2e ${dir}
     PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
     mv profile*pt ${dir}
@@ -203,7 +230,7 @@ Run_benchmark_Phi3-mini() {
     sub_model_name=phi3-mini
     dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
-    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 2>&1 | tee log_e2e
+    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --disable_static_cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
     mv log_e2e ${dir}
     PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
     mv profile*pt ${dir}
@@ -221,6 +248,8 @@ main() {
     Run_benchmark_llama2-7b
     Run_benchmark_llama2-13b
     Run_benchmark_llama3-8b
+    Run_benchmark_llama3.2-1b
+    Run_benchmark_llama3.2-3b
     Run_benchmark_opt-6.7b
     Run_benchmark_bloom-7b
     Run_benchmark_baichuan2-13b-chat

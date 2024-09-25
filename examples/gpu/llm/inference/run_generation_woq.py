@@ -111,6 +111,7 @@ parser.add_argument(
     help="tasks list for accuracy validation, only enabled lambada_standard and lambada_standard at present",
 )
 parser.add_argument("--acc-iter", default=-1, type=int)
+parser.add_argument("--disable_static_cache", action="store_true")
 args = parser.parse_args()
 print(args)
 

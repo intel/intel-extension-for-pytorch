@@ -6,6 +6,13 @@ from .transformer_modules.Norm import QWenRMSNorm
 
 from ._transformers import MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
+from .transformer_modules.XPUAttentionfp16 import (
+    IPEXAttention,
+)
+from .transformer_modules.XPUAttentionInt4 import (
+    IPEXAttentionInt4,
+    IPEXAttentionInt4OneDNN,
+)
 from .transformer_modules.Mlp import (  # noqa F401
     IPEXTransformerBaseMLP,
     IPEXTransformerMLPOptimizedFp16,
@@ -45,7 +52,18 @@ class NewIPEXQWEN2DecoderLayer(IPEXTransformerBlock):
         grouped = (
             self.ipex_config.num_attention_head > self.ipex_config.num_key_value_head
         )
-        self.attn = self.build_attention_from_config(grouped=grouped)
+        if dtype == "fp16":
+            self.attn = IPEXAttention(self.ipex_config, self.layer_idx)
+        elif dtype == "int4" and xpu_gemm_use_xetla():
+            self.attn = IPEXAttentionInt4(self.ipex_config, module.self_attn.layer_idx)
+        elif dtype == "int4" and not xpu_gemm_use_xetla():
+            self.attn = IPEXAttentionInt4OneDNN(
+                self.ipex_config, module.self_attn.layer_idx
+            )
+        else:
+            raise NotImplementedError(
+                "IPEXAttention dose not support this modelType {} !".format(dtype)
+            )
         self.mlp = self.build_mlp_from_config("Qwen")
         self.input_layernorm = QWenRMSNorm(
             self.ipex_config.embedding_dim, self.ipex_config.norm_eps
@@ -140,106 +158,38 @@ class NewIPEXQWEN2DecoderLayer(IPEXTransformerBlock):
         self,
         hidden_states: Optional[Tuple[torch.FloatTensor]],
         attention_mask: Optional[torch.FloatTensor] = None,
-        head_mask: Optional[torch.FloatTensor] = None,
         position_ids: Optional[torch.IntTensor] = None,
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
-        use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
+        use_cache: Optional[bool] = False,
+        cache_position: Optional[torch.LongTensor] = None,
+        **kwargs,
     ):
         # hidden_states:  [bs*beam, seq, hidden_size]
         # position_ids:   [bs*beam, seq]
         # attention_mask: [bs*beam, head, q_seq, kv_seq]
         bs = IPEXTransformerAttn.batch_size
-        dim = hidden_states.dim()
-        if dim == 3:
-            beam = hidden_states.shape[0] // bs
-            seq = hidden_states.shape[1]
-        elif dim == 4:
-            beam = hidden_states.shape[1]
-            seq = hidden_states.shape[2]
-        else:
-            print("Unsupported input shape")
-            return
-
-        IPEXTransformerAttn.beam_size = beam
-        first_token = True if seq > 1 else False
-        hidden_size = hidden_states.shape[-1]
-        hidden_shape = [bs, beam, seq, hidden_size]
-        if first_token and beam > 1:
-            # for 1st token, keep the original layout
-            # reduce the duplicated info in beam dim
-            # shape -> [bs*beam, seq, hidden_size]
-            # layout -> [bs*beam, seq, hidden_size]
-            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
-            # if position_ids is not None:
-            #     position_ids = position_ids.view(bs, beam, position_ids.shape[1])[
-            #         :, 0, :
-            #     ].view(bs, position_ids.shape[1])
-            if attention_mask is not None:
-                attention_mask = attention_mask.view(
-                    bs,
-                    beam,
-                    attention_mask.shape[1],
-                    attention_mask.shape[2],
-                    attention_mask.shape[3],
-                )[:, 0, :, :, :].view(
-                    bs,
-                    attention_mask.shape[1],
-                    attention_mask.shape[2],
-                    attention_mask.shape[3],
-                )
-        else:
-            # for 2nd to last token, we convert the layout
-            # shape -> [bs*beam, seq, hidden_size]
-            # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1).contiguous()
-        layernorm_output = self.input_layernorm(hidden_states)
-
-        layer_past = None
-        if self.layer_idx < len(past_key_value.key_cache):
-            # next token
-            layer_past = (
-                past_key_value.key_cache[self.layer_idx],
-                past_key_value.value_cache[self.layer_idx],
-            )
-
-        attn_output, present_key_value, self_attn_weights = self.attn(
-            hidden_states=layernorm_output,
-            layer_past=layer_past,
-            attention_mask=attention_mask,
-            head_mask=head_mask,
-            position_ids=position_ids,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-        )
-
-        if self.layer_idx < len(past_key_value.key_cache):
-            past_key_value.update(
-                present_key_value[0][:, :, -1, :].unsqueeze(-2),
-                present_key_value[1][:, :, -1, :].unsqueeze(-2),
-                self.layer_idx,
-            )
-        else:
-            past_key_value.update(
-                present_key_value[0], present_key_value[1], self.layer_idx
-            )
+        IPEXTransformerAttn.beam_size = hidden_states.shape[0] // bs
 
         residual = hidden_states
-        layernorm_input = attn_output + residual
-        residual = layernorm_input
+        layernorm_output = self.input_layernorm(hidden_states)
 
-        layernorm_output = self.post_attn_layernorm(layernorm_input)
+        hidden_states, present_key_value, self_attn_weights = self.attn(
+            hidden_states=layernorm_output,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_value=past_key_value,
+            output_attentions=output_attentions,
+            use_cache=use_cache,
+            cache_position=cache_position,
+            residual=residual,
+        )
 
-        hidden_states = self.mlp(layernorm_output, residual)
+        residual = hidden_states
 
-        if first_token and beam > 1:
-            # for 1st token, expand the result with beam
-            hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
-            hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
-        else:
-            # for 2nd to last token, we convert the layout back
-            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1)
+        hidden_states = self.post_attn_layernorm(hidden_states)
+
+        hidden_states = self.mlp(hidden_states, residual)
 
         outputs = (hidden_states,)
 

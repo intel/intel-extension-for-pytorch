@@ -708,22 +708,24 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3OneDNN(
         up_states = up_states * self.act(gate)
 
         if self.fc_out_quant.bias is None:
-            output = torch.ops.torch_ipex.mm_int4(
+            output = torch.ops.torch_ipex.mm_add_int4(
                 up_states,
                 self.fc_out_quant.qweight,
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                residual,
                 self.fc_out_quant.g_idx,
             )
         else:
-            output = torch.ops.torch_ipex.mm_bias_int4(
+            output = torch.ops.torch_ipex.mm_bias_add_int4(
                 up_states,
                 self.fc_out_quant.qweight,
                 self.fc_out_quant.bias,
                 self.fc_out_quant.scales,
                 self.fc_out_quant.qzeros,
                 self.fc_out_quant.blocksize,
+                residual,
                 self.fc_out_quant.g_idx,
             )
         return output

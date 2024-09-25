@@ -34,9 +34,9 @@ Run_benchmark_qwen-7b_int4() {
 Run_benchmark_qwen1.5-7b_int4() {
     model=Qwen/Qwen1.5-7B-Chat
     sub_model_name=qwen1.5-7b
-    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    dir=int4_perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
-    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16 --token-latency 2>&1 | tee log_e2e
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --disable_static_cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16 --token-latency 2>&1 | tee log_e2e
     mv log_e2e ${dir}
     PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16
     mv profile*pt ${dir}
@@ -48,9 +48,9 @@ Run_benchmark_qwen1.5-7b_int4() {
 Run_benchmark_qwen2-7b_int4() {
     model=Qwen/Qwen2-7B-Instruct
     sub_model_name=qwen2-7b
-    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    dir=int4_perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
-    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16 --token-latency 2>&1 | tee log_e2e
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --disable_static_cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16 --token-latency 2>&1 | tee log_e2e
     mv log_e2e ${dir}
     PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16
     mv profile*pt ${dir}
@@ -96,13 +96,28 @@ Run_benchmark_llama2-70b_int4() {
     mv trace.json ${dir}
 }
 
+
+## Llama3-8b
+Run_benchmark_llama3-8b_int4() {
+    model=meta-llama/Meta-Llama-3-8B
+    sub_model_name=llama3-8b
+    dir=int4_perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
+
 ## Phi3-mini
 Run_benchmark_Phi3-mini_int4() {
     model=microsoft/Phi-3-mini-4k-instruct
     sub_model_name=phi3-mini
     dir=int4_perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
-    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --disable_static_cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
     mv log_e2e ${dir}
     PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
     mv profile*pt ${dir}
@@ -131,6 +146,7 @@ main() {
     Run_benchmark_gpt-j-6b_int4
     Run_benchmark_llama2-7b_int4
     Run_benchmark_llama2-70b_int4
+    Run_benchmark_llama3-8b_int4
     Run_benchmark_Phi3-mini_int4
     Run_benchmark_chatglm3-6b-chat_int4
 }

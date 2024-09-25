@@ -279,5 +279,11 @@ class IPEXTransformerMLPOptimizedFp16SiluPhi3(IPEXTransformerMLP):
 
         gate, up_states = up_states.chunk(2, dim=-1)
         up_states = up_states * self.act(gate)
-
-        return self.fc_out(up_states)
+        if self.fc_out.bias is None:
+            return torch.ops.torch_ipex.mm_resadd(
+                up_states, self.fc_out.weight, residual, 1.0
+            )
+        else:
+            return torch.ops.torch_ipex.mm_bias_resadd(
+                up_states, self.fc_out.weight, self.fc_out.bias, 1.0, residual, 1.0
+            )
