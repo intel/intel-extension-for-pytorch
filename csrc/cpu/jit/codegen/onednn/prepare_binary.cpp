@@ -102,8 +102,7 @@ static void ReplaceTypeAsWithTo(Block* block) {
           nodeOutputTypePtr->scalarType();
       // Sometimes, JIT IR may not have input dtype
       auto nodeInputTypePtr = node->input(0)->type()->expect<TensorType>();
-      c10::optional<at::ScalarType> inputDtype =
-          nodeInputTypePtr->scalarType();
+      c10::optional<at::ScalarType> inputDtype = nodeInputTypePtr->scalarType();
       if (outputDtype.has_value() && inputDtype.has_value()) {
         auto g = node->prev()->owningGraph();
         auto replacementNodeOutput =

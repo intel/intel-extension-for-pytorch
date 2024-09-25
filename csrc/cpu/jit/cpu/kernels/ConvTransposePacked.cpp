@@ -312,8 +312,7 @@ ContextConvTranspose create(
     packed_weight.init(
         expected_desc, at_weight.template data_ptr<c10::BFloat16>());
   } else if (ideep::data_type::f16 == weight_dtype) {
-    packed_weight.init(
-        expected_desc, at_weight.template data_ptr<c10::Half>());
+    packed_weight.init(expected_desc, at_weight.template data_ptr<c10::Half>());
   } else {
     TORCH_CHECK(false, "only fp32, bf16, and fp16 are supported");
   }
@@ -481,8 +480,7 @@ at::Tensor unpack(ContextConvTranspose& context, const at::Tensor& tensor) {
     blocked_tensor.init(
         expected_desc, tensor.template data_ptr<c10::BFloat16>());
   } else if (ideep::data_type::f16 == dtype) {
-    blocked_tensor.init(
-        expected_desc, tensor.template data_ptr<c10::Half>());
+    blocked_tensor.init(expected_desc, tensor.template data_ptr<c10::Half>());
   } else {
     TORCH_CHECK(false, "only fp32, bf16, and fp16 are supported");
   }
