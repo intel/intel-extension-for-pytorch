@@ -20,9 +20,13 @@ void check_input_devices(
   if (!self.defined() || !other.defined())
     return;
 
-  TORCH_CHECK(self.device() == other.device(),
+  TORCH_CHECK(
+      self.device() == other.device(),
       "Expected all tensors to be on the same device, but found at least two devices, ",
-      self.device(), " and ", other.device(), "!");
+      self.device(),
+      " and ",
+      other.device(),
+      "!");
 }
 
 static void xpu_fallback_impl(
