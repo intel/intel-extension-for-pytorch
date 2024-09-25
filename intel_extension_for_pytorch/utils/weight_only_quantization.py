@@ -109,6 +109,13 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
             # Ensure group_size is a power of two
             assert group_size > 0
             group_size = 2 ** (group_size - 1).bit_length()
+    if g_idx is not None and group_size > 0:
+        # ignore dummy g_idx
+        # qweight is compressed along the last dim int4 * 8 -> int32
+        ic = qweight.size(-1) * 8
+        dummy = torch.tensor([i // group_size for i in range(ic)], dtype=torch.int32)
+        if torch.equal(g_idx, dummy):
+            g_idx = None
     return qweight, scales, qzeros, bias, group_size, g_idx
 
 
