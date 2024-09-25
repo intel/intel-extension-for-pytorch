@@ -3,12 +3,13 @@ Releases
 
 ## 2.3.110+xpu
 
-Intel® Extension for PyTorch\* v2.3.110+xpu is the new release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.3.1.
+Intel® Extension for PyTorch\* v2.3.110+xpu is the new release which supports Intel® GPU platforms (Intel® Data Center GPU Max Series, Intel® Arc™ A-Series Graphics, Intel® Core™ Ultra Processors with Intel® Arc™ Graphics,  Intel® Core™ Ultra Series 2 with Intel® Arc™ Graphics and Intel® Data Center GPU Flex Series) based on PyTorch\* 2.3.1.
 
 ### Highlights
 
-- Intel® oneDNN v3.5.3 integration
+- oneDNN v3.5.3 integration
 - Intel® oneAPI Base Toolkit 2024.2.1 compatibility
+- Intel® Core™ Ultra Series 2 with Intel® Arc™ Graphics support on Windows (Prototype)
 - Large Language Model (LLM) optimization
   
   Intel® Extension for PyTorch\* provides a new dedicated module, `ipex.llm`, to host for Large Language Models (LLMs) specific APIs. With `ipex.llm`, Intel® Extension for PyTorch\* provides comprehensive LLM optimization on FP16 and INT4 datatypes. Specifically for low precision, Weight-Only Quantization is supported for various scenarios. And user can also run Intel® Extension for PyTorch\* with Tensor Parallel to fit in the multiple ranks or multiple nodes scenarios to get even better performance.
@@ -34,11 +35,15 @@ Intel® Extension for PyTorch\* v2.3.110+xpu is the new release which supports I
 
 - Serving framework support
   
-  Typical LLM serving frameworks including [vLLM](https://github.com/vllm-project/vllm) and [TGI](https://huggingface.co/text-generation-inference) can co-work with Intel® Extension for PyTorch\* on Intel® GPU platforms (Intel® Data Center GPU Max 1550 and Intel® Arc™ A-Series Graphics). Besides the integration of LLM serving frameworks with `ipex.llm` module level APIs, we enhanced the performance and quality of underneath Intel® Extension for PyTorch\* operators such as paged attention and flash attention for better end to end model performance.
+  Typical LLM serving frameworks including [vLLM](https://github.com/vllm-project/vllm) and [TGI](https://huggingface.co/text-generation-inference) can co-work with Intel® Extension for PyTorch\* on Intel® GPU platforms (Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics). Besides the integration of LLM serving frameworks with `ipex.llm` module level APIs, we enhanced the performance and quality of underneath Intel® Extension for PyTorch\* operators such as paged attention and flash attention for better end to end model performance.
 
 - Prototype support of full fine-tuning and LoRA PEFT with mixed precision
 
   Intel® Extension for PyTorch\* also provides new capability for supporting popular recipes with both full fine-tuning and [LoRA PEFT](https://github.com/huggingface/peft)  for mixed precision with BF16 and FP32. We optimized many typical LLM models including Llama 2 (7B and 70B), Llama 3 8B, Phi-3-Mini 3.8B model families and Chinese model Qwen-7B, on both single GPU and Multi-GPU (distributed fine-tuning based on PyTorch FSDP) use cases.
+
+### Breaking Changes
+
+- Block format support: oneDNN Block format integration support is being deprecated and will no longer be available starting from the release after v2.3.110+xpu.
 
 ### Known Issues
 
