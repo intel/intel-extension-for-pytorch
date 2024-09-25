@@ -49,7 +49,12 @@ class fmha_forward_t {
     uint32_t uH;
     uint32_t uF;
     uint32_t uT;
-    uint64_t q_strideF;
+    uint32_t q_strideB;
+    uint32_t q_strideN;
+    uint32_t q_strideF;
+    uint32_t kv_strideB;
+    uint32_t kv_strideN;
+    uint32_t kv_strideT;
     uint32_t bias_strideB;
     uint32_t bias_strideN;
     uint32_t bias_strideF;
@@ -84,7 +89,12 @@ class fmha_forward_t {
         uint32_t head_size,
         uint32_t num_queries,
         uint32_t num_keys,
-        uint64_t q_strideF,
+        uint32_t q_strideB,
+        uint32_t q_strideN,
+        uint32_t q_strideF,
+        uint32_t kv_strideB,
+        uint32_t kv_strideN,
+        uint32_t kv_strideT,
         uint32_t bias_strideB,
         uint32_t bias_strideN,
         uint32_t bias_strideF,
@@ -111,7 +121,12 @@ class fmha_forward_t {
           uH(head_size),
           uF(num_queries),
           uT(num_keys),
+          q_strideB(q_strideB),
+          q_strideN(q_strideN),
           q_strideF(q_strideF),
+          kv_strideB(kv_strideB),
+          kv_strideN(kv_strideN),
+          kv_strideT(kv_strideT),
           bias_strideB(bias_strideB),
           bias_strideN(bias_strideN),
           bias_strideF(bias_strideF),
@@ -303,21 +318,25 @@ class fmha_forward_t {
         mem_desc_Oi.init(
             args.O_ptr, {end_x, end_y, ld_qo}, {start_acc, start_y});
       } else { // 2d mem: [BxF, NxH]
+        uint32_t ptr_offset =
+            batch_id * args.q_strideB + head_id * args.q_strideN;
+        auto Q_ptr = args.Q_ptr + ptr_offset;
+        auto O_ptr = args.O_ptr + ptr_offset;
+
         // startF
-        int32_t start_y = batch_id * args.uF + item.get_group(1) * kBr;
+        int32_t start_y = item.get_group(1) * kBr;
         uint32_t end_y = start_y + kBr;
         // boundaryF
-        uint32_t boundary_y = (batch_id + 1) * args.uF;
+        uint32_t boundary_y = args.uF;
         end_y = end_y > boundary_y ? boundary_y : end_y;
 
-        int32_t start_acc = head_id * args.uH;
+        int32_t start_acc = 0;
         uint32_t end_acc = start_acc + args.uH;
-        const uint32_t ld_o = args.uH * args.uN;
 
         mem_desc_Qi.init(
-            args.Q_ptr, {end_acc, end_y, args.q_strideF}, {start_acc, start_y});
+            Q_ptr, {end_acc, end_y, args.q_strideF}, {start_acc, start_y});
         mem_desc_Oi.init(
-            args.O_ptr, {end_acc, end_y, ld_o}, {start_acc, start_y});
+            O_ptr, {end_acc, end_y, args.q_strideF}, {start_acc, start_y});
       }
 
       int32_t start_x_ml = item.get_group(1) * kBr + sg_idy * kSgBr;
@@ -375,22 +394,23 @@ class fmha_forward_t {
             {start_acc, start_x});
 
       } else {
-        int32_t start_x = batch_id * args.uT + startT;
+        uint32_t ptr_offset =
+            batch_id * args.kv_strideB + head_id_kv * args.kv_strideN;
+        auto K_ptr = args.K_ptr + ptr_offset;
+        auto V_ptr = args.V_ptr + ptr_offset;
+
+        int32_t start_x = startT;
         uint32_t end_x = start_x + kBc;
-        uint32_t boundary_x = (batch_id + 1) * args.uT;
+        uint32_t boundary_x = args.uT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
 
-        int32_t start_acc = head_id_kv * args.uH;
+        int32_t start_acc = 0;
         uint32_t end_acc = start_acc + args.uH;
 
         mem_desc_Kj_T.init(
-            args.K_ptr,
-            {end_x, end_acc, args.uH * args.uNkv},
-            {start_x, start_acc});
+            K_ptr, {end_x, end_acc, args.kv_strideT}, {start_x, start_acc});
         mem_desc_Vj.init(
-            args.V_ptr,
-            {end_acc, end_x, args.uH * args.uNkv},
-            {start_acc, start_x});
+            V_ptr, {end_acc, end_x, args.kv_strideT}, {start_acc, start_x});
       }
 
       // B, N, 1, T
