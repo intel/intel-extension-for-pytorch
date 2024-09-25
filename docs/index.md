@@ -105,7 +105,7 @@ Besides, the standalone shard model function/scripts are also provided in sectio
 # Vision-Text generation inference
 deepspeed --bind_cores_to_rank  run.py --benchmark -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH> --dtype bfloat16 --ipex  --greedy --autotp --shard-model --vision-text-model  --prompt <PROMPT_TEXT>  --image-url <IMAGE_URL>
 
-<PROMPT_TEXT> example:  "<|image|><|begin_of_text|>Describe all of the images briefly."
+<PROMPT_TEXT> example:  "<|image|><|begin_of_text|>Please describe the given image briefly."
 <IMAGE_URL> example "https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg"
 ```
 
