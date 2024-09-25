@@ -1,6 +1,7 @@
 #include "PagedAttention.h"
 #include <torch/all.h>
 #include <torch/csrc/autograd/function.h>
+#include "csrc/utils/CustomOperatorRegistration.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -84,28 +85,17 @@ void flash_attn_varlen_cpu(
 namespace {
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.def(
-      "single_query_cached_kv_attention(Tensor (a!)out, Tensor (a!)query, Tensor (a!)key_cache, Tensor (a!)value_cache,\
-       Tensor(a!) head_mapping, float scale, Tensor(a!) block_tables, Tensor(a!) context_lens, int block_size, int max_context_len,\
-       Tensor? alibi_slopes)-> ()");
-  m.impl(
+  IPEX_OP_REGISTER_DISPATCH(
       "single_query_cached_kv_attention",
-      c10::DispatchKey::CPU,
-      torch_ipex::cpu::single_query_cached_kv_attention_forward_cpu);
-  m.def(
-      "reshape_and_cache(Tensor (a!)key, Tensor (a!)value, Tensor (a!)key_cache, Tensor (a!)value_cache, Tensor(a!) slot_mapping)-> ()");
-  m.impl(
+      torch_ipex::cpu::single_query_cached_kv_attention_forward_cpu,
+      c10::DispatchKey::CPU);
+  IPEX_OP_REGISTER_DISPATCH(
       "reshape_and_cache",
-      c10::DispatchKey::CPU,
-      torch_ipex::cpu::reshape_and_cache_cpu);
-  m.def(
-      "flash_attn_varlen_func(Tensor (a!)out, Tensor (a!)query, Tensor (a!)key, Tensor (a!)value, Tensor(a!) cu_seqlens_q,\
-         Tensor(a!) cu_seqlens_kv, int max_seqlen_q, int max_seqlen_kv, float softmax_scale, bool is_causal, Tensor(a!) block_table, \
-         Tensor? alibi_slopes)-> ()");
-
-  m.impl(
+      torch_ipex::cpu::reshape_and_cache_cpu,
+      c10::DispatchKey::CPU);
+  IPEX_OP_REGISTER_DISPATCH(
       "flash_attn_varlen_func",
-      c10::DispatchKey::CPU,
-      torch_ipex::cpu::flash_attn_varlen_cpu);
+      torch_ipex::cpu::flash_attn_varlen_cpu,
+      c10::DispatchKey::CPU);
 }
 } // namespace
