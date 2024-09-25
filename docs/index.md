@@ -126,15 +126,17 @@ python create_shard_model.py -m <LLAMA3_MODEL_ID_OR_LOCAL_PATH>  --save-path ./l
 You can use auto-round (part of INC) to generate INT4 WOQ model with following steps.
 - Environment installation:
 ```bash
-pip install git+https://github.com/intel/auto-round.git@e24b9074af6cdb099e31c92eb81b7f5e9a4a244e
+pip install git+https://github.com/intel/auto-round.git@llama/new/9
 git clone https://github.com/intel/auto-round.git
-git checkout e24b9074af6cdb099e31c92eb81b7f5e9a4a244e
-cd auto-round/examples/language-modeling
+cd auto-round
+git checkout -b llama/new/9 origin/llama/new/9
+cd examples/language-modeling
 ```
 
 - Command (quantize):
 ```bash
-python3 main.py --model_name  $model_name --device cpu --sym --nsamples 512 --iters 1000 --group_size 32 --deployment_device cpu --disable_eval --output_dir <INT4_MODEL_SAVE_PATH>
+export model_name=/path/to/model
+python3 main.py --model_name  $model_name --device cpu --gradient_accumulate_steps 2 --model_dtype bfloat16 --group_size 128  --train_bs 4 --iters 1000 --nsample 512  --format auto_gptq   --disable_quanted_input  --disable_eval --output_dir <INT4_MODEL_SAVE_PATH>
 ```
 
 - Command (benchmark):
