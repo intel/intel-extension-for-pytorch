@@ -708,11 +708,11 @@ static void mm_qkv_out(
   } else {
     RECORD_FUNC_IMPL(hgemm_addmm_out);
     at::AtenIpexTypeXPU::addmm_out(
-        bias_.value()[0], input, wq, at::Scalar(1), at::Scalar(1), out0_);
+        bias_.value()[0], input, wq, at::Scalar(1), at::Scalar(1), out0);
     at::AtenIpexTypeXPU::addmm_out(
-        bias_.value()[1], input, wk, at::Scalar(1), at::Scalar(1), out1_);
+        bias_.value()[1], input, wk, at::Scalar(1), at::Scalar(1), out1);
     at::AtenIpexTypeXPU::addmm_out(
-        bias_.value()[2], input, wv, at::Scalar(1), at::Scalar(1), out2_);
+        bias_.value()[2], input, wv, at::Scalar(1), at::Scalar(1), out2);
   }
 }
 
