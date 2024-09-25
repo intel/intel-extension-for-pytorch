@@ -650,15 +650,16 @@ int64_t _fused_sdp_choice(
     const Tensor& query,
     const Tensor& key,
     const Tensor& value,
-    const c10::optional<Tensor>& attn_mask_,
+    const std::optional<Tensor>& attn_mask_,
     double dropout_p,
     bool is_causal,
-    c10::optional<double> scale) {
+    std::optional<double> scale,
+    bool enable_gqa) {
   // We have implemented efficient_attention backend with xetla, flash_attention
   // backend is not supported now, which will be implemented in the future. So
   // we provide two backends here.
   sdp::sdp_params kernel_params{
-      query, key, value, attn_mask_, dropout_p, is_causal};
+      query, key, value, attn_mask_, dropout_p, is_causal, enable_gqa};
   sdp::SDPBackend backend = sdp::use_mem_efficient_attention(kernel_params)
       ? sdp::SDPBackend::efficient_attention
       : sdp::SDPBackend::math;
@@ -1984,15 +1985,16 @@ int64_t _fused_sdp_choice(
     const Tensor& query,
     const Tensor& key,
     const Tensor& value,
-    const c10::optional<Tensor>& attn_mask_,
+    const std::optional<Tensor>& attn_mask_,
     double dropout_p,
     bool is_causal,
-    c10::optional<double> scale) {
+    std::optional<double> scale,
+    bool enable_gqa) {
   // We have implemented efficient_attention backend with xetla, flash_attention
   // backend is not supported now, which will be implemented in the future. So
   // we provide two backends here.
   sdp::sdp_params kernel_params{
-      query, key, value, attn_mask_, dropout_p, is_causal};
+      query, key, value, attn_mask_, dropout_p, is_causal, enable_gqa};
   sdp::SDPBackend backend = sdp::use_mem_efficient_attention(kernel_params)
       ? sdp::SDPBackend::efficient_attention
       : sdp::SDPBackend::math;

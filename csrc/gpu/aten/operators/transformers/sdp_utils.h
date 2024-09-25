@@ -48,6 +48,7 @@ struct sdp_params {
   const c10::optional<at::Tensor> attn_mask;
   double dropout;
   bool is_causal;
+  bool enable_gqa;
 };
 
 inline c10::SymFloat calculate_scale(
