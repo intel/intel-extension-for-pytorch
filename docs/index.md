@@ -18,7 +18,7 @@ git submodule update --init --recursive
 
 # Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch\* from source
 # To have a custom ssh server port for multi-nodes run, please add --build-arg PORT_SSH=<CUSTOM_PORT> ex: 2345, otherwise use the default 22 SSH port
-docker build -f examples/cpu/llm/Dockerfile --build-arg COMPILE=ON --build-arg PORT_SSH=2345 -t ipex-llm:2.6.0-preview .
+docker build -f examples/cpu/llm/Dockerfile --build-arg PORT_SSH=2345 -t ipex-llm:2.6.0-preview .
 
 # Run the container with command below
 docker run --rm -it --privileged -v /dev/shm:/dev/shm ipex-llm:2.6.0-preview bash
