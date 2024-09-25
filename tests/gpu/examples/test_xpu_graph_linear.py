@@ -11,6 +11,7 @@ loss_fn = torch.nn.MSELoss()
 
 
 class TestTorchMethod(TestCase):
+    @pytest.mark.skipif(True, reason="compiler doesn't support sycl graph")
     def test_xpu_graph_linear(self, dtype=torch.float):
         # Placeholders used for capture
         static_input = torch.randn(N, D_in, device="xpu")
