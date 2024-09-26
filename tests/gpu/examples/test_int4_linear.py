@@ -4,6 +4,7 @@ import pytest
 from intel_extension_for_pytorch.nn.utils._quantize_convert import GPTQShuffle
 
 from enum import Enum
+from typing import List
 
 from torch.testing._internal.common_utils import (
     TestCase,
@@ -23,6 +24,116 @@ base_atol = 1e-2
 base_rtol = 2e-2
 skip_bf16_input = not torch.xpu.has_2d_block_array() and not torch.xpu.has_xmx()
 COMPILER_VERSION = torch.xpu.get_compiler_version()
+
+AWQ_PACK_ORDER = [0, 2, 4, 6, 1, 3, 5, 7]
+REVERSE_AWQ_PACK_ORDER = [0, 4, 1, 5, 2, 6, 3, 7]
+
+
+def pack(imatrix: torch.Tensor, direction: str = "column"):
+    """
+    Packs a 4-bit integer matrix into a packed 32-bit integer matrix.
+    Args:
+        imatrix (torch.Tensor): matrix of integers
+        direction (str): direction of packing, either "column" or "row"
+    Returns:
+        qmatrix (torch.Tensor): packed matrix of integers
+    """
+    shifts = torch.arange(0, 32, 4, dtype=torch.int32, device=imatrix.device)
+
+    imatrix = imatrix.to(torch.int8) & 0x0F  # eventually correct overflow
+
+    if direction == "column":
+        imatrix = imatrix.view(-1, imatrix.shape[1] // (32 // 4), (32 // 4))
+        qmatrix = torch.bitwise_left_shift(imatrix, shifts[None, None, :]).sum(dim=-1)
+
+    elif direction == "row":
+        imatrix = imatrix.view(imatrix.shape[0] // (32 // 4), (32 // 4), -1)
+        qmatrix = torch.bitwise_left_shift(imatrix, shifts[None, :, None]).sum(dim=1)
+
+    qmatrix = qmatrix.to(torch.int32)
+
+    return qmatrix
+
+
+def unpack(qmatrix: torch.Tensor, direction: str = "column"):
+    """
+    Unpacks a 32-bit packed integer matrix into a 4-bit integer matrix.
+    Args:
+        qmatrix (torch.Tensor): matrix of packed integers
+        direction (str): direction of unpacking, either "column" or "row"
+    Returns:
+        imatrix (torch.Tensor): matrix of integers
+    """
+    shifts = torch.arange(0, 32, 4, device=qmatrix.device)
+
+    if direction == "column":
+        imatrix = torch.bitwise_right_shift(
+            qmatrix[:, :, None], shifts[None, None, :]
+        ).view(qmatrix.shape[0], -1)
+
+    elif direction == "row":
+        imatrix = torch.bitwise_right_shift(
+            qmatrix[:, None, :], shifts[None, :, None]
+        ).view(-1, qmatrix.shape[-1])
+
+    imatrix = imatrix.to(torch.int8) & 0x0F  # eventually correct overflow
+
+    return imatrix
+
+
+def apply_order(
+    imatrix: torch.Tensor,
+    direction: str = "column",
+    order: List[int] = AWQ_PACK_ORDER,
+):
+    """
+    Applies the order to a 4-bit integer matrix.
+    Args:
+        imatrix (torch.Tensor): matrix of integers
+        direction (str): direction of applying order, either "column" or "row"
+        order (List[int]): order to apply, default is AWQ_PACK_ORDER
+    Returns:
+        imatrix (torch.Tensor): matrix of integers
+    """
+    if direction == "column":
+        imatrix = imatrix.view(-1, (32 // 4))[:, order].view(imatrix.shape)
+    elif direction == "row":
+        imatrix = imatrix.view((32 // 4), -1)[order, :].view(imatrix.shape)
+
+    return imatrix
+
+
+def fast_awq_to_gptq(qweight, qzeros):
+    # awq uses column packing for both weights and zeros
+    izeros = unpack(qzeros, direction="column")
+    iweights = unpack(qweight, direction="column")
+
+    # Reverse the order of the iweight and izeros tensors
+    izeros = apply_order(izeros, direction="column", order=REVERSE_AWQ_PACK_ORDER)
+    iweights = apply_order(iweights, direction="column", order=REVERSE_AWQ_PACK_ORDER)
+    # Subtract 1 from the izeros tensor (gptq adds 1 to the zeros)
+    izeros = izeros - 1
+    # exllama uses row packing for weights and column packing for zeros
+    qzeros = pack(izeros, direction="column")
+    qweight = pack(iweights, direction="row")
+
+    return qweight, qzeros
+
+
+def fast_gptq_to_awq(qweight, qzeros):
+    # gptq uses row packing for both weights and zeros
+    izeros = unpack(qzeros, direction="column")
+    iweight = unpack(qweight, direction="row")
+
+    izeros = apply_order(izeros, direction="column", order=AWQ_PACK_ORDER)
+    iweight = apply_order(iweight, direction="row", order=AWQ_PACK_ORDER)
+
+    izeros = izeros + 1
+
+    qzeros = pack(izeros, direction="column")
+    qweight = pack(iweight, direction="column")
+
+    return qweight, qzeros
 
 
 class TestInt4Linear(TestCase):
@@ -190,7 +301,7 @@ class TestInt4Linear(TestCase):
     @parametrize("act_order", [False, True])
     @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
     @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
-    def test_woqlinear_interface(
+    def test_gptq_woqlinear_interface(
         self, m, n, k, per_channel, act_order, dtype=torch.float16
     ):
         input = torch.rand([m, k], device="xpu", dtype=dtype)
@@ -233,6 +344,60 @@ class TestInt4Linear(TestCase):
         )
         out_xetla = woqlinear(input)
         out_torch = torch.matmul(input_torch, weight_fp16)
+        self.assertEqual(
+            out_xetla.cpu().float(),
+            out_torch.float(),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
+
+    @parametrize("per_channel", [False], lambda k: "per_channel" * k)
+    @parametrize("dtype", [torch.float16])
+    @parametrize("act_order", [False])
+    @parametrize("m,n,k", [(8, 4096, 4096), (1, 4096, 11008), (32, 4096, 4096)])
+    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    def test_awq_woqlinear_interface(
+        self, m, n, k, per_channel, act_order, dtype=torch.float16
+    ):
+        input = torch.rand([m, k], device="xpu", dtype=dtype)
+        input_torch = input.cpu()
+        weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k, n // 8)
+        group_size = min(128, k)
+        checking_atol = 1e-1
+        checking_rtol = base_rtol
+        g_idx = None
+        g_idx4kernel = None
+        if per_channel:
+            group_size = k
+        group_num = int(k / group_size)
+
+        scales = -torch.rand([group_num, n], device="xpu", dtype=dtype)
+        zero_points = self.rand_int4(group_num * n, torch.int32, "xpu").reshape(
+            group_num, n // 8
+        )
+
+        weight_gptq, zero_points_gptq = fast_awq_to_gptq(weight, zero_points)
+
+        weight_fp16 = self.dequantize(
+            weight_gptq, scales, zero_points_gptq, group_size, g_idx
+        ).cpu()
+        woqlinear = ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight(
+            weight,
+            scales,
+            zero_points,
+            k,
+            n,
+            None,
+            None,
+            group_size,
+            g_idx4kernel,
+            ipex.llm.quantization.QuantMethod.AWQ_GEMM,
+            ipex.llm.quantization.QuantDtype.INT4,
+        )
+        out_xetla = woqlinear(input)
+        out_torch = torch.matmul(input_torch, weight_fp16)
+        print("out_xetla: ", out_xetla.cpu().float())
+        print("out_torch: ", out_torch.float())
         self.assertEqual(
             out_xetla.cpu().float(),
             out_torch.float(),

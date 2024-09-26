@@ -2,7 +2,7 @@ import torch
 import intel_extension_for_pytorch as ipex  # noqa
 import torch.nn as nn
 from torch import Tensor
-from typing import Optional
+from typing import Optional, List
 
 
 DTYPE_BITS_MAPPING = {
@@ -96,6 +96,117 @@ def convert_dtype_str2torch(str_dtype):
         AssertionError(False), "Unsupport str dtype {} to torch dtype".format(str_dtype)
 
 
+AWQ_PACK_ORDER = [0, 2, 4, 6, 1, 3, 5, 7]
+REVERSE_AWQ_PACK_ORDER = [0, 4, 1, 5, 2, 6, 3, 7]
+
+
+def pack(imatrix: torch.Tensor, direction: str = "column"):
+    """
+    Packs a 4-bit integer matrix into a packed 32-bit integer matrix.
+    Args:
+        imatrix (torch.Tensor): matrix of integers
+        direction (str): direction of packing, either "column" or "row"
+    Returns:
+        qmatrix (torch.Tensor): packed matrix of integers
+    """
+    shifts = torch.arange(0, 32, 4, dtype=torch.int32, device=imatrix.device)
+
+    imatrix = imatrix.to(torch.int8) & 0x0F  # eventually correct overflow
+
+    if direction == "column":
+        imatrix = imatrix.view(-1, imatrix.shape[1] // (32 // 4), (32 // 4))
+        qmatrix = torch.bitwise_left_shift(imatrix, shifts[None, None, :]).sum(dim=-1)
+
+    elif direction == "row":
+        imatrix = imatrix.view(imatrix.shape[0] // (32 // 4), (32 // 4), -1)
+        qmatrix = torch.bitwise_left_shift(imatrix, shifts[None, :, None]).sum(dim=1)
+
+    qmatrix = qmatrix.to(torch.int32)
+
+    return qmatrix
+
+
+def unpack(qmatrix: torch.Tensor, direction: str = "column"):
+    """
+    Unpacks a 32-bit packed integer matrix into a 4-bit integer matrix.
+    Args:
+        qmatrix (torch.Tensor): matrix of packed integers
+        direction (str): direction of unpacking, either "column" or "row"
+    Returns:
+        imatrix (torch.Tensor): matrix of integers
+    """
+    shifts = torch.arange(0, 32, 4, device=qmatrix.device)
+
+    if direction == "column":
+        imatrix = torch.bitwise_right_shift(
+            qmatrix[:, :, None], shifts[None, None, :]
+        ).view(qmatrix.shape[0], -1)
+
+    elif direction == "row":
+        imatrix = torch.bitwise_right_shift(
+            qmatrix[:, None, :], shifts[None, :, None]
+        ).view(-1, qmatrix.shape[-1])
+
+    imatrix = imatrix.to(torch.int8) & 0x0F  # eventually correct overflow
+
+    return imatrix
+
+
+def apply_order(
+    imatrix: torch.Tensor,
+    direction: str = "column",
+    order: List[int] = AWQ_PACK_ORDER,
+):
+    """
+    Applies the order to a 4-bit integer matrix.
+    Args:
+        imatrix (torch.Tensor): matrix of integers
+        direction (str): direction of applying order, either "column" or "row"
+        order (List[int]): order to apply, default is AWQ_PACK_ORDER
+    Returns:
+        imatrix (torch.Tensor): matrix of integers
+    """
+    if direction == "column":
+        imatrix = imatrix.view(-1, (32 // 4))[:, order].view(imatrix.shape)
+    elif direction == "row":
+        imatrix = imatrix.view((32 // 4), -1)[order, :].view(imatrix.shape)
+
+    return imatrix
+
+
+def fast_awq_to_gptq(qweight, qzeros):
+    # awq uses column packing for both weights and zeros
+    izeros = unpack(qzeros, direction="column")
+    iweights = unpack(qweight, direction="column")
+
+    # Reverse the order of the iweight and izeros tensors
+    izeros = apply_order(izeros, direction="column", order=REVERSE_AWQ_PACK_ORDER)
+    iweights = apply_order(iweights, direction="column", order=REVERSE_AWQ_PACK_ORDER)
+    # Subtract 1 from the izeros tensor (gptq adds 1 to the zeros)
+    izeros = izeros - 1
+    # exllama uses row packing for weights and column packing for zeros
+    qzeros = pack(izeros, direction="column")
+    qweight = pack(iweights, direction="row")
+
+    return qweight, qzeros
+
+
+def fast_gptq_to_awq(qweight, qzeros):
+    # gptq uses row packing for both weights and zeros
+    izeros = unpack(qzeros, direction="column")
+    iweight = unpack(qweight, direction="row")
+
+    izeros = apply_order(izeros, direction="column", order=AWQ_PACK_ORDER)
+    iweight = apply_order(iweight, direction="row", order=AWQ_PACK_ORDER)
+
+    izeros = izeros + 1
+
+    qzeros = pack(izeros, direction="column")
+    qweight = pack(iweight, direction="column")
+
+    return qweight, qzeros
+
+
 class ParamsLowBits(torch.nn.Parameter):
     def __new__(
         cls,
@@ -167,6 +278,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         compression_dim=1,
         device=None,
         use_optimum_format=False,
+        quant_method=0,  # QuantMethod(GPTQ_GEMM)
     ) -> None:
         super().__init__()
         self.in_features = in_features
@@ -269,13 +381,20 @@ class WeightOnlyQuantizedLinear(nn.Module):
             dtype == QuantDtype.INT4
         ), "IPEX only support INT4 as quantization data type for now."
         assert quant_method in [
-            QuantMethod.GPTQ_GEMM
-        ], "IPEX only support GPTQ_GEMM as quantization method for now."
+            QuantMethod.GPTQ_GEMM,
+            QuantMethod.AWQ_GEMM,
+        ], "IPEX only support GPTQ_GEMM and AWQ_GEMM as quantization method for now."
         compression_dim = None
         compression_dtype = None
         if quant_method == QuantMethod.GPTQ_GEMM:
             compression_dim = 1
             compression_dtype = torch.int32
+        if quant_method == QuantMethod.AWQ_GEMM:
+            scheme = "asym"
+            compression_dim = 0
+            compression_dtype = torch.int32
+        else:
+            scheme = "sym"
         cls_inst = WeightOnlyQuantizedLinear(
             in_features=in_feature,
             out_features=out_feature,
@@ -285,25 +404,28 @@ class WeightOnlyQuantizedLinear(nn.Module):
             weight_dtype="int4_fullrange",
             scale_dtype="fp16",
             blocksize=group_size,
-            scheme="sym",
+            scheme=scheme,
             double_quant_scale_dtype=None,
             compression_dtype=compression_dtype,
             compression_dim=compression_dim,
             device="xpu",
             use_optimum_format=False,
+            quant_method=quant_method,
         )
         cls_inst.set_weights_bias(qweight, bias)
-        cls_inst.set_scales_zps_gidx(scales, zero_points, g_idx)
+        cls_inst.set_scales_zps_gidx(scales, zero_points, g_idx, quant_method)
+        if quant_method == QuantMethod.AWQ_GEMM:
+            cls_inst.qweight.data, cls_inst.qzeros.data = fast_awq_to_gptq(
+                cls_inst.qweight, cls_inst.qzeros
+            )
         if not cls_inst.weight_transposed:
             cls_inst.qweight.data = cls_inst.qweight.t().contiguous()
             cls_inst.scales.data = cls_inst.scales.t().contiguous().to(torch.float16)
-            if cls_inst.qzeros is not None:
-                cls_inst.qzeros.data = cls_inst.qzeros.t().contiguous().to(torch.int32)
             if cls_inst.bias is not None:
                 cls_inst.bias.data = cls_inst.bias.contiguous().to(torch.float16)
-            if cls_inst.scheme == "sym":
+            if cls_inst.scheme == "sym" and quant_method == QuantMethod.GPTQ_GEMM:
                 cls_inst.qzeros = None
-            else:
+            elif quant_method == QuantMethod.GPTQ_GEMM:
                 cls_inst.qzeros += 0x11111111
             cls_inst.weight_transposed = True
 
@@ -322,9 +444,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
                 self.scales.data = self.scales.t().contiguous().to(torch.float16)
                 if self.bias is not None:
                     self.bias.data = self.bias.contiguous().to(torch.float16)
-                if self.scheme == "sym":
+                if (
+                    self.scheme == "sym" and self.quant_method == 0
+                ):  # QuantMethod(GPTQ_GEMM)
                     self.qzeros = None
-                else:
+                elif self.quant_method == 0:  # QuantMethod(GPTQ_GEMM)
                     self.qzeros += 0x11111111
             else:
                 self.qweight.data = (
@@ -392,7 +516,9 @@ class WeightOnlyQuantizedLinear(nn.Module):
             shuf_weight = GPTQShuffle(self.bits, self.blocksize)
             self.qweight.data, self.g_idx = shuf_weight(self.qweight.data, self.g_idx)
 
-    def set_scales_zps_gidx(self, scales, qzeros=None, g_idx=None):
+    def set_scales_zps_gidx(
+        self, scales, qzeros=None, g_idx=None, quant_method=0  # QuantMethod(GPTQ_GEMM)
+    ):
         self.register_buffer("scales", scales)
         self.register_buffer("qzeros", qzeros)
         unuse_g_idx = torch.tensor(
@@ -402,13 +528,16 @@ class WeightOnlyQuantizedLinear(nn.Module):
         )
         if g_idx is not None and not torch.equal(g_idx, unuse_g_idx):
             self.g_idx = g_idx
-        # WA: for sym scheme with xetla impl., qzeros needs to be None
-        if self.scheme == "sym" and xpu_gemm_use_xetla():
-            self.qzeros = None
-        elif xpu_gemm_use_xetla():
-            self.qzeros += 0x11111111
+        if quant_method == 1:  # QuantMethod(AWQ_GEMM)
+            self.qzeros = qzeros
         else:
-            self.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
+            # WA: for sym scheme with xetla impl., qzeros needs to be None
+            if self.scheme == "sym" and xpu_gemm_use_xetla():
+                self.qzeros = None
+            elif xpu_gemm_use_xetla():
+                self.qzeros += 0x11111111
+            else:
+                self.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
 
     def extra_repr(self) -> str:
         tmp_str = (
