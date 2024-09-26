@@ -297,7 +297,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     args = parser.parse_args(args_in)
 
     parent_path = Path(__file__).parent.absolute()
-
+    if args.vision_text_model and args.batch_size > 1:
+        print(
+            "LLM RUNTIME ERROR: Current run.py script does not support vision-text generation with batch size > 1, exiting ..."
+        )
+        quit()
     group_size = args.group_size
     if group_size == 0:
         # weight dtype is ignored if gptq is true

@@ -421,6 +421,7 @@ def model_convert_reference(_model):
         transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXAttention,
         transformers.models.llama.modeling_llama.LlamaAttention,
         transformers.models.mllama.modeling_mllama.MllamaTextCrossAttention,
+        transformers.models.mllama.modeling_mllama.MllamaTextCrossSdpaAttention,
         transformers.models.mllama.modeling_mllama.MllamaTextSelfAttention,
         transformers.models.gptj.modeling_gptj.GPTJAttention,
         transformers.models.opt.modeling_opt.OPTAttention,
@@ -1733,7 +1734,7 @@ def optimize(
             if not is_woq:  # static quantization
                 if model.config.architectures[0] in ["MllamaForConditionalGeneration"]:
                     logger.warning(
-                        "ipex.llm.optimize does not support static quantizations on MLlama, fallback to origin model..."
+                        "ipex.llm.optimize will skip static quantizations on MLlama ..."
                     )
                     return model
 

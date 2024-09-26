@@ -2427,6 +2427,10 @@ class _IPEXAttentionRef(nn.Module):
                 self.model_backbone == "MllamaForConditionalGeneration"
                 and module._get_name() != "MllamaTextCrossAttention"
             )
+            or (
+                self.model_backbone == "MllamaForConditionalGeneration"
+                and module._get_name() != "MllamaTextCrossSdpaAttention"
+            )
         ):
             if hasattr(module, "rotary_dim"):
                 self.pos_embd_dim = module.rotary_dim
@@ -2508,6 +2512,7 @@ class _IPEXAttentionRef(nn.Module):
             supported_linear_types = tuple(supported_linear_types)
             if (
                 module._get_name() != "MllamaTextCrossAttention"
+                and module._get_name() != "MllamaTextCrossSdpaAttention"
                 and hasattr(module, "q_proj")
                 and hasattr(module, "k_proj")
                 and hasattr(module, "v_proj")
@@ -2522,13 +2527,15 @@ class _IPEXAttentionRef(nn.Module):
                 del module.q_proj, module.k_proj, module.v_proj
         if not (
             self.model_backbone == "MllamaForConditionalGeneration"
-            and module._get_name() == "MllamaTextCrossAttention"
+            and (
+                module._get_name() == "MllamaTextCrossAttention"
+                or module._get_name() == "MllamaTextCrossSdpaAttention"
+            )
         ):
             self._IPEXScaleDotProduct = _IPEXScaleDotProductRef(module, config)
             self.is_mllama_cross_attention = False
         else:
             self.is_mllama_cross_attention = True
-
         if (
             self.model_backbone == "FalconForCausalLM"
             or self.model_backbone == "RWForCausalLM"

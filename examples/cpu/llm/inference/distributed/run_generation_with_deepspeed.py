@@ -615,7 +615,10 @@ elif model_type == "mllama":
     else:
         raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
 
-    input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
+    raw_image = load_image(args.image_url)
+    raw_image = [raw_image] * args.batch_size
+    inputs = tokenizer(raw_image, prompt, return_tensors="pt")
+    input_size = inputs["input_ids"].size(dim=1)
     print("---- Prompt size:", input_size)
     inputs = [prompt] * args.batch_size
 else:
@@ -682,7 +685,7 @@ def generate():
     elif model_type == "mllama":
         raw_image = load_image(args.image_url)
         raw_image = [raw_image] * args.batch_size
-        input_tokens = tokenizer(inputs, raw_image, return_tensors="pt")
+        input_tokens = tokenizer(raw_image, prompt, return_tensors="pt")
         input_ids = input_tokens["input_ids"]
     else:
         input_tokens = tokenizer.batch_encode_plus(

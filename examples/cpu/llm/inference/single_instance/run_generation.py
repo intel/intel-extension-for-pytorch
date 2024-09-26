@@ -323,8 +323,13 @@ if args.benchmark:
             prompt = prompt_pool[model_type][args.input_tokens]
         else:
             raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
-
-        input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
+        if model_type == "mllama":
+            raw_image = load_image(args.image_url)
+            raw_image = [raw_image] * args.batch_size
+            inputs = tokenizer(raw_image, prompt, return_tensors="pt")
+            input_size = inputs["input_ids"].size(dim=1)
+        else:
+            input_size = tokenizer(prompt, return_tensors="pt").input_ids.size(dim=1)
         print("---- Prompt size:", input_size)
 
     # start
@@ -367,7 +372,7 @@ if args.benchmark:
             elif model_type == "mllama":
                 raw_image = load_image(args.image_url)
                 raw_image = [raw_image] * args.batch_size
-                inputs = tokenizer(prompt, raw_image, return_tensors="pt")
+                inputs = tokenizer(raw_image, prompt, return_tensors="pt")
                 input_ids = inputs["input_ids"]
                 output = model.generate(**inputs, **generate_kwargs)
             else:
@@ -434,7 +439,7 @@ if args.benchmark:
                         output = model.generate(input_ids, **generate_kwargs)
                     elif model_type == "mllama":
                         raw_image = [load_image(args.image_url)] * args.batch_size
-                        inputs = tokenizer(prompt, raw_image, return_tensors="pt")
+                        inputs = tokenizer(raw_image, prompt, return_tensors="pt")
                         output = model.generate(**inputs, **generate_kwargs)
                     else:
                         input_ids = tokenizer(prompt, return_tensors="pt").input_ids

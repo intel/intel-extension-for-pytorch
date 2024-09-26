@@ -662,7 +662,7 @@ def MllamaForConditionalGeneration_forward(
         cross_attention_states = self.vision_model(
             pixel_values, aspect_ratio_ids, aspect_ratio_mask
         )
-
+        cross_attention_states = cross_attention_states[0]
         cross_attention_states = self.multi_modal_projector(
             cross_attention_states.reshape(
                 -1, cross_attention_states.shape[-2], cross_attention_states.shape[-1]
