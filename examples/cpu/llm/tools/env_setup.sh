@@ -81,9 +81,9 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
         echo "python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20240918%2Bcpu-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
-        echo "python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgit689db64-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgit45b5d5a-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
         python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20240918%2Bcpu-cp310-cp310-linux_x86_64.whl
-        python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgit689db64-cp310-cp310-linux_x86_64.whl
+        python -m pip install https://intel-extension-for-pytorch.s3.amazonaws.com/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgit45b5d5a-cp310-cp310-linux_x86_64.whl
     else
         function ver_compare() {
             VER_MAJOR_CUR=$(echo $1 | cut -d "." -f 1)
