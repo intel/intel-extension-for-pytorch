@@ -132,15 +132,47 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
 #endif
 }
 
+std::tuple<at::Tensor, at::Tensor> pre_process_group_query_attention_input(
+    const at::Tensor& query,
+    const at::Tensor& key,
+    const at::Tensor& value,
+    const bool enable_gqa) {
+  if (!enable_gqa) {
+    return std::make_tuple(key, value);
+  }
+  const auto q_num_heads = query.sym_size(-3);
+  const auto k_num_heads = key.sym_size(-3);
+  const auto v_num_heads = value.sym_size(-3);
+
+  bool all_equal = q_num_heads == k_num_heads && k_num_heads == v_num_heads;
+  bool key_divisible = q_num_heads % k_num_heads == 0;
+  bool value_divisible = q_num_heads % v_num_heads == 0;
+  TORCH_CHECK(
+      all_equal || (key_divisible && value_divisible),
+      "Number of heads in key and value must divide the number of heads in ");
+
+  if (all_equal) {
+    return std::make_tuple(key, value);
+  }
+  auto repeat_key_shape = query.sym_size(-3) / key.sym_size(-3);
+  auto repeat_value_shape = query.sym_size(-3) / value.sym_size(-3);
+
+  at::Tensor key_repeated = key.repeat_interleave_symint(repeat_key_shape, -3);
+  at::Tensor value_repeated =
+      value.repeat_interleave_symint(repeat_value_shape, -3);
+  return std::make_tuple(std::move(key_repeated), std::move(value_repeated));
+}
+
 std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_native_impl(
     const Tensor& query_,
     const Tensor& key,
     const Tensor& value,
-    const c10::optional<Tensor>& attn_mask_,
+    const std::optional<Tensor>& attn_mask_,
     double dropout_p,
     bool is_causal,
-    const c10::optional<Tensor>& dropout_mask,
-    c10::optional<double> scale) {
+    const std::optional<Tensor>& dropout_mask,
+    std::optional<double> scale,
+    bool enable_gqa) {
   if (query_.is_nested() || key.is_nested() || value.is_nested()) {
     TORCH_CHECK(
         query_.is_contiguous() && key.is_contiguous() && value.is_contiguous(),
@@ -175,7 +207,12 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_native_impl(
         at::ones_symint({L, S}, query.options().dtype(at::kBool)).tril();
     attn_mask = sdp::convert_boolean_attn_mask(attn_mask, query.dtype());
   }
-  auto attn = at::matmul(query, key.transpose(-2, -1) * scaling_factor);
+
+  // MQA/GQA handling
+  auto [key_expanded, value_expanded] =
+      pre_process_group_query_attention_input(query, key, value, enable_gqa);
+  auto attn =
+      at::matmul(query, key_expanded.transpose(-2, -1) * scaling_factor);
   if (attn_mask.has_value()) {
     if (at::areAnyTensorSubclassLike({attn, *attn_mask})) {
       attn = attn.add(*attn_mask);
@@ -191,24 +228,26 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_native_impl(
       TORCH_WARN_ONCE("Dropout mask should only be used for testing purposes.");
       attn = attn.masked_fill(dropout_mask->logical_not(), 0.0);
       auto dropout_scaling = 1.0 / (1 - dropout_p);
-      return std::make_tuple(at::matmul(attn, value * dropout_scaling), attn);
+      return std::make_tuple(
+          at::matmul(attn, value_expanded * dropout_scaling), attn);
     } else {
       attn = at::dropout(attn, dropout_p, true);
     }
   }
 
-  return std::make_tuple(at::matmul(attn, value), attn);
+  return std::make_tuple(at::matmul(attn, value_expanded), attn);
 }
 
 std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_impl(
     const Tensor& query_,
     const Tensor& key,
     const Tensor& value,
-    const c10::optional<Tensor>& attn_mask_,
+    const std::optional<Tensor>& attn_mask_,
     double dropout_p,
     bool is_causal,
-    const c10::optional<Tensor>& dropout_mask,
-    c10::optional<double> scale) {
+    const std::optional<Tensor>& dropout_mask,
+    std::optional<double> scale,
+    bool enable_gqa) {
   if (query_.is_nested() || key.is_nested() || value.is_nested()) {
     TORCH_CHECK(
         query_.is_contiguous() && key.is_contiguous() && value.is_contiguous(),
@@ -240,12 +279,15 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_impl(
     attn_mask = sdp::convert_boolean_attn_mask(attn_mask, query_.dtype());
   }
 
+  // MQA/GQA handling
+  auto [key_expanded, value_expanded] =
+      pre_process_group_query_attention_input(query_, key, value, enable_gqa);
   Tensor attn;
   if (attn_mask.has_value()) {
     attn_mask = attn_mask->contiguous();
     if (is_negative_scaling) {
       attn = trans_matmul_div_add(
-          key,
+          key_expanded,
           /*dim1=*/-1,
           /*dim2=*/-1,
           query_,
@@ -254,7 +296,7 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_impl(
           1.0);
     } else {
       attn = trans_matmul_div_add(
-          key,
+          key_expanded,
           /*dim1=*/-1,
           /*dim2=*/-1,
           query_,
@@ -265,14 +307,14 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_impl(
   } else {
     if (is_negative_scaling) {
       attn = trans_matmul_div_scalar(
-          key,
+          key_expanded,
           /*dim1=*/-1,
           /*dim2=*/-1,
           query_,
           c10::SymFloat(0.0) - orig_scaling_factor);
     } else {
       attn = trans_matmul_div_scalar(
-          key, /*dim1=*/-1, /*dim2=*/-1, query_, orig_scaling_factor);
+          key_expanded, /*dim1=*/-1, /*dim2=*/-1, query_, orig_scaling_factor);
     }
   }
   attn = at::softmax(attn, -1);
@@ -283,24 +325,26 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math_impl(
       TORCH_WARN_ONCE("Dropout mask should only be used for testing purposes.");
       attn = attn.masked_fill(dropout_mask->logical_not(), 0.0);
       auto dropout_scaling = 1.0 / (1 - dropout_p);
-      return std::make_tuple(at::matmul(attn, value * dropout_scaling), attn);
+      return std::make_tuple(
+          at::matmul(attn, value_expanded * dropout_scaling), attn);
     } else {
       attn = at::dropout(attn, dropout_p, true);
     }
   }
 
-  return std::make_tuple(at::matmul(attn, value), attn);
+  return std::make_tuple(at::matmul(attn, value_expanded), attn);
 }
 
 std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
     const Tensor& query_,
     const Tensor& key,
     const Tensor& value,
-    const c10::optional<Tensor>& attn_mask_,
+    const std::optional<Tensor>& attn_mask_,
     double dropout_p,
     bool is_causal,
-    const c10::optional<Tensor>& dropout_mask,
-    c10::optional<double> scale) {
+    const std::optional<Tensor>& dropout_mask,
+    std::optional<double> scale,
+    bool enable_gqa) {
   // on ATSM, the efficient_attention path is not available
   // With naive math path, oneDNN matmul has overflow issue with fp16 inputs
   // as a WA, convert fp16 inputs to fp32
@@ -313,7 +357,7 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
         [&] {
           bool is_half = std::is_same<scalar_t, at::Half>::value;
           if (is_half) {
-            c10::optional<Tensor> attn_mask_fp32;
+            std::optional<Tensor> attn_mask_fp32;
             Tensor query_fp32 = query_.to(at::kFloat);
             Tensor key_fp32 = key.to(at::kFloat);
             Tensor value_fp32 = value.to(at::kFloat);
@@ -331,7 +375,8 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
                     dropout_p,
                     is_causal,
                     dropout_mask,
-                    scale);
+                    scale,
+                    enable_gqa);
             return std::make_tuple(
                 attn_output.to(at::kHalf), attn_weight.to(at::kHalf));
           }
@@ -343,7 +388,8 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
               dropout_p,
               is_causal,
               dropout_mask,
-              scale);
+              scale,
+              enable_gqa);
         });
   } else {
     // accelerate for inference
@@ -355,7 +401,7 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
         [&] {
           bool is_half = std::is_same<scalar_t, at::Half>::value;
           if (is_half) {
-            c10::optional<Tensor> attn_mask_fp32;
+            std::optional<Tensor> attn_mask_fp32;
             Tensor query_fp32 = query_.to(at::kFloat);
             Tensor key_fp32 = key.to(at::kFloat);
             Tensor value_fp32 = value.to(at::kFloat);
@@ -373,7 +419,8 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
                     dropout_p,
                     is_causal,
                     dropout_mask,
-                    scale);
+                    scale,
+                    enable_gqa);
             return std::make_tuple(
                 attn_output.to(at::kHalf), attn_weight.to(at::kHalf));
           }
@@ -385,7 +432,8 @@ std::tuple<Tensor, Tensor> _scaled_dot_product_attention_math(
               dropout_p,
               is_causal,
               dropout_mask,
-              scale);
+              scale,
+              enable_gqa);
         });
   }
 }
@@ -2256,8 +2304,8 @@ std::tuple<Tensor, Tensor> _native_multi_head_attention(
         value.view({value.size(0), -1, num_head, dim_per_head}).transpose(1, 2);
 
     auto backend = static_cast<sdp::SDPBackend>(
-        _fused_sdp_choice(q, k, v, mask, 0.0, false));
-    sdp::sdp_params kernel_params{q, k, v, mask, 0.0, false};
+        _fused_sdp_choice(q, k, v, mask, 0.0, false, false));
+    sdp::sdp_params kernel_params{q, k, v, mask, 0.0, false, false};
 
     bool no_seq_len_1_nested = query.is_nested()
         ? check_for_seq_len_1_nested_tensor(kernel_params, false)

@@ -205,6 +205,32 @@ inline bool check_safe_kv_broadcast(at::Tensor param) {
   return true;
 }
 
+inline bool check_grouped_query_attention(sdp_params const& params) {
+  const auto q_num_heads = params.query.sym_size(-3);
+  const auto k_num_heads = params.key.sym_size(-3);
+  const auto v_num_heads = params.value.sym_size(-3);
+  const bool same_kv_heads = k_num_heads == v_num_heads;
+
+  if (!(same_kv_heads)) {
+    IPEX_DEBUG_LOG(
+        "OPS",
+        "",
+        "grouped query attention require key and value to have the same num_heads and batch_size. ");
+    return false;
+  }
+  // Check if grouped query attention is supported and validate the number of
+  // heads
+  if (q_num_heads % k_num_heads != 0) {
+    IPEX_DEBUG_LOG(
+        "OPS",
+        "",
+        "grouped query attention only support when the number of heads in key/value must divide number of heads in query.");
+    return false;
+  }
+  return true;
+}
+
+template <bool supports_gqa = false>
 inline bool check_batch_size_and_num_heads(sdp_params params) {
   // This is expected to be called after check_tensor_shapes ensuring that the
   // size() calls won't error since the inputs are all 4 dimensional
@@ -242,20 +268,31 @@ inline bool check_batch_size_and_num_heads(sdp_params params) {
     return broadcastable_batch_size;
   }
 
-  auto q_num_heads = params.query.sym_size(1);
-  auto k_num_heads = params.key.sym_size(1);
-  auto v_num_heads = params.value.sym_size(1);
+  auto q_num_heads = params.query.sym_size(-3);
+  auto k_num_heads = params.key.sym_size(-3);
+  auto v_num_heads = params.value.sym_size(-3);
   bool same_num_heads =
       q_num_heads == k_num_heads && q_num_heads == v_num_heads;
 
-  if (!(same_batch_size && same_num_heads)) {
+  if (!same_batch_size) {
     IPEX_DEBUG_LOG(
         "OPS",
         "",
-        "For dense inputs, both fused kernels require query, key and value "
-        "to have the same batch_size and num_heads. "
-        "To broadcast dense inputs, try using unsqueeze and "
-        "expand_to before passing them into the kernel.");
+        "For dense input, both fused kernels require query, key and value to have the same batch_size. "
+        "To broadcast dense inputs, try using unsqueeze and expand_to before passing them into the kernel.");
+    return false;
+  }
+
+  if (params.enable_gqa && supports_gqa) {
+    return check_grouped_query_attention(params);
+  }
+
+  if (!same_num_heads) {
+    IPEX_DEBUG_LOG(
+        "OPS",
+        "",
+        "For dense input, both fused kernels require query, key and value to have the same num_heads. "
+        "To broadcast dense inputs, try using unsqueeze and expand_to before passing them into the kernel.");
     return false;
   }
   return true;
@@ -394,7 +431,8 @@ inline bool use_mem_efficient_attention(sdp::sdp_params params) {
       sdp::xetla_supported,
       sdp::check_requires_grad_and_nested,
       sdp::check_tensor_shapes,
-      sdp::check_batch_size_and_num_heads,
+      sdp::check_batch_size_and_num_heads<
+          false /*supports_grouped_query_attention=*/>,
       sdp::check_for_seq_len_0_nested_tensor,
       sdp::check_nonzero_sequence_lengths,
       sdp::check_last_dim_stride_equals_1,
