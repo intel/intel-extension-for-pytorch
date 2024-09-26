@@ -163,13 +163,6 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     cd ${BASEFOLDER}/..
 
-    # Install transformers from source
-    git clone https://github.com/huggingface/transformers
-    cd transformers
-    python setup.py install
-    cd ..
-    rm -rf transformers
-
     # Used for accuracy test only
     if [ -d lm-evaluation-harness ]; then
         rm -rf lm-evaluation-harness

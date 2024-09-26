@@ -4,6 +4,7 @@ datasets
 sentencepiece
 mkl
 protobuf==3.20.3
+transformers==4.45.0
 transformers_stream_generator
 tiktoken
 unzip
