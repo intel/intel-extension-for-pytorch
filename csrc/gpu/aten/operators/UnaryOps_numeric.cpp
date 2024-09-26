@@ -14,6 +14,7 @@
 #include "Loops.h"
 #include "LoopsTemplates.h"
 #include "Resize.h"
+#include "utils/CustomOperatorRegistration.h"
 #include "utils/logging.h"
 
 using namespace torch_ipex::xpu::dpcpp;
@@ -234,3 +235,12 @@ Tensor& nan_to_num_(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("angle", TORCH_FN((&at::AtenIpexTypeXPU::angle)));
+  m.impl("angle.out", TORCH_FN((&at::AtenIpexTypeXPU::angle_out)));
+}
+
+} // namespace

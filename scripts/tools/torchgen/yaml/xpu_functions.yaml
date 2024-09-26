@@ -4,6 +4,14 @@ class_name: AtenIpexTypeXPU
 use_out_as_primary: true
 device_guard: true
 supported:
+####################################
+# Here list these ops conflicted with torch-xpu-ops fallback. We have to mute
+# them here and register them with IPEX_TORCH_LIBRARY_IMPL to suppress the
+# previously registered kernel overriding warning message.
+#
+# - angle
+# - angle.out
+####################################
 #  - _aminmax
 #  - _aminmax.dim
 #  - _amp_foreach_non_finite_check_and_unscale_
@@ -676,8 +684,6 @@ supported:
   - _linalg_det.result
 #  - conj_physical.out
 #  - conj_physical_
-  - angle
-  - angle.out
 #  - linalg_eig
 #  - linalg_eig.out
 #  - linalg_eigh
