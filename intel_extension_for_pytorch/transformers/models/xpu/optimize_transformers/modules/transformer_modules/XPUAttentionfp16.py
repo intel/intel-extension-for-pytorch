@@ -117,7 +117,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 query,
                 key,
                 position_ids,
-                self.layer_id,
+                self.layer_idx,
                 self.beam_idx,
                 seqlen,
                 past_key_value.cache_format,
@@ -129,7 +129,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             value = value.permute(1, 2, 0, 3)
         else:
             query, key = self.position_embed(
-                query, key, position_ids, self.layer_id, self.beam_idx, seqlen
+                query, key, position_ids, self.layer_idx, self.beam_idx, seqlen
             )
             query = query.permute(0, 2, 1, 3)
             key = key.permute(0, 2, 1, 3)
@@ -142,7 +142,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         return
 
     def get_blocked_alibi(self, alibi, seq_len):
-        if self.layer_id == 0:
+        if self.layer_idx == 0:
             cache_len = (
                 self.max_position
                 if self.max_position > seq_len
@@ -162,7 +162,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
 
     def get_blocked_attn_mask(self, attn_mask_):
         alignment = 64
-        if self.layer_id == 0:
+        if self.layer_idx == 0:
             attn_mask = attn_mask_.contiguous()
             seq_len = attn_mask_.size(-1)
             align_cache_len = (seq_len + alignment - 1) // alignment * alignment
@@ -359,7 +359,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
 
         # apply rope to qk
         query, key, value = self.rotary_embedding(
-            query, key, value, past_key_value, position_ids, self.layer_id, seqlen
+            query, key, value, past_key_value, position_ids, self.layer_idx, seqlen
         )
 
         kwargs_for_cache_update = {

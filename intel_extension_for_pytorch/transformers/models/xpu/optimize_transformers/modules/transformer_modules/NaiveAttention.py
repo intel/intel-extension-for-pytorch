@@ -263,7 +263,7 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
     def post_qkv(self, query, key, value, position_ids, layer_past=None):
         bs_beam, seq, _ = self.get_runtime_shape(query)
         key, query = self.position_embed(
-            key, query, position_ids, self.layer_id, self.beam_size, seq
+            key, query, position_ids, self.layer_idx, self.beam_size, seq
         )
         if self.is_beam_search():
             query, key, value = self.combine_kv_cache_interface(
