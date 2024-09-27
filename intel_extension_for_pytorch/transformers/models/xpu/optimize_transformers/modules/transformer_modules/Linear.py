@@ -114,7 +114,7 @@ class IPEXQKVFusedGemm(IPEXLowbitGemmBase):
                 v_proj.bias.data = self.bias[2, :]
         else:  # GQA path
             embed_dim = q_proj.weight.shape[-1]
-            head_dim = embed_dim // self.num_head
+            head_dim = q_proj.weight.shape[0] // self.num_head
             group = self.num_head // self.num_kv_head + 2
             q_proj_w = q_proj.weight.view(
                 self.num_kv_head, group - 2, head_dim, embed_dim
