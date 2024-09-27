@@ -297,7 +297,7 @@ This release supports the following fusion patterns in PyTorch\* JIT mode:
 
 ### Known Issues
 
-- [CRITICAL ERROR] Kernel 'XXX' removed due to usage of FP64 instructions unsupported by the targeted hardware
+- [FATAL ERROR] Kernel 'XXX' removed due to usage of FP64 instructions unsupported by the targeted hardware
 
     FP64 is not natively supported by the [Intel® Data Center GPU Flex Series](https://www.intel.com/content/www/us/en/products/docs/discrete-gpus/data-center-gpu/flex-series/overview.html) platform. If you run any AI workload on that platform and receive this error message, it means a kernel requiring FP64 instructions is removed and not executed, hence the accuracy of the whole workload is wrong.
 

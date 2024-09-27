@@ -23,8 +23,8 @@ enum LOG_LEVEL {
   INFO = 2,
   WARN = 3,
   ERR = 4,
-  CRITICAL = 5,
-  LOG_LEVEL_MAX = CRITICAL,
+  FATAL = 5,
+  LOG_LEVEL_MAX = FATAL,
   LOG_LEVEL_MIN = DISABLED
 };
 static const char* LOG_LEVEL_STR[]{
@@ -34,7 +34,7 @@ static const char* LOG_LEVEL_STR[]{
     "INFO",
     "WARN",
     "ERR",
-    "CRITICAL"};
+    "FATAL"};
 
 enum XPU_BACKEND {
   GPU = 0,

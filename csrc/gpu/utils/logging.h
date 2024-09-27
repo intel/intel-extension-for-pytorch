@@ -44,12 +44,11 @@
 #define IPEX_RUNTIME_ERROR(...) IPEX_MOD_ERROR(IPEX_RUNTIME, __VA_ARGS__)
 #define IPEX_SYNGRAPH_ERROR(...) IPEX_MOD_ERROR(IPEX_SYNGRAPH, __VA_ARGS__)
 
-// --------------------------------- CRITICAL --------------------------------
-#define IPEX_OPS_CRITICAL(...) IPEX_MOD_CRITICAL(IPEX_OPS, __VA_ARGS__)
-#define IPEX_MEMORY_CRITICAL(...) IPEX_MOD_CRITICAL(IPEX_MEMORY, __VA_ARGS__)
-#define IPEX_RUNTIME_CRITICAL(...) IPEX_MOD_CRITICAL(IPEX_RUNTIME, __VA_ARGS__)
-#define IPEX_SYNGRAPH_CRITICAL(...) \
-  IPEX_MOD_CRITICAL(IPEX_SYNGRAPH, __VA_ARGS__)
+// --------------------------------- FATAL --------------------------------
+#define IPEX_OPS_FATAL(...) IPEX_MOD_FATAL(IPEX_OPS, __VA_ARGS__)
+#define IPEX_MEMORY_FATAL(...) IPEX_MOD_FATAL(IPEX_MEMORY, __VA_ARGS__)
+#define IPEX_RUNTIME_FATAL(...) IPEX_MOD_FATAL(IPEX_RUNTIME, __VA_ARGS__)
+#define IPEX_SYNGRAPH_FATAL(...) IPEX_MOD_FATAL(IPEX_SYNGRAPH, __VA_ARGS__)
 
 // ------------------------------- NOT IMPLEMENTED ---------------------------
 #define IPEX_MOD_NOT_IMPLEMENTED(MOD) \
@@ -71,7 +70,7 @@
 #define IPEX_MOD_ASSERT(MOD, condition, ...) \
   {                                          \
     if (!(condition)) {                      \
-      IPEX_MOD_CRITICAL(                     \
+      IPEX_MOD_FATAL(                        \
           MOD,                               \
           "Asertion failed [",               \
           #condition,                        \
@@ -140,15 +139,14 @@
 #define IPEX_SYNGRAPH_ERROR(...) \
   IPEX_MOD_ERROR(LoggerTypes::IPEX_SYNGRAPH, __VA_ARGS__)
 
-// --------------------------------- CRITICAL --------------------------------
-#define IPEX_OPS_CRITICAL(...) \
-  IPEX_MOD_CRITICAL(LoggerTypes::IPEX_OPS, __VA_ARGS__)
-#define IPEX_MEMORY_CRITICAL(...) \
-  IPEX_MOD_CRITICAL(LoggerTypes::IPEX_MEMORY, __VA_ARGS__)
-#define IPEX_RUNTIME_CRITICAL(...) \
-  IPEX_MOD_CRITICAL(LoggerTypes::IPEX_RUNTIME, __VA_ARGS__)
-#define IPEX_SYNGRAPH_CRITICAL(...) \
-  IPEX_MOD_CRITICAL(LoggerTypes::IPEX_SYNGRAPH, __VA_ARGS__)
+// --------------------------------- FATAL --------------------------------
+#define IPEX_OPS_FATAL(...) IPEX_MOD_FATAL(LoggerTypes::IPEX_OPS, __VA_ARGS__)
+#define IPEX_MEMORY_FATAL(...) \
+  IPEX_MOD_FATAL(LoggerTypes::IPEX_MEMORY, __VA_ARGS__)
+#define IPEX_RUNTIME_FATAL(...) \
+  IPEX_MOD_FATAL(LoggerTypes::IPEX_RUNTIME, __VA_ARGS__)
+#define IPEX_SYNGRAPH_FATAL(...) \
+  IPEX_MOD_FATAL(LoggerTypes::IPEX_SYNGRAPH, __VA_ARGS__)
 
 // ------------------------------- NOT IMPLEMENTED ---------------------------
 #define IPEX_MOD_NOT_IMPLEMENTED(MOD) \
@@ -173,7 +171,7 @@
 #define IPEX_MOD_ASSERT(MOD, condition, ...) \
   {                                          \
     if (!(condition)) {                      \
-      IPEX_MOD_CRITICAL(                     \
+      IPEX_MOD_FATAL(                        \
           MOD,                               \
           "Asertion failed [",               \
           #condition,                        \

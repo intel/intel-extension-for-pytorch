@@ -95,18 +95,18 @@ enum class LoggerTypes {
     IPEX_ERR_LOG("SYNGRAPH", "", FMT, __VA_ARGS__);                         \
   }
 
-#define VA_ARGS_TO_FMT_AND_ARGS_CRITICAL(STRING_MOD, FMT, ...)              \
+#define VA_ARGS_TO_FMT_AND_ARGS_FATAL(STRING_MOD, FMT, ...)                 \
   if (static_cast<LoggerTypes>(STRING_MOD) == LoggerTypes::IPEX_OPS) {      \
-    IPEX_CRITICAL_LOG("OPS", "", FMT, __VA_ARGS__);                         \
+    IPEX_FATAL_LOG("OPS", "", FMT, __VA_ARGS__);                            \
   } else if (                                                               \
       static_cast<LoggerTypes>(STRING_MOD) == LoggerTypes::IPEX_MEMORY) {   \
-    IPEX_CRITICAL_LOG("MEMORY", "", FMT, __VA_ARGS__);                      \
+    IPEX_FATAL_LOG("MEMORY", "", FMT, __VA_ARGS__);                         \
   } else if (                                                               \
       static_cast<LoggerTypes>(STRING_MOD) == LoggerTypes::IPEX_RUNTIME) {  \
-    IPEX_CRITICAL_LOG("RUNTIME", "", FMT, __VA_ARGS__);                     \
+    IPEX_FATAL_LOG("RUNTIME", "", FMT, __VA_ARGS__);                        \
   } else if (                                                               \
       static_cast<LoggerTypes>(STRING_MOD) == LoggerTypes::IPEX_SYNGRAPH) { \
-    IPEX_CRITICAL_LOG("SYNGRAPH", "", FMT, __VA_ARGS__);                    \
+    IPEX_FATAL_LOG("SYNGRAPH", "", FMT, __VA_ARGS__);                       \
   }
 
 #define IPEX_MOD_TRACE(MOD, ...) \
@@ -124,5 +124,5 @@ enum class LoggerTypes {
 #define IPEX_MOD_ERROR(MOD, ...) \
   VA_ARGS_TO_FMT_AND_ARGS_ERROR(static_cast<LoggerTypes>(MOD), __VA_ARGS__);
 
-#define IPEX_MOD_CRITICAL(MOD, ...) \
-  VA_ARGS_TO_FMT_AND_ARGS_CRITICAL(static_cast<LoggerTypes>(MOD), __VA_ARGS__);
+#define IPEX_MOD_FATAL(MOD, ...) \
+  VA_ARGS_TO_FMT_AND_ARGS_FATAL(static_cast<LoggerTypes>(MOD), __VA_ARGS__);

@@ -100,7 +100,7 @@ class LogLevel(EnumBase):
     INFO = intel_extension_for_pytorch._C.LogLevel.INFO
     WARN = intel_extension_for_pytorch._C.LogLevel.WARN
     ERR = intel_extension_for_pytorch._C.LogLevel.ERR
-    CRITICAL = intel_extension_for_pytorch._C.LogLevel.CRITICAL
+    FATAL = intel_extension_for_pytorch._C.LogLevel.FATAL
 
 
 def get_log_level():

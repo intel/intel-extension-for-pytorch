@@ -91,7 +91,7 @@ inline void IPEX_ERR_LOG(
 }
 
 template <typename... Args>
-inline void IPEX_CRITICAL_LOG(
+inline void IPEX_FATAL_LOG(
     std::string log_component,
     std::string log_sub_component,
     spdlog::format_string_t<Args...> fmt_message,

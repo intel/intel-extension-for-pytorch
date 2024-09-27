@@ -45,7 +45,7 @@ class proxy_log_level(object):
     INFO = -5
     WARN = -6
     ERR = -7
-    CRITICAL = -8
+    FATAL = -8
 
 
 # --- [ CPU proxys:

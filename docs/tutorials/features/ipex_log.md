@@ -17,7 +17,7 @@ The supported log levels are defined as follows, default log level is `DISABLED`
 | INFO  | 2 | Record calling info to other library functions and environment variable settings |
 | WARN  | 3 | Warn the second attempt of an action, such as memory reallocation |
 | ERR  | 4 | Report error in try catch |
-| CRITICAL  | 5 | Reserve for further usage |
+| FATAL  | 5 | Reserve for further usage |
 
 ### Log Component
 Log component is used to specify which part from Intel® Extension for PyTorch\* does this log information belong to. The supported log components are defined as follows:

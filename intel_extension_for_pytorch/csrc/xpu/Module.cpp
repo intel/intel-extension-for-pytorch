@@ -365,7 +365,7 @@ void init_xpu_module(pybind11::module& m) {
       .value("INFO", LOG_LEVEL::INFO)
       .value("WARN", LOG_LEVEL::WARN)
       .value("ERR", LOG_LEVEL::ERR)
-      .value("CRITICAL", LOG_LEVEL::CRITICAL)
+      .value("FATAL", LOG_LEVEL::FATAL)
       .export_values();
 
   m.def("_get_log_level", []() { return Settings::I().get_log_level(); });
