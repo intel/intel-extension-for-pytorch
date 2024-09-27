@@ -173,7 +173,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl
     fi
 
-    echo "python -m pip install cpuid accelerate datasets sentencepiece mkl protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC} transformers_stream_generator tiktoken unzip librosa soundfile" >> ${AUX_INSTALL_SCRIPT}
+    echo "python -m pip install cpuid accelerate datasets==2.21.0 sentencepiece mkl protobuf==${VER_PROTOBUF} transformers==${VER_TRANSFORMERS} neural-compressor==${VER_INC} transformers_stream_generator tiktoken unzip librosa soundfile" >> ${AUX_INSTALL_SCRIPT}
 
     # Used for accuracy test only
     if [ -d lm-evaluation-harness ]; then
