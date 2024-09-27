@@ -1,6 +1,6 @@
 cpuid
 accelerate
-datasets
+datasets==2.21.0
 sentencepiece
 mkl
 protobuf==3.20.3
