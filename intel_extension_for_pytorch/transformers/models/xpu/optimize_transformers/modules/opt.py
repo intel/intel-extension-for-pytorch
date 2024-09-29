@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 from .transformer_modules.Attention import IPEXTransformerAttnOptimizedFp16  # noqa
 
 from .transformer_modules.RoPE import PositionalEmbedding
@@ -21,6 +21,13 @@ from .transformer_modules.CrossedAttention import (  # noqa F401
 )  # noqa
 from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
+from .transformer_modules.XPUAttentionfp16 import (
+    IPEXAttention,
+)
+from .transformer_modules.XPUAttentionInt4 import (
+    IPEXAttentionInt4,
+    IPEXAttentionInt4OneDNN,
+)
 
 
 class NewIPEXOPTBlock(IPEXTransformerBlock):
@@ -40,7 +47,16 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        self.attn = self.build_attention_from_config("crossed")
+        if dtype == "fp16":
+            self.self_attn = IPEXAttention(self.ipex_config)
+        elif dtype == "int4" and xpu_gemm_use_xetla():
+            self.self_attn = IPEXAttentionInt4(self.ipex_config)
+        elif dtype == "int4" and not xpu_gemm_use_xetla():
+            self.self_attn = IPEXAttentionInt4OneDNN(self.ipex_config)
+        else:
+            raise NotImplementedError(
+                "IPEXAttention dose not support this modelType {} !".format(dtype)
+            )
         self.mlp = self.build_mlp_from_config("Opt")
         self.do_layer_norm_before = self.ipex_config.do_norm_before
         self.self_attn_layer_norm = nn.LayerNorm(
@@ -79,6 +95,7 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
             embedding_dim=self.config.hidden_size,
             intermediate_dim=self.config.ffn_dim,
             num_attention_head=self.config.num_attention_heads,
+            num_key_value_head=self.config.num_attention_heads,
             max_positions=max(self.config.max_position_embeddings, MAX_SEQ_LEN),
             max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=PositionalEmbedding,
@@ -107,7 +124,7 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
 
     def port_attn_parameter(self):
         # IPEXTransformerAttnOptimizedFp16Opt IPEXTransformerAttnOptimizedFp16
-        self.attn.load_parameter(
+        self.self_attn.load_parameter(
             self.module.self_attn.q_proj,
             self.module.self_attn.k_proj,
             self.module.self_attn.v_proj,
@@ -125,14 +142,14 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
         self.final_layer_norm.bias = self.module.final_layer_norm.bias
 
     def transpose_parameter(self):
-        self.attn.transpose_parameter()
+        self.self_attn.transpose_parameter()
         self.mlp.transpose_parameter()
 
     def port_all_parameters_to_new_module(self):
         super().port_all_parameters_to_new_module()
         if self.ipex_config.transpose:
             self.transpose_parameter()
-        self.attn.cat_qkv()
+        self.self_attn.cat_qkv()
 
     def forward(
         self,
@@ -141,45 +158,12 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
         layer_head_mask: Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
-        past_key_value: Optional[Tuple[torch.Tensor]] = None,
+        past_key_value: Optional[List[torch.FloatTensor]] = None,
     ) -> Tuple[
         torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]
     ]:
-        # hidden_states:  [bs*beam, seq, hidden_size]
-        # position_ids:   [bs*beam, seq]
-        # attention_mask: [bs*beam, head, q_seq, kv_seq]
         bs = IPEXTransformerAttn.batch_size
-        dim = hidden_states.dim()
-        if dim == 3:
-            beam = hidden_states.shape[0] // bs
-            seq = hidden_states.shape[1]
-        elif dim == 4:
-            beam = hidden_states.shape[1]
-            seq = hidden_states.shape[2]
-        else:
-            print("Unsupported input shape")
-            return
-        IPEXTransformerAttn.beam_size = beam
-        first_token = True if past_key_value is None else False
-        hidden_size = hidden_states.shape[-1]
-        hidden_shape = [bs, beam, seq, hidden_size]
-        if first_token and beam > 1:
-            # for 1st token, keep the original layout
-            # reduce the duplicated info in beam dim
-            # shape -> [bs*beam, seq, hidden_size]
-            # layout -> [bs*beam, seq, hidden_size]
-            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
-            if attention_mask is not None:
-                shape = attention_mask.shape
-                attention_mask = attention_mask.view(
-                    bs, beam, shape[1], shape[2], shape[3]
-                )[:, 0, :, :, :].view(bs, shape[1], shape[2], shape[3])
-
-        else:
-            # for 2nd to last token, we convert the layout
-            # shape -> [bs*beam, seq, hidden_size]
-            # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1).contiguous()
+        IPEXTransformerAttn.beam_size = hidden_states.shape[0] // bs
 
         residual = hidden_states
         if self.do_layer_norm_before:
@@ -191,14 +175,13 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
                 self.self_attn_layer_norm.eps,
             )
 
-        hidden_states, present_key_value, self_attn_weights = self.attn(
+        hidden_states, present_key_value, self_attn_weights = self.self_attn(
             hidden_states=hidden_states,
-            layer_past=past_key_value,
-            attention_mask=attention_mask,
+            attention_mask=None,
             head_mask=layer_head_mask,
             output_attentions=output_attentions,
             residual=residual,
-            first_token=first_token,
+            past_key_value=past_key_value,
         )
 
         if not self.do_layer_norm_before:
@@ -228,15 +211,6 @@ class NewIPEXOPTBlock(IPEXTransformerBlock):
                 self.final_layer_norm.bias,
                 self.final_layer_norm.eps,
             )
-
-        if first_token and beam > 1:
-            # for 1st token, expand the result with beam
-            hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
-            hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
-        else:
-            # for 2nd to last token, we convert the layout back
-            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1)
 
         outputs = (hidden_states,)
         if output_attentions:

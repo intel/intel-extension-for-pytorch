@@ -3,7 +3,7 @@ from .._transformer_configuration import IPEXTransformerConfig
 from .NaiveAttention import IPEXTransformerAttnNaive
 from .CacheUtils import IPEXStaticCache, CacheFormat
 from typing import Optional
-from typing import List
+from typing import Tuple
 import torch.distributed as dist
 import math
 from .Linear import (
@@ -21,7 +21,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
     ) -> None:
         super().__init__(config)
         self.config = config
-        self.layer_idx = layer_idx
+        self.layer_idx = layer_idx if layer_idx else self.layer_id
         self.hidden_size = config.embedding_dim // self.tp_size
         self.use_causal_mask = config.use_causal_mask
         self.num_heads = config.num_attention_head // self.tp_size
@@ -96,7 +96,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             value = value.transpose(1, 2).contiguous().transpose(1, 2)
             seqlen = cache.get_seq_length()
             return (key[:, :, :seqlen, :], value[:, :, :seqlen, :])
-        elif isinstance(cache, List):
+        elif isinstance(cache, Tuple):
             key_cache = torch.cat([cache[0], key], dim=2)
             value_cache = torch.cat([cache[1], value], dim=2)
             return (key_cache, value_cache)
@@ -375,8 +375,8 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         )
         key, value = present
         past_key_value = (
-            [key, value]
-            if isinstance(past_key_value, List) or past_key_value is None
+            (key, value)
+            if isinstance(past_key_value, Tuple) or past_key_value is None
             else past_key_value
         )
         # need to repeat kv for beam search next token
