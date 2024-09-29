@@ -90,6 +90,9 @@ if(NOT WINDOWS)
   set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} "-Wl,--disable-new-dtags")
 endif()
 
+# This workaround enables some definitions in PyTorch header file protected by USE_XPU macro.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_XPU")
+
 if(BUILD_SEPARATE_OPS)
   set(IPEX_GPU_OP_LIBRARIES)
   foreach(op_src ${IPEX_ATEN_OPS_SRCS})

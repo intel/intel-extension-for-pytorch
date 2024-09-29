@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/TensorSubclassLikeUtils.h>
 #include <ATen/cpp_custom_type_hack.h>
+#include <ATen/native/DispatchStub.h>
 #include <ATen/native/nested/NestedTensorUtils.h>
 #include <ATen/native/transformers/attention.h>
 #include <ATen/record_function.h>
@@ -2504,3 +2505,11 @@ IPEX_LIBRARY_FRAGMENT() {
       c10::DispatchKey::XPU)
 }
 } // namespace
+
+namespace at::native {
+
+REGISTER_XPU_DISPATCH(
+    _fused_sdp_choice_stub,
+    &at::AtenIpexTypeXPU::_fused_sdp_choice);
+
+} // namespace at::native
