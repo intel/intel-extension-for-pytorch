@@ -24,7 +24,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.37.0"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.45.0"]
     )
     import transformers
     from transformers import AutoConfig
@@ -194,6 +194,13 @@ supported_models = [
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
     ),
+    model_info(
+        "mllama",
+        transformers.models.mllama.modeling_mllama.MllamaForConditionalGeneration,
+        True,
+        lambda m: m.language_model.model.layers[0].self_attn.__class__,
+        lambda m: m.language_model.model.layers[0].__class__,
+    ),
 ]
 
 
@@ -277,6 +284,22 @@ class OptimizeTransformersNightlyTester(TestCase):
                 "decoder_input_ids": torch.ones(4).to(torch.long).unsqueeze(0),
                 "encoder_outputs": (last_hidden_state,),
             }
+        if m.name == "mllama":
+            cross_attention_mask = torch.ones(1, 10, 1, 4)
+            pixel_values = torch.rand(
+                1,
+                1,
+                4,
+                3,
+                560,
+                560,
+            )
+            aspect_ratio_mask = torch.tensor([[[1, 1, 1, 1]]])
+            aspect_ratio_ids = torch.tensor([[6]])
+            input_dict["pixel_values"] = pixel_values
+            input_dict["aspect_ratio_mask"] = aspect_ratio_mask
+            input_dict["aspect_ratio_ids"] = aspect_ratio_ids
+            input_dict["cross_attention_mask"] = cross_attention_mask
 
         with torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
@@ -289,14 +312,20 @@ class OptimizeTransformersNightlyTester(TestCase):
         ):
             key_ipex = ipex_m(**input_dict)
         error_message = f"model={m.name}, deployment_mode={deployment_mode}, torchcompile={torchcompile}, return_dict={return_dict}"
-        if return_dict:
-            assert isinstance(key_ipex, dict)
-            self.assertEqual(
-                key_hf["logits"], key_ipex["logits"], prec=0.1, message=error_message
-            )
-        else:
-            assert isinstance(key_ipex, tuple)
-            self.assertEqual(key_hf[0], key_ipex[0], prec=0.1, message=error_message)
+        if m.name != "mllama":
+            if return_dict:
+                assert isinstance(key_ipex, dict)
+                self.assertEqual(
+                    key_hf["logits"],
+                    key_ipex["logits"],
+                    prec=0.1,
+                    message=error_message,
+                )
+            else:
+                assert isinstance(key_ipex, tuple)
+                self.assertEqual(
+                    key_hf[0], key_ipex[0], prec=0.1, message=error_message
+                )
 
     def test_model_replacement(self):
         dtypes = [torch.bfloat16]

@@ -196,6 +196,7 @@ def _beam_search(
         if self.model_backbone in [
             "GPTJForCausalLM",
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "GPTNeoXForCausalLM",
             "OPTForCausalLM",
             "FalconForCausalLM",
@@ -344,41 +345,76 @@ def _beam_search(
                     num_hidden_layers = self.config.n_layer
                 elif hasattr(self.config, "num_hidden_layers"):
                     num_hidden_layers = self.config.num_hidden_layers
+                elif hasattr(self.config.text_config, "num_hidden_layers"):
+                    num_hidden_layers = self.config.text_config.num_hidden_layers
                 elif hasattr(self.config, "num_layers"):
                     num_hidden_layers = self.config.num_layers
                 elif hasattr(self.config, "n_layers"):
                     num_hidden_layers = self.config.n_layers
                 beam_idx_tmp = torch.zeros(
                     (2048, int(batch_size * num_beams)), dtype=torch.long
-                ).contiguous()
-                model_inputs["past_key_values"] = tuple(
-                    [
-                        (
-                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            beam_idx_tmp,
-                        )
-                        for i in range(num_hidden_layers)
-                    ]
                 )
-                new_attention_mask = model_inputs["attention_mask"][:batch_size].clone()
-                new_input_ids = model_inputs["input_ids"][:batch_size].clone()
-                if has_position_id:
-                    new_position_ids = model_inputs["position_ids"][:batch_size].clone()
-                for i in range(batch_size):
-                    new_attention_mask[i] = model_inputs["attention_mask"][
-                        i * num_beams
-                    ]
-                    new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
+
+                if self.model_backbone == "MllamaForConditionalGeneration":
+                    head_dim = self.config.text_config.hidden_size // (
+                        self.config.text_config.num_hidden_layers
+                        - len(self.config.text_config.cross_attention_layers)
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                (
+                                    torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    beam_idx_tmp,
+                                )
+                                if i
+                                not in self.config.text_config.cross_attention_layers
+                                else (
+                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                )
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
+                else:
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
+                if self.model_backbone != "MllamaForConditionalGeneration":
+                    new_attention_mask = model_inputs["attention_mask"][
+                        :batch_size
+                    ].clone()
+                    new_input_ids = model_inputs["input_ids"][:batch_size].clone()
                     if has_position_id:
-                        new_position_ids[i] = model_inputs["position_ids"][
+                        new_position_ids = model_inputs["position_ids"][
+                            :batch_size
+                        ].clone()
+                    for i in range(batch_size):
+                        new_attention_mask[i] = model_inputs["attention_mask"][
                             i * num_beams
                         ]
-                model_inputs["attention_mask"] = new_attention_mask
-                model_inputs["input_ids"] = new_input_ids
-                if has_position_id:
-                    model_inputs["position_ids"] = new_position_ids
+                        new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
+                        if has_position_id:
+                            new_position_ids[i] = model_inputs["position_ids"][
+                                i * num_beams
+                            ]
+                    model_inputs["attention_mask"] = new_attention_mask
+                    model_inputs["input_ids"] = new_input_ids
+                    if has_position_id:
+                        model_inputs["position_ids"] = new_position_ids
             model_inputs.pop("use_cache", None)
             model_inputs.pop("token_type_ids", None)
             if "return_last_logit" in model_inputs:
@@ -421,6 +457,7 @@ def _beam_search(
             if (
                 first_token
                 and self.model_backbone != "YuanForCausalLM"
+                and self.model_backbone != "MllamaForConditionalGeneration"
                 and len(model_inputs["past_key_values"][0]) == 4
             ):
                 if isinstance(outputs, dict):

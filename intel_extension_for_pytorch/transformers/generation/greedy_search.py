@@ -158,6 +158,7 @@ def _greedy_search(
         if self.model_backbone in [
             "GPTJForCausalLM",
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "GPTNeoXForCausalLM",
             "OPTForCausalLM",
             "FalconForCausalLM",
@@ -276,11 +277,13 @@ def _greedy_search(
                         ]
                     )
 
-            if first_token:
+            if first_token and self.model_backbone:
                 if hasattr(self.config, "n_layer"):
                     num_hidden_layers = self.config.n_layer
                 elif hasattr(self.config, "num_hidden_layers"):
                     num_hidden_layers = self.config.num_hidden_layers
+                elif hasattr(self.config.text_config, "num_hidden_layers"):
+                    num_hidden_layers = self.config.text_config.num_hidden_layers
                 elif hasattr(self.config, "num_layers"):
                     num_hidden_layers = self.config.num_layers
                 elif hasattr(self.config, "n_layers"):
@@ -306,6 +309,32 @@ def _greedy_search(
                                     [input_bs, num_head, 1, head_dim]
                                 ).contiguous(),
                                 beam_idx_tmp,
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
+                elif self.model_backbone == "MllamaForConditionalGeneration":
+                    head_dim = self.config.text_config.hidden_size // (
+                        self.config.text_config.num_hidden_layers
+                        - len(self.config.text_config.cross_attention_layers)
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                (
+                                    torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    beam_idx_tmp,
+                                )
+                                if i
+                                not in self.config.text_config.cross_attention_layers
+                                else (
+                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                )
                             )
                             for i in range(num_hidden_layers)
                         ]

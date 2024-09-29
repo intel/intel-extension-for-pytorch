@@ -47,6 +47,14 @@ def _update_model_kwargs_for_generation(
     standardize_cache_format: bool = False,
     num_new_tokens: int = 1,
 ) -> Dict[str, Any]:
+
+    cross_attention_mask_prev = model_kwargs.get("cross_attention_mask", None)
+    # add cross-attn mask for new token
+    if cross_attention_mask_prev is not None:
+        model_kwargs["cross_attention_mask"] = torch.cat(
+            [cross_attention_mask_prev, cross_attention_mask_prev[:, -1:, ...]], dim=1
+        )
+
     try:
         # update past_key_values keeping its naming used in model code
         cache_name, cache = self._extract_past_from_model_output(

@@ -1,2 +1,2 @@
-transformers==4.43.2
+transformers==4.45.0
 neural-compressor==2.4.1

@@ -61,6 +61,11 @@ parser.add_argument(
     help="the huggingface mdoel id",
 )
 parser.add_argument(
+    "--vision-text-model",
+    action="store_true",
+    help="whether or not it is vision-text multi-model structure",
+)
+parser.add_argument(
     "--dtype",
     type=str,
     help="float16 or bfloat16",
@@ -278,6 +283,8 @@ tp_presharded_mode = True if model_name in tp_presharded_models else False
 
 print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), "auto")
+if model_type == "llama" and args.vision_text_model:
+    model_type = "mllama"
 model_class = MODEL_CLASSES[model_type]
 tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=True)
 
@@ -361,6 +368,7 @@ elif world_size == 1 or model_type in [
     "baichuan2",
     "gptbigcode",
     "git",
+    "mllama",
     "qwen",
     "yuan",
     "whisper",
@@ -593,6 +601,41 @@ elif model_type == "whisper":
     prompt = sample[0]
     inputs = [prompt] * args.batch_size
     generate_kwargs.pop("min_new_tokens", None)
+elif model_type == "mllama":
+    from PIL import Image
+
+    def load_image(image_file):
+        if image_file.startswith("http://") or image_file.startswith("https://"):
+            import requests
+
+            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+        else:
+            raw_image = Image.open(image_file)
+        return raw_image
+
+    current_path = pathlib.Path(__file__).parent.resolve()
+    with open(str(current_path) + "/prompt.json") as f:
+        prompt_pool = json.load(f)
+    if args.prompt is not None:
+        prompt = args.prompt
+    elif model_type == "auto":
+        raise SystemExit(
+            "[ERROR] model prompt is not supported, please use --prompt for this model: "
+            + args.model_id
+        )
+    # elif int(args.input_tokens) > 8192:
+    #     prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+    elif args.input_tokens in prompt_pool[model_type]:
+        prompt = prompt_pool[model_type][args.input_tokens]
+    else:
+        raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+
+    raw_image = load_image(args.image_url)
+    raw_image = [raw_image] * args.batch_size
+    inputs = tokenizer(raw_image, prompt, return_tensors="pt")
+    input_size = inputs["input_ids"].size(dim=1)
+    print("---- Prompt size:", input_size)
+    inputs = [prompt] * args.batch_size
 else:
     # input tokens
     input_sentences = []
@@ -654,6 +697,11 @@ def generate():
     elif model_type == "whisper":
         input_tokens = tokenizer(inputs, sampling_rate=16000, return_tensors="pt")
         input_ids = input_tokens.input_features
+    elif model_type == "mllama":
+        raw_image = load_image(args.image_url)
+        raw_image = [raw_image] * args.batch_size
+        input_tokens = tokenizer(raw_image, prompt, return_tensors="pt")
+        input_ids = input_tokens["input_ids"]
     else:
         input_tokens = tokenizer.batch_encode_plus(
             inputs, return_token_type_ids=False, return_tensors="pt"

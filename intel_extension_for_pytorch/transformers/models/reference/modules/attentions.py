@@ -2273,6 +2273,69 @@ def _create_attention_mask_for_git(
     return full_attention_mask
 
 
+def _MllamaTextCrossAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    cross_attention_states: Optional[torch.Tensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    output_attentions: bool = False,
+    use_cache: bool = None,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    query_states = self.q_proj(hidden_states)
+    query_states = query_states.view(
+        bsz, q_len, self.num_heads, self.head_dim
+    ).transpose(1, 2)
+    query_states = self.q_norm(query_states)
+
+    if cross_attention_states is not None:
+        key_states = self.k_proj(cross_attention_states)
+        value_states = self.v_proj(cross_attention_states)
+        key_states = key_states.view(bsz, -1, self.num_key_value_heads, self.head_dim)
+        value_states = value_states.view(
+            bsz, -1, self.num_key_value_heads, self.head_dim
+        )
+        key_states = repeat_kv(key_states, self.num_key_value_groups).transpose(1, 2)
+        value_states = repeat_kv(value_states, self.num_key_value_groups).transpose(
+            1, 2
+        )
+
+        key_states = self.k_norm(key_states)
+        past_key_value = (key_states, value_states)
+
+    elif past_key_value[0].shape[2] != 0:
+        key_states, value_states = past_key_value
+
+    else:
+        raise ValueError(
+            "Cross attention layer can't find neither `cross_attn_states` nor cached values for key/values!"
+        )
+
+    if attention_mask is not None:  # no matter the length, we just slice it
+        causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+    else:
+        causal_mask = None
+
+    attn_output = torch.nn.functional.scaled_dot_product_attention(
+        query_states,
+        key_states,
+        value_states,
+        attn_mask=causal_mask,
+        dropout_p=0.0,
+        is_causal=False,
+    )
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.reshape(bsz, q_len, -1)
+    attn_output = self.o_proj(attn_output)
+
+    # if not output_attentions:
+    attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
 class _IPEXAttentionRef(nn.Module):
     def __init__(self, module, config, sdp_module_ref, distributed=False):
         super().__init__()
@@ -2360,6 +2423,14 @@ class _IPEXAttentionRef(nn.Module):
                 self.model_backbone == "LlavaLlamaForCausalLM"
                 and module._get_name() != "CLIPAttention"
             )
+            or (
+                self.model_backbone == "MllamaForConditionalGeneration"
+                and module._get_name() != "MllamaTextCrossAttention"
+            )
+            or (
+                self.model_backbone == "MllamaForConditionalGeneration"
+                and module._get_name() != "MllamaTextCrossSdpaAttention"
+            )
         ):
             if hasattr(module, "rotary_dim"):
                 self.pos_embd_dim = module.rotary_dim
@@ -2419,6 +2490,7 @@ class _IPEXAttentionRef(nn.Module):
         if self.model_backbone in [
             "GPTJForCausalLM",
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",
@@ -2439,7 +2511,9 @@ class _IPEXAttentionRef(nn.Module):
                 supported_linear_types.extend(ds_modules)
             supported_linear_types = tuple(supported_linear_types)
             if (
-                hasattr(module, "q_proj")
+                module._get_name() != "MllamaTextCrossAttention"
+                and module._get_name() != "MllamaTextCrossSdpaAttention"
+                and hasattr(module, "q_proj")
                 and hasattr(module, "k_proj")
                 and hasattr(module, "v_proj")
                 and (isinstance(module.q_proj, supported_linear_types))
@@ -2451,9 +2525,17 @@ class _IPEXAttentionRef(nn.Module):
                     [module.q_proj, module.k_proj, module.v_proj]
                 )
                 del module.q_proj, module.k_proj, module.v_proj
-
-        self._IPEXScaleDotProduct = _IPEXScaleDotProductRef(module, config)
-
+        if not (
+            self.model_backbone == "MllamaForConditionalGeneration"
+            and (
+                module._get_name() == "MllamaTextCrossAttention"
+                or module._get_name() == "MllamaTextCrossSdpaAttention"
+            )
+        ):
+            self._IPEXScaleDotProduct = _IPEXScaleDotProductRef(module, config)
+            self.is_mllama_cross_attention = False
+        else:
+            self.is_mllama_cross_attention = True
         if (
             self.model_backbone == "FalconForCausalLM"
             or self.model_backbone == "RWForCausalLM"
@@ -2622,6 +2704,7 @@ class _IPEXAttentionRef(nn.Module):
         mask: Optional[torch.FloatTensor] = None,
         pixel_values_present: Optional[bool] = False,
         vision: Optional[bool] = False,
+        cross_attention_states: Optional[torch.Tensor] = None,
     ):
         if self.model_backbone == "GPTJForCausalLM":
             return _GPTJAttention_forward(
@@ -2634,16 +2717,30 @@ class _IPEXAttentionRef(nn.Module):
                 use_cache,
                 output_attentions,
             )
-        elif self.model_backbone == "LlamaForCausalLM":
-            return _LlamaAttention_forward(
-                self,
-                hidden_states,
-                attention_mask,
-                position_ids,
-                past_key_value,
-                output_attentions,
-                use_cache,
-            )
+        elif (
+            self.model_backbone == "LlamaForCausalLM"
+            or self.model_backbone == "MllamaForConditionalGeneration"
+        ):
+            if not self.is_mllama_cross_attention:
+                return _LlamaAttention_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    position_ids,
+                    past_key_value,
+                    output_attentions,
+                    use_cache,
+                )
+            else:
+                return _MllamaTextCrossAttention_forward(
+                    self,
+                    hidden_states,
+                    cross_attention_states,
+                    past_key_value,
+                    attention_mask,
+                    output_attentions,
+                    use_cache,
+                )
         elif self.model_backbone == "Qwen2ForCausalLM":
             return _QWen2Attention_forward(
                 self,
@@ -2885,8 +2982,18 @@ def _reorder_cache(
     if (
         len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1
     ):  # discrete kv_cache
+        idx = 0
+        cross_attention_layers = []
+        if (
+            hasattr(self, "config")
+            and hasattr(self.config, "text_config")
+            and hasattr(self.config.text_config, "cross_attention_layers")
+        ):
+            cross_attention_layers = self.config.text_config.cross_attention_layers
         for layer_past in past_key_values:
-            layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
+            if idx not in cross_attention_layers:
+                layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
+            idx = idx + 1
         return past_key_values
     elif len(past_key_values[0]) == 8:
         for layer_past in past_key_values:

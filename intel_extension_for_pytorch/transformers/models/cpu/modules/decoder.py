@@ -52,6 +52,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "OPTForCausalLM",
             "StableLmForCausalLM",
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "BaichuanForCausalLM",
             "MistralForCausalLM",
             "QWenLMHeadModel",

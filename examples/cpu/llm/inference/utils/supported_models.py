@@ -3,6 +3,7 @@ from transformers import (
     AutoTokenizer,
     T5ForConditionalGeneration,
     WhisperForConditionalGeneration,
+    MllamaForConditionalGeneration,
     AutoProcessor,
 )
 
@@ -11,6 +12,7 @@ MODEL_CLASSES = {
     "gpt-j": (AutoModelForCausalLM, AutoTokenizer),
     "gpt-neox": (AutoModelForCausalLM, AutoTokenizer),
     "llama": (AutoModelForCausalLM, AutoTokenizer),
+    "mllama": (MllamaForConditionalGeneration, AutoProcessor),
     "opt": (AutoModelForCausalLM, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
     "bloom": (AutoModelForCausalLM, AutoTokenizer),

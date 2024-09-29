@@ -10,6 +10,8 @@
 |LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-3.2-3B-Instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
 |GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
 |DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
@@ -53,6 +55,8 @@
 |LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-3.2-3B-Instruct | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | 🟩 |
 |GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 |
 |GPT-NEOX| EleutherAI/gpt-neox-20b | 🟨 | 🟩 |
 |DOLLY| databricks/dolly-v2-12b | 🟨 | 🟩 |
@@ -107,7 +111,9 @@ python run.py --help # for more detailed usages
 | Key args of run.py | Notes |
 |---|---|
 | generation | default: beam search (beam size = 4), "--greedy" for greedy search |
-| input tokens | default: 32, provide fixed sizes for input prompt size, use "--input-tokens" for [32, 64, 128, 256, 512, 1024, 2016, 2017, 2048, 4096, 8192]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
+| input tokens or prompt | provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 32768, 130944]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
+| input images | default: None, use "--image-url" to choose the image link address for vision-text tasks |
+| vision text tasks | default: False, use "--vision-text-model" to choose if your model (like llama3.2 11B model) is running for vision-text generation tasks, default False meaning text generation tasks only|
 | output tokens | default: 32, use "--max-new-tokens" to choose any other size |
 | batch size |  default: 1, use "--batch-size" to choose any other size |
 | token latency |  enable "--token-latency" to print out the first or next token latency |

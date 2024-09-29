@@ -301,6 +301,7 @@ class _IPEXRopeRef(nn.Module):
                 x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "LlavaLlamaForCausalLM",
@@ -442,11 +443,12 @@ class _IPEXScaleDotProductRef(nn.Module):
         super().__init__()
         self.model_backbone = config.architectures[0]
         if self.model_backbone == "GPTJForCausalLM":
-            self.bias = module.bias
+            self.bias = module.bias if hasattr(module, "bias") else None
             self.scale_attn = module.scale_attn
             self.attn_dropout = module.attn_dropout
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",
@@ -665,6 +667,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             )
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",

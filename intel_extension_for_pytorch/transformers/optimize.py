@@ -92,7 +92,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.43.2"
+    validated_version = "4.45.0"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -154,9 +154,13 @@ def model_convert_reference(_model):
 
     # generation length or model forward order
     from .models.reference.models import (
+        GPTJModel_forward,
         GPTJForCausalLM_forward,
         LlamaModel_forward,
         LlamaForCausalLM_forward,
+        MllamaTextModel_forward,
+        MllamaForCausalLM_forward,
+        MllamaForConditionalGeneration_forward,
         GPTNeoXForCausalLM_forward,
         OPTForCausalLM_forward,
         BloomForCausalLM_forward,
@@ -197,8 +201,10 @@ def model_convert_reference(_model):
         WhisperModel_forward,
         WhisperDecoderLayer_forward,
         prepare_inputs_for_generation,
+        prepare_inputs_for_generation_gptj,
         prepare_inputs_for_generation_gptbigcode,
         prepare_inputs_for_generation_llama,
+        prepare_inputs_for_generation_mllama,
         prepare_inputs_labels_for_multimodal_llavallama,
         prepare_inputs_for_generation_chatglm,
         detect_language,
@@ -256,6 +262,17 @@ def model_convert_reference(_model):
             "forward",
             GPTJForCausalLM_forward,
         )
+
+        convert_function(
+            _model.transformer,
+            "forward",
+            GPTJModel_forward,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_gptj,
+        )
     elif (
         hasattr(_model, "__class__")
         and _model.__class__
@@ -276,6 +293,37 @@ def model_convert_reference(_model):
             "prepare_inputs_for_generation",
             prepare_inputs_for_generation_llama,
         )
+    elif (
+        hasattr(_model, "__class__")
+        and _model.__class__
+        == transformers.models.mllama.modeling_mllama.MllamaForConditionalGeneration
+    ):
+        convert_function(
+            _model.language_model,
+            "forward",
+            MllamaForCausalLM_forward,
+        )
+        convert_function(
+            _model.language_model.model,
+            "forward",
+            MllamaTextModel_forward,
+        )
+        convert_function(
+            _model,
+            "forward",
+            MllamaForConditionalGeneration_forward,
+        )
+        convert_function(
+            _model.language_model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_mllama,
+        )
+
     elif (
         hasattr(_model, "__class__")
         and _model.__class__
@@ -385,6 +433,9 @@ def model_convert_reference(_model):
     supported_mha_classes = [
         transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXAttention,
         transformers.models.llama.modeling_llama.LlamaAttention,
+        transformers.models.mllama.modeling_mllama.MllamaTextCrossAttention,
+        transformers.models.mllama.modeling_mllama.MllamaTextCrossSdpaAttention,
+        transformers.models.mllama.modeling_mllama.MllamaTextSelfAttention,
         transformers.models.gptj.modeling_gptj.GPTJAttention,
         transformers.models.opt.modeling_opt.OPTAttention,
         transformers.models.bloom.modeling_bloom.BloomAttention,
@@ -471,6 +522,8 @@ def model_convert_reference(_model):
     # model-wise optimizations - Feedforward/Decoder layer modules
     for supported_decoder_class in [
         transformers.models.llama.modeling_llama.LlamaDecoderLayer,
+        transformers.models.mllama.modeling_mllama.MllamaSelfAttentionDecoderLayer,
+        transformers.models.mllama.modeling_mllama.MllamaCrossAttentionDecoderLayer,
         transformers.models.gptj.modeling_gptj.GPTJBlock,
         transformers.models.codegen.modeling_codegen.CodeGenBlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer,
@@ -902,6 +955,8 @@ def get_dummy_input(_model, return_dict=False):
         model_num_layers = _model.config.n_layer
     elif hasattr(_model.config, "num_hidden_layers"):
         model_num_layers = _model.config.num_hidden_layers
+    elif hasattr(_model.config.text_config, "num_hidden_layers"):
+        model_num_layers = _model.config.text_config.num_hidden_layers
     elif hasattr(_model.config, "num_layers"):
         model_num_layers = _model.config.num_layers
     elif hasattr(_model.config, "n_layers"):
@@ -911,51 +966,87 @@ def get_dummy_input(_model, return_dict=False):
             False,
             "Cannot support the dummy sample_inputs for your model, please use your sample_inputs as the inputs and run again",
         )
-    past_key_values = tuple(
-        [
-            (
+    if _model.config.architectures[0] == "T5ForConditionalGeneration":
+        past_key_values = tuple(
+            [
                 (
-                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros(1, 4, dtype=torch.long),
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros(
+                            [
+                                32,
+                                1,
+                                _model.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.n_heads,
+                                _model.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.key_value_proj_dim,
+                            ]
+                        ).contiguous(),
+                        torch.zeros(
+                            [
+                                32,
+                                1,
+                                _model.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.n_heads,
+                                _model.decoder.block[i]
+                                .layer[1]
+                                .EncDecAttention.key_value_proj_dim,
+                            ]
+                        ).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
                 )
-                if _model.config.architectures[0] != "T5ForConditionalGeneration"
-                else (
-                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                    torch.zeros(1, 4, dtype=torch.long),
-                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                    torch.zeros(
-                        [
-                            32,
-                            1,
-                            _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
-                            _model.decoder.block[i]
-                            .layer[1]
-                            .EncDecAttention.key_value_proj_dim,
-                        ]
-                    ).contiguous(),
-                    torch.zeros(
-                        [
-                            32,
-                            1,
-                            _model.decoder.block[i].layer[1].EncDecAttention.n_heads,
-                            _model.decoder.block[i]
-                            .layer[1]
-                            .EncDecAttention.key_value_proj_dim,
-                        ]
-                    ).contiguous(),
-                    torch.zeros(1, 4, dtype=torch.long),
+                for i in range(model_num_layers)
+            ]
+        )
+    elif _model.config.architectures[0] == "MllamaForConditionalGeneration":
+        head_dim = _model.config.text_config.hidden_size // (
+            _model.config.text_config.num_hidden_layers
+            - len(_model.config.text_config.cross_attention_layers)
+        )
+        past_key_values = tuple(
+            [
+                (
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
+                    if i not in _model.config.text_config.cross_attention_layers
+                    else (
+                        torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                        torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                    )
                 )
-            )
-            for i in range(model_num_layers)
-        ]
-    )
+                for i in range(model_num_layers)
+            ]
+        )
+    else:
+        past_key_values = tuple(
+            [
+                (
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
+                )
+                for i in range(model_num_layers)
+            ]
+        )
 
     input_ids = torch.ones(32).to(torch.long).unsqueeze(0)
     attention_mask = torch.ones_like(input_ids)
+
     # prepare_inputs_for_generation is just for checking if position_ids should be in the model inputs,
     # input input_ids and attention_mask to make sure this func can generate the correct position_ids.
     model_inputs = _model.prepare_inputs_for_generation(
@@ -1135,11 +1226,18 @@ def get_dummy_input(_model, return_dict=False):
             if return_dict
             else (input_ids, attention_mask, position_ids, past_key_values)
         )
+
     if "return_last_logit" in model_inputs:
         if return_dict:
             sample_inputs["return_last_logit"] = torch.tensor(True)
         else:
             sample_inputs = sample_inputs + (torch.tensor(True),)
+    if _model.config.architectures[0] == "MllamaForConditionalGeneration":
+        cross_attention_mask = torch.ones(1, 32, 1, 4)
+        if return_dict:
+            sample_inputs["cross_attention_mask"] = cross_attention_mask
+        else:
+            sample_inputs = sample_inputs + (cross_attention_mask,)
     return sample_inputs
 
 
@@ -1277,6 +1375,7 @@ def model_convert_lowering(
 
             supported_classes = [
                 transformers.models.llama.modeling_llama.LlamaRMSNorm,
+                transformers.models.mllama.modeling_mllama.MllamaTextRMSNorm,
             ]
             if _model.config.architectures[0] in [
                 "BaichuanForCausalLM",
@@ -1365,6 +1464,34 @@ def model_convert_lowering(
                     check_trace=False,
                 )
                 trace_model = torch.jit.freeze(trace_model)
+                if _model.config.architectures[0] == "MllamaForConditionalGeneration":
+                    pixel_values = torch.rand(
+                        1,
+                        1,
+                        4,
+                        3,
+                        _model.config.vision_config.image_size,
+                        _model.config.vision_config.image_size,
+                    )
+                    aspect_ratio_mask = torch.tensor([[[1, 1, 1, 1]]])
+                    aspect_ratio_ids = torch.tensor([[6]])
+                    sample_inputs["pixel_values"] = pixel_values
+                    sample_inputs["aspect_ratio_mask"] = aspect_ratio_mask
+                    sample_inputs["aspect_ratio_ids"] = aspect_ratio_ids
+
+                    trace_model_first = torch.jit.trace(
+                        _model,
+                        example_kwarg_inputs=sample_inputs,
+                        strict=False,
+                        check_trace=False,
+                    )
+                    trace_model_first = torch.jit.freeze(trace_model_first)
+                    _model = _set_optimized_model_for_generation(
+                        _model,
+                        optimized_model=trace_model,
+                        first_token_optimized_model=trace_model_first,
+                    )
+
                 if _model.config.architectures[0] == "YuanForCausalLM":
                     sample_inputs.pop("past_key_values", None)
                     batch_size = (
@@ -1438,7 +1565,7 @@ def optimize(
     This API focus on transformers models, especially for generation tasks inference.
 
     Well supported model family with full functionalities:
-    Llama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
+    Llama, MLlama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
     T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Whisper.
 
     For the model that is not in the scope of supported model family above, will try to
@@ -1513,6 +1640,7 @@ def optimize(
             well_supported_model = model.config.architectures[0] in [
                 "GPTJForCausalLM",
                 "LlamaForCausalLM",
+                "MllamaForConditionalGeneration",
                 "GPTNeoXForCausalLM",
                 "OPTForCausalLM",
                 "FalconForCausalLM",
@@ -1541,7 +1669,7 @@ def optimize(
         else:
             if quantization_config is not None:
                 logger.warning(
-                    "ipex.llm.optimize supports quantizations on Llama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen,"
+                    "ipex.llm.optimize supports quantizations on Llama, MLlama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen,"
                     + " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, Llava, Yuan,"
                     + " Phi, and Whisper, fallback to origin model"
                 )
@@ -1617,6 +1745,12 @@ def optimize(
         # model quantization if needed
         if is_quantization:
             if not is_woq:  # static quantization
+                if model.config.architectures[0] in ["MllamaForConditionalGeneration"]:
+                    logger.warning(
+                        "ipex.llm.optimize will skip static quantizations on MLlama ..."
+                    )
+                    return model
+
                 deployment_mode = False
 
                 if qconfig_summary_file is not None:

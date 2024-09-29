@@ -32,6 +32,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
         help="huggingface model id or local directory containing model files",
     )
     parser.add_argument(
+        "--vision-text-model",
+        action="store_true",
+        help="whether or not it is vision-text multi-model structure",
+    )
+    parser.add_argument(
         "--config-file",
         default=None,
         type=str,
@@ -298,7 +303,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     args = parser.parse_args(args_in)
 
     parent_path = Path(__file__).parent.absolute()
-
+    if args.vision_text_model and args.batch_size > 1:
+        print(
+            "LLM RUNTIME ERROR: Current run.py script does not support vision-text generation with batch size > 1, exiting ..."
+        )
+        quit()
     group_size = args.group_size
     if group_size == 0:
         # weight dtype is ignored if gptq is true
@@ -326,7 +335,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-iter", str(args.num_iter)])
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
-
+            if args.vision_text_model:
+                infer_cmd.extend(["--vision-text-model"])
             if args.greedy:
                 infer_cmd.extend(["--greedy"])
             if args.streaming:
@@ -370,6 +380,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 quant_cmd.extend(["--output-dir", str(args.output_dir)])
                 quant_cmd.extend(["--input-tokens", str(args.input_tokens)])
                 quant_cmd.extend(["--max-new-tokens", str(args.max_new_tokens)])
+                if args.vision_text_model:
+                    quant_cmd.extend(["--vision-text-model"])
                 if args.config_file is not None:
                     quant_cmd.extend(["--config-file", str(args.config_file)])
                 if args.quant_with_amp:
@@ -505,7 +517,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-iter", str(args.num_iter)])
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
-
+            if args.vision_text_model:
+                infer_cmd.extend(["--vision-text-model"])
             if args.quant_with_amp:
                 infer_cmd.extend(["--quant-with-amp"])
             if args.greedy:
@@ -575,12 +588,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 ),
                 "auto",
             )
+
             work_path = Path(str(args.output_dir))
             if not work_path.exists():
                 Path.mkdir(work_path)
                 model_path = Path(str(args.output_dir) + str(MODEL_CLASSES[model_type]))
                 if not model_path.exists():
                     Path.mkdir(model_path)
+            if args.vision_text_model:
+                shard_cmd.extend(["--vision-text-model"])
             shard_cmd.extend(
                 ["--save-path", str(args.output_dir) + str(MODEL_CLASSES[model_type])]
             )
@@ -633,7 +649,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--image-url", str(args.image_url)])
         if args.audio is not None:
             infer_cmd.extend(["--audio", str(args.audio)])
-
+        if args.vision_text_model:
+            infer_cmd.extend(["--vision-text-model"])
         if args.prompt is not None:
             infer_cmd.extend(["--prompt", str(args.prompt)])
         if args.config_file is not None:
