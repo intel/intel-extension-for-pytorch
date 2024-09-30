@@ -72,7 +72,6 @@ TORCH_LIBRARY_IMPL(aten, XPU, m) {
       "geqrf.a",
       "linalg_eig.out",
       "linalg_eigh.eigvals",
-      "linalg_eigvals.out",
       "linalg_householder_product.out",
       "linalg_solve_triangular.out",
       "ormqr.out",

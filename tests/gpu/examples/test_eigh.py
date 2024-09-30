@@ -132,7 +132,7 @@ class TestTorchMethod(TestCase):
             # Trigger warning
             torch.linalg.eigh(a, out=(out_w, out_v))
             # Check warning occurs
-            self.assertEqual(len(w), 2)
+            self.assertEqual(len(w), 3)
             self.assertTrue(
                 "An output with one or more elements was resized" in str(w[-2].message)
             )
@@ -143,14 +143,12 @@ class TestTorchMethod(TestCase):
         # dtypes should be safely castable
         out_w = torch.empty(0, dtype=real_dtype, device=device)
         out_v = torch.empty(0, dtype=torch.int, device=device)
-        with self.assertRaisesRegex(
-            RuntimeError, "but got eigenvectors with dtype Int"
-        ):
+        with self.assertRaisesRegex(RuntimeError, "but got int instead"):
             torch.linalg.eigh(a, out=(out_w, out_v))
 
         out_w = torch.empty(0, dtype=torch.int, device=device)
         out_v = torch.empty(0, dtype=dtype, device=device)
-        with self.assertRaisesRegex(RuntimeError, "but got eigenvalues with dtype Int"):
+        with self.assertRaisesRegex(RuntimeError, "but got int instead"):
             torch.linalg.eigh(a, out=(out_w, out_v))
 
         # device should match
@@ -159,13 +157,13 @@ class TestTorchMethod(TestCase):
             out_w = torch.empty(0, device=wrong_device, dtype=dtype)
             out_v = torch.empty(0, device=device, dtype=dtype)
             with self.assertRaisesRegex(
-                RuntimeError, "tensors to be on the same device"
+                RuntimeError, "operator doesn't exist for this backend"
             ):
                 torch.linalg.eigh(a, out=(out_w, out_v))
             out_w = torch.empty(0, device=device, dtype=dtype)
             out_v = torch.empty(0, device=wrong_device, dtype=dtype)
             with self.assertRaisesRegex(
-                RuntimeError, "tensors to be on the same device"
+                RuntimeError, "operator doesn't exist for this backend"
             ):
                 torch.linalg.eigh(a, out=(out_w, out_v))
 
@@ -353,7 +351,7 @@ class TestTorchMethod(TestCase):
 
         # dtypes should be safely castable
         out = torch.empty(0, dtype=torch.int, device=device)
-        with self.assertRaisesRegex(RuntimeError, "but got result with dtype Int"):
+        with self.assertRaisesRegex(RuntimeError, "but got int instead"):
             torch.linalg.eigvalsh(t, out=out)
 
         # device should match
@@ -361,7 +359,7 @@ class TestTorchMethod(TestCase):
             wrong_device = cpu_device if device != cpu_device else dpcpp_device
             out = torch.empty(0, device=wrong_device, dtype=dtype)
             with self.assertRaisesRegex(
-                RuntimeError, "tensors to be on the same device"
+                RuntimeError, "operator doesn't exist for this backend"
             ):
                 torch.linalg.eigvalsh(t, out=out)
 

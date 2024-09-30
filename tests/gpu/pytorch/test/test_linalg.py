@@ -7415,8 +7415,8 @@ scipy_lobpcg  | {eq_err_scipy:10.2e}  | {eq_err_general_scipy:10.2e}  | {iters2:
             # Trigger warning
             torch.linalg.slogdet(a, out=(sign_out, logabsdet_out))
             # Check warning occurs
-            self.assertEqual(len(w), 1)
-            self.assertTrue("An output with one or more elements was resized" in str(w[-1].message))
+            self.assertEqual(len(w), 2)
+            self.assertTrue("An output with one or more elements was resized" in str(w[-2].message))
 
         # device should match
         if torch.cuda.is_available():
