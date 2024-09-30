@@ -162,6 +162,7 @@ export OMP_SCHEDULE=STATIC
 By default, PyTorch uses GNU OpenMP (GNU libgomp) for parallel computation. On Intel platforms, Intel OpenMP Runtime Library (libiomp) provides OpenMP API specification support. It sometimes brings more performance benefits compared to libgomp. Utilizing environment variable `LD_PRELOAD` can switch OpenMP library to libiomp:
 
 ```
+pip install intel-openmp=2024.1.2
 export LD_PRELOAD=<path>/libiomp5.so:$LD_PRELOAD
 ```
 

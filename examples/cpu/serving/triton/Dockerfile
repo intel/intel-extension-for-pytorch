@@ -22,7 +22,7 @@ RUN python3 -m pip install --no-cache-dir \
     intel_extension_for_pytorch==${IPEX_VERSION:-2.3.0}+cpu \
     -f https://developer.intel.com/ipex-whl-stable-cpu \
     configargparse \
-    intel-openmp \
+    intel-openmp==2024.1.2 \
     numpy \
     transformers \
     tritonclient[all]

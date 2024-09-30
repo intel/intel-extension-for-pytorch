@@ -54,7 +54,7 @@ COPY --from=dev /root/intel-extension-for-pytorch/dist ./wheels
 COPY --from=dev /root/torch_install.sh .
 RUN bash ./torch_install.sh && rm ./torch_install.sh && \
     python -m pip install ./wheels/*.whl && \
-    python -m pip install intel-openmp && \
+    python -m pip install intel-openmp==2024.1.2 && \
     python -m pip cache purge && \
     rm -rf ./wheels && \
     echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc
