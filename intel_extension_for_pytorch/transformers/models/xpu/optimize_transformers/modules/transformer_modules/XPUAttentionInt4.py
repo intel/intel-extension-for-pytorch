@@ -409,11 +409,12 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
                 self.qkv_proj_quant.g_idx,
             )
             m = query.shape[-1]
-            query = qkv_out[:, :, :m].contiguous()
             if IPEXAttention.cache_type == "static":
-                key.copy_(qkv_out[:, :, m : 2 * m])
-                value.copy_(qkv_out[:, :, 2 * m :])
+                query = qkv_out[:, :, :m].transpose(0, 1).contiguous()
+                key.copy_(qkv_out[:, :, m : 2 * m].transpose(0, 1))
+                value.copy_(qkv_out[:, :, 2 * m :].transpose(0, 1))
             elif IPEXAttention.cache_type == "dynamic":
+                query = qkv_out[:, :, :m].contiguous()
                 key = qkv_out[:, :, m : 2 * m].contiguous()
                 value = qkv_out[:, :, 2 * m :].contiguous()
             return query, key, value

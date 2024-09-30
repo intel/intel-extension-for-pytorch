@@ -14,6 +14,7 @@ from .modules.Functions import (
     qwen_forward_hook,
     chatglm_forward_hook,
     ipex_build_bloom_alibi_tensor,
+    ipex_static_cache,
 )
 from .modules.utils import is_int4
 from typing import List
@@ -99,6 +100,7 @@ def default_override_function_list() -> List:
         qwen_forward_hook,
         chatglm_forward_hook,
         ipex_build_bloom_alibi_tensor,
+        ipex_static_cache,
     ]
     return default_fn_list
 

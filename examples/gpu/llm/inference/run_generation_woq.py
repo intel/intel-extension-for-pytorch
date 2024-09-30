@@ -112,6 +112,7 @@ parser.add_argument(
 )
 parser.add_argument("--acc-iter", default=-1, type=int)
 parser.add_argument("--disable_static_cache", action="store_true")
+parser.add_argument("--use_hf_code", default=True, action="store_false", help="use hf transformers code")
 args = parser.parse_args()
 print(args)
 
@@ -137,12 +138,12 @@ model_type = next(
 )
 model_class = MODEL_CLASSES[model_type]
 if args.woq_checkpoint_path:
-    tokenizer = AutoTokenizer.from_pretrained(args.woq_checkpoint_path, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(args.woq_checkpoint_path, trust_remote_code=args.use_hf_code)
     config = AutoConfig.from_pretrained(args.woq_checkpoint_path, use_cache=True, # to use kv cache.
                                         trust_remote_code=True)
 else:
-    config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit, trust_remote_code=True)
-    tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit, trust_remote_code=args.use_hf_code)
+    tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=args.use_hf_code)
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 
@@ -150,7 +151,7 @@ if not hasattr(config, "text_max_length") and args.prompt is None:
 if args.woq_checkpoint_path:
     # directly load already quantized model
     model = AutoModelForCausalLM.from_pretrained(
-        args.woq_checkpoint_path, trust_remote_code=True, device_map="xpu", torch_dtype=torch.float16)
+        args.woq_checkpoint_path, trust_remote_code=args.use_hf_code, device_map="xpu", torch_dtype=torch.float16)
     model = model.to(memory_format=torch.channels_last)
     woq_quantization_config = getattr(model, "quantization_config", None)
 else:
@@ -164,7 +165,7 @@ else:
         args.model_id,
         device_map=device,
         quantization_config=woq_quantization_config,
-        trust_remote_code=True,
+        trust_remote_code=args.use_hf_code,
         use_llm_runtime=False
     )
     if args.save_model:
@@ -182,6 +183,7 @@ get_memory_usage("Ipex", args)
 
 num_beams = 1 if args.greedy else args.num_beams
 # generate args
+# generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams, cache_implementation='static')
 generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
 
 

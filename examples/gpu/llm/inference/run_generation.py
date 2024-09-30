@@ -113,6 +113,7 @@ parser.add_argument(
 )
 parser.add_argument("--acc-iter", default=-1, type=int)
 parser.add_argument("--disable_static_cache", action="store_true")
+parser.add_argument("--use_hf_code", default=True, action="store_false", help="use hf transformers code")
 args = parser.parse_args()
 print(args)
 
@@ -150,7 +151,7 @@ model_type = next(
     (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
 )
 model_class = MODEL_CLASSES[model_type]
-config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit, trust_remote_code=True)
+config = AutoConfig.from_pretrained(args.model_id, torchscript=args.jit, trust_remote_code=args.use_hf_code)
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if amp_dtype == torch.float16 and args.woq and args.woq_checkpoint_path == "":
@@ -158,9 +159,9 @@ if amp_dtype == torch.float16 and args.woq and args.woq_checkpoint_path == "":
 else:
     load_dtype = amp_dtype
 model = model_class[0].from_pretrained(
-    args.model_id, torch_dtype=load_dtype, config=config, low_cpu_mem_usage=True, trust_remote_code=True
+    args.model_id, torch_dtype=load_dtype, config=config, low_cpu_mem_usage=True, trust_remote_code=args.use_hf_code
 )
-tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=True)
+tokenizer = model_class[1].from_pretrained(args.model_id, trust_remote_code=args.use_hf_code)
 
 woq_weight_path = args.woq_checkpoint_path
 if args.woq and args.woq_checkpoint_path == "":

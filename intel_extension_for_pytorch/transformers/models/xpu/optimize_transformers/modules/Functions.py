@@ -1903,3 +1903,48 @@ def _ipex_beam_search_without_optimize(
 def ipex_beam_search_without_optimize(model):
     if hasattr(model, "beam_search"):
         setattr(model, "beam_search", _ipex_beam_search_without_optimize)  # noqa
+
+
+def ipex_static_cache(model):
+    if model.__class__.__name__ == "Phi3ForCausalLM":
+        print("get in replace", model)
+        setattr(model, "_setup_cache", partial(_ipex_setup_cache, model))  # noqa
+        model._supports_static_cache = True
+        setattr(model, "_reset_cache", partial(_ipex_reset_cache, model))  # noqa
+
+
+def _ipex_setup_cache(
+    self, cache_cls, max_batch_size, max_cache_len: Optional[int] = None
+):
+    self.model.causal_mask = torch.full(
+        (
+            self.model.config.max_position_embeddings,
+            self.model.config.max_position_embeddings,
+        ),
+        fill_value=1,
+    )
+    if (
+        max_cache_len > self.model.causal_mask.shape[-1]
+        or self.device != self.model.causal_mask.device
+    ):
+        causal_mask = torch.full(
+            (max_cache_len, max_cache_len), fill_value=1, device=self.device
+        )
+        self.register_buffer(
+            "causal_mask", torch.triu(causal_mask, diagonal=1), persistent=False
+        )
+
+    for layer in self.model.layers:
+        weights = layer.attn.o_proj.weight
+        layer.attn.past_key_value = cache_cls(
+            self.config,
+            max_batch_size,
+            max_cache_len,
+            device=weights.device,
+            dtype=weights.dtype,
+        )
+
+
+def _ipex_reset_cache(self):
+    for layer in self.model.layers:
+        layer.self_attn.past_key_value = None
