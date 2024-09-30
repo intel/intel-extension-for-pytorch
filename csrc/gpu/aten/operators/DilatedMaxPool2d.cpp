@@ -9,6 +9,7 @@
 #include "comm/ParamUtils.h"
 #include "comm/RegistrationDeclarations.h"
 #include "utils/ComputeEngine.h"
+#include "utils/CustomOperatorRegistration.h"
 
 #include <tuple>
 
@@ -1003,6 +1004,20 @@ Tensor& max_pool2d_with_indices_backward_out_template(
 
 } // namespace impl
 
+std::tuple<Tensor, Tensor> max_pool2d_with_indices(
+    const Tensor& self,
+    IntArrayRef kernel_size,
+    IntArrayRef stride,
+    IntArrayRef padding,
+    IntArrayRef dilation,
+    bool ceil_mode) {
+  Tensor output;
+  Tensor indices;
+  impl::max_pool2d_with_indices_out_template(
+      output, indices, self, kernel_size, stride, padding, dilation, ceil_mode);
+  return std::tuple<Tensor&, Tensor&>(output, indices);
+}
+
 std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
     const Tensor& input,
     IntArrayRef kernel_size,
@@ -1022,6 +1037,30 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
       dilation,
       ceil_mode);
   return std::tuple<Tensor&, Tensor&>(output, indices);
+}
+
+Tensor max_pool2d_with_indices_backward(
+    const Tensor& grad_output,
+    const Tensor& self,
+    IntArrayRef kernel_size,
+    IntArrayRef stride,
+    IntArrayRef padding,
+    IntArrayRef dilation,
+    bool ceil_mode,
+    const Tensor& indices) {
+  Tensor grad_input;
+  max_pool2d_with_indices_backward_out(
+      grad_output,
+      self,
+      kernel_size,
+      stride,
+      padding,
+      dilation,
+      ceil_mode,
+      indices,
+      grad_input);
+
+  return grad_input;
 }
 
 Tensor& max_pool2d_with_indices_backward_out(
@@ -1072,3 +1111,22 @@ Tensor& max_pool2d_with_indices_backward_out(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl(
+      "max_pool2d_with_indices",
+      TORCH_FN((&at::AtenIpexTypeXPU::max_pool2d_with_indices)));
+  m.impl(
+      "max_pool2d_with_indices.out",
+      TORCH_FN((&at::AtenIpexTypeXPU::max_pool2d_with_indices_out)));
+  m.impl(
+      "max_pool2d_with_indices_backward",
+      TORCH_FN((&at::AtenIpexTypeXPU::max_pool2d_with_indices_backward)));
+  m.impl(
+      "max_pool2d_with_indices_backward.grad_input",
+      TORCH_FN((&at::AtenIpexTypeXPU::max_pool2d_with_indices_backward_out)));
+}
+
+} // namespace

@@ -11,6 +11,41 @@ supported:
 #
 # - angle
 # - angle.out
+################## override below ops due to UTs failed
+# - ceil.out                           # for https://github.com/intel/torch-xpu-ops/pull/872
+# - floor.out
+# - col2im                             # for https://github.com/intel/torch-xpu-ops/pull/894
+# - col2im.out
+# - im2col
+# - im2col.out
+################## override below ops due to performance issues
+# - convolution_overrideable
+# - convolution_backward_overrideable
+# - _addmm_activation.out
+# - addmm.out
+# - addmv.out
+# - mm
+# - mm.out
+# - baddbmm
+# - baddbmm.out
+# - baddbmm_
+# - addbmm
+# - addbmm_
+# - addbmm.out
+# - bmm
+# - bmm.out
+# - tensordot.out
+# - native_batch_norm
+# - native_batch_norm.out
+# - native_batch_norm_backward
+# - upsample_bilinear2d
+# - upsample_bilinear2d.out
+# - upsample_bilinear2d_backward
+# - upsample_bilinear2d_backward.grad_input
+# - max_pool2d_with_indices
+# - max_pool2d_with_indices.out
+# - max_pool2d_with_indices_backward
+# - max_pool2d_with_indices_backward.grad_input
 ####################################
 #  - _aminmax
 #  - _aminmax.dim
@@ -109,14 +144,8 @@ supported:
 #  - add.out
 #  - add_.Scalar
 #  - add_.Tensor
-  - addbmm # duplicated op
-  - addbmm_ # duplicated op
-  - addbmm.out # duplicated op
 #  - addcdiv.out
 #  - addcmul.out
-  - _addmm_activation.out # duplicated op
-  - addmm.out  # newly added # duplicated op
-  - addmv.out  # newly added # duplicated op
 #  - addr
 #  - addr.out
 #  - all.all_out
@@ -145,9 +174,6 @@ supported:
 #  - avg_pool2d_backward.grad_input
   - avg_pool3d.out
   - avg_pool3d_backward.grad_input
-  - baddbmm # duplicated op
-  - baddbmm.out # duplicated op
-  - baddbmm_ # duplicated op
 #  - batch_norm_elemt
 #  - batch_norm_elemt.out
   - batch_norm_gather_stats
@@ -185,10 +211,7 @@ supported:
   - bitwise_right_shift_.Tensor_Scalar
   - bitwise_right_shift.Tensor_Scalar_out
   - bitwise_right_shift.Scalar_Tensor
-  - bmm # duplicated op
-  - bmm.out # duplicated op
   - cauchy_
-#  - ceil.out
 #  - cholesky
 #  - cholesky.out
 #  - cholesky_inverse
@@ -204,11 +227,7 @@ supported:
 #  - clamp_min.Tensor_out
 #  - clamp_max.Tensor_out
 #  - clone
-#  - col2im
-#  - col2im.out
   - conv_tbc
-#  - convolution_backward_overrideable # duplicated op
-#  - convolution_overrideable # duplicated op
 #  - copy_
 #  - copysign.out
 #  - cos.out
@@ -257,7 +276,6 @@ supported:
 #  - fill_.Scalar
 #  - fill_.Tensor
 #  - flip
-#  - floor.out
 #  - floor_divide
 #  - floor_divide.out
 #  - floor_divide_.Tensor
@@ -323,8 +341,6 @@ supported:
   - i0.out
   - igamma.out
   - igammac.out
-#  - im2col
-#  - im2col.out
 #  - index.Tensor
   - _unsafe_index.Tensor
 #  - index_fill_.int_Scalar
@@ -389,8 +405,6 @@ supported:
   - max.dim
 #  - max.dim_max
 #  - max.unary_out
-#  - max_pool2d_with_indices.out
-#  - max_pool2d_with_indices_backward.grad_input
   - max_pool3d_with_indices
   - max_pool3d_with_indices.out
   - max_pool3d_with_indices_backward
@@ -412,8 +426,6 @@ supported:
 #  - min.unary_out
 #  - minimum
 #  - minimum.out
-  - mm # duplicated op
-  - mm.out # duplicated op
   - mode
 #  - mse_loss
 #  - mse_loss.out
@@ -439,9 +451,6 @@ supported:
 #  - nan_to_num.out
 #  - nanmedian
 #  - nanmedian.dim_values
-#  - native_batch_norm
-#  - native_batch_norm.out
-#  - native_batch_norm_backward
 #  - native_dropout
 #  - native_dropout_backward
 #  - native_group_norm
@@ -625,7 +634,6 @@ supported:
 #  - tanh.out
 #  - tanh_backward
 #  - tanh_backward.grad_input
-#  - tensordot.out # duplicated op
 #  - threshold
 #  - threshold.out
 #  - threshold_
@@ -653,8 +661,6 @@ supported:
 #  - unique_dim_consecutive
 #  - upsample_bicubic2d.out
   - upsample_bicubic2d_backward.grad_input
-#  - upsample_bilinear2d.out
-#  - upsample_bilinear2d_backward.grad_input
 #  - upsample_linear1d.out
 #  - upsample_linear1d_backward.grad_input
 #  - upsample_nearest1d

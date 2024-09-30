@@ -310,6 +310,36 @@
     }                                                                       \
   }()
 
+#define IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND3(                      \
+    SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, TYPE, NAME, ...)                 \
+  [&] {                                                                     \
+    const auto& the_type = TYPE;                                            \
+    /* don't use TYPE again in case it is an expensive or side-effect op */ \
+    at::ScalarType _st = ::detail::scalar_type(the_type);                   \
+    switch (_st) {                                                          \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Double, double, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(at::ScalarType::Float, float, __VA_ARGS__)     \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
+          at::ScalarType::ComplexDouble, std::complex<double>, __VA_ARGS__) \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
+          at::ScalarType::ComplexFloat, std::complex<float>, __VA_ARGS__)   \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
+          SCALARTYPE1,                                                      \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE1>::t),         \
+          __VA_ARGS__)                                                      \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
+          SCALARTYPE2,                                                      \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE2>::t),         \
+          __VA_ARGS__)                                                      \
+      IPEX_PRIVATE_CASE_TYPE(                                               \
+          SCALARTYPE3,                                                      \
+          decltype(c10::impl::ScalarTypeToCPPType<SCALARTYPE3>::t),         \
+          __VA_ARGS__)                                                      \
+      default:                                                              \
+        AT_ERROR(#NAME, " not implemented for '", toString(_st), "'");      \
+    }                                                                       \
+  }()
+
 #define IPEX_DISPATCH_INTEGRAL_TYPES(TYPE, NAME, ...)                       \
   [&] {                                                                     \
     const auto& the_type = TYPE;                                            \
@@ -761,6 +791,11 @@
     SCALARTYPE1, SCALARTYPE2, TYPE, NAME, ...)         \
   AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(         \
       SCALARTYPE1, SCALARTYPE2, TYPE, NAME, __VA_ARGS__)
+
+#define IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND3(      \
+    SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, TYPE, NAME, ...) \
+  AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND3(              \
+      SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, TYPE, NAME, __VA_ARGS__)
 
 #define IPEX_DISPATCH_INTEGRAL_TYPES(TYPE, NAME, ...) \
   AT_DISPATCH_INTEGRAL_TYPES(TYPE, NAME, __VA_ARGS__)

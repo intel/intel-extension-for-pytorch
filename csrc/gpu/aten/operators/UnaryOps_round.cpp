@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 #include <oneDNN/oneDNN.h>
+#include <utils/CustomOperatorRegistration.h>
 #include <utils/DPCPP.h>
 
 #include "comm/AccumulateType.h"
@@ -116,3 +117,12 @@ Tensor& fmod_(Tensor& self, const Scalar& other) {
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("ceil_out", TORCH_FN((&at::AtenIpexTypeXPU::ceil_out)));
+  m.impl("floor_out", TORCH_FN((&at::AtenIpexTypeXPU::floor_out)));
+}
+
+} // namespace

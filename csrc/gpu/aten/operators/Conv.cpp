@@ -3055,5 +3055,14 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       TORCH_FN(at::AtenIpexTypeXPU::convolution_pointwise_binary_));
 }
 
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl(
+      "convolution_overrideable",
+      TORCH_FN((&at::AtenIpexTypeXPU::convolution_overrideable)));
+  m.impl(
+      "convolution_backward_overrideable",
+      TORCH_FN((&at::AtenIpexTypeXPU::convolution_backward_overrideable)));
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at

@@ -4,6 +4,7 @@
 
 #include <core/Memory.h>
 #include <runtime/Utils.h>
+#include <utils/CustomOperatorRegistration.h>
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
@@ -97,8 +98,13 @@ static void im2col_out_template(
   output.resize_({batch_size, n_output_plane, output_length});
   output.zero_();
 
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
-      kHalf, kBFloat16, input.scalar_type(), "im2col_out_dpcpp", [&] {
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND3(
+      at::ScalarType::Bool,
+      at::ScalarType::BFloat16,
+      at::ScalarType::Half,
+      input.scalar_type(),
+      "im2col_out_dpcpp",
+      [&] {
         Tensor input_n;
         Tensor output_n;
 
@@ -157,3 +163,12 @@ Tensor im2col(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("im2col", TORCH_FN((&at::AtenIpexTypeXPU::im2col)));
+  m.impl("im2col.out", TORCH_FN((&at::AtenIpexTypeXPU::im2col_out)));
+}
+
+} // namespace

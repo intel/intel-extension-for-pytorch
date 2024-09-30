@@ -204,7 +204,6 @@ operator will automatically convert to normal tensor layout when execution.
 
 #include <c10/util/Logging.h>
 
-
 // This FLAGS_caffe2_log_level flag is used to control the log level and defined
 // at Pytorch c10 library. The default is log level is warn. But it triggers the
 // warn to override the kernel under a particular dispatch key. Unfortunately,

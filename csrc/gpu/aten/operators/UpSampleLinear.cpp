@@ -9,6 +9,7 @@
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
 #include "utils/ComputeEngine.h"
+#include "utils/CustomOperatorRegistration.h"
 
 using namespace dnnl;
 using namespace at::native;
@@ -656,38 +657,6 @@ Tensor upsample_bilinear2d(
   return output;
 }
 
-Tensor upsample_bilinear2d(
-    const Tensor& input,
-    c10::optional<IntArrayRef> output_size,
-    bool align_corners,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  auto output = at::empty_like(input, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  auto osize = compute_output_size(input.sizes(), output_size, scale_factors);
-  auto scales_h = get_scale_value(scale_factors, 0);
-  auto scales_w = get_scale_value(scale_factors, 1);
-  torch_ipex::xpu::COMPUTE_ENG real_eng;
-  if (align_corners) {
-    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
-  } else {
-    real_eng = choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, input);
-  }
-
-  if (torch_ipex::xpu::COMPUTE_ENG::BASIC == real_eng) {
-    at::AtenIpexTypeXPU::to_plain_if_needed_(input);
-    upsample_bilinear2d_out_dpcpp_template(
-        output, input, osize, true, scales_h, scales_w);
-  } else {
-    torch_ipex::xpu::oneDNN::resample(
-        input,
-        output,
-        osize,
-        algorithm::resampling_linear,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
-  }
-  return output;
-}
-
 Tensor& upsample_bilinear2d_backward_out(
     const Tensor& grad_output,
     IntArrayRef output_size,
@@ -774,55 +743,6 @@ Tensor upsample_bilinear2d_backward(
   return grad_input;
 }
 
-Tensor upsample_bilinear2d_backward(
-    const Tensor& grad_output,
-    c10::optional<IntArrayRef> output_size,
-    IntArrayRef input_size,
-    bool align_corners,
-    c10::optional<ArrayRef<double>> scale_factors) {
-  auto osize = compute_output_size(input_size, output_size, scale_factors);
-  auto scales_h = get_scale_value(scale_factors, 0);
-  auto scales_w = get_scale_value(scale_factors, 1);
-  auto ndim = grad_output.ndimension();
-  Tensor grad_input;
-  if (is_smf_channels_last(grad_output)) {
-    grad_input =
-        at::empty(input_size, grad_output.options(), get_cl_tag_by_ndim(ndim));
-  } else {
-    grad_input = at::empty(input_size, grad_output.options());
-  }
-
-  torch_ipex::xpu::COMPUTE_ENG real_eng;
-  if (align_corners) {
-    real_eng = torch_ipex::xpu::COMPUTE_ENG::BASIC;
-  } else {
-    real_eng =
-        choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::ONEDNN, grad_output);
-  }
-
-  if (torch_ipex::xpu::COMPUTE_ENG::BASIC == real_eng) {
-    at::AtenIpexTypeXPU::to_plain_if_needed_(grad_output);
-    upsample_bilinear2d_backward_out_dpcpp_template(
-        grad_input,
-        grad_output,
-        osize,
-        input_size,
-        true, // align_corners
-        scales_h,
-        scales_w);
-  } else {
-    torch_ipex::xpu::oneDNN::resample_backward(
-        grad_input,
-        grad_output,
-        input_size,
-        osize,
-        algorithm::resampling_linear,
-        scales_w.has_value() ? static_cast<double>(scales_w.value()) : 0.0f,
-        scales_h.has_value() ? static_cast<double>(scales_h.value()) : 0.0f);
-  }
-  return grad_input;
-}
-
 Tensor& upsample_linear1d_out(
     const Tensor& input,
     IntArrayRef output_size,
@@ -865,3 +785,22 @@ Tensor& upsample_linear1d_backward_out(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl(
+      "upsample_bilinear2d",
+      TORCH_FN((&at::AtenIpexTypeXPU::upsample_bilinear2d)));
+  m.impl(
+      "upsample_bilinear2d.out",
+      TORCH_FN((&at::AtenIpexTypeXPU::upsample_bilinear2d_out)));
+  m.impl(
+      "upsample_bilinear2d_backward",
+      TORCH_FN((&at::AtenIpexTypeXPU::upsample_bilinear2d_backward)));
+  m.impl(
+      "upsample_bilinear2d_backward.grad_input",
+      TORCH_FN((&at::AtenIpexTypeXPU::upsample_bilinear2d_backward_out)));
+}
+
+} // namespace

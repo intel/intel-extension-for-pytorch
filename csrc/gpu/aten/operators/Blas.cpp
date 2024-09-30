@@ -1415,5 +1415,25 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_MATMUL(hardtanh);
   IPEX_OP_REGISTER_MATMUL(elu);
 }
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl(
+      "_addmm_activation.out",
+      TORCH_FN((&at::AtenIpexTypeXPU::_addmm_activation_out)));
+  m.impl("addmm.out ", TORCH_FN((&at::AtenIpexTypeXPU::addmm_out)));
+  m.impl("addmv.out ", TORCH_FN((&at::AtenIpexTypeXPU::addmv_out)));
+  m.impl("mm", TORCH_FN((&at::AtenIpexTypeXPU::mm)));
+  m.impl("mm.out", TORCH_FN((&at::AtenIpexTypeXPU::mm_out)));
+  m.impl("baddbmm", TORCH_FN((&at::AtenIpexTypeXPU::baddbmm)));
+  m.impl("baddbmm.out", TORCH_FN((&at::AtenIpexTypeXPU::baddbmm_out)));
+  m.impl("baddbmm_", TORCH_FN((&at::AtenIpexTypeXPU::baddbmm_)));
+  m.impl("addbmm", TORCH_FN((&at::AtenIpexTypeXPU::addbmm)));
+  m.impl("addbmm.out", TORCH_FN((&at::AtenIpexTypeXPU::addbmm_out)));
+  m.impl("addbmm_", TORCH_FN((&at::AtenIpexTypeXPU::addbmm_)));
+  m.impl("bmm", TORCH_FN((&at::AtenIpexTypeXPU::bmm)));
+  m.impl("bmm.out", TORCH_FN((&at::AtenIpexTypeXPU::bmm_out)));
+  m.impl("tensordot.out", TORCH_FN((&at::AtenIpexTypeXPU::tensordot_out)));
+}
+
 } // namespace AtenIpexTypeQuantizedXPU
 } // namespace at

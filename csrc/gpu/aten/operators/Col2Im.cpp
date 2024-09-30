@@ -5,7 +5,9 @@
 #include <core/Memory.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
+#include <utils/CustomOperatorRegistration.h>
 #include <utils/DPCPP.h>
+
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
 #include "comm/RegistrationDeclarations.h"
@@ -95,7 +97,8 @@ static void col2im_out_template(
   output.resize_({batch_size, n_output_plane, output_height, output_width});
   output.zero_();
 
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND3(
+      at::ScalarType::Bool,
       at::ScalarType::BFloat16,
       at::ScalarType::Half,
       input.scalar_type(),
@@ -172,3 +175,12 @@ Tensor col2im(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("col2im", TORCH_FN((&at::AtenIpexTypeXPU::col2im)));
+  m.impl("col2im.out", TORCH_FN((&at::AtenIpexTypeXPU::col2im_out)));
+}
+
+} // namespace

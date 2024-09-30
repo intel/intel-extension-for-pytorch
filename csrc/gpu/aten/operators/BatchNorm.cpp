@@ -12,6 +12,7 @@
 #include "comm/RegistrationDeclarations.h"
 #include "core/MemoryFormat.h"
 #include "utils/ComputeEngine.h"
+#include "utils/CustomOperatorRegistration.h"
 #include "utils/DPCPP.h"
 using namespace dnnl;
 using namespace torch_ipex::xpu::dpcpp;
@@ -5207,3 +5208,18 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> batch_norm_backward_reduce(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl(
+      "native_batch_norm", TORCH_FN((&at::AtenIpexTypeXPU::native_batch_norm)));
+  m.impl(
+      "native_batch_norm.out",
+      TORCH_FN((&at::AtenIpexTypeXPU::native_batch_norm_out)));
+  m.impl(
+      "native_batch_norm_backward",
+      TORCH_FN((&at::AtenIpexTypeXPU::native_batch_norm_backward)));
+}
+
+} // namespace
