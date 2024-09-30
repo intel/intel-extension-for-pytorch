@@ -436,52 +436,6 @@ void _index_fill(
 }
 
 template <typename scalar_t>
-void _index_copy(
-    Tensor& dst,
-    int64_t dim,
-    const Tensor& indices,
-    const Tensor& source) {
-  TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(indices.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(source.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-
-  // The `src` is partitioned into two parts:
-  // -the size of each slice we are indexing, which is the
-  // total size of the tensor ignoring dimension `dim`;
-  // -the number of indices we are choosing, which is the total size
-  // of the tensor `indices`.
-  int dstDims = dst.dim() == 0 ? 1 : dst.dim();
-
-  TORCH_CHECK(dim >= 0 && dim < dstDims, "Indexing dim is out of bounds");
-
-  ptrdiff_t sliceSize = 1;
-  for (int d = 0; d < dstDims; d++) {
-    if (d != dim) {
-      sliceSize *= dst.dim() == 0 ? 1 : dst.size(d);
-    }
-  }
-  ptrdiff_t dstTotalSize = dst.numel();
-  ptrdiff_t numIndices = indices.numel();
-
-  if (sliceSize == 0) {
-    return;
-  }
-
-  TensorInfo<int64_t, int64_t> indices_info =
-      getTensorInfo<int64_t, int64_t>(indices);
-  indices_info.collapseDims();
-
-  TensorInfo<scalar_t, int64_t> src_info =
-      getTensorInfo<scalar_t, int64_t>(source);
-
-  TensorInfo<scalar_t, int64_t> dst_info =
-      getTensorInfo<scalar_t, int64_t>(dst);
-  auto collapse_dim = (dst.dim() == 0) ? -1 : dim;
-  int new_indexing_dim = dst_info.collapseDims(collapse_dim);
-  _index_copy_kernel(src_info, dst_info, indices_info, new_indexing_dim);
-}
-
-template <typename scalar_t>
 struct DiagKernelFunctor {
   void operator()(sycl::item<1> item_id) const {
     size_t id = item_id.get_id(0);
@@ -1526,82 +1480,104 @@ Tensor& index_add_out(
   return out;
 }
 
-at::Tensor& index_copy_out(
+at::Tensor index_copy_meta(
     const at::Tensor& self,
-    int64_t dim,
+    int64_t& dim,
     const at::Tensor& index,
     const at::Tensor& source,
     at::Tensor& out) {
-  if (!out.is_same(self)) {
-    out.copy_(self);
+  dim = maybe_wrap_dim(dim, self.dim());
+
+  at::Tensor& result = out;
+
+  // Memory overlap checks need to be done after resizing (if required) is done.
+  // But it only makes sense to do these checks when result was defined, hence
+  // the boolean variable `check_result` here.
+  // For more details, see:
+  // https://github.com/pytorch/pytorch/pull/63312#discussion_r694794832 and
+  // https://github.com/pytorch/pytorch/issues/63837
+  bool check_result = result.defined();
+  at::TensorIterator iter = at::TensorIteratorConfig()
+                                .add_output(result)
+                                .add_borrowed_const_input(self)
+                                .build();
+  iter.set_output_raw_strided(
+      0,
+      self.sizes(),
+      {},
+      self.options(),
+      result.has_names() ? result.names() : DimnameList{});
+  if (check_result) {
+    at::assert_no_internal_overlap(result);
+    at::assert_no_overlap(result, index);
+    at::assert_no_overlap(result, source);
   }
-  if (index.numel() == 0) {
-    return out;
-  }
-  dim = maybe_wrap_dim(dim, out.dim());
+
   TORCH_CHECK_INDEX(
       index.dim() < 2,
       "index_copy_(): Index should have dimension 1 or 0 (got ",
       index.dim(),
       ")");
-  at::assert_no_internal_overlap(out);
-  at::assert_no_overlap(out, index);
-  at::assert_no_overlap(out, source);
 
   int64_t numIndices = index.numel();
   if (source.dim() == 0 && numIndices != 1) {
     TORCH_CHECK_INDEX(
         false,
-        "index_copy_(): When source is scalar, index should have one element (got ",
+        "index_copy_(): When source is scalar, index should have "
+        "one element (got ",
         numIndices,
         ")");
   } else if (
-      (source.dim() != out.dim()) && (source.dim() != 0 && self.dim() != 0)) {
+      (source.dim() != self.dim()) && (source.dim() != 0 && self.dim() != 0)) {
     TORCH_CHECK_INDEX(
         false,
-        "index_copy_(): When source and destination are not scalars, their dimensionality must match. Source dimensionality (",
+        "index_copy_(): When source and destination are not scalars, their "
+        "dimensionality must match. Source dimensionality (",
         source.dim(),
         "), destination dimensionality (",
-        out.dim(),
+        self.dim(),
         ")");
   }
 
   TORCH_CHECK(
       index.scalar_type() == ScalarType::Long,
       "index_copy_(): Expected a long tensor for index, but got ",
-      index.scalar_type())
+      index.scalar_type());
   TORCH_CHECK(
-      out.scalar_type() == source.scalar_type(),
-      "index_copy_(): out and source expected to have the same dtype, but got (out) ",
-      out.scalar_type(),
+      self.scalar_type() == source.scalar_type(),
+      "index_copy_(): self and source expected to have the same dtype, "
+      "but got (self) ",
+      self.scalar_type(),
       " and (source) ",
       source.scalar_type());
   TORCH_CHECK(
-      out.device() == source.device() && out.device() == index.device(),
-      "index_copy_(): out, index and source expected to be in the same device, but got (out) ",
-      out.device(),
+      self.device() == source.device() && self.device() == index.device(),
+      "index_copy_(): self, index and source expected to be in the "
+      "same device, but got (self) ",
+      self.device(),
       ", (index) ",
       index.device(),
       ", and (source) ",
       source.device());
 
   // Check that source and destination slices have the same size
-  auto outSlicedSizes = out.sizes().vec();
-  if (outSlicedSizes.size() > 0) {
-    outSlicedSizes.erase(outSlicedSizes.begin() + dim);
+  auto selfSlicedSizes = self.sizes().vec();
+  if (!selfSlicedSizes.empty()) {
+    selfSlicedSizes.erase(selfSlicedSizes.begin() + dim);
   }
   auto sourceSlicedSizes = source.sizes().vec();
-  if (sourceSlicedSizes.size() > 0) {
+  if (!sourceSlicedSizes.empty()) {
     sourceSlicedSizes.erase(sourceSlicedSizes.begin() + dim);
   }
-  if (outSlicedSizes.size() != sourceSlicedSizes.size() ||
+  if (selfSlicedSizes.size() != sourceSlicedSizes.size() ||
       !std::equal(
-          outSlicedSizes.begin(),
-          outSlicedSizes.end(),
+          selfSlicedSizes.begin(),
+          selfSlicedSizes.end(),
           sourceSlicedSizes.begin())) {
     std::stringstream ss;
-    ss << "index_copy_(): Source/destination tensor must have same slice shapes. ";
-    ss << "Destination slice shape: " << outSlicedSizes << " at dimension "
+    ss << "index_copy_(): Source/destination tensor must have same slice "
+          "shapes. ";
+    ss << "Destination slice shape: " << selfSlicedSizes << " at dimension "
        << dim;
     ss << " and source slice shape: " << sourceSlicedSizes
        << " at dimension 0.";
@@ -1615,14 +1591,58 @@ at::Tensor& index_copy_out(
       source.size(dim),
       ")");
 
-  // See Note [Enabling Deterministic Operations]
-  if (globalContext().deterministicAlgorithms()) {
-    // TODO: enable deterministic algorithm
-    TORCH_CHECK(
-        false, "index_copy is not implemented with deterministic algorithm.");
+  return iter.output();
+}
+
+template <typename scalar_t>
+void index_copy_impl(
+    at::Tensor& dst,
+    int64_t dim,
+    const at::Tensor& indices,
+    const at::Tensor& source) {
+  TORCH_CHECK(dst.dim() <= MAX_TENSORINFO_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(indices.dim() <= MAX_TENSORINFO_DIMS, DPCPPTORCH_DIM_WARNING);
+  TORCH_CHECK(source.dim() <= MAX_TENSORINFO_DIMS, DPCPPTORCH_DIM_WARNING);
+
+  // The `src` is partitioned into two parts:
+  // -the size of each slice we are indexing, which is the
+  // total size of the tensor ignoring dimension `dim`;
+  // -the number of indices we are choosing, which is the total size
+  // of the tensor `indices`.
+  int64_t dstDims = dst.dim() == 0 ? 1 : dst.dim();
+
+  TORCH_CHECK(dim >= 0 && dim < dstDims, "Indexing dim is out of bounds");
+
+  ptrdiff_t sliceSize = 1;
+  for (int d = 0; d < dstDims; d++) {
+    if (d != dim) {
+      sliceSize *= dst.dim() == 0 ? 1 : dst.size(d);
+    }
+  }
+  if (sliceSize == 0) {
+    return;
   }
 
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5(
+  TensorInfo<int64_t, int64_t> indices_info =
+      getTensorInfo<int64_t, int64_t>(indices);
+  indices_info.collapseDims();
+
+  TensorInfo<scalar_t, int64_t> src_info =
+      getTensorInfo<scalar_t, int64_t>(source);
+
+  TensorInfo<scalar_t, int64_t> dst_info =
+      getTensorInfo<scalar_t, int64_t>(dst);
+  auto collapse_dim = (dst.dim() == 0) ? -1 : dim;
+  int new_indexing_dim = dst_info.collapseDims(collapse_dim);
+  _index_copy_kernel(src_info, dst_info, indices_info, new_indexing_dim);
+}
+
+void index_copy_kernel(
+    int64_t dim,
+    const at::Tensor& index,
+    const at::Tensor& source,
+    at::Tensor& out) {
+  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
       at::ScalarType::Bool,
@@ -1630,8 +1650,38 @@ at::Tensor& index_copy_out(
       at::ScalarType::Float8_e5m2,
       out.scalar_type(),
       "index_copy",
-      [&]() { impl::_index_copy<scalar_t>(out, dim, index, source); });
+      [&]() { index_copy_impl<scalar_t>(out, dim, index, source); });
+}
 
+Tensor& index_copy_out(
+    const at::Tensor& self,
+    int64_t dim,
+    const at::Tensor& index,
+    const at::Tensor& source,
+    at::Tensor& out) {
+  out = index_copy_meta(self, dim, index, source, out);
+
+  if (!out.is_same(self))
+    out.copy_(self);
+
+  if (index.numel() == 0) {
+    return out;
+  }
+
+  // See Note [Enabling Deterministic Operations]
+  if (globalContext().deterministicAlgorithms()) {
+    torch::List<std::optional<Tensor>> indices;
+    indices.reserve(dim + 1);
+    for (const auto i : c10::irange(dim)) {
+      (void)i;
+      indices.emplace_back();
+    }
+    indices.emplace_back(index);
+    out.index_put_(indices, source, false);
+    return out;
+  }
+
+  index_copy_kernel(dim, index, source, out);
   return out;
 }
 
