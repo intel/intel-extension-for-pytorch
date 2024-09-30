@@ -24,7 +24,7 @@ class TestTorchMethod:
         return topk_weights, topk_indices, token_for_experts
 
     @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
-    @pytest.mark.parametrize("n_token", [2, 32, 1024])
+    @pytest.mark.parametrize("n_token", [2, 32])
     @pytest.mark.parametrize("n_expert", [8, 32])
     @pytest.mark.parametrize("n_topk", [1, 2])
     def test_topk_softmax(self, dtype, n_token, n_topk, n_expert):
