@@ -1,6 +1,7 @@
+from typing import List
 import torch
 from torch._dynamo.backends.registry import register_backend
-from typing import List
+from torch._inductor.compile_fx import compile_fx
 from functools import lru_cache
 
 
@@ -75,7 +76,6 @@ def ipex(
         return compile(graph_module, example_inputs, options=options)
     else:
         from ..utils.utils import _is_syngraph_available
-        from torch._inductor.compile_fx import compile_fx
 
         if _is_syngraph_available():
             # FIXME: For now the syngraph is not integrated into the IPEX,

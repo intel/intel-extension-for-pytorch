@@ -192,9 +192,13 @@ def FalconDecoderLayer_forward(
     output_attentions: bool = False,
 ):
     residual = hidden_states
-    if self.self_attention.new_decoder_architecture or not hasattr(
-        self, "input_layernorm"
-    ):
+    if (
+        self.self_attention.new_decoder_architecture
+        and not (
+            hasattr(self.config, "num_ln_in_parallel_attn")
+            and self.config.num_ln_in_parallel_attn == 1
+        )
+    ) or not hasattr(self, "input_layernorm"):
         attention_layernorm_out = self.ln_attn(hidden_states)
         mlp_layernorm_out = self.ln_mlp(hidden_states)
     else:
@@ -219,6 +223,13 @@ def FalconDecoderLayer_forward(
         else:
             residual = attention_output + residual
             mlp_layernorm_out = self.post_attention_layernorm(residual)
+    if (
+        self.config.new_decoder_architecture
+        and self.config.parallel_attn
+        and hasattr(self.config, "num_ln_in_parallel_attn")
+        and self.config.num_ln_in_parallel_attn == 1
+    ):
+        mlp_layernorm_out = attention_layernorm_out
     outputs = attn_outputs[1:]
     # MLP.
 
@@ -394,9 +405,12 @@ def GLMBlock_forward(
     # Layer norm post the self attention.
     layernorm_output = self.post_attention_layernorm(layernorm_input)
 
-    # MLP.
-    intermediate_parallel = self.mlp.dense_h_to_4h(layernorm_output)
-    intermediate_parallel = self.mlp.activation_func(intermediate_parallel)
+    # # MLP.
+    if hasattr(self, "linear_silu_mul"):
+        intermediate_parallel = self.linear_silu_mul(layernorm_output)
+    else:
+        intermediate_parallel = self.mlp.dense_h_to_4h(layernorm_output)
+        intermediate_parallel = self.mlp.activation_func(intermediate_parallel)
 
     # Second residual connection.
     if self.apply_residual_connection_post_layernorm:
@@ -1008,6 +1022,59 @@ def QWenBlock_forward(
     return outputs
 
 
+def Qwen2DecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    **kwargs,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.o_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+
+    mlp_gate = self.linear_silu_mul(hidden_states)
+
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(mlp_gate, residual)
+    else:
+        hidden_states = self.mlp.down_proj(mlp_gate)
+        hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
 def GitLayer_forward(
     self,
     hidden_states: torch.Tensor,
@@ -1273,6 +1340,128 @@ def Phi3DecoderLayer_forward(
     return outputs
 
 
+def WhisperEncoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: torch.Tensor,
+    layer_head_mask: torch.Tensor,
+    output_attentions: bool = False,
+) -> torch.Tensor:
+    residual = hidden_states
+    hidden_states = self.self_attn_layer_norm(hidden_states)
+    hidden_states, attn_weights, _ = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        layer_head_mask=layer_head_mask,
+        output_attentions=output_attentions,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.out_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    residual = hidden_states
+    hidden_states = self.final_layer_norm(hidden_states)
+    hidden_states = self.linear_gelu(hidden_states)
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.fc2(hidden_states)
+        hidden_states = residual + hidden_states
+
+    if hidden_states.dtype == torch.float16 and (
+        torch.isinf(hidden_states).any() or torch.isnan(hidden_states).any()
+    ):
+        clamp_value = torch.finfo(hidden_states.dtype).max - 1000
+        hidden_states = torch.clamp(hidden_states, min=-clamp_value, max=clamp_value)
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    return outputs
+
+
+def WhisperDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    encoder_hidden_states: Optional[torch.Tensor] = None,
+    encoder_attention_mask: Optional[torch.Tensor] = None,
+    layer_head_mask: Optional[torch.Tensor] = None,
+    cross_attn_layer_head_mask: Optional[torch.Tensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = True,
+) -> torch.Tensor:
+    residual = hidden_states
+    hidden_states = self.self_attn_layer_norm(hidden_states)
+    self_attn_past_key_value = (
+        past_key_value[:4] if past_key_value is not None else None
+    )
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        past_key_value=self_attn_past_key_value,
+        attention_mask=attention_mask,
+        layer_head_mask=layer_head_mask,
+        output_attentions=output_attentions,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.out_proj(hidden_states)
+        hidden_states = residual + hidden_states
+    cross_attn_present_key_value = None
+    cross_attn_weights = None
+    if encoder_hidden_states is not None:
+        residual = hidden_states
+        hidden_states = self.encoder_attn_layer_norm(hidden_states)
+        cross_attn_past_key_value = (
+            past_key_value[4:] if past_key_value is not None else None
+        )
+        (
+            hidden_states,
+            cross_attn_weights,
+            cross_attn_present_key_value,
+        ) = self.encoder_attn(
+            hidden_states=hidden_states,
+            key_value_states=encoder_hidden_states,
+            attention_mask=encoder_attention_mask,
+            layer_head_mask=cross_attn_layer_head_mask,
+            past_key_value=cross_attn_past_key_value,
+            output_attentions=output_attentions,
+        )
+        if not self.distributed:
+            hidden_states = self.encoder_mha_linear_add(hidden_states, residual)
+        else:
+            hidden_states = self.encoder_attn.out_proj(hidden_states)
+            hidden_states = residual + hidden_states
+        present_key_value = present_key_value + cross_attn_present_key_value
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.final_layer_norm(hidden_states)
+
+    hidden_states = self.linear_gelu(hidden_states)
+    if not self.distributed:
+        hidden_states = self.mlp_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.fc2(hidden_states)
+        hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights, cross_attn_weights)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1294,6 +1483,7 @@ class _IPEXDecoderLayerRef(nn.Module):
             "LlamaForCausalLM",
             "BaichuanForCausalLM",
             "MistralForCausalLM",
+            "Qwen2ForCausalLM",
         ]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
@@ -1359,6 +1549,26 @@ class _IPEXDecoderLayerRef(nn.Module):
                 self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.dense_4h_to_h)
                 del self.__dict__["_modules"]["self_attention"].dense
                 del self.__dict__["_modules"]["mlp"].dense_4h_to_h
+
+            if module.mlp.dense_h_to_4h.weight.dtype not in [torch.uint8]:
+                gate_weights, up_weights = module.mlp.dense_h_to_4h.weight.chunk(
+                    2, dim=0
+                )
+                has_bias = module.mlp.dense_h_to_4h.bias is not None
+                gate_linear = torch.nn.Linear(
+                    gate_weights.shape[1], gate_weights.shape[0], has_bias
+                )
+                up_linear = torch.nn.Linear(
+                    up_weights.shape[1], up_weights.shape[0], has_bias
+                )
+                gate_linear.weight.data = gate_weights
+                up_linear.weight.data = up_weights
+                if has_bias:
+                    gate_bias, up_bias = module.mlp.dense_h_to_4h.bias.chunk(2, dim=0)
+                    gate_linear.bias.data = gate_bias
+                    up_linear.bias.data = up_bias
+                self.linear_silu_mul = _IPEXlinearSiluMulRef(gate_linear, up_linear)
+                del self.__dict__["_modules"]["mlp"].dense_h_to_4h
         elif self.model_backbone == "GPTBigCodeForCausalLM":
             self.linear_gelu = _IPEXlinearGeluRef(module.mlp.c_fc)
             del self.__dict__["_modules"]["mlp"].c_fc
@@ -1470,6 +1680,19 @@ class _IPEXDecoderLayerRef(nn.Module):
                 del self.__dict__["_modules"]["mlp"].down_proj
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
                 del self.__dict__["_modules"]["self_attn"].o_proj
+        elif self.model_backbone == "WhisperForConditionalGeneration":
+            if not self.distributed:
+                self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.out_proj)
+                del self.__dict__["_modules"]["self_attn"].out_proj
+                self.mlp_linear_add = _IPEXlinearAddRef(module.fc2)
+                del self.__dict__["_modules"]["fc2"]
+                if hasattr(module, "encoder_attn"):
+                    self.encoder_mha_linear_add = _IPEXlinearAddRef(
+                        module.encoder_attn.out_proj
+                    )
+                    del self.__dict__["_modules"]["encoder_attn"].out_proj
+            self.linear_gelu = _IPEXlinearGeluRef(module.fc1)
+            del self.__dict__["_modules"]["fc1"]
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -1509,6 +1732,16 @@ class _IPEXDecoderLayerRef(nn.Module):
             )
         elif self.model_backbone == "LlamaForCausalLM":
             return LlamaDecoderLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "Qwen2ForCausalLM":
+            return Qwen2DecoderLayer_forward(
                 self,
                 hidden_states,
                 attention_mask,
@@ -1709,6 +1942,23 @@ class _IPEXDecoderLayerRef(nn.Module):
                 output_attentions,
                 use_cache,
                 past_key_value,
+            )
+        elif self.model_backbone == "WhisperForConditionalGeneration":
+            if encoder_hidden_states is not None:
+                return WhisperDecoderLayer_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    encoder_hidden_states,
+                    encoder_attention_mask,
+                    layer_head_mask,
+                    cross_attn_layer_head_mask,
+                    past_key_value,
+                    output_attentions,
+                    use_cache,
+                )
+            return WhisperEncoderLayer_forward(
+                self, hidden_states, attention_mask, layer_head_mask, output_attentions
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

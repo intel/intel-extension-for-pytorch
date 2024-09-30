@@ -279,6 +279,7 @@ def varlen_attention(
         is_causal (bool): whether to apply causal attention masking, default is True.
 
     """
+
     return VarlenAttention.apply_function(
         query,
         key,
@@ -386,7 +387,7 @@ def gelu_quick(x: torch.Tensor, out: torch.Tensor = None):
 
 def silu_mul(x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None):
     r"""
-    Applies PyTorch silu on input x, and them mul input y:
+    Applies PyTorch silu on input x, and mul input y:
     out = silu(x)*y
 
     Args:
@@ -401,7 +402,7 @@ def silu_mul(x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None):
 
 def silu_and_mul(x: torch.Tensor, out: torch.Tensor = None):
     r"""
-    Applies PyTorch silu on input x, and them mul input x:
+    Applies PyTorch silu on input x, and mul input x:
     d = x.size(-1) / 2
     out = silu(x[..., :d])*x[..., d:]
 
@@ -418,7 +419,7 @@ def gelu_mul(
     x: torch.Tensor, y: torch.Tensor, out: torch.Tensor = None, approximate="none"
 ):
     r"""
-    Applies PyTorch gelu on input x, and them mul input y:
+    Applies PyTorch gelu on input x, and mul input y:
     out = gelu(x)*y
 
     Args:
@@ -434,7 +435,7 @@ def gelu_mul(
 
 def gelu_and_mul(x: torch.Tensor, out: torch.Tensor = None, approximate="none"):
     r"""
-    Applies PyTorch gelu on input x, and them mul input x:
+    Applies PyTorch gelu on input x, and mul input x:
     d = x.size(-1) / 2
     out = gelu(x[..., :d], approximate)*x[..., d:]
 

@@ -4,7 +4,7 @@ from torch.ao.quantization import PlaceholderObserver, QConfigMapping
 from intel_extension_for_pytorch.utils.utils import has_cpu
 
 if has_cpu():
-    from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
+    from intel_extension_for_pytorch.quantization import QConfigWoq, WoqLowpMode
 
 # The config describes how to load low precision checkpoint for weight only quantization.
 # Weight shape is N by K if transposed is False otherwise K by N.
@@ -40,6 +40,24 @@ def _is_woq_qconfig(qconfig_mapping):
         isinstance(qconfig.activation(), PlaceholderObserver)
         and not qconfig.activation().is_dynamic
     )
+
+
+def _woq_enable_weight_cache_for_large_batch(qconfig_mapping):
+    qconfig = (
+        qconfig_mapping.global_qconfig
+        if isinstance(qconfig_mapping, QConfigMapping)
+        else qconfig_mapping
+    )
+    assert qconfig.lowp_mode in [
+        WoqLowpMode.BF16,
+        WoqLowpMode.INT8,
+    ], "Weight cache is only supported for lowp-mode=BF16 and INT8"
+    qconfig_dict = qconfig._asdict()
+    qconfig_dict["cache_weight_for_large_batch"] = True
+    if isinstance(qconfig_mapping, QConfigMapping):
+        qconfig_mapping.set_global(QConfigWoq(**qconfig_dict))
+        return qconfig_mapping
+    return QConfigWoq(**qconfig_dict)
 
 
 def _default_lowp_checkpoint_config():
@@ -144,6 +162,9 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
         if scales.size(-1) != 1:
             # qweight is compressed along the last dim int4 * 8 -> int32
             group_size = qweight.size(-1) * 8 // scales.size(-1)
+            # Ensure group_size is a power of two
+            assert group_size > 0
+            group_size = 2 ** (group_size - 1).bit_length()
     return qweight, scales, qzeros, bias, group_size, g_idx
 
 
@@ -205,6 +226,8 @@ def _convert_woq_with_low_precision_checkpoint(
             )
             if any(i is None for i in [qweight, scales, qzeros]):
                 return mod
+            from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
+
             mod_new = WeightOnlyQuantizedLinear.from_float_and_int4_weight(
                 mod, qweight, scales, qzeros, bias, group_size=group_size, g_idx=g_idx
             )

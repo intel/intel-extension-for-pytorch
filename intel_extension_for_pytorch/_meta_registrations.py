@@ -521,6 +521,16 @@ def meta_tpp_linear_bias(
     return input.new_empty((*input.shape[:-1], out_features))
 
 
+@register_meta("choose_tpp_linear_weight")
+def meta_choose_tpp_linear_weight(x, weight, weight_for_large_batch):
+    M = x.numel() // x.size(-1)
+    return (
+        weight_for_large_batch
+        if weight_for_large_batch is not None and M >= 256
+        else weight
+    )
+
+
 @register_meta("tpp_linear_gelu")
 def meta_tpp_linear_gelu(
     input,

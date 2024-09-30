@@ -152,7 +152,7 @@ def _LlamaAttention_forward(
             self.head_dim,
             self.head_dim // 2,
             self.head_dim,
-            kv_seq_len,
+            None,
             self.concat_qkv.num_concat,
         )
     else:
@@ -168,7 +168,7 @@ def _LlamaAttention_forward(
             self.head_dim,
             self.head_dim // 2,
             self.head_dim,
-            kv_seq_len,
+            None,
         )
         query = self._IPEXROPE(
             query,
@@ -177,7 +177,7 @@ def _LlamaAttention_forward(
             self.head_dim,
             self.head_dim // 2,
             self.head_dim,
-            kv_seq_len,
+            None,
         )
 
     if use_cache:
@@ -445,7 +445,10 @@ def _FalconAttention_forward(
             )
     attention_mask_float = (
         (attention_mask * 1.0)
-        .masked_fill(attention_mask.to(torch.bool), float("-1e9"))
+        .masked_fill(
+            attention_mask.to(torch.bool),
+            float("-6e4") if query_layer.dtype == torch.half else float("-1e9"),
+        )
         .to(query_layer.dtype)
     )
 
@@ -825,72 +828,63 @@ def _GLM2Attention_forward(
     # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)]
     mixed_x_layer = self.query_key_value(hidden_states)
     mixed_x_layer = mixed_x_layer.transpose(0, 1)
-
-    if self.multi_query_attention:
-        (query_layer, key_layer, value_layer) = mixed_x_layer.split(
-            [
-                self.num_attention_heads_per_partition
-                * self.hidden_size_per_attention_head,
-                self.num_multi_query_groups_per_partition
-                * self.hidden_size_per_attention_head,
-                self.num_multi_query_groups_per_partition
-                * self.hidden_size_per_attention_head,
-            ],
-            dim=-1,
-        )
-        query_layer = query_layer.view(
-            query_layer.size()[:-1]
-            + (
-                self.num_attention_heads_per_partition,
-                self.hidden_size_per_attention_head,
-            )
-        )
-        key_layer = key_layer.view(
-            key_layer.size()[:-1]
-            + (
-                self.num_multi_query_groups_per_partition,
-                self.hidden_size_per_attention_head,
-            )
-        )
-        value_layer = value_layer.view(
-            value_layer.size()[:-1]
-            + (
-                self.num_multi_query_groups_per_partition,
-                self.hidden_size_per_attention_head,
-            )
-        )
-    else:
-        new_tensor_shape = mixed_x_layer.size()[:-1] + (
-            self.num_attention_heads_per_partition,
-            3 * self.hidden_size_per_attention_head,
-        )
-        mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
-
-        # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
-        (query_layer, key_layer, value_layer) = self.split_tensor_along_last_dim(
-            mixed_x_layer, 3
-        )
     past_len = kv_cache[0].shape[-2] if kv_cache is not None else 0
     # apply relative positional encoding (rotary embedding)
     if rotary_pos_emb is not None:
-        query_layer = query_layer.contiguous()
-        key_layer = key_layer.contiguous()
-        key_layer = self._IPEXROPE(
-            key_layer,
+        query_layer, key_layer, value_layer = self._IPEXROPE(
+            mixed_x_layer,
             torch.tensor(past_len),
-            key_layer.size(-2),
-            key_layer.size(-1),
+            self.num_attention_heads_per_partition,
+            self.hidden_size_per_attention_head,
             1,
             64,
+            num_concats=3,
         )
-        query_layer = self._IPEXROPE(
-            query_layer,
-            torch.tensor(past_len),
-            query_layer.size(-2),
-            query_layer.size(-1),
-            1,
-            64,
-        )
+    else:
+        if self.multi_query_attention:
+            (query_layer, key_layer, value_layer) = mixed_x_layer.split(
+                [
+                    self.num_attention_heads_per_partition
+                    * self.hidden_size_per_attention_head,
+                    self.num_multi_query_groups_per_partition
+                    * self.hidden_size_per_attention_head,
+                    self.num_multi_query_groups_per_partition
+                    * self.hidden_size_per_attention_head,
+                ],
+                dim=-1,
+            )
+            query_layer = query_layer.view(
+                query_layer.size()[:-1]
+                + (
+                    self.num_attention_heads_per_partition,
+                    self.hidden_size_per_attention_head,
+                )
+            )
+            key_layer = key_layer.view(
+                key_layer.size()[:-1]
+                + (
+                    self.num_multi_query_groups_per_partition,
+                    self.hidden_size_per_attention_head,
+                )
+            )
+            value_layer = value_layer.view(
+                value_layer.size()[:-1]
+                + (
+                    self.num_multi_query_groups_per_partition,
+                    self.hidden_size_per_attention_head,
+                )
+            )
+        else:
+            new_tensor_shape = mixed_x_layer.size()[:-1] + (
+                self.num_attention_heads_per_partition,
+                3 * self.hidden_size_per_attention_head,
+            )
+            mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
+
+            # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
+            (query_layer, key_layer, value_layer) = self.split_tensor_along_last_dim(
+                mixed_x_layer, 3
+            )
 
     if attention_mask is None:
         attention_mask = torch.ones(
@@ -916,9 +910,7 @@ def _GLM2Attention_forward(
         attention_mask,
     )
     context_layer = attn_output.permute(2, 0, 1, 3).contiguous()
-    output = context_layer.reshape(
-        context_layer.shape[0], context_layer.shape[1], self.projection_size
-    )
+    output = context_layer.reshape(context_layer.shape[0], context_layer.shape[1], -1)
     # output = self.dense(context_layer)
     return output, present
 
@@ -1521,6 +1513,110 @@ def _StableLMEpochAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _QWen2Attention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+):
+    bsz, q_len, _ = hidden_states.size()
+    concat_qkv = None
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+    else:
+        query = self.q_proj(hidden_states)
+        key = self.k_proj(hidden_states)
+        value = self.v_proj(hidden_states)
+
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+
+    if concat_qkv is not None and type(concat_qkv) is not tuple:
+        query, key, value = self._IPEXROPE(
+            concat_qkv,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+            self.concat_qkv.num_concat,
+        )
+    else:
+        if concat_qkv is not None:
+            query, key, value = concat_qkv
+        query = query.view(bsz, q_len, self.num_heads, self.head_dim)
+        key = key.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+        value = value.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
+        key = self._IPEXROPE(
+            key,
+            position_ids,
+            self.num_key_value_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+        )
+        query = self._IPEXROPE(
+            query,
+            position_ids,
+            self.num_heads,
+            self.head_dim,
+            self.head_dim // 2,
+            self.head_dim,
+            kv_seq_len,
+        )
+
+    if use_cache:
+        (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+            query,
+            key,
+            value,
+            math.sqrt(self.head_dim),
+            past_key_value,
+            None,
+            attention_mask,
+        )
+    else:
+        value_states = value.transpose(1, 2)
+        query_states = query.transpose(1, 2)
+        key_states = key.transpose(1, 2)
+        kv_seq_len = key_states.shape[-2]
+
+        past_key_value = None
+        # repeat k/v heads if n_kv_heads < n_heads
+        key_states = _repeat_kv(key_states, self.num_key_value_groups)
+        value_states = _repeat_kv(value_states, self.num_key_value_groups)
+
+        attn_weights = torch.matmul(
+            query_states, key_states.transpose(2, 3)
+        ) / math.sqrt(self.head_dim)
+
+        if attention_mask is not None:
+            attn_weights = torch.tensor(attn_weights) + torch.tensor(attention_mask)
+            attn_weights = torch.max(
+                attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min)
+            )
+
+        # upcast attention to fp32
+        attn_weights = nn.functional.softmax(
+            attn_weights, dim=-1, dtype=torch.float32
+        ).to(query_states.dtype)
+        attn_output = torch.matmul(attn_weights, value_states)
+
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
 def _QWenAttention_forward(
     self,
     hidden_states: Optional[Tuple[torch.FloatTensor]],
@@ -1686,7 +1782,7 @@ def _GitVisionAttention_forward(
         None,
         attention_mask,
         vision=True,
-        add_causal_mask=False,
+        add_casual_mask=False,
     )
     if not output_attentions:
         attn_weights = None
@@ -2011,7 +2107,7 @@ def _Phi3Attention_forward(
         past_key_value,
         None,
         attention_mask,
-        add_causal_mask=False,
+        add_casual_mask=False,
     )
     attn_output = attn_output.transpose(1, 2).contiguous()
     attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
@@ -2019,6 +2115,102 @@ def _Phi3Attention_forward(
     # attn_output = self.o_proj(attn_output)
     if not output_attentions:
         attn_weights = None
+    return attn_output, attn_weights, past_key_value
+
+
+def _WhisperAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    key_value_states: Optional[torch.Tensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    layer_head_mask: Optional[torch.Tensor] = None,
+    output_attentions: bool = False,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    is_cross_attention = key_value_states is not None
+    bsz, tgt_len, _ = hidden_states.size()
+    query_states = self.q_proj(hidden_states) * self.scaling
+    if is_cross_attention and past_key_value is not None:
+        key_states = past_key_value[1].contiguous()
+        value_states = past_key_value[2].contiguous()
+    elif is_cross_attention:
+        key_states = (
+            self.k_proj(key_value_states)
+            .view(bsz, -1, self.num_heads, self.head_dim)
+            .contiguous()
+        )
+        value_states = (
+            self.v_proj(key_value_states)
+            .view(bsz, -1, self.num_heads, self.head_dim)
+            .contiguous()
+        )
+    else:
+        key_states = (
+            self.k_proj(hidden_states)
+            .view(bsz, -1, self.num_heads, self.head_dim)
+            .contiguous()
+        )
+        value_states = (
+            self.v_proj(hidden_states)
+            .view(bsz, -1, self.num_heads, self.head_dim)
+            .contiguous()
+        )
+
+    query_states = query_states.view(
+        bsz, -1, self.num_heads, self.head_dim
+    ).contiguous()
+
+    src_len = key_states.size(1)
+    if attention_mask is None:
+        seq_len = (
+            src_len + past_key_value[0].size(-2)
+            if past_key_value is not None
+            else src_len
+        )
+        attention_mask = torch.zeros(
+            [bsz, 1, tgt_len, src_len if is_cross_attention else seq_len],
+            dtype=hidden_states.dtype,
+        )
+    if key_value_states is None and self.is_decoder:
+        decoded_tokens = (
+            torch.tensor(past_key_value[0].size(-2))
+            if past_key_value is not None
+            else None
+        )
+    else:
+        decoded_tokens = torch.zeros(1, dtype=torch.long).contiguous()[0]
+
+    (
+        attn_output,
+        attn_weights,
+        past_key_value,
+    ) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        1,
+        past_key_value,
+        layer_head_mask,
+        attention_mask,
+        None,
+        False,
+        decoded_tokens,
+    )
+    if is_cross_attention:
+        past_key_value = (
+            past_key_value[0],
+            key_states,
+            value_states,
+            past_key_value[3],
+        )
+    if not output_attentions:
+        attn_weights = None
+    if not self.is_decoder:
+        past_key_value = None
+
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, tgt_len, -1)
+    # attn_output = self.out_proj(attn_output)
     return attn_output, attn_weights, past_key_value
 
 
@@ -2090,6 +2282,13 @@ class _IPEXAttentionRef(nn.Module):
             if k.startswith("__") or k.startswith("forward"):
                 continue
             setattr(self.__class__, k, getattr(module.__class__, k))
+        for base_class in module.__class__.__bases__:
+            if base_class.__class__ == nn.Module:
+                continue
+            for k, v in base_class.__dict__.items():
+                if k.startswith("__") or k.startswith("forward"):
+                    continue
+                setattr(self.__class__, k, getattr(base_class, k))
 
         self.model_backbone = config.architectures[0]
         self.distributed = distributed
@@ -2125,7 +2324,7 @@ class _IPEXAttentionRef(nn.Module):
                 if (
                     self.model_backbone == "LlavaLlamaForCausalLM"
                     and module._get_name() == "CLIPAttention"
-                ):
+                ) or config.num_key_value_heads == config.num_attention_heads:
                     self.num_key_value_heads = self.num_attention_heads
                 else:
                     raise ValueError(
@@ -2151,6 +2350,7 @@ class _IPEXAttentionRef(nn.Module):
                 "T5ForConditionalGeneration",
                 "MptForCausalLM",
                 "GitForCausalLM",
+                "WhisperForConditionalGeneration",
             ]
             or (
                 self.model_backbone == "BaichuanForCausalLM"
@@ -2181,36 +2381,41 @@ class _IPEXAttentionRef(nn.Module):
                 self.rope_base = config.rotary_emb_base
             elif hasattr(config, "rope_theta"):
                 self.rope_base = config.rope_theta
-            if self.model_backbone in ["Phi3ForCausalLM"]:
-                extra_inputs = {}
-                if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
-                    if "short_factor" in config.rope_scaling:
-                        extra_inputs["short_factor"] = config.rope_scaling[
-                            "short_factor"
-                        ]
-                    if "long_factor" in config.rope_scaling:
-                        extra_inputs["long_factor"] = config.rope_scaling["long_factor"]
-                    if "type" in config.rope_scaling:
-                        extra_inputs["type"] = config.rope_scaling["type"]
-                if hasattr(config, "original_max_position_embeddings"):
+            extra_inputs = {}
+            if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
+                if "short_factor" in config.rope_scaling:
+                    extra_inputs["short_factor"] = config.rope_scaling["short_factor"]
+                if "long_factor" in config.rope_scaling:
+                    extra_inputs["long_factor"] = config.rope_scaling["long_factor"]
+                if "type" in config.rope_scaling:
+                    extra_inputs["type"] = config.rope_scaling["type"]
+                if "factor" in config.rope_scaling:
+                    extra_inputs["factor"] = config.rope_scaling["factor"]
+                if "low_freq_factor" in config.rope_scaling:
+                    extra_inputs["low_freq_factor"] = config.rope_scaling[
+                        "low_freq_factor"
+                    ]
+                if "high_freq_factor" in config.rope_scaling:
+                    extra_inputs["high_freq_factor"] = config.rope_scaling[
+                        "high_freq_factor"
+                    ]
+                if "original_max_position_embeddings" in config.rope_scaling:
                     extra_inputs["original_max_position_embeddings"] = (
-                        config.original_max_position_embeddings
+                        config.rope_scaling["original_max_position_embeddings"]
                     )
-                self._IPEXROPE = _IPEXRopeRef(
-                    self.max_position_embeddings,
-                    self.pos_embd_dim,
-                    self.rope_base,
-                    self.model_backbone,
-                    extra_inputs,
+                if "rope_type" in config.rope_scaling:
+                    extra_inputs["rope_type"] = config.rope_scaling["rope_type"]
+            if hasattr(config, "original_max_position_embeddings"):
+                extra_inputs["original_max_position_embeddings"] = (
+                    config.original_max_position_embeddings
                 )
-            else:
-                self._IPEXROPE = _IPEXRopeRef(
-                    self.max_position_embeddings,
-                    self.pos_embd_dim,
-                    self.rope_base,
-                    self.model_backbone,
-                )
-
+            self._IPEXROPE = _IPEXRopeRef(
+                self.max_position_embeddings,
+                self.pos_embd_dim,
+                self.rope_base,
+                self.model_backbone,
+                extra_inputs,
+            )
         if self.model_backbone in [
             "GPTJForCausalLM",
             "LlamaForCausalLM",
@@ -2219,19 +2424,19 @@ class _IPEXAttentionRef(nn.Module):
             "StableLmForCausalLM",
             "LlavaLlamaForCausalLM",
             "PhiForCausalLM",
+            "Qwen2ForCausalLM",
         ]:
             supported_linear_types = [
                 torch.nn.Linear,
                 WeightOnlyQuantizedLinear,
             ]
-            try:
-                import deepspeed
+            from intel_extension_for_pytorch.nn.utils._weight_prepack import (
+                may_import_deepspeed_modules,
+            )
 
-                supported_linear_types.append(
-                    deepspeed.module_inject.layers.LinearLayer
-                )
-            except ImportError:
-                pass
+            ds_modules = may_import_deepspeed_modules()
+            if ds_modules is not None:
+                supported_linear_types.extend(ds_modules)
             supported_linear_types = tuple(supported_linear_types)
             if (
                 hasattr(module, "q_proj")
@@ -2431,6 +2636,16 @@ class _IPEXAttentionRef(nn.Module):
             )
         elif self.model_backbone == "LlamaForCausalLM":
             return _LlamaAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "Qwen2ForCausalLM":
+            return _QWen2Attention_forward(
                 self,
                 hidden_states,
                 attention_mask,
@@ -2648,6 +2863,16 @@ class _IPEXAttentionRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
+        elif self.model_backbone == "WhisperForConditionalGeneration":
+            return _WhisperAttention_forward(
+                self,
+                hidden_states,
+                key_value_states,
+                past_key_value,
+                attention_mask,
+                layer_head_mask,
+                output_attentions,
+            )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2655,6 +2880,8 @@ class _IPEXAttentionRef(nn.Module):
 def _reorder_cache(
     self, past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
 ) -> Tuple[Tuple[torch.Tensor]]:
+    if isinstance(past_key_values[0], str):
+        past_key_values = past_key_values[1]
     if (
         len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1
     ):  # discrete kv_cache

@@ -139,7 +139,6 @@ class _IPEXRopeCPU(nn.Module):
         # keep the inplace context as used in TGI
         query.copy_(query_)
         key.copy_(key_)
-
         return query, key
 
 
@@ -344,7 +343,11 @@ class _IPEXPagedAttentionCPU:
     @classmethod
     def reshape_and_cache(cls, key, value, key_cache, value_cache, slot_mapping):
         torch.ops.torch_ipex.reshape_and_cache(
-            key, value, key_cache, value_cache, slot_mapping
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping.int() if slot_mapping.dtype is torch.long else slot_mapping,
         )
 
     @classmethod
@@ -415,6 +418,37 @@ class _IPEXPagedAttentionCPU:
             context_lens,
             block_size,
             max_context_len,
+            alibi_slopes,
+        )
+
+    @classmethod
+    def flash_attn_varlen_func(
+        cls,
+        output,
+        query,
+        k_cache,
+        v_cache,
+        cu_seq_lens_q,
+        cu_seq_lens_kv,
+        max_seq_len_q,
+        max_seq_len_kv,
+        scale,
+        is_causal,
+        block_table,
+        alibi_slopes=None,
+    ):
+        torch.ops.torch_ipex.flash_attn_varlen_func(
+            output,
+            query,
+            k_cache,
+            v_cache,
+            cu_seq_lens_q,
+            cu_seq_lens_kv,
+            max_seq_len_q,
+            max_seq_len_kv,
+            scale,
+            is_causal,
+            block_table,
             alibi_slopes,
         )
 

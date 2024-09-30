@@ -50,6 +50,37 @@ def _sample(
     streamer: Optional["BaseStreamer"] = None,
     **model_kwargs,
 ) -> Union[SampleOutput, torch.LongTensor]:
+    new_generation_config = model_kwargs.pop("generation_config", None)
+    if new_generation_config is not None:
+        if not new_generation_config.do_sample:
+            pad_token_id = new_generation_config._pad_token_tensor
+            eos_token_id = new_generation_config._eos_token_tensor
+            return self._greedy_search(
+                input_ids,
+                logits_processor,
+                stopping_criteria,
+                max_length,
+                pad_token_id,
+                eos_token_id,
+                output_attentions,
+                output_hidden_states,
+                output_scores,
+                return_dict_in_generate,
+                synced_gpus,
+                streamer,
+                **model_kwargs,
+            )
+    else:
+        pad_token_id = (
+            pad_token_id
+            if pad_token_id is not None
+            else self.generation_config.pad_token_id
+        )
+        eos_token_id = (
+            eos_token_id
+            if eos_token_id is not None
+            else self.generation_config.eos_token_id
+        )
     token_latency = (
         self.config.token_latency if hasattr(self.config, "token_latency") else False
     )
@@ -152,6 +183,10 @@ def _sample(
             if this_peer_finished_flag.item() == 0.0:
                 break
 
+        if "past_key_values" in model_kwargs and not isinstance(
+            model_kwargs["past_key_values"], tuple
+        ):
+            model_kwargs["past_key_values"] = None
         # prepare model inputs
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -180,6 +215,8 @@ def _sample(
             "YuanForCausalLM",
             "PhiForCausalLM",
             "Phi3ForCausalLM",
+            "WhisperForConditionalGeneration",
+            "Qwen2ForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -235,6 +272,47 @@ def _sample(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
+                if self.model_backbone == "WhisperForConditionalGeneration":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                self.model.decoder.layers[i]
+                                .encoder_attn.k_proj(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.model.decoder.layers[i].encoder_attn.num_heads,
+                                    self.model.decoder.layers[i].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                self.model.decoder.layers[i]
+                                .encoder_attn.v_proj(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.model.decoder.layers[i].encoder_attn.num_heads,
+                                    self.model.decoder.layers[i].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+
             if first_token:
                 if hasattr(self.config, "n_layer"):
                     num_hidden_layers = self.config.n_layer
@@ -287,6 +365,13 @@ def _sample(
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            if self.model_backbone == "WhisperForConditionalGeneration":
+                model_inputs["encoder_outputs"] = (
+                    model_inputs["encoder_outputs"]["last_hidden_state"],
+                )
+                model_inputs.pop("decoder_position_ids", None)
+                model_inputs.pop("decoder_attention_mask", None)
+            model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
@@ -386,9 +471,11 @@ def _sample(
             if unfinished_sequences.max() == 0:
                 this_peer_finished = True
         latency_list.append(time.time() - tic)
+        unfinished_sequences = unfinished_sequences & ~stopping_criteria(
+            input_ids, scores
+        )
         # stop if we exceed the maximum length
-        if stopping_criteria(input_ids, scores):
-            this_peer_finished = True
+        this_peer_finished = unfinished_sequences.max() == 0
 
         if this_peer_finished and not synced_gpus:
             break

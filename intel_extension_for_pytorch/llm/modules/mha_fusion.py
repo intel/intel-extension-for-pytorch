@@ -154,11 +154,9 @@ class RotaryEmbedding(nn.Module):
         runtime_module = cls.runtime_ops.get_module_from_device(
             query.device.type, IPEXCustomOpType.ROPE, False
         )
-
         query, key = runtime_module.rotary_embedding(
             query, key, sin, cos, rotary_dim, rotary_half, position_ids
         )
-
         return query, key
 
 
@@ -484,7 +482,7 @@ class VarlenAttention(nn.Module):
 class PagedAttention:
     r"""
     This module follows the API of two class methods as [vLLM](https://blog.vllm.ai/2023/06/20/vllm.html)
-    to enable the paged attention kernel in and use the layout of (num_blocks, self.block_size, num_heads, head_size)
+    to enable the paged attention kernel in and use the layout of (num_blocks, num_heads, block_size,  head_size)
     for key/value cache. The basic logic as following figure. Firstly, The DRAM buffer which includes num_blocks
     are pre-allocated to store key or value cache. For every block, block_size tokens can be stored. In the forward
     pass, the cache manager will firstly allocate some slots from this buffer and use reshape_and_cache API to store
@@ -534,9 +532,9 @@ class PagedAttention:
             means the number of query head. head_size means the head dimension.
         query (torch.Tensor): The query tensor. The shape should be [num_seqs, num_heads, head_size].
         key_cache (torch.Tensor): The pre-allocated buffer to store the key cache.
-            The shape should be [num_blocks,  block_size, num_heads, head_size].
+            The shape should be [num_blocks,  num_heads, block_size, head_size].
         value_cache(torch.Tensor): The pre-allocated buffer to store the value cache.
-            The shape should be [num_blocks,  block_size, num_heads, head_size].
+            The shape should be [num_blocks, num_heads, block_size, head_size].
         head_mapping(torch.Tensor): The mapping from the query head to the kv head.
             The shape should be the number of query heads.
         scale (float): The scale used by the scale-dot-product.
@@ -589,6 +587,43 @@ class PagedAttention:
         max_context_len (int): The max sequence length.
         alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
 
+    [class method]: flash_atten_varlen
+
+    .. highlight:: python
+    .. code-block:: python
+
+    ipex.llm.modules.PagedAttention.flash_atten_varlen(
+        out,
+        query,
+        key_cache,
+        value_cache,
+        cu_seqlens_q,
+        cu_seqlens_kv,
+        max_seqlen_q,
+        max_seqlen_kv,
+        scale,
+        is_cusal,
+        block_tables,
+        alibi_slopes
+    )
+
+    Args:
+        out (torch.Tensor): The output tensor with shape of [num_seqs, num_heads, head_size],
+        query (torch.Tensor): The query tensor. The shape should be [num_seqs, num_heads, head_size].
+        key_cache (torch.Tensor): The pre-allocated buffer to store the key cache.
+            The shape should be [num_blocks,  num_heads, block_size, head_size].
+        value_cache(torch.Tensor): The pre-allocated buffer to store the value cache.
+            The shape should be [num_blocks, num_heads, block_size, head_size].
+        cu_seqlens_q (torch.Tensor): The accumulated sequence length for query. The size is [batch_size+1].
+        cu_seqlens_kv (torch.Tensor): The accumulated sequence length for key/value. The size is [batch_size+1].
+        max_seqlen_q (int): The max sequence length for query.
+        max_seqlen_kv (int): The max sequence length for key/value.
+        scale (float): The scale used by the scale-dot-product.
+            In general, it is: ``float(1.0 / (head_size ** 0.5))``.
+        is_cusal (bool): Whether to apply causal attention masking. Default is True. False is not supported yet.
+        block_tables:(torch.Tensor): The mapping table used to mapping the logical sequence
+            to the physical sequence. The shape should be [batch_size, max_num_blocks_per_seq].
+        alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
     """
 
     runtime_ops: IPEXRuntimeCustomOps = IPEXRuntimeCustomOps()
@@ -683,6 +718,39 @@ class PagedAttention:
             context_lens,
             block_size,
             max_context_len,
+            alibi_slopes,
+        )
+
+    @classmethod
+    def flash_attn_varlen_func(
+        cls,
+        output: torch.Tensor,
+        query: torch.Tensor,
+        key_cache: torch.Tensor,
+        value_cache: torch.Tensor,
+        cu_seqlens_q: torch.Tensor,
+        cu_seqlens_kv: torch.Tensor,
+        max_seqlen_q: int,
+        max_seqlen_kv: int,
+        scale,
+        is_cusal: bool,
+        block_tables: torch.Tensor,
+        alibi_slopes: torch.Tensor,
+    ):
+        return cls.runtime_ops.get_module_from_device(
+            output.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
+        ).flash_attn_varlen_func(
+            output,
+            query,
+            key_cache,
+            value_cache,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            max_seqlen_q,
+            max_seqlen_kv,
+            scale,
+            is_cusal,
+            block_tables,
             alibi_slopes,
         )
 

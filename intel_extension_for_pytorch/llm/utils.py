@@ -10,7 +10,7 @@ import os
 import shutil
 import typing
 from ..utils._logger import logger, WarningType
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 from transformers.dynamic_module_utils import (
     check_imports,
     create_dynamic_module,
@@ -303,6 +303,35 @@ def _get_cached_module_file(
     return os.path.join(full_submodule, module_file)
 
 
+def _get_imports(filename: Union[str, os.PathLike]) -> List[str]:
+    """
+    Extracts all the libraries (not relative imports this time) that are imported in a file.
+
+    Args:
+        filename (`str` or `os.PathLike`): The module file to inspect.
+
+    Returns:
+        `List[str]`: The list of all packages required to use the input module.
+    """
+    with open(filename, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # filter out try/except block so in custom code we can have try/except imports
+    content = re.sub(
+        r"\s*try\s*:\s*.*?\s*except\s*.*?:", "", content, flags=re.MULTILINE | re.DOTALL
+    )
+
+    # Imports of the form `import xxx`
+    imports = re.findall(r"^\s*import\s+(\S+)\s*$", content, flags=re.MULTILINE)
+    # Imports of the form `from xxx import yyy`
+    imports += re.findall(r"^\s*from\s+(\S+)\s+import", content, flags=re.MULTILINE)
+    # Only keep the top-level module
+    imports = [imp.split(".")[0] for imp in imports if not imp.startswith(".")]
+    while "flash_attn" in imports:
+        imports.remove("flash_attn")
+    return list(set(imports))
+
+
 def _get_class_from_dynamic_module(
     class_reference: str,
     pretrained_model_name_or_path: Union[str, os.PathLike],
@@ -427,6 +456,12 @@ def _get_class_from_dynamic_module(
         local_files_only=local_files_only,
         repo_type=repo_type,
     )
-    return get_class_in_module(
-        class_name, final_module.replace(".py", "").replace("-", "_")
-    )
+    import transformers
+    from packaging import version
+
+    trans_version = transformers.__version__
+    if version.parse(trans_version) < version.parse("4.39.0"):
+        return get_class_in_module(
+            class_name, final_module.replace(".py", "").replace("-", "_")
+        )
+    return get_class_in_module(class_name, final_module.replace("-", "_"))

@@ -147,6 +147,10 @@ def _greedy_search(
             if this_peer_finished_flag.item() == 0.0:
                 break
 
+        if "past_key_values" in model_kwargs and not isinstance(
+            model_kwargs["past_key_values"], tuple
+        ):
+            model_kwargs["past_key_values"] = None
         # prepare model inputs
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -174,6 +178,8 @@ def _greedy_search(
             "YuanForCausalLM",
             "PhiForCausalLM",
             "Phi3ForCausalLM",
+            "WhisperForConditionalGeneration",
+            "Qwen2ForCausalLM",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -229,6 +235,47 @@ def _greedy_search(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
+                if self.model_backbone == "WhisperForConditionalGeneration":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(input_bs)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                self.model.decoder.layers[i]
+                                .encoder_attn.k_proj(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.model.decoder.layers[i].encoder_attn.num_heads,
+                                    self.model.decoder.layers[i].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                self.model.decoder.layers[i]
+                                .encoder_attn.v_proj(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(input_bs),
+                                    -1,
+                                    self.model.decoder.layers[i].encoder_attn.num_heads,
+                                    self.model.decoder.layers[i].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
+
             if first_token:
                 if hasattr(self.config, "n_layer"):
                     num_hidden_layers = self.config.n_layer
@@ -279,8 +326,15 @@ def _greedy_search(
                 self, "prepare_inputs_labels_for_multimodal"
             ):
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
+            elif self.model_backbone == "WhisperForConditionalGeneration":
+                model_inputs["encoder_outputs"] = (
+                    model_inputs["encoder_outputs"]["last_hidden_state"],
+                )
+                model_inputs.pop("decoder_position_ids", None)
+                model_inputs.pop("decoder_attention_mask", None)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)
                 model_inputs.pop("token_type_ids", None)
@@ -376,7 +430,10 @@ def _greedy_search(
 
         # stop when each sentence is finished, or if we exceed the maximum length
         latency_list.append(time.time() - tic)
-        if unfinished_sequences.max() == 0 or stopping_criteria(input_ids, scores):
+        unfinished_sequences = unfinished_sequences & ~stopping_criteria(
+            input_ids, scores
+        )
+        if unfinished_sequences.max() == 0:
             if not synced_gpus:
                 break
             else:

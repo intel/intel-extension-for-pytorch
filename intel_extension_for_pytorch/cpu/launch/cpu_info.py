@@ -3,7 +3,6 @@ import os
 import platform
 import re
 import subprocess
-from ...utils._logger import WarningType
 
 # lscpu Examples
 # # The following is the parsable format, which can be fed to other
@@ -225,21 +224,21 @@ class CPUPoolList:
 
     """
     Get CPU pools from all available CPU cores with designated criterias.
-    - ninstances [int]: Number of instances. Should be a non negative integer, 0 by default. \
+    - ninstances [int]: Number of instances. Should be a non negative integer, 0 by default.
         When it is 0, it will be set according to usage scenarios automatically in the function.
-    - ncores_per_instance [int]: Number of cores per instance. Should be a non negative integer, 0 by default. \
+    - ncores_per_instance [int]: Number of cores per instance. Should be a non negative integer, 0 by default.
         When it is 0, it will be set according to usage scenarios automatically in the function.
-    - use_logical_cores [bool]: Use logical cores on the workloads or not, False by default. When set to False, \
+    - use_logical_cores [bool]: Use logical cores on the workloads or not, False by default. When set to False,
         only physical cores are used.
     - use_e_cores [bool]: Use Efficient-Cores, False by default. When set to False, only Performance-Cores are used.
-    - skip_cross_node_cores [bool]: Allow instances to be executed on cores across NUMA nodes, False by default.
+    - bind_numa_node [bool]: Bind instances to be executed on cores on a single NUMA node, False by default.
     - nodes_list [list]: A list containing all node ids that the execution is expected to be running on.
     - cores_list [list]: A list containing all cpu ids that the execution is expected to be running on.
-    - return_mode [str]: A string that defines how result values are formed, could be either of 'auto', \
-        'list' and 'range'. When set to 'list', a string with comma-separated cpu ids, '0,1,2,3,...', is returned. \
-        When set to 'range', a string with comma-separated cpu id ranges, '0-2,6-8,...', is returned. \
-        When set to 'auto', a 'list' or a 'range' whoever has less number of elements that are separated by \
-        comma is returned. I.e. for a list '0,1,2,6,7,8' and a range '0-2,6-8', both reflect the same cpu \
+    - return_mode [str]: A string that defines how result values are formed, could be either of 'auto',
+        'list' and 'range'. When set to 'list', a string with comma-separated cpu ids, '0,1,2,3,...', is returned.
+        When set to 'range', a string with comma-separated cpu id ranges, '0-2,6-8,...', is returned.
+        When set to 'auto', a 'list' or a 'range' whoever has less number of elements that are separated by
+        comma is returned. I.e. for a list '0,1,2,6,7,8' and a range '0-2,6-8', both reflect the same cpu
         configuration, the range '0-2,6-8' is returned.
     """
 
@@ -249,9 +248,10 @@ class CPUPoolList:
         ncores_per_instance=0,
         use_logical_cores=False,
         use_e_cores=False,
-        skip_cross_node_cores=False,
+        bind_numa_node=False,
         nodes_list=None,
         cores_list=None,
+        strategy="close",
         return_mode="auto",
     ):
         if nodes_list is None:
@@ -265,40 +265,7 @@ class CPUPoolList:
             assert set(cores_list).issubset(
                 set(cores_available)
             ), f"Designated cores list {cores_list} contains invalid cores."
-            if use_logical_cores:
-                self.verbose(
-                    "warning",
-                    "Argument --use-logical-cores won't take effect when --cores-list is set."
-                    + "please see https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#launch-script-usage-guide"  # noqa: B950
-                    + "for usage guide",
-                    warning_type=WarningType.AmbiguousArgument,
-                )
-            if use_e_cores:
-                self.verbose(
-                    "warning",
-                    "Argument --use-e-cores won't take effect when --cores-list is set.",
-                    +"please see https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#launch-script-usage-guide"  # noqa: B950
-                    + "for usage guide",
-                    warning_type=WarningType.AmbiguousArgument,
-                )
             pool = [c for c in self.pool_all if c.cpu in cores_list]
-            nodes = list(set([c.node for c in pool]))
-            ncores_per_node = -1
-            for n in nodes:
-                ncores_local = len([c for c in pool if c.node == n])
-                if ncores_per_node == -1:
-                    ncores_per_node = ncores_local
-                else:
-                    if ncores_per_node != ncores_local and skip_cross_node_cores:
-                        skip_cross_node_cores = False
-                        self.verbose(
-                            "warning",
-                            "Argument --skip-cross-node-cores cannot take effect on the designated cores. Disabled.",
-                            +"please see https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#launch-script-usage-guide"  # noqa: B950
-                            + "for usage guide",
-                            warning_type=WarningType.WrongArgument,
-                        )
-                        break
         else:
             if len(nodes_list) > 0:
                 nodes_available = set([c.node for c in self.pool_all])
@@ -308,78 +275,171 @@ class CPUPoolList:
                 pool = [c for c in self.pool_all if c.node in nodes_list]
             else:
                 pool = self.pool_all
-            if not use_logical_cores:
-                pool = [c for c in pool if c.is_physical_core]
-            if not use_e_cores:
-                pool = [c for c in pool if c.is_p_core]
-                e_cores = [c.cpu for c in pool if not c.is_p_core]
-                if len(e_cores) > 0:
-                    self.verbose(
-                        "info",
-                        f"Efficient-Cores are detected ({e_cores}). Disabled for performance consideration. \
-                            You can enable them with argument --use-e-cores.",
-                    )
+        if not use_logical_cores:
+            pool = [c for c in pool if c.is_physical_core]
+            logical_cores = [c.cpu for c in pool if not c.is_physical_core]
+            if len(logical_cores) > 0:
+                self.verbose(
+                    "info",
+                    f"Logical cores are detected ({logical_cores}). Disabled for performance consideration. "
+                    + "You can enable them with argument --use-logical-cores.",
+                )
+        if not use_e_cores:
+            pool = [c for c in pool if c.is_p_core]
+            e_cores = [c.cpu for c in pool if not c.is_p_core]
+            if len(e_cores) > 0:
+                self.verbose(
+                    "info",
+                    f"Efficient-Cores are detected ({e_cores}). Disabled for performance consideration. "
+                    + "You can enable them with argument --use-e-cores.",
+                )
 
         # Determine ninstances and ncores_per_instance for grouping
         assert (
-            ncores_per_instance >= 0
-        ), "Argument --ncores-per-instance cannot be a negative value."
+            ncores_per_instance >= -1
+        ), "Argument --ncores-per-instance cannot be a negative value other than -1."
         assert ninstances >= 0, "Argument --ninstances cannot be a negative value."
-        nodes = set([c.node for c in pool])
+        pool.sort(key=lambda x: (x.core, 1 - int(x.is_physical_core)))
+        nodes = list(set([c.node for c in pool]))
+        is_greedy = False
+        if ncores_per_instance == -1:
+            is_greedy = True
+            ncores_per_instance = 0
         if ncores_per_instance + ninstances == 0:
             # Both ncores_per_instance and ninstances are 0
             ninstances = 1
-        if ncores_per_instance * ninstances == 0:
-            # Either ncores_per_instance or ninstances is 0
-            if skip_cross_node_cores:
-                ncores_per_node = len(pool) // len(nodes)
-                nresidual = 0
-                if ncores_per_instance == 0:
-                    nins_per_node = ninstances // len(nodes)
-                    if ninstances % len(nodes) > 0:
-                        nins_per_node += 1
-                    ncores_per_instance = ncores_per_node // nins_per_node
-                    nresidual = ncores_per_node % nins_per_node
-                if ninstances == 0:
-                    ninstances = ncores_per_node // ncores_per_instance * len(nodes)
-                    nresidual = ncores_per_node % ncores_per_instance
-                if nresidual > 0:
-                    cores_remove = []
-                    for n in nodes:
-                        cores = [c for c in pool if c.node == n]
-                        for i in range(nresidual):
-                            cores_remove.append(cores[-1 * (i + 1)])
-                    for c in cores_remove:
-                        pool.remove(c)
+
+        rst = []
+        if ncores_per_instance == 0:
+            pool_process = []
+            ninstances_node = []
+            if bind_numa_node:
+                for node in nodes:
+                    pool_node = [c for c in pool if c.node == node]
+                    pool_process.append(pool_node)
+                    ninstances_local = (ninstances * len(pool_node)) // len(pool)
+                    if (ninstances_local) == 0 or (
+                        (ninstances * len(pool_node)) % len(pool) > 0
+                    ):
+                        ninstances_local += 1
+                    ninstances_node.append(ninstances_local)
+                for _ in range(int(sum(ninstances_node)) - ninstances):
+                    ncores_per_instance_local = []
+                    for i in range(len(nodes)):
+                        ncores_node = len([c for c in pool if c.node == nodes[i]])
+                        tmp = ncores_node / ninstances_node[i]
+                        if ninstances_node[i] == 1:
+                            tmp = len(pool)
+                        ncores_per_instance_local.append(tmp)
+                    ncores_per_instance_local_min = min(ncores_per_instance_local)
+                    if ncores_per_instance_local_min == len(pool):
+                        break
+                    index = ncores_per_instance_local.index(
+                        ncores_per_instance_local_min
+                    )
+                    ninstances_node[index] -= 1
+                delta = int(sum(ninstances_node)) - ninstances
+                if delta > 0:
+                    ncores_per_instance_local = []
+                    for i in range(len(nodes)):
+                        ncores_per_instance_local.append(
+                            {
+                                "index": i,
+                                "count": len([c for c in pool if c.node == nodes[i]]),
+                            }
+                        )
+                    ncores_per_instance_local.sort(
+                        key=lambda x: (x["count"], len(nodes) - x["index"])
+                    )
+                    for i in range(delta):
+                        ninstances_node[ncores_per_instance_local[i]["index"]] -= 1
             else:
-                if ninstances == 0:
-                    ninstances = len(pool) // ncores_per_instance
-                if ncores_per_instance == 0:
-                    ncores_per_instance = len(pool) // ninstances
+                pool_process.append(pool)
+                ninstances_node.append(ninstances)
+            for i in range(len(pool_process)):
+                p = pool_process[i]
+                n = ninstances_node[i]
+                if n == 0:
+                    continue
+                tmp = []
+                for j in range(n):
+                    tmp.append({"ncores": len(p) // n, "pool": []})
+                if is_greedy:
+                    ncores_residual = len(p) % n
+                    for j in range(ncores_residual):
+                        tmp[j]["ncores"] += 1
+                ncores_assigned = 0
+                for j in range(len(tmp)):
+                    tmp[j]["pool"] = p[
+                        ncores_assigned : ncores_assigned + tmp[j]["ncores"]
+                    ]
+                    ncores_assigned += tmp[j]["ncores"]
+                rst += tmp
         else:
-            # Neither ncores_per_instance nor ninstances is 0
-            if skip_cross_node_cores:
-                self.verbose(
-                    "warning",
-                    "Argument --skip-cross-node-cores won't take effect when both --ninstances and"
-                    + " --ncores-per-instance are explicitly set."
-                    + "please see https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#launch-script-usage-guide"  # noqa: B950
-                    + "for usage guide",
-                    warning_type=WarningType.AmbiguousArgument,
+            pool_process = []
+            if bind_numa_node:
+                for node in nodes:
+                    pool_process.append([c for c in pool if c.node == node])
+            else:
+                pool_process.append(pool)
+            for i in range(len(pool_process)):
+                p = pool_process[i]
+                n = len(p) // ncores_per_instance
+                ncores_assigned = 0
+                for _ in range(n):
+                    item = {"ncores": 0, "node": nodes[i], "pool": []}
+                    item["ncores"] = ncores_per_instance
+                    item["pool"] = p[
+                        ncores_assigned : ncores_assigned + ncores_per_instance
+                    ]
+                    ncores_assigned += ncores_per_instance
+                    rst.append(item)
+            if ninstances > 0:
+                assert ninstances <= len(rst), (
+                    f"Requested --ninstances ({ninstances}) and --ncores_per_instance ({ncores_per_instance}) "
+                    + "combination is not supported. Please adjust either or both of these 2 parameters and try again."
                 )
-        assert (
-            ninstances * ncores_per_instance > 0
-            and ninstances * ncores_per_instance <= len(pool)
-        ), "Requested number of cores exceeds what is available."
+                if ninstances < len(rst):
+                    if strategy == "close":
+                        rst = rst[:ninstances]
+                    elif strategy == "scatter":
+                        if len(pool_process) == 1:
+                            step = len(rst) // ninstances
+                            if len(rst) % ninstances > 0:
+                                step += 1
+                            rst = rst[::step]
+                        else:
+                            rst_map = []
+                            ninstances_node_avai = []
+                            ninstances_node = []
+                            for node in nodes:
+                                tmp = [r for r in rst if r["node"] == node]
+                                rst_map.append(tmp)
+                                ninstances_node_avai.append(len(tmp))
+                                ninstances_node.append(0)
+                            index = 0
+                            for _ in range(ninstances):
+                                while index < len(nodes):
+                                    index += 1
+                                    if index == len(nodes):
+                                        index = 0
+                                    if ninstances_node_avai[index - 1] > 0:
+                                        ninstances_node[index - 1] += 1
+                                        ninstances_node_avai[index - 1] -= 1
+                                        break
+                            rst.clear()
+                            for i in range(len(ninstances_node)):
+                                rst += rst_map[i][: ninstances_node[i]]
+                    else:
+                        raise ValueError(f"Strategy {strategy} is not available.")
 
         # Split the aggregated pool into individual pools
         self.pools_ondemand.clear()
-        pool.sort(key=lambda x: (x.core, 1 - int(x.is_physical_core)))
-        for i in range(ninstances):
+        for item in rst:
             # Generate individual raw pool
             pool_local = CPUPool()
-            for j in range(ncores_per_instance):
-                pool_local.append(pool[i * ncores_per_instance + j])
+            for c in item["pool"]:
+                pool_local.append(c)
             pool_local.sort(key=lambda x: x.cpu)
             self.pools_ondemand.append(pool_local)
 
@@ -387,22 +447,29 @@ class CPUPoolList:
 if __name__ == "__main__":
     lscpu_txt = """
 """
+    try:
+        with open("example.txt", "r") as f:
+            lscpu_txt = f.read()
+    except Exception:
+        lscpu_txt = """
+"""
     pools = CPUPoolList(lscpu_txt=lscpu_txt)
     pools.gen_pools_ondemand(
         use_logical_cores=False,
         return_mode="auto",
-        ninstances=3,
-        ncores_per_instance=0,
+        ninstances=10,
+        ncores_per_instance=-1,
         use_e_cores=True,
-        skip_cross_node_cores=False,
+        bind_numa_node=True,
+        strategy="scatter",
     )
     print(f'capacity pool_auto:  {pools.pool_all.get_pool_txt(return_mode="auto")}')
-    print(f'capacity pool_list:  {pools.pool_all.get_pool_txt(return_mode="list")}')
-    print(f'capacity pool_range: {pools.pool_all.get_pool_txt(return_mode="range")}')
+    # print(f'capacity pool_list:  {pools.pool_all.get_pool_txt(return_mode="list")}')
+    # print(f'capacity pool_range: {pools.pool_all.get_pool_txt(return_mode="range")}')
     print("")
     for i in range(len(pools.pools_ondemand)):
         p = pools.pools_ondemand[i]
         print(f'ondemand pool_auto:  {i} {p.get_pool_txt(return_mode="auto")}')
-        print(f'ondemand pool_list:  {i} {p.get_pool_txt(return_mode="list")}')
-        print(f'ondemand pool_range: {i} {p.get_pool_txt(return_mode="range")}')
-        print([c.cpu for c in p])
+        # print(f'ondemand pool_list:  {i} {p.get_pool_txt(return_mode="list")}')
+        # print(f'ondemand pool_range: {i} {p.get_pool_txt(return_mode="range")}')
+        # print([c.cpu for c in p])

@@ -98,7 +98,11 @@ class RotaryEmbedding(torch.nn.Module):
                 ext_factors_long
                 * base ** (torch.arange(0, dim, 2, device=self.device).float() / dim)
             )
-        if kwargs is not None and "original_max_position_embeddings" in kwargs:
+        if (
+            kwargs is not None
+            and "original_max_position_embeddings" in kwargs
+            and not ("rope_type" in kwargs and kwargs["rope_type"] == "llama3")
+        ):
             self.original_max_position_embeddings = kwargs[
                 "original_max_position_embeddings"
             ]
@@ -113,6 +117,35 @@ class RotaryEmbedding(torch.nn.Module):
                 elif "type" in kwargs and kwargs["type"] == "yarn":
                     self.scaling_factor = 0.1 * math.log(scale) + 1.0
             self.max_seq_len_cached = self.original_max_position_embeddings
+        if (
+            kwargs is not None
+            and "rope_type" in kwargs
+            and kwargs["rope_type"] == "llama3"
+        ):
+            # Values obtained from grid search
+            scale_factor = kwargs["factor"]
+            low_freq_factor = kwargs["low_freq_factor"]
+            high_freq_factor = kwargs["high_freq_factor"]
+            old_context_len = kwargs["original_max_position_embeddings"]
+
+            low_freq_wavelen = old_context_len / low_freq_factor
+            high_freq_wavelen = old_context_len / high_freq_factor
+            new_freqs = []
+            for freq in inv_freq:
+                wavelen = 2 * math.pi / freq
+                if wavelen < high_freq_wavelen:
+                    new_freqs.append(freq)
+                elif wavelen > low_freq_wavelen:
+                    new_freqs.append(freq / scale_factor)
+                else:
+                    assert low_freq_wavelen != high_freq_wavelen
+                    smooth = (old_context_len / wavelen - low_freq_factor) / (
+                        high_freq_factor - low_freq_factor
+                    )
+                    new_freqs.append((1 - smooth) * freq / scale_factor + smooth * freq)
+            inv_freq = torch.tensor(
+                new_freqs, dtype=inv_freq.dtype, device=inv_freq.device
+            )
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         if backbone == "Phi3ForCausalLM" and "long_factor" not in kwargs:
             self.max_seq_len_cached = self.max_seq_len_cached + 256
@@ -1018,7 +1051,7 @@ class _IPEXRMSNormRef(nn.Module):
 class _IPEXPagedAttentionRef:
     @classmethod
     def reshape_and_cache(cls, key, value, key_cache, value_cache, slot_mapping):
-        if key.dtype is torch.bfloat16:
+        if key.dtype in [torch.bfloat16, torch.float16]:
             x = 16 // torch.tensor([], dtype=key.dtype).element_size()
         else:
             x = 32 // torch.tensor([], dtype=key.dtype).element_size()

@@ -1,7 +1,7 @@
 """Utility functions for IPEX FP8 modules"""
 
 import torch
-import copy
+from intel_extension_for_pytorch.frontend import _copy_model_and_optimizer
 from .fp8 import FP8GlobalStateManager
 
 
@@ -56,7 +56,7 @@ def cast_from_fp8(
     )
 
 
-def convert(model, device="xpu"):
+def convert(model, optimizer, device="xpu"):
     from .linear import FP8Linear
 
     torch_modules = {
@@ -79,20 +79,21 @@ def convert(model, device="xpu"):
                 setattr(new_m, p, getattr(model, p))
         else:
             new_m.__dict__[k] = v
-
     return new_m
 
 
-def convert_rec(m, device="xpu"):
-    new_m = convert(m, device)
+def convert_rec(m, optimizer, device="xpu"):
+    new_m = convert(m, optimizer, device)
     for name, sub_m in m.named_children():
-        setattr(new_m, name, convert_rec(sub_m))
-    return new_m
+        setattr(new_m, name, convert_rec(sub_m, optimizer)[0])
+    return new_m, optimizer
 
 
-def prepare_fp8(model, device="xpu"):
+def prepare_fp8(model, optimizer=None, device="xpu"):
     """Convert modules to FP8 modules (e.g, convert nn.Linear to FP8Linear) in the model."""
     FP8GlobalStateManager.set_fp8_device_type(device)
-    new_model = copy.deepcopy(model)
-    fp8_model = convert_rec(new_model, device)
-    return fp8_model
+    optimized_model, optimized_optimizer = _copy_model_and_optimizer(model, optimizer)
+    new_m, new_optimizer = convert_rec(optimized_model, optimized_optimizer)
+    if optimizer is None:
+        return new_m
+    return new_m, new_optimizer

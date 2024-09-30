@@ -30,6 +30,7 @@ class Launcher:
         )
         self.ma_supported = ["auto", "default", "tcmalloc", "jemalloc"]
         self.omp_supported = ["auto", "default", "intel"]
+        self.strategy_supported = ["scatter", "close"]
         self.environ_set = {}
         self.ld_preload = (
             os.environ["LD_PRELOAD"].split(":") if "LD_PRELOAD" in os.environ else []
@@ -42,15 +43,19 @@ class Launcher:
             "--ncores_per_instance",
             default=0,
             type=int,
-            help="Number of cores used for computation per instance",
+            help="Number of cores used for computation per instance. It has to be an integer larger than -1. "
+            + "When set to 0, cores are evenly assigned to each instance. If number of cores cannot be divided "
+            + "by number of instances, residual cores are unused. When set to -1, cores are evenly assigned to "
+            + "each instance as much as possible to fully utilize all cores. When set to a number larger than 0, "
+            + "designated number of cores are assigned to each instance.",
         )
         group.add_argument(
             "--nodes-list",
             "--nodes_list",
             default="",
             type=str,
-            help='Specify nodes list for multiple instances to run on, in format of list of single node ids \
-                "node_id,node_id,..." or list of node ranges "node_id-node_id,...". By default all nodes will be used.',
+            help="Specify nodes list for multiple instances to run on, in format of list of single node ids "
+            + '"node_id,node_id,..." or list of node ranges "node_id-node_id,...". By default all nodes will be used.',
         )
         group.add_argument(
             "--use-e-cores",
@@ -58,6 +63,16 @@ class Launcher:
             action="store_true",
             default=False,
             help="Use Efficient-Cores on the workloads or not. By default, only Performance-Cores are used.",
+        )
+        group.add_argument(
+            "--strategy",
+            default="scatter",
+            type=str,
+            choices=self.strategy_supported,
+            help="Tell how cores are distributed over instances when only part of all cores are needed on a "
+            + f'machine with multiple NUMA nodes. Supported choices are {self.strategy_supported}. With "scatter", '
+            + "instances are distributed evenly as much as possible over all available NUMA nodes. While with "
+            + '"close", instances are assigned to cores in order continuously.',
         )
         group.add_argument(
             "--memory-allocator",
@@ -117,7 +132,7 @@ class Launcher:
                     break
         return lib_set or lib_found
 
-    def add_env(self, env_name, env_value):
+    def check_env(self, env_name, env_value):
         value = os.getenv(env_name, "")
         if value != "" and value != env_value:
             self.verbose(
@@ -126,9 +141,12 @@ class Launcher:
                 + f" is {env_value}. Use the exsiting value. Please unset the {env_name} if you wish ipex launcher set it ",
                 warning_type=WarningType.AmbiguousArgument,
             )
-            self.environ_set[env_name] = os.environ[env_name]
+            return os.environ[env_name]
         else:
-            self.environ_set[env_name] = env_value
+            return env_value
+
+    def add_env(self, env_name, env_value):
+        self.environ_set[env_name] = self.check_env(env_name, env_value)
 
     def set_lib_bin_from_list(
         self,
@@ -183,7 +201,7 @@ class Launcher:
                 warning_type=WarningType.WrongArgument,
             )
         if name_local == supported[0]:
-            self.verbose("info", "auto choosing bin...")
+            self.verbose("info", f"auto choosing {category}...")
             for name in supported[2:]:
                 if name in skip_list:
                     continue

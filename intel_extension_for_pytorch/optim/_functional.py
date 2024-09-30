@@ -534,10 +534,11 @@ def sgd_step(self, closure=None):
             fused=self.fused,
         )
 
-        # update momentum_buffers in state
-        for p, momentum_buffer in zip(params_with_grad, momentum_buffer_list):
-            state = self.state[p]
-            state["momentum_buffer"] = momentum_buffer
+        if group["momentum"] != 0:
+            # update momentum_buffers in state
+            for p, momentum_buffer in zip(params_with_grad, momentum_buffer_list):
+                state = self.state[p]
+                state["momentum_buffer"] = momentum_buffer
 
     return loss
 
@@ -1059,7 +1060,7 @@ def _multi_tensor_adam(
         lr=lr,
         weight_decay=weight_decay,
         eps=eps,
-        maximize=maximize,
+        maximize=False,
     )
 
 
@@ -1208,7 +1209,7 @@ def _multi_tensor_adamw(
         lr=lr,
         weight_decay=weight_decay,
         eps=eps,
-        maximize=maximize,
+        maximize=False,
     )
 
 

@@ -1,5 +1,6 @@
 import torch
 import torch.utils._pytree as pytree
+import copy
 
 # import math
 # from enum import Enum
@@ -18,7 +19,7 @@ def _prod(myList):
 def get_vnni_blocking(dtype):
     if dtype == torch.float32:
         return 1
-    elif dtype == torch.bfloat16:
+    elif dtype in [torch.bfloat16, torch.float16]:
         return 2
     elif dtype == torch.bfloat8:
         return 4
@@ -298,6 +299,21 @@ class BlockedParameter(torch.nn.Parameter):
             kwargs = {}
         args_data = pytree.tree_map_only(BlockedParameter, lambda x: x._data, args)
         return func(*args_data, **kwargs)
+
+    def __copy__(self):
+        new_param = BlockedParameter(self._data, requires_grad=self.requires_grad)
+        for k, v in self.__dict__.items():
+            if k != "_data":
+                setattr(new_param, k, copy.copy(v))
+        return new_param
+
+    def __deepcopy__(self, memo):
+        new_param = BlockedParameter(
+            copy.deepcopy(self._data, memo), requires_grad=self.requires_grad
+        )
+        for k, v in self.__dict__.items():
+            setattr(new_param, k, copy.deepcopy(v, memo))
+        return new_param
 
 
 class BlockedModule(torch.nn.Module):

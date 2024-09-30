@@ -1,5 +1,4 @@
 # Custom lowerings overriding those from PyTorch
-import torch  # noqa
 import contextlib
 import functools
 from torch._inductor.lowering import ELEMENTWISE_TYPE_PROMOTION_KIND

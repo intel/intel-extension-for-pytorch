@@ -1,13 +1,20 @@
 import torch
 from torch import nn
+from torch.nn.utils import skip_init
+from typing import Optional
 import math
 from .....utils._logger import logger, WarningType
-from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
+import intel_extension_for_pytorch as ipex
+from intel_extension_for_pytorch.nn.utils._weight_prepack import _IPEXLinear
 from intel_extension_for_pytorch.quantization import (
     get_weight_only_quant_qconfig_mapping,
     dequantize_per_channel,
     dequantize_per_block,
     WoqWeightDtype,
+)
+from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+    _enable_tpp,
+    _disable_tpp,
 )
 
 
@@ -16,7 +23,7 @@ class _IPEXlinearFusionCPU(nn.Module):
         super().__init__()
         self.tpp = tpp
         self.woq = woq
-        self.dtype = linear.weight.dtype if self.tpp else None
+        self.dtype = None if woq else linear.weight.dtype
 
     def extra_repr(self):
         extra_repr_str = f"dtype = {self.dtype}, tpp = {self.tpp}, woq = {self.woq}"
@@ -31,15 +38,27 @@ class _IPEXlinearSiluCPU(_IPEXlinearFusionCPU):
     def forward(self, x):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_silu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
                     else x.new_empty(0)
                 ),
                 self.linear.out_features,
+            )
+        elif (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return torch.ops.torch_ipex.woq_linear_silu(
+                x,
+                self.linear._op_context.get_data_handle(),
             )
         else:  # fallback path
             return nn.functional.silu(self.linear(x))
@@ -53,15 +72,27 @@ class _IPEXlinearReluCPU(_IPEXlinearFusionCPU):
     def forward(self, x):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_relu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
                     else x.new_empty(0)
                 ),
                 self.linear.out_features,
+            )
+        elif (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return torch.ops.torch_ipex.woq_linear_relu(
+                x,
+                self.linear._op_context.get_data_handle(),
             )
         else:  # fallback path
             return nn.functional.relu(self.linear(x))
@@ -76,16 +107,29 @@ class _IPEXlinearMulCPU(_IPEXlinearFusionCPU):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             y = y.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_mul(
                 x,
                 y,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
                     else x.new_empty(0)
                 ),
                 self.linear.out_features,
+            )
+        elif (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return torch.ops.torch_ipex.woq_linear_mul(
+                x,
+                self.linear._op_context.get_data_handle(),
+                [y],
             )
         else:  # fallback path
             return self.linear(x) * y
@@ -100,10 +144,13 @@ class _IPEXlinearAddCPU(_IPEXlinearFusionCPU):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
             y = y.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_add(
                 x,
                 y,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -136,11 +183,14 @@ class _IPEXlinearAddAddCPU(_IPEXlinearFusionCPU):
             x = x.to(self.dtype).contiguous()
             y = y.to(self.dtype).contiguous()
             z = z.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_add_add(
                 x,
                 y,
                 z,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -171,9 +221,12 @@ class _IPEXlinearNewGeluCPU(_IPEXlinearFusionCPU):
     def forward(self, x):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_gelu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -213,9 +266,12 @@ class _IPEXlinearGeluCPU(_IPEXlinearFusionCPU):
     def forward(self, x):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_linear_gelu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -248,6 +304,8 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
         self.woq = woq
         self.tpp = tpp
         use_g_idx = False
+        from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
+
         if woq:
             for i in range(self.num_concat):
                 attr_name = f"linear_{i}"
@@ -274,12 +332,23 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             lowp_mode = self.linear_list[0]._lowp_mode
             act_quant_mode = self.linear_list[0]._act_quant_mode
             group_size = self.linear_list[0]._group_size
+            cache_weight_for_large_batch = self.linear_list[
+                0
+            ]._cache_weight_for_large_batch
             qconfig_mapping = get_weight_only_quant_qconfig_mapping(
                 weight_dtype=w_dtype,
                 lowp_mode=lowp_mode,
                 act_quant_mode=act_quant_mode,
                 group_size=group_size,
             )
+            if cache_weight_for_large_batch:
+                from intel_extension_for_pytorch.utils.weight_only_quantization import (
+                    _woq_enable_weight_cache_for_large_batch,
+                )
+
+                qconfig_mapping = _woq_enable_weight_cache_for_large_batch(
+                    qconfig_mapping
+                )
             qconfig = qconfig_mapping.global_qconfig
             for i in range(self.num_concat):
                 linear = self.linear_list[i]
@@ -357,11 +426,7 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                     self.concat_linear = WeightOnlyQuantizedLinear.from_float(
                         mod, concat_scales, concat_zeros
                     )
-        elif (
-            self.tpp
-            and hasattr(module, "concat_linear")
-            and module.concat_linear is not None
-        ):
+        elif hasattr(module, "concat_linear") and module.concat_linear is not None:
             self.concat_linear = module.concat_linear
         else:
             for i in range(self.num_concat):
@@ -397,20 +462,42 @@ class _IPEXlinearSiluMulCPU(nn.Module):
             and not self.linear_m.tpp_fallback
         ):
             x = x.to(self.dtype).contiguous()
+            w_s = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear_s.weight, self.linear_s.weight_for_large_batch
+            )
+            w_m = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear_m.weight, self.linear_m.weight_for_large_batch
+            )
             return torch.ops.torch_ipex.tpp_fused_gate_up_proj(
                 x,
-                self.linear_s.weight.detach(),
+                w_s.detach(),
                 (
                     self.linear_s.bias.detach()
                     if self.linear_s.bias is not None
                     else x.new_empty(0)
                 ),
-                self.linear_m.weight.detach(),
+                w_m.detach(),
                 (
                     self.linear_m.bias.detach()
                     if self.linear_m.bias is not None
                     else x.new_empty(0)
                 ),
+            )
+        elif (
+            self.woq
+            and hasattr(self.linear_s, "_op_context")
+            and self.linear_s._op_context is not None
+            and hasattr(self.linear_m, "_op_context")
+            and self.linear_m._op_context is not None
+        ):
+            y = torch.ops.torch_ipex.woq_linear_silu(
+                x,
+                self.linear_s._op_context.get_data_handle(),
+            )
+            return torch.ops.torch_ipex.woq_linear_mul(
+                x,
+                self.linear_m._op_context.get_data_handle(),
+                [y],
             )
         else:  # fallback path
             return nn.functional.silu(self.linear_s(x)) * self.linear_m(x)
@@ -427,9 +514,12 @@ class _IPEXlinearSiluAndMulCPU(nn.Module):
     def forward(self, x, y):
         if self.tpp and not self.linear.tpp_fallback:
             x = x.to(self.dtype).contiguous()
+            w = torch.ops.torch_ipex.choose_tpp_linear_weight(
+                x, self.linear.weight, self.linear.weight_for_large_batch
+            )
             x1 = torch.ops.torch_ipex.tpp_linear_silu(
                 x,
-                self.linear.weight.detach(),
+                w.detach(),
                 (
                     self.linear.bias.detach()
                     if self.linear.bias is not None
@@ -438,5 +528,161 @@ class _IPEXlinearSiluAndMulCPU(nn.Module):
                 self.linear.out_features,
             )
             return x1 * y
+        elif (
+            self.woq
+            and hasattr(self.linear, "_op_context")
+            and self.linear._op_context is not None
+        ):
+            return (
+                torch.ops.torch_ipex.woq_linear_silu(
+                    x,
+                    self.linear._op_context.get_data_handle(),
+                )
+                * y
+            )
         else:  # fallback path
             return nn.functional.silu(self.linear(x)) * y
+
+
+class _IPEXGatedMLPMOECPU(nn.Module):
+    def __init__(self, W13, W2, W3=None, use_prepack=False):
+        super().__init__()
+
+        self.num_experts = W2.shape[0]
+        self.hidden_size = W2.shape[1]
+        self.intermediate_size = W2.shape[2]
+        linear_list = []
+        for i in range(W2.shape[0]):
+            if W3 is not None:
+                _W1 = W13[i]
+                _W3 = W3[i]
+            else:
+                _W1 = W13[i][0 : self.intermediate_size, :]
+                _W3 = W13[i][self.intermediate_size : 2 * self.intermediate_size, :]
+            linear1 = skip_init(
+                torch.nn.Linear,
+                self.intermediate_size,
+                self.hidden_size,
+                bias=False,
+            )
+            linear1.weight = nn.Parameter(_W1)
+            linear2 = skip_init(
+                torch.nn.Linear,
+                self.hidden_size,
+                self.intermediate_size,
+                bias=False,
+            )
+            linear2.weight = nn.Parameter(W2[i])
+            linear3 = skip_init(
+                torch.nn.Linear,
+                self.intermediate_size,
+                self.hidden_size,
+                bias=False,
+            )
+            linear3.weight = nn.Parameter(_W3)
+            linear_per_expert = nn.ModuleList([linear1, linear2, linear3])
+            linear_list.append(linear_per_expert)
+        self.linear_module_list = nn.ModuleList(
+            [linear_list[i] for i in range(W2.shape[0])]
+        )
+        if use_prepack:
+            _disable_tpp()
+            if W13.dtype is torch.bfloat16 and W2.dtype is torch.bfloat16:
+                _enable_tpp()
+                auto_kernel_selection = False
+            else:
+                auto_kernel_selection = True
+            self.linear_module_list = ipex.optimize(
+                self.linear_module_list.eval(),
+                dtype=W13.dtype,
+                auto_kernel_selection=auto_kernel_selection,
+                inplace=True,
+            )
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        use_grouped_topk: bool,
+        top_k: int,
+        router_logits: torch.Tensor,
+        renormalize: bool,
+        topk_group: Optional[int] = None,
+        num_expert_group: Optional[int] = None,
+    ) -> torch.Tensor:
+        assert not use_grouped_topk
+        assert num_expert_group is None
+        assert topk_group is None
+        batch_size, head_dim = hidden_states.shape
+        routing_weights = torch.nn.functional.softmax(
+            router_logits, dim=1, dtype=torch.float32
+        )
+        routing_weights, selected_experts = torch.topk(routing_weights, top_k, dim=-1)
+        if renormalize:
+            routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
+        routing_weights = routing_weights.to(hidden_states.dtype)
+        final_hidden_states = torch.zeros(
+            (batch_size, head_dim),
+            dtype=hidden_states.dtype,
+            device=hidden_states.device,
+        )
+        expert_mask = torch.nn.functional.one_hot(
+            selected_experts, num_classes=self.num_experts
+        ).permute(2, 1, 0)
+        for expert_idx in range(self.num_experts):
+            idx, top_x = torch.where(expert_mask[expert_idx])
+            if isinstance(self.linear_module_list[expert_idx][0], _IPEXLinear):
+                if (
+                    hasattr(self.linear_module_list[expert_idx][0], "use_dnnl")
+                    and self.linear_module_list[expert_idx][0].use_dnnl
+                ):
+                    final_hidden_states = torch.ops.torch_ipex.mixtral_moe(
+                        hidden_states,
+                        top_x,
+                        idx,
+                        self.linear_module_list[expert_idx][0]._get_forward_weight(),
+                        self.linear_module_list[expert_idx][0].ctx.get_data_handle(),
+                        self.linear_module_list[expert_idx][2]._get_forward_weight(),
+                        self.linear_module_list[expert_idx][2].ctx.get_data_handle(),
+                        self.linear_module_list[expert_idx][1]._get_forward_weight(),
+                        self.linear_module_list[expert_idx][1].ctx.get_data_handle(),
+                        hasattr(self.linear_module_list[expert_idx][0], "use_dnnl")
+                        and self.linear_module_list[expert_idx][0].use_dnnl,
+                        routing_weights,
+                        final_hidden_states,
+                        False,
+                    )
+                else:
+                    final_hidden_states = torch.ops.torch_ipex.mixtral_moe_tpp(
+                        hidden_states,
+                        top_x,
+                        idx,
+                        self.linear_module_list[expert_idx][0].weight.detach(),
+                        self.linear_module_list[expert_idx][2].weight.detach(),
+                        self.linear_module_list[expert_idx][1].weight.detach(),
+                        (
+                            self.linear_module_list[expert_idx][0].tpp_fallback
+                            if hasattr(
+                                self.linear_module_list[expert_idx][0], "tpp_fallback"
+                            )
+                            else True
+                        ),
+                        routing_weights,
+                        final_hidden_states,
+                        False,
+                    )
+            else:
+                # nn.Linear
+                final_hidden_states = torch.ops.torch_ipex.mixtral_moe_tpp(
+                    hidden_states,
+                    top_x,
+                    idx,
+                    self.linear_module_list[expert_idx][0].weight.detach(),
+                    self.linear_module_list[expert_idx][2].weight.detach(),
+                    self.linear_module_list[expert_idx][1].weight.detach(),
+                    True,
+                    routing_weights,
+                    final_hidden_states,
+                    False,
+                )
+
+        return final_hidden_states.view(-1, head_dim)

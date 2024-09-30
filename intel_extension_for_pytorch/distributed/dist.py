@@ -1,14 +1,19 @@
-import torch
-from torch.distributed import Backend, default_pg_timeout, Store, ReduceOp
-import torch.distributed as dist
-from datetime import timedelta
-from typing import Union, Optional, Any
 import sys
+from intel_extension_for_pytorch.transformers.models.cpu.distributed.dist import (  # noqa
+    all_reduce_cpu,
+    all_gather_cpu,
+    all_gather_into_tensor_cpu,
+)
 from intel_extension_for_pytorch.distributed.xpu.dist import (  # noqa F401
     all_reduce_xpu,
     all_gather_xpu,
     all_gather_into_tensor_xpu,
 )
+import torch
+from torch.distributed import Backend, default_pg_timeout, Store, ReduceOp
+import torch.distributed as dist
+from datetime import timedelta
+from typing import Union, Optional, Any
 
 
 def _get_function_from_device(device_type: str, f):
@@ -37,18 +42,13 @@ def init_process_group(
 ):
     """
     Initialize the default distributed process group.
-
     This will also initialize the distributed package.
-
     There are 2 main ways to initialize a process group:
         1. Specify ``store``, ``rank``, and ``world_size`` explicitly.
         2. Specify ``init_method`` (a URL string) which indicates where/how
            to discover peers. Optionally specify ``rank`` and ``world_size``,
            or encode all required parameters in the URL and omit them.
-
     If neither is specified, ``init_method`` is assumed to be "env://".
-
-
     Args:
         backend (str or Backend, optional): The backend to use. Depending on
             build-time configurations, valid values include ``mpi``, ``gloo``,
@@ -79,7 +79,6 @@ def init_process_group(
             This is done since CUDA execution is async and it is no longer safe to continue executing user code since
             failed async NCCL operations might result in subsequent CUDA operations running on corrupted data.
             When TORCH_NCCL_BLOCKING_WAIT is set, the process will block and wait for this timeout.
-
         group_name (str, optional, deprecated): Group name. This argument is ignored
         pg_options (ProcessGroupOptions, optional): process group options
             specifying what additional options need to be passed in during
@@ -97,26 +96,32 @@ def init_process_group(
             possible to avoid unnecessary overhead of group creation. If you
             want to know NCCL initialization error early, you can also use this
             field.
-
     .. note:: To enable ``backend == Backend.MPI``, PyTorch needs to be built from source
         on a system that supports MPI.
-
     .. note:: Support for multiple backends is experimental. Currently when no backend is
         specified, both ``gloo`` and ``nccl`` backends will be created. The ``gloo`` backend
         will be used for collectives with CPU tensors and the ``nccl`` backend will be used
         for collectives with CUDA tensors. A custom backend can be specified by passing in
         a string with format "<device_type>:<backend_name>,<device_type>:<backend_name>", e.g.
         "cpu:gloo,cuda:custom_backend".
-
+    .. note:: To enable backend ``ccl``, oneccl_bindings_for_pytorch needs to be installed
+        and it will be imported automatically.
     """
-
     if backend == "ccl":
         try:
             import oneccl_bindings_for_pytorch  # noqa
         except ImportError as e:
             raise RuntimeError("oneccl_bindings_for_pytorch is not installed!")
     return dist.init_process_group(
-        backend, init_method, timeout, world_size, rank, store, group_name, pg_options
+        backend,
+        init_method,
+        timeout,
+        world_size,
+        rank,
+        store,
+        group_name,
+        pg_options,
+        device_id,
     )
 
 
@@ -124,11 +129,8 @@ def all_reduce(tensor, op=ReduceOp.SUM, group=None, async_op=False):
     """
     Reduces the tensor data across all machines in such a way that all get
     the final result.
-
     After the call ``tensor`` is going to be bitwise identical in all processes.
-
     Complex tensors are supported.
-
     Args:
         tensor (Tensor): Input and output of the collective. The function
             operates in-place.
@@ -138,11 +140,9 @@ def all_reduce(tensor, op=ReduceOp.SUM, group=None, async_op=False):
         group (ProcessGroup, optional): The process group to work on. If None,
             the default process group will be used.
         async_op (bool, optional): Whether this op should be an async op
-
     Returns:
         Async work handle, if async_op is set to True.
         None, if not async_op or if not part of the group
-
     Examples:
         >>> # xdoctest: +SKIP("no rank")
         >>> # All tensors below are of torch.int64 type.
@@ -155,7 +155,6 @@ def all_reduce(tensor, op=ReduceOp.SUM, group=None, async_op=False):
         >>> tensor
         tensor([4, 6]) # Rank 0
         tensor([4, 6]) # Rank 1
-
         >>> # All tensors below are of torch.cfloat type.
         >>> # We have 2 process groups, 2 ranks.
         >>> tensor = torch.tensor([1+1j, 2+2j], dtype=torch.cfloat) + 2 * rank * (1+1j)
@@ -166,7 +165,6 @@ def all_reduce(tensor, op=ReduceOp.SUM, group=None, async_op=False):
         >>> tensor
         tensor([4.+4.j, 6.+6.j]) # Rank 0
         tensor([4.+4.j, 6.+6.j]) # Rank 1
-
     """
     f = _get_function_from_device(tensor.device.type, all_reduce)
     return f(tensor, op, group, async_op)
@@ -175,9 +173,7 @@ def all_reduce(tensor, op=ReduceOp.SUM, group=None, async_op=False):
 def all_gather(tensor_list, tensor, group=None, async_op=False):
     """
     Gathers tensors from the whole group in a list.
-
     Complex tensors are supported.
-
     Args:
         tensor_list (list[Tensor]): Output list. It should contain
             correctly-sized tensors to be used for output of the collective.
@@ -185,11 +181,9 @@ def all_gather(tensor_list, tensor, group=None, async_op=False):
         group (ProcessGroup, optional): The process group to work on. If None,
             the default process group will be used.
         async_op (bool, optional): Whether this op should be an async op
-
     Returns:
         Async work handle, if async_op is set to True.
         None, if not async_op or if not part of the group
-
     Examples:
         >>> # xdoctest: +SKIP("need process group init")
         >>> # All tensors below are of torch.int64 dtype.
@@ -205,7 +199,6 @@ def all_gather(tensor_list, tensor, group=None, async_op=False):
         >>> tensor_list
         [tensor([1, 2]), tensor([3, 4])] # Rank 0
         [tensor([1, 2]), tensor([3, 4])] # Rank 1
-
         >>> # All tensors below are of torch.cfloat dtype.
         >>> # We have 2 process groups, 2 ranks.
         >>> tensor_list = [torch.zeros(2, dtype=torch.cfloat) for _ in range(2)]
@@ -219,7 +212,6 @@ def all_gather(tensor_list, tensor, group=None, async_op=False):
         >>> tensor_list
         [tensor([1.+1.j, 2.+2.j]), tensor([3.+3.j, 4.+4.j])] # Rank 0
         [tensor([1.+1.j, 2.+2.j]), tensor([3.+3.j, 4.+4.j])] # Rank 1
-
     """
     f = _get_function_from_device(tensor.device.type, all_gather)
     return f(tensor_list, tensor, group, async_op)
@@ -228,7 +220,6 @@ def all_gather(tensor_list, tensor, group=None, async_op=False):
 def all_gather_into_tensor(output_tensor, input_tensor, group=None, async_op=False):
     """
     Gather tensors from all ranks and put them in a single output tensor.
-
     Args:
         output_tensor (Tensor): Output tensor to accommodate tensor elements
             from all ranks. It must be correctly sized to have one of the
@@ -244,11 +235,9 @@ def all_gather_into_tensor(output_tensor, input_tensor, group=None, async_op=Fal
         group (ProcessGroup, optional): The process group to work on. If None,
             the default process group will be used.
         async_op (bool, optional): Whether this op should be an async op
-
     Returns:
         Async work handle, if async_op is set to True.
         None, if not async_op or if not part of the group
-
     Examples:
         >>> # xdoctest: +SKIP("need process group init")
         >>> # All tensors below are of torch.int64 dtype and on XPU devices.
@@ -272,10 +261,8 @@ def all_gather_into_tensor(output_tensor, input_tensor, group=None, async_op=Fal
                 [3, 4]], device='xpu:0') # Rank 0
         tensor([[1, 2],
                 [3, 4]], device='xpu:1') # Rank 1
-
     .. warning::
         The Gloo backend does not support this API.
-
     """
-    f = _get_function_from_device(input_tensor.device.type, all_gather_into_tensor)
+    f = _get_function_from_device(output_tensor.device.type, all_gather_into_tensor)
     return f(output_tensor, input_tensor, group, async_op)

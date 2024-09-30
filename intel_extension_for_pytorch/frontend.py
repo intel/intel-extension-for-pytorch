@@ -401,7 +401,8 @@ def optimize(
     _disable_dnnl()
     if opt_properties.auto_kernel_selection:
         _enable_dnnl()
-    # when on xpu, parts of features are not supported
+
+    # when on xpu, some features are not supported
     if device_type == "xpu":
         if opt_properties.split_master_weight_for_bf16:
             # currently split master weight for xpu only support sgd
@@ -561,13 +562,13 @@ def optimize(
     if opt_properties.weights_prepack and device_type == "cpu":
         if dtype == torch.bfloat16:
             assert core.onednn_has_bf16_support(), (
-                "BF16 weight prepack needs the cpu support avx512bw, avx512vl and avx512dq, "
+                "BF16 weight prepack needs the cpu support avx_ne_convert or avx512bw, avx512vl and avx512dq, "
                 + "but the desired instruction sets are not available. "
                 + "Please set dtype to torch.float or set weights_prepack to False."
             )
         if dtype == torch.half:
             assert core.onednn_has_fp16_support(), (
-                "FP16 weight prepack needs the cpu support avx512_core_fp16, "
+                "FP16 weight prepack needs the cpu support avx_ne_convert or avx512_core_fp16, "
                 + "but the desired instruction sets are not available. "
                 + "Please set dtype to torch.float or set weights_prepack to False."
             )

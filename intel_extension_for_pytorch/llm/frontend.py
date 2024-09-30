@@ -1,3 +1,3 @@
-from intel_extension_for_pytorch.transformers.optimize import optimize_transformers
+from intel_extension_for_pytorch.transformers.optimize import optimize
 
-optimize = optimize_transformers
+optimize = optimize

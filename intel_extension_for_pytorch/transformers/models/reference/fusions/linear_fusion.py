@@ -97,10 +97,10 @@ class _IPEXConcatLinearRef(nn.Module):
                 if linear_list[i].bias is not None:
                     bias_list.append(linear_list[i].bias)
             concat_weight = torch.concat(weights_list, 0)
-            use_bias = True if bias_list is None else False
+            use_bias = True if bias_list != [] else False
             concat_bias = torch.concat(bias_list, 0) if use_bias else None
             self.concat_linear = nn.Linear(
-                concat_weight.shape[1], concat_weight.shape[0], use_bias
+                concat_weight.shape[1], concat_weight.shape[0], bias=use_bias
             )
             self.concat_linear.weight = nn.Parameter(concat_weight)
             self.concat_linear.bias = nn.Parameter(concat_bias) if use_bias else None

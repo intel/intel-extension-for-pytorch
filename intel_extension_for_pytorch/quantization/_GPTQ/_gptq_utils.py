@@ -5,7 +5,8 @@ from torch.nn import functional as F
 
 format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.INFO, format=format_str)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("GPTQ")
+logger.setLevel(logging.INFO)
 
 
 def gptq_quantize(
@@ -81,6 +82,9 @@ def gptq_export(
     scale_dtype=torch.float16,
 ):
     for k, v in weight_config.items():
+        if "lm_head" in k or "output_layer" in k or "embed_out" in k:
+            continue
+        logger.info(f"Exporting {k}")
         num_bits = v["wbits"]
         group_size = v["group_size"]
         sym = v["sym"]

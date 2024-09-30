@@ -122,198 +122,21 @@ searching availability of the memory allocator in order of `tcmalloc`, 'jemalloc
 def add_deprecated_params(parser):
     group = parser.add_argument_group("Deprecated Arguments")
     group.add_argument(
-        "--nproc_per_node",
-        metavar="\b",
-        type=int,
-        default=-1,
-        help="Deprecated by --nprocs-per-node.",
-    )
-    group.add_argument(
-        "--more_mpi_params",
-        metavar="\b",
-        type=str,
-        default="",
-        help="Deprecated by --extra-mpi-params.",
-    )
-    group.add_argument(
-        "--ncore_per_instance",
-        metavar="\b",
-        type=int,
-        default=-1,
-        help="Deprecated by --ncores-per-instance.",
-    )
-    group.add_argument(
-        "--node_id",
-        metavar="\b",
-        type=int,
-        default=-1,
-        help="Deprecated by --nodes-list.",
-    )
-    group.add_argument(
-        "--core_list",
-        metavar="\b",
-        type=str,
-        default="",
-        help="Deprecated by --cores-list.",
-    )
-    group.add_argument(
-        "--logical_core_for_ccl",
+        "--skip-cross-node-cores",
+        "--skip_cross_node_cores",
         action="store_true",
         default=False,
-        help="Deprecated by --logical-cores-for-ccl.",
-    )
-    group.add_argument(
-        "--enable_tcmalloc",
-        action="store_true",
-        default=False,
-        help="Deprecated by --memory-allocator.",
-    )
-    group.add_argument(
-        "--enable_jemalloc",
-        action="store_true",
-        default=False,
-        help="Deprecated by --memory-allocator.",
-    )
-    group.add_argument(
-        "--use_default_allocator",
-        action="store_true",
-        default=False,
-        help="Deprecated by --memory-allocator.",
-    )
-    group.add_argument(
-        "--use_logical_core",
-        action="store_true",
-        default=False,
-        help="Deprecated by --use-logical-cores.",
-    )
-    group.add_argument(
-        "--disable_numactl",
-        action="store_true",
-        default=False,
-        help="Deprecated by --multi-task-manager.",
-    )
-    group.add_argument(
-        "--disable_taskset",
-        action="store_true",
-        default=False,
-        help="Deprecated by --multi-task-manager.",
-    )
-    group.add_argument(
-        "--disable_iomp",
-        action="store_true",
-        default=False,
-        help="Deprecated by --omp-runtime.",
-    )
-    group.add_argument(
-        "--log_path", type=str, default="", help="Deprecated by --log-dir."
-    )
-    group.add_argument(
-        "--multi_instance",
-        action="store_true",
-        default=False,
-        help="Deprecated. Will be removed.",
-    )
-    group.add_argument(
-        "--distributed",
-        action="store_true",
-        default=False,
-        help="Deprecated. Will be removed.",
+        help="Deprecated by --bind-numa-node.",
     )
 
 
 def process_deprecated_params(args, logger):
-    if args.nproc_per_node != -1:
+    if args.skip_cross_node_cores:
         logger.warning(
-            "Argument --nproc_per_node is deprecated by --nprocs-per-node.",
+            "Argument --skip-cross-node-cores is deprecated by --bind-numa-node.",
             _type=WarningType.DeprecatedArgument,
         )
-        args.nprocs_per_node = args.nproc_per_node
-    if args.more_mpi_params != "":
-        logger.warning(
-            "Argument --more_mpi_params is deprecated by --extra-mpi-params.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.extra_mpi_params = args.more_mpi_params
-    if args.ncore_per_instance != -1:
-        logger.warning(
-            "Argument --ncore_per_instance is deprecated by --ncores-per-instance.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.ncores_per_instance = args.ncore_per_instance
-    if args.node_id != -1:
-        logger.warning(
-            "Argument --node_id is deprecated by --nodes-list.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.nodes_list = str(args.node_id)
-    if args.core_list != "":
-        logger.warning(
-            "Argument --core_list is deprecated by --cores-list.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.cores_list = args.core_list
-    if args.logical_core_for_ccl:
-        logger.warning(
-            "Argument --logical_core_for_ccl is deprecated by --logical-cores-for-ccl.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.logical_cores_for_ccl = args.logical_core_for_ccl
-    if args.use_logical_core:
-        logger.warning(
-            "Argument --use_logical_core is deprecated by --use-logical-cores.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.use_logical_cores = args.use_logical_core
-    if args.log_path != "":
-        logger.warning(
-            "Argument --log_path is deprecated by --log-dir.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.log_dir = args.log_path
-
-    if args.multi_instance:
-        logger.warning(
-            "Argument --multi_instance is deprecated. Will be removed."
-            + "If you are using the deprecated argument, please update it to the new one.",
-            _type=WarningType.DeprecatedArgument,
-        )
-    if args.distributed:
-        logger.warning(
-            "Argument --distributed is deprecated. Will be removed."
-            + "If you are using the deprecated argument, please update it to the new one.",
-            _type=WarningType.DeprecatedArgument,
-        )
-
-    if args.enable_tcmalloc or args.enable_jemalloc or args.use_default_allocator:
-        logger.warning(
-            "Arguments --enable_tcmalloc, --enable_jemalloc and --use_default_allocator"
-            + "are deprecated by --memory-allocator tcmalloc/jemalloc/auto.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        if args.use_default_allocator:
-            args.memory_allocator = "default"
-        if args.enable_jemalloc:
-            args.memory_allocator = "jemalloc"
-        if args.enable_tcmalloc:
-            args.memory_allocator = "tcmalloc"
-    if args.disable_numactl:
-        logger.warning(
-            "Argument --disable_numactl is deprecated by --multi-task-manager taskset.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.multi_task_manager = "taskset"
-    if args.disable_taskset:
-        logger.warning(
-            "Argument --disable_taskset is deprecated by --multi-task-manager numactl.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.multi_task_manager = "numactl"
-    if args.disable_iomp:
-        logger.warning(
-            "Argument --disable_iomp is deprecated by --omp-runtime default.",
-            _type=WarningType.DeprecatedArgument,
-        )
-        args.omp_runtime = "default"
+        args.bind_numa_node = args.skip_cross_node_cores
 
 
 class ArgumentTypesDefaultsHelpFormatter(argparse.HelpFormatter):
@@ -366,12 +189,6 @@ def init_parser(parser):
         help="Avoid applying python to execute program.",
     )
 
-    parser.add_argument(
-        "--silent",
-        default=False,
-        action="store_true",
-        help="Suppress printings to stdio.",
-    )
     parser.add_argument(
         "--log-dir",
         "--log_dir",

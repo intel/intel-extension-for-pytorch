@@ -9,6 +9,7 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _using_tpp,
 )
 from intel_extension_for_pytorch import frontend
+import intel_extension_for_pytorch._C as core
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
     _IPEXConv1d,
@@ -217,11 +218,7 @@ def _should_prepack(module, is_training, is_xpu=False):
     # Conv1d backward is not implemented, will not prepack.
     if isinstance(module, torch.nn.Conv1d) and module.training:
         return False
-    if module.weight.dtype == torch.half and module.__class__ in (
-        torch.nn.ConvTranspose2d,
-        torch.nn.ConvTranspose3d,
-    ):
-        return False
+
     if module.weight.dtype not in (
         torch.float,
         torch.float32,
@@ -592,9 +589,7 @@ class ParameterWrapper(object):
 
     def linear_prepack(self, module, is_training):
         if module.__class__ in IPEX_GEMM_MODULE_CPU():
-            if module.weight.dtype == torch.half:
-                use_dnnl = True
-            elif (
+            if (
                 module.weight.dtype == torch.float32
                 and not is_training
                 and frontend.get_fp32_math_mode(device="cpu")
@@ -606,10 +601,13 @@ class ParameterWrapper(object):
                 assert module.weight.dtype in [
                     torch.float32,
                     torch.bfloat16,
+                    torch.float16,
                 ], "Only float, bf16 and fp16 are supported"
                 use_dnnl = True
 
-        module.use_tpp = _using_tpp()
+        module.use_tpp = _using_tpp() and (
+            module.weight.dtype != torch.float16 or core.isa_has_amx_fp16_support()
+        )
         if not hasattr(module, "out_features"):
             setattr(module, "out_features", module.weight.shape[0])  # noqa: B010
 

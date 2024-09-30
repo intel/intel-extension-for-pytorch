@@ -102,6 +102,7 @@ def fp8_autocast(
     calibrating: bool = False,
     fp8_recipe: Optional[DelayedScaling] = None,
     fp8_group: Optional[dist_group_type] = None,
+    device: str = "xpu",
 ) -> None:
     """
     Context manager for FP8 usage.
@@ -132,6 +133,7 @@ def fp8_autocast(
         FP8GlobalStateManager.fp8_autocast_enter(
             enabled=enabled, calibrating=calibrating, fp8_recipe=fp8_recipe
         )
+        FP8GlobalStateManager.device = device
         yield
     finally:
         FP8GlobalStateManager.set_fp8_autocast_state(fp8_state)

@@ -67,6 +67,7 @@ def compile(
                 with torch.no_grad():
                     traced_model = torch.jit.trace(model.eval(), real_inputs)
                     traced_model = torch.jit.freeze(traced_model)
+                traced_model.training = False
                 return traced_model
         except Exception:
             logger.warning(

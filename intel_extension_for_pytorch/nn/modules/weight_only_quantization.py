@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from typing import Optional
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
     _all_reduce_and_bias_add,
@@ -12,6 +13,17 @@ from intel_extension_for_pytorch.quantization import (
     WoqWeightDtype,
 )
 from ...utils._logger import logger, WarningType
+from intel_extension_for_pytorch.nn.utils._model_convert import (
+    prepack_awq_weight,
+    _convert_optimum_format_to_desired,
+)
+
+from intel_extension_for_pytorch.llm.quantization.utils import QuantMethod, QuantDtype
+from intel_extension_for_pytorch.quantization._qconfig import (
+    WOQ_LOWP_MODE_TO_STR,
+    WOQ_ACT_QUANT_MODE_TO_STR,
+    WOQ_DTYPE_TO_STR,
+)
 
 
 class WeightOnlyQuantizedLinear(nn.Module):
@@ -37,6 +49,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self._lowp_mode = 0
         self._act_quant_mode = 0
         self._group_size = -1
+        self._cache_weight_for_large_batch = False
 
     def pre_ipex_gemm(self, input):
         return input
@@ -56,12 +69,17 @@ class WeightOnlyQuantizedLinear(nn.Module):
 
     def extra_repr(self):
         extra_repr_str = "in_features={}, out_features={}, dtype={}".format(
-            self.in_features, self.out_features, self.dtype
+            self.in_features, self.out_features, WOQ_DTYPE_TO_STR[self.dtype]
         )
         extra_repr_str += ", bias={}".format(self.bias)
-        extra_repr_str += ", lowp_mode={}".format(self._lowp_mode)
-        extra_repr_str += ", act_quant_mode={}".format(self._act_quant_mode)
+        extra_repr_str += ", lowp_mode={}".format(WOQ_LOWP_MODE_TO_STR[self._lowp_mode])
+        extra_repr_str += ", act_quant_mode={}".format(
+            WOQ_ACT_QUANT_MODE_TO_STR[self._act_quant_mode]
+        )
         extra_repr_str += ", group_size={}".format(self._group_size)
+        extra_repr_str += ", cache_weight_for_large_batch={}".format(
+            self._cache_weight_for_large_batch
+        )
         return extra_repr_str
 
     @classmethod
@@ -106,19 +124,25 @@ class WeightOnlyQuantizedLinear(nn.Module):
         act_quant_mode = qconfig.act_quant_mode
         dtype = qconfig.weight_dtype
         group_size = qconfig.group_size
+        # if dtype = int8, lowp-mode = int8, we want zero points to be 0
+        # otherwise, it may overflow when we subtract zero points from int8 weight.
+        sym_quant = dtype == WoqWeightDtype.INT8 and lowp_mode == 3
 
         if group_size == -1:
             qweight, scales, zero_points = quantize_per_channel(
-                mod.weight, dtype, scales, zero_points
+                mod.weight, dtype, scales, zero_points, sym_quant
             )
         else:
             qweight, scales, zero_points = quantize_per_block(
-                mod.weight, dtype, group_size, scales, zero_points
+                mod.weight, dtype, group_size, scales, zero_points, sym_quant
             )
         if not hasattr(mod, "in_features"):
             mod.in_features = mod.weight.size()[1]
         if not hasattr(mod, "out_features"):
             mod.out_features = mod.weight.size()[0]
+        cache_weight_for_large_batch = (
+            qconfig.cache_weight_for_large_batch and lowp_mode in (2, 3)
+        )
 
         qlinear = cls._init_cls(
             mod,
@@ -130,8 +154,10 @@ class WeightOnlyQuantizedLinear(nn.Module):
             group_size,
             lowp_mode,
             act_quant_mode,
+            cache_weight_for_large_batch,
         )
         del qweight
+        mod.weight = torch.nn.Parameter()
         return qlinear
 
     @classmethod
@@ -167,11 +193,16 @@ class WeightOnlyQuantizedLinear(nn.Module):
 
         lowp_mode = 0
         act_quant_mode = 0
+        cache_weight_for_large_batch = False
         if mod.qconfig is not None:
             if hasattr(mod.qconfig, "lowp_mode"):
                 lowp_mode = mod.qconfig.lowp_mode
             if hasattr(mod.qconfig, "act_quant_mode"):
                 act_quant_mode = mod.qconfig.act_quant_mode
+            if hasattr(mod.qconfig, "cache_weight_for_large_batch"):
+                cache_weight_for_large_batch = (
+                    mod.qconfig.cache_weight_for_large_batch and lowp_mode in (2, 3)
+                )
 
         w_dtype = qweight.dtype
         supported_qw_dtype = [
@@ -192,8 +223,10 @@ class WeightOnlyQuantizedLinear(nn.Module):
             mod.out_features = mod.weight.size()[0]
 
         qlinear = cls(mod.in_features, mod.out_features, dtype=WoqWeightDtype.INT4)
-        if bias is None:
+        if mod.bias is not None:
             bias = mod.bias
+        if bias is not None and torch.count_nonzero(bias) == 0:
+            bias = None
         qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
             qweight,
             scales,
@@ -204,13 +237,159 @@ class WeightOnlyQuantizedLinear(nn.Module):
             group_size,
             int(lowp_mode),
             act_quant_mode,
+            cache_weight_for_large_batch,
         )
         qlinear.weight = qlinear._op_context.get_weight()
+        qlinear.bias = bias is not None
         qlinear._lowp_mode = lowp_mode
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
+        qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch
         del qweight
         return qlinear
+
+    @classmethod
+    def from_int4_weight(
+        cls,
+        qweight,
+        scales,
+        zero_points,
+        in_features,
+        out_features,
+        quant_method,
+        qconfig=None,
+        bias=None,
+        group_size=-1,
+        g_idx=None,
+    ):
+        r"""Create a weight-only quantized module from int4 weight including autoAWQ and autoGPTQ format
+
+        Args:
+            qweight (Tensor): tensor in int32 dtype and contains actually int4 data
+            scales (Tensor): scales for qweight
+            zero_points (Tensor): zero points for qweight
+            bias (Tensor or None): bias for linear
+            in_features (int): size of each input sample
+            out_features (int): size of each output sample
+            qconfig (object): Defining the IPEX quantization recipe for Weight only quantization.
+                Default value is ``None``.
+            group_size: Group size for weight quantization
+            g_idx: Indices of groups for each input channel of weight. Generated by
+                GPTQ with act-order.
+        """
+
+        lowp_mode = 2
+        act_quant_mode = 1
+        cache_weight_for_large_batch = False
+        if qconfig is not None:
+            if hasattr(qconfig, "lowp_mode"):
+                lowp_mode = qconfig.lowp_mode
+            if hasattr(qconfig, "act_quant_mode"):
+                act_quant_mode = qconfig.act_quant_mode
+            if hasattr(qconfig, "cache_weight_for_large_batch"):
+                cache_weight_for_large_batch = (
+                    qconfig.cache_weight_for_large_batch and lowp_mode == 2
+                )
+
+        w_dtype = qweight.dtype
+        supported_qw_dtype = [
+            torch.int32,
+            torch.uint8,
+            torch.quint4x2,
+        ]
+        assert (
+            w_dtype in supported_qw_dtype
+        ), "Data type of int4 weight should be in {}, but got: {}".format(
+            supported_qw_dtype, w_dtype
+        )
+
+        qlinear = cls(in_features, out_features, dtype=WoqWeightDtype.INT4)
+        if quant_method == QuantMethod.AWQ_GEMM:
+            qweight, scales, zero_points = prepack_awq_weight(
+                qweight, zero_points, scales, 4, group_size
+            )
+        elif quant_method == QuantMethod.GPTQ_GEMM:
+            qweight, scales, zero_points = _convert_optimum_format_to_desired(
+                qweight, scales, zero_points, inplace=False
+            )
+
+        if bias is not None and torch.count_nonzero(bias) == 0:
+            bias = None
+        qlinear._op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
+            qweight,
+            scales,
+            zero_points,
+            bias,
+            g_idx,
+            None,
+            group_size,
+            int(lowp_mode),
+            act_quant_mode,
+            cache_weight_for_large_batch,
+        )
+        qlinear.weight = qlinear._op_context.get_weight()
+        qlinear.bias = bias is not None
+        qlinear._lowp_mode = lowp_mode
+        qlinear._act_quant_mode = act_quant_mode
+        qlinear._group_size = group_size
+        qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch
+        del qweight
+        return qlinear
+
+    @classmethod
+    def from_weight(
+        cls,
+        qweight: torch.Tensor,
+        scales: torch.Tensor,
+        zero_points: torch.Tensor,
+        in_features: int,
+        out_features: int,
+        qconfig=None,
+        bias: Optional[torch.Tensor] = None,
+        group_size: int = -1,
+        g_idx: Optional[torch.Tensor] = None,
+        quant_method: QuantMethod = QuantMethod.GPTQ_GEMM,
+        dtype: int = 0,
+        **kwargs,
+    ):
+        r"""Create a weight-only quantized module from weight
+
+        Args:
+            qweight (Tensor): tensor in int32 dtype and contains actually int4 data
+            scales (Tensor): scales for qweight
+            zero_points (Tensor): zero points for qweight
+            in_features (int): size of each input sample
+            out_features (int): size of each output sample
+            qconfig (object): Defining the IPEX quantization recipe for Weight only quantization.
+                Default value is ``None``.
+            bias (Tensor or None): bias for linear
+            group_size: Group size for weight quantization
+            g_idx: Indices of groups for each input channel of weight. Generated by
+                GPTQ with act-order.
+            quant_method (int): Quantization method, such as GPTQ=0, AWQ=1, ...
+            dtype (int): quantization data type, INT4=0
+
+        """
+        if (
+            quant_method in [QuantMethod.GPTQ_GEMM, QuantMethod.AWQ_GEMM]
+            and dtype == QuantDtype.INT4
+        ):
+            return cls.from_int4_weight(
+                qweight,
+                scales,
+                zero_points,
+                in_features,
+                out_features,
+                quant_method,
+                qconfig,
+                bias,
+                group_size,
+                g_idx,
+            )
+        else:
+            raise AssertionError(
+                "Currently ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight() supports 4bits with AWQ or GPTQ."
+            )
 
     @classmethod
     def _init_cls(
@@ -224,6 +403,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         group_size,
         lowp_mode,
         act_quant_mode,
+        cache_weight_for_large_batch,
     ):
         qlinear = cls(
             mod.in_features, mod.out_features, mod.bias is not None, dtype=dtype
@@ -240,11 +420,14 @@ class WeightOnlyQuantizedLinear(nn.Module):
             group_size,
             int(lowp_mode),
             act_quant_mode,
+            cache_weight_for_large_batch,
         )
         qlinear.weight = qlinear._op_context.get_weight()
+        qlinear.bias = mod.bias is not None
         qlinear._lowp_mode = lowp_mode
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
+        qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch
         return qlinear
 
 
@@ -271,6 +454,7 @@ class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
             mod.out_features,
             mod.mp_group,
             mod.bias,  # save the original bias value
+            mod.bias is not None,
             dtype=dtype,
         )
 
@@ -286,6 +470,7 @@ class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
         group_size,
         lowp_mode,
         act_quant_mode,
+        cache_weight_for_large_batch,
     ):
         qlinear = cls._init_from_mod(mod, dtype)
 
@@ -301,8 +486,13 @@ class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
             group_size,
             lowp_mode,
             act_quant_mode,
+            cache_weight_for_large_batch,
         )
         qlinear.weight = qlinear._op_context.get_weight()
+        qlinear._lowp_mode = lowp_mode
+        qlinear._act_quant_mode = act_quant_mode
+        qlinear._group_size = group_size
+        qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch is not None
 
         return qlinear
 
@@ -337,6 +527,7 @@ class IpexWoqLmHeadLinearAllreduce(IpexWoqLinearAllreduce):
             mod.rank,
             mod.world_size,
             mod.bias,  # save the original bias value
+            mod.bias is not None,
             dtype=dtype,
         )
 

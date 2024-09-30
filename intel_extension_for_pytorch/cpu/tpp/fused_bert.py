@@ -1243,7 +1243,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
         >>> model = ...
         >>> model.load_state_dict(torch.load(PATH))
         >>> model.eval()
-        >>> optimized_model = ipex.tpp_bert(model, dtype=torch.bfloat16)
+        >>> optimized_model = ipex.fast_bert(model, dtype=torch.bfloat16)
         >>> # running evaluation step.
         >>> # bfloat16 training case.
         >>> optimizer = ...
@@ -1256,7 +1256,7 @@ def fast_bert(model, dtype=torch.float, optimizer=None, unpad=False):
     # tpp bert optimization depends on the transformers repo to implementate the related module
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.6.0"
-    max_version = "4.38.1"
+    max_version = "4.43.2"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "Please installed the transformers with version: between {} and {}".format(

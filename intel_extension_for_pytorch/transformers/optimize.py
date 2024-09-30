@@ -10,11 +10,13 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _using_tpp,
 )
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 from ..utils.utils import has_cpu
 
 if has_cpu():
     from ..utils.weight_only_quantization import (
         _is_woq_qconfig,
+        _woq_enable_weight_cache_for_large_batch,
         _convert_woq_with_low_precision_checkpoint,
     )
 
@@ -95,7 +97,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.38.2"
+    validated_version = "4.43.2"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -127,12 +129,14 @@ def model_convert_reference(_model):
     # generation wise optimization
     from .generation.utils import (
         _extract_past_from_model_output,
+        _update_model_kwargs_for_generation,
     )
     from .generation import (
         _beam_search,
         _greedy_search,
         _sample,
         _beam_sample,
+        whisper_generate,
     )
 
     # model wise optimization for MHA module
@@ -181,6 +185,8 @@ def model_convert_reference(_model):
         StableLMEpochModel_forward,
         QWenLMHeadModel_forward,
         QWenModel_forward,
+        QWen2Model_forward,
+        Qwen2ForCausalLM_forward,
         GitForCausalLM_forward,
         GitEncoder_forward,
         GitVisionEncoder_forward,
@@ -192,10 +198,17 @@ def model_convert_reference(_model):
         PhiForCausalLM_forward,
         PhiModel_forward,
         Phi3Model_forward,
+        WhisperForConditionalGeneration_forward,
+        WhisperModel_forward,
+        WhisperDecoderLayer_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptbigcode,
         prepare_inputs_for_generation_llama,
         prepare_inputs_labels_for_multimodal_llavallama,
+        prepare_inputs_for_generation_chatglm,
+        detect_language,
+        _postprocess_outputs_whisper,
+        _prepare_encoder_decoder_kwargs_for_generation,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -209,10 +222,19 @@ def model_convert_reference(_model):
     convert_function(_model, "greedy_search", _greedy_search)
     convert_function(_model, "sample", _sample)
     convert_function(_model, "beam_sample", _beam_sample)
+    convert_function(_model, "_beam_search", _beam_search)
+    convert_function(_model, "_greedy_search", _greedy_search)
+    convert_function(_model, "_sample", _sample)
+    convert_function(_model, "_beam_sample", _beam_sample)
     convert_function(
         _model,
         "_extract_past_from_model_output",
         _extract_past_from_model_output,
+    )
+    convert_function(
+        _model,
+        "_update_model_kwargs_for_generation",
+        _update_model_kwargs_for_generation,
     )
     convert_functions(
         _model,
@@ -320,6 +342,11 @@ def model_convert_reference(_model):
         == transformers.models.t5.modeling_t5.T5ForConditionalGeneration
     ):
         convert_function(_model, "forward", T5ForConditionalGeneration_forward)
+        convert_function(
+            _model,
+            "_prepare_encoder_decoder_kwargs_for_generation",
+            _prepare_encoder_decoder_kwargs_for_generation,
+        )
         convert_function(
             transformers.models.t5.modeling_t5.T5Attention,
             "_relative_position_bucket",
@@ -565,6 +592,11 @@ def model_convert_reference(_model):
             distributed=distributed,
         )
         convert_function(_model.transformer, "get_masks", GLM2_get_masks)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_chatglm,
+        )
     elif _model.config.architectures[0] == "MistralForCausalLM":
         convert_function(_model, "forward", MistralForCausalLM_forward)
         convert_function(_model.model, "forward", MistralModel_forward)
@@ -581,6 +613,11 @@ def model_convert_reference(_model):
             _IPEXDecoderLayerRef,
             _model.config,
             distributed=distributed,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
         )
     elif _model.config.architectures[0] == "MptForCausalLM":
         convert_function(_model, "forward", MptForCausalLM_forward)
@@ -601,6 +638,11 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "MixtralForCausalLM":
         convert_function(_model, "forward", MixtralForCausalLM_forward)
         convert_function(_model.model, "forward", MixtralModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
         convert_class(
             _model,
             transformers.models.mixtral.modeling_mixtral.MixtralAttention,
@@ -618,6 +660,11 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "StableLmForCausalLM":
         convert_function(_model, "forward", StableLMEpochForCausalLM_forward)
         convert_function(_model.model, "forward", StableLMEpochModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
         convert_class(
             _model,
             type(_model.model.layers[0].self_attn),
@@ -650,6 +697,28 @@ def model_convert_reference(_model):
         convert_class(
             _model,
             type(_model.transformer.h[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+    elif _model.config.architectures[0] == "Qwen2ForCausalLM":
+        convert_function(_model, "forward", Qwen2ForCausalLM_forward)
+        convert_function(_model.model, "forward", QWen2Model_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
+        convert_class(
+            _model,
+            transformers.models.qwen2.modeling_qwen2.Qwen2SdpaAttention,
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            transformers.models.qwen2.modeling_qwen2.Qwen2DecoderLayer,
             _IPEXDecoderLayerRef,
             _model.config,
             distributed=distributed,
@@ -777,6 +846,11 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_llama,
+        )
     elif _model.config.architectures[0] == "Phi3ForCausalLM":
         convert_function(_model, "forward", PhiForCausalLM_forward)
         convert_function(_model.model, "forward", Phi3Model_forward)
@@ -791,6 +865,37 @@ def model_convert_reference(_model):
             _model,
             type(_model.model.layers[0]),
             _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+    elif _model.config.architectures[0] == "WhisperForConditionalGeneration":
+        convert_function(_model, "detect_language", detect_language)
+        if version.parse(transformers.__version__) >= version.parse("4.43.0"):
+            convert_function(
+                _model, "_postprocess_outputs", _postprocess_outputs_whisper
+            )
+            convert_function(_model, "generate", whisper_generate)
+        convert_function(_model, "forward", WhisperForConditionalGeneration_forward)
+        convert_function(_model.model, "forward", WhisperModel_forward)
+        convert_function(_model.model.decoder, "forward", WhisperDecoderLayer_forward)
+        convert_class(
+            _model,
+            type(_model.model.encoder.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.decoder.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.encoder.layers[0].self_attn),
+            _IPEXAttentionRef,
             _model.config,
             distributed=distributed,
         )
@@ -896,6 +1001,60 @@ def get_dummy_input(_model, return_dict=False):
                 (last_hidden_state,),
             )
         )
+    elif _model.config.architectures[0] == "WhisperForConditionalGeneration":
+        dtype = (
+            _model.model.decoder.layers[0].mha_linear_add.dtype
+            if hasattr(_model.model.decoder.layers[0], "mha_linear_add")
+            else _model.dtype
+        )
+        past_key_values = tuple(
+            [
+                (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros(
+                        [
+                            1,
+                            32,
+                            _model.model.decoder.layers[i].encoder_attn.num_heads,
+                            _model.model.decoder.layers[i].encoder_attn.head_dim,
+                        ],
+                        dtype=dtype,
+                    ).contiguous(),
+                    torch.zeros(
+                        [
+                            1,
+                            32,
+                            _model.model.decoder.layers[i].encoder_attn.num_heads,
+                            _model.model.decoder.layers[i].encoder_attn.head_dim,
+                        ],
+                        dtype=dtype,
+                    ).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                )
+                for i in range(model_num_layers)
+            ]
+        )
+        last_hidden_state = torch.rand([1, 32, 1280]).to(dtype)
+        sample_inputs = (
+            (
+                {
+                    "decoder_input_ids": torch.ones(4).to(torch.long).unsqueeze(0),
+                    "past_key_values": past_key_values,
+                    "encoder_outputs": (last_hidden_state,),
+                }
+            )
+            if return_dict
+            else (
+                torch.ones(1).to(torch.long).unsqueeze(0),
+                past_key_values,
+                (last_hidden_state,),
+            )
+        )
+
     else:
         sample_inputs = (
             {
@@ -926,18 +1085,14 @@ def get_dummy_input(_model, return_dict=False):
             ]
         )
         if return_dict:
-            sample_inputs["input_ids"] = sample_inputs["input_ids"].repeat(
-                batch_size, 1
-            )
-            sample_inputs["attention_mask"] = sample_inputs["attention_mask"].repeat(
-                batch_size, 1
-            )
+            sample_inputs["input_ids"] = torch.ones(batch_size, 1).to(torch.long)
+            sample_inputs["attention_mask"] = torch.ones(batch_size, 1)
             sample_inputs["pixel_values"] = torch.zeros(batch_size, 3, 224, 224)
             sample_inputs["past_key_values"] = past_key_values
         else:
             sample_inputs = (
-                input_ids.repeat(_model.config.batch_size, 1),
-                attention_mask.repeat(_model.config.batch_size, 1),
+                torch.ones(batch_size, 1).to(torch.long),
+                torch.ones(batch_size, 1),
                 past_key_values,
                 torch.zeros(_model.config.batch_size, 3, 224, 224),
             )
@@ -958,6 +1113,7 @@ def get_dummy_input(_model, return_dict=False):
                 torch.zeros(batch_size, 1, 4096).to(_model.dtype),
                 torch.ones((batch_size, 1), dtype=torch.long),
             ) + sample_inputs[2:]
+
     if _model.config.architectures[0] == "YuanForCausalLM":
         hidden_size = _model.config.hidden_size
         if _model.device.type == "cpu":
@@ -1023,6 +1179,60 @@ def ipex_quantization_flow(
     return convert_model
 
 
+def attach_extra_weight_for_large_batch_inference(model):
+    # Traverse the entire model and attch extra bf16 weight to linear
+    assert _using_tpp()
+    from intel_extension_for_pytorch.nn.utils._weight_prepack import (
+        _IPEXLinear,
+    )
+
+    def _pack_weight_for_large_batch(weight):
+        assert weight.dim() == 2, "Expected 2D weight to pack, but got {}D".format(
+            weight.dim()
+        )
+
+        def block_weight(weight, Nb, Kb):
+            N = weight.size(0)
+            K = weight.size(1)
+            return (
+                weight.reshape((N // Nb, Nb, K // Kb, Kb // 2, 2))
+                .permute((0, 2, 3, 1, 4))
+                .contiguous()
+                .to(torch.bfloat16)
+            )
+
+        if weight.size(0) % 100 == 0 and weight.size(1) % 64 == 0:
+            return block_weight(weight, 100, 64)
+        elif weight.size(0) % 64 == 0 and weight.size(1) % 64 == 0:
+            return block_weight(weight, 64, 64)
+        else:
+            return None
+
+    def _unpack_blocked_weight(weight):
+        assert weight.dim() == 5, "Expected 5D weight to unpack, but got {}D".format(
+            weight.dim()
+        )
+        N = weight.size(0) * weight.size(3)
+        return weight.permute((0, 3, 1, 2, 4)).contiguous().reshape((N, -1))
+
+    def _convert(mod, attr_name):
+        if isinstance(mod, _IPEXLinear):
+            weight = mod.weight.data
+            unblocked_weight = _unpack_blocked_weight(weight)
+            extra_weight = _pack_weight_for_large_batch(unblocked_weight)
+            mod.weight_for_large_batch = extra_weight
+            return mod
+
+        mod_new = mod
+
+        for name, child in mod.named_children():
+            attr = attr_name + "." + name if attr_name != "" else name
+            setattr(mod_new, name, _convert(child, attr))
+        return mod_new
+
+    return _convert(model, "")
+
+
 def model_convert_lowering(
     _model,
     device,
@@ -1031,6 +1241,7 @@ def model_convert_lowering(
     deployment_mode,
     is_quantization=False,
     woq=False,
+    cache_weight_for_large_batch=False,
 ):
     from .models.reference.modules.attentions import _IPEXAttentionRef
     from .models.reference.modules.decoder import _IPEXDecoderLayerRef
@@ -1060,15 +1271,14 @@ def model_convert_lowering(
                         auto_kernel_selection=True,
                     )
                 elif dtype is torch.half:
-                    _model = ipex.optimize(
-                        _model.eval(),
-                        dtype=dtype,
-                        inplace=True,
-                        auto_kernel_selection=True,
-                    )
+                    if core.isa_has_amx_fp16_support():
+                        _enable_tpp()
+                    _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
                 elif dtype is torch.bfloat16:
                     _enable_tpp()
                     _model = ipex.optimize(_model.eval(), dtype=dtype, inplace=True)
+                    if cache_weight_for_large_batch:
+                        _model = attach_extra_weight_for_large_batch_inference(_model)
 
         if not is_quantization or woq:
             import transformers
@@ -1091,6 +1301,10 @@ def model_convert_lowering(
                 )
             if _model.config.architectures[0] == "QWenLMHeadModel":
                 supported_classes.append(type(_model.transformer.h[0].ln_1))
+            if _model.config.architectures[0] == "Qwen2ForCausalLM":
+                supported_classes.append(
+                    transformers.models.qwen2.modeling_qwen2.Qwen2RMSNorm
+                )
             if hasattr(transformers.models, "mistral"):
                 supported_classes.append(
                     transformers.models.mistral.modeling_mistral.MistralRMSNorm
@@ -1114,6 +1328,13 @@ def model_convert_lowering(
                 getattr(_model, model_name), "_use_sdpa"
             ):
                 getattr(_model, model_name)._use_sdpa = False
+            if hasattr(_model, model_name):
+                cur_mod = getattr(_model, model_name)
+                for submodel_name in ["encoder", "decoder"]:
+                    if hasattr(cur_mod, submodel_name) and hasattr(
+                        getattr(cur_mod, submodel_name), "_use_sdpa"
+                    ):
+                        getattr(cur_mod, submodel_name)._use_sdpa = False
 
         for supported_mlp_class in [_IPEXDecoderLayerRef]:
             lowering_class_cpu(
@@ -1369,7 +1590,7 @@ def check_model_support(device, model):
     return cpu_supported_model, xpu_supported_model
 
 
-def optimize_transformers(
+def optimize(
     model,
     optimizer=None,
     dtype=torch.float,
@@ -1380,6 +1601,7 @@ def optimize_transformers(
     low_precision_checkpoint=None,
     sample_inputs=None,
     deployment_mode=True,
+    cache_weight_for_large_batch=False,
 ):
     r"""
     Apply optimizations at Python frontend to the given transformers model (nn.Module).
@@ -1415,6 +1637,11 @@ def optimize_transformers(
             Default value is ``None``, and for well supported model, we provide this sample inputs automaticlly. (only works on CPU)
         deployment_mode (bool): Whether to apply the optimized model for deployment of model generation.
             It means there is no need to further apply optimization like torchscirpt. Default value is ``True``. (only works on CPU)
+        cache_weight_for_large_batch (bool): Whether to cache the dedicated weight for large batch to speed up
+            its inference (e.g., prefill phase) with extra memory usage. It is only valid for non-quantization cases
+            where dtype = bfloat16 and weight-only quantization cases where lowp-mode=BF16/INT8. In other cases, an
+            error will be raised. Default value is ``False``.
+
 
     Returns:
         optimized model object for model.generate(), also workable with model.forward
@@ -1519,6 +1746,16 @@ def optimize_transformers(
                 is_quantization = True
                 if _is_woq_qconfig(quantization_config):
                     is_woq = True
+
+            if cache_weight_for_large_batch:
+                assert (
+                    is_woq or dtype == torch.bfloat16
+                ), "cache_weight_for_large_batch is only valid for WOQ or BF16 cases"
+                if is_woq:
+                    quantization_config = _woq_enable_weight_cache_for_large_batch(
+                        quantization_config
+                    )
+
             # Load low precision checkpoint (generated by GPTQ, etc.) for WOQ before any conversion
             if is_woq and low_precision_checkpoint is not None:
                 state_dict, config = None, None
@@ -1667,6 +1904,7 @@ def optimize_transformers(
             deployment_mode,
             is_quantization,
             is_woq if device == "cpu" else xpu_woq,
+            cache_weight_for_large_batch,
         )
         if device == "cpu":
             # do not register output hook when doing calibration in static int8
@@ -1687,3 +1925,33 @@ def optimize_transformers(
         return model
 
     return model
+
+
+def optimize_transformers(
+    model,
+    optimizer=None,
+    dtype=torch.float,
+    inplace=False,
+    device="cpu",
+    quantization_config=None,
+    qconfig_summary_file=None,
+    low_precision_checkpoint=None,
+    sample_inputs=None,
+    deployment_mode=True,
+):
+    logger.warning(
+        "ipex.optimize_transformers API is going to be deprecated, please use ipex.llm.optimize instead.",
+        _type=WarningType.DeprecatedArgument,
+    )
+    return optimize(
+        model=model,
+        optimizer=optimizer,
+        dtype=dtype,
+        inplace=inplace,
+        device=device,
+        quantization_config=quantization_config,
+        qconfig_summary_file=qconfig_summary_file,
+        low_precision_checkpoint=low_precision_checkpoint,
+        sample_inputs=sample_inputs,
+        deployment_mode=deployment_mode,
+    )

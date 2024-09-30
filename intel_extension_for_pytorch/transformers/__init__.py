@@ -5,6 +5,11 @@ from ..utils.utils import has_cpu
 if has_cpu():
     from .models.cpu.modules.attentions import _IPEXAttentionCPU
     from .models.cpu.modules.decoder import _IPEXDecoderLayerCPU
+
+    try:
+        from .models.reference.models import detect_language
+    except ImportError:
+        pass
     from .tensor_parallel import (
         shard_lm_head_weights,
         shard_mha_weights,

@@ -165,6 +165,10 @@ def _beam_sample(
             if this_peer_finished_flag.item() == 0.0:
                 break
 
+        if "past_key_values" in model_kwargs and not isinstance(
+            model_kwargs["past_key_values"], tuple
+        ):
+            model_kwargs["past_key_values"] = None
         model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
         self.model_backbone = self.config.architectures[0]
@@ -191,6 +195,8 @@ def _beam_sample(
             "YuanForCausalLM",
             "PhiForCausalLM",
             "Phi3ForCausalLM",
+            "WhisperForConditionalGeneration",
+            "Qwen2ForCausalLM",
         ]:
             first_token = False
             if model_inputs["past_key_values"] is None:
@@ -271,6 +277,46 @@ def _beam_sample(
                             for i in range(self.config.num_hidden_layers)
                         ]
                     )
+                elif self.model_backbone == "WhisperForConditionalGeneration":
+                    first_token = False
+                    beam_idx_tmp = torch.zeros(
+                        (2048, int(batch_size * num_beams)), dtype=torch.long
+                    ).contiguous()
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                self.model.decoder.layers[i]
+                                .encoder_attn.k_proj(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(batch_size * num_beams),
+                                    -1,
+                                    self.model.decoder.layers[i].encoder_attn.num_heads,
+                                    self.model.decoder.layers[i].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                self.model.decoder.layers[i]
+                                .encoder_attn.v_proj(
+                                    model_inputs["encoder_outputs"]["last_hidden_state"]
+                                )
+                                .view(
+                                    int(batch_size * num_beams),
+                                    -1,
+                                    self.model.decoder.layers[i].encoder_attn.num_heads,
+                                    self.model.decoder.layers[i].encoder_attn.head_dim,
+                                )
+                                .contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
             if first_token:
                 if hasattr(self.config, "n_layer"):
                     num_hidden_layers = self.config.n_layer
@@ -308,12 +354,19 @@ def _beam_sample(
                 model_inputs["encoder_outputs"] = (
                     model_inputs["encoder_outputs"]["last_hidden_state"],
                 )
+            if self.model_backbone == "WhisperForConditionalGeneration":
+                model_inputs["encoder_outputs"] = (
+                    model_inputs["encoder_outputs"]["last_hidden_state"],
+                )
+                model_inputs.pop("decoder_position_ids", None)
+                model_inputs.pop("decoder_attention_mask", None)
             if self.model_backbone == "LlavaLlamaForCausalLM" and hasattr(
                 self, "prepare_inputs_labels_for_multimodal"
             ):
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)
@@ -429,8 +482,11 @@ def _beam_sample(
         # increase cur_len
         cur_len = cur_len + 1
         latency_list.append(time.time() - tic)
-
-        if beam_scorer.is_done or stopping_criteria(input_ids, scores):
+        stopping_res = stopping_criteria(input_ids, scores)
+        is_stopped = (
+            stopping_res if isinstance(stopping_res, bool) else all(stopping_res)
+        )
+        if beam_scorer.is_done or is_stopped:
             if not synced_gpus:
                 break
             else:

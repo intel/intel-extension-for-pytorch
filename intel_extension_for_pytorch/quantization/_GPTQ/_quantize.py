@@ -1,7 +1,11 @@
 import logging
 import torch
 from pathlib import Path
-from ...utils._logger import logger, WarningType
+
+format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+logging.basicConfig(level=logging.INFO, format=format_str)
+logger = logging.getLogger("GPTQ")
+logger.setLevel(logging.INFO)
 
 
 @torch.no_grad()
@@ -47,14 +51,25 @@ def gptq(
     logger.info("quantizing with GPTQ algorithm")
     from ._gptq_utils import gptq_quantize, gptq_export
 
+    for model_name in ["model", "transformer"]:
+        if hasattr(model, model_name) and hasattr(
+            getattr(model, model_name), "_use_sdpa"
+        ):
+            getattr(model, model_name)._use_sdpa = False
+        if hasattr(model, model_name):
+            cur_mod = getattr(model, model_name)
+            for submodel_name in ["encoder", "decoder"]:
+                if hasattr(cur_mod, submodel_name) and hasattr(
+                    getattr(cur_mod, submodel_name), "_use_sdpa"
+                ):
+                    getattr(cur_mod, submodel_name)._use_sdpa = False
     model_path = None
     weight_config = {}
     excluded_op = ["lm_head", "embed_out"]
     for name, module in model.named_modules():
-        if (
-            isinstance(module, torch.nn.modules.linear.Linear)
-            and name not in excluded_op
-        ):
+        if "lm_head" in name or "output_layer" in name or "embed_out" in name:
+            continue
+        if isinstance(module, torch.nn.modules.linear.Linear):
             weight_config[name] = {
                 "wbits": wbits,
                 "group_size": group_size,
@@ -66,8 +81,7 @@ def gptq(
         logger.warning(
             "You choose to use unified sequence length for calibration"
             + "but you have not set length value. Default sequence length"
-            + "is 2048 and this might cause inference error!",
-            _type=WarningType.WrongArgument,
+            + "is 2048 and this might cause inference error!"
         )
     model, gptq_config = gptq_quantize(
         model,
@@ -79,6 +93,7 @@ def gptq(
         layer_wise,
         model_path,
     )
+    logger.info("Exporting compressed model...")
     compressed_model = gptq_export(
         model,
         weight_config,
@@ -91,7 +106,7 @@ def gptq(
     output_file_name = f"gptq_checkpoint_g{group_size}.pt"
     output_file_path = save_dir + "/" + output_file_name
     torch.save(compressed_model.state_dict(), output_file_path)
-    logging.info(
+    logger.info(
         "Low-precision checkpoint generated and saved to {}.".format(output_file_path)
     )
     return compressed_model
