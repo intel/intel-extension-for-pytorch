@@ -52,7 +52,7 @@
   - test_unary_ufuncs
   - test_view_ops
   - test_vmap
-- CI_All_TESTS:
+- CI_TESTS_ALL:
   - distributed/test_data_parallel
   - nn/test_dropout
   - nn/test_embedding

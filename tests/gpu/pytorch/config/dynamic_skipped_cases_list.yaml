@@ -6793,6 +6793,7 @@
   - test_scatter_gather_ops.py::TestScatterGatherXPU::test_scatter_reduce_sum_xpu_uint8
 - reason: Auto skipped due to porting of p6_other_Failed
   cases:
+  - test_nestedtensor.py::TestNestedTensorSubclassXPU::test_specialize_dynamic_shape_xpu
   - test_reductions.py::TestReductionsXPU::test_histc_xpu
   - test_ops.py::TestCommonXPU::test_errors_amin_xpu
   - test_ops.py::TestCommonXPU::test_errors_cat_xpu
@@ -10237,6 +10238,8 @@
 - reason: Auto skipped due to page fault issue
   cases:
   - test_ops.py::TestCommonXPU::test_out_index_copy_xpu_float32
+  - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float64
+  - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float32
 - reason: Auto skipped due to Jacobian mismatch issue
   cases:
   - test_modules.py::TestModuleXPU::test_grad_nn_MultiheadAttention_eval_mode_xpu_float64
@@ -10260,3 +10263,21 @@
   - test_ops.py::TestCompositeComplianceXPU::test_cow_input_meshgrid_list_of_tensors_xpu_float32
   - test_ops.py::TestCompositeComplianceXPU::test_cow_input_stack_xpu_float32
   - test_ops.py::TestCompositeComplianceXPU::test_cow_input_vstack_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input__batch_norm_with_update_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input__unsafe_masked_index_put_accumulate_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input__unsafe_masked_index_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_alias_copy_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_as_strided_copy_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_expand_copy_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_index_reduce_amax_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_index_reduce_amin_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_index_reduce_mean_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_index_reduce_prod_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_nn_functional_channel_shuffle_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_nn_functional_rms_norm_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_t_copy_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_torch_ops_aten__safe_softmax_default_xpu_float32
+  - test_ops.py::TestCompositeComplianceXPU::test_cow_input_unsqueeze_copy_xpu_float32
+- reason: Auto skipped due to skip in upstream
+  cases:
+  - test_nn.py::TestNNDeviceTypeXPU::test_TransformerEncoderLayer_empty_xpu

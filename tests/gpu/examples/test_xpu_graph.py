@@ -2,6 +2,7 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 import copy
+import pytest
 
 N, C, H_in, H_out = 2, 2, 128, 64
 model = torch.nn.AvgPool2d(2)
