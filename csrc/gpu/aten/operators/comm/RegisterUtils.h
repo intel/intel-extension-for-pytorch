@@ -7,7 +7,7 @@
 #include <c10/core/Allocator.h>
 #include <c10/core/DeviceGuard.h>
 
-namespace at::AtenIpexTypeXPU{
+namespace at::AtenIpexTypeXPU {
 namespace detail {
 
 TensorBase empty_xpu(
