@@ -7,6 +7,7 @@
 #include "comm/ATDispatch.h"
 #include "comm/Atomics.h"
 #include "comm/ParamUtils.h"
+#include "comm/RegisterUtils.h"
 #include "comm/RegistrationDeclarations.h"
 #include "utils/ComputeEngine.h"
 #include "utils/CustomOperatorRegistration.h"
@@ -676,11 +677,39 @@ void max_pool2d_with_indices_out_template(
 
   /* resize output/indices */
   if (input.ndimension() == 3) {
-    output.resize_({nInputPlane, outputHeight, outputWidth}, smf);
-    indices.resize_({nInputPlane, outputHeight, outputWidth}, smf);
+    if (output.defined()) {
+      output.resize_({nInputPlane, outputHeight, outputWidth}, smf);
+    } else {
+      output = at::AtenIpexTypeXPU::create_out(
+          {nInputPlane, outputHeight, outputWidth},
+          {},
+          input.options().memory_format(smf));
+    }
+    if (indices.defined()) {
+      indices.resize_({nInputPlane, outputHeight, outputWidth}, smf);
+    } else {
+      indices = at::AtenIpexTypeXPU::create_out(
+          {nInputPlane, outputHeight, outputWidth},
+          {},
+          input.options().memory_format(smf).dtype(kLong));
+    }
   } else {
-    output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
-    indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
+    if (output.defined()) {
+      output.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
+    } else {
+      output = at::AtenIpexTypeXPU::create_out(
+          {nbatch, nInputPlane, outputHeight, outputWidth},
+          {},
+          input.options().memory_format(smf));
+    }
+    if (indices.defined()) {
+      indices.resize_({nbatch, nInputPlane, outputHeight, outputWidth}, smf);
+    } else {
+      indices = at::AtenIpexTypeXPU::create_out(
+          {nbatch, nInputPlane, outputHeight, outputWidth},
+          {},
+          input.options().memory_format(smf).dtype(kLong));
+    }
   }
 
   auto real_eng =
@@ -923,6 +952,14 @@ Tensor& max_pool2d_with_indices_backward_out_template(
       outputWidth,
       memory_format);
 
+  if (gradInput.defined()) {
+    gradInput.resize_(input.sizes(), memory_format);
+  } else {
+    auto options = input.options().memory_format(memory_format);
+    gradInput = at::AtenIpexTypeXPU::create_out(input.sizes(), {}, options);
+  }
+  gradInput.zero_();
+
   auto real_eng =
       choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::BASIC, input);
   if ((input.is_quantized()) ||
@@ -951,7 +988,6 @@ Tensor& max_pool2d_with_indices_backward_out_template(
         padding_vec_r);
   } else {
     auto gradOutput_ = gradOutput.contiguous(memory_format);
-    gradInput.zero_();
     IPEX_DISPATCH_FLOATING_TYPES_AND2(
         at::ScalarType::Half,
         at::ScalarType::BFloat16,
@@ -1087,13 +1123,11 @@ Tensor& max_pool2d_with_indices_backward_out(
     self = self_.contiguous();
     grad_output = grad_output_.contiguous();
     indices = indices_.contiguous();
-    grad_input.zero_();
   } else {
     auto smf = self_.suggest_memory_format();
     self = contiguous_if_needed(self_, smf);
     grad_output = contiguous_if_needed(grad_output_, smf);
     indices = contiguous_if_needed(indices_, smf);
-    grad_input.zero_();
   }
 
   impl::max_pool2d_with_indices_backward_out_template(
