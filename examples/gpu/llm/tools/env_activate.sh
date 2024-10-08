@@ -20,6 +20,9 @@ export TORCH_LLM_ALLREDUCE=1
 cd ${BASEFOLDER}/../${MODE}
 python -m pip install -r ./requirements.txt
 PKGDIR=$(python -c 'import transformers; print(transformers.__path__[0]);')
-patch -d ${PKGDIR} -p3 -t < ./patches/transformers.patch
-find ${PKGDIR} -name "*.rej" | while read -r FILE; do FILE=${FILE::-4}; rm ${FILE}.rej; mv ${FILE}.orig ${FILE}; done
-find ${PKGDIR} -name "*.orig" -exec rm {} \;
+grep "token_latency" -R ${PKGDIR} > /dev/null
+if [ $? -gt 0 ]; then
+    patch -d ${PKGDIR} -p3 -t < ./patches/transformers.patch
+    find ${PKGDIR} -name "*.rej" | while read -r FILE; do FILE=${FILE::-4}; rm ${FILE}.rej; mv ${FILE}.orig ${FILE}; done
+    find ${PKGDIR} -name "*.orig" -exec rm {} \;
+fi
