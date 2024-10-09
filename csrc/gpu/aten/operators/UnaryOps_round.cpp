@@ -121,8 +121,8 @@ Tensor& fmod_(Tensor& self, const Scalar& other) {
 namespace {
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("ceil_out", TORCH_FN((&at::AtenIpexTypeXPU::ceil_out)));
-  m.impl("floor_out", TORCH_FN((&at::AtenIpexTypeXPU::floor_out)));
+  m.impl("ceil.out", TORCH_FN((&at::AtenIpexTypeXPU::ceil_out)));
+  m.impl("floor.out", TORCH_FN((&at::AtenIpexTypeXPU::floor_out)));
 }
 
 } // namespace
