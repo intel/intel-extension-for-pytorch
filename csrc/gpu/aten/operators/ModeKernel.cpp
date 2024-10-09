@@ -786,10 +786,10 @@ static void mode_xpu_kernel(
     // scratch memory size needed by built-in sort
 #if __INTEL_LLVM_COMPILER >= 20250000
     auto sort_scratch_memory_size =
-        sycl::ext::oneapi::experimental::default_sorters::
-            joint_sorter<std::greater<scalar_t>>::template memory_required<
-                ModeOpValueIndex<scalar_t>>(
-                sycl::memory_scope::work_group, group_size);
+        sycl::ext::oneapi::experimental::default_sorters::group_sorter<
+            ModeOpValueIndex<scalar_t>,
+            std::greater<scalar_t>,
+            1>::memory_required(sycl::memory_scope::work_group, group_size);
 #else
     auto sort_scratch_memory_size = sycl::ext::oneapi::experimental::
         default_sorter<std::greater<scalar_t>>::template memory_required<
