@@ -294,9 +294,11 @@ class paged_attention_kernel {
     scalar_t* value_cache; // [num_blocks, num_kv_heads, head_size, block_size]
 
     // Index
-    index_t* head_mapping; // [num_heads]
     index_t* block_tables; // [num_seqs, max_blocks_per_seq]
     index_t* context_lens; // [num_seqs]
+
+    // The number of queries to process per key/value header
+    uint32_t num_queries_per_tokens;
 
     // Softmax scale
     accum_t sm_scale;
@@ -315,9 +317,9 @@ class paged_attention_kernel {
         scalar_t* query,
         scalar_t* key_cache,
         scalar_t* value_cache,
-        index_t* head_mapping,
         index_t* block_tables,
         index_t* context_lens,
+        uint32_t num_queries_per_tokens,
         accum_t sm_scale,
         uint32_t num_seqs,
         uint32_t num_heads,
@@ -330,9 +332,9 @@ class paged_attention_kernel {
           query(query),
           key_cache(key_cache),
           value_cache(value_cache),
-          head_mapping(head_mapping),
           block_tables(block_tables),
           context_lens(context_lens),
+          num_queries_per_tokens(num_queries_per_tokens),
           sm_scale(sm_scale),
           num_seqs(num_seqs),
           num_heads(num_heads),
@@ -413,7 +415,8 @@ class paged_attention_kernel {
       block_table = args.block_tables + seq_id * args.max_blocks_per_seq;
       num_blocks_per_sg = 0;
 
-      const int kv_head_id = args.head_mapping[head_id];
+      //   const int kv_head_id = args.head_mapping[head_id];
+      const int kv_head_id = head_id / args.num_queries_per_tokens;
       kv_block_stride = args.num_kv_heads * args.head_size;
       kv_head_stride = args.head_size * kv_head_id;
 

@@ -197,6 +197,7 @@ class TestPagedAttention(TestCase):
         xpu_device = torch.device("xpu")
         output_xpu = output.to(xpu_device)
         output_xpu_clone = output_xpu.clone()
+        output_xpu_deprecated = output_xpu.clone()
         query_xpu = query.to(xpu_device)
         key_cache_xpu = key_cache.to(xpu_device)
         value_cache_xpu = value_cache.to(xpu_device)
@@ -213,7 +214,7 @@ class TestPagedAttention(TestCase):
                 query_xpu,
                 key_cache_xpu,
                 value_cache_xpu,
-                head_mapping_xpu,
+                num_queries_per_kv,
                 scale,
                 block_tables_xpu,
                 context_lens_xpu,
@@ -223,11 +224,25 @@ class TestPagedAttention(TestCase):
             )
 
             ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
-                output_xpu_clone,
+                output_xpu_deprecated,
                 query_xpu,
                 key_cache_xpu,
                 value_cache_xpu,
                 head_mapping_xpu,
+                scale,
+                block_tables_xpu,
+                context_lens_xpu,
+                block_size,
+                max_context_len,
+                alibi_slopes,
+            )
+
+            ipex.llm.modules.PagedAttention.single_query_kv_attention(
+                output_xpu_clone,
+                query_xpu,
+                key_cache_xpu,
+                value_cache_xpu,
+                num_queries_per_kv,
                 scale,
                 block_tables_xpu,
                 context_lens_xpu,
@@ -253,11 +268,24 @@ class TestPagedAttention(TestCase):
             )
             max_logits_xpu = torch.empty_like(exp_sums_xpu)
             ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
-                output_xpu_clone,
+                output_xpu_deprecated,
                 query_xpu,
                 key_cache_xpu,
                 value_cache_xpu,
                 head_mapping_xpu,
+                scale,
+                block_tables_xpu,
+                context_lens_xpu,
+                block_size,
+                max_context_len,
+                alibi_slopes,
+            )
+            ipex.llm.modules.PagedAttention.single_query_kv_attention(
+                output_xpu_clone,
+                query_xpu,
+                key_cache_xpu,
+                value_cache_xpu,
+                num_queries_per_kv,
                 scale,
                 block_tables_xpu,
                 context_lens_xpu,
@@ -273,9 +301,9 @@ class TestPagedAttention(TestCase):
                 query_xpu,
                 key_cache_xpu,
                 value_cache_xpu,
-                head_mapping_xpu,
                 block_tables_xpu,
                 context_lens_xpu,
+                num_queries_per_kv,
                 scale,
                 block_size,
                 max_context_len,
@@ -286,7 +314,8 @@ class TestPagedAttention(TestCase):
 
         # Run the reference implementation.
         actual_output = output_xpu.cpu().float()
-        clone_output = output_xpu_clone.cpu().float()
+        output_deprecated = output_xpu_deprecated.cpu().float()
+        output_clone = output_xpu_clone.cpu().float()
         ref_output = torch.empty_like(query)
         self.ref_single_query_cached_kv_attention(
             ref_output,
@@ -303,7 +332,10 @@ class TestPagedAttention(TestCase):
             actual_output, ref_output.float(), atol=1e-3, rtol=1e-2
         )
         torch.testing.assert_close(
-            clone_output, ref_output.float(), atol=1e-3, rtol=1e-2
+            output_deprecated, ref_output.float(), atol=1e-3, rtol=1e-2
+        )
+        torch.testing.assert_close(
+            output_clone, ref_output.float(), atol=1e-3, rtol=1e-2
         )
         print(f"attention {version} {dtype} accuracy test passed")
 

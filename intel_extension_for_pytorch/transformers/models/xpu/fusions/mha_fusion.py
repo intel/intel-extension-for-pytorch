@@ -388,15 +388,46 @@ class _IPEXPagedAttentionXPU:
         max_context_len,
         alibi_slopes,
     ):
+        num_queries_per_tokens = (head_mapping == 0).sum()
         query = query.contiguous()
         torch.ops.torch_ipex.paged_attention(
             output,
             query,
             key_cache,
             value_cache,
-            head_mapping,
             block_tables,
             context_lens,
+            num_queries_per_tokens,
+            scale,
+            block_size,
+            max_context_len,
+            alibi_slopes,
+        )
+
+    @classmethod
+    def single_query_kv_attention(
+        cls,
+        output,
+        query,
+        key_cache,
+        value_cache,
+        num_queries_per_tokens,
+        scale,
+        block_tables,
+        context_lens,
+        block_size,
+        max_context_len,
+        alibi_slopes,
+    ):
+        query = query.contiguous()
+        torch.ops.torch_ipex.paged_attention(
+            output,
+            query,
+            key_cache,
+            value_cache,
+            block_tables,
+            context_lens,
+            num_queries_per_tokens,
             scale,
             block_size,
             max_context_len,

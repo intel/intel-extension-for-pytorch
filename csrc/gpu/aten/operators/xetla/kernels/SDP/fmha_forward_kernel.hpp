@@ -25,8 +25,8 @@ struct dispatch_fmha_forward_args_t {
   void* log_sumexp;
   float softmax_scale;
   float dropout_prob;
-  int32_t* cu_seqlen_q;
-  int32_t* cu_seqlen_k;
+  int64_t* cu_seqlen_q;
+  int64_t* cu_seqlen_k;
   uint32_t num_batches;
   uint32_t num_heads;
   uint32_t num_kv_heads;

@@ -18,11 +18,13 @@ using namespace torch_ipex::xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-std::tuple<Tensor, Tensor> rms_norm_fw(
-    const Tensor& input,
+void rms_norm_fw(
+    Tensor& input,
     at::IntArrayRef normalized_shape,
     const Tensor& weight,
-    double epsilon);
+    double epsilon,
+    Tensor& output,
+    Tensor& rstd);
 namespace normalization {
 constexpr int SIMD = 16;
 inline std::pair<int64_t, int64_t> _check_layer_norm_inputs(

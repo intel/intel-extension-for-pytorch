@@ -262,9 +262,7 @@ def reshape_and_cache(
     value_cache: torch.Tensor,
     slots: torch.Tensor,
 ):
-    return torch.ops.torch_ipex.reshape_and_cache(
-        key, value, key_cache, value_cache, slots
-    )
+    torch.ops.torch_ipex.reshape_and_cache(key, value, key_cache, value_cache, slots)
 
 
 def IpexPaged_attention(
@@ -272,7 +270,7 @@ def IpexPaged_attention(
     query,
     key_cache,
     value_cache,
-    head_mapping,
+    num_queries_per_tokens,
     block_tables,
     context_lens,
     head_scale,
@@ -285,9 +283,9 @@ def IpexPaged_attention(
         query,
         key_cache,
         value_cache,
-        head_mapping,
         block_tables,
         context_lens,
+        num_queries_per_tokens,
         head_scale,
         block_size,
         max_context_len,
@@ -303,9 +301,9 @@ def paged_attention_v2(
     query,
     key_cache,
     value_cache,
-    head_mapping,
     block_tables,
     context_lens,
+    num_queries_per_tokens,
     head_scale,
     block_size,
     max_context_len,
@@ -319,9 +317,9 @@ def paged_attention_v2(
         query,
         key_cache,
         value_cache,
-        head_mapping,
         block_tables,
         context_lens,
+        num_queries_per_tokens,
         head_scale,
         block_size,
         max_context_len,
@@ -334,7 +332,7 @@ def paged_attention_v1(
     query,
     key_cache,
     value_cache,
-    head_mapping,
+    num_queries_per_tokens,
     head_scale,
     block_tables,
     context_lens,
@@ -347,9 +345,9 @@ def paged_attention_v1(
         query,
         key_cache,
         value_cache,
-        head_mapping,
         block_tables,
         context_lens,
+        num_queries_per_tokens,
         head_scale,
         block_size,
         max_context_len,

@@ -1084,3 +1084,46 @@ class _IPEXPagedAttentionRef:
             )
             out = out.view(num_heads, head_size)
             output[i].copy_(out, non_blocking=True)
+
+    @classmethod
+    def single_query_kv_attention(
+        cls,
+        output,
+        query,
+        key_cache,
+        value_cache,
+        num_queries_per_tokens,
+        scale,
+        block_tables,
+        context_lens,
+        block_size,
+        max_context_len,
+        alibi_slopes,
+    ) -> None:
+        num_heads = output.size(1)
+        num_kv_heads = num_heads // num_queries_per_tokens
+        head_mapping = (
+            torch.arange(
+                0,
+                num_kv_heads,
+                device=query.device,
+                dtype=torch.int32,
+            )
+            .view(num_kv_heads, 1)
+            .repeat_interleave(num_queries_per_tokens)
+            .flatten()
+        )
+        cls.single_query_cached_kv_attention(
+            cls,
+            output,
+            query,
+            key_cache,
+            value_cache,
+            head_mapping,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes,
+        )
