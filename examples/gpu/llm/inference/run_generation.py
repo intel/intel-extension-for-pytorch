@@ -112,8 +112,8 @@ parser.add_argument(
     help="tasks list for accuracy validation, only enabled lambada_standard and lambada_standard at present",
 )
 parser.add_argument("--acc-iter", default=-1, type=int)
-parser.add_argument("--disable_static_cache", action="store_true")
-parser.add_argument("--use_hf_code", default=True, action="store_false", help="use hf transformers code")
+parser.add_argument("--use-static-cache", default=False, action="store_true", help="use static kv cache")
+parser.add_argument("--use-hf-code", default=True, action="store_false", help="use hf transformers code")
 args = parser.parse_args()
 print(args)
 
@@ -211,8 +211,9 @@ if args.ipex:
 
 num_beams = 1 if args.greedy else args.num_beams
 # generate args
-# generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams, cache_implementation='static')
 generate_kwargs = dict(do_sample=False, temperature=0.9, num_beams=num_beams)
+if args.use_static_cache:
+    generate_kwargs.update({"cache_implementation": "static"})
 
 
 ######################## run lm eval accuracy check ########################
