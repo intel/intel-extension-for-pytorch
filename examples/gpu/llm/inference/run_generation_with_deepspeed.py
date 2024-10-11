@@ -99,6 +99,8 @@ parser.add_argument(
 )
 parser.add_argument("--acc-iter", default=-1, type=int)
 parser.add_argument("--disable_optimize_transformers", action="store_true")
+parser.add_argument("--use-static-cache", default=False, action="store_true", help="use static kv cache")
+parser.add_argument("--use-hf-code", default=True, action="store_false", help="use hf transformers code")
 args = parser.parse_args()
 
 
@@ -203,8 +205,8 @@ tp_presharded_mode = True if model_name in tp_presharded_models else False
 print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), 'auto')
 model_class = MODEL_CLASSES[model_type]
-tokenizer = model_class[1].from_pretrained(model_name)
-config = AutoConfig.from_pretrained(model_name, torchscript=args.jit)
+tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=args.use_hf_code)
+config = AutoConfig.from_pretrained(model_name, torchscript=args.jit, trust_remote_code=args.use_hf_code)
 # Avoid deepspeed tp>=2 lm_head weight reload. Not affect the results.
 if not args.disable_optimize_transformers:
     config.tie_word_embeddings = False
@@ -225,7 +227,7 @@ with deepspeed.OnDevice(dtype=load_dtype, device="meta", enabled=is_meta_support
     if model_class[0] == AutoModelForCausalLM and is_meta_support:
         model = model_class[0].from_config(config, torch_dtype=load_dtype)
     else:
-        model = model_class[0].from_pretrained(model_name, config=config, low_cpu_mem_usage=True, torch_dtype=load_dtype)
+        model = model_class[0].from_pretrained(model_name, config=config, low_cpu_mem_usage=True, torch_dtype=load_dtype, trust_remote_code=args.use_hf_code)
 
 print_rank0("*** model after load", model)
 
@@ -361,6 +363,8 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
 
     generate_kwargs = dict(max_new_tokens=num_tokens,
                            do_sample=False, num_beams=num_beams)
+    if args.use_static_cache:
+        generate_kwargs["cache_implementation"] = "static"
     if args.token_latency:
         generate_kwargs["token_latency"] = True
     if args.jit:
