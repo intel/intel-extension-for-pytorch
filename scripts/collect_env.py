@@ -1,5 +1,6 @@
 # Referenced from https://github.com/pytorch/pytorch/blob/master/torch/utils/collect_env.py
 # Run it with `python collect_env.py`.
+import json
 import locale
 import re
 import subprocess
@@ -42,12 +43,11 @@ SystemEnv = namedtuple(
         "is_xpu_available",
         "dpcpp_runtime_version",
         "mkl_version",
-        "gpu_models",
-        "intel_opencl_version",
-        "level_zero_version",
-        "pip_version",  # 'pip' or 'pip3'
-        "pip_packages",
-        "conda_packages",
+        "gpu_models_onboard",
+        "gpu_models_detected",
+        "driver_version",
+        "python_env",
+        "python_packages",
         "cpu_info",
     ],
 )
@@ -98,27 +98,6 @@ def run_and_return_first_line(run_lambda, command):
     return out.split("\n")[0]
 
 
-def get_conda_packages(run_lambda):
-    conda = os.environ.get("CONDA_EXE", "conda")
-    out = run_and_read_all(run_lambda, "{} list".format(conda))
-    if out is None:
-        return out
-
-    return "\n".join(
-        line
-        for line in out.splitlines()
-        if not line.startswith("#")
-        and any(
-            name in line
-            for name in {
-                "torch",
-                "numpy",
-                "mkl",
-            }
-        )
-    )
-
-
 def get_gcc_version(run_lambda):
     return run_and_parse_first_match(run_lambda, "gcc --version", r"gcc (.*)")
 
@@ -140,7 +119,7 @@ def get_cmake_version(run_lambda):
 
 
 def get_pkg_version(run_lambda, pkg):
-    txt = ""
+    ret = ""
     index = -1
     if get_platform() == "linux":
         mgr_name = ""
@@ -149,24 +128,32 @@ def get_pkg_version(run_lambda, pkg):
             if rc == 0:
                 mgr_name = "dpkg"
         if mgr_name == "":
+            rc, _, _ = run("which dnf")
+            if rc == 0:
+                mgr_name = "dnf"
+        if mgr_name == "":
             rc, _, _ = run("which yum")
             if rc == 0:
                 mgr_name = "yum"
         if mgr_name == "":
-            rc, _, _ = run("which dnf")
+            rc, _, _ = run("which zypper")
             if rc == 0:
-                mgr_name = "dnf"
+                mgr_name = "zypper"
         if mgr_name != "":
             cmd = ""
-            if mgr_name == "yum" or mgr_name == "dnf":
-                index = 1
+            if mgr_name in ["dnf", "yum", "zypper"]:
                 pkg_name = ""
                 if pkg == "intel_opencl":
                     pkg_name = "intel-opencl"
                 if pkg == "level_zero":
                     pkg_name = "intel-level-zero-gpu"
                 if pkg_name != "":
-                    cmd = f"{mgr_name} list | grep {pkg_name}"
+                    if mgr_name in ["dnf", "yum"]:
+                        index = 1
+                        cmd = f"{mgr_name} list | grep {pkg_name}"
+                    if mgr_name in ["zypper"]:
+                        index = 2
+                        cmd = f"{mgr_name} info {pkg_name} | grep Version"
             if mgr_name == "dpkg":
                 index = 2
                 pkg_name = ""
@@ -177,24 +164,87 @@ def get_pkg_version(run_lambda, pkg):
                 if pkg_name != "":
                     cmd = f"{mgr_name} -l | grep {pkg_name}"
             if cmd != "":
-                txt = run_and_read_all(run_lambda, cmd)
-    lst_txt = []
-    if txt:
-        lst_txt = re.sub(" +", " ", txt).split(" ")
-    if len(lst_txt) > index and index != -1:
-        txt = lst_txt[index]
+                ret = run_and_read_all(run_lambda, cmd)
+    lst = []
+    if ret:
+        lst += re.sub(" +", " ", ret).split(" ")
+    if len(lst) > index and index != -1:
+        ret = lst[index]
     else:
-        txt = "N/A"
-    return txt
+        ret = "N/A"
+    return ret
 
 
-def get_gpu_info(run_lambda):
+def get_driver_version(run_lambda):
+    lst = []
+    platform = get_platform()
+    if platform == "linux":
+        pkgs = ["intel_opencl", "level_zero"]
+        for pkg in pkgs:
+            lst.append(f"* {pkg}:\t{get_pkg_version(run_lambda, pkg)}")
+    if platform == "win32" or platform == "cygwin":
+        txt = run_and_read_all(
+            run_lambda,
+            'powershell.exe "gwmi -Class Win32_PnpSignedDriver | where{$_.DeviceClass -eq \\"DISPLAY\\"\
+            -and $_.Manufacturer -match \\"Intel\\"} | Select-Object -Property DeviceName,DriverVersion,DriverDate\
+            | ConvertTo-Json"',
+        )
+        try:
+            obj = json.loads(txt)
+            if type(obj) is list:
+                for o in obj:
+                    lst.append(
+                        f'* {o["DeviceName"]}: {o["DriverVersion"]} ({o["DriverDate"]})'
+                    )
+            else:
+                lst.append(f'* {obj["DriverVersion"]} ({obj["DriverDate"]})')
+        except ValueError as e:
+            lst.append(txt)
+            lst.append(str(e))
+    return "\n".join(lst)
+
+
+def get_gpu_info_onboard(run_lambda):
+    lst = []
+    platform = get_platform()
+    if platform == "linux":
+        txt = run_and_read_all(run_lambda, "xpu-smi discovery -j")
+        try:
+            obj = json.loads(txt)
+            for o in obj["device_list"]:
+                lst.append(f'* {o["device_name"]}')
+        except ValueError as e:
+            lst.append(txt)
+            lst.append(str(e))
+    if platform == "win32" or platform == "cygwin":
+        txt = run_and_read_all(
+            run_lambda,
+            'powershell.exe "gwmi -Class Win32_PnpSignedDriver | where{$_.DeviceClass -eq \\"DISPLAY\\"\
+            -and $_.Manufacturer -match \\"Intel\\"} | Select-Object -Property DeviceName | ConvertTo-Json"',
+        )
+        try:
+            obj = json.loads(txt)
+            if type(obj) is list:
+                for o in obj:
+                    lst.append(f'* {o["DeviceName"]}')
+            else:
+                lst.append(f'* {obj["DeviceName"]}')
+        except ValueError as e:
+            lst.append(txt)
+            lst.append(str(e))
+    return "\n".join(lst)
+
+
+def get_gpu_info_detected(run_lambda):
     if TORCH_AVAILABLE and IPEX_AVAILABLE:
         devices = [
-            f"[{i}] {torch.xpu.get_device_properties(i)}"
+            f"* [{i}] {torch.xpu.get_device_properties(i)}"
             for i in range(torch.xpu.device_count())
         ]
-        return "\n".join(devices)
+        if len(devices) > 0:
+            return "\n".join(devices)
+        else:
+            return "N/A"
     else:
         return "N/A"
 
@@ -213,14 +263,31 @@ def get_mkl_version(run_lambda):
 
 def get_cpu_info(run_lambda):
     rc, out, err = 0, "", ""
-    if get_platform() == "linux":
+    platform = get_platform()
+    if platform == "linux":
         rc, out, err = run_lambda("lscpu")
-    elif get_platform() == "win32":
+    elif platform == "win32":
         rc, out, err = run_lambda(
-            "wmic cpu get Name,Manufacturer,Family,Architecture,ProcessorType,DeviceID,\
-        CurrentClockSpeed,MaxClockSpeed,L2CacheSize,L2CacheSpeed,Revision /VALUE"
+            'powershell.exe "gwmi -Class Win32_Processor | Select-Object -Property Description,Manufacturer,Name,\
+            NumberOfCores,NumberOfEnabledCore,NumberOfLogicalProcessors,ThreadCount | ConvertTo-Json"'
         )
-    elif get_platform() == "darwin":
+        if rc == 0:
+            lst = []
+            try:
+                obj = json.loads(out)
+                if type(obj) is list:
+                    for o in obj:
+                        lst.append("----------------------")
+                        for key in o.keys():
+                            lst.append(f"{key}: {o[key]}")
+                else:
+                    for key in obj.keys():
+                        lst.append(f"{key}: {obj[key]}")
+            except ValueError as e:
+                lst.append(out)
+                lst.append(str(e))
+            out = "\n".join(lst)
+    elif platform == "darwin":
         rc, out, err = run_lambda("sysctl -n machdep.cpu.brand_string")
     cpu_info = "N/A"
     if rc == 0:
@@ -248,12 +315,17 @@ def get_mac_version(run_lambda):
 
 
 def get_windows_version(run_lambda):
-    system_root = os.environ.get("SYSTEMROOT", "C:\\Windows")
-    wmic_cmd = os.path.join(system_root, "System32", "Wbem", "wmic")
-    findstr_cmd = os.path.join(system_root, "System32", "findstr")
-    return run_and_read_all(
-        run_lambda, "{} os get Caption | {} /v Caption".format(wmic_cmd, findstr_cmd)
+    ret = run_and_read_all(
+        run_lambda,
+        'powershell.exe "gwmi -Class Win32_OperatingSystem | Select-Object -Property Caption,\
+        OSArchitecture,Version | ConvertTo-Json"',
     )
+    try:
+        obj = json.loads(ret)
+        ret = f'{obj["Caption"]} ({obj["Version"]} {obj["OSArchitecture"]})'
+    except ValueError as e:
+        ret += f"\n{str(e)}"
+    return ret
 
 
 def get_lsb_version(run_lambda):
@@ -280,20 +352,20 @@ def get_os(run_lambda):
         version = get_mac_version(run_lambda)
         if version is None:
             return None
-        return "macOS {} ({})".format(version, machine())
+        return f"macOS {version} ({machine()})"
 
     if platform == "linux":
         # Ubuntu/Debian based
         desc = get_lsb_version(run_lambda)
         if desc is not None:
-            return "{} ({})".format(desc, machine())
+            return f"{desc} ({machine()})"
 
         # Try reading /etc/*-release
         desc = check_release_file(run_lambda)
         if desc is not None:
-            return "{} ({})".format(desc, machine())
+            return f"{desc} ({machine()})"
 
-        return "{} ({})".format(platform, machine())
+        return f"{platform} ({machine()})"
 
     # Unknown platform
     return platform
@@ -313,36 +385,42 @@ def get_libc_version():
     return "-".join(platform.libc_ver())
 
 
-def get_pip_packages(run_lambda):
-    """Returns `pip list` output. Note: will also find conda-installed pytorch
-    and numpy packages."""
-
-    # People generally have `pip` as `pip` or `pip3`
-    # But here it is incoved as `python -mpip`
-    def run_with_pip(pip):
-        out = run_and_read_all(run_lambda, "{} list --format=freeze".format(pip))
-        return "\n".join(
-            line
-            for line in out.splitlines()
-            if any(
-                name in line
-                for name in {
-                    "torch",
-                    "numpy",
-                    "mypy",
-                }
-            )
+def get_python_packages(run_lambda):
+    conda = os.environ.get("CONDA_EXE", "conda")
+    pyenv = "conda"
+    out = run_and_read_all(run_lambda, f"{conda} list")
+    if out is None:
+        pyenv = "pip"
+        out = run_and_read_all(
+            run_lambda, f"{sys.executable} -mpip list --format=freeze"
         )
 
-    pip_version = "pip3" if sys.version[0] == "3" else "pip"
-    out = run_with_pip(sys.executable + " -mpip")
-
-    return pip_version, out
+    return pyenv, "\n".join(
+        line
+        for line in out.splitlines()
+        if not line.startswith("#")
+        and any(
+            name in line
+            for name in {
+                "torch",
+                "numpy",
+                "intel",
+                "mkl",
+                "dpcpp",
+                "ccl",
+                "mpi",
+                "pti",
+                "transformers",
+                "deepspeed",
+                "libuv",
+            }
+        )
+    )
 
 
 def get_env_info():
     run_lambda = run
-    pip_version, pip_list_output = get_pip_packages(run_lambda)
+    pyenv, pip_list_output = get_python_packages(run_lambda)
 
     if TORCH_AVAILABLE:
         torch_version_str = torch.__version__
@@ -380,19 +458,16 @@ def get_env_info():
         ipex_version=ipex_version_str,
         ipex_gitrev=ipex_gitrev_str,
         build_type=build_type_str,
-        python_version="{} ({}-bit runtime)".format(
-            sys_version, sys.maxsize.bit_length() + 1
-        ),
+        python_version=f"{sys_version} ({sys.maxsize.bit_length() + 1}-bit runtime)",
         python_platform=get_python_platform(),
         is_xpu_available=xpu_available_str,
         dpcpp_runtime_version=get_running_dpcpp_version(run_lambda),
         mkl_version=get_mkl_version(run_lambda),
-        gpu_models=f"\n{get_gpu_info(run_lambda)}",
-        intel_opencl_version=get_pkg_version(run_lambda, "intel_opencl"),
-        level_zero_version=get_pkg_version(run_lambda, "level_zero"),
-        pip_version=pip_version,
-        pip_packages=pip_list_output,
-        conda_packages=get_conda_packages(run_lambda),
+        gpu_models_onboard=f"\n{get_gpu_info_onboard(run_lambda)}",
+        gpu_models_detected=f"\n{get_gpu_info_detected(run_lambda)}",
+        driver_version=f"\n{get_driver_version(run_lambda)}",
+        python_env=pyenv,
+        python_packages=pip_list_output,
         os=get_os(run_lambda),
         libc_version=get_libc_version(),
         gcc_version=get_gcc_version(run_lambda),
@@ -404,34 +479,36 @@ def get_env_info():
 
 
 env_info_fmt = """
-PyTorch version: {torch_version}
+PyTorch version:   {torch_version}
 PyTorch CXX11 ABI: {torch_cxx11_abi}
-IPEX version: {ipex_version}
-IPEX commit: {ipex_gitrev}
-Build type: {build_type}
+IPEX version:      {ipex_version}
+IPEX commit:       {ipex_gitrev}
+Build type:        {build_type}
 
-OS: {os}
-GCC version: {gcc_version}
-Clang version: {clang_version}
-IGC version: {icx_version}
-CMake version: {cmake_version}
-Libc version: {libc_version}
+OS:                {os}
+GCC version:       {gcc_version}
+Clang version:     {clang_version}
+IGC version:       {icx_version}
+CMake version:     {cmake_version}
+Libc version:      {libc_version}
 
-Python version: {python_version}
-Python platform: {python_platform}
-Is XPU available: {is_xpu_available}
-DPCPP runtime version: {dpcpp_runtime_version}
-MKL version: {mkl_version}
-GPU models and configuration: {gpu_models}
-Intel OpenCL ICD version: {intel_opencl_version}
-Level Zero version: {level_zero_version}
+Python version:    {python_version}
+Python platform:   {python_platform}
+Is XPU available:  {is_xpu_available}
+DPCPP runtime:     {dpcpp_runtime_version}
+MKL version:       {mkl_version}
+
+GPU models and configuration onboard: {gpu_models_onboard}
+
+GPU models and configuration detected: {gpu_models_detected}
+
+Driver version: {driver_version}
 
 CPU:
 {cpu_info}
 
 Versions of relevant libraries:
-{pip_packages}
-{conda_packages}
+{python_packages}
 """.strip()
 
 
@@ -471,7 +548,7 @@ def pretty_str(envinfo):
     def maybe_start_on_next_line(string):
         # If `string` is multiline, prepend a \n to it.
         if string is not None and len(string.split("\n")) > 1:
-            return "\n{}\n".format(string)
+            return f"\n{string}\n"
         return string
 
     mutable_dict = envinfo._asdict()
@@ -486,18 +563,13 @@ def pretty_str(envinfo):
     mutable_dict = replace_empties(mutable_dict, replacement="N/A")
 
     # If either of these are '', replace with 'No relevant packages'
-    mutable_dict["pip_packages"] = replace_if_empty(mutable_dict["pip_packages"])
-    mutable_dict["conda_packages"] = replace_if_empty(mutable_dict["conda_packages"])
+    mutable_dict["python_packages"] = replace_if_empty(mutable_dict["python_packages"])
 
     # Tag conda and pip packages with a prefix
     # If they were previously None, they'll show up as ie '[conda] Could not collect'
-    if mutable_dict["pip_packages"]:
-        mutable_dict["pip_packages"] = prepend(
-            mutable_dict["pip_packages"], "[{}] ".format(envinfo.pip_version)
-        )
-    if mutable_dict["conda_packages"]:
-        mutable_dict["conda_packages"] = prepend(
-            mutable_dict["conda_packages"], "[conda] "
+    if mutable_dict["python_packages"]:
+        mutable_dict["python_packages"] = prepend(
+            mutable_dict["python_packages"], f"[{envinfo.python_env}] "
         )
     mutable_dict["cpu_info"] = envinfo.cpu_info
     return env_info_fmt.format(**mutable_dict)
@@ -510,6 +582,7 @@ def get_pretty_env_info():
 def main():
     print("Collecting environment information...")
     output = get_pretty_env_info()
+    print("=====================================")
     print(output)
 
 

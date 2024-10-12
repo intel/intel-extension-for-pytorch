@@ -45,8 +45,8 @@ body:
     description: |
       Please run the following and paste the output below.
       ```sh
-      wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/master/scripts/collect_env.py
-      # For security purposes, please check the contents of collect_env.py before running it.
+      wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/main/scripts/collect_env.py
+      # For security purposes, please check the output contents of collect_env.py before posting them.
       python collect_env.py
       ```
   validations:
