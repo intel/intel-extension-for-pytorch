@@ -162,9 +162,13 @@ def model_convert_reference(_model):
         MllamaForCausalLM_forward,
         MllamaForConditionalGeneration_forward,
         GPTNeoXForCausalLM_forward,
+        GPTNeoXModel_forward,
         OPTForCausalLM_forward,
+        BloomModel_forward,
         BloomForCausalLM_forward,
+        FalconModel_forward,
         FalconForCausalLM_forward,
+        CodeGenModel_forward,
         CodeGenForCausalLM_forward,
         BaichuanForCausalLM_forward,
         ChatGLMModel_forward,
@@ -295,6 +299,7 @@ def model_convert_reference(_model):
         )
     elif (
         hasattr(_model, "__class__")
+        and hasattr(transformers.models, "mllama")
         and _model.__class__
         == transformers.models.mllama.modeling_mllama.MllamaForConditionalGeneration
     ):
@@ -334,6 +339,7 @@ def model_convert_reference(_model):
             "forward",
             GPTNeoXForCausalLM_forward,
         )
+        convert_function(_model.gpt_neox, "forward", GPTNeoXModel_forward)
     elif (
         hasattr(_model, "__class__")
         and _model.__class__ == transformers.models.opt.modeling_opt.OPTForCausalLM
@@ -353,6 +359,7 @@ def model_convert_reference(_model):
             "forward",
             BloomForCausalLM_forward,
         )
+        convert_function(_model.transformer, "forward", BloomModel_forward)
     elif (
         hasattr(_model, "__class__")
         and _model.__class__
@@ -363,6 +370,7 @@ def model_convert_reference(_model):
             "forward",
             CodeGenForCausalLM_forward,
         )
+        convert_function(_model.transformer, "forward", CodeGenModel_forward)
     elif (
         hasattr(_model, "__class__")
         and _model.__class__
@@ -433,9 +441,6 @@ def model_convert_reference(_model):
     supported_mha_classes = [
         transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXAttention,
         transformers.models.llama.modeling_llama.LlamaAttention,
-        transformers.models.mllama.modeling_mllama.MllamaTextCrossAttention,
-        transformers.models.mllama.modeling_mllama.MllamaTextCrossSdpaAttention,
-        transformers.models.mllama.modeling_mllama.MllamaTextSelfAttention,
         transformers.models.gptj.modeling_gptj.GPTJAttention,
         transformers.models.opt.modeling_opt.OPTAttention,
         transformers.models.bloom.modeling_bloom.BloomAttention,
@@ -466,6 +471,16 @@ def model_convert_reference(_model):
         ipex_tp_supported_mha_classes.append(type(_model.model.layers[0].self_attn))
         ipex_tp_supported_mlp_classes.append(type(_model.model.layers[0].mlp))
         ipex_tp_supported_model_classes.append(type(_model))
+    if hasattr(transformers.models, "mllama"):
+        supported_mha_classes.append(
+            transformers.models.mllama.modeling_mllama.MllamaTextCrossAttention
+        )
+        supported_mha_classes.append(
+            transformers.models.mllama.modeling_mllama.MllamaTextCrossSdpaAttention
+        )
+        supported_mha_classes.append(
+            transformers.models.mllama.modeling_mllama.MllamaTextSelfAttention
+        )
     # model-wise optimizations - MHA module
     for supported_mha_class in supported_mha_classes:
         if need_ipex_tp and supported_mha_class in ipex_tp_supported_mha_classes:
@@ -519,18 +534,25 @@ def model_convert_reference(_model):
                 )
                 update_heads_info(_model, rank, world_size)
 
+    mllama_decoder_layers = (
+        [
+            transformers.models.mllama.modeling_mllama.MllamaSelfAttentionDecoderLayer,
+            transformers.models.mllama.modeling_mllama.MllamaCrossAttentionDecoderLayer,
+        ]
+        if hasattr(transformers.models, "mllama")
+        else []
+    )
     # model-wise optimizations - Feedforward/Decoder layer modules
     for supported_decoder_class in [
         transformers.models.llama.modeling_llama.LlamaDecoderLayer,
-        transformers.models.mllama.modeling_mllama.MllamaSelfAttentionDecoderLayer,
-        transformers.models.mllama.modeling_mllama.MllamaCrossAttentionDecoderLayer,
+        transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXLayer,
         transformers.models.gptj.modeling_gptj.GPTJBlock,
         transformers.models.codegen.modeling_codegen.CodeGenBlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer,
         transformers.models.bloom.modeling_bloom.BloomBlock,
         transformers.models.gpt_bigcode.modeling_gpt_bigcode.GPTBigCodeBlock,
         transformers.models.t5.modeling_t5.T5Block,
-    ]:
+    ] + mllama_decoder_layers:
         convert_class(
             _model,
             supported_decoder_class,
@@ -559,6 +581,7 @@ def model_convert_reference(_model):
                 _model.eval()
             )
         convert_function(_model, "forward", FalconForCausalLM_forward)
+        convert_function(_model.transformer, "forward", FalconModel_forward)
         convert_class(
             _model,
             type(_model.transformer.h[0].self_attention),
@@ -955,7 +978,9 @@ def get_dummy_input(_model, return_dict=False):
         model_num_layers = _model.config.n_layer
     elif hasattr(_model.config, "num_hidden_layers"):
         model_num_layers = _model.config.num_hidden_layers
-    elif hasattr(_model.config.text_config, "num_hidden_layers"):
+    elif hasattr(_model.config, "text_config") and hasattr(
+        _model.config.text_config, "num_hidden_layers"
+    ):
         model_num_layers = _model.config.text_config.num_hidden_layers
     elif hasattr(_model.config, "num_layers"):
         model_num_layers = _model.config.num_layers
@@ -1375,8 +1400,11 @@ def model_convert_lowering(
 
             supported_classes = [
                 transformers.models.llama.modeling_llama.LlamaRMSNorm,
-                transformers.models.mllama.modeling_mllama.MllamaTextRMSNorm,
             ]
+            if hasattr(transformers.models, "mllama"):
+                supported_classes.append(
+                    transformers.models.mllama.modeling_mllama.MllamaTextRMSNorm
+                )
             if _model.config.architectures[0] in [
                 "BaichuanForCausalLM",
                 "YuanForCausalLM",

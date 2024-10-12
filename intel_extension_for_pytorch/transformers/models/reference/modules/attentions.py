@@ -600,8 +600,17 @@ def _BloomAttention_forward(
         hidden_states
     )  # [batch_size, seq_length, 3 x hidden_size]
 
+    def _split_heads(
+        fused_qkv: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        batch_size, seq_length, three_times_hidden_size = fused_qkv.shape
+        fused_qkv = fused_qkv.view(
+            batch_size, seq_length, self.num_heads, 3, self.head_dim
+        )
+        return fused_qkv[..., 0, :], fused_qkv[..., 1, :], fused_qkv[..., 2, :]
+
     # 3 x [batch_size, seq_length, num_heads, head_dim]
-    (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
+    (query_layer, key_layer, value_layer) = _split_heads(fused_qkv)
 
     batch_size, q_length, _, _ = query_layer.shape
     query_layer = query_layer.contiguous()

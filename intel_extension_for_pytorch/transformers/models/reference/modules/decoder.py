@@ -1505,6 +1505,54 @@ def MllamaCrossAttentionDecoderLayer_forward(
     return outputs
 
 
+def GPTNeoXLayer_forward(
+    self,
+    hidden_states: Optional[torch.FloatTensor],
+    attention_mask: Optional[torch.FloatTensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    head_mask: Optional[torch.FloatTensor] = None,
+    use_cache: Optional[bool] = False,
+    layer_past: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+):
+    attention_layer_outputs = self.attention(
+        self.input_layernorm(hidden_states),
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        layer_past=layer_past,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+    attn_output = attention_layer_outputs[
+        0
+    ]  # output_attn: attn_output, present, (attn_weights)
+    attn_output = self.post_attention_dropout(attn_output)
+    outputs = attention_layer_outputs[1:]
+
+    if self.use_parallel_residual:
+        # pseudocode:
+        # x = x + attn(ln1(x)) + mlp(ln2(x))
+        mlp_output = self.mlp(self.post_attention_layernorm(hidden_states))
+        mlp_output = self.post_mlp_dropout(mlp_output)
+        hidden_states = mlp_output + attn_output + hidden_states
+    else:
+        # pseudocode:
+        # x = x + attn(ln1(x))
+        # x = x + mlp(ln2(x))
+        attn_output = attn_output + hidden_states
+        mlp_output = self.mlp(self.post_attention_layernorm(attn_output))
+        mlp_output = self.post_mlp_dropout(mlp_output)
+        hidden_states = mlp_output + attn_output
+
+    if use_cache:
+        outputs = (hidden_states,) + outputs  # hidden_states, present, (attn_weights)
+    else:
+        outputs = (hidden_states,) + outputs[1:]  # hidden_states, (attn_weights)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1782,6 +1830,17 @@ class _IPEXDecoderLayerRef(nn.Module):
                 position_ids,
                 head_mask,
                 use_cache,
+                output_attentions,
+            )
+        elif self.model_backbone == "GPTNeoXForCausalLM":
+            return GPTNeoXLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                head_mask,
+                use_cache,
+                layer_past,
                 output_attentions,
             )
         elif (

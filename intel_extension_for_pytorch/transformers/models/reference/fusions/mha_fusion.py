@@ -499,7 +499,13 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.head_dim = module.head_dim
             self.scale_attn = module.scale_attn
             self.attn_dropout = module.attn_dropout
-            self.causal_mask = module.causal_mask
+            if hasattr(module, "causal_mask"):
+                self.causal_mask = module.causal_mask
+            else:
+                max_positions = config.max_position_embeddings
+                self.causal_mask = torch.tril(
+                    torch.ones((max_positions, max_positions), dtype=torch.bool)
+                ).view(1, 1, max_positions, max_positions)
         elif self.model_backbone == "BaichuanForCausalLM":
             self.head_dim = module.head_dim
             self.num_heads = module.num_heads
