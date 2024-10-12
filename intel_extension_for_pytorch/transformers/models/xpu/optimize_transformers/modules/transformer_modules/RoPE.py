@@ -11,7 +11,16 @@ class PositionalEmbedding(nn.Module):
         self.dtype = dtype
         self.dynamic_cache_stride = config.dynamic_cache_stride
 
-    def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
+    def forward(
+        self,
+        query,
+        key,
+        position_ids,
+        layer_id,
+        beam_size,
+        kv_seq_len,
+        *args,
+    ):
         return query, key
 
 

@@ -1944,26 +1944,25 @@ def ipex_beam_search_without_optimize(model):
 IPEX_STATIC_CACHE_MODEL_LIST = [
     "Phi3ForCausalLM",
     "BaichuanForCausalLM",
+    "BloomForCausalLM",
+    "ChatGLMForConditionalGeneration",
+    "GPTJForCausalLM",
+    "Qwen2ForCausalLM",
 ]
 
 
 def ipex_static_cache(model):
-    if model.__class__.__name__ == "ChatGLMForConditionalGeneration":
-        setattr(model, "_setup_cache", partial(_ipex_setup_cache_GLM, model))  # noqa
-        model._supports_static_cache = True
-        model._supports_cache_class = True
-        setattr(model, "_reset_cache", partial(_ipex_reset_cache_, model))  # noqa
-    if model.__class__.__name__ == "GPTJForCausalLM":
-        setattr(model, "_setup_cache", partial(_ipex_setup_cache_GPTJ, model))  # noqa
-        model._supports_static_cache = True
-        model._supports_cache_class = True
-        setattr(model, "_reset_cache", partial(_ipex_reset_cache_, model))  # noqa
-
     if model.__class__.__name__ in IPEX_STATIC_CACHE_MODEL_LIST:
-        setattr(model, "_setup_cache", partial(_ipex_setup_cache, model))  # noqa
+        if model.__class__.__name__ == "ChatGLMForConditionalGeneration":
+            model._setup_cache = partial(_ipex_setup_cache_GLM, model)
+        elif model.__class__.__name__ == "GPTJForCausalLM":
+            model._setup_cache = partial(_ipex_setup_cache_GPTJ, model)
+        else:
+            model._setup_cache = partial(_ipex_setup_cache, model)
+
+        model._reset_cache = partial(_ipex_reset_cache, model)
         model._supports_static_cache = True
         model._supports_cache_class = True
-        setattr(model, "_reset_cache", partial(_ipex_reset_cache, model))  # noqa
 
 
 def _ipex_setup_cache(
@@ -2004,7 +2003,13 @@ def _ipex_setup_cache(
 
 def _ipex_reset_cache(self):
     for layer in self.model.layers:
-        layer.attn.past_key_value = None
+        if hasattr(layer, "self_attn"):
+            layer.self_attn.past_key_value = None
+        elif hasattr(layer, "attn"):
+            layer.attn.past_key_value = None
+
+    if hasattr(self, "past_key_values"):
+        self.past_key_values = None
 
 
 def _ipex_setup_cache_GPTJ(
@@ -2065,7 +2070,3 @@ def _ipex_setup_cache_GLM(
         past_key_values.key_cache.append(new_layer_key_cache)
         past_key_values.value_cache.append(new_layer_value_cache)
     self.past_key_values = past_key_values
-
-
-def _ipex_reset_cache_(self):
-    self.past_key_values = None

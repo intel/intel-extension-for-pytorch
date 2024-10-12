@@ -127,13 +127,16 @@ class ModuleReplacer:
             config = model.config
             config.dtype = dtype
             config.device = "xpu"
+
         # Add num_key_value_heads which is required by StaticCache in Transformers 4.44.0.
         if not hasattr(config, "num_key_value_heads"):
-            config.num_key_value_heads = (
-                config.multi_query_group_num
-                if hasattr(config, "multi_query_group_num")
-                else None
-            )
+            if hasattr(config, "n_head"):
+                config.num_key_value_heads = config.n_head
+            elif hasattr(config, "multi_query_group_num"):
+                config.num_key_value_heads = config.multi_query_group_num
+            else:
+                config.num_key_value_heads = None
+
         module_name = "" if prefix == "" else prefix + "."
         is_replace_success = False
         enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in [

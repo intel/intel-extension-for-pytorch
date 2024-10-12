@@ -17,6 +17,13 @@ from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.Linear import (  # noqa F401
     IPEXTransformerLinear,
 )  # noqa
+from .transformer_modules.XPUAttentionfp16 import (
+    IPEXAttention,
+)
+from .transformer_modules.XPUAttentionInt4 import (
+    IPEXAttentionInt4,
+    IPEXAttentionInt4OneDNN,
+)
 
 
 class NewIPEXBloomBlock(IPEXTransformerBlock):
@@ -36,7 +43,16 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        self.attn = self.build_attention_from_config()
+        if dtype == "fp16":
+            self.attn = IPEXAttention(self.ipex_config)
+        elif dtype == "int4" and xpu_gemm_use_xetla():
+            self.attn = IPEXAttentionInt4(self.ipex_config)
+        elif dtype == "int4" and not xpu_gemm_use_xetla():
+            self.attn = IPEXAttentionInt4OneDNN(self.ipex_config)
+        else:
+            raise NotImplementedError(
+                "IPEXAttention dose not support this modelType {} !".format(dtype)
+            )
         self.mlp = self.build_mlp_from_config()
         self.input_layernorm = nn.LayerNorm(
             self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps
@@ -70,6 +86,7 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
             embedding_dim=self.config.hidden_size,
             intermediate_dim=4 * self.config.hidden_size,
             num_attention_head=self.config.n_head,
+            num_key_value_head=self.config.n_head,
             max_positions=max(2048, MAX_SEQ_LEN),
             max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=PositionalEmbedding,
@@ -162,47 +179,10 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
         head_mask: Optional[torch.Tensor] = None,
         use_cache: bool = False,
         output_attentions: bool = False,
+        cache_position: Optional[torch.LongTensor] = None,
     ):
         bs = IPEXTransformerAttn.batch_size
-        dim = hidden_states.dim()
-        if dim == 3:
-            beam = hidden_states.shape[0] // bs
-            seq = hidden_states.shape[1]
-        elif dim == 4:
-            beam = hidden_states.shape[1]
-            seq = hidden_states.shape[2]
-        else:
-            print("Unsupported input shape")
-            return
-        IPEXTransformerAttn.beam_size = beam
-        first_token = True if layer_past is None else False
-        hidden_size = hidden_states.shape[-1]
-        hidden_shape = [bs, beam, seq, hidden_size]
-        if first_token and beam > 1:
-            # for 1st token, keep the original layout
-            # reduce the duplicated info in beam dim
-            # shape -> [bs*beam, seq, hidden_size]
-            # layout -> [bs*beam, seq, hidden_size]
-            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
-            if attention_mask is not None:
-                attention_mask = attention_mask.view(
-                    bs,
-                    beam,
-                    attention_mask.shape[1],
-                    attention_mask.shape[2],
-                    attention_mask.shape[3],
-                )[:, 0, :, :, :].view(
-                    bs,
-                    attention_mask.shape[1],
-                    attention_mask.shape[2],
-                    attention_mask.shape[3],
-                )
-        else:
-            # for 2nd to last token, we convert the layout
-            # shape -> [bs*beam, seq, hidden_size]
-            # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1).contiguous()
-
+        IPEXTransformerAttn.beam_size = hidden_states.shape[0] // bs
         layernorm_output = torch.ops.torch_ipex.fast_layer_norm(
             hidden_states,
             self.input_layernorm.normalized_shape,
@@ -216,14 +196,14 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
             residual = hidden_states
         attn_outputs = self.attn(
             hidden_states=layernorm_output,
-            layer_past=layer_past,
-            attention_mask=attention_mask,
+            past_key_value=layer_past,
+            attention_mask=None,
             head_mask=head_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
             residual=residual,
             alibi=alibi,
-            first_token=first_token,
+            cache_position=cache_position,
         )
 
         attention_output = attn_outputs[0]
@@ -242,33 +222,8 @@ class NewIPEXBloomBlock(IPEXTransformerBlock):
 
         hidden_states = self.mlp(layernorm_output, residual)
 
-        if first_token and beam > 1:
-            # for 1st token, expand the result with beam
-            hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
-            hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
-        else:
-            # for 2nd to last token, we convert the layout back
-            # convert hidden_states form [seq, beam, hidden_size] back to [beam, seq, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1)
         if use_cache:
             outputs = (hidden_states,) + outputs
         else:
             outputs = (hidden_states,) + outputs[1:]
         return outputs
-
-
-def _convert_to_bloom_cache_ipex(
-    past_key_value: Tuple[Tuple[torch.Tensor, torch.Tensor]]
-) -> Tuple[Tuple[torch.Tensor, torch.Tensor]]:
-    """
-    Converts the cache to the format expected by Bloom, i.e. to tuple(tuple([batch_size * num_heads, ...]))
-    """
-    batch_size, num_heads, seq_length, head_dim = past_key_value[0][0].shape
-
-    return tuple(
-        (
-            layer_past[0].view(batch_size, num_heads, seq_length, head_dim),
-            layer_past[1].view(batch_size, num_heads, seq_length, head_dim),
-        )
-        for layer_past in past_key_value
-    )
