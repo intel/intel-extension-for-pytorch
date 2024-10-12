@@ -37,9 +37,9 @@ from .modules.opt import NewIPEXOPTBlock
 from .modules.falcon import NewIPEXFalconBlock
 from .modules.qwen import NewIPEXQWENBlock
 from .modules.qwen2 import NewIPEXQWEN2DecoderLayer
+from .modules.baichuan import NewIPEXBaichuanBlock
 from .modules.chatglm import (
     NewIPEXCHATGLMBlock,
-    prepare_inputs_for_generation,
     NewIPEXRotaryEmbedding,
 )
 from .modules.DiffusersTransformer import NewIPEXBasicTransformerBlock
@@ -88,7 +88,6 @@ def default_override_function_list() -> List:
         ipex_convert_to_bloom_cache,
         ipex_prepare_model_inputs,
         ipex_beam_search,
-        ipex_prepare_inputs_for_generation,
         ipex_beam_search_new,
         ipex_beam_sample,
         gptj_forward_hook,
@@ -101,6 +100,7 @@ def default_override_function_list() -> List:
         chatglm_forward_hook,
         ipex_build_bloom_alibi_tensor,
         ipex_static_cache,
+        ipex_prepare_inputs_for_generation,
     ]
     return default_fn_list
 
@@ -127,6 +127,13 @@ class ModuleReplacer:
             config = model.config
             config.dtype = dtype
             config.device = "xpu"
+        # Add num_key_value_heads which is required by StaticCache in Transformers 4.44.0.
+        if not hasattr(config, "num_key_value_heads"):
+            config.num_key_value_heads = (
+                config.multi_query_group_num
+                if hasattr(config, "multi_query_group_num")
+                else None
+            )
         module_name = "" if prefix == "" else prefix + "."
         is_replace_success = False
         enable_naive_path = os.environ.get("ENABLE_NAIVE_PATH", "OFF").upper() in [
@@ -170,8 +177,6 @@ class ModuleReplacer:
                     is_replace_success = True
             # BaichuanLayer is a custom model in transformers
             elif child.__class__.__name__ == "BaichuanLayer":
-                from .modules.baichuan import NewIPEXBaichuanBlock
-
                 new_module = NewIPEXBaichuanBlock(
                     child,
                     config,
@@ -253,10 +258,6 @@ class ModuleReplacer:
         return is_replace_success
 
     def replace_op(self, model):
-        if model.__class__.__name__ == "ChatGLMForConditionalGeneration":
-            model.prepare_inputs_for_generation = prepare_inputs_for_generation.__get__(
-                model, model.__class__
-            )
         for name, child in model.named_children():
             if (
                 type(child) in self.module_dict.keys()

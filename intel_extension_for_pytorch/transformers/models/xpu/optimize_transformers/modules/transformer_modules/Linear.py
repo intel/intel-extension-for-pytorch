@@ -296,6 +296,11 @@ class IPEXLowbitGemmAdd(IPEXLowbitGemmBase):
             self.bias = proj.bias
 
     def forward_fp16(self, input, residual):
+        if residual is None:
+            attn_output = torch.matmul(input, self.weight)
+            if self.bias is not None:
+                attn_output += self.bias
+            return attn_output
         if self.bias is None:
             return torch.addmm(
                 residual.flatten(0, -2),

@@ -1,9 +1,15 @@
 import torch
 from typing import Optional, Tuple
 from functools import partial
+from transformers.modeling_outputs import BaseModelOutputWithPast
+from transformers.cache_utils import DynamicCache
+
 from .transformer_modules.RoPE import ChatGLMRotaryEmbedding
 from .transformer_modules.Norm import LlamaRMSNorm
-
+from .transformer_modules.CacheUtils import (
+    IPEXStaticCache,
+    CacheFormat,
+)
 
 from ._transformers import MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
@@ -24,10 +30,158 @@ from .transformer_modules.DecoderBlock import IPEXTransformerBlock
 from .transformer_modules.Mlp import *  # noqa
 from .transformer_modules.model_utils import (
     chatglm_load_attn_params_grouped,
-    chatglm_post_qkv,
     load_attn_fused_qkv_params,
     transpose_attn_fused_qkv_params,
+    xpu_gemm_use_xetla,
 )
+
+from .transformer_modules.XPUAttentionfp16 import (
+    IPEXAttention,
+    IPEXGroupedAttention,
+)
+from .transformer_modules.XPUAttentionInt4 import (
+    IPEXAttentionInt4,
+    IPEXAttentionInt4OneDNN,
+    IPEXAttentionInt4Grouped,
+    IPEXAttentionInt4GroupedOneDNN,
+)
+
+
+def GLMModel_forward(
+    self,
+    input_ids,
+    position_ids: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.BoolTensor] = None,
+    full_attention_mask: Optional[torch.BoolTensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
+    inputs_embeds: Optional[torch.Tensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+):
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    use_cache = use_cache if use_cache is not None else self.config.use_cache
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    batch_size, seq_length = input_ids.shape
+
+    past_length = past_key_values.get_seq_length()
+    cache_position = torch.arange(
+        past_length, past_length + seq_length, device=input_ids.device
+    )
+
+    if inputs_embeds is None:
+        inputs_embeds = self.embedding(input_ids)
+
+    if full_attention_mask is None:
+        if (attention_mask is not None and not attention_mask.all()) or (
+            past_key_values.get_seq_length() != 0 and seq_length != 1
+        ):
+            full_attention_mask = self.get_masks(
+                input_ids, past_key_values, padding_mask=attention_mask
+            )
+
+    # Rotary positional embeddings
+    rotary_pos_emb = self.rotary_pos_emb(self.seq_length)
+    if position_ids is not None:
+        rotary_pos_emb = rotary_pos_emb[position_ids]
+    else:
+        rotary_pos_emb = rotary_pos_emb[None, :seq_length]
+
+    # Run encoder.
+    hidden_states, presents, all_hidden_states, all_self_attentions = self.encoder(
+        inputs_embeds,
+        full_attention_mask,
+        rotary_pos_emb=rotary_pos_emb,
+        kv_caches=past_key_values,
+        use_cache=use_cache,
+        output_hidden_states=output_hidden_states,
+        cache_position=cache_position,
+    )
+    if presents is not None and type(presents) is torch.Tensor:
+        presents = presents.split(1, dim=0)
+        presents = list(presents)
+        presents = [list(x.squeeze(0).split(1, dim=0)) for x in presents]
+        presents = [tuple([x.squeeze(0) for x in y]) for y in presents]
+        presents = tuple(presents)
+
+    if not return_dict:
+        return tuple(
+            v
+            for v in [hidden_states, presents, all_hidden_states, all_self_attentions]
+            if v is not None
+        )
+
+    return BaseModelOutputWithPast(
+        last_hidden_state=hidden_states,
+        past_key_values=presents,
+        hidden_states=all_hidden_states,
+        attentions=all_self_attentions,
+    )
+
+
+def GLMTransformer_forward(
+    self,
+    hidden_states,
+    attention_mask,
+    rotary_pos_emb,
+    kv_caches=None,
+    use_cache: Optional[bool] = True,
+    output_hidden_states: Optional[bool] = False,
+    cache_position: Optional[torch.Tensor] = None,
+):
+    if self.gradient_checkpointing and self.training:
+        if use_cache:
+            logger.warning_once(
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+            )
+            use_cache = False
+
+    all_self_attentions = None
+    all_hidden_states = () if output_hidden_states else None
+    for index in range(self.num_layers):
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        layer = self._get_layer(index)
+        if self.gradient_checkpointing and self.training:
+            layer_ret = torch.utils.checkpoint.checkpoint(
+                layer,
+                hidden_states,
+                attention_mask,
+                rotary_pos_emb,
+                kv_caches,
+                use_cache,
+                use_reentrant=False,
+            )
+        else:
+            layer_ret = layer(
+                hidden_states,
+                attention_mask,
+                rotary_pos_emb,
+                kv_cache=kv_caches,
+                use_cache=use_cache,
+                cache_position=cache_position,
+            )
+        hidden_states, kv_cache = layer_ret
+        if use_cache:
+            presents = kv_cache
+
+    if output_hidden_states:
+        all_hidden_states = all_hidden_states + (hidden_states,)
+
+    # Final layer norm.
+    if self.post_layer_norm:
+        hidden_states = self.final_layernorm(hidden_states)
+
+    return hidden_states, presents, all_hidden_states, all_self_attentions
 
 
 # return repeat_interleave of cache compared to original
@@ -39,14 +193,12 @@ class NewIPEXRotaryEmbedding(nn.Module):
 
         inv_freq = 1.0 / (
             10000
-            ** (
-                torch.arange(0, dim, 2, device=device).to(dtype=config.torch_dtype)
-                / dim
-            )
+            ** (torch.arange(0, dim, 2, device=device).to(dtype=torch.float16) / dim)
         )
         self.register_buffer("inv_freq", inv_freq)
         self.dim = dim
         self.original_impl = original_impl
+        self.rope_ratio = module.rope_ratio if hasattr(module, "rope_ratio") else 1
 
     def forward_impl(
         self,
@@ -62,6 +214,7 @@ class NewIPEXRotaryEmbedding(nn.Module):
         https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/license.
         """
         # $\Theta = {\theta_i = 10000^{\frac{2(i-1)}{d}}, i \in [1, 2, ..., \frac{d}{2}]}$
+        base = base * self.rope_ratio
         theta = 1.0 / (
             base
             ** (torch.arange(0, n_elem, 2, dtype=torch.float, device=device) / n_elem)
@@ -78,7 +231,8 @@ class NewIPEXRotaryEmbedding(nn.Module):
         # this is to mimic the behaviour of complex32, else we will get different results
         if dtype in (torch.float16, torch.bfloat16, torch.int8):
             cache = cache.bfloat16() if dtype == torch.bfloat16 else cache.half()
-        return torch.repeat_interleave(cache, 2, -2)
+        cache = torch.repeat_interleave(cache, 2, -2)
+        return cache
 
     def forward(self, max_seq_len, offset=0):
         return self.forward_impl(
@@ -89,7 +243,7 @@ class NewIPEXRotaryEmbedding(nn.Module):
         )
 
 
-def prepare_inputs_for_generation(
+def GLM_prepare_inputs_for_generation(
     self,
     input_ids: torch.LongTensor,
     past_key_values: Optional[torch.Tensor] = None,
@@ -99,13 +253,19 @@ def prepare_inputs_for_generation(
     is_first_forward: bool = True,
     **kwargs,
 ) -> dict:
+    if past_key_values is None:
+        if hasattr(self, "past_key_values"):
+            past_key_values = self.past_key_values
+        else:
+            past_key_values = DynamicCache()
     # only last token for input_ids if past is not None
     if position_ids is None:
         position_ids = self.get_position_ids(attention_mask, device=input_ids.device)
     if not is_first_forward:
-        if past_key_values is not None:
+        if past_key_values.get_seq_length() != 0:
             position_ids = position_ids[..., -1:]
             input_ids = input_ids[:, -1:]
+
     return {
         "input_ids": input_ids,
         "past_key_values": past_key_values,
@@ -148,13 +308,36 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        grouped = False
-        if self.ipex_config.multi_query_attention:
-            grouped = True
-        self.attn = self.build_attention_from_config(grouped=grouped)
+        grouped = True if self.ipex_config.multi_query_attention else False
+
+        if dtype == "fp16":
+            self.attn = (
+                IPEXGroupedAttention(self.ipex_config, module.layer_number - 1)
+                if grouped
+                else IPEXAttention(self.ipex_config, module.layer_number - 1)
+            )
+        elif dtype == "int4" and xpu_gemm_use_xetla():
+            self.attn = (
+                IPEXAttentionInt4Grouped(self.ipex_config, module.layer_number - 1)
+                if grouped
+                else IPEXAttentionInt4(self.ipex_config, module.layer_number - 1)
+            )
+        elif dtype == "int4" and not xpu_gemm_use_xetla():
+            self.attn = (
+                IPEXAttentionInt4GroupedOneDNN(
+                    self.ipex_config, module.layer_number - 1
+                )
+                if grouped
+                else IPEXAttentionInt4OneDNN(self.ipex_config, module.layer_number - 1)
+            )
+        else:
+            raise NotImplementedError(
+                "IPEXAttention dose not support this modelType {} !".format(dtype)
+            )
+
         self.mlp = self.build_mlp_from_config("ChatGLM")
-        self.attn.post_qkv = partial(chatglm_post_qkv, self.attn)
-        self.attn.prepare_sdp_input = partial(chatglm_prepare_sdp_input, self.attn)
+        # self.attn.post_qkv = partial(chatglm_post_qkv, self.attn)
+        # self.attn.prepare_sdp_input = partial(chatglm_prepare_sdp_input, self.attn)
 
         self.input_layernorm = LlamaRMSNorm(
             config.hidden_size,
@@ -166,6 +349,9 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         )
 
         self.port_all_parameters_to_new_module()
+        self.glm_version = 3
+        if "4" in config._name_or_path:
+            self.glm_version = 4
 
     def build_ipex_transformer_config(
         self, config, device, dtype, impl_mode, tp_size, tp_group
@@ -275,55 +461,39 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         rotary_pos_emb: Optional[torch.LongTensor] = None,
         kv_cache: Optional[Tuple[torch.Tensor]] = None,
         use_cache: Optional[bool] = False,
+        position_embeddings: Optional[torch.Tensor] = None,
+        cache_position: Optional[torch.Tensor] = None,
     ) -> Tuple[
         torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]
     ]:
-        # hidden_states:  [seq, bs*beam, hidden_size]
-        # rotary_pos_emb:   [seq, bs*beam, seq, 2]
+        # hidden_states:  [bs*beam, seq, hidden_size]
+        # rotary_pos_emb:   [bs*beam, seq, seq, 2]
         # attention_mask: [bs*beam, head, q_seq, kv_seq]
         bs = IPEXTransformerAttn.batch_size
-        dim = hidden_states.dim()
-        if dim == 3:
-            beam = hidden_states.shape[1] // bs
-            seq = hidden_states.shape[0]
-        elif dim == 4:
-            beam = hidden_states.shape[2]
-            seq = hidden_states.shape[0]
-        else:
-            print("Unsupported input shape")
-            return
 
-        IPEXTransformerAttn.beam_size = beam
-        first_token = True if kv_cache is None else False
+        if self.glm_version == 3:
+            hidden_states = hidden_states.transpose(0, 1).contiguous()
+        b, seq, hidden_size = hidden_states.shape
 
-        hidden_size = hidden_states.shape[-1]
-        hidden_shape = [bs, beam, seq, hidden_size]
+        IPEXTransformerAttn.beam_size = b // bs
+        beam = IPEXTransformerAttn.beam_size
+        first_token = True if seq > 1 else False
         if first_token and beam > 1:
-            # for 1st token, keep the original layout
-            # reduce the duplicated info in beam dim
-            # shape -> [bs*beam, seq, hidden_size]
-            # layout -> [bs*beam, seq, hidden_size]
-            hidden_states = (
-                hidden_states.transpose(0, 1)
-                .view(hidden_shape)[:, 0, :, :]
-                .contiguous()
-            )
+            hidden_states = hidden_states.view(bs, beam, seq, hidden_size)[
+                :, 0, :, :
+            ].contiguous()
             if rotary_pos_emb is not None:
-                rotary_pos_emb = (
-                    rotary_pos_emb.transpose(0, 1)
-                    .view(
-                        bs,
-                        beam,
-                        rotary_pos_emb.shape[0],
-                        rotary_pos_emb.shape[2],
-                        rotary_pos_emb.shape[3],
-                    )[:, 0, :, :, :]
-                    .view(
-                        bs,
-                        rotary_pos_emb.shape[0],
-                        rotary_pos_emb.shape[2],
-                        rotary_pos_emb.shape[3],
-                    )
+                rotary_pos_emb = rotary_pos_emb.view(
+                    bs,
+                    beam,
+                    rotary_pos_emb.shape[1],
+                    rotary_pos_emb.shape[2],
+                    rotary_pos_emb.shape[3],
+                )[:, 0, :, :, :].view(
+                    bs,
+                    rotary_pos_emb.shape[1],
+                    rotary_pos_emb.shape[2],
+                    rotary_pos_emb.shape[3],
                 )
             if attention_mask is not None:
                 attention_mask = attention_mask.view(
@@ -339,6 +509,25 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
                     attention_mask.shape[3],
                 )
 
+        if hasattr(kv_cache, "max_batch_size") and kv_cache.max_batch_size < b:
+            repeat_cnt = b // kv_cache.max_batch_size
+            for i in range(len(kv_cache.key_cache)):
+                kv_cache.key_cache[i] = kv_cache.key_cache[i].repeat(
+                    1, repeat_cnt, 1, 1
+                )
+                kv_cache.value_cache[i] = kv_cache.value_cache[i].repeat(
+                    1, repeat_cnt, 1, 1
+                )
+            kv_cache.max_batch_size = b
+
+        # seq first to be consist with query, key and value
+        if (
+            isinstance(kv_cache, IPEXStaticCache)
+            and kv_cache.cache_format == CacheFormat.FBNH
+            and not self.attn.beam_search_first_iter(seq)
+        ):
+            rotary_pos_emb = rotary_pos_emb.transpose(0, 1).contiguous()
+
         if rotary_pos_emb is not None:
             rotary_pos_emb = rotary_pos_emb.unsqueeze(2)
 
@@ -353,10 +542,10 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
             hidden_states=layernorm_output,
             attention_mask=attention_mask,
             position_ids=rotary_pos_emb,
-            layer_past=kv_cache,
+            past_key_value=kv_cache,
             use_cache=use_cache,
             residual=residual,
-            first_token=first_token,
+            cache_position=cache_position,
         )
 
         layernorm_output = self.post_attn_layernorm(layernorm_input)
@@ -369,14 +558,15 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
         mlp_output = self.mlp(layernorm_output, residual)
 
         if first_token and beam > 1:
-            # for 1st token, expand the result with beam
             mlp_output = (
                 mlp_output.view(bs, 1, seq, hidden_size)
                 .expand([bs, beam, seq, hidden_size])
                 .view(bs * beam, seq, hidden_size)
                 .squeeze()
-                .transpose(0, 1)
             )
+        if self.glm_version == 3:
+            mlp_output = mlp_output.transpose(0, 1)
+
         outputs = (mlp_output,)
 
         if use_cache:

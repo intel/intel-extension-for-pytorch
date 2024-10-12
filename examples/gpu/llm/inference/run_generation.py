@@ -31,6 +31,7 @@ MODEL_CLASSES = {
     "qwen": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm3": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
+    "glm-4": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -379,4 +380,3 @@ def to_list(obj):
 
 for o, i, g in zip(to_list(args.max_new_tokens), to_list(args.input_tokens), to_list(args.num_beams)):
     run_generate(o, i, g)
-

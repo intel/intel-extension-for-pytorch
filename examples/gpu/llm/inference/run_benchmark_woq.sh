@@ -63,9 +63,9 @@ Run_benchmark_gpt-j-6b_int4() {
     sub_model_name=gpt-j-6B
     dir=int4_perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
-    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16 --token-latency 2>&1 | tee log_e2e
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16 --token-latency 2>&1 | tee log_e2e
     mv log_e2e ${dir}
-    PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16
+    PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --dtype float16
     mv profile*pt ${dir}
     mv trace.json ${dir}
 }
@@ -130,9 +130,22 @@ Run_benchmark_chatglm3-6b-chat_int4() {
     sub_model_name=chatglm3-6b
     dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
-    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
     mv log_e2e ${dir}
-    PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
+## GLM4-9b-chat
+Run_benchmark_glm4-9b-chat() {
+    model=THUDM/glm-4-9b-chat
+    sub_model_name=glm-4-9b
+    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
     mv profile*pt ${dir}
     mv trace.json ${dir}
 }
@@ -149,6 +162,7 @@ main() {
     Run_benchmark_llama3-8b_int4
     Run_benchmark_Phi3-mini_int4
     Run_benchmark_chatglm3-6b-chat_int4
+    Run_benchmark_glm4-9b-chat
 }
 
 main

@@ -3,7 +3,7 @@ from .._transformer_configuration import IPEXTransformerConfig
 from .NaiveAttention import IPEXTransformerAttnNaive
 from .CacheUtils import IPEXStaticCache, CacheFormat
 from typing import Optional
-from typing import Tuple
+from typing import List, Tuple
 import torch.distributed as dist
 import math
 from .Linear import (
@@ -91,12 +91,27 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         elif cache_relpath == "transformers.cache_utils.Cache":
             # huggingface's Cache have memory layout of [bs, num_heads, seqlen, head_dim] memory layout
             # we need to transpose it to [bs, seqlen, num_heads, head_dim] memory layout
+            if (
+                len(cache.key_cache) > self.layer_idx
+                and cache.key_cache[self.layer_idx].shape[0] < key.shape[0]
+            ):
+                cache_type = cache.key_cache[self.layer_idx].shape
+                cache.key_cache[self.layer_idx] = (
+                    cache.key_cache[self.layer_idx]
+                    .expand(key.shape[0], cache_type[1], cache_type[2], cache_type[3])
+                    .contiguous()
+                )
+                cache.value_cache[self.layer_idx] = (
+                    cache.value_cache[self.layer_idx]
+                    .expand(value.shape[0], cache_type[1], cache_type[2], cache_type[3])
+                    .contiguous()
+                )
             key, value = cache.update(key, value, self.layer_idx, kwargs)
             key = key.transpose(1, 2).contiguous().transpose(1, 2)
             value = value.transpose(1, 2).contiguous().transpose(1, 2)
             seqlen = cache.get_seq_length()
             return (key[:, :, :seqlen, :], value[:, :, :seqlen, :])
-        elif isinstance(cache, Tuple):
+        elif isinstance(cache, List) or isinstance(cache, Tuple):
             key_cache = torch.cat([cache[0], key], dim=2)
             value_cache = torch.cat([cache[1], value], dim=2)
             return (key_cache, value_cache)
@@ -113,24 +128,26 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             and past_key_value.cache_format == CacheFormat.FBNH
             and not self.beam_search_first_iter(seqlen)
         ):
-            query, key = self.position_embed(
-                query,
-                key,
-                position_ids,
-                self.layer_idx,
-                self.beam_idx,
-                seqlen,
-                past_key_value.cache_format,
-            )
+            if hasattr(self, "position_embed") and self.position_embed is not None:
+                query, key = self.position_embed(
+                    query,
+                    key,
+                    position_ids,
+                    self.layer_idx,
+                    self.beam_idx,
+                    seqlen,
+                    past_key_value.cache_format,
+                )
 
             # from [bs, seqlen, num_heads, head_dim] to [bs, num_heads, seqlen, head_dim]
             query = query.permute(1, 2, 0, 3)
             key = key.permute(1, 2, 0, 3)
             value = value.permute(1, 2, 0, 3)
         else:
-            query, key = self.position_embed(
-                query, key, position_ids, self.layer_idx, self.beam_idx, seqlen
-            )
+            if hasattr(self, "position_embed") and self.position_embed is not None:
+                query, key = self.position_embed(
+                    query, key, position_ids, self.layer_id, self.beam_idx, seqlen
+                )
             query = query.permute(0, 2, 1, 3)
             key = key.permute(0, 2, 1, 3)
             value = value.permute(0, 2, 1, 3)
@@ -266,6 +283,10 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                     key = key.transpose(1, 2).contiguous().transpose(1, 2)
                     value = value.transpose(1, 2).contiguous().transpose(1, 2)
 
+                if not self.is_beam_search() and query.size(-2) == 1:
+                    key = key.permute(2, 0, 1, 3).contiguous().permute(1, 2, 0, 3)
+                    value = value.permute(2, 0, 1, 3).contiguous().permute(1, 2, 0, 3)
+
                 attention_output = torch.xpu.IpexSDP(
                     query,
                     key,
@@ -286,7 +307,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         return self.beam_idx is not None and seqlen != 1
 
     def beam_search_next_token(self, seqlen):
-        return self.beam_idx is not None and seqlen == 1
+        return self.is_beam_search() is True and seqlen == 1
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
         query, key, value = self.qkv_proj(hidden_states, query, key, value)
@@ -376,7 +397,9 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         key, value = present
         past_key_value = (
             (key, value)
-            if isinstance(past_key_value, Tuple) or past_key_value is None
+            if isinstance(past_key_value, List)
+            or isinstance(past_key_value, Tuple)
+            or past_key_value is None
             else past_key_value
         )
         # need to repeat kv for beam search next token
@@ -408,3 +431,73 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         else:
             outputs += (None,)
         return outputs
+
+
+class IPEXGroupedAttention(IPEXAttention):
+    def __init__(
+        self, config: IPEXTransformerConfig, layer_idx: Optional[int] = None
+    ) -> None:
+        super().__init__(config, layer_idx)
+        self.num_kv_head = config.num_key_value_head // self.tp_size
+        self.num_kv_group = self.num_attn_head // self.num_kv_head
+        del self.q_proj
+        del self.k_proj
+        del self.v_proj
+
+    def load_parameter(
+        self, q_proj=None, k_proj=None, v_proj=None, out_proj=None, qkv_proj=None
+    ):
+        embed_dim = self.embed_dim
+        num_head = self.num_attn_head
+        num_kv_head = self.num_kv_head
+        head_dim = self.head_dim
+        group = num_head // num_kv_head + 2
+        if qkv_proj is None:
+
+            def helper(proj, g):
+                w = proj.weight.view(num_kv_head, g, head_dim, embed_dim)
+                del proj.weight
+                if proj.bias is not None:
+                    b = proj.bias.view(num_kv_head, g, head_dim)
+                    del proj.bias
+                else:
+                    b = None
+                return w, b
+
+            wq, bq = helper(q_proj, group - 2)
+            wk, bk = helper(k_proj, 1)
+            wv, bv = helper(v_proj, 1)
+
+            # [num_kv_head * (num_head//num_kv_head + 2) * head_dim, embed_dim]
+            wqkv = torch.concat([wq, wk, wv], dim=1).contiguous()
+            if bq is None:
+                bqkv = None
+            else:
+                bqkv = torch.concat([bq, bk, bv], dim=1).contiguous()
+            qkv_proj = IPEXTransformerLinear(wqkv, bqkv)
+
+        self.qkv_proj.weight = qkv_proj.weight.view(
+            num_kv_head, group, head_dim, embed_dim
+        )
+        if qkv_proj.bias is not None:
+            self.qkv_proj.bias = qkv_proj.bias.view(num_kv_head, group, head_dim)
+        else:
+            self.qkv_proj.bias = None
+
+        self.out_proj.weight = out_proj.weight
+        self.out_proj.bias = out_proj.bias
+        self.position_embed = self.config.rotary_embedding_class(
+            self.config, qkv_proj.weight.dtype
+        )
+
+    def transpose_parameter(self):
+        self.qkv_proj.weight.data = self.qkv_proj.weight.permute(
+            3, 0, 1, 2
+        ).contiguous()
+        self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
+        # Note: synchronize to ensure the completion of contiguous
+        torch.xpu.synchronize()
+
+    def cat_qkv(self):
+        # GQA will directly use concatenated weight for qkv
+        pass

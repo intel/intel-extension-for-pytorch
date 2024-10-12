@@ -10,6 +10,19 @@ import time
 from .utils import pad_for_gptj_lm_head, is_int4, pad_for_chatglm_output_layer
 from .transformer_modules.CacheUtils import warp_cache_if_needed
 from .transformer_modules.CacheUtils import IPEXStaticCache
+from .gptj import (
+    GPTJModel_forward,
+    GPTJ_prepare_inputs_for_generation,
+)
+from .baichuan import (
+    Baichuan_prepare_inputs_for_generation,
+    BaichuanModel_forward,
+)
+from .chatglm import (
+    GLM_prepare_inputs_for_generation,
+    GLMTransformer_forward,
+    GLMModel_forward,
+)
 
 
 class IPEXLLMResourceContrainer:
@@ -31,6 +44,11 @@ def gptj_forward_hook(model):
 
     if type(model) == transformers.models.gptj.modeling_gptj.GPTJForCausalLM:
         pad_for_gptj_lm_head(model, is_int4(model))
+        model.prepare_inputs_for_generation = partial(
+            GPTJ_prepare_inputs_for_generation, model
+        )
+    if type(model) == transformers.models.gptj.modeling_gptj.GPTJModel:
+        model.forward = partial(GPTJModel_forward, model)
 
 
 def llama_forward_hook(model):
@@ -57,11 +75,23 @@ def falcon_forward_hook(model):
 def baichuan_forward_hook(model):
     if model.__class__.__name__ == "BaichuanForCausalLM":
         pad_for_gptj_lm_head(model, is_int4(model))
+        model.prepare_inputs_for_generation = partial(
+            Baichuan_prepare_inputs_for_generation, model
+        )
+    if model.__class__.__name__ == "BaichuanModel":
+        model.forward = partial(BaichuanModel_forward, model)
 
 
 def chatglm_forward_hook(model):
     if model.__class__.__name__ == "ChatGLMModel":
         pad_for_chatglm_output_layer(model, is_int4(model))
+        model.forward = partial(GLMModel_forward, model)
+    if model.__class__.__name__ == "ChatGLMForConditionalGeneration":
+        model.prepare_inputs_for_generation = partial(
+            GLM_prepare_inputs_for_generation, model
+        )
+    if model.__class__.__name__ == "GLMTransformer":
+        model.forward = partial(GLMTransformer_forward, model)
 
 
 def bloom_forward_hook(model):
@@ -787,9 +817,15 @@ def _ipex_beam_search_(
         StoppingCriteriaList,
     )
 
+    # RepetitionPenaltyLogitsProcessor in Transformers 4.44.0 will return wrong result
+    if self.__class__.__name__ == "BaichuanForCausalLM":
+        logits_processor = LogitsProcessorList(logits_processor[1:])
+
     latency_list = []
     pad_token_id = generation_config._pad_token_tensor
     eos_token_id = generation_config._eos_token_tensor
+    if type(eos_token_id) is List or type(eos_token_id) is torch.Tensor:
+        eos_token_id = eos_token_id[0]
     output_attentions = generation_config.output_attentions
     output_hidden_states = generation_config.output_hidden_states
     output_scores = generation_config.output_scores
@@ -1905,34 +1941,55 @@ def ipex_beam_search_without_optimize(model):
         setattr(model, "beam_search", _ipex_beam_search_without_optimize)  # noqa
 
 
+IPEX_STATIC_CACHE_MODEL_LIST = [
+    "Phi3ForCausalLM",
+    "BaichuanForCausalLM",
+]
+
+
 def ipex_static_cache(model):
-    if model.__class__.__name__ == "Phi3ForCausalLM":
-        print("get in replace", model)
+    if model.__class__.__name__ == "ChatGLMForConditionalGeneration":
+        setattr(model, "_setup_cache", partial(_ipex_setup_cache_GLM, model))  # noqa
+        model._supports_static_cache = True
+        model._supports_cache_class = True
+        setattr(model, "_reset_cache", partial(_ipex_reset_cache_, model))  # noqa
+    if model.__class__.__name__ == "GPTJForCausalLM":
+        setattr(model, "_setup_cache", partial(_ipex_setup_cache_GPTJ, model))  # noqa
+        model._supports_static_cache = True
+        model._supports_cache_class = True
+        setattr(model, "_reset_cache", partial(_ipex_reset_cache_, model))  # noqa
+
+    if model.__class__.__name__ in IPEX_STATIC_CACHE_MODEL_LIST:
         setattr(model, "_setup_cache", partial(_ipex_setup_cache, model))  # noqa
         model._supports_static_cache = True
+        model._supports_cache_class = True
         setattr(model, "_reset_cache", partial(_ipex_reset_cache, model))  # noqa
 
 
 def _ipex_setup_cache(
     self, cache_cls, max_batch_size, max_cache_len: Optional[int] = None
 ):
-    self.model.causal_mask = torch.full(
-        (
-            self.model.config.max_position_embeddings,
-            self.model.config.max_position_embeddings,
-        ),
-        fill_value=1,
-    )
     if (
-        max_cache_len > self.model.causal_mask.shape[-1]
-        or self.device != self.model.causal_mask.device
+        hasattr(self.model.config, "max_position_embeddings")
+        and self.model.config.max_position_embeddings is not None
     ):
-        causal_mask = torch.full(
-            (max_cache_len, max_cache_len), fill_value=1, device=self.device
+        self.model.causal_mask = torch.full(
+            (
+                self.model.config.max_position_embeddings,
+                self.model.config.max_position_embeddings,
+            ),
+            fill_value=1,
         )
-        self.register_buffer(
-            "causal_mask", torch.triu(causal_mask, diagonal=1), persistent=False
-        )
+        if (
+            max_cache_len > self.model.causal_mask.shape[-1]
+            or self.device != self.model.causal_mask.device
+        ):
+            causal_mask = torch.full(
+                (max_cache_len, max_cache_len), fill_value=1, device=self.device
+            )
+            self.register_buffer(
+                "causal_mask", torch.triu(causal_mask, diagonal=1), persistent=False
+            )
 
     for layer in self.model.layers:
         weights = layer.attn.o_proj.weight
@@ -1947,4 +2004,68 @@ def _ipex_setup_cache(
 
 def _ipex_reset_cache(self):
     for layer in self.model.layers:
-        layer.self_attn.past_key_value = None
+        layer.attn.past_key_value = None
+
+
+def _ipex_setup_cache_GPTJ(
+    self, cache_cls, max_batch_size, max_cache_len: Optional[int] = None
+):
+    if hasattr(self.transformer.h[0].attn, "out_proj_quant"):
+        weights = self.transformer.h[0].attn.out_proj_quant.qweight
+    else:
+        weights = self.transformer.h[0].attn.o_proj.weight
+    device = weights.device
+    dtype = weights.dtype
+
+    past_key_values = cache_cls(
+        self.config,
+        max_batch_size,
+        max_cache_len,
+        device=weights.device,
+        dtype=weights.dtype,
+    )
+    cache_shape = past_key_values.key_cache.shape
+    past_key_values.key_cache = []
+    past_key_values.value_cache = []
+    for layer in self.transformer.h:
+        new_layer_key_cache = torch.zeros(cache_shape, dtype=self.dtype, device=device)
+        new_layer_value_cache = torch.zeros(
+            cache_shape, dtype=self.dtype, device=device
+        )
+        past_key_values.key_cache.append(new_layer_key_cache)
+        past_key_values.value_cache.append(new_layer_value_cache)
+    self.past_key_values = past_key_values
+
+
+def _ipex_setup_cache_GLM(
+    self, cache_cls, max_batch_size, max_cache_len: Optional[int] = None
+):
+    if hasattr(self.transformer.encoder.layers[0].attn, "out_proj_quant"):
+        weights = self.transformer.encoder.layers[0].attn.out_proj_quant.qweight
+    else:
+        weights = self.transformer.encoder.layers[0].attn.o_proj.weight
+    device = weights.device
+    dtype = weights.dtype
+
+    past_key_values = cache_cls(
+        self.config,
+        max_batch_size,
+        max_cache_len,
+        device=weights.device,
+        dtype=weights.dtype,
+    )
+    cache_shape = past_key_values.key_cache.shape
+    past_key_values.key_cache = []
+    past_key_values.value_cache = []
+    for layer in self.transformer.encoder.layers:
+        new_layer_key_cache = torch.zeros(cache_shape, dtype=self.dtype, device=device)
+        new_layer_value_cache = torch.zeros(
+            cache_shape, dtype=self.dtype, device=device
+        )
+        past_key_values.key_cache.append(new_layer_key_cache)
+        past_key_values.value_cache.append(new_layer_value_cache)
+    self.past_key_values = past_key_values
+
+
+def _ipex_reset_cache_(self):
+    self.past_key_values = None

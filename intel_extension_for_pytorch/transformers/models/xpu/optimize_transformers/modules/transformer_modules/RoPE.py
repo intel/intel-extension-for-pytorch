@@ -147,27 +147,23 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
             query, key, sin, cos, query, key
         )
 
-    def get_sin_cos(self, position_ids, layer_id, beam_size, kv_seq_len):
+    def get_sin_cos(self, position_ids, layer_id, beam_size, kv_seq_len, cache_format):
         # position_ids [bs*beam, seq_len]
-        first_token = position_ids.shape[-1] > 1
         if GPTJRotaryEmbedding.max_position_embedding < kv_seq_len:
             new_cache_length = kv_seq_len + self.dynamic_cache_stride
             self.create_sin_cos_cache(new_cache_length)
             GPTJRotaryEmbedding.max_position_embedding = new_cache_length
         if layer_id == 0:
-            GPTJRotaryEmbedding.position_ids = position_ids.transpose(0, 1).contiguous()
+            GPTJRotaryEmbedding.position_ids = position_ids
             GPTJRotaryEmbedding.sin = self.sin_cached[
                 GPTJRotaryEmbedding.position_ids
             ].unsqueeze(2)
             GPTJRotaryEmbedding.cos = self.cos_cached[
                 GPTJRotaryEmbedding.position_ids
             ].unsqueeze(2)
-            if first_token and beam_size > 1:
-                # 1st token
-                # convert sin/cos from shape [seq, bs*beam, num_head, head_dim]
-                # to shape [bs*beam, seq, num_head, head_dim]
-                GPTJRotaryEmbedding.sin = GPTJRotaryEmbedding.sin.transpose(0, 1)
-                GPTJRotaryEmbedding.cos = GPTJRotaryEmbedding.cos.transpose(0, 1)
+            if cache_format == CacheFormat.FBNH:
+                GPTJRotaryEmbedding.sin = GPTJRotaryEmbedding.sin.permute(1, 0, 2, 3)
+                GPTJRotaryEmbedding.cos = GPTJRotaryEmbedding.cos.permute(1, 0, 2, 3)
 
         # 1st token
         # GPTJRotaryEmbedding.sin is in shape of [bs*beam, seq, num_head, head_dim]
@@ -175,8 +171,19 @@ class GPTJRotaryEmbedding(PositionalEmbedding):
         # GPTJRotaryEmbedding.sin is in shape of [seq, bs*beam, num_head, head_dim]
         return GPTJRotaryEmbedding.sin, GPTJRotaryEmbedding.cos
 
-    def forward(self, query, key, position_ids, layer_id, beam_size, kv_seq_len):
-        sin, cos = self.get_sin_cos(position_ids, layer_id, beam_size, kv_seq_len)
+    def forward(
+        self,
+        query,
+        key,
+        position_ids,
+        layer_id,
+        beam_size,
+        kv_seq_len,
+        cache_format=CacheFormat.BFNH,
+    ):
+        sin, cos = self.get_sin_cos(
+            position_ids, layer_id, beam_size, kv_seq_len, cache_format
+        )
         if self.rotary_dim is not None:
             self.apply_rotary_pos_emb(
                 query[:, :, :, : self.rotary_dim],
@@ -623,7 +630,16 @@ class ChatGLMRotaryEmbedding(PositionalEmbedding):
         x_out2 = x_out2.flatten(3)
         return torch.cat((x_out2, x_pass), dim=-1)
 
-    def forward(self, query, key, rotary_pos_emb):
+    def forward(
+        self,
+        query,
+        key,
+        rotary_pos_emb,
+        layer_id=None,
+        beam_idx=None,
+        seqlen=None,
+        cache_format=CacheFormat.BFNH,
+    ):
         rot_dim = rotary_pos_emb.shape[-2]
         self.apply_rotary_pos_emb(
             query[..., :rot_dim], key[..., :rot_dim], rotary_pos_emb

@@ -34,7 +34,6 @@ try:
                 self.tp_size = dist.get_world_size()
                 self.tp_idx = dist.get_rank()
             self.num_key_value_heads = cache.num_key_value_heads // self.tp_size
-            self.max_batch_size = cache.key_cache[0].size(0)
             self.key_cache: List[torch.Tensor] = []
             self.value_cache: List[torch.Tensor] = []
             self.seq_cnt = int(cache.get_seq_length())
@@ -189,7 +188,7 @@ try:
             # Occupied cache == any slot in the 3rd dim (sequence length) holds a non-zero value. To save on compute, let's
             # limit the check to the first batch member and head dimension.
             # TODO: deprecate this function in favor of `cache_position`
-            return (self.key_cache[layer_idx][0, 0].any(dim=-1)).sum()
+            return self.seq_cnt
 
         def get_max_length(self) -> Optional[int]:
             """Returns the maximum sequence length of the cached states."""
