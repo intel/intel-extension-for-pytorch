@@ -209,13 +209,16 @@ def get_gpu_info_onboard(run_lambda):
     platform = get_platform()
     if platform == "linux":
         txt = run_and_read_all(run_lambda, "xpu-smi discovery -j")
-        try:
-            obj = json.loads(txt)
-            for o in obj["device_list"]:
-                lst.append(f'* {o["device_name"]}')
-        except ValueError as e:
-            lst.append(txt)
-            lst.append(str(e))
+        if txt:
+            try:
+                obj = json.loads(txt)
+                for o in obj["device_list"]:
+                    lst.append(f'* {o["device_name"]}')
+            except ValueError as e:
+                lst.append(txt)
+                lst.append(str(e))
+        else:
+            lst.append("N/A")
     if platform == "win32" or platform == "cygwin":
         txt = run_and_read_all(
             run_lambda,
