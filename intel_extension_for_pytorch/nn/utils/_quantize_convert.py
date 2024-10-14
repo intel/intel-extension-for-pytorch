@@ -336,6 +336,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self.register_parameter("bias", None)
         self.register_buffer("g_idx", None)
         self.force_xetla = False
+        self.quant_method = quant_method
 
     # This api will force the xetla implementation, used it with caution !
     @classmethod
