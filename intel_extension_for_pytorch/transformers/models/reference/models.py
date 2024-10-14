@@ -106,7 +106,7 @@ def GPTJModel_forward(
         )
         position_ids = position_ids.unsqueeze(0)
 
-    if not self._use_flash_attention_2:
+    if not hasattr(self, "_use_flash_attention_2") or not self._use_flash_attention_2:
         # Attention mask.
         if attention_mask is not None:
             if batch_size <= 0:
