@@ -48,6 +48,10 @@ def gptq(
         scale_dtype: data type for scale and bias.
         save_dir (str): path to save checkpoint.
     """
+    logger.warning(
+        "The GPTQ API is deprecated. Please use the Intel(R) Neural Compressor to run GPTQ instead."
+    )
+
     logger.info("quantizing with GPTQ algorithm")
     from ._gptq_utils import gptq_quantize, gptq_export
 
