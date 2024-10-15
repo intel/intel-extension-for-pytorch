@@ -309,7 +309,9 @@ def _sample(
                     num_hidden_layers = self.config.n_layer
                 elif hasattr(self.config, "num_hidden_layers"):
                     num_hidden_layers = self.config.num_hidden_layers
-                elif hasattr(self.config.text_config, "num_hidden_layers"):
+                elif hasattr(self.config, "text_config") and hasattr(
+                    self.config.text_config, "num_hidden_layers"
+                ):
                     num_hidden_layers = self.config.text_config.num_hidden_layers
                 elif hasattr(self.config, "num_layers"):
                     num_hidden_layers = self.config.num_layers
