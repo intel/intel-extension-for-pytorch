@@ -4,15 +4,15 @@ from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
 from intel_extension_for_pytorch.quantization import QConfigWoq, WoqLowpMode
 from torch.ao.quantization import PlaceholderObserver, QConfigMapping
 from intel_extension_for_pytorch.nn.utils._model_convert import (
+    prepack_awq_weight,
     _convert_optimum_format_to_desired,
 )
 
 # The config describes how to load low precision checkpoint for weight only quantization.
 # Weight shape is N by K if transposed is False otherwise K by N.
 # Bias is optional. If bias is not provided in the checkpoint, we read the original model.
-DEFAULT_LOWP_CHECKPOINT_CONFIG = {
-    "name": "optimum",
-    "use_optimum_format": True,
+GPTQ_LOWP_CHECKPOINT_CONFIG = {
+    "name": "gptq",
     "weight_key": "qweight",
     "scale_key": "scales",
     "zero_point_key": "qzeros",
@@ -20,14 +20,12 @@ DEFAULT_LOWP_CHECKPOINT_CONFIG = {
     "g_idx_key": "g_idx",
 }
 
-LEGACY_LOWP_CHECKPOINT_CONFIG = {
-    "name": "legacy",
-    "use_optimum_format": False,
-    "weight_key": "packed_weight",
-    "scale_key": "scale",
-    "zero_point_key": "packed_zp",
+AWQ_LOWP_CHECKPOINT_CONFIG = {
+    "name": "awq",
+    "weight_key": "qweight",
+    "scale_key": "scales",
+    "zero_point_key": "qzeros",
     "bias_key": "bias",
-    "g_idx_key": "g_idx",
 }
 
 
@@ -61,12 +59,12 @@ def _woq_enable_weight_cache_for_large_batch(qconfig_mapping):
     return QConfigWoq(**qconfig_dict)
 
 
-def _default_lowp_checkpoint_config():
-    return DEFAULT_LOWP_CHECKPOINT_CONFIG
+def _gptq_lowp_checkpoint_config():
+    return GPTQ_LOWP_CHECKPOINT_CONFIG
 
 
-def _legacy_lowp_checkpoint_config():
-    return LEGACY_LOWP_CHECKPOINT_CONFIG
+def _awq_lowp_checkpoint_config():
+    return AWQ_LOWP_CHECKPOINT_CONFIG
 
 
 def _get_keys_from_config(checkpoint_config):
@@ -74,7 +72,7 @@ def _get_keys_from_config(checkpoint_config):
     scales_key = checkpoint_config.get("scale_key", "scales")
     zeros_key = checkpoint_config.get("zero_point_key", "qzeros")
     bias_key = checkpoint_config.get("bias_key", "bias")
-    g_idx_key = checkpoint_config.get("g_idx_key", "bias")
+    g_idx_key = checkpoint_config.get("g_idx_key", "g_idx")
     return weight_key, scales_key, zeros_key, bias_key, g_idx_key
 
 
@@ -94,28 +92,36 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
     bias = state_dict.get(b_key, None)
     g_idx = state_dict.get(g_key, None)
 
-    use_optimum_format = checkpoint_config.get("use_optimum_format", True)
-    if use_optimum_format:
+    if checkpoint_config["name"] == "gptq":
         qweight, scales, qzeros = _convert_optimum_format_to_desired(
             qweight, scales, qzeros
         )
+        group_size = -1
+        if qweight is not None and scales is not None:
+            assert scales.dim() == 2, "Unexpected scales tensor dimension"
+            if scales.size(-1) != 1:
+                # qweight is compressed along the last dim int4 * 8 -> int32
+                group_size = qweight.size(-1) * 8 // scales.size(-1)
+                # Ensure group_size is a power of two
+                assert group_size > 0
+                group_size = 2 ** (group_size - 1).bit_length()
 
-    group_size = -1
-    if qweight is not None and scales is not None:
-        assert scales.dim() == 2, "Unexpected scales tensor dimension"
-        if scales.size(-1) != 1:
+        if g_idx is not None and group_size > 0:
+            # ignore dummy g_idx
             # qweight is compressed along the last dim int4 * 8 -> int32
-            group_size = qweight.size(-1) * 8 // scales.size(-1)
-            # Ensure group_size is a power of two
-            assert group_size > 0
-            group_size = 2 ** (group_size - 1).bit_length()
-    if g_idx is not None and group_size > 0:
-        # ignore dummy g_idx
-        # qweight is compressed along the last dim int4 * 8 -> int32
-        ic = qweight.size(-1) * 8
-        dummy = torch.tensor([i // group_size for i in range(ic)], dtype=torch.int32)
-        if torch.equal(g_idx, dummy):
-            g_idx = None
+            ic = qweight.size(-1) * 8
+            dummy = torch.tensor(
+                [i // group_size for i in range(ic)], dtype=torch.int32
+            )
+            if torch.equal(g_idx, dummy):
+                g_idx = None
+    elif checkpoint_config["name"] == "awq":
+        group_size = -1
+        if qweight is not None and scales is not None:
+            group_size = qweight.size(0) // scales.size(0)
+            qweight, scales, qzeros = prepack_awq_weight(
+                qweight, qzeros, scales, 4, group_size
+            )
     return qweight, scales, qzeros, bias, group_size, g_idx
 
 
@@ -123,16 +129,16 @@ def _convert_woq_with_low_precision_checkpoint(
     model,
     qconfig_mapping,
     low_precision_checkpoint,
-    checkpoint_config=None,
+    quantization_method,
     inplace=True,
 ):
     r"""
-    Method to convert fp32 model to WOQ model with checkpoint generated by GPTQ
+    Method to convert fp32 model to WOQ model with checkpoint generated by GPTQ or AWQ
     Args:
         model: original model
         qconfig_mapping: QConfigMapping object containing observer info, lowp mode, etc.
-        low_precision_checkpoint (dict): checkpoint generated by GPTQ, etc.
-        checkpoint_config (dict): custom config to load the checkpoint. Use default if None
+        low_precision_checkpoint (dict): checkpoint generated by GPTQ/AWQ, etc.
+        quantization_method (str): checkpoint generating method, choice in ["gptq", "awq"]
         inplace: do conversion in-place or make a copy of original model
     Return:
         Converted model
@@ -148,11 +154,15 @@ def _convert_woq_with_low_precision_checkpoint(
     assert isinstance(
         low_precision_checkpoint, dict
     ), "low_precision_checkpoint should be a state_dict"
-    assert checkpoint_config is None or isinstance(
-        checkpoint_config, dict
-    ), "checkpoint_config should be a dict"
-    if checkpoint_config is None:
-        checkpoint_config = _default_lowp_checkpoint_config()
+
+    if quantization_method == "gptq":
+        checkpoint_config = _gptq_lowp_checkpoint_config()
+    elif quantization_method == "awq":
+        checkpoint_config = _awq_lowp_checkpoint_config()
+    else:
+        raise AssertionError(
+            f"{quantization_method} is not supported, quantization_method choice in [`gptq`, `awq`]."
+        )
 
     state_dict = low_precision_checkpoint
     # Check that keys can be found in the state dict. Bias and g_idx are optional.

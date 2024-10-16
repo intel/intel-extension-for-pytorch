@@ -1114,6 +1114,9 @@ elif args.ipex_weight_only_quantization:
             assert (
                 low_precision_checkpoint is not None
             ), f"Invalid checkpoint file: {pathname}. Should be a .pt, .pth or .safetensors file."
+
+            quant_method = {"quant_method": "gptq"}
+
         elif os.path.isdir(pathname):
             low_precision_checkpoint = {}
             for pattern in ["*.pt", "*.pth"]:
@@ -1139,19 +1142,38 @@ elif args.ipex_weight_only_quantization:
             assert (
                 len(low_precision_checkpoint) > 0
             ), f"Cannot find checkpoint (.pt/.pth/.safetensors) files in path {pathname}."
+
+            try:
+                with open(pathname + "/config.json") as f:
+                    quant_model_config = json.load(f)
+                quant_method = {
+                    "quant_method": quant_model_config["quantization_config"][
+                        "quant_method"
+                    ]
+                }
+            except Exception as e:
+                print(
+                    "warning: loading HF config.json to get `quant_method` failed, due to ",
+                    e,
+                )
+                print("warning: specifying `quant_method` = `gptq` by default.")
+                quant_method = {"quant_method": "gptq"}
+
         else:
             raise AssertionError(
                 f"Invalid low-precision-checkpoint: {pathname}."
                 " Should be a .pt/.pth/.safetensors file or a directory containing them."
             )
 
+        low_precision_checkpoint = tuple(low_precision_checkpoint, _quant_method)
+
         if args.gptq_legacy_format:
-            config_dict = (
-                ipex.utils.weight_only_quantization._legacy_lowp_checkpoint_config()
+            raise AssertionError(
+                "gptq legacy format is deprecated and not supported now."
             )
-            low_precision_checkpoint = (low_precision_checkpoint, config_dict)
     else:
         low_precision_checkpoint = None
+
     user_model = ipex.llm.optimize(
         user_model.eval(),
         dtype=amp_dtype,
