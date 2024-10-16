@@ -339,21 +339,21 @@ inline void _dil_normalization_kernel(
     const float& sum,
     const int& size,
     scalar_t* out) {
-  auto vec_sum = _mm512_set1_ps(sum);
+  auto vec_sum = _mm512_set1_ps(1.0 / sum);
   __m512 vec_a = {};
   __m512 vec_out = {};
 
   int i = 0;
   for (; i <= size - 16; i += 16) {
     auto vec_a = _mm512_loadu_ps(a + i);
-    auto vec_out = _mm512_div_ps(vec_a, vec_sum);
+    auto vec_out = _mm512_mul_ps(vec_a, vec_sum);
     _storeu(out + i, vec_out);
   }
 
   if (i < size) {
     __mmask16 mask = (1 << (size - i)) - 1;
     auto vec_a = _mm512_maskz_loadu_ps(mask, a + i);
-    auto vec_out = _mm512_div_ps(vec_a, vec_sum);
+    auto vec_out = _mm512_mul_ps(vec_a, vec_sum);
     _mask_storeu(out + i, vec_out, mask);
   }
 }
@@ -364,21 +364,22 @@ inline void _dil_normalization_kernel_half(
     const at::Half& sum,
     const int& size,
     at::Half* out) {
-  auto vec_sum = _mm512_set1_ph(*(_Float16*)&sum);
+  at::Half scale = 1.0 / sum;
+  auto vec_sum = _mm512_set1_ph(*(_Float16*)&scale);
   __m512h vec_a = {};
   __m512h vec_out = {};
 
   int i = 0;
   for (; i <= size - 32; i += 32) {
     auto vec_a = _loadu_half(a + i);
-    auto vec_out = _mm512_div_ph(vec_a, vec_sum);
+    auto vec_out = _mm512_mul_ph(vec_a, vec_sum);
     _storeu_Half(out + i, vec_out);
   }
 
   if (i < size) {
     __mmask32 mask = (1 << (size - i)) - 1;
     auto vec_a = _maskz_loadu(a + i, mask);
-    auto vec_out = _mm512_div_ph(vec_a, vec_sum);
+    auto vec_out = _mm512_mul_ph(vec_a, vec_sum);
     _mask_storeu(out + i, vec_out, mask);
   }
 }
