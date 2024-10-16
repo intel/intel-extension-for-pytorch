@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -49,12 +50,38 @@ def TPPLinear_weight_prepack(m, bk=None, bc=None, layer_dtype=torch.float32):
     return m
 
 
+# For below shapes where ic is 2x bigger than oc, oneDNN may perform better when mb is also big
+# (while TPP still better when mb is small). However, mb is not able to be aware during IPEX
+# weight prepack stage.
+#
+# For short term, we add the ENV flag ("BF16_OPTIMIZED_THROUGHPUT") to specify when we are running
+#  with big mb like throughput usecase, and avoiding regression when mb is small like latency usecase.
+#
+# For long term, mark as TODO, we will tune TPP block layout/loop order to make it on par with oneDNN.
+
+fallback_ic_shape_list = [13824, 11008]
+fallback_oc_shape_list = [4096, 5120]
+
+
 def Apply_TPPLinear_weight_prepack(m, dtype, device="cpu"):
+    BF16_OPTIMIZED_THROUGHPUT = int(os.environ.get("BF16_OPTIMIZED_THROUGHPUT", 0))
     if (m.weight.size()[0] == 50400 or m.weight.size()[0] == 32000) and m.weight.size()[
         1
     ] % 64 == 0:
         m = TPPLinear_weight_prepack(m, 100, 64, dtype)
-    elif m.weight.size()[0] % 16 == 0 and m.weight.size()[1] % 64 == 0:
+    elif (
+        m.weight.size()[0] % 16 == 0
+        and m.weight.size()[1] % 64 == 0
+        and (
+            not (
+                BF16_OPTIMIZED_THROUGHPUT
+                and (
+                    m.weight.size()[1] in fallback_ic_shape_list
+                    and m.weight.size()[0] in fallback_oc_shape_list
+                )
+            )
+        )
+    ):
         m = TPPLinear_weight_prepack(m, 16, 64, dtype)
     else:
         m.tpp_fallback = True

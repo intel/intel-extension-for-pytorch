@@ -5,6 +5,7 @@ import intel_extension_for_pytorch as ipex
 import intel_extension_for_pytorch._C as core
 from torch.testing._internal.common_utils import TestCase
 import copy
+import os
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _enable_tpp,
     _disable_tpp,
@@ -102,7 +103,50 @@ class Linear_tpp_fallback_dnnl(torch.nn.Module):
         return self.mlp(x)
 
 
+class Linear_tpp_fallback_dnnl_v2(torch.nn.Module):
+    def __init__(self, ic, oc):
+        super(Linear_tpp_fallback_dnnl_v2, self).__init__()
+        self.mlp = torch.nn.Linear(ic, oc)
+
+    def forward(self, x):
+        return self.mlp(x)
+
+
 class TestTPPlinear(TestCase):
+    def test_tpp_linear_fallback_env_set(self):
+        fallback_ic_shape = [13824, 11008]
+        fallback_oc_shape = [4096, 5120]
+        dtypes = [torch.bfloat16]
+        for env_set in [0, 1]:
+            os.environ["BF16_OPTIMIZED_THROUGHPUT"] = str(env_set)
+            for dtype in dtypes:
+                for ic in fallback_ic_shape:
+                    for oc in fallback_oc_shape:
+                        x1 = torch.rand(1, 1, ic)
+                        model = Linear_tpp_fallback_dnnl_v2(ic, oc).eval()
+                        with torch.no_grad(), torch.cpu.amp.autocast(
+                            enabled=(
+                                True
+                                if dtype in [torch.bfloat16, torch.float16]
+                                else False
+                            ),
+                            dtype=dtype,
+                        ):
+                            ref_out = model(x1)
+                        _enable_tpp()
+                        model = ipex.optimize(model, dtype=dtype)
+                        with torch.no_grad(), torch.cpu.amp.autocast(
+                            enabled=True,
+                            dtype=dtype,
+                        ):
+                            out = model(x1)
+                        if env_set:
+                            assert model.mlp.use_dnnl is True
+                        else:
+                            assert model.mlp.use_tpp is True
+                        self.assertEqual(out, ref_out)
+                        _disable_tpp()
+
     def test_tpp_linear_fallback_flag(self):
         x1 = torch.rand(1, 1, 4097)
         x2 = copy.deepcopy(x1)
