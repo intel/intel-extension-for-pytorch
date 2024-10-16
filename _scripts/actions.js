@@ -614,6 +614,7 @@ $(document).ready(function() {
       m = data.version.match("v([0-9\\.]+\\+([a-zA-Z]+))");
       if(m != null && m.length == 3) {
         ret += "<p>Once installation succeeds, visit <a href=\"./" + m[2] + "/" + m[1] + "/tutorials/getting_started.html\">Get Started</a> and <a href=\"./" + m[2] + "/" + m[1] + "/tutorials/examples.html\">Examples</a> sections to start using the extension in your code.</p>";
+        ret += "<div>Check <a href=\"./" + m[2] + "/" + m[1] + "/tutorials/known_issues.html\">Known Issues</a> first if anything goes wrong.</div>";
       }
       ret += "</div>";
       indexa += 1;
