@@ -1165,7 +1165,7 @@ elif args.ipex_weight_only_quantization:
                 " Should be a .pt/.pth/.safetensors file or a directory containing them."
             )
 
-        low_precision_checkpoint = tuple(low_precision_checkpoint, _quant_method)
+        low_precision_checkpoint = (low_precision_checkpoint, quant_method)
 
         if args.gptq_legacy_format:
             raise AssertionError(

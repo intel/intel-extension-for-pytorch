@@ -191,6 +191,9 @@ def _convert_woq_with_low_precision_checkpoint(
                 mod, qweight, scales, qzeros, bias, group_size=group_size, g_idx=g_idx
             )
             return mod_new
+        elif hasattr(mod, "weight") and isinstance(mod.weight, torch.nn.Parameter):
+            mod.weight.data = state_dict.get(attr_name + ".weight", mod.weight.data)
+            return mod
 
         mod_new = mod
 
