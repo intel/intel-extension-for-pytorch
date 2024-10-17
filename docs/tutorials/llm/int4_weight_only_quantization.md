@@ -67,18 +67,18 @@ In this section, we will describe the implementation of Weight-Only Quantization
 ![image](../../images/llm/weight-only-quantization-flow.png)
 
 ### Weight-Only Quantization Initialization
-On Intel® GPU, the easiest way to load INT4 models is to use the `load_in_4bit` interface provided by [Intel® Extension for Transformers\*](https://github.com/intel/intel-extension-for-transformers), which hooks the `AutoModelForCausalLM.from_pretrained` function to use `load_in_4bit` on Intel® GPU. Pass the argument `load_in_4bit=True` to load a model in 4bit when calling the `from_pretrained` method, which can read the model weight in INT4 format directly.
+On Intel® GPU, the easiest way to load INT4 models is to use the `load_in_4bit` interface provided by [Intel® Neural Compressor\*](https://github.com/intel/neural-compressor), which hooks the `AutoModelForCausalLM.from_pretrained` function to use `load_in_4bit` on Intel® GPU. Pass the argument `load_in_4bit=True` to load a model in 4bit when calling the `from_pretrained` method, which can read the model weight in INT4 format directly.
 
 ```python
 qmodel = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, device_map="xpu", trust_remote_code=True, use_llm_runtime=False)
 ```
-Another option that Intel® Extension for Transformers\* offers is to extend the `AutoModelForCausalLM.from_pretrained` function to allow `quantization_config` to take [`WeightOnlyQuantConfig`](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/transformers/utils/config.py#L30) as an argument, which enables conversion on the Intel® GPU platform. We currently support the RTN algorithm and the weight_dtype setting of `int4_fullrange` (which means that all linear weights are converted to INT4).
+Another option that Intel® Neural Compressor\* offers is to extend the `AutoModelForCausalLM.from_pretrained` function to allow `quantization_config` to take [`WeightOnlyQuantConfig`](https://github.com/intel/neural-compressor/blob/master/neural_compressor/transformers/utils/quantization_config.py#L27-L34) as an argument, which enables conversion on the Intel® GPU platform. We currently support the RTN algorithm and the weight_dtype setting of `int4_fullrange` (which means that all linear weights are converted to INT4).
 
 ```python
 woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=64)
 qmodel = AutoModelForCausalLM.from_pretrained(model_name, device_map="xpu", quantization_config=woq_quantization_config, trust_remote_code=True)
 ```
-In Weight-Only Quantization INT4 case, when using `AutoModelForCausalLM.from_pretrained` from Intel® Extension for Transformers\* to load the model, it will use Intel® Neural Compressor according to the running device to perform quantization deployment.
+In Weight-Only Quantization INT4 case, when using `AutoModelForCausalLM.from_pretrained` from Intel® Neural Compressor\* to load the model, it will use Intel® Neural Compressor according to the running device to perform quantization deployment.
 
 ```python
     inc_model = quantization.fit(model,
@@ -122,18 +122,17 @@ Intel® Extension for PyTorch\* implements Weight-Only Quantization for Intel® 
 Please refer to the [instructions](https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.30%2Bxpu/examples/gpu/inference/python/llm/README.md#environment-setup).
 
 ### Run Weight-Only Quantization LLM on Intel® GPU
-#### Install Intel-extension-for-transformers and Neural-compressor
+#### Install Neural-compressor
 
 ```python
 pip install neural-compressor
-pip install intel-extension-for-transformers
 ```
 
 #### Quantize Model and Inference
 
 ```python
 import intel_extension_for_pytorch as ipex
-from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
+from neural_compressor.transformers import AutoModelForCausalLM
 from transformers import AutoTokenizer
 
 device = "xpu"
@@ -160,7 +159,7 @@ output = qmodel.generate(inputs)
 
 ```python
 
-from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
+from neural_compressor.transformers import AutoModelForCausalLM
 
 qmodel = AutoModelForCausalLM.from_pretrained("Qwen/Qwen-7B", load_in_4bit=True, device_map="xpu", trust_remote_code=True)
 

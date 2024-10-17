@@ -16,9 +16,7 @@ from transformers import (
     AutoTokenizer,
     LlamaTokenizer,
 )
-from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
-from intel_extension_for_transformers.transformers import RtnConfig
-from intel_extension_for_transformers.transformers.llm.utils.generation import _beam_search, _greedy_search
+from neural_compressor.transformers import AutoModelForCausalLM, RtnConfig
 
 # supported models
 MODEL_CLASSES = {
@@ -167,7 +165,6 @@ else:
         device_map=device,
         quantization_config=woq_quantization_config,
         trust_remote_code=args.use_hf_code,
-        use_llm_runtime=False
     )
     if args.save_model:
         model.save_pretrained(args.output_dir)
@@ -270,11 +267,12 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
     num_iter = args.num_iter
     num_warmup = args.num_warmup
     prompt = [prompt] * args.batch_size
-    if args.token_latency:
-        ipex.transformers.optimize.convert_function(model, "_greedy_search", _greedy_search)
-        if args.disable_optimize_transformers:
-            ipex.transformers.optimize.convert_function(model, "_beam_search", _beam_search)
-        model.config.token_latency = True
+    # will add it back after inc supports these changes
+    # if args.token_latency:
+        # ipex.transformers.optimize.convert_function(model, "_greedy_search", _greedy_search)
+        # if args.disable_optimize_transformers:
+        #     ipex.transformers.optimize.convert_function(model, "_beam_search", _beam_search)
+        # model.config.token_latency = True
     total_list = []
     with torch.inference_mode(), torch.no_grad(), torch.autocast(
         device_type=args.device,

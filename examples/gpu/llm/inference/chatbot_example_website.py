@@ -52,9 +52,7 @@ if torch.xpu.is_available() and not args.woq:
     model = ipex.optimize_transformers(model.eval(), dtype=torch.float16, device="xpu")
 
 elif torch.xpu.is_available() and args.woq:
-    import intel_extension_for_transformers
-    from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
-    from intel_extension_for_transformers.transformers import RtnConfig
+    from neural_compressor.transformers import AutoModelForCausalLM, RtnConfig
     from transformers import AutoTokenizer, TextIteratorStreamer, AutoConfig
     if args.woq_checkpoint_path:
     # directly load already quantized model
