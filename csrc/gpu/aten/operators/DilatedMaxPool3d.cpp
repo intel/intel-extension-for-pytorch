@@ -25,11 +25,11 @@ struct MaxPool3dWithIndicesOutFrameImplKernelFunctor {
   void operator()(sycl::nd_item<1> item) const {
     for (auto outputIndex = item.get_global_id(0); outputIndex < OutputSize;
          outputIndex += global_range) {
-      int batch = 0;
-      int channel = 0;
-      int oDepth = 0;
-      int oRow = 0;
-      int oColumn = 0;
+      int64_t batch = 0;
+      int64_t channel = 0;
+      int64_t oDepth = 0;
+      int64_t oRow = 0;
+      int64_t oColumn = 0;
       // used only for channels-first indexing
       int64_t slice = 0;
       batch = outputIndex / out_batch_stride;
