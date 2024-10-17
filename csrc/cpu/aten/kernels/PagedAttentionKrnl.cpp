@@ -555,8 +555,10 @@ void reshape_and_cache_kernel(
   auto cache_strideN = key_cache.stride(0);
   auto cache_strideP = key_cache.stride(2);
   auto cache_strideH = key_cache.stride(1);
-  auto state_strideN = key.stride(0);
-  auto state_strideH = key.stride(1);
+  auto key_state_strideN = key.stride(0);
+  auto key_state_strideH = key.stride(1);
+  auto value_state_strideN = value.stride(0);
+  auto value_state_strideH = value.stride(1);
 #pragma omp parallel for collapse(2)
   for (auto ti = 0; ti < num_tokens; ti++) {
     for (auto hi = 0; hi < head_num; hi++) {
@@ -564,11 +566,13 @@ void reshape_and_cache_kernel(
       auto block_offset = slot_mapping_ptr[ti] % block_size;
       auto cache_offset = physical_block_id * cache_strideN +
           block_offset * cache_strideP + hi * cache_strideH;
-      auto state_offset = ti * state_strideN + hi * state_strideH;
+      auto key_state_offset = ti * key_state_strideN + hi * key_state_strideH;
+      auto value_state_offset =
+          ti * value_state_strideN + hi * value_state_strideH;
       auto key_cache_start = key_cache_ptr + cache_offset;
-      auto key_ptr_start = key_ptr + state_offset;
+      auto key_ptr_start = key_ptr + key_state_offset;
       auto value_cache_start = value_cache_ptr + cache_offset;
-      auto value_ptr_start = value_ptr + state_offset;
+      auto value_ptr_start = value_ptr + value_state_offset;
       torch_ipex::cpu::kernel::move_ker<DST_T, SRC_T>(
           key_cache_start, key_ptr_start, head_size);
       torch_ipex::cpu::kernel::move_ker<DST_T, SRC_T>(
