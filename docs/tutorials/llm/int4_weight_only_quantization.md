@@ -119,65 +119,27 @@ After the policy is selected, Intel® Extension for PyTorch\* will use `HGEMM_IN
 Intel® Extension for PyTorch\* implements Weight-Only Quantization for Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics with Intel® Extension for Transformers\*. Below section uses Qwen-7B to demonstrate the detailed usage.
 
 ### Environment Setup
-Please refer to the [instructions](https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.30%2Bxpu/examples/gpu/inference/python/llm/README.md#environment-setup).
+Please refer to the [instructions](https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.3.110/examples/gpu/llm/inference#environment-set-up).
 
 ### Run Weight-Only Quantization LLM on Intel® GPU
 #### Install Intel-extension-for-transformers and Neural-compressor
 
 ```python
-pip install neural-compressor
-pip install intel-extension-for-transformers
+pip install numpy==1.26.4
+git clone https://github.com/intel/neural-compressor.git -b v3.0
+cd neural-compressor
+python setup.py install
+cd ..
+ 
+git clone https://github.com/intel/intel-extension-for-transformers.git
+cd intel-extension-for-transformers
+git checkout c263d09f0899741142b35ebed3159e9425b1ac8f
+pip install -r requirements.txt
+python setup.py install
 ```
 
-#### Quantize Model and Inference
 
-```python
-import intel_extension_for_pytorch as ipex
-from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
-from transformers import AutoTokenizer
-
-device = "xpu"
-model_name = "Qwen/Qwen-7B"
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-
-prompt = "Once upon a time, there existed a little girl,"
-inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-
-# woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=64)
-# qmodel = AutoModelForCausalLM.from_pretrained(model_name, device_map="xpu", quantization_config=woq_quantization_config, trust_remote_code=True)
-
-qmodel = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, device_map="xpu", trust_remote_code=True)
-
-# optimize the model with Intel® Extension for PyTorch*, it will improve performance.
-qmodel = ipex.llm.optimize(qmodel, inplace=True, dtype=torch.float16, woq=True, device="xpu")
-
-output = qmodel.generate(inputs)
-```
-
-> Note: It is recommended quantizing and saving the model first, then loading the model as below on a GPU device without sufficient device memory. Otherwise you could skip below instruction, execute quantization and inference on your device directly.
-
-#### Save and Load Quantized Model (Optional)
-
-```python
-
-from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
-
-qmodel = AutoModelForCausalLM.from_pretrained("Qwen/Qwen-7B", load_in_4bit=True, device_map="xpu", trust_remote_code=True)
-
-# Please note, saving model should be executed before ipex.llm.optimize function is called. 
-model.save_pretrained("saved_dir")
-
-# Load model
-loaded_model = AutoModelForCausalLM.from_pretrained("saved_dir", trust_remote_code=True)
-
-# Before executed the loaded model, you can call ipex.llm.optimize function.
-loaded_model = ipex.llm.optimize(loaded_model, inplace=True, dtype=torch.float16, woq=True, device="xpu")
-
-output = loaded_model.generate(inputs)
-
-```
-
-#### Execute [WOQ benchmark script](https://github.com/intel/intel-extension-for-pytorch/blob/xpu-main/examples/gpu/inference/python/llm/run_benchmark_woq.sh)
+#### Execute [WOQ benchmark script](https://github.com/intel/intel-extension-for-pytorch/blob/release/xpu/2.3.110/examples/gpu/llm/inference/run_benchmark_woq.sh)
 
 ```python
 bash run_benchmark_woq.sh
