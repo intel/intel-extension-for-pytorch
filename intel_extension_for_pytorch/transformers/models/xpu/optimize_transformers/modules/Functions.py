@@ -2070,3 +2070,26 @@ def _ipex_setup_cache_GLM(
         past_key_values.key_cache.append(new_layer_key_cache)
         past_key_values.value_cache.append(new_layer_value_cache)
     self.past_key_values = past_key_values
+
+
+def ipex_disable_attn_mask_prepare(model):
+    import transformers
+    import importlib
+
+    model_list = {
+        transformers.models.llama.modeling_llama.LlamaForCausalLM: "LlamaModel",
+        transformers.models.phi3.modeling_phi3.Phi3ForCausalLM: "Phi3Model",
+        transformers.models.qwen2.modeling_qwen2.Qwen2ForCausalLM: "Qwen2Model",
+    }
+
+    if type(model) in model_list.keys():
+        base_module = type(model).__base__.__module__
+        module_spec = importlib.import_module(base_module)
+        module_spec._prepare_4d_causal_attention_mask_with_cache_position = (
+            lambda attention_mask, *args, **kwargs: attention_mask
+        )
+        model_name = model_list[type(model)]
+        model_spec = getattr(module_spec, model_name)
+        model_spec._update_causal_mask = (
+            lambda self, attention_mask, *args: attention_mask
+        )
