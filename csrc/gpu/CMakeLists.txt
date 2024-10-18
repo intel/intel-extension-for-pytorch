@@ -2,7 +2,6 @@ set(IPEX_GPU_ATEN_SRC_DIR "${IPEX_GPU_ROOT_DIR}/aten")
 set(IPEX_GPU_ATEN_CORE_DIR "${IPEX_GPU_ATEN_SRC_DIR}/core")
 set(IPEX_GPU_RUNTIME_SRC_DIR "${IPEX_GPU_ROOT_DIR}/runtime")
 set(IPEX_GPU_UTILS_SRC_DIR "${IPEX_GPU_ROOT_DIR}/utils")
-set(IPEX_GPU_PROFILER_SRC_DIR "${IPEX_GPU_ROOT_DIR}/profiler")
 
 if (WINDOWS)
   set(LINK_LIBRARY_PREFIX "")
@@ -55,24 +54,13 @@ if(NOT DEFINED SYCL_INCLUDE_DIR)
   message(FATAL_ERROR, "Cannot find SYCL include directory")
 endif()
 
-# Kineto + PTI-sdk dependency part
-if(USE_PTI)
-  set(USE_PTI OFF CACHE BOOL "Disable PTI support." FORCE)
-  message(WARNING "PTI build is deprecated in IPEX.\n")
-endif(USE_PTI)
-
-set(IPEX_PROFILER_INCLUDES)
-set(IPEX_PROFILER_SRCS)
-add_subdirectory(${IPEX_GPU_PROFILER_SRC_DIR})
-
 set(IPEX_INCLUDE_DIRS
         ${TORCH_INCLUDE_DIRS}
         ${SYCL_INCLUDE_DIR}
         ${IPEX_GPU_ROOT_DIR}
         ${IPEX_GPU_ATEN_SRC_DIR}
         ${IPEX_CSRC_ROOT_DIR}
-        ${BUILD_IPEX_GPU_ATEN_GENERATED}
-        ${IPEX_PROFILER_INCLUDES})
+        ${BUILD_IPEX_GPU_ATEN_GENERATED})
 
 set(IPEX_GPU_CORE_SRC
         ${IPEX_JIT_SRCS}
@@ -80,8 +68,7 @@ set(IPEX_GPU_CORE_SRC
         ${IPEX_ATEN_CORE_SRCS}
         ${IPEX_RUNTIME_SRCS}
         ${IPEX_GPU_GEN_FILES}
-        ${IPEX_UTILS_SRCS}
-        ${IPEX_PROFILER_SRCS})
+        ${IPEX_UTILS_SRCS})
 
 if(NOT WINDOWS)
   foreach(RPATH ${RPATHS_LIST})
@@ -252,25 +239,6 @@ endif()
   endif()
 else()
   message(FATAL_ERROR "Error: Cannot find spdlog")
-endif()
-
-if (USE_PTI)
-  # Temp fmt part dependency for copied Kineto code
-  if (NOT TARGET fmt::fmt-header-only)
-    find_package(fmt QUIET)
-    if (FMT_FOUND)
-      target_link_libraries(intel-ext-pt-gpu PRIVATE fmt::fmt-header-only)
-      target_include_directories(intel-ext-pt-gpu PRIVATE ${FMT_INCLUDE_DIR})
-      set_target_properties(intel-ext-pt-gpu PROPERTIES FMT_INCLUDE_DIR "${FMT_INCLUDE_DIR}")
-    else()
-      message(FATAL_ERROR "ERROR: Cannot build fmt::fmt-header-only! Cannot build USE_PTI without FMT!")
-    endif()
-  endif()
-  # Temp fmt part end.
-  target_link_libraries(intel-ext-pt-gpu PUBLIC Pti::pti_view)
-  list(APPEND IPEX_COMPILE_DEFINITIONS "USE_PTI")
-  set_target_properties(intel-ext-pt-gpu PROPERTIES USE_PTI ON)
-  target_compile_options(intel-ext-pt-gpu PRIVATE "-DKINETO_NAMESPACE=libkineto")
 endif()
 
 # XXX: Please make sure to find oneMKL before oneDNN

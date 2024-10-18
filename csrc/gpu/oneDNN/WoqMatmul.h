@@ -22,7 +22,6 @@ using namespace torch_ipex::xpu::oneDNN;
 namespace torch_ipex::xpu {
 namespace oneDNN {
 
-#ifdef USE_PTI
 #define RECORD_WOQ_FUNCTION_IMPL(F, m, n, k, group_size, m2_trans) \
   char str__[100];                                                 \
   sprintf(                                                         \
@@ -35,9 +34,6 @@ namespace oneDNN {
       group_size,                                                  \
       m2_trans);                                                   \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-#else
-#define RECORD_WOQ_FUNCTION_IMPL(F, m, n, k, group_size, m2_trans)
-#endif
 
 inline Tensor resize_as_onednn_mat1(const Tensor& mat1, const Tensor& output) {
   auto output_ = output.flatten(0, -2);

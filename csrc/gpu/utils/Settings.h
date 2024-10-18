@@ -121,7 +121,6 @@ class IPEX_API Settings final {
   void enable_simple_trace();
   void disable_simple_trace();
 
-  bool is_pti_enabled() const;
   bool is_ds_kernel_enabled() const;
 
   int64_t get_compiler_version() const;

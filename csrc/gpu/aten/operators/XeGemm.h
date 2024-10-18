@@ -13,14 +13,10 @@
 
 using namespace torch_ipex::xpu::xetla;
 
-#ifdef USE_PTI
 #define RECORD_FUNCTION_IMPL(F, M, N, K)            \
   char str__[100];                                  \
   sprintf(str__, "%s(%d, %d, %d)", "" #F, M, N, K); \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-#else
-#define RECORD_FUNCTION_IMPL(F, M, N, K)
-#endif
 
 class HGEMM_XETLA final {
  public:

@@ -9,7 +9,6 @@
 #include <ATen/xpu/XPUGeneratorImpl.h>
 #include <core/Allocator.h>
 #include <include/xpu/Settings.h>
-#include <profiler/profiler_kineto.h>
 #include <pybind11/stl.h>
 #include <runtime/XPUGraph.h>
 #include <utils/Settings.h>
@@ -489,8 +488,6 @@ void init_xpu_module(pybind11::module& m) {
   m.def("_is_ds_kernel_enabled", []() {
     return Settings::I().is_ds_kernel_enabled();
   });
-
-  m.def("_prepare_profiler", torch_ipex::xpu::dpcpp::profiler::prepareProfiler);
 
   auto module = m.ptr();
   PyModule_AddFunctions(module, _THPModule_methods);

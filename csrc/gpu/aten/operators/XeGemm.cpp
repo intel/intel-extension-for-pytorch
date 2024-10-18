@@ -22,7 +22,6 @@ inline bool fp64_valid() {
   return Settings::I().has_2d_block_array(curDevID);
 }
 
-#ifdef USE_PTI
 #define RECORD_ONEDNN_FUNCTION_IMPL(F)                     \
   char str__[100];                                         \
   sprintf(str__, "onednn_%s(%d, %d, %d)", "" #F, m, n, k); \
@@ -47,13 +46,6 @@ inline bool fp64_valid() {
   char str__[100];                                               \
   sprintf(str__, "%s(%d, %d, %d, g=%d)", "" #F, m, n, k, group); \
   RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
-#else
-#define RECORD_ONEDNN_FUNCTION_IMPL(F)
-#define RECORD_XETLA_FUNCTION_IMPL(F)
-#define RECORD_XETLA_FUNCTION_IMPLG(F)
-#define RECORD_FUNC_IMPL(F)
-#define RECORD_FUNC_IMPLG(F)
-#endif
 
 static void mm_common_out(const Tensor& a, const Tensor& b, Tensor& out) {
   auto af = a.flatten(0, -2);
