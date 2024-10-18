@@ -2,7 +2,6 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 import copy
-import pytest
 
 N, D_in, H, D_out = 32, 128, 32, 256
 model = torch.nn.Sequential(torch.nn.Linear(D_in, H), torch.nn.Linear(H, D_out)).xpu()
@@ -12,7 +11,6 @@ loss_fn = torch.nn.MSELoss()
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(True, reason="compiler doesn't support sycl graph")
     def test_xpu_graph_linear(self, dtype=torch.float):
         # Placeholders used for capture
         static_input = torch.randn(N, D_in, device="xpu")
