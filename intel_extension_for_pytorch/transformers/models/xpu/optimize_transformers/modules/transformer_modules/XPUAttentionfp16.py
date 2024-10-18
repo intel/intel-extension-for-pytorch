@@ -15,6 +15,7 @@ from .Linear import (
 
 class IPEXAttention(IPEXTransformerAttnNaive):
     cache_type = None
+    cache_format = None
 
     def __init__(
         self, config: IPEXTransformerConfig, layer_idx: Optional[int] = None
@@ -95,15 +96,19 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 len(cache.key_cache) > self.layer_idx
                 and cache.key_cache[self.layer_idx].shape[0] < key.shape[0]
             ):
-                cache_type = cache.key_cache[self.layer_idx].shape
+                cache_shape = cache.key_cache[self.layer_idx].shape
                 cache.key_cache[self.layer_idx] = (
                     cache.key_cache[self.layer_idx]
-                    .expand(key.shape[0], cache_type[1], cache_type[2], cache_type[3])
+                    .expand(
+                        key.shape[0], cache_shape[1], cache_shape[2], cache_shape[3]
+                    )
                     .contiguous()
                 )
                 cache.value_cache[self.layer_idx] = (
                     cache.value_cache[self.layer_idx]
-                    .expand(value.shape[0], cache_type[1], cache_type[2], cache_type[3])
+                    .expand(
+                        value.shape[0], cache_shape[1], cache_shape[2], cache_shape[3]
+                    )
                     .contiguous()
                 )
             key, value = cache.update(key, value, self.layer_idx, kwargs)
@@ -333,6 +338,11 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             IPEXAttention.cache_type = (
                 "static" if isinstance(past_key_value, IPEXStaticCache) else "dynamic"
             )
+        if (
+            isinstance(past_key_value, IPEXStaticCache)
+            and IPEXAttention.cache_format is None
+        ):
+            IPEXAttention.cache_format = past_key_value.cache_format
 
         bs, seqlen, _ = hidden_states.size()
         # TODO this wa will be removed after qkv gemm support strided write on F dim, we need this now

@@ -7,6 +7,7 @@ from .XPUAttentionfp16 import (
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
 )
+from .CacheUtils import CacheFormat
 
 
 class IPEXAttentionInt4(IPEXAttention):
@@ -410,9 +411,17 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
             )
             m = query.shape[-1]
             if IPEXAttention.cache_type == "static":
-                query = qkv_out[:, :, :m].transpose(0, 1).contiguous()
-                key.copy_(qkv_out[:, :, m : 2 * m].transpose(0, 1))
-                value.copy_(qkv_out[:, :, 2 * m :].transpose(0, 1))
+                if (
+                    IPEXAttention.cache_format == CacheFormat.FBNH
+                    and not self.beam_search_first_iter(hidden_states.shape[1])
+                ):
+                    query = qkv_out[:, :, :m].transpose(0, 1).contiguous()
+                    key.copy_(qkv_out[:, :, m : 2 * m].transpose(0, 1))
+                    value.copy_(qkv_out[:, :, 2 * m :].transpose(0, 1))
+                else:
+                    query = qkv_out[:, :, :m].contiguous()
+                    key.copy_(qkv_out[:, :, m : 2 * m])
+                    value.copy_(qkv_out[:, :, 2 * m :])
             elif IPEXAttention.cache_type == "dynamic":
                 query = qkv_out[:, :, :m].contiguous()
                 key = qkv_out[:, :, m : 2 * m].contiguous()
@@ -499,11 +508,19 @@ class IPEXAttentionInt4GroupedOneDNN(IPEXAttentionInt4OneDNN, IPEXAttentionInt4G
             m_query = query.shape[-1]
             m_key = key.shape[-1]
             if IPEXAttention.cache_type == "static":
-                query.copy_(qkv_out[:, :, :m_query].transpose(0, 1).contiguous())
-                key.copy_(qkv_out[:, :, m_query : m_query + m_key].transpose(0, 1))
-                value.copy_(qkv_out[:, :, m_query + m_key :].transpose(0, 1))
+                if (
+                    IPEXAttention.cache_format == CacheFormat.FBNH
+                    and not self.beam_search_first_iter(hidden_states.shape[1])
+                ):
+                    query = qkv_out[:, :, :m_query].transpose(0, 1).contiguous()
+                    key.copy_(qkv_out[:, :, m_query : m_query + m_key].transpose(0, 1))
+                    value.copy_(qkv_out[:, :, m_query + m_key :].transpose(0, 1))
+                else:
+                    query = qkv_out[:, :, :m_query].contiguous()
+                    key.copy_(qkv_out[:, :, m_query : m_query + m_key])
+                    value.copy_(qkv_out[:, :, m_query + m_key :])
             if IPEXAttention.cache_type == "dynamic":
-                query.copy_(qkv_out[:, :, :m_query].contiguous())
+                query = qkv_out[:, :, :m_query].contiguous()
                 key.copy_(qkv_out[:, :, m_query : m_query + m_key].contiguous())
                 value.copy_(qkv_out[:, :, m_query + m_key :].contiguous())
         else:
