@@ -630,7 +630,7 @@ class RadixSortDownsweep {
     WARPS = (GROUP_THREADS + WARP_THREADS - 1) / WARP_THREADS,
 
     RADIX_DIGITS = 1 << RADIX_BITS,
-    KEY_TRAITS_TYPE_MASK = 1l << ((sizeof(KeyTraitsT) << 3) - 1),
+    KEY_TRAITS_TYPE_MASK = 1ll << ((sizeof(KeyTraitsT) << 3) - 1),
   };
 
  private:
