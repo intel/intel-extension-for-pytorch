@@ -11,6 +11,7 @@ from .Linear import (
     IPEXLowbitGemmAdd,
     GemmDtype,
 )
+from transformers.cache_utils import Cache
 
 
 class IPEXAttention(IPEXTransformerAttnNaive):
@@ -55,12 +56,12 @@ class IPEXAttention(IPEXTransformerAttnNaive):
 
     def repeat_kv(self, kv, num_group):
         # kv shape: [b, f, n, h]
-        bs, _, seqlen, _ = kv.shape
+        bs, _, curr_len, _ = kv.shape
         kv = kv.permute(2, 0, 1, 3).contiguous()
         kv = kv[:, :, :, None, :].expand(
-            seqlen, bs, self.num_kv_heads, num_group, self.head_dim
+            curr_len, bs, self.num_kv_heads, num_group, self.head_dim
         )
-        kv = kv.reshape(seqlen, bs, self.num_heads, self.head_dim).contiguous()
+        kv = kv.reshape(curr_len, bs, self.num_heads, self.head_dim).contiguous()
         kv = kv.permute(1, 2, 0, 3)
         return kv
 
@@ -90,8 +91,8 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 key, value, layer_idx=self.layer_idx, cache_kwargs=kwargs
             )
         elif cache_relpath == "transformers.cache_utils.Cache":
-            # huggingface's Cache have memory layout of [bs, num_heads, seqlen, head_dim] memory layout
-            # we need to transpose it to [bs, seqlen, num_heads, head_dim] memory layout
+            # huggingface's Cache have memory layout of [bs, num_heads, curr_len, head_dim] memory layout
+            # we need to transpose it to [bs, curr_len, num_heads, head_dim] memory layout
             if (
                 len(cache.key_cache) > self.layer_idx
                 and cache.key_cache[self.layer_idx].shape[0] < key.shape[0]
@@ -114,8 +115,8 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             key, value = cache.update(key, value, self.layer_idx, kwargs)
             key = key.transpose(1, 2).contiguous().transpose(1, 2)
             value = value.transpose(1, 2).contiguous().transpose(1, 2)
-            seqlen = cache.get_seq_length()
-            return (key[:, :, :seqlen, :], value[:, :, :seqlen, :])
+            prev_len = cache.get_seq_length()
+            return (key[:, :, :prev_len, :], value[:, :, :prev_len, :])
         elif isinstance(cache, List) or isinstance(cache, Tuple):
             key_cache = torch.cat([cache[0], key], dim=2)
             value_cache = torch.cat([cache[1], value], dim=2)
@@ -126,13 +127,15 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             raise ValueError(f"Unrecognized cache type {cache_relpath}")
 
     def rotary_embedding(
-        self, query, key, value, past_key_value, position_ids, layer_id, seqlen
+        self, query, key, value, past_key_value, position_ids, layer_id, curr_len
     ):
         if (
             isinstance(past_key_value, IPEXStaticCache)
             and past_key_value.cache_format == CacheFormat.FBNH
-            and not self.beam_search_first_iter(seqlen)
+            and not self.beam_search_first_iter(curr_len)
         ):
+            prev_len = past_key_value.get_seq_length()
+            self.seq_len = curr_len + prev_len
             if hasattr(self, "position_embed") and self.position_embed is not None:
                 query, key = self.position_embed(
                     query,
@@ -140,18 +143,29 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                     position_ids,
                     self.layer_idx,
                     self.beam_idx,
-                    seqlen,
+                    self.seq_len,
                     past_key_value.cache_format,
                 )
 
-            # from [bs, seqlen, num_heads, head_dim] to [bs, num_heads, seqlen, head_dim]
+            # from [bs, curr_len, num_heads, head_dim] to [bs, num_heads, curr_len, head_dim]
             query = query.permute(1, 2, 0, 3)
             key = key.permute(1, 2, 0, 3)
             value = value.permute(1, 2, 0, 3)
         else:
+            prev_len = 0
+            if isinstance(past_key_value, List) or isinstance(past_key_value, Tuple):
+                prev_len = past_key_value[0].shape[-2]
+            elif isinstance(past_key_value, Cache):
+                prev_len = past_key_value.get_seq_length()
+            self.seq_len = curr_len + prev_len
             if hasattr(self, "position_embed") and self.position_embed is not None:
                 query, key = self.position_embed(
-                    query, key, position_ids, self.layer_id, self.beam_idx, seqlen
+                    query,
+                    key,
+                    position_ids,
+                    self.layer_id,
+                    self.beam_idx,
+                    self.seq_len,
                 )
             query = query.permute(0, 2, 1, 3)
             key = key.permute(0, 2, 1, 3)
@@ -168,7 +182,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             cache_len = (
                 self.max_position
                 if self.max_position > seq_len
-                else seq_len + self.runtime_cache_size
+                else math.ceil((seq_len + self.runtime_cache_size) / 8) * 8
             )
             shape = [
                 alibi.shape[0],
@@ -215,7 +229,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         # if attention_mask is not None:
         #     attention_mask = self.get_blocked_attn_mask(attention_mask)
         if alibi is not None:
-            alibi = self.get_blocked_alibi(alibi, key.size(1))
+            alibi = self.get_blocked_alibi(alibi, key.size(2))
         if (
             self.beam_idx is not None
             and query.size(-2) == 1
@@ -226,12 +240,12 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 self.layer_idx
             )
             prompt_length = key_prompt.size(2)
-            seqlen = key.size(2)
+            curr_len = key.size(2)
             # TODO: remove this after ifmha support combined kv cache with both prompt
-            # and decode in [bs, seqlen, num_head, head_dim] layout
+            # and decode in [bs, curr_len, num_head, head_dim] layout
             key = key[:, :, prompt_length:, :]
             value = value[:, :, prompt_length:, :]
-            # TODO: remove this after ifmha support [bs, seqlen, num_head, head_dim] layout
+            # TODO: remove this after ifmha support [bs, curr_len, num_head, head_dim] layout
             if (
                 isinstance(past_key_value, IPEXStaticCache)
                 and past_key_value.cache_format == CacheFormat.BFNH
@@ -257,7 +271,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 alibi,
                 None,
                 head_mask,
-                seqlen,
+                curr_len,
                 scale,
                 1.0,
                 0.0,
@@ -308,11 +322,11 @@ class IPEXAttention(IPEXTransformerAttnNaive):
 
         return attention_output, None
 
-    def beam_search_first_iter(self, seqlen):
-        return self.beam_idx is not None and seqlen != 1
+    def beam_search_first_iter(self, curr_len):
+        return self.beam_idx is not None and curr_len != 1
 
-    def beam_search_next_token(self, seqlen):
-        return self.is_beam_search() is True and seqlen == 1
+    def beam_search_next_token(self, curr_len):
+        return self.is_beam_search() is True and curr_len == 1
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
         query, key, value = self.qkv_proj(hidden_states, query, key, value)
@@ -344,16 +358,16 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         ):
             IPEXAttention.cache_format = past_key_value.cache_format
 
-        bs, seqlen, _ = hidden_states.size()
+        bs, curr_len, _ = hidden_states.size()
         # TODO this wa will be removed after qkv gemm support strided write on F dim, we need this now
         # for performance reason
         if (
             isinstance(past_key_value, IPEXStaticCache)
             and past_key_value.cache_format == CacheFormat.FBNH
-            and not self.beam_search_first_iter(seqlen)
+            and not self.beam_search_first_iter(curr_len)
         ):
             query = torch.empty(
-                [seqlen, bs, self.num_heads * self.head_dim],
+                [curr_len, bs, self.num_heads * self.head_dim],
                 dtype=hidden_states.dtype,
                 device=hidden_states.device,
             )
@@ -363,17 +377,17 @@ class IPEXAttention(IPEXTransformerAttnNaive):
 
         else:
             query = torch.empty(
-                [bs, seqlen, self.num_heads * self.head_dim],
+                [bs, curr_len, self.num_heads * self.head_dim],
                 dtype=hidden_states.dtype,
                 device=hidden_states.device,
             )
             key = torch.empty(
-                [bs, seqlen, self.num_kv_heads * self.head_dim],
+                [bs, curr_len, self.num_kv_heads * self.head_dim],
                 dtype=query.dtype,
                 device=query.device,
             )
             value = torch.empty(
-                [bs, seqlen, self.num_kv_heads * self.head_dim],
+                [bs, curr_len, self.num_kv_heads * self.head_dim],
                 dtype=query.dtype,
                 device=query.device,
             )
@@ -390,7 +404,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
 
         # apply rope to qk
         query, key, value = self.rotary_embedding(
-            query, key, value, past_key_value, position_ids, self.layer_idx, seqlen
+            query, key, value, past_key_value, position_ids, self.layer_idx, curr_len
         )
 
         kwargs_for_cache_update = {
@@ -424,16 +438,16 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             query, key, value, past_key_value, attention_mask, head_mask, alibi
         )
 
-        # transpose back to [bs, seqlen, num_heads, head_dim]
+        # transpose back to [bs, curr_len, num_heads, head_dim]
         attn_output = attn_output.transpose(1, 2).reshape(
-            [bs, seqlen, self.hidden_size]
+            [bs, curr_len, self.hidden_size]
         )
         # o proj + residual
         residual = kwargs.get("residual", None)
         attn_output = self.out_proj_compute(attn_output, residual)
 
         self.all_reduce_if_necessary(attn_output)
-        attn_output = attn_output.view([bs, seqlen, self.hidden_size * self.tp_size])
+        attn_output = attn_output.view([bs, curr_len, self.hidden_size * self.tp_size])
 
         outputs = (attn_output, past_key_value)
         if output_attentions:
