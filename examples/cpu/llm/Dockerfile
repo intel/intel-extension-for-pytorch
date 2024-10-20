@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Intel Corporation
+# SPDX-License-Identifier: Apache 2.0
+
 # NOTE: To build this you will need a docker version >= 19.03 and DOCKER_BUILDKIT=1
 #
 #       If you do not use buildkit you are not going to have a good time
