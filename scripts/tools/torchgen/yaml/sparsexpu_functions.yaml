@@ -4,12 +4,18 @@ class_name: AtenIpexTypeSparseXPU
 use_out_as_primary: true
 device_guard: true
 supported:
-  - _coalesced_
-  - copy_
-  - _indices
+####################################
+# Here list these ops conflicted with torch-xpu-ops fallback. We have to mute
+# them here and register them with IPEX_TORCH_LIBRARY_IMPL to suppress the
+# previously registered kernel overriding warning message.
+#
 #  - _nnz # duplicated op
 #  - _sparse_coo_tensor_with_dims_and_tensors # duplicated op
 #  - _values # duplicated op
+####################################
+  - _coalesced_
+  - copy_
+  - _indices
 #  - coalesce	# different schema
   - copy_sparse_to_sparse_
   - dense_dim

@@ -4,8 +4,8 @@
 #include <core/detail/ListUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
+#include <utils/CustomOperatorRegistration.h>
 #include <utils/DPCPP.h>
-
 #include "BitonicMergeSort.h"
 #include "IndexingUtils.h"
 #include "PSTLFunctions.h"
@@ -537,3 +537,16 @@ Tensor empty(
 
 } // namespace AtenIpexTypeSparseXPU
 } // namespace at
+
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, SparseXPU, m) {
+  m.impl("_nnz", TORCH_FN((&at::AtenIpexTypeSparseXPU::_nnz)));
+  m.impl("_values", TORCH_FN((&at::AtenIpexTypeSparseXPU::_values)));
+  m.impl(
+      "_sparse_coo_tensor_with_dims_and_tensors",
+      TORCH_FN((&at::AtenIpexTypeSparseXPU::
+                    _sparse_coo_tensor_with_dims_and_tensors)));
+}
+
+} // namespace

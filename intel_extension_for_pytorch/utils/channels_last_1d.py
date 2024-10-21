@@ -1,3 +1,4 @@
+from typing_extensions import deprecated
 import torch
 
 # This is a work-around to convert 3d tensor to channels last format.
@@ -10,6 +11,10 @@ import torch
 # except for N1W format. It needs use as_strided to convert to channels last.
 
 
+@deprecated(
+    "`ipex.utils.tensor_to_channels_last_1d(args...)` is deprecated.",
+    category=FutureWarning,
+)
 def tensor_to_channels_last_1d(t):
     assert t.dim() == 3
 
@@ -26,6 +31,10 @@ def tensor_to_channels_last_1d(t):
     return t
 
 
+@deprecated(
+    "`ipex.utils.to_channels_last_1d(args...)` is deprecated.",
+    category=FutureWarning,
+)
 def to_channels_last_1d(t):
     scope = torch.nn.Conv1d
     if isinstance(t, torch.nn.Module):
