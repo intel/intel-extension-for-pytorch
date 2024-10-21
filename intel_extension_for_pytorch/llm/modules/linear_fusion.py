@@ -5,6 +5,7 @@ import intel_extension_for_pytorch
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
 )
+from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
 from .utils import IPEXRuntimeCustomOps, IPEXCustomOpType
 
 
@@ -25,6 +26,7 @@ class IPEXLinearFusion(nn.Module):
             tpp=(
                 self.linear.use_tpp if isinstance(self.linear, _IPEXLinear) else False
             ),
+            woq=isinstance(self.linear, WeightOnlyQuantizedLinear),
         )
 
 
@@ -50,6 +52,7 @@ class IPEXLinear2Fusion(nn.Module):
                 and isinstance(self.linear_2, _IPEXLinear)
                 else False
             ),
+            woq=True if (isinstance(self.linear_1, WeightOnlyQuantizedLinear) and isinstance(self.linear_2, WeightOnlyQuantizedLinear)) else False,
         )
 
 
