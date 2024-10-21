@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Intel Corporation
+# Copyright (c) 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 
 FROM nvcr.io/nvidia/tritonserver:23.10-py3
