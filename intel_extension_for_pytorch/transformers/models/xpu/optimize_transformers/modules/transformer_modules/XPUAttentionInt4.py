@@ -6,7 +6,9 @@ from .XPUAttentionfp16 import (
 )
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
+    dequant_gemm_block,
 )
+from .model_utils import xpu_gemm_use_xetla
 from .CacheUtils import CacheFormat
 
 
@@ -93,15 +95,19 @@ class IPEXAttentionInt4(IPEXAttention):
         self.q_proj_quant.qweight.data = self.q_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.q_proj_quant.use_optimum_format = False
         self.k_proj_quant.qweight.data = self.k_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.k_proj_quant.use_optimum_format = False
         self.v_proj_quant.qweight.data = self.v_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.v_proj_quant.use_optimum_format = False
         self.out_proj_quant.qweight.data = self.out_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
+        self.out_proj_quant.use_optimum_format = False
 
         self.q_proj_quant.scales.data = self.q_proj_quant.scales.transpose(
             0, 1
@@ -177,6 +183,27 @@ class IPEXAttentionInt4(IPEXAttention):
         torch.xpu.synchronize()
 
     def compute_qkv_gemm(self, hidden_states, query, key, value):
+        if hidden_states.shape[1] > 1 and xpu_gemm_use_xetla():
+            # dequantize+gemm kernel can improve IPEX int4 linear performance of first token
+            if (
+                self.q_proj_quant.qweight is None
+                and self.qkv_proj_quant.qweight is not None
+            ):
+                qkv_out = dequant_gemm_block(hidden_states, self.qkv_proj_quant)
+                m = query.shape[-1]
+                if IPEXAttention.cache_type == "static":
+                    query = qkv_out[:, :, :m]
+                    key.copy_(qkv_out[:, :, m : 2 * m].transpose(0, 1)).contiguous()
+                    value.copy_(qkv_out[:, :, 2 * m :].transpose(0, 1)).contiguous()
+                else:
+                    query = qkv_out[:, :, :m]
+                    key.copy_(qkv_out[:, :, m : 2 * m])
+                    value.copy_(qkv_out[:, :, 2 * m :])
+            else:
+                dequant_gemm_block(hidden_states, self.q_proj_quant, output=query)
+                dequant_gemm_block(hidden_states, self.k_proj_quant, output=key)
+                dequant_gemm_block(hidden_states, self.v_proj_quant, output=value)
+            return query, key, value
         if self.q_proj_quant.g_idx is not None:
             # qkv fusion cannot apply actorder
             return self.compute_qkv_gemm_separate(hidden_states, query, key, value)
@@ -263,6 +290,12 @@ class IPEXAttentionInt4(IPEXAttention):
         return query, key, value
 
     def out_proj_compute(self, attn_output, residual=None):
+        if attn_output.shape[1] > 1 and xpu_gemm_use_xetla():
+            # dequantize+gemm kernel can improve IPEX int4 linear performance of first token
+            attn_output = dequant_gemm_block(attn_output, self.out_proj_quant)
+            if residual is not None:
+                attn_output += residual
+            return attn_output
         if residual is None:
             if self.out_proj.bias is not None:
                 attn_output = torch.ops.torch_ipex.mm_bias_int4(
@@ -369,15 +402,19 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
         self.q_proj_quant.qweight.data = (
             self.q_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.q_proj_quant.use_optimum_format = False
         self.k_proj_quant.qweight.data = (
             self.k_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.k_proj_quant.use_optimum_format = False
         self.v_proj_quant.qweight.data = (
             self.v_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.v_proj_quant.use_optimum_format = False
         self.out_proj_quant.qweight.data = (
             self.out_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
+        self.out_proj_quant.use_optimum_format = False
 
         self.q_proj_quant.scales.data = self.q_proj_quant.scales
         self.k_proj_quant.scales.data = self.k_proj_quant.scales

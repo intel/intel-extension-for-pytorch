@@ -229,7 +229,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4):
         torch.xpu.synchronize()
 
     def out_mm(self, hidden_states, residual=None):
-        if hidden_states.shape[0] > 1 and xpu_gemm_use_xetla():
+        if hidden_states.shape[1] > 1 and xpu_gemm_use_xetla():
             hidden_states = dequant_gemm_block(hidden_states, self.c_proj_quant)
             return hidden_states + residual
         if self.c_proj_quant.bias is None:
@@ -298,7 +298,7 @@ class IPEXTransformerMLPOptimizedInt4SiluQwen(IPEXTransformerMLPOptimizedInt4):
             )
 
     def inter_mm(self, hidden_states):
-        if hidden_states.shape[0] > 1 and xpu_gemm_use_xetla():
+        if hidden_states.shape[1] > 1 and xpu_gemm_use_xetla():
             hidden_states2 = dequant_gemm_block_with_params(
                 hidden_states,
                 self.mlp_silu_qweight[0],
