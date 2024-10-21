@@ -9,6 +9,8 @@ from .linear_fusion import (
     LinearAdd,
     LinearAddAdd,
     GatedMLPMOE,
+    LinearMOE,
+    LinearMOETP
 )
 from .mha_fusion import (
     RotaryEmbedding,

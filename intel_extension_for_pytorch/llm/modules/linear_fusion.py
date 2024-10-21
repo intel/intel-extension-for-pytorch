@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Optional
+import intel_extension_for_pytorch
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
 )
@@ -399,6 +400,9 @@ class LinearAddAdd(IPEXLinearFusion):
 
         return self.linear_fusion(x, y, z)
 
+LinearMOE = intel_extension_for_pytorch.transformers.models.cpu.fusions.linear_fusion._IPEXlinearMOECPU
+
+LinearMOETP = intel_extension_for_pytorch.transformers.models.cpu.fusions.linear_fusion._IPEXlinearMOECPU_TP
 
 class GatedMLPMOE(nn.Module):
     r"""
