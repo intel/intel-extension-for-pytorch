@@ -211,6 +211,8 @@ def model_convert_reference(_model):
         prepare_inputs_for_generation_mllama,
         prepare_inputs_labels_for_multimodal_llavallama,
         prepare_inputs_for_generation_chatglm,
+        prepare_inputs_for_generation_gptneox,
+        prepare_inputs_for_generation_git,
         detect_language,
         _postprocess_outputs_whisper,
         _prepare_encoder_decoder_kwargs_for_generation,
@@ -340,6 +342,11 @@ def model_convert_reference(_model):
             GPTNeoXForCausalLM_forward,
         )
         convert_function(_model.gpt_neox, "forward", GPTNeoXModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_gptneox,
+        )
     elif (
         hasattr(_model, "__class__")
         and _model.__class__ == transformers.models.opt.modeling_opt.OPTForCausalLM
@@ -371,6 +378,11 @@ def model_convert_reference(_model):
             CodeGenForCausalLM_forward,
         )
         convert_function(_model.transformer, "forward", CodeGenModel_forward)
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_gptneox,
+        )
     elif (
         hasattr(_model, "__class__")
         and _model.__class__
@@ -802,6 +814,9 @@ def model_convert_reference(_model):
             _model.git.image_encoder.vision_model.encoder,
             "forward",
             GitVisionEncoder_forward,
+        )
+        convert_function(
+            _model, "prepare_inputs_for_generation", prepare_inputs_for_generation_git
         )
         convert_class(
             _model,
