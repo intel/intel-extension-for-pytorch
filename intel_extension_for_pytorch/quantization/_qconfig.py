@@ -188,7 +188,7 @@ def get_weight_only_quant_qconfig_mapping(
     *,
     weight_dtype: int = WoqWeightDtype.INT8,
     lowp_mode: int = WoqLowpMode.NONE,
-    act_quant_mode: int = WoqActQuantMode.PER_IC_BLOCK,
+    act_quant_mode: int = WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
     group_size: int = -1,
     weight_qscheme: int = WoqWeightQScheme.UNDEFINED,
 ):
@@ -222,8 +222,8 @@ def get_weight_only_quant_qconfig_mapping(
                                 No grouping along IC for weight. For activation,
                                 IC_BLOCK is determined automatically by IC.
                         If group_size > 0:
-                            act_quant_mode can be any. If act_quant_mode is PER_IC_BLOCK
-                            or PER_BATCH_IC_BLOCK, weight is grouped along IC by group_size.
+                            act_quant_mode can be any. If act_quant_mode is PER_IC_BLOCK(_SYM)
+                            or PER_BATCH_IC_BLOCK(_SYM), weight is grouped along IC by group_size.
                             The IC_BLOCK for activation is determined by group_size automatically.
                             Each group has its own quantization parameters.
         weight_qscheme: Specify how to quantize weight, asymmetrically or symmetrically. Generally,

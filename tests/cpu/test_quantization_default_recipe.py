@@ -2155,7 +2155,7 @@ class WeightOnlyQuantizationTester(TestCase):
                     None,
                     group_size,
                     lowp_mode,
-                    WoqActQuantMode.PER_IC_BLOCK,
+                    WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
                     compensation,
                 )
                 torch.testing.assert_close(output, output_ref)
