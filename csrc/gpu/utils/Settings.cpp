@@ -24,11 +24,6 @@ namespace dpcpp {
  *
  * XPU ONLY optionos:
  * ==========GPU==========
- *   IPEX_VERBOSE:
- *      Default = 0 | Set verbose level with synchronization execution mode, will be deprecated
- *      very soon. Please use IPEX_LOG_LEVEL instead.
- *   IPEX_XPU_SYNC_MODE:
- *      Default = 0 | Set 1 to enforce synchronization execution mode, will be deprecated very soon.
  *   IPEX_LOG_LEVEL:
  *      Default = -1 | Set log level to trace the execution and get log information, pls refer to 'ipex_log.md' for different log level.
  *   IPEX_LOG_COMPONENT:
@@ -42,13 +37,6 @@ namespace dpcpp {
  *   IPEX_LOG_OUTPUT:
  *      Default = "" | Set output file path for IPEX_LOG, default is null
  * ==========GPU==========
- *
- * EXPERIMENTAL options:
- * ==========EXP==========
- *   IPEX_SIMPLE_TRACE:
- *      Default = 0 | Set 1 to enable simple trace for all operators*, will be deprecated very soon.
- *      Please use IPEX_LOG_LEVEL instead.
- * ==========EXP==========
  *
  * Internal options:
  * ==========INT==========
@@ -119,9 +107,6 @@ Settings::Settings() {
               << std::endl;
   }
 
-  verbose_level = VERBOSE_LEVEL::DISABLE;
-  DPCPP_INIT_ENV_VAL("IPEX_VERBOSE", verbose_level, VERBOSE_LEVEL, show_opt);
-
   log_level = LOG_LEVEL::DISABLED;
   DPCPP_INIT_ENV_VAL("IPEX_LOG_LEVEL", log_level, LOG_LEVEL, show_opt);
 
@@ -163,10 +148,6 @@ Settings::Settings() {
   xpu_backend = XPU_BACKEND::GPU;
   DPCPP_INIT_ENV_VAL("IPEX_XPU_BACKEND", xpu_backend, XPU_BACKEND, show_opt);
 
-  sync_mode_enabled = ENV_VAL::OFF;
-  DPCPP_INIT_ENV_VAL(
-      "IPEX_XPU_SYNC_MODE", sync_mode_enabled, ENV_VAL, show_opt);
-
   onednn_layout_enabled = ENV_VAL::OFF;
   DPCPP_INIT_ENV_VAL(
       "IPEX_XPU_ONEDNN_LAYOUT", onednn_layout_enabled, ENV_VAL, show_opt);
@@ -177,12 +158,6 @@ Settings::Settings() {
   fp32_math_mode = FP32_MATH_MODE::FP32;
   DPCPP_INIT_ENV_VAL(
       "IPEX_FP32_MATH_MODE", fp32_math_mode, FP32_MATH_MODE, show_opt);
-
-#ifdef BUILD_SIMPLE_TRACE
-  simple_trace_enabled = ENV_VAL::OFF;
-  DPCPP_INIT_ENV_VAL(
-      "IPEX_SIMPLE_TRACE", simple_trace_enabled, ENV_VAL, show_opt);
-#endif
 
   if (show_opt) {
     std::cerr << " *********************************************************"
@@ -205,20 +180,6 @@ bool Settings::has_atomic64(int device_id) {
 bool Settings::has_xmx(int device_id) {
   // whether XMX is supported in the specified platform.
   return dpcppGetDeviceHasXMX(device_id);
-}
-
-int Settings::get_verbose_level() const {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return static_cast<int>(verbose_level);
-}
-
-bool Settings::set_verbose_level(int level) {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  if (level >= 0 && level <= VERBOSE_LEVEL_MAX) {
-    verbose_level = static_cast<VERBOSE_LEVEL>(level);
-    return true;
-  }
-  return false;
 }
 
 bool Settings::set_log_level(int level) {
@@ -405,21 +366,6 @@ bool Settings::set_compute_eng(COMPUTE_ENG eng) {
   return false;
 }
 
-bool Settings::is_sync_mode_enabled() const {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return sync_mode_enabled == ENV_VAL::ON;
-}
-
-void Settings::enable_sync_mode() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  sync_mode_enabled = ENV_VAL::ON;
-}
-
-void Settings::disable_sync_mode() {
-  std::lock_guard<std::mutex> lock(s_mutex);
-  sync_mode_enabled = ENV_VAL::OFF;
-}
-
 bool Settings::is_onednn_layout_enabled() const {
   return false;
 }
@@ -478,26 +424,11 @@ bool Settings::is_xetla_enabled() const {
 #endif
 }
 
-bool Settings::is_simple_trace_enabled() const {
-#ifdef BUILD_SIMPLE_TRACE
-  std::lock_guard<std::mutex> lock(s_mutex);
-  return simple_trace_enabled == ENV_VAL::ON;
+bool Settings::is_pti_enabled() const {
+#ifdef USE_PTI
+  return true;
 #else
   return false;
-#endif
-}
-
-void Settings::enable_simple_trace() {
-#ifdef BUILD_SIMPLE_TRACE
-  std::lock_guard<std::mutex> lock(s_mutex);
-  simple_trace_enabled = ENV_VAL::ON;
-#endif
-}
-
-void Settings::disable_simple_trace() {
-#ifdef BUILD_SIMPLE_TRACE
-  std::lock_guard<std::mutex> lock(s_mutex);
-  simple_trace_enabled = ENV_VAL::OFF;
 #endif
 }
 

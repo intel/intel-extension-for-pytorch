@@ -8,14 +8,6 @@ namespace torch_ipex::xpu {
 enum ENV_VAL { OFF = 0, ON = 1, ENV_VAL_MIN = OFF, ENV_VAL_MAX = ON };
 static const char* ENV_VAL_STR[]{"OFF", "ON"};
 
-enum VERBOSE_LEVEL {
-  DISABLE = 0,
-  XXX = 1,
-  VERBOSE_LEVEL_MIN = DISABLE,
-  VERBOSE_LEVEL_MAX = XXX
-};
-static const char* VERBOSE_LEVEL_STR[]{"DISABLE", "DEBUG"};
-
 enum LOG_LEVEL {
   DISABLED = -1,
   TRACE = 0,
@@ -74,9 +66,6 @@ class IPEX_API Settings final {
 
   static Settings& I(); // Singleton
 
-  int get_verbose_level() const;
-  bool set_verbose_level(int level);
-
   int get_log_level();
   bool set_log_level(int level);
 
@@ -98,10 +87,6 @@ class IPEX_API Settings final {
   COMPUTE_ENG get_compute_eng() const;
   bool set_compute_eng(COMPUTE_ENG eng);
 
-  bool is_sync_mode_enabled() const;
-  void enable_sync_mode();
-  void disable_sync_mode();
-
   bool is_onednn_layout_enabled() const;
   void enable_onednn_layout();
   void disable_onednn_layout();
@@ -117,16 +102,13 @@ class IPEX_API Settings final {
   bool is_channels_last_1d_enabled() const;
   bool is_xetla_enabled() const;
 
-  bool is_simple_trace_enabled() const;
-  void enable_simple_trace();
-  void disable_simple_trace();
+  bool is_pti_enabled() const;
 
   bool is_ds_kernel_enabled() const;
 
   int64_t get_compiler_version() const;
 
  private:
-  VERBOSE_LEVEL verbose_level;
   LOG_LEVEL log_level;
   std::string log_component;
   std::string log_output;
@@ -138,10 +120,6 @@ class IPEX_API Settings final {
 
   ENV_VAL sync_mode_enabled;
   ENV_VAL onednn_layout_enabled;
-
-#ifdef BUILD_SIMPLE_TRACE
-  ENV_VAL simple_trace_enabled;
-#endif
 };
 
 } // namespace dpcpp
