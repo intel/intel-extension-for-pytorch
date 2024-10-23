@@ -81,22 +81,6 @@ class EnumBase(Enum):
         return set_func(cls.convert(value).value)
 
 
-# Verbose Level
-class VerbLevel(EnumBase):
-    OFF = 0
-    ON = 1
-
-
-def get_verbose_level():
-    raise AssertionError("WARNING, the IPEX_VERBOSE are deprecated")
-    return VerbLevel.get_value(_C._get_verbose_level)
-
-
-def set_verbose_level(level):
-    raise AssertionError("WARNING, the IPEX_VERBOSE are deprecated")
-    VerbLevel.set_value(_C._set_verbose_level, level)
-
-
 class LogLevel(EnumBase):
     DISABLED = intel_extension_for_pytorch._C.LogLevel.DISABLED
     TRACE = intel_extension_for_pytorch._C.LogLevel.TRACE
@@ -349,24 +333,6 @@ class fp32_math_mode(object):
         return False
 
 
-# Sync Execution Mode
-def using_sync_mode():
-    return _C._is_sync_mode()
-
-
-def enable_sync_mode():
-    _C._enable_sync_mode()
-
-
-def disable_sync_mode():
-    _C._disable_sync_mode()
-
-
-class sync_mode(OnOff):
-    def __init__(self):
-        super().__init__(using_sync_mode, enable_sync_mode, disable_sync_mode)
-
-
 ################################################################
 # EXPERIMENTAL options:
 # NOTE: Below options are under experimental.
@@ -438,21 +404,3 @@ class compute_eng(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         set_compute_eng(self.eng)
         return False
-
-
-# Simple Trace
-def using_simple_trace():
-    return _C._is_simple_trace_enabled()
-
-
-def enable_simple_trace():
-    _C._enable_simple_trace()
-
-
-def disable_simple_trace():
-    _C._disable_simple_trace()
-
-
-class simple_trace(OnOff):
-    def __init__(self):
-        super().__init__(using_simple_trace, enable_simple_trace, disable_simple_trace)

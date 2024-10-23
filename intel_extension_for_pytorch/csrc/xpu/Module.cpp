@@ -350,13 +350,6 @@ void init_xpu_module(pybind11::module& m) {
 
   m.def("_has_xmx", [](int device) { return Settings::I().has_xmx(device); });
 
-  m.def(
-      "_get_verbose_level", []() { return Settings::I().get_verbose_level(); });
-
-  m.def("_set_verbose_level", [](int level) {
-    return Settings::I().set_verbose_level(level);
-  });
-
   py::enum_<LOG_LEVEL>(m, "LogLevel")
       .value("DISABLED", LOG_LEVEL::DISABLED)
       .value("TRACE", LOG_LEVEL::TRACE)
@@ -417,12 +410,6 @@ void init_xpu_module(pybind11::module& m) {
     return Settings::I().set_backend(static_cast<xpu::XPU_BACKEND>(backend));
   });
 
-  m.def("_is_sync_mode", []() { return Settings::I().is_sync_mode_enabled(); });
-
-  m.def("_enable_sync_mode", []() { Settings::I().enable_sync_mode(); });
-
-  m.def("_disable_sync_mode", []() { Settings::I().disable_sync_mode(); });
-
   m.def("_is_onednn_layout_enabled", []() {
     return Settings::I().is_onednn_layout_enabled();
   });
@@ -474,15 +461,6 @@ void init_xpu_module(pybind11::module& m) {
   });
   m.def("_set_fp32_math_mode", [](const FP32_MATH_MODE mode) {
     return Settings::I().set_fp32_math_mode(mode);
-  });
-
-  m.def("_enable_simple_trace", []() { Settings::I().enable_simple_trace(); });
-
-  m.def(
-      "_disable_simple_trace", []() { Settings::I().disable_simple_trace(); });
-
-  m.def("_is_simple_trace_enabled", []() {
-    return Settings::I().is_simple_trace_enabled();
   });
 
   m.def("_is_ds_kernel_enabled", []() {

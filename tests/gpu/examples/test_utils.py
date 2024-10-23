@@ -51,10 +51,6 @@ class TestUtils(TestCase):
                     "Fail to enable FP32 math mode: " + mode
                 )
 
-    def test_sync_mode(self):
-        with torch.xpu.sync_mode():
-            assert torch.xpu.using_sync_mode(), "Fail to set sync mode"
-
     def test_compute_eng(self):
         eng_list = [
             torch.xpu.XPUComputeEng.RECOMMEND,

@@ -52,15 +52,6 @@ enum DPCPP_STATUS {
 // Command group function implementation
 #define DPCPP_Q_CGF(h) [&](sycl::handler & h)
 
-#define DPCPP_E_SYNC_FOR_DEBUG(e)                                     \
-  {                                                                   \
-    static auto force_sync =                                          \
-        torch_ipex::xpu::dpcpp::Settings::I().is_sync_mode_enabled(); \
-    if (force_sync) {                                                 \
-      (e).wait_and_throw();                                           \
-    }                                                                 \
-  }
-
 inline constexpr std::string_view USES_FP64_MATH("uses-fp64-math");
 inline constexpr std::string_view ASPECT_FP64_IS_NOT_SUPPORTED(
     "aspect fp64 is not supported");
@@ -99,7 +90,6 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
       l.add_event("OPS", "", "", "event wait", "event wait end");           \
     } else {                                                                \
       auto e = (ker_submit);                                                \
-      DPCPP_E_SYNC_FOR_DEBUG(e);                                            \
     }                                                                       \
     (q).throw_asynchronous();                                               \
     DPCPP_EXCEP_CATCH                                                       \
@@ -117,7 +107,6 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
     l.add_event("OPS", "", "", "event wait", "event wait end");           \
   } else {                                                                \
     output_event = (ker_submit);                                          \
-    DPCPP_E_SYNC_FOR_DEBUG(output_event);                                 \
   }                                                                       \
   (q).throw_asynchronous();                                               \
   DPCPP_EXCEP_CATCH
@@ -136,7 +125,6 @@ inline constexpr std::string_view OUT_OF_RESOURCES("PI_ERROR_OUT_OF_RESOURCES");
     } else {                                                                \
       auto e = (q).submit((cgf), ##__VA_ARGS__);                            \
       (q).throw_asynchronous();                                             \
-      DPCPP_E_SYNC_FOR_DEBUG(e);                                            \
     }                                                                       \
     DPCPP_EXCEP_CATCH                                                       \
   }

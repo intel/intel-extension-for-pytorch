@@ -6,7 +6,6 @@
 #include <oneDNN/oneDNN.h>
 #include <torch/autograd.h>
 #include <torch/custom_class.h>
-#include <utils/SimpleTrace.h>
 #include "Norm.h"
 #include "comm/ATDispatch.h"
 #include "comm/RegistrationDeclarations.h"
@@ -598,10 +597,6 @@ class IPEXRmsNormOp : public Function<IPEXRmsNormOp> {
       at::IntArrayRef normalized_shape,
       const Tensor& weight,
       double epsilon) {
-#ifdef BUILD_SIMPLE_TRACE
-    SimpleTrace trace(
-        "IPEXRmsNormOp forward -> at::AtenIpexTypeXPU::IPEXRmsNormOp::forward");
-#endif
     ctx->saved_data["input_requires_grad"] = input.requires_grad();
     ctx->saved_data["weight_requires_grad"] = weight.requires_grad();
     ctx->saved_data["normalized_shape"] = normalized_shape;
@@ -617,10 +612,6 @@ class IPEXRmsNormOp : public Function<IPEXRmsNormOp> {
   static variable_list backward(
       AutogradContext* ctx,
       variable_list grad_outputs) {
-#ifdef BUILD_SIMPLE_TRACE
-    SimpleTrace trace(
-        "IPEXRmsNormOp backward -> at::AtenIpexTypeXPU::IPEXRmsNormOp::backward");
-#endif
     auto weight_requires_grad =
         ctx->saved_data["weight_requires_grad"].toBool();
     auto input_requires_grad = ctx->saved_data["input_requires_grad"].toBool();

@@ -49,7 +49,6 @@ void memcpyHostToDevice(
           at::xpu::getCurrentXPUStream());
     }
   }
-  DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
 void memcpyDeviceToHost(
@@ -71,7 +70,6 @@ void memcpyDeviceToHost(
     at::xpu::CachingHostAllocator_recordEvent(
         dst, const_cast<void*>(hctx), at::xpu::getCurrentXPUStream());
   }
-  DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
 void memcpyDeviceToDevice(
@@ -88,8 +86,6 @@ void memcpyDeviceToDevice(
   if (!async) {
     e.wait();
   }
-
-  DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
 void memsetDevice(void* dst, int value, size_t n_bytes, bool async) {
@@ -99,8 +95,6 @@ void memsetDevice(void* dst, int value, size_t n_bytes, bool async) {
   if (!async) {
     e.wait();
   }
-
-  DPCPP_E_SYNC_FOR_DEBUG(e);
 }
 
 } // namespace dpcpp

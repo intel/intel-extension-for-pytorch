@@ -71,7 +71,6 @@
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
 # BUILD_STRIPPED_BIN    - to strip all symbols after build
 # BUILD_SEPARATE_OPS    - to build each operator in separate library
-# BUILD_SIMPLE_TRACE    - to build simple trace for each registered operator
 # BUILD_OPT_LEVEL       - to add build option -Ox, accept values: 0/1
 # BUILD_NO_CLANGFORMAT  - to build without force clang-format
 # BUILD_INTERNAL_DEBUG  - to build internal debug code path

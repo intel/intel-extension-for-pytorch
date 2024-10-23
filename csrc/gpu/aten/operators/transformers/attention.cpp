@@ -12,7 +12,6 @@
 #include <torch/autograd.h>
 #include <torch/custom_class.h>
 #include <utils/DPCPP.h>
-#include <utils/SimpleTrace.h>
 #include <cstdint>
 #include "../Blas.h"
 #include "../DistributionTemplates.h"
@@ -549,10 +548,6 @@ class IPEXSDPDropoutOp : public Function<IPEXSDPDropoutOp> {
       double dropout_p,
       bool is_causal,
       c10::optional<double> scale) {
-#ifdef BUILD_SIMPLE_TRACE
-    SimpleTrace trace(
-        "IPEXSDPDropoutOp forward -> at::AtenIpexTypeXPU::IPEXSDPDropoutOp::forward");
-#endif
     ctx->saved_data["dropout_p"] = dropout_p;
     ctx->saved_data["is_causal"] = is_causal;
     ctx->saved_data["scale"] = scale;
@@ -584,10 +579,6 @@ class IPEXSDPDropoutOp : public Function<IPEXSDPDropoutOp> {
   static variable_list backward(
       AutogradContext* ctx,
       variable_list grad_outputs) {
-#ifdef BUILD_SIMPLE_TRACE
-    SimpleTrace trace(
-        "IPEXSDPDropoutOp backward -> at::AtenIpexTypeXPU::IPEXSDPDropoutOp::backward");
-#endif
     auto attn_bias = ctx->saved_data["attn_bias"].toOptional<at::Tensor>();
     auto dropout_p = ctx->saved_data["dropout_p"].toDouble();
     auto is_causal = ctx->saved_data["is_causal"].toBool();

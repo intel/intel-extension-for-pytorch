@@ -117,10 +117,7 @@ class IPEX_API Settings final {
   bool is_channels_last_1d_enabled() const;
   bool is_xetla_enabled() const;
 
-  bool is_simple_trace_enabled() const;
-  void enable_simple_trace();
-  void disable_simple_trace();
-
+  bool is_pti_enabled() const;
   bool is_ds_kernel_enabled() const;
 
   int64_t get_compiler_version() const;
@@ -139,9 +136,6 @@ class IPEX_API Settings final {
   ENV_VAL sync_mode_enabled;
   ENV_VAL onednn_layout_enabled;
 
-#ifdef BUILD_SIMPLE_TRACE
-  ENV_VAL simple_trace_enabled;
-#endif
 };
 
 } // namespace dpcpp
