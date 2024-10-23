@@ -41,9 +41,9 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> ipex_sdp_dropout_backward(
     c10::optional<double> scale);
 
 inline Tensor _scaled_dot_product_efficient_attention_impl(
-    const Tensor& _query,
-    const Tensor& _key,
-    const Tensor& _value,
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
     const c10::optional<Tensor>& attn_mask,
     const c10::optional<at::Tensor>& dropout_mask,
     const c10::optional<at::Tensor>& seed_t,
@@ -63,10 +63,10 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
     attn_mask_padded_block_size = alignTo * ((lastDim + alignTo - 1) / alignTo);
   }
 
-  // make q, k, v strided
-  auto query = _query.transpose(1, 2).contiguous().transpose(1, 2);
-  auto key = _key.transpose(1, 2).contiguous().transpose(1, 2);
-  auto value = _value.transpose(1, 2).contiguous().transpose(1, 2);
+  // check q, k, v
+  CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(query);
+  CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(key);
+  CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(value);
 
   // create strided output
   // size [bs, num_head, qsize, head_size]

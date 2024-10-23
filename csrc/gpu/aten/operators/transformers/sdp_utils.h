@@ -20,6 +20,12 @@
 using namespace gpu::xetla;
 #endif
 
+#define CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(TENSOR)                      \
+  TORCH_CHECK(TENSOR.is_xpu(), #TENSOR " must be a XPU tensor");       \
+  TORCH_CHECK(!TENSOR.is_sparse(), #TENSOR " must be a dense tensor"); \
+  TORCH_CHECK(                                                         \
+      TENSOR.stride(-1) == 1, #TENSOR ": last dimension must be contiguous");
+
 using namespace at;
 using namespace torch_ipex::xpu::dpcpp;
 
