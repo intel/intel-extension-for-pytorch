@@ -997,11 +997,11 @@ Tensor varlen_fwd(
       q_scalar_type == value.scalar_type(),
       "The datatype of value should be the same as query");
   TORCH_CHECK(
-      cu_seqlens_q.scalar_type() == at::kLong,
-      "The datatype of cu_seqlens_q should be int64");
+      cu_seqlens_q.scalar_type() == at::kInt,
+      "The datatype of cu_seqlens_q should be int32");
   TORCH_CHECK(
-      cu_seqlens_k.scalar_type() == at::kLong,
-      "The datatype of cu_seqlens_k should be int64");
+      cu_seqlens_k.scalar_type() == at::kInt,
+      "The datatype of cu_seqlens_k should be int32");
 
   // Check device
   TORCH_CHECK(query.is_xpu(), "query must on XPU");
@@ -1126,8 +1126,8 @@ Tensor varlen_fwd(
        softmax_scale,
        /* bera */ 0,
        p_dropout,
-       cu_seqlens_q.data_ptr<int64_t>(),
-       cu_seqlens_k.data_ptr<int64_t>(),
+       cu_seqlens_q.data_ptr<int32_t>(),
+       cu_seqlens_k.data_ptr<int32_t>(),
        batch_size,
        num_heads_q,
        num_heads_k,

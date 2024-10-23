@@ -1,7 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
 #include <ATen/NativeFunctions.h>
-#include <ATen/autocast_mode.h>
+
 #include <oneDNN/oneDNN.h>
 #include "Norm.h"
 #include "comm/RegistrationDeclarations.h"
@@ -12,16 +12,13 @@ using namespace at::AtenIpexTypeXPU::normalization;
 
 namespace at {
 namespace AtenIpexTypeXPU {
-using autocast::cached_cast;
 
 // Decalre the rms_norm_fwd from RMSNorm.cpp for naive implementation fallback
-void rms_norm_fw(
-    Tensor& input,
+std::tuple<Tensor, Tensor> rms_norm_fw(
+    const Tensor& input,
     at::IntArrayRef normalized_shape,
     const Tensor& weight,
-    double epsilon,
-    Tensor& output,
-    Tensor& rstd);
+    double epsilon);
 
 namespace impl {
 
@@ -584,36 +581,10 @@ Tensor fast_layer_norm(
       epsilon);
 }
 
-Tensor fast_layer_norm_autocast(
-    const Tensor& input,
-    at::IntArrayRef normalized_shape,
-    const c10::optional<at::Tensor>& weight_opt,
-    const c10::optional<at::Tensor>& bias_opt,
-    double epsilon) {
-  c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::AutocastXPU);
-  auto to_type = input.scalar_type();
-  if (input.scalar_type() == at::ScalarType::Half ||
-      weight_opt->scalar_type() == at::ScalarType::Half ||
-      bias_opt->scalar_type() == at::ScalarType::Half) {
-    to_type = at::ScalarType::Half;
-  } else if (
-      input.scalar_type() == at::ScalarType::BFloat16 ||
-      weight_opt->scalar_type() == at::ScalarType::BFloat16 ||
-      bias_opt->scalar_type() == at::ScalarType::BFloat16) {
-    to_type = at::ScalarType::BFloat16;
-  }
-  return fast_layer_norm(
-      cached_cast(to_type, input, c10::DeviceType::XPU),
-      normalized_shape,
-      cached_cast(to_type, *weight_opt, c10::DeviceType::XPU),
-      cached_cast(to_type, *bias_opt, c10::DeviceType::XPU),
-      epsilon);
-}
-
 Tensor add_add_rms_norm(
     const Tensor& add1,
     const Tensor& add2,
-    Tensor& input,
+    const Tensor& input,
     at::IntArrayRef normalized_shape,
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
@@ -631,21 +602,24 @@ Tensor add_add_rms_norm(
   auto M = M_N.first;
   auto N = M_N.second;
   int numel = input.numel();
-
+  Tensor output = at::empty(input.sizes(), input.options());
   if (input.numel()) {
     Tensor input_ = to_plain_if_needed(input).contiguous();
     Tensor weight_ =
         weight.defined() ? to_plain_if_needed(weight).contiguous() : weight;
     Tensor bias_ =
         bias.defined() ? to_plain_if_needed(bias).contiguous() : bias;
+    bool can_be_fused = true;
     bool fast_path_success = false;
-    if (add_back)
-      fast_path_success = impl::LayerNormKernelImpl<true, true>(
-          add1, add2, input_, weight_, bias_, M, N, epsilon, input);
-    else
-      fast_path_success = impl::LayerNormKernelImpl<true, false>(
-          add1, add2, input_, weight_, bias_, M, N, epsilon, input);
-    if (!fast_path_success) {
+    if (can_be_fused) {
+      if (add_back)
+        fast_path_success = impl::LayerNormKernelImpl<true, true>(
+            add1, add2, input_, weight_, bias_, M, N, epsilon, output);
+      else
+        fast_path_success = impl::LayerNormKernelImpl<true, false>(
+            add1, add2, input_, weight_, bias_, M, N, epsilon, output);
+    }
+    if (!(can_be_fused && fast_path_success)) {
       if (add1.defined() && add2.defined()) {
         if (add_back) {
           add1.add_(input_).add_(add2);
@@ -660,16 +634,16 @@ Tensor add_add_rms_norm(
         } else
           input_ = add1 + input_;
       }
-      Tensor rstd;
-      rms_norm_fw(input_, normalized_shape, weight_, epsilon, input, rstd);
+      output =
+          std::get<0>(rms_norm_fw(input_, normalized_shape, weight_, epsilon));
     }
   }
-  return input;
+  return output.reshape(input.sizes());
 }
 
 Tensor add_rms_norm(
     const Tensor& add1,
-    Tensor& input,
+    const Tensor& input,
     at::IntArrayRef normalized_shape,
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
@@ -687,14 +661,14 @@ Tensor add_rms_norm(
       add_back);
 }
 
-void fast_rms_norm(
-    Tensor& input,
+Tensor fast_rms_norm(
+    const Tensor& input,
     at::IntArrayRef normalized_shape,
     const c10::optional<at::Tensor>& weight_opt,
     const c10::optional<at::Tensor>& bias_opt,
     double epsilon) {
   RECORD_FUNCTION("fast_rms_norm", std::vector<c10::IValue>({input}));
-  add_add_rms_norm(
+  return add_add_rms_norm(
       Tensor(),
       Tensor(),
       input,
@@ -716,12 +690,6 @@ IPEX_LIBRARY_FRAGMENT() {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "fast_layer_norm", fast_layer_norm, c10::DispatchKey::XPU);
-}
-IPEX_LIBRARY_FRAGMENT() {
-  IPEX_OP_REGISTER_DISPATCH(
-      "fast_layer_norm",
-      fast_layer_norm_autocast,
-      c10::DispatchKey::AutocastXPU);
 }
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(

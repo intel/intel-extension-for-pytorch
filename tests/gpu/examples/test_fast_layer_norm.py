@@ -81,10 +81,8 @@ class TestNNMethod(TestCase):
         RMS = LlamaRMSNorm(embedding_dim)
         ref = RMS(hidden_states)
         hsz = hidden_states.shape[-1]
-        fast_rms = torch.empty_like(hidden_states_xpu)
-        fast_rms.copy_(hidden_states_xpu)
-        torch.ops.torch_ipex.fast_rms_norm(
-            fast_rms, [hsz], RMS.weight.to("xpu"), None, RMS.variance_epsilon
+        fast_rms = torch.ops.torch_ipex.fast_rms_norm(
+            hidden_states_xpu, [hsz], RMS.weight.to("xpu"), None, RMS.variance_epsilon
         )
         self.assertEqual(ref, fast_rms.cpu())
 
@@ -95,10 +93,8 @@ class TestNNMethod(TestCase):
         RMS = LlamaRMSNorm(embedding_dim).to(dtype)
         ref = RMS(hidden_states)
         hsz = hidden_states.shape[-1]
-        fast_rms = torch.empty_like(hidden_states_xpu)
-        fast_rms.copy_(hidden_states_xpu)
-        torch.ops.torch_ipex.fast_rms_norm(
-            fast_rms, [hsz], RMS.weight.to("xpu"), None, RMS.variance_epsilon
+        fast_rms = torch.ops.torch_ipex.fast_rms_norm(
+            hidden_states_xpu, [hsz], RMS.weight.to("xpu"), None, RMS.variance_epsilon
         )
         self.assertEqual(ref, fast_rms.cpu())
 
@@ -111,11 +107,10 @@ class TestNNMethod(TestCase):
         hidden_states_xpu = hidden_states.to("xpu")
         RMS = LlamaRMSNorm(embedding_dim).to(dtype)
         ref = RMS(hidden_states, residual_ref)
-        fast_rms1 = torch.empty_like(hidden_states_xpu)
-        fast_rms1.copy_(hidden_states_xpu)
-        ipex.llm.functional.add_rms_norm(
+        hsz = hidden_states.shape[-1]
+        fast_rms1 = ipex.llm.functional.add_rms_norm(
             residual_kernel,
-            fast_rms1,
+            hidden_states_xpu,
             RMS.weight.to("xpu"),
             None,
             RMS.variance_epsilon,
@@ -123,11 +118,9 @@ class TestNNMethod(TestCase):
         )
         self.assertEqual(residual_ref_ori, residual_kernel.cpu())
         self.assertEqual(ref, fast_rms1.cpu())
-        fast_rms2 = torch.empty_like(hidden_states_xpu)
-        fast_rms2.copy_(hidden_states_xpu)
-        ipex.llm.functional.add_rms_norm(
+        fast_rms2 = ipex.llm.functional.add_rms_norm(
             residual_kernel,
-            fast_rms2,
+            hidden_states_xpu,
             RMS.weight.to("xpu"),
             None,
             RMS.variance_epsilon,
@@ -215,11 +208,10 @@ class TestNNMethod(TestCase):
         hidden_states_xpu = hidden_states.to("xpu")
         RMS = LlamaRMSNorm(embedding_dim).to(dtype)
         ref = RMS(hidden_states, residual_ref)
-        fast_rms1 = torch.empty_like(hidden_states_xpu)
-        fast_rms1.copy_(hidden_states_xpu)
-        ipex.llm.functional.add_rms_norm(
+        hsz = hidden_states.shape[-1]
+        fast_rms1 = ipex.llm.functional.add_rms_norm(
             residual_kernel,
-            fast_rms1,
+            hidden_states_xpu,
             RMS.weight.to("xpu"),
             None,
             RMS.variance_epsilon,
@@ -227,11 +219,9 @@ class TestNNMethod(TestCase):
         )
         self.assertEqual(residual_ref_ori, residual_kernel.cpu())
         self.assertEqual(ref, fast_rms1.cpu())
-        fast_rms2 = torch.empty_like(hidden_states_xpu)
-        fast_rms2.copy_(hidden_states_xpu)
-        ipex.llm.functional.add_rms_norm(
+        fast_rms2 = ipex.llm.functional.add_rms_norm(
             residual_kernel,
-            fast_rms2,
+            hidden_states_xpu,
             RMS.weight.to("xpu"),
             None,
             RMS.variance_epsilon,
