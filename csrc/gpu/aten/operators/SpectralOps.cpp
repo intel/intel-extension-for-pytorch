@@ -14,7 +14,9 @@
 #include "comm/ATDispatch.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
+#ifdef USE_OVERRIDE_OP
 #include "utils/CustomOperatorRegistration.h"
+#endif
 
 using namespace torch_ipex::xpu::dpcpp;
 using namespace torch_ipex::xpu::dpcpp::detail;
@@ -953,6 +955,7 @@ Tensor _fft_c2c(
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
+#ifdef USE_OVERRIDE_OP
 namespace {
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
@@ -965,3 +968,4 @@ IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
 }
 
 } // namespace
+#endif

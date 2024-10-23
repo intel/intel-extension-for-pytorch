@@ -7,6 +7,9 @@
 #include <core/detail/IndexUtils.h>
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
+#ifdef USE_OVERRIDE_OP
+#include <utils/CustomOperatorRegistration.h>
+#endif
 #include <utils/DPCPP.h>
 #include <utils/Helpers.h>
 #include <iostream>
@@ -210,11 +213,26 @@ struct nonzero_copy_if_functor {
  private:
   scalar_t* self_begin;
 };
+template <>
+struct nonzero_copy_if_functor<bool> {
+  bool operator()(int64_t x) const {
+    // Using data type conversion to break deduce of execution chain in bool.
+    // Bool operations will be removed in the compiler optimization.
+    // The function returns a bool variable with one byte value stored i    n
+    // self_begin_ not 1 specified here.
+    volatile int in = (int)self_begin_[x];
+    bool res = in != int(0) ? 1 : 0;
+    return res;
+  }
+  nonzero_copy_if_functor(bool* self_begin) : self_begin_(self_begin) {}
+
+ private:
+  bool* self_begin_;
+};
 
 template <typename scalar_t>
 void nonzero(Tensor& tensor, const Tensor& self_) {
   Tensor self = self_.contiguous();
-
   const int64_t num_dim = self.dim();
   TORCH_CHECK(num_dim <= MAX_TENSORINFO_DIMS, "dim exceed max allowed dim");
 
@@ -1441,6 +1459,28 @@ Tensor index_select(const Tensor& self, int64_t dim, const Tensor& index) {
 }
 
 Tensor& nonzero_out(const Tensor& self, Tensor& out) {
+  TORCH_CHECK(
+      self.numel() < std::numeric_limits<int>::max(),
+      "nonzero is not supported for tensors with more than INT_MAX elements, \
+      See https://github.com/pytorch/pytorch/issues/51871");
+  TORCH_CHECK(
+      out.dtype() == at::kLong,
+      "Expected object of scalar type ",
+      at::kLong,
+      " as out, but got ",
+      out.dtype());
+  TORCH_CHECK(
+      self.device() == out.device(),
+      "expected self and out to be on the same device, but got out on ",
+      out.device(),
+      " and self on ",
+      self.device());
+  TORCH_CHECK(
+      self.dim() <= 16,
+      "nonzero is not supported for tensor with more than ",
+      16,
+      " dimensions");
+
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -2291,6 +2331,15 @@ Tensor& index_out(
       });
   return result;
 }
+
+#ifdef USE_OVERRIDE_OP
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl(
+      "_index_put_impl_", TORCH_FN((&at::AtenIpexTypeXPU::_index_put_impl_)));
+  m.impl("nonzero", TORCH_FN((&at::AtenIpexTypeXPU::nonzero)));
+  m.impl("nonzero.out", TORCH_FN((&at::AtenIpexTypeXPU::nonzero_out)));
+}
+#endif
 
 } // namespace AtenIpexTypeXPU
 } // namespace at

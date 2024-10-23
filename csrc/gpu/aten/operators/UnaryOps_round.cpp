@@ -1,7 +1,9 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 #include <oneDNN/oneDNN.h>
+#ifdef USE_OVERRIDE_OP
 #include <utils/CustomOperatorRegistration.h>
+#endif
 #include <utils/DPCPP.h>
 
 #include "comm/AccumulateType.h"
@@ -118,6 +120,7 @@ Tensor& fmod_(Tensor& self, const Scalar& other) {
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
+#ifdef USE_OVERRIDE_OP
 namespace {
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
@@ -126,3 +129,4 @@ IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
 }
 
 } // namespace
+#endif

@@ -10,7 +10,9 @@
 #include "comm/RegisterUtils.h"
 #include "comm/RegistrationDeclarations.h"
 #include "utils/ComputeEngine.h"
+#ifdef USE_OVERRIDE_OP
 #include "utils/CustomOperatorRegistration.h"
+#endif
 
 #include <tuple>
 
@@ -1040,6 +1042,7 @@ Tensor& max_pool2d_with_indices_backward_out_template(
 
 } // namespace impl
 
+#ifdef USE_OVERRIDE_OP
 std::tuple<Tensor, Tensor> max_pool2d_with_indices(
     const Tensor& self,
     IntArrayRef kernel_size,
@@ -1053,6 +1056,7 @@ std::tuple<Tensor, Tensor> max_pool2d_with_indices(
       output, indices, self, kernel_size, stride, padding, dilation, ceil_mode);
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
+#endif
 
 std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
     const Tensor& input,
@@ -1075,6 +1079,7 @@ std::tuple<Tensor&, Tensor&> max_pool2d_with_indices_out(
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
 
+#ifdef USE_OVERRIDE_OP
 Tensor max_pool2d_with_indices_backward(
     const Tensor& grad_output,
     const Tensor& self,
@@ -1098,6 +1103,7 @@ Tensor max_pool2d_with_indices_backward(
 
   return grad_input;
 }
+#endif
 
 Tensor& max_pool2d_with_indices_backward_out(
     const Tensor& grad_output_,
@@ -1146,6 +1152,7 @@ Tensor& max_pool2d_with_indices_backward_out(
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
+#ifdef USE_OVERRIDE_OP
 namespace {
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
@@ -1164,3 +1171,4 @@ IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
 }
 
 } // namespace
+#endif

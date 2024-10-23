@@ -1416,6 +1416,12 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_MATMUL(elu);
 }
 
+} // namespace AtenIpexTypeQuantizedXPU
+} // namespace at
+
+#ifdef USE_OVERRIDE_OP
+namespace {
+
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl(
       "_addmm_activation.out",
@@ -1435,5 +1441,5 @@ IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl("tensordot.out", TORCH_FN((&at::AtenIpexTypeXPU::tensordot_out)));
 }
 
-} // namespace AtenIpexTypeQuantizedXPU
-} // namespace at
+} // namespace
+#endif
