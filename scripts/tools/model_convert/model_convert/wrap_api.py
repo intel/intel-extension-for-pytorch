@@ -46,7 +46,7 @@ class WrapAPI:
                 import oneccl_bindings_for_pytorch
 
                 kwargs["backend"] = "ccl"
-            elif backend is None and args_len > 0 and args[0] == "nccl":
+            elif backend is None and args_len > 0 and isinstance(args[0], str) and args[0] == "nccl":
                 import oneccl_bindings_for_pytorch
 
                 new_args[0] = "ccl"
