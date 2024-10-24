@@ -67,6 +67,7 @@
 # USE_SYCL_ASSERT       - to enable assert in sycl kernel
 # USE_ITT_ANNOTATION    - to enable ITT annotation in sycl kernel
 # USE_SPLIT_FP64_LOOPS  - to split FP64 loops into separate kernel for element-wise kernels
+# USE_OVERRIDE_OP       - to use the operator in IPEX to override the duplicated one in stock PyTorch
 # BUILD_STATS           - to count statistics for each component during build process
 # BUILD_BY_PER_KERNEL   - to build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST)
 # BUILD_STRIPPED_BIN    - to strip all symbols after build

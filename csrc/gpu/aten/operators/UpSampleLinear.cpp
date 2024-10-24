@@ -9,7 +9,9 @@
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
 #include "utils/ComputeEngine.h"
+#ifdef USE_OVERRIDE_OP
 #include "utils/CustomOperatorRegistration.h"
+#endif
 
 using namespace dnnl;
 using namespace at::native;
@@ -786,6 +788,7 @@ Tensor& upsample_linear1d_backward_out(
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
+#ifdef USE_OVERRIDE_OP
 namespace {
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
@@ -804,3 +807,4 @@ IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
 }
 
 } // namespace
+#endif

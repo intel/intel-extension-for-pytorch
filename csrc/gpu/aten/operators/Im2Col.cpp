@@ -4,7 +4,9 @@
 
 #include <core/Memory.h>
 #include <runtime/Utils.h>
+#ifdef USE_OVERRIDE_OP
 #include <utils/CustomOperatorRegistration.h>
+#endif
 #include <utils/DPCPP.h>
 #include "comm/ATDispatch.h"
 #include "comm/ApplyUtils.h"
@@ -164,6 +166,7 @@ Tensor im2col(
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
+#ifdef USE_OVERRIDE_OP
 namespace {
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
@@ -172,3 +175,4 @@ IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
 }
 
 } // namespace
+#endif

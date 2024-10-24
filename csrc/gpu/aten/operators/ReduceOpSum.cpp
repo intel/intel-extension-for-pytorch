@@ -12,6 +12,10 @@
 #include "comm/Numerics.h"
 //#include "comm/RegistrationDeclarations.h"
 
+#ifdef USE_OVERRIDE_OP
+#include <utils/CustomOperatorRegistration.h>
+#endif
+
 #include "Reduce.h"
 #include "ReduceOpsUtils.h"
 
@@ -160,3 +164,33 @@ Tensor nansum(const Tensor& self, c10::optional<ScalarType> dtype) {
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+#ifdef USE_OVERRIDE_OP
+
+// Rename this function here because original sum function has overload
+// with different signature and can't be registered.
+Tensor sum_with_dim(
+    const Tensor& self,
+    OptionalIntArrayRef dim,
+    bool keepdim,
+    c10::optional<ScalarType> opt_dtype) {
+  return at::AtenIpexTypeXPU::sum(self, dim, keepdim, opt_dtype);
+}
+
+Tensor nansum_ipex(
+    const Tensor& self,
+    c10::OptionalArrayRef<int64_t> opt_dim,
+    bool keepdim,
+    c10::optional<ScalarType> opt_dtype) {
+  return at::AtenIpexTypeXPU::nansum(self, opt_dim, keepdim, opt_dtype);
+}
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("sum.dim_IntList", TORCH_FN((&sum_with_dim)));
+  m.impl("sum.IntList_out", TORCH_FN((&at::AtenIpexTypeXPU::sum_out)));
+  m.impl("nansum", TORCH_FN((&nansum_ipex)));
+  m.impl("nansum.out", TORCH_FN((&at::AtenIpexTypeXPU::nansum_out)));
+}
+#endif
+} // namespace

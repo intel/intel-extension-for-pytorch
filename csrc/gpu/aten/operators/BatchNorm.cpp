@@ -12,7 +12,9 @@
 #include "comm/RegistrationDeclarations.h"
 #include "core/MemoryFormat.h"
 #include "utils/ComputeEngine.h"
+#ifdef USE_OVERRIDE_OP
 #include "utils/CustomOperatorRegistration.h"
+#endif
 #include "utils/DPCPP.h"
 using namespace dnnl;
 using namespace torch_ipex::xpu::dpcpp;
@@ -5209,6 +5211,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> batch_norm_backward_reduce(
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
+#ifdef USE_OVERRIDE_OP
 namespace {
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
@@ -5223,3 +5226,4 @@ IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
 }
 
 } // namespace
+#endif

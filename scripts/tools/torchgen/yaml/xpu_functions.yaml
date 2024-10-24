@@ -46,6 +46,13 @@ supported:
 # - max_pool2d_with_indices.out
 # - max_pool2d_with_indices_backward
 # - max_pool2d_with_indices_backward.grad_input
+# - _index_put_impl_
+# - nonzero
+# - nonzero.out
+# - sum.IntList_out
+# - sum.dim_IntList
+# - nansum
+# - nansum.out
 ####################################
 #  - _aminmax
 #  - _aminmax.dim
@@ -96,7 +103,6 @@ supported:
   - _fused_moving_avg_obs_fq_helper
   - _masked_scale
   - index_copy.out
-#  - _index_put_impl_
 #  - linalg_qr.out
 #  - _local_scalar_dense
   - _logcumsumexp
@@ -469,8 +475,6 @@ supported:
 #  - nll_loss2d_forward.output
 #  - nll_loss_backward.grad_input
 #  - nll_loss_forward.output
-#  - nonzero
-#  - nonzero.out
 #  - norm.dtype_out
 #  - norm.out
 #  - normal.Tensor_Tensor
@@ -624,10 +628,6 @@ supported:
 #  - std_mean.correction
 #  - sub.out
   - sum
-#  - sum.IntList_out
-#  - sum.dim_IntList
-#  - nansum
-#  - nansum.out
   - take
   - take.out
 #  - tan.out
