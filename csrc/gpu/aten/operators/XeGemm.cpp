@@ -719,17 +719,21 @@ static void mm_qkv_out_autocast(
     Tensor& out2_) {
   c10::impl::ExcludeDispatchKeyGuard no_autocast(c10::DispatchKey::AutocastXPU);
   auto to_type = kHalf;
-  auto casted_input = cached_cast(to_type, input_, c10::DeviceType::XPU);
-  auto out0 = at::empty_like(casted_input, at::MemoryFormat::Contiguous);
-  auto out1 = at::empty_like(casted_input, at::MemoryFormat::Contiguous);
-  auto out2 = at::empty_like(casted_input, at::MemoryFormat::Contiguous);
-  return mm_qkv_out(
-      casted_input,
-      cached_cast(to_type, weight_, c10::DeviceType::XPU),
-      cached_cast(to_type, bias_, c10::DeviceType::XPU),
-      out0,
-      out1,
-      out2);
+  if (input_.scalar_type() == to_type && weight_.scalar_type() == to_type) {
+    mm_qkv_out(input_, weight_, bias_, out0_, out1_, out2_);
+  } else {
+    auto casted_input = cached_cast(to_type, input_, c10::DeviceType::XPU);
+    auto out0 = at::empty_like(casted_input, at::MemoryFormat::Contiguous);
+    auto out1 = at::empty_like(casted_input, at::MemoryFormat::Contiguous);
+    auto out2 = at::empty_like(casted_input, at::MemoryFormat::Contiguous);
+    mm_qkv_out(
+        casted_input,
+        cached_cast(to_type, weight_, c10::DeviceType::XPU),
+        cached_cast(to_type, bias_, c10::DeviceType::XPU),
+        out0,
+        out1,
+        out2);
+  }
 }
 
 static void mm_qkv_group_out(
