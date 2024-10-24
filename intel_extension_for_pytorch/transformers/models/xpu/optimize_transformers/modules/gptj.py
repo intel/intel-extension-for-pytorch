@@ -130,6 +130,7 @@ def GPTJModel_forward(
         raise ValueError("You have to specify either input_ids or inputs_embeds")
 
     device = input_ids.device if input_ids is not None else inputs_embeds.device
+    curr_len = input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
 
     if token_type_ids is not None:
         token_type_ids = token_type_ids.view(-1, input_shape[-1])
@@ -140,9 +141,7 @@ def GPTJModel_forward(
     else:
         past_length = past_key_values.get_seq_length()
 
-    cache_position = torch.arange(
-        past_length, past_length + input_ids.shape[1], device=device
-    )
+    cache_position = torch.arange(past_length, past_length + curr_len, device=device)
 
     if position_ids is None:
         position_ids = torch.arange(

@@ -480,6 +480,8 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
         torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]
     ]:
         bs = IPEXTransformerAttn.batch_size
+        IPEXTransformerAttn.beam_size = hidden_states.shape[0] // bs
+        beam = IPEXTransformerAttn.beam_size
 
         # broadcast attention mask if needed
         if attention_mask.dim() < 4:
@@ -493,9 +495,6 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
                 )
                 .contiguous()
             )
-
-        IPEXTransformerAttn.beam_size = hidden_states.shape[0] // bs
-        beam = IPEXTransformerAttn.beam_size
 
         _, seq, hidden_size = hidden_states.shape
         first_token = True if seq > 1 else False
