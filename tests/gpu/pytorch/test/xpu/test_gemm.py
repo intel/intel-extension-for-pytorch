@@ -415,21 +415,6 @@ class TestBasicGEMM(TestCase):
 
         is_supported = True
 
-        if not is_supported:
-            b1 = make_tensor(
-                (num_batches, M, N), dtype=dtype, device=device, low=-1, high=1
-            )
-            b2 = make_tensor(
-                (num_batches, N, O), dtype=dtype, device=device, low=-1, high=1
-            )
-            t = make_tensor((M, O), dtype=dtype, device=device, low=-1, high=1)
-            self.assertRaisesRegex(
-                RuntimeError,
-                "type|Type|not implemented|CUBLAS_STATUS_NOT_SUPPORTED",
-                lambda: torch.addbmm(t, b1, b2),
-            )
-            return
-
         def invert_perm(p):
             d = {x: i for i, x in enumerate(p)}
             return (d[0], d[1], d[2])

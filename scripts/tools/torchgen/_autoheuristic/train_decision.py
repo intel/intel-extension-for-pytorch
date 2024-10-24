@@ -24,15 +24,13 @@ from train import AHTrain
 
 
 log = logging.getLogger(__name__)
-DEBUG = True
-if DEBUG:
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(
-        "%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    ch.setFormatter(formatter)
-    log.addHandler(ch)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter(
+    "%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+)
+ch.setFormatter(formatter)
+log.addHandler(ch)
 
 
 class AHTrainDecisionTree(AHTrain):
