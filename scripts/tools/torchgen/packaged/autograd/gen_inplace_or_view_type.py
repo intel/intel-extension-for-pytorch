@@ -313,7 +313,9 @@ def unpack_args(f: NativeFunction) -> tuple[list[str], list[Binding]]:
 
         is_tensor_list = is_tensor_list_type(binding.argument.type)
         ref = (not is_nullable) and not is_tensor_list
-        suffix = "_opt" if is_nullable and not is_tensor_list else ""
+        assert isnullable is False
+        suffix = ""
+        #suffix = "_opt" if is_nullable and not is_tensor_list else ""
         body.append(
             UNPACK_TENSOR.substitute(
                 arg_name=binding.name,

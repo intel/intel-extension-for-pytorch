@@ -1034,9 +1034,6 @@ class NativeFunction:
             self.has_composite_implicit_autograd_kernel
             or self.has_composite_explicit_autograd_kernel
             or self.has_composite_explicit_autograd_non_functional_kernel
-        ) or (
-            self.has_composite_implicit_autograd_kernel
-            and self.has_composite_implicit_autograd_nested_tensor_kernel
         )
 
     @property
