@@ -161,7 +161,7 @@ def test_varlen_fwd(
     cu_seqlen = torch.cumsum(seqlen_list, dim=0)
     num_heads_query, num_heads_kv = num_heads
     cu_seqlen = (
-        torch.cat([torch.tensor([0]), cu_seqlen], dim=0).to(torch.int64).to("xpu")
+        torch.cat([torch.tensor([0]), cu_seqlen], dim=0).to(torch.int32).to("xpu")
     )
 
     query = torch.randn(
@@ -263,7 +263,7 @@ def test_varlen_attention_softcap(
     cu_seqlen = torch.cumsum(seqlen_list, dim=0)
     num_heads_query, num_heads_kv = num_heads, num_heads
     cu_seqlen = (
-        torch.cat([torch.tensor([0]), cu_seqlen], dim=0).to(torch.int64).to("xpu")
+        torch.cat([torch.tensor([0]), cu_seqlen], dim=0).to(torch.int32).to("xpu")
     )
 
     query = torch.randn(

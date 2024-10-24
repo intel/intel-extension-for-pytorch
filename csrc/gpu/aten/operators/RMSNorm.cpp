@@ -18,13 +18,11 @@ using namespace at::AtenIpexTypeXPU::normalization;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-void rms_norm_fw(
-    Tensor& input,
+std::tuple<Tensor, Tensor> rms_norm_fw(
+    const Tensor& input,
     at::IntArrayRef normalized_shape,
     const Tensor& weight,
-    double epsilon,
-    Tensor& output,
-    Tensor& rstd);
+    double epsilon);
 
 std::tuple<Tensor, Tensor> rms_norm_bw(
     const Tensor& grad_output,
@@ -370,13 +368,11 @@ void RMSNormKernelImpl(
       });
 }
 
-void rms_norm_fw(
-    Tensor& input,
+std::tuple<Tensor, Tensor> rms_norm_fw(
+    const Tensor& input,
     at::IntArrayRef normalized_shape,
     const Tensor& weight,
-    double epsilon,
-    Tensor& output,
-    Tensor& rstd) {
+    double epsilon) {
   RECORD_FUNCTION("ipex::rms_norm_fw", std::vector<c10::IValue>({input}));
 
   auto M_N =
@@ -384,34 +380,18 @@ void rms_norm_fw(
   auto M = M_N.first;
   auto N = M_N.second;
 
-  // incase output and input is the same tensor
-  at::IntArrayRef sizes = input.sizes();
-  std::vector<int64_t> sizes_vec(sizes.begin(), sizes.end());
-
+  Tensor output = at::empty(input.sizes(), input.options());
+  Tensor rstd;
   if (input.numel() != 0) {
     Tensor input_ = (input.dim() == 1) ? input.reshape({M, N}) : input;
+    Tensor output_ = (output.dim() == 1) ? output.reshape({M, N}) : output;
     Tensor weight_ = (weight.dim() == 1) ? weight.reshape({N}) : weight;
 
     input_ = to_plain_if_needed(input_).contiguous();
     weight_ = to_plain_if_needed(weight_).contiguous();
     RMSNormKernelImpl(input_, weight_, M, N, epsilon, output, rstd);
   }
-  output.reshape(at::IntArrayRef(sizes_vec));
-}
-
-std::tuple<Tensor, Tensor> rms_norm_fw_xpu(
-    Tensor& input,
-    at::IntArrayRef normalized_shape,
-    const Tensor& weight,
-    double epsilon) {
-  RECORD_FUNCTION("ipex::rms_norm_fw_xpu", std::vector<c10::IValue>({input}));
-
-  Tensor output = at::empty(input.sizes(), input.options());
-  Tensor rstd;
-
-  rms_norm_fw(input, normalized_shape, weight, epsilon, output, rstd);
-
-  return std::make_tuple(output, rstd);
+  return std::make_tuple(output.reshape(input.sizes()), rstd);
 }
 
 template <typename scalar_t, typename mean_t, typename weight_t>
@@ -593,19 +573,18 @@ class IPEXRmsNormOp : public Function<IPEXRmsNormOp> {
  public:
   static variable_list forward(
       AutogradContext* ctx,
-      Tensor& input,
+      const Tensor& input,
       at::IntArrayRef normalized_shape,
       const Tensor& weight,
       double epsilon) {
     ctx->saved_data["input_requires_grad"] = input.requires_grad();
     ctx->saved_data["weight_requires_grad"] = weight.requires_grad();
     ctx->saved_data["normalized_shape"] = normalized_shape;
-    Tensor output = at::empty(input.sizes(), input.options());
-    Tensor rstd;
-    rms_norm_fw(input, normalized_shape, weight, epsilon, output, rstd);
+    auto outputs = rms_norm_fw(input, normalized_shape, weight, epsilon);
 
-    ctx->save_for_backward({input, weight, output, rstd});
-    variable_list result = {output, rstd};
+    ctx->save_for_backward(
+        {input, weight, std::get<0>(outputs), std::get<1>(outputs)});
+    variable_list result = {std::get<0>(outputs), std::get<1>(outputs)};
     return result;
   }
 
@@ -636,7 +615,7 @@ class IPEXRmsNormOp : public Function<IPEXRmsNormOp> {
 };
 
 Tensor rms_norm_impl(
-    Tensor& input,
+    const Tensor& input,
     at::IntArrayRef normalized_shape,
     const Tensor& weight,
     double epsilon) {
@@ -652,6 +631,6 @@ IPEX_LIBRARY_FRAGMENT() {
       "rms_norm_impl",
       at::AtenIpexTypeXPU::rms_norm_impl,
       c10::DispatchKey::AutogradXPU);
-  IPEX_OP_REGISTER("rms_norm.xpu", at::AtenIpexTypeXPU::rms_norm_fw_xpu);
+  IPEX_OP_REGISTER("rms_norm.xpu", at::AtenIpexTypeXPU::rms_norm_fw);
 }
 } // namespace

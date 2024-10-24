@@ -59,8 +59,8 @@ class fmha_forward_t {
     uint32_t bias_strideN;
     uint32_t bias_strideF;
     // Sequence length info
-    int64_t* cu_seqlen_q;
-    int64_t* cu_seqlen_k;
+    int32_t* cu_seqlen_q;
+    int32_t* cu_seqlen_k;
     // Softmax scale is the reciprocal square root of head size by default
     accum_t sm_scale;
     // Dropout scale is computed from dropout prob
@@ -98,8 +98,8 @@ class fmha_forward_t {
         uint32_t bias_strideB,
         uint32_t bias_strideN,
         uint32_t bias_strideF,
-        int64_t* cu_seqlen_q,
-        int64_t* cu_seqlen_k,
+        int32_t* cu_seqlen_q,
+        int32_t* cu_seqlen_k,
         accum_t sm_scale,
         accum_t dropout_prob,
         uint32_t alibi_padded_block_size,
