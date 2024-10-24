@@ -131,7 +131,7 @@ class ModuleReplacer:
             config.device = "xpu"
 
         # Add num_key_value_heads which is required by StaticCache in Transformers 4.44.0.
-        if not hasattr(config, "num_key_value_heads"):
+        if config is not None and not hasattr(config, "num_key_value_heads"):
             if hasattr(config, "n_head"):
                 config.num_key_value_heads = config.n_head
             elif hasattr(config, "multi_query_group_num"):

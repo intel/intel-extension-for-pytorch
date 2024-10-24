@@ -525,6 +525,7 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
             isinstance(kv_cache, IPEXStaticCache)
             and kv_cache.cache_format == CacheFormat.FBNH
             and not self.attn.beam_search_first_iter(seq)
+            and rotary_pos_emb is not None
         ):
             rotary_pos_emb = rotary_pos_emb.transpose(0, 1).contiguous()
 
