@@ -12,6 +12,9 @@
 #include "comm/ApplyUtils.h"
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
+#ifdef USE_OVERRIDE_OP
+#include "utils/CustomOperatorRegistration.h"
+#endif
 
 #include "Resize.h"
 
@@ -504,94 +507,6 @@ Tensor& triu_(Tensor& self, int64_t diagonal) {
   return at::AtenIpexTypeXPU::triu_out(self, diagonal, self);
 }
 
-Tensor _lu_solve_helper(
-    const Tensor& self,
-    const Tensor& LU_data,
-    const Tensor& LU_pivots) {
-  auto self_working_copy = native::cloneBatchedColumnMajor(self);
-  auto LU_data_working_copy = native::cloneBatchedColumnMajor(LU_data);
-  auto LU_pivots_working_copy =
-      LU_pivots.is_contiguous() ? LU_pivots : LU_pivots.contiguous();
-  // FIXME: oneMKL only support int64_t datatype of pivots
-  LU_pivots_working_copy = LU_pivots.to(kLong);
-  auto infos_tensor = at::zeros(
-      native::batchCount(self),
-      self.options().dtype(kInt).device(DeviceType::CPU));
-  std::vector<int32_t> infos(native::batchCount(self), 0);
-
-  if (self.numel() == 0 || LU_data.numel() == 0) {
-    return at::zeros_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
-  }
-  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
-      self.scalar_type(), "lu_solve_dpcpp", [&] {
-        impl::apply_lu_solve_dpcpp_<scalar_t>(
-            self_working_copy,
-            LU_data_working_copy,
-            LU_pivots_working_copy,
-            infos,
-            TransposeType::NoTranspose);
-      });
-
-  std::copy(
-      infos.begin(), infos.end(), infos_tensor.template data_ptr<int32_t>());
-  at::_linalg_check_errors(infos_tensor, "lu_solve_dpcpp", self.dim() == 2);
-
-  return self_working_copy;
-}
-
-Tensor lu_solve(
-    const Tensor& self,
-    const Tensor& LU_data,
-    const Tensor& LU_pivots) {
-  TORCH_CHECK(
-      self.dim() >= 2,
-      "b should have at least 2 dimensions, but has ",
-      self.dim(),
-      " dimensions instead");
-  TORCH_CHECK(
-      LU_data.dim() >= 2,
-      "LU_data should have at least 2 dimensions, but has ",
-      LU_data.dim(),
-      " dimensions instead");
-  TORCH_CHECK(
-      LU_pivots.size(-1) == LU_data.size(-1),
-      "Number of pivots per batch should be same as the dimension of the matrix");
-  TORCH_CHECK(
-      LU_pivots.device() == LU_data.device(),
-      "Expected LU_pivots and LU_data to be on the same device, "
-      "but found LU_pivots on ",
-      LU_pivots.device(),
-      " and LU_data on ",
-      LU_data.device(),
-      " instead");
-
-  IntArrayRef pivots_sizes(LU_pivots.sizes().data(), LU_pivots.dim() - 1);
-  IntArrayRef lu_sizes(LU_data.sizes().data(), LU_data.dim() - 2);
-  TORCH_CHECK(
-      pivots_sizes == lu_sizes,
-      "batch dimensions of LU_pivots doesn't match batch dimensions of LU_data");
-
-  Tensor self_broadcasted, LU_data_broadcasted;
-  std::tie(self_broadcasted, LU_data_broadcasted) =
-      native::_linalg_broadcast_batch_dims(self, LU_data, "lu_solve_dpcpp");
-
-  IntArrayRef new_pivots_sizes(
-      LU_data_broadcasted.sizes().data(), LU_data_broadcasted.dim() - 1);
-  Tensor LU_pivots_broadcasted = LU_pivots.expand(new_pivots_sizes);
-  return at::AtenIpexTypeXPU::_lu_solve_helper(
-      self_broadcasted, LU_data_broadcasted, LU_pivots_broadcasted);
-}
-
-Tensor& lu_solve_out(
-    const Tensor& self,
-    const Tensor& LU_data,
-    const Tensor& LU_pivots,
-    Tensor& out) {
-  Tensor out_tmp = at::AtenIpexTypeXPU::lu_solve(self, LU_data, LU_pivots);
-  out.resize_as_(out_tmp).copy_(out_tmp);
-  return out;
-}
-
 std::tuple<Tensor, Tensor> linalg_eig(const Tensor& input) {
   return at::native::linalg_eig(input);
 }
@@ -905,5 +820,66 @@ std::tuple<Tensor&, Tensor&, Tensor&, Tensor&> _linalg_solve_ex_out(
       result, LU, pivots, info);
 }
 
+Tensor& linalg_lu_solve_out(
+    const Tensor& LU,
+    const Tensor& pivots,
+    const Tensor& B,
+    bool left,
+    bool adjoint,
+    Tensor& result) {
+  // Trivial case
+  if (result.numel() == 0) {
+    return result;
+  }
+
+  // Solve A^H X = B^H. Then we return X^H
+  if (!left) {
+    adjoint = !adjoint;
+    result.transpose_(-2, -1);
+  }
+
+  // Copy B (or B^H) into result
+  if (!result.is_same(B)) {
+    result.copy_(left ? B : B.mH());
+  }
+
+  // Make LU / pivots F-contiguous
+  auto pivots_ = pivots.expect_contiguous();
+  auto LU_ = at::native::borrow_else_clone(
+      LU.mT().is_contiguous(), LU, LU, /*row_major=*/false);
+
+  const auto trans = !adjoint ? TransposeType::NoTranspose
+      : LU.is_complex()       ? TransposeType::ConjTranspose
+                              : TransposeType::Transpose;
+  std::vector<int32_t> infos_vec(native::batchCount(LU), 0);
+
+  IPEX_DISPATCH_FLOATING_AND_COMPLEX_TYPES(
+      LU_->scalar_type(), "lu_solve_dpcpp", [&] {
+        impl::apply_lu_solve_dpcpp_<scalar_t>(
+            result, *LU_, *pivots_, infos_vec, trans);
+      });
+
+  // Conj-transpose back in-place
+  if (!left) {
+    result.transpose_(-2, -1);
+    if (result.is_complex()) {
+      result._set_conj(!result.is_conj());
+    }
+  }
+  return result;
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+#ifdef USE_OVERRIDE_OP
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl(
+      "linalg_lu_solve.out",
+      TORCH_FN((&at::AtenIpexTypeXPU::linalg_lu_solve_out)));
+}
+
+} // namespace
+#endif
