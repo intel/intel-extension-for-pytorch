@@ -2,36 +2,18 @@ import torch
 from torch import nn
 import torch.distributed as dist
 from ...utils._logger import logger, WarningType
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Union, List
 from transformers.generation.stopping_criteria import (
     StoppingCriteriaList,
     validate_stopping_criteria,
 )
 from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.beam_search import BeamScorer
-from transformers.utils import ModelOutput
 import time
-
-
-class BeamSearchEncoderDecoderOutput(ModelOutput):
-    sequences: torch.LongTensor = None
-    sequences_scores: Optional[torch.FloatTensor] = None
-    scores: Optional[Tuple[torch.FloatTensor]] = None
-    beam_indices: Optional[torch.LongTensor] = None
-    encoder_attentions: Optional[Tuple[torch.FloatTensor]] = None
-    encoder_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    decoder_attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    cross_attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    decoder_hidden_states: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-
-
-class BeamSearchDecoderOnlyOutput(ModelOutput):
-    sequences: torch.LongTensor = None
-    sequences_scores: Optional[torch.FloatTensor] = None
-    scores: Optional[Tuple[torch.FloatTensor]] = None
-    beam_indices: Optional[torch.LongTensor] = None
-    attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    hidden_states: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+from transformers.generation.utils import (
+    BeamSearchEncoderDecoderOutput,
+    BeamSearchDecoderOnlyOutput,
+)
 
 
 BeamSearchOutput = Union[BeamSearchEncoderDecoderOutput, BeamSearchDecoderOnlyOutput]
@@ -55,6 +37,7 @@ def _beam_search(
 ) -> Union[BeamSearchOutput, torch.LongTensor]:
     new_generation_config = model_kwargs.pop("generation_config", None)
     if new_generation_config is not None:
+        return_dict_in_generate = new_generation_config.return_dict_in_generate
         if new_generation_config.do_sample:
             return self._beam_sample(
                 input_ids,
