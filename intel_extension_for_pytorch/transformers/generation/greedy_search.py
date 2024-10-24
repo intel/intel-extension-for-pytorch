@@ -1,33 +1,19 @@
 import torch
 import torch.distributed as dist
 from ...utils._logger import logger, WarningType
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Union, List
 from transformers.generation.stopping_criteria import (
     StoppingCriteriaList,
     validate_stopping_criteria,
 )
 from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.streamers import BaseStreamer
-from transformers.utils import ModelOutput
 import time
 
-
-class GreedySearchDecoderOnlyOutput(ModelOutput):
-    sequences: torch.LongTensor = None
-    scores: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    hidden_states: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-
-
-class GreedySearchEncoderDecoderOutput(ModelOutput):
-    sequences: torch.LongTensor = None
-    scores: Optional[Tuple[torch.FloatTensor]] = None
-    encoder_attentions: Optional[Tuple[torch.FloatTensor]] = None
-    encoder_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    decoder_attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    cross_attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    decoder_hidden_states: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-
+from transformers.generation.utils import (
+    GreedySearchDecoderOnlyOutput,
+    GreedySearchEncoderDecoderOutput,
+)
 
 GreedySearchOutput = Union[
     GreedySearchEncoderDecoderOutput, GreedySearchDecoderOnlyOutput
