@@ -1,0 +1,105 @@
+From 0ad30cddfeb74434a1b0f96206546d0314ba51aa Mon Sep 17 00:00:00 2001
+From: zhuyuhua-v <yuhua.zhu@intel.com>
+Date: Wed, 21 Aug 2024 02:31:52 -0700
+Subject: [PATCH 1/5] Revert "Support XPU ABI=0 build (#130110)"
+
+This reverts commit 92bebb46fa9fd60523d8aeb7b5f1a3f488c4cd93.
+---
+ README.md                           |  2 --
+ c10/xpu/CMakeLists.txt              | 12 ++++++------
+ cmake/Dependencies.cmake            |  4 ----
+ cmake/Modules/FindMKLDNN.cmake      |  8 ++------
+ cmake/Modules/FindSYCLToolkit.cmake |  2 +-
+ 5 files changed, 9 insertions(+), 19 deletions(-)
+
+diff --git a/README.md b/README.md
+index c7dd72ccc77..37bf2d1a123 100644
+--- a/README.md
++++ b/README.md
+@@ -279,8 +279,6 @@ If you would like to compile PyTorch with [new C++ ABI](https://gcc.gnu.org/onli
+ export _GLIBCXX_USE_CXX11_ABI=1
+ ```
+ 
+-Please **note** that starting from PyTorch 2.5, the PyTorch build with XPU supports both new and old C++ ABIs. Previously, XPU only supported the new C++ ABI. If you want to compile with Intel GPU support, please follow [Intel GPU Support](#intel-gpu-support).
+-
+ If you're compiling for AMD ROCm then first run this command:
+ ```bash
+ # Only run this if you're compiling for ROCm
+diff --git a/c10/xpu/CMakeLists.txt b/c10/xpu/CMakeLists.txt
+index 01f77d61713..4271fbf9370 100644
+--- a/c10/xpu/CMakeLists.txt
++++ b/c10/xpu/CMakeLists.txt
+@@ -30,12 +30,12 @@ set(C10_XPU_HEADERS
+     impl/XPUGuardImpl.h
+ )
+ if(NOT BUILD_LIBTORCHLESS)
+-  add_library(c10_xpu ${C10_XPU_SRCS} ${C10_XPU_HEADERS})
+-  target_compile_options(c10_xpu PRIVATE "-DC10_XPU_BUILD_MAIN_LIB")
+-  # Enable hidden visibility if compiler supports it.
+-  if(${COMPILER_SUPPORTS_HIDDEN_VISIBILITY})
+-    target_compile_options(c10_xpu PRIVATE "-fvisibility=hidden")
+-  endif()
++add_library(c10_xpu ${C10_XPU_SRCS} ${C10_XPU_HEADERS})
++target_compile_options(c10_xpu PRIVATE "-DC10_XPU_BUILD_MAIN_LIB")
++# Enable hidden visibility if compiler supports it.
++if(${COMPILER_SUPPORTS_HIDDEN_VISIBILITY})
++  target_compile_options(c10_xpu PRIVATE "-fvisibility=hidden")
++endif()
+ 
+   # ---[ Dependency of c10_xpu
+   target_link_libraries(c10_xpu PUBLIC c10 torch::xpurt)
+diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
+index e78305e0a8e..c8de7343822 100644
+--- a/cmake/Dependencies.cmake
++++ b/cmake/Dependencies.cmake
+@@ -95,10 +95,6 @@ if(USE_XPU)
+     message(WARNING "Not compiling with XPU. Could NOT find SYCL."
+     "Suppress this warning with -DUSE_XPU=OFF.")
+     caffe2_update_option(USE_XPU OFF)
+-  else()
+-    if(LINUX)
+-      string(APPEND CMAKE_CXX_FLAGS " -D__INTEL_PREVIEW_BREAKING_CHANGES")
+-    endif()
+   endif()
+ endif()
+ 
+diff --git a/cmake/Modules/FindMKLDNN.cmake b/cmake/Modules/FindMKLDNN.cmake
+index 234d361d7f5..6601f51ed87 100644
+--- a/cmake/Modules/FindMKLDNN.cmake
++++ b/cmake/Modules/FindMKLDNN.cmake
+@@ -36,17 +36,13 @@ IF(NOT MKLDNN_FOUND)
+     set(DNNL_MAKE_COMMAND "cmake" "--build" ".")
+     include(ProcessorCount)
+     ProcessorCount(proc_cnt)
+-    if((DEFINED ENV{MAX_JOBS}) AND ("$ENV{MAX_JOBS}" LESS_EQUAL ${proc_cnt}))
++    if ((DEFINED ENV{MAX_JOBS}) AND ("$ENV{MAX_JOBS}" LESS_EQUAL ${proc_cnt}))
+       list(APPEND DNNL_MAKE_COMMAND "-j" "$ENV{MAX_JOBS}")
+       if(CMAKE_GENERATOR MATCHES "Make|Ninja")
+         list(APPEND DNNL_MAKE_COMMAND "--" "-l" "$ENV{MAX_JOBS}")
+       endif()
+     endif()
+-    if(LINUX)
+-      set(DNNL_CXX_FLAGS "-DCMAKE_CXX_FLAGS=-fpreview-breaking-changes")
+-    else()
+-      set(DNNL_CXX_FLAGS "")
+-    endif()
++    set(DNNL_CXX_FLAGS "")
+     ExternalProject_Add(xpu_mkldnn_proj
+       SOURCE_DIR ${MKLDNN_ROOT}
+       PREFIX ${XPU_MKLDNN_DIR_PREFIX}
+diff --git a/cmake/Modules/FindSYCLToolkit.cmake b/cmake/Modules/FindSYCLToolkit.cmake
+index d96b4c8d45c..899cbdac48d 100644
+--- a/cmake/Modules/FindSYCLToolkit.cmake
++++ b/cmake/Modules/FindSYCLToolkit.cmake
+@@ -52,7 +52,7 @@ find_file(
+ if(LINUX)
+   find_library(
+     SYCL_LIBRARY
+-    NAMES sycl-preview
++    NAMES sycl
+     HINTS ${SYCL_LIBRARY_DIR}
+     NO_DEFAULT_PATH
+   )
+-- 
+2.34.1
+
