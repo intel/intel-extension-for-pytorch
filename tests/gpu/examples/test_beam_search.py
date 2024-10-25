@@ -7,7 +7,7 @@ beam_size = 4
 vocab_size = 50401
 
 pad_token_id = 0
-eos_token_id = torch.tensor([32000, 32001, 32007])
+eos_token_id = -1
 time_step = 3
 length_penalty = 1.0
 input_length = 32
