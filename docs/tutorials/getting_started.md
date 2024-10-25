@@ -1,6 +1,6 @@
 # Quick Start
 
-The following instructions assume you have installed the Intel® Extension for PyTorch\*. For installation instructions, refer to [Installation](../../../index.html#installation?platform=cpu&version=main).
+The following instructions assume you have installed the Intel® Extension for PyTorch\*. For installation instructions, refer to [Installation](../../../index.html#installation?platform=cpu&version=v2.5.0%2Bcpu).
 
 To start using the Intel® Extension for PyTorch\* in your code, you need to make the following changes:
 
@@ -63,7 +63,6 @@ In [Cheat Sheet](./cheat_sheet.md), you can find more commands that can help you
 ## LLM Quick Start
 
 `ipex.llm.optimize` is used for Large Language Models (LLM).
-
 
 ```python
 import torch
@@ -157,4 +156,4 @@ with torch.inference_mode(), torch.cpu.amp.autocast(enabled=amp_enabled):
     print(gen_text, total_new_tokens, flush=True)
 ```
 
-More LLM examples, including usage of low precision data types are available in the [LLM Examples](https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm) section.
+More LLM examples, including usage of low precision data types are available in the [LLM Examples](https://github.com/intel/intel-extension-for-pytorch/tree/release/2.5/examples/cpu/llm) section.
