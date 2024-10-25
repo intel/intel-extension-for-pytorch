@@ -16,7 +16,7 @@ void beam_search_topk_kernel(
     int64_t* tmp_idx,
     scalar_t* tmp_topk_scores,
     int64_t* tmp_topk_idx,
-    int64_t* end_id,
+    int64_t end_id,
     int64_t vocab_size,
     int64_t beam_size,
     int64_t batch_size,
@@ -49,7 +49,7 @@ void beam_search_topk_launch(
     int64_t* tmp_idx,
     scalar_t* tmp_topk_scores,
     int64_t* tmp_topk_idx,
-    int64_t* end_id,
+    int64_t end_id,
     int64_t vocab_size,
     int64_t beam_size,
     int64_t batch_size,
@@ -90,8 +90,7 @@ void beam_seach_procss_impl(
     int64_t* topk_token, // out
     int64_t* topk_beams, // out
     const int64_t pad_token_id,
-    int64_t* eos_token_id,
-    size_t eos_token_size,
+    const int64_t eos_token_id,
     bool* finished,
     const float length_penalty,
     const int process_length, // beam_size x beam_size x 2
@@ -122,7 +121,6 @@ void beam_seach_procss_impl(
       topk_beams,
       pad_token_id,
       eos_token_id,
-      eos_token_size,
       finished,
       candidate_num_beams,
       candidate_min_normed_scores,
@@ -155,8 +153,7 @@ void beam_seach_procss(
     int64_t* topk_token,
     int64_t* topk_beams,
     const int64_t pad_token_id,
-    int64_t* eos_token_id,
-    size_t eos_token_size,
+    const int64_t eos_token_id,
     bool* finished,
     const float length_penalty,
     const int process_length,
@@ -185,7 +182,6 @@ void beam_seach_procss(
         topk_beams,                          \
         pad_token_id,                        \
         eos_token_id,                        \
-        eos_token_size,                      \
         finished,                            \
         length_penalty,                      \
         process_length,                      \
@@ -230,7 +226,7 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
     const Tensor& logits_score, // in: all token scores
     Tensor& finished, // mark decode finishes
     int64_t pad_token_id,
-    Tensor& eos_token_id,
+    int64_t eos_token_id,
     double length_penalty,
     const int64_t beam_size,
     const int64_t batch_size,
@@ -289,7 +285,7 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
             tmp_log_idx.data_ptr<int64_t>(),
             tmp_topk_val.data_ptr<scalar_t>(),
             tmp_topk_idx.data_ptr<int64_t>(),
-            eos_token_id.data_ptr<int64_t>(),
+            eos_token_id,
             vocab_size,
             beam_size,
             batch_size,
@@ -309,8 +305,7 @@ std::tuple<Tensor, Tensor, Tensor> beam_search_topk(
             topk_token.data_ptr<int64_t>(),
             topk_idx.data_ptr<int64_t>(),
             pad_token_id,
-            eos_token_id.data_ptr<int64_t>(),
-            eos_token_id.numel(),
+            eos_token_id,
             finished.data_ptr<bool>(),
             (float)length_penalty,
             process_length,
