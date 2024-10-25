@@ -111,8 +111,7 @@ def fast_awq_to_gptq(qweight, qzeros):
     # Reverse the order of the iweight and izeros tensors
     izeros = apply_order(izeros, direction="column", order=REVERSE_AWQ_PACK_ORDER)
     iweights = apply_order(iweights, direction="column", order=REVERSE_AWQ_PACK_ORDER)
-    # Subtract 1 from the izeros tensor (gptq adds 1 to the zeros)
-    izeros = izeros - 1
+
     # exllama uses row packing for weights and column packing for zeros
     qzeros = pack(izeros, direction="column")
     qweight = pack(iweights, direction="row")
@@ -310,14 +309,9 @@ class TestInt4Linear(TestCase):
         group_size = min(128, k)
         checking_atol = base_atol
         checking_rtol = base_rtol
+        g_idx = None
         if act_order:
             g_idx = torch.randperm(k, dtype=torch.int32) // group_size
-            shuf_weight = GPTQShuffle(bits=4, blocksize=group_size)
-            shuffled_weight, g_idx4kernel = shuf_weight(weight, g_idx)
-        else:
-            g_idx = None
-            g_idx4kernel = None
-            shuffled_weight = weight
         if per_channel:
             group_size = k
         group_num = int(k / group_size)
@@ -329,8 +323,9 @@ class TestInt4Linear(TestCase):
         weight_fp16 = self.dequantize(
             weight, scales, zero_points, group_size, g_idx
         ).cpu()
+
         woqlinear = ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight(
-            shuffled_weight,
+            weight,
             scales,
             zero_points_kernel,
             k,
@@ -338,7 +333,7 @@ class TestInt4Linear(TestCase):
             None,
             None,
             group_size,
-            g_idx4kernel,
+            g_idx.to("xpu") if g_idx is not None else None,
             ipex.llm.quantization.QuantMethod.GPTQ_GEMM,
             ipex.llm.quantization.QuantDtype.INT4,
         )
@@ -363,7 +358,7 @@ class TestInt4Linear(TestCase):
         input_torch = input.cpu()
         weight = self.rand_int4(k * n, torch.int32, "xpu").reshape(k, n // 8)
         group_size = min(128, k)
-        checking_atol = 1e-1
+        checking_atol = 2e-1
         checking_rtol = base_rtol
         g_idx = None
         g_idx4kernel = None

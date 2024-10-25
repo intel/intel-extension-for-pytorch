@@ -182,8 +182,7 @@ def fast_awq_to_gptq(qweight, qzeros):
     # Reverse the order of the iweight and izeros tensors
     izeros = apply_order(izeros, direction="column", order=REVERSE_AWQ_PACK_ORDER)
     iweights = apply_order(iweights, direction="column", order=REVERSE_AWQ_PACK_ORDER)
-    # Subtract 1 from the izeros tensor (gptq adds 1 to the zeros)
-    izeros = izeros - 1
+
     # exllama uses row packing for weights and column packing for zeros
     qzeros = pack(izeros, direction="column")
     qweight = pack(iweights, direction="row")
@@ -413,6 +412,9 @@ class WeightOnlyQuantizedLinear(nn.Module):
             use_optimum_format=False,
             quant_method=quant_method,
         )
+        if g_idx is not None and quant_method == QuantMethod.GPTQ_GEMM:
+            shuffler = GPTQShuffle(bits=4, blocksize=group_size)
+            qweight, g_idx = shuffler(qweight, g_idx)
         cls_inst.set_weights_bias(qweight, bias)
         cls_inst.set_scales_zps_gidx(scales, zero_points, g_idx, quant_method)
         if quant_method == QuantMethod.AWQ_GEMM:
