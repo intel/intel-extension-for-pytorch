@@ -16,7 +16,7 @@
     "version": "0.20.0+cpu"
   },
   "torch-ccl": {
-    "commit": "v2.5.0+cpu+rc0",
+    "commit": "v2.5.0+cpu",
     "version": "2.5.0+cpu"
   },
   "deepspeed": {
