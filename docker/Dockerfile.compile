@@ -22,29 +22,32 @@ RUN apt update && \
     wget \
     vim \
     numactl \
+    google-perftools \
+    openssh-server \
+    net-tools \
     gcc-12 \
     g++-12 \
-    python3 \
-    python3-dev \
-    python3-pip \
     make
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
-    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 && \
-    update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 && \
-    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100 && \
-    update-alternatives --install /usr/bin/python python /usr/bin/python3 100
 RUN apt clean && \
     rm -rf /var/lib/apt/lists/* && \
     if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 && \
+    update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 && \
+    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
 
 WORKDIR /root
-ENV PATH=/root/.local/bin:${PATH}
+
+RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/download/24.7.1-2/Miniforge3-24.7.1-2-Linux-x86_64.sh && \
+    bash miniforge.sh -b -p ./miniforge3 && \
+    rm miniforge.sh
 
 FROM base AS dev
 COPY . ./intel-extension-for-pytorch
 RUN cp ./intel-extension-for-pytorch/scripts/compile_bundle.sh ./ && \
     sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
-RUN CC=gcc CXX=g++ bash compile_bundle.sh && \
+RUN . ~/miniforge3/bin/activate && conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
+    CC=gcc CXX=g++ bash compile_bundle.sh && \
     cd intel-extension-for-pytorch && \
     VER_TORCH=$(python tools/dep_ver_utils.py -f dependency_version.json -k pytorch:version) && \
     VER_TORCHVISION=$(python tools/dep_ver_utils.py -f dependency_version.json -k torchvision:version) && \
@@ -53,11 +56,33 @@ RUN CC=gcc CXX=g++ bash compile_bundle.sh && \
     echo ${VER_TORCH} | grep "dev" > /dev/null; TORCH_DEV=$?; URL_NIGHTLY=""; if [ ${TORCH_DEV} -eq 0 ]; then URL_NIGHTLY="nightly/"; fi; echo "#!/bin/bash\npython -m pip install torch==${VER_TORCH} torchvision==${VER_TORCHVISION} torchaudio==${VER_TORCHAUDIO} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu" > torch_install.sh
 
 FROM base AS deploy
-COPY --from=dev /root/intel-extension-for-pytorch/dist ./wheels
+COPY --from=dev /root/intel-extension-for-pytorch/dist ./wheels/
+COPY --from=dev /root/torch-ccl/dist ./wheels/
 COPY --from=dev /root/torch_install.sh .
-RUN bash ./torch_install.sh && rm ./torch_install.sh && \
+RUN cd /usr/lib/x86_64-linux-gnu/ && ln -s libtcmalloc.so.4 libtcmalloc.so && cd && \
+    . ~/miniforge3/bin/activate && conda create -y -n py310 python=3.10 && conda activate py310 && \
+    bash ./torch_install.sh && rm ./torch_install.sh && \
     python -m pip install ./wheels/*.whl && \
-    python -m pip install intel-openmp==2024.1.2 && \
+    python -m pip install intel-openmp && \
     python -m pip cache purge && \
-    rm -rf ./wheels && \
-    echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc
+    rm -rf ./wheels
+ARG PORT_SSH=22
+RUN mkdir /var/run/sshd && \
+    sed -i "s/#Port.*/Port ${PORT_SSH}/" /etc/ssh/sshd_config && \
+    echo "service ssh start" >> /root/.bashrc && \
+    ssh-keygen -b 4096 -f /root/.ssh/id_rsa -N "" && \
+    mv /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys && \
+    echo "Host *\n    Port ${PORT_SSH}\n    IdentityFile /root/.ssh/id_rsa\n    StrictHostKeyChecking no" > /root/.ssh/config
+EXPOSE ${PORT_SSH}
+RUN ENTRYPOINT=/usr/local/bin/entrypoint.sh && \
+    echo "#!/bin/bash" > ${ENTRYPOINT} && \
+    echo "CMDS=(); while [ \$# -gt 0 ]; do CMDS+=(\$1); shift; done;" >> ${ENTRYPOINT} && \
+    echo "CMD=\"\"; for i in \${!CMDS[@]}; do CMD=\"\${CMD} \${CMDS[\$i]}\"; done;" >> ${ENTRYPOINT} && \
+    echo ". ~/miniforge3/bin/activate" >> ${ENTRYPOINT} && \
+    echo "conda activate py310" >> ${ENTRYPOINT} && \
+    echo "TMP=\$(python -c \"import torch; import os; print(os.path.abspath(os.path.dirname(torch.__file__)))\")" >> ${ENTRYPOINT} && \
+    echo ". \${TMP}/../oneccl_bindings_for_pytorch/env/setvars.sh" >> ${ENTRYPOINT} && \
+    echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ${ENTRYPOINT} && \
+    echo "exec \${CMD}" >> ${ENTRYPOINT} && \
+    chmod +x ${ENTRYPOINT}
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
