@@ -1,8 +1,8 @@
 diff --git a/src/transformers/trainer.py b/src/transformers/trainer.py
-index afe414fbc..c2db35d5d 100755
+index 68ba7babf..9873d5d31 100755
 --- a/src/transformers/trainer.py
 +++ b/src/transformers/trainer.py
-@@ -277,6 +277,24 @@ SCHEDULER_NAME = "scheduler.pt"
+@@ -284,6 +284,25 @@ SCHEDULER_NAME = "scheduler.pt"
  SCALER_NAME = "scaler.pt"
  FSDP_MODEL_NAME = "pytorch_model_fsdp"
  
@@ -24,10 +24,11 @@ index afe414fbc..c2db35d5d 100755
 +        print(os.environ["UR_L0_IN_ORDER_BARRIER_BY_SIGNAL"])
 +
 +import contextlib
++
  
  class Trainer:
      """
-@@ -2175,7 +2193,10 @@ class Trainer:
+@@ -2233,7 +2252,10 @@ class Trainer:
                  rng_to_sync = True
  
              step = -1
@@ -38,7 +39,7 @@ index afe414fbc..c2db35d5d 100755
                  total_batched_samples += 1
  
                  if self.args.include_num_input_tokens_seen:
-@@ -2212,93 +2233,118 @@ class Trainer:
+@@ -2275,95 +2297,121 @@ class Trainer:
                  if step % args.gradient_accumulation_steps == 0:
                      self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
  
@@ -158,21 +159,6 @@ index afe414fbc..c2db35d5d 100755
 -                                grad_norm = grad_norm.item()
 -                        else:
 -                            grad_norm = _grad_norm
--
--                    # Optimizer step
--                    self.optimizer.step()
--                    optimizer_was_run = not self.accelerator.optimizer_step_was_skipped
--                    if optimizer_was_run:
--                        # Delay optimizer scheduling until metrics are generated
--                        if not isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
--                            self.lr_scheduler.step()
--
--                    model.zero_grad()
--                    self.state.global_step += 1
--                    self.state.epoch = epoch + (step + 1 + steps_skipped) / steps_in_epoch
--                    self.control = self.callback_handler.on_step_end(args, self.state, self.control)
--
--                    self._maybe_log_save_evaluate(tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval)
 +                            if (
 +                                is_accelerate_available()
 +                                and self.accelerator.distributed_type == DistributedType.DEEPSPEED
@@ -183,20 +169,34 @@ index afe414fbc..c2db35d5d 100755
 +                                    grad_norm = grad_norm.item()
 +                            else:
 +                                grad_norm = _grad_norm
-+
-+                        # Optimizer step
+ 
+-                    self.optimizer.step()
 +                        self.optimizer.step()
+ 
+-                    self.control = self.callback_handler.on_optimizer_step(args, self.state, self.control)
++                        self.control = self.callback_handler.on_optimizer_step(args, self.state, self.control)
+ 
+-                    optimizer_was_run = not self.accelerator.optimizer_step_was_skipped
+-                    if optimizer_was_run:
+-                        # Delay optimizer scheduling until metrics are generated
+-                        if not isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+-                            self.lr_scheduler.step()
 +                        optimizer_was_run = not self.accelerator.optimizer_step_was_skipped
 +                        if optimizer_was_run:
 +                            # Delay optimizer scheduling until metrics are generated
 +                            if not isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
 +                                self.lr_scheduler.step()
-+
+ 
+-                    model.zero_grad()
+-                    self.state.global_step += 1
+-                    self.state.epoch = epoch + (step + 1 + steps_skipped) / steps_in_epoch
+-                    self.control = self.callback_handler.on_step_end(args, self.state, self.control)
 +                        model.zero_grad()
 +                        self.state.global_step += 1
 +                        self.state.epoch = epoch + (step + 1 + steps_skipped) / steps_in_epoch
 +                        self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-+
+ 
+-                    self._maybe_log_save_evaluate(tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval)
 +                        self._maybe_log_save_evaluate(tr_loss, grad_norm, model, trial, epoch, ignore_keys_for_eval)
 +                    else:
 +                        self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
@@ -216,6 +216,7 @@ index afe414fbc..c2db35d5d 100755
 +
 +            latency = total_time / (iteration - warmup_iter)
 +            print("--latency_{}={}".format(self.args.device, latency))
++
 +            if do_profiling:
 +                if kineto:
 +                    torch.save(prof.key_averages().table(sort_by="self_xpu_time_total"), 'profile_kineto_{}.pt'.format(self.args.device))
