@@ -1811,8 +1811,9 @@ class WeightOnlyQuantizationTester(TestCase):
             def forward(self, x):
                 return self.linear(x)
 
-        def test(feature, has_bias, w_dtype, lowp_mode):
-            if lowp_mode == WoqLowpMode.INT8 and w_dtype != WoqWeightDtype.INT4:
+        def test(feature, has_bias, w_dtype, lowp_mode, group_size):
+            if lowp_mode == WoqLowpMode.INT8 and w_dtype == WoqWeightDtype.NF4:
+                # not supported yet
                 return
             model = M(feature[1], feature[2], has_bias)
             m = model.to(torch.bfloat16).eval()
@@ -1821,6 +1822,7 @@ class WeightOnlyQuantizationTester(TestCase):
             qconfig_ref = ipex.quantization.get_weight_only_quant_qconfig_mapping(
                 weight_dtype=w_dtype,
                 lowp_mode=lowp_mode,
+                group_size=group_size,
             )
             prepared_model_ref = prepare(
                 m, qconfig_ref, example_inputs=data, inplace=False
@@ -1852,11 +1854,12 @@ class WeightOnlyQuantizationTester(TestCase):
         use_bias_list = [True, False]
         w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4]
         lowp_mode_list = [WoqLowpMode.BF16, WoqLowpMode.INT8]
+        group_size_list = [-1, 128]
         cases = itertools.product(
-            shape_list, use_bias_list, w_dtype_list, lowp_mode_list
+            shape_list, use_bias_list, w_dtype_list, lowp_mode_list, group_size_list
         )
-        for shape, use_bias, w_dtype, lowp_mode in cases:
-            test(shape, use_bias, w_dtype, lowp_mode)
+        for shape, use_bias, w_dtype, lowp_mode, group_size in cases:
+            test(shape, use_bias, w_dtype, lowp_mode, group_size)
 
     def test_weight_only_quantization_int8_lowp_mode_int8(self):
         class Mod(nn.Module):
