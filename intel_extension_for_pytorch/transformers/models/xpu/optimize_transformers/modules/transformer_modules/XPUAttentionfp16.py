@@ -23,7 +23,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
     ) -> None:
         super().__init__(config)
         self.config = config
-        self.layer_idx = layer_idx if layer_idx else self.layer_id
+        self.layer_idx = layer_idx if layer_idx is not None else self.layer_id
         self.hidden_size = config.embedding_dim // self.tp_size
         self.use_causal_mask = config.use_causal_mask
         self.num_heads = config.num_attention_head // self.tp_size
@@ -163,7 +163,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                     query,
                     key,
                     position_ids,
-                    self.layer_id,
+                    self.layer_idx,
                     self.beam_idx,
                     self.seq_len,
                 )
