@@ -2,7 +2,7 @@ import torch
 from typing import Optional, Tuple
 from functools import partial
 from transformers.modeling_outputs import BaseModelOutputWithPast
-from transformers.cache_utils import DynamicCache
+from transformers.cache_utils import Cache, DynamicCache
 
 from .transformer_modules.RoPE import ChatGLMRotaryEmbedding
 from .transformer_modules.Norm import LlamaRMSNorm
@@ -72,7 +72,13 @@ def GLMModel_forward(
 
     batch_size, seq_length = input_ids.shape
 
-    past_length = past_key_values.get_seq_length()
+    if past_key_values is None:
+        past_length = 0
+    elif isinstance(past_key_values, Cache):
+        past_length = past_key_values.get_seq_length()
+    else:
+        past_length = past_key_values[0][0].shape[2]
+
     cache_position = torch.arange(
         past_length, past_length + seq_length, device=input_ids.device
     )
@@ -82,7 +88,7 @@ def GLMModel_forward(
 
     if full_attention_mask is None:
         if (attention_mask is not None and not attention_mask.all()) or (
-            past_key_values.get_seq_length() != 0 and seq_length != 1
+            past_length != 0 and seq_length != 1
         ):
             full_attention_mask = self.get_masks(
                 input_ids, past_key_values, padding_mask=attention_mask

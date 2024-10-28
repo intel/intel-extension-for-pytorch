@@ -3,7 +3,7 @@ import math
 from functools import partial
 from typing import Optional, Tuple, List, Union
 from transformers.modeling_outputs import BaseModelOutputWithPast
-from transformers.cache_utils import DynamicCache
+from transformers.cache_utils import Cache, DynamicCache
 
 from .transformer_modules.Norm import LlamaRMSNorm
 from .transformer_modules.CacheUtils import IPEXStaticCache, CacheFormat
@@ -65,7 +65,12 @@ def BaichuanModel_forward(
 
     seq_length_with_past = seq_length
 
-    past_key_values_length = past_key_values.get_seq_length()
+    if past_key_values is None:
+        past_key_values_length = 0
+    elif isinstance(past_key_values, Cache):
+        past_key_values_length = past_key_values.get_seq_length()
+    else:
+        past_key_values_length = past_key_values[0][0].shape[2]
     seq_length_with_past = seq_length_with_past + past_key_values_length
 
     cache_position = torch.arange(
