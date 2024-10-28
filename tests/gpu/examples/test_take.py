@@ -2,17 +2,12 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
-import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skip(
-        reason="PT2.5: Total number of work-items in a work-group cannot exceed 512 for this kernel \
-            -54 (PI_ERROR_INVALID_WORK_GROUP_SIZE)"
-    )
     def test_take(self, dtype=torch.float):
         src = torch.rand(2, 3)
         print(src)
