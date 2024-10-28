@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Optional, Tuple, Union
 from transformers.modeling_outputs import BaseModelOutputWithPast
-from transformers.cache_utils import DynamicCache
+from transformers.cache_utils import Cache, DynamicCache
 from .transformer_modules.RoPE import GPTJRotaryEmbedding
 from ._transformers import MAX_OUT_SEQ_LEN
 from .transformer_modules.QuantizedAttention import (  # noqa F401
@@ -137,9 +137,10 @@ def GPTJModel_forward(
 
     if past_key_values is None:
         past_length = 0
-        past_key_values = tuple([None] * len(self.h))
-    else:
+    elif isinstance(past_key_values, Cache):
         past_length = past_key_values.get_seq_length()
+    else:
+        past_length = past_key_values[0][0].shape[2]
 
     cache_position = torch.arange(past_length, past_length + curr_len, device=device)
 
