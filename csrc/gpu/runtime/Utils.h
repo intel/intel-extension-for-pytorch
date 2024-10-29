@@ -21,6 +21,28 @@ static inline sycl::queue& dpcppGetCurrentQueue() {
   return at::xpu::getCurrentXPUStream().queue();
 }
 
+template <class KernelClass>
+static int64_t dpcppMaxWorkGroupSize(
+    at::DeviceIndex dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
+  auto q = c10::xpu::getCurrentXPUStream(dev_id).queue();
+  auto ctx = q.get_context();
+  auto dev = q.get_device();
+
+  auto kid = ::sycl::get_kernel_id<KernelClass>();
+  auto kbundle =
+      ::sycl::get_kernel_bundle<::sycl::bundle_state::executable>(ctx, {kid});
+
+  ::sycl::kernel k = kbundle.get_kernel(kid);
+  return k.get_info<::sycl::info::kernel_device_specific::work_group_size>(dev);
+}
+
+template <class KernelClass>
+static int64_t dpcppMaxWorkGroupSize(
+    KernelClass /*kfn*/,
+    at::DeviceIndex dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
+  return dpcppMaxWorkGroupSize<KernelClass>(dev_id);
+}
+
 static inline int64_t dpcppMaxWorkGroupSize(
     DeviceId dev_id = dpcppGetDeviceIdOfCurrentQueue()) {
   auto* dev_prop = at::xpu::getDeviceProperties(dev_id);

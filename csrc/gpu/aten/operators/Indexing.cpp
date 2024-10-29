@@ -1366,10 +1366,6 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
   idx_info.collapseDims();
 
   auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
-  auto wgroup_size = dpcppMaxWorkGroupSize(dev_id);
-  auto wgroup_range = (dst_num_elem + wgroup_size - 1) / wgroup_size;
-
   auto cgf = DPCPP_Q_CGF(cgh) {
     auto src_data = src.data_ptr<scalar_t>();
     auto dst_data = dst.data_ptr<scalar_t>();
@@ -1384,6 +1380,8 @@ void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
         src_data,
         dst_data,
         idx_data);
+    auto wgroup_size = dpcppMaxWorkGroupSize(kfn);
+    auto wgroup_range = (dst_num_elem + wgroup_size - 1) / wgroup_size;
 
     cgh.parallel_for<decltype(kfn)>(
         sycl::nd_range<1>({wgroup_range * wgroup_size}, {wgroup_size}), kfn);
