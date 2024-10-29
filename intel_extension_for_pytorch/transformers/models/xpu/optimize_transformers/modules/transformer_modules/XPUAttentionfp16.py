@@ -239,12 +239,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             key_prompt, value_prompt = past_key_value.get_prompt_for_beam_search(
                 self.layer_idx
             )
-            prompt_length = key_prompt.size(2)
             curr_len = key.size(2)
-            # TODO: remove this after ifmha support combined kv cache with both prompt
-            # and decode in [bs, curr_len, num_head, head_dim] layout
-            key = key[:, :, prompt_length:, :]
-            value = value[:, :, prompt_length:, :]
             # TODO: remove this after ifmha support [bs, curr_len, num_head, head_dim] layout
             if (
                 isinstance(past_key_value, IPEXStaticCache)
@@ -260,7 +255,6 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                         0,
                     )
                 )
-
             attention_output = torch.xpu.IpexSDP_Index(
                 query,
                 key_prompt,
@@ -401,7 +395,6 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         value = value.view(
             [value.shape[0], value.shape[1], self.num_kv_heads, self.head_dim]
         )
-
         # apply rope to qk
         query, key, value = self.rotary_embedding(
             query, key, value, past_key_value, position_ids, self.layer_idx, curr_len

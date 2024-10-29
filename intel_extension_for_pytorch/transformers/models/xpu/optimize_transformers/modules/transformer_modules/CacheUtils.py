@@ -166,19 +166,26 @@ try:
             layer_idx: int,
             key: torch.Tensor,
         ) -> Tuple[torch.Tensor, torch.Tensor]:
-            # return the key and value cache for decoding in shape of BNFH
+            # return the key and value cache for decoding
+            prompt_len = (
+                0 if len(self.key_prompt) == 0 else self.key_prompt[layer_idx].size(2)
+            )
             seqlen = self.update_or_get_seq_cnt(layer_idx) + key.size(2)
             if self.cache_format == CacheFormat.FBNH:
-                key = self.key_cache[layer_idx][:seqlen, :, :, :].permute(1, 2, 0, 3)
-                value = self.value_cache[layer_idx][:seqlen, :, :, :].permute(
+                key = self.key_cache[layer_idx][prompt_len:seqlen, :, :, :].permute(
+                    1, 2, 0, 3
+                )
+                value = self.value_cache[layer_idx][prompt_len:seqlen, :, :, :].permute(
                     1, 2, 0, 3
                 )
             elif self.cache_format == CacheFormat.BNFH:
-                key = self.key_cache[layer_idx][:, :, :seqlen, :]
-                value = self.value_cache[layer_idx][:, :, :seqlen, :]
+                key = self.key_cache[layer_idx][:, :, prompt_len:seqlen, :]
+                value = self.value_cache[layer_idx][:, :, prompt_len:seqlen, :]
             elif self.cache_format == CacheFormat.BFNH:
-                key = self.key_cache[layer_idx][:, :seqlen, :, :].permute(0, 2, 1, 3)
-                value = self.value_cache[layer_idx][:, :seqlen, :, :].permute(
+                key = self.key_cache[layer_idx][:, prompt_len:seqlen, :, :].permute(
+                    0, 2, 1, 3
+                )
+                value = self.value_cache[layer_idx][:, prompt_len:seqlen, :, :].permute(
                     0, 2, 1, 3
                 )
             return key, value
