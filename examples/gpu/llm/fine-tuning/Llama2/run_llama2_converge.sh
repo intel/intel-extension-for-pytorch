@@ -26,9 +26,7 @@ Run_llama2-7b_fsdp_alpaca_converge() {
         --warmup_ratio 0.03 \
         --lr_scheduler_type "cosine" \
         --logging_steps 1 \
-        --optim "adamw_torch_fused" \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' 2>&1 | tee llama2_fsdp_alpaca_adamfuse_bs4_3epoch_converge.log
+        --optim "adamw_torch_fused" 2>&1 | tee llama2_fsdp_alpaca_adamfuse_bs4_3epoch_converge.log
 
 }
 
@@ -57,9 +55,7 @@ Run_llama2-7b_fsdp_alpaca_peft_converge() {
         --warmup_ratio 0.03 \
         --lr_scheduler_type "cosine" \
         --logging_steps 1 \
-        --optim "adamw_torch_fused" \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' 2>&1 | tee llama2_fsdp_alpaca_peft_adamfuse_bs4_3epoch_converge.log
+        --optim "adamw_torch_fused" 2>&1 | tee llama2_fsdp_alpaca_peft_adamfuse_bs4_3epoch_converge.log
 }
 
 
@@ -87,9 +83,7 @@ Run_llama2-70b_fsdp_alpaca_peft_converge() {
         --weight_decay 0. \
         --warmup_ratio 0.03 \
         --lr_scheduler_type "cosine" \
-        --logging_steps 1 \
-        --fsdp "full_shard auto_wrap" \
-        --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' 2>&1 | tee llama2_70b_fsdp_alpaca_peft_bs1_3epoch_converge.log
+        --logging_steps 1 2>&1 | tee llama2_70b_fsdp_alpaca_peft_bs1_3epoch_converge.log
  
 }
 
