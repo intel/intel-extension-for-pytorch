@@ -7,24 +7,24 @@
     "commit": "llvmorg-16.0.6"
   },
   "pytorch": {
-    "version": "2.6.0.dev20241019+cpu"
+    "version": "2.6.0.dev20241027+cpu"
   },
   "torchaudio": {
-    "version": "2.5.0.dev20241019+cpu"
+    "version": "2.5.0.dev20241027+cpu"
   },
   "torchvision": {
-    "version": "0.20.0.dev20241018+cpu"
+    "version": "0.20.0.dev20241027+cpu"
   },
   "torch-ccl": {
     "commit": "v2.4.0+cpu+rc0",
     "version": "2.4.0+cpu"
   },
   "deepspeed": {
-    "version": "0.15.2",
-    "commit": "v0.15.2"
+    "version": "0.15.3",
+    "commit": "v0.15.3"
   },
   "oneCCL": {
-    "commit": "2021.11"
+    "commit": "2021.12"
   },
   "lm-evaluation-harness": {
     "commit": "cc9778fbe4fa1a709be2abed9deb6180fd40e7e2"

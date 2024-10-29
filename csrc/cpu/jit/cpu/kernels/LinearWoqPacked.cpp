@@ -395,6 +395,11 @@ IPEX_DEFINE_DISPATCH(woq_dequant_int4_to_int8_packed_stub);
 // Lowp_mode == 3:
 //     Dequantize weight to INT8 and compute compensation.
 static void _dequant_weight_and_cache_in_context(ContextLinearWoq& context) {
+  int64_t quant_w_mode = context.group_size_ > 0
+      ? (context.zero_points_list_[0].defined() ? QUANT_W_PER_K_BLOCK
+                                                : QUANT_W_PER_K_BLOCK_SYM)
+      : (context.zero_points_list_[0].defined() ? QUANT_W_PER_CHANNEL
+                                                : QUANT_W_PER_CHANNEL_SYM);
   if (context.lowp_mode_ == 2) {
     // Requres g_idx disabled, and N/K divisible by block size
     auto N = context.weight_shape_[0];
@@ -411,11 +416,22 @@ static void _dequant_weight_and_cache_in_context(ContextLinearWoq& context) {
           .to(c10::kBFloat16);
     };
     at::Tensor scale, zp;
-    scale = context.scales_list_[0].unsqueeze(-1);
-    if (context.weight_dtype_ != WOQ_DTYPE_NF4) {
-      zp = context.zero_points_list_[0].unsqueeze(-1);
+    if ((quant_w_mode == QUANT_W_PER_K_BLOCK ||
+         quant_w_mode == QUANT_W_PER_K_BLOCK_SYM) &&
+        context.at_weight_.dim() == 4) {
+      // [#block_n, #block_k, n_block_size] -> [N, #block_k]
+      scale = context.scales_list_[2].permute({0, 2, 1}).contiguous();
+      scale = scale.view({-1, scale.size(-1), 1});
+      if (context.zero_points_list_[2].defined()) {
+        zp = context.zero_points_list_[2].permute({0, 2, 1}).contiguous();
+        zp = zp.view({-1, zp.size(-1), 1});
+      }
+    } else {
+      scale = context.scales_list_[2].unsqueeze(-1);
+      if (context.zero_points_list_[2].defined()) {
+        zp = context.zero_points_list_[2].unsqueeze(-1);
+      }
     }
-    int64_t quant_w_mode = context.group_size_ > 0 ? 1 : 0;
     auto dequant_weight = torch_ipex::cpu::dequantize_woq_weight(
         unpacked_weight,
         context.weight_shape_,
@@ -431,6 +447,10 @@ static void _dequant_weight_and_cache_in_context(ContextLinearWoq& context) {
   } else if (context.lowp_mode_ == 3) {
     if (context.at_weight_.dim() != 4)
       return;
+    // You don't have to cache extra INT8 weight for lowp-mode INT8
+    // Because you compute with INT8 weight directly
+    if (context.weight_dtype_ == WOQ_DTYPE_INT8)
+      return;
     auto w_sizes = context.at_weight_.sizes();
     auto Nc = w_sizes[0];
     auto Kc = w_sizes[1];
@@ -438,7 +458,6 @@ static void _dequant_weight_and_cache_in_context(ContextLinearWoq& context) {
     auto Nb = w_sizes[3] * 2;
     at::Tensor compensation =
         at::empty({Nc, Kc, Nb}, device(c10::kCPU).dtype(c10::kInt));
-    int64_t quant_w_mode = context.group_size_ > 0 ? 1 : 0;
     auto new_weight = woq_dequant_int4_to_int8_packed_stub(
         kCPU,
         context.at_weight_,

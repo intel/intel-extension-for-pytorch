@@ -1981,6 +1981,7 @@ void qlinear_woq_affine_dequant_upfront_impl(
             auto dequant_loop =
                 ThreadedLoop<2>({{Nc}, {0, Kc, Kc}}, loop_scheme);
             constexpr const int N_GROUP_SIZE = get_n_group_size(block_n);
+            constexpr bool sym_quant_w = !is_asymmetric_quant_w(quant_w_mode);
             dequant_loop(
                 [&](int* idx) {
                   int nc = idx[0];
@@ -2009,7 +2010,7 @@ void qlinear_woq_affine_dequant_upfront_impl(
                         block_n,
                         N_GROUP_SIZE,
                         qw_type_,
-                        quant_w_mode>::
+                        sym_quant_w>::
                         call(
                             pw[nc][kc],
                             Kb,
@@ -4952,6 +4953,8 @@ at::Tensor dequantize_int4_weight_to_int8_packed(
                         zp_w = pzps[nc][quant_offset];
                       }
                     }
+                    constexpr bool sym_quant_w =
+                        !is_asymmetric_quant_w(quant_w_mode);
                     // quant_a_mode is used to determine whether compensation is
                     // needed or not Here we assume compensation is always
                     // needed.
@@ -4961,7 +4964,7 @@ at::Tensor dequantize_int4_weight_to_int8_packed(
                         block_n,
                         N_GROUP_SIZE,
                         /*qw_type*/ QINT4,
-                        quant_w_mode>::
+                        sym_quant_w>::
                         template call<quant_a_mode>(
                             pw[nc][kc],
                             Kb,

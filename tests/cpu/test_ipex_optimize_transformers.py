@@ -523,6 +523,13 @@ class OptimizeTransformersTester(TestCase):
                     ipex_res = ipex_m.generate(input_ids, **generate_kwargs)
                     ref_res = ref_m.generate(input_ids, **generate_kwargs)
                     self.assertEqual(ipex_res, ref_res)
+                    ipex_res_dict = ipex_m.generate(
+                        input_ids, return_dict_in_generate=True, **generate_kwargs
+                    )
+                    ref_res_dict = ref_m.generate(
+                        input_ids, return_dict_in_generate=True, **generate_kwargs
+                    )
+                    self.assertEqual(ipex_res_dict.sequences, ref_res_dict.sequences)
 
     def test_cache_weight_for_large_batch(self):
         config = AutoConfig.from_pretrained(

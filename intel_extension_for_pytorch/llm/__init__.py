@@ -17,6 +17,7 @@ try:
         _get_class_from_dynamic_module,
         _get_cached_module_file,
         _get_imports,
+        _pad,
     )
     import transformers
 
@@ -32,5 +33,6 @@ try:
     transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_enable = (
         _gradient_checkpointing_enable
     )
+    transformers.tokenization_utils_base.PreTrainedTokenizerBase.pad = _pad
 except ImportError:
     pass

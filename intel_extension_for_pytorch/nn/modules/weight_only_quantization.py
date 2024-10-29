@@ -287,14 +287,16 @@ class WeightOnlyQuantizedLinear(nn.Module):
         lowp_mode = 2
         act_quant_mode = 1
         cache_weight_for_large_batch = False
-        if qconfig is not None:
+
+        if qconfig is not None and hasattr(qconfig, "global_qconfig"):
             if hasattr(qconfig.global_qconfig, "lowp_mode"):
                 lowp_mode = qconfig.global_qconfig.lowp_mode
             if hasattr(qconfig.global_qconfig, "act_quant_mode"):
                 act_quant_mode = qconfig.global_qconfig.act_quant_mode
             if hasattr(qconfig.global_qconfig, "cache_weight_for_large_batch"):
                 cache_weight_for_large_batch = (
-                    qconfig.global_qconfig.cache_weight_for_large_batch and lowp_mode in (2, 3)
+                    qconfig.global_qconfig.cache_weight_for_large_batch
+                    and lowp_mode in (2, 3)
                 )
 
         w_dtype = qweight.dtype

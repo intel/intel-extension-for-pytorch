@@ -2,33 +2,18 @@ import torch
 from torch import nn
 import torch.distributed as dist
 import warnings
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Union, List
 from transformers.generation.stopping_criteria import (
     StoppingCriteriaList,
     validate_stopping_criteria,
 )
 from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.streamers import BaseStreamer
-from transformers.utils import ModelOutput
 import time
-
-
-class SampleEncoderDecoderOutput(ModelOutput):
-    sequences: torch.LongTensor = None
-    scores: Optional[Tuple[torch.FloatTensor]] = None
-    encoder_attentions: Optional[Tuple[torch.FloatTensor]] = None
-    encoder_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    decoder_attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    cross_attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    decoder_hidden_states: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-
-
-class SampleDecoderOnlyOutput(ModelOutput):
-    sequences: torch.LongTensor = None
-    scores: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    hidden_states: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-
+from transformers.generation.utils import (
+    SampleEncoderDecoderOutput,
+    SampleDecoderOnlyOutput,
+)
 
 SampleOutput = Union[SampleEncoderDecoderOutput, SampleDecoderOnlyOutput]
 
@@ -52,6 +37,7 @@ def _sample(
 ) -> Union[SampleOutput, torch.LongTensor]:
     new_generation_config = model_kwargs.pop("generation_config", None)
     if new_generation_config is not None:
+        return_dict_in_generate = new_generation_config.return_dict_in_generate
         if not new_generation_config.do_sample:
             pad_token_id = new_generation_config._pad_token_tensor
             eos_token_id = new_generation_config._eos_token_tensor

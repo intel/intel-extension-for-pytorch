@@ -230,7 +230,7 @@ parser.add_argument(
         "PER_BATCH_SYM",
         "PER_BATCH_IC_BLOCK_SYM",
     ],
-    default="PER_IC_BLOCK",
+    default="PER_BATCH_IC_BLOCK_SYM",
     type=str,
     help="Quantization mode for activation with different granularity. "
     "For lowp-mode=INT8 only. For other cases, it has no effect. "
