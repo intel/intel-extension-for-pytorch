@@ -1100,7 +1100,7 @@ elif args.ipex_weight_only_quantization:
         assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
         if os.path.isfile(pathname):
             low_precision_checkpoint = None
-            if pathname.endswith(".pt") or pathname.endswith(".pth"):
+            if pathname.endswith((".pt", ".pth", ".bin")):
                 low_precision_checkpoint = torch.load(pathname, weights_only=True)
             elif pathname.endswith(".safetensors"):
                 try:
@@ -1113,13 +1113,13 @@ elif args.ipex_weight_only_quantization:
                 low_precision_checkpoint = safetensors.torch.load_file(pathname)
             assert (
                 low_precision_checkpoint is not None
-            ), f"Invalid checkpoint file: {pathname}. Should be a .pt, .pth or .safetensors file."
+            ), f"Invalid checkpoint file: {pathname}. Should be a .pt, .pth, .bin or .safetensors file."
 
             quant_method = {"quant_method": "gptq"}
 
         elif os.path.isdir(pathname):
             low_precision_checkpoint = {}
-            for pattern in ["*.pt", "*.pth"]:
+            for pattern in ["*.pt", "*.pth", "*.bin"]:
                 files = list(pathlib.Path(pathname).glob(pattern))
                 if files:
                     for f in files:
@@ -1141,7 +1141,7 @@ elif args.ipex_weight_only_quantization:
                         low_precision_checkpoint.update(data_f)
             assert (
                 len(low_precision_checkpoint) > 0
-            ), f"Cannot find checkpoint (.pt/.pth/.safetensors) files in path {pathname}."
+            ), f"Cannot find checkpoint (.pt/.pth/.bin/.safetensors) files in path {pathname}."
 
             try:
                 with open(pathname + "/config.json") as f:
