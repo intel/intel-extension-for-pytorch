@@ -574,7 +574,10 @@ class HuggingFaceModel(BaseLM):
             model_kwargs = {"attention_mask": attention_mask_batched}
             model_kwargs = (
                 self.base_model._prepare_encoder_decoder_kwargs_for_generation(
-                    inputs, model_kwargs, "input_ids"
+                    inputs,
+                    model_kwargs,
+                    "input_ids",
+                    transformers.generation.configuration_utils.GenerationConfig(),
                 )
             )
             (

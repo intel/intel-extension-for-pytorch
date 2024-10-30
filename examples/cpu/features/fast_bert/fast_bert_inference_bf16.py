@@ -1,7 +1,7 @@
 import torch
 from transformers import BertModel
 
-model = BertModel.from_pretrained("bert-base-uncased")
+model = BertModel.from_pretrained("bert-base-uncased", attn_implementation="eager")
 model.eval()
 
 vocab_size = model.config.vocab_size
