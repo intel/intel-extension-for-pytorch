@@ -462,7 +462,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
 
         if xpu_gemm_use_xetla(self.force_xetla):
             # TODO input.shape[1] > 1 seems not work on gidx scenario, need to fix this bug
-            if input.shape[1] > 1 and not self.force_xetla:
+            if input.dim() == 3:
+                m = input.size(1)
+            else:
+                m = input.size(0)
+            if m > 1:
                 return dequant_gemm_block(input, self)
             return torch.ops.torch_ipex.mm_low_bits(
                 input,
@@ -578,7 +582,7 @@ def convert_qmodel(model, dtype, group_size):
 
 def dequant_gemm_block(input, quant_layer, output=None):
     if quant_layer.g_idx is not None:
-        input = input[:, :, quant_layer.g_idx]
+        input = input[..., quant_layer.g_idx]
     if output is None:
         output = torch.ops.torch_ipex.mm_common(
             input,
