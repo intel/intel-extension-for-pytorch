@@ -2,7 +2,7 @@ import torch
 from transformers import BertForSequenceClassification
 
 model = BertForSequenceClassification.from_pretrained(
-    "bert-base-uncased", return_dict=True
+    "bert-base-uncased", return_dict=True, attn_implementation="eager"
 )
 model.train()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)

@@ -8,6 +8,7 @@ from datasets import load_dataset
 
 import torch
 from torch.utils.data import DataLoader
+import transformers
 from transformers import AutoConfig
 from transformers import TextStreamer
 import intel_extension_for_pytorch as ipex
@@ -842,12 +843,11 @@ if args.ipex_smooth_quant:
                 elif model.example_inputs_mode == EXAMPLE_INPUTS_MODE.KV_ENC:
                     input_bs = int(args.batch_size * num_beams)
                     model_kwargs = {}
-                    model_kwargs = (
-                        user_model._prepare_encoder_decoder_kwargs_for_generation(
-                            torch.vstack(input_ids_padded).unsqueeze(0),
-                            model_kwargs,
-                            "input_features",
-                        )
+                    model_kwargs = user_model._prepare_encoder_decoder_kwargs_for_generation(
+                        torch.vstack(input_ids_padded).unsqueeze(0),
+                        model_kwargs,
+                        "input_features",
+                        transformers.generation.configuration_utils.GenerationConfig(),
                     )
                     last_hidden_state = model_kwargs["encoder_outputs"][
                         "last_hidden_state"

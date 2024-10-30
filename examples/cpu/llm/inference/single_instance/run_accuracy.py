@@ -346,7 +346,10 @@ class HuggingFaceModel(BaseLM):
             model_kwargs = {"attention_mask": attention_mask_batched}
             model_kwargs = (
                 self.base_model._prepare_encoder_decoder_kwargs_for_generation(
-                    inputs, model_kwargs, "input_ids"
+                    inputs,
+                    model_kwargs,
+                    "input_ids",
+                    transformers.generation.configuration_utils.GenerationConfig(),
                 )
             )
             (
@@ -888,7 +891,7 @@ class LMMS(lmms):
         self._config = self._model.config
         self._config.torchscript = self._with_jit
         self._model.eval()
-        if with_ipex and dtype not in ["int8", "int4", "nf4"]:
+        if with_ipex:
             self._model = ipex.llm.optimize(
                 self._model.eval(),
                 dtype=infer_dtype,
@@ -1389,6 +1392,8 @@ class LMMS(lmms):
                     "num_beams": gen_kwargs["num_beams"],
                     "max_new_tokens": gen_kwargs["max_new_tokens"],
                 }
+                if not self._with_ipex:
+                    input_dict["use_cache"] = False
             elif re.search("git", self.model.config.architectures[0], re.IGNORECASE):
                 input_ids = self._image_processor(
                     images=visuals, return_tensors="pt"
