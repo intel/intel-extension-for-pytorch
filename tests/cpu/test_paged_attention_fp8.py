@@ -4,7 +4,6 @@ import unittest
 import random
 from typing import List, Optional, Tuple
 from itertools import product
-import intel_extension_for_pytorch._C as core
 
 
 class PagedAttentionTest(TestCase):
@@ -17,6 +16,7 @@ class PagedAttentionTest(TestCase):
         head_size: int,
         dtype: torch.dtype,
         seed: int,
+        is_zeros: bool,
     ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         torch.random.manual_seed(seed)
         torch.manual_seed(seed)
@@ -25,15 +25,21 @@ class PagedAttentionTest(TestCase):
         key_cache_shape = (num_blocks, num_head, block_size, head_size)
         key_caches = []
         for _ in range(num_layer):
-            key_cache = torch.empty(size=key_cache_shape, dtype=dtype)
-            key_cache.uniform_(-scale, scale)
+            if not is_zeros:
+                key_cache = torch.empty(size=key_cache_shape, dtype=dtype)
+                key_cache.uniform_(-scale, scale)
+            else:
+                key_cache = torch.zeros(size=key_cache_shape, dtype=dtype)
             key_caches.append(key_cache)
 
         value_cache_shape = (num_blocks, num_head, block_size, head_size)
         value_caches = []
         for _ in range(num_layer):
-            value_cache = torch.empty(size=value_cache_shape, dtype=dtype)
-            value_cache.uniform_(-scale, scale)
+            if not is_zeros:
+                value_cache = torch.empty(size=value_cache_shape, dtype=dtype)
+                value_cache.uniform_(-scale, scale)
+            else:
+                value_cache = torch.zeros(size=key_cache_shape, dtype=dtype)
             value_caches.append(value_cache)
         return key_caches, value_caches
 
@@ -119,8 +125,12 @@ class PagedAttentionTest(TestCase):
         num_blocks: int,
         block_size: int,
         dtype: torch.dtype,
+        qtype: torch.dtype,
         seed: int,
     ) -> None:
+        k_scale = 1.0
+        v_scale = 1.0
+
         random.seed(seed)
         torch.random.manual_seed(seed)
         torch.manual_seed(seed)
@@ -170,24 +180,28 @@ class PagedAttentionTest(TestCase):
 
         # Create the KV caches.
         key_caches, value_caches = self.create_kv_caches(
-            num_blocks, block_size, 1, num_kv_head, head_size, dtype, seed
+            num_blocks, block_size, 1, num_kv_head, head_size, dtype, seed, False
         )
         key_cache, value_cache = key_caches[0], value_caches[0]
+        key_cache_fp8 = key_cache.to(qtype)
+        value_cache_fp8 = value_cache.to(qtype)
+        key_cache = key_cache_fp8.to(dtype)
+        value_cache = value_cache_fp8.to(dtype)
         # Call the paged attention kernel.
         output = torch.empty_like(query)
         torch.ops.torch_ipex.single_query_cached_kv_attention(
             output,
             query,
-            key_cache,
-            value_cache,
+            key_cache_fp8,
+            value_cache_fp8,
             head_mapping,
             scale,
             block_tables,
             context_lens,
             block_size,
             max_context_len,
-            1.0,
-            1.0,
+            k_scale,
+            v_scale,
             alibi_slopes,
         )
 
@@ -208,9 +222,12 @@ class PagedAttentionTest(TestCase):
 
     def test_paged_attention(self):
         num_blocks = 128
-        dtypes = [torch.bfloat16, torch.float]
-        if core.onednn_has_fp16_support():
-            dtypes.append(torch.float16)
+        dtypes = [
+            torch.bfloat16,
+        ]
+        qtypes = [
+            torch.float8_e5m2,
+        ]
         num_gen_seqs = [7]  # Arbitrary values for testing
         num_heads = [(40, 40), (64, 16)]  # Arbitrary values for testing
         head_sizes = [64, 80, 128, 96, 112, 128, 256]
@@ -224,6 +241,7 @@ class PagedAttentionTest(TestCase):
             use_alibi,
             block_size,
             dtype,
+            qtype,
             seed,
         ) in product(
             num_gen_seqs,
@@ -232,6 +250,7 @@ class PagedAttentionTest(TestCase):
             use_alibis,
             block_sizes,
             dtypes,
+            qtypes,
             seeds,
         ):
             self._test_paged_attention_func(
@@ -242,6 +261,7 @@ class PagedAttentionTest(TestCase):
                 num_blocks,
                 block_size,
                 dtype,
+                qtype,
                 seed,
             )
 
@@ -253,13 +273,20 @@ class PagedAttentionTest(TestCase):
         block_size: int,
         num_blocks: int,
         dtype: torch.dtype,
+        qtype: torch.dtype,
         seed: int,
-        key_is_contiguous: bool,
-        value_is_contiguous: bool,
     ) -> None:
         random.seed(seed)
         torch.random.manual_seed(seed)
         torch.manual_seed(seed)
+
+        # E5M2 not need to support scale
+        if qtype == torch.float8_e5m2:
+            k_scale = 1.0
+            v_scale = 1.0
+        else:
+            k_scale = 2.0
+            v_scale = 2.0
 
         # Create a random slot mapping.
         num_slots = block_size * num_blocks
@@ -268,25 +295,25 @@ class PagedAttentionTest(TestCase):
 
         qkv = torch.randn(num_token, 3, num_head, head_size, dtype=dtype, device="cpu")
         _, key, value = qkv.unbind(dim=1)
-        if key.shape[0] != 1:
-            if not key_is_contiguous:
-                key = key.transpose(0, 1).contiguous()
-                key = key.transpose(0, 1)
-            if not value_is_contiguous:
-                value = value.transpose(0, 1).contiguous()
-                value = value.transpose(0, 1)
+        key = key.to(qtype).to(dtype)
+        value = value.to(qtype).to(dtype)
         # Create the KV caches.
         key_caches, value_caches = self.create_kv_caches(
-            num_blocks, block_size, 1, num_head, head_size, dtype, seed
+            num_blocks, block_size, 1, num_head, head_size, dtype, seed, True
         )
         key_cache, value_cache = key_caches[0], value_caches[0]
+        key_cache = key_cache.to(qtype).to(dtype)
+        value_cache = value_cache.to(qtype).to(dtype)
         # Clone the KV caches.
         cloned_key_cache = key_cache.clone()
         cloned_value_cache = value_cache.clone()
 
+        key_cache_fp8 = key_cache.to(qtype)
+        value_cache_fp8 = value_cache.to(qtype)
+
         # Call the reshape_and_cache kernel.
         torch.ops.torch_ipex.reshape_and_cache(
-            key, value, key_cache, value_cache, slot_mapping, 1.0, 1.0
+            key, value, key_cache_fp8, value_cache_fp8, slot_mapping, k_scale, v_scale
         )
 
         # Run the reference implementation.
@@ -301,8 +328,8 @@ class PagedAttentionTest(TestCase):
                 cloned_key_cache[block_idx, j, block_offset, :] = key[i][j]
                 cloned_value_cache[block_idx, j, block_offset, :] = value[i][j]
 
-        assert torch.allclose(key_cache, cloned_key_cache)
-        assert torch.allclose(value_cache, cloned_value_cache)
+        assert torch.allclose(key_cache_fp8.to(dtype), cloned_key_cache * k_scale)
+        assert torch.allclose(value_cache_fp8.to(dtype), cloned_value_cache * v_scale)
 
     def test_reshape_and_cache(self):
         num_blocks = 128  # Arbitrary values for testing
@@ -311,10 +338,9 @@ class PagedAttentionTest(TestCase):
         head_sizes = [64, 80, 128, 96, 112, 128, 256]
         block_sizes = [16, 32]
         dtypes = [torch.bfloat16, torch.float]
-        key_modes = [True, False]
-        value_modes = [True, False]
-        if core.onednn_has_fp16_support():
-            dtypes.append(torch.float16)
+        qtypes = [
+            torch.float8_e5m2,
+        ]
         seeds = [0]
         for (
             num_token,
@@ -322,18 +348,16 @@ class PagedAttentionTest(TestCase):
             head_size,
             block_size,
             dtype,
+            qtype,
             seed,
-            key_is_contiguous,
-            value_is_contiguous,
         ) in product(
             num_tokens,
             num_kv_heads,
             head_sizes,
             block_sizes,
             dtypes,
+            qtypes,
             seeds,
-            key_modes,
-            value_modes,
         ):
             self._test_reshape_and_cache_func(
                 num_token,
@@ -342,9 +366,8 @@ class PagedAttentionTest(TestCase):
                 block_size,
                 num_blocks,
                 dtype,
+                qtype,
                 seed,
-                key_is_contiguous,
-                value_is_contiguous,
             )
 
 

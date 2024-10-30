@@ -393,6 +393,8 @@ class _IPEXPagedAttentionCPU:
         scale,
         is_causal,
         block_table,
+        k_scale,
+        v_scale,
         alibi_slopes=None,
     ):
         torch.ops.torch_ipex.flash_attn_varlen_func(
@@ -407,6 +409,8 @@ class _IPEXPagedAttentionCPU:
             scale,
             is_causal,
             block_table,
+            k_scale,
+            v_scale,
             alibi_slopes,
         )
 

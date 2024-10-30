@@ -44,6 +44,51 @@ namespace cpu {
 
 namespace {
 
+namespace fp8 {
+
+template <typename DST_T, typename SRC_T>
+void scaled_convert(
+    const SRC_T* src_ptr,
+    DST_T* dst_ptr,
+    size_t len,
+    float scale) {
+  torch_ipex::cpu::kernel::move_ker<DST_T, SRC_T>(dst_ptr, src_ptr, len);
+}
+
+template <>
+void scaled_convert<at::Float8_e5m2, float>(
+    const float* src_ptr,
+    at::Float8_e5m2* dst_ptr,
+    size_t len,
+    float scale) {
+  size_t idx_offset = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  torch_ipex::cpu::kernel::cvt_fp32_e5m2_rne_intrinsic(src_ptr, dst_ptr, len);
+#else
+  for (size_t i = 0; i < len; i++) {
+    dst_ptr[i] = static_cast<at::Float8_e5m2>(src_ptr[i]);
+  }
+#endif
+}
+
+template <>
+void scaled_convert<at::Float8_e5m2, at::BFloat16>(
+    const at::BFloat16* src_ptr,
+    at::Float8_e5m2* dst_ptr,
+    size_t len,
+    float scale) {
+  size_t idx_offset = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  torch_ipex::cpu::kernel::cvt_bf16_e5m2_rne_intrinsic(src_ptr, dst_ptr, len);
+#else
+  for (size_t i = 0; i < len; i++) {
+    dst_ptr[i] = static_cast<at::Float8_e5m2>(src_ptr[i]);
+  }
+#endif
+}
+
+} // namespace fp8
+
 inline c10::SymFloat calculate_scale(
     const at::Tensor& query,
     c10::optional<double> scale) {
@@ -84,6 +129,102 @@ void reduce_head(
 #endif
 }
 
+#if defined(CPU_CAPABILITY_AVX512)
+void _reduce_head_e5m2(
+    const at::BFloat16* q_ptr_start,
+    const at::Float8_e5m2* k_ptr_start,
+    float* attn_w_pos,
+    int64_t head_size) {
+  using namespace torch_ipex::cpu::kernel;
+  auto hsi = 0;
+  auto vec_size = 32;
+  auto qk_sum_vec = _mm512_setzero_ps();
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    auto k_vec_ =
+        _mm512_cvte5m2_fp16(_mm256_loadu_si256((__m256i*)&k_ptr_start[hsi]));
+    auto k_vec0 = _mm512_cvtph_ps(_mm512_extracti64x4_epi64(k_vec_, 0));
+    auto k_vec1 = _mm512_cvtph_ps(_mm512_extracti64x4_epi64(k_vec_, 1));
+    auto q_vec0 = _loadu(q_ptr_start + hsi);
+    auto q_vec1 = _loadu(q_ptr_start + hsi + 16);
+    qk_sum_vec = _mm512_fmadd_ps(q_vec0, k_vec0, qk_sum_vec);
+    qk_sum_vec = _mm512_fmadd_ps(q_vec1, k_vec1, qk_sum_vec);
+  }
+  attn_w_pos[0] += _mm512_reduce_add_ps(qk_sum_vec);
+  for (; hsi < head_size; hsi++) {
+    attn_w_pos[0] += q_ptr_start[hsi] * (float)k_ptr_start[hsi];
+  }
+}
+
+inline void _mul_and_accumulate_e5m2(
+    const float& attn_w,
+    const at::Float8_e5m2* v_ptr_start,
+    float* attn_out_start,
+    int64_t head_size,
+    int accumulated) {
+  using namespace torch_ipex::cpu::kernel;
+  auto hsi = 0;
+  auto vec_size = 32;
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    auto attn_w_vec = _mm512_set1_ps(attn_w);
+    auto v_vec_ =
+        _mm512_cvte5m2_fp16(_mm256_loadu_si256((__m256i*)&v_ptr_start[hsi]));
+    auto v_vec0 = _mm512_cvtph_ps(_mm512_extracti64x4_epi64(v_vec_, 0));
+    auto v_vec1 = _mm512_cvtph_ps(_mm512_extracti64x4_epi64(v_vec_, 1));
+    if (accumulated) {
+      auto attn_out_vec0 = _loadu(attn_out_start + hsi);
+      auto attn_out_vec1 = _loadu(attn_out_start + hsi + 16);
+      auto attn_out_vec_new0 =
+          _mm512_fmadd_ps(attn_w_vec, v_vec0, attn_out_vec0);
+      auto attn_out_vec_new1 =
+          _mm512_fmadd_ps(attn_w_vec, v_vec1, attn_out_vec1);
+      _storeu(attn_out_start + hsi, attn_out_vec_new0);
+      _storeu(attn_out_start + hsi + 16, attn_out_vec_new1);
+    } else {
+      auto attn_out_vec_new0 = _mm512_mul_ps(attn_w_vec, v_vec0);
+      auto attn_out_vec_new1 = _mm512_mul_ps(attn_w_vec, v_vec1);
+      _storeu(attn_out_start + hsi, attn_out_vec_new0);
+      _storeu(attn_out_start + hsi + 16, attn_out_vec_new1);
+    }
+  }
+  for (; hsi < head_size; hsi++) {
+    if (accumulated) {
+      attn_out_start[hsi] += attn_w * (float)v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * (float)v_ptr_start[hsi];
+    }
+  }
+}
+#endif
+
+template <>
+void reduce_head<at::BFloat16, at::Float8_e5m2>(
+    const at::BFloat16* q_ptr_start,
+    int64_t kv_head_group_size,
+    const at::Float8_e5m2* k_cache_start,
+    float* attn_w_pos,
+    int attn_w_stride,
+    int64_t head_size) {
+#if defined(CPU_CAPABILITY_AVX512)
+  for (auto i = 0; i < kv_head_group_size; i++) {
+    attn_w_pos[i * attn_w_stride] = 0;
+    _reduce_head_e5m2(
+        q_ptr_start + i * head_size,
+        k_cache_start,
+        attn_w_pos + i * attn_w_stride,
+        head_size);
+  }
+#else
+  for (auto i = 0; i < kv_head_group_size; i++) {
+    attn_w_pos[i * attn_w_stride] = 0;
+    for (auto hsi = 0; hsi < head_size; hsi++) {
+      attn_w_pos[i * attn_w_stride] +=
+          (float)q_ptr_start[i * head_size + hsi] * (float)k_cache_start[hsi];
+    }
+  }
+
+#endif
+}
+
 template <typename OT, typename CT>
 inline void mul_attenion_weights_and_value_of_head(
     const float* attn_w,
@@ -94,7 +235,6 @@ inline void mul_attenion_weights_and_value_of_head(
     int kv_head_group_size,
     int64_t head_size,
     bool accumulated) {
-  auto vec_size = 16; // 512/32
   auto hsi = 0;
 #if defined(CPU_CAPABILITY_AVX512)
   for (auto i = 0; i < kv_head_group_size; i++) {
@@ -105,6 +245,41 @@ inline void mul_attenion_weights_and_value_of_head(
         head_size,
         false,
         nullptr,
+        accumulated);
+  }
+#else
+  for (auto i = 0; i < kv_head_group_size; i++) {
+    for (hsi = 0; hsi < head_size; hsi++) {
+      if (accumulated) {
+        attn_out_start[i * attn_out_strideH + hsi] +=
+            attn_w[i * attn_w_stride] * (float)v_cache_start[hsi];
+      } else {
+        attn_out_start[i * attn_out_strideH + hsi] =
+            attn_w[i * attn_w_stride] * (float)v_cache_start[hsi];
+      }
+    }
+  }
+#endif
+}
+
+template <>
+inline void mul_attenion_weights_and_value_of_head<float, at::Float8_e5m2>(
+    const float* attn_w,
+    int attn_w_stride,
+    const at::Float8_e5m2* v_cache_start,
+    float* attn_out_start,
+    int attn_out_strideH,
+    int kv_head_group_size,
+    int64_t head_size,
+    bool accumulated) {
+  auto hsi = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  for (auto i = 0; i < kv_head_group_size; i++) {
+    _mul_and_accumulate_e5m2(
+        attn_w[i * attn_w_stride],
+        v_cache_start,
+        attn_out_start + i * attn_out_strideH,
+        head_size,
         accumulated);
   }
 #else
@@ -234,10 +409,12 @@ inline void _mul_reduce_max_fusion_kernel(
  * @param block_size    The block size which means the number of token in every
  * block.
  * @param max_context_len Maximum context length.
+ * @param k_scale       Scaling factor for key cache of data type fp8.
+ * @param v_scale       Scaling factor for value cache of data type fp8.
  * @param alibi_slopes  Optional tensor of alibi slopes with the shape of
  * (num_heads).
  */
-template <typename scalar_t>
+template <typename scalar_t, typename cache_t>
 void single_query_cached_kv_attention_kernel(
     at::Tensor& out,
     at::Tensor& query,
@@ -248,11 +425,13 @@ void single_query_cached_kv_attention_kernel(
     at::Tensor& context_lens,
     int64_t block_size,
     int64_t max_context_len,
+    const double k_scale,
+    const double v_scale,
     const c10::optional<at::Tensor>& alibi_slopes) {
   auto out_ptr = out.data_ptr<scalar_t>();
   auto query_ptr = query.data_ptr<scalar_t>();
-  auto key_cache_ptr = key_cache.data_ptr<scalar_t>();
-  auto value_cache_ptr = value_cache.data_ptr<scalar_t>();
+  auto key_cache_ptr = key_cache.data_ptr<cache_t>();
+  auto value_cache_ptr = value_cache.data_ptr<cache_t>();
   auto block_tables_ptr = block_tables.data_ptr<int>();
   auto context_lens_ptr = context_lens.data_ptr<int>();
   auto alibi_slopes_ptr = alibi_slopes.has_value()
@@ -509,7 +688,6 @@ void single_query_cached_kv_attention_kernel(
           head_size);
     }
   }
-
 } // single_query_cached_kv_attention_kernel
 
 /**
@@ -531,6 +709,8 @@ void single_query_cached_kv_attention_kernel(
  * sequences. For sequence i, the slot_mapping[i]//block_number can get the
  * block index, and the slot_mapping%block_size can get the offset of this
  * block.
+ * @param k_scale Scaling factor for key cache of data type fp8.
+ * @param v_scale Scaling factor for value cache of data type fp8.
  *
  * @tparam DST_T The data type of the output tensors.
  * @tparam SRC_T The data type of the input tensors.
@@ -541,7 +721,9 @@ void reshape_and_cache_kernel(
     at::Tensor& value,
     at::Tensor& key_cache,
     at::Tensor& value_cache,
-    at::Tensor& slot_mapping) {
+    at::Tensor& slot_mapping,
+    const double k_scale,
+    const double v_scale) {
   auto num_tokens = key.size(0);
   auto head_num = key.size(1);
   auto head_size = key.size(2);
@@ -573,10 +755,10 @@ void reshape_and_cache_kernel(
       auto key_ptr_start = key_ptr + key_state_offset;
       auto value_cache_start = value_cache_ptr + cache_offset;
       auto value_ptr_start = value_ptr + value_state_offset;
-      torch_ipex::cpu::kernel::move_ker<DST_T, SRC_T>(
-          key_cache_start, key_ptr_start, head_size);
-      torch_ipex::cpu::kernel::move_ker<DST_T, SRC_T>(
-          value_cache_start, value_ptr_start, head_size);
+      fp8::scaled_convert<DST_T, SRC_T>(
+          key_ptr_start, key_cache_start, head_size, k_scale);
+      fp8::scaled_convert<DST_T, SRC_T>(
+          value_ptr_start, value_cache_start, head_size, v_scale);
     }
   }
 }
@@ -609,7 +791,7 @@ void reshape_and_cache_kernel(
  * by this kernel. The decode tokens are processed by the
  * single_query_cached_kv_attention_kernel.
  */
-template <typename scalar_t, int64_t q_split_size = 16>
+template <typename scalar_t, typename cache_t, int64_t q_split_size = 16>
 void flash_attn_varlen_kernel(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
     at::Tensor& query, // [num_seqs, num_heads, head_size]
@@ -625,6 +807,8 @@ void flash_attn_varlen_kernel(
     const double softmax_scale, // scale for softmax
     bool is_causal, // whether the attention is causal
     at::Tensor& block_table,
+    const double k_scale,
+    const double v_scale,
     const c10::optional<at::Tensor>& alibi_slopes) {
   auto kv_block_strideN = key_cache.stride(0);
   auto kv_block_strideH = key_cache.stride(1);
@@ -673,8 +857,8 @@ void flash_attn_varlen_kernel(
 
   auto out_ptr = out.data_ptr<scalar_t>();
   auto query_ptr = query.data_ptr<scalar_t>();
-  auto key_ptr = key_cache.data_ptr<scalar_t>();
-  auto value_ptr = value_cache.data_ptr<scalar_t>();
+  auto key_ptr = key_cache.data_ptr<cache_t>();
+  auto value_ptr = value_cache.data_ptr<cache_t>();
   auto cu_seqlens_q_ptr = cu_seqlens_q.data_ptr<int>();
   auto cu_seqlens_k_ptr = cu_seqlens_k.data_ptr<int>();
   auto block_table_ptr = block_table.data_ptr<int>();
@@ -843,13 +1027,16 @@ void single_query_cached_kv_attention_kernel_impl(
     at::Tensor& context_lens, // [num_seqs]
     int64_t block_size,
     int64_t max_context_len,
+    const double k_scale,
+    const double v_scale,
     const c10::optional<at::Tensor>& alibi_slopes) {
   RECORD_FUNCTION(
       "ipex::single_query_cached_kv_attention_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
   // dispatch kernel according to the data type of input tensor
-  if (out.scalar_type() == at::ScalarType::Float) {
-    single_query_cached_kv_attention_kernel<float>(
+  if (key_cache.scalar_type() == at::ScalarType::Float8_e5m2 &&
+      out.scalar_type() == at::ScalarType::BFloat16) {
+    single_query_cached_kv_attention_kernel<at::BFloat16, at::Float8_e5m2>(
         out,
         query,
         key_cache,
@@ -859,9 +1046,25 @@ void single_query_cached_kv_attention_kernel_impl(
         context_lens,
         block_size,
         max_context_len,
+        k_scale,
+        v_scale,
+        alibi_slopes);
+  } else if (out.scalar_type() == at::ScalarType::Float) {
+    single_query_cached_kv_attention_kernel<float, float>(
+        out,
+        query,
+        key_cache,
+        value_cache,
+        scale,
+        block_tables,
+        context_lens,
+        block_size,
+        max_context_len,
+        k_scale,
+        v_scale,
         alibi_slopes);
   } else if (out.scalar_type() == at::ScalarType::BFloat16) {
-    single_query_cached_kv_attention_kernel<at::BFloat16>(
+    single_query_cached_kv_attention_kernel<at::BFloat16, at::BFloat16>(
         out,
         query,
         key_cache,
@@ -871,9 +1074,11 @@ void single_query_cached_kv_attention_kernel_impl(
         context_lens,
         block_size,
         max_context_len,
+        k_scale,
+        v_scale,
         alibi_slopes);
   } else if (out.scalar_type() == at::ScalarType::Half) {
-    single_query_cached_kv_attention_kernel<at::Half>(
+    single_query_cached_kv_attention_kernel<at::Half, at::Half>(
         out,
         query,
         key_cache,
@@ -883,6 +1088,8 @@ void single_query_cached_kv_attention_kernel_impl(
         context_lens,
         block_size,
         max_context_len,
+        k_scale,
+        v_scale,
         alibi_slopes);
   } else {
     TORCH_CHECK(
@@ -896,7 +1103,9 @@ void reshape_and_cache_cpu_kernel_impl(
     at::Tensor& value,
     at::Tensor& key_cache,
     at::Tensor& value_cache,
-    at::Tensor& slot_mapping) {
+    at::Tensor& slot_mapping,
+    const double k_scale,
+    const double v_scale) {
   TORCH_CHECK(
       key.scalar_type() == value.scalar_type(),
       "key and value should have the same data type");
@@ -908,15 +1117,24 @@ void reshape_and_cache_cpu_kernel_impl(
   RECORD_FUNCTION(
       "ipex::reshape_and_cache_cpu_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
-  if (key.scalar_type() == at::ScalarType::Float) {
+  if (key_cache.scalar_type() == at::ScalarType::Float8_e5m2 &&
+      key.scalar_type() == at::ScalarType::Float) {
+    reshape_and_cache_kernel<at::Float8_e5m2, float>(
+        key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale);
+  } else if (
+      key_cache.scalar_type() == at::ScalarType::Float8_e5m2 &&
+      key.scalar_type() == at::ScalarType::BFloat16) {
+    reshape_and_cache_kernel<at::Float8_e5m2, at::BFloat16>(
+        key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale);
+  } else if (key.scalar_type() == at::ScalarType::Float) {
     reshape_and_cache_kernel<float, float>(
-        key, value, key_cache, value_cache, slot_mapping);
+        key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale);
   } else if (key.scalar_type() == at::ScalarType::BFloat16) {
     reshape_and_cache_kernel<at::BFloat16, at::BFloat16>(
-        key, value, key_cache, value_cache, slot_mapping);
+        key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale);
   } else if (key.scalar_type() == at::ScalarType::Half) {
     reshape_and_cache_kernel<at::Half, at::Half>(
-        key, value, key_cache, value_cache, slot_mapping);
+        key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale);
   } else {
     TORCH_CHECK(false, "Unsupported data type for ipex::reshape_and_cache");
   }
@@ -934,13 +1152,12 @@ void flash_attn_varlen_cpu_kernel_impl(
     const double softmax_scale,
     bool is_causal,
     at::Tensor& block_table,
+    const double k_scale,
+    const double v_scale,
     const c10::optional<at::Tensor>& alibi_slopes) {
   TORCH_CHECK(
-      query.scalar_type() == key.scalar_type(),
-      "query and key should have the same data type");
-  TORCH_CHECK(
-      query.scalar_type() == value.scalar_type(),
-      "query and value should have the same data type");
+      key.scalar_type() == value.scalar_type(),
+      "key and value should have the same data type");
   TORCH_CHECK(
       !alibi_slopes.has_value(),
       "alibi_slopes is not supported for flash_attn_varlen yet");
@@ -955,7 +1172,8 @@ void flash_attn_varlen_cpu_kernel_impl(
       c10::ArrayRef<c10::IValue>({}));
   if (query.scalar_type() == at::ScalarType::Float) {
     if (max_seqlen_q >= 768) {
-      flash_attn_varlen_kernel<float, 128>(
+      flash_attn_varlen_kernel<float, float, 128>(
+
           out,
           query,
           key,
@@ -967,9 +1185,11 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          k_scale,
+          v_scale,
           alibi_slopes);
     } else if (max_seqlen_q >= 192) {
-      flash_attn_varlen_kernel<float, 64>(
+      flash_attn_varlen_kernel<float, float, 64>(
           out,
           query,
           key,
@@ -981,9 +1201,11 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          k_scale,
+          v_scale,
           alibi_slopes);
     } else {
-      flash_attn_varlen_kernel<float, 32>(
+      flash_attn_varlen_kernel<float, float, 32>(
           out,
           query,
           key,
@@ -995,12 +1217,14 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          k_scale,
+          v_scale,
           alibi_slopes);
     }
 
   } else if (query.scalar_type() == at::ScalarType::BFloat16) {
     if (max_seqlen_q >= 768) {
-      flash_attn_varlen_kernel<at::BFloat16, 128>(
+      flash_attn_varlen_kernel<at::BFloat16, at::BFloat16, 128>(
           out,
           query,
           key,
@@ -1012,9 +1236,11 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          k_scale,
+          v_scale,
           alibi_slopes);
     } else if (max_seqlen_q >= 192) {
-      flash_attn_varlen_kernel<at::BFloat16, 64>(
+      flash_attn_varlen_kernel<at::BFloat16, at::BFloat16, 64>(
           out,
           query,
           key,
@@ -1026,9 +1252,11 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          k_scale,
+          v_scale,
           alibi_slopes);
     } else {
-      flash_attn_varlen_kernel<at::BFloat16, 32>(
+      flash_attn_varlen_kernel<at::BFloat16, at::BFloat16, 32>(
           out,
           query,
           key,
@@ -1040,6 +1268,8 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          k_scale,
+          v_scale,
           alibi_slopes);
     }
 

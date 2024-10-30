@@ -133,7 +133,9 @@ class TestFlashAttnVarLen(TestCase):
             scale,
             True,
             block_table,
-            alibi_slopes=None,
+            1.0,
+            1.0,
+            None,
         )
         assert torch.allclose(
             output_ref, output, atol=1e-6 if dtype == torch.float else 5e-2

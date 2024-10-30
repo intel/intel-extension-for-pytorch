@@ -24,6 +24,8 @@ void single_query_cached_kv_attention_forward_cpu(
     at::Tensor& context_lens, // [num_seqs]
     int64_t block_size,
     int64_t max_context_len,
+    const double k_scale,
+    const double v_scale,
     const c10::optional<at::Tensor>& alibi_slopes) {
   return single_query_cached_kv_attention_kernel_stub(
       kCPU,
@@ -37,6 +39,8 @@ void single_query_cached_kv_attention_forward_cpu(
       context_lens,
       block_size,
       max_context_len,
+      k_scale,
+      v_scale,
       alibi_slopes);
 }
 
@@ -45,9 +49,11 @@ void reshape_and_cache_cpu(
     at::Tensor& value,
     at::Tensor& key_cache,
     at::Tensor& value_cache,
-    at::Tensor& slot_mapping) {
+    at::Tensor& slot_mapping,
+    const double k_scale,
+    const double v_scale) {
   return reshape_and_cache_kernel_stub(
-      kCPU, key, value, key_cache, value_cache, slot_mapping);
+      kCPU, key, value, key_cache, value_cache, slot_mapping, k_scale, v_scale);
 }
 
 void flash_attn_varlen_cpu(
@@ -62,6 +68,8 @@ void flash_attn_varlen_cpu(
     const double softmax_scale,
     bool is_causal,
     at::Tensor& block_table,
+    const double k_scale,
+    const double v_scale,
     const c10::optional<at::Tensor>& alibi_slopes) {
   return flash_attn_var_len_kernel_stub(
       kCPU,
@@ -76,6 +84,8 @@ void flash_attn_varlen_cpu(
       softmax_scale,
       is_causal,
       block_table,
+      k_scale,
+      v_scale,
       alibi_slopes);
 }
 
