@@ -27,19 +27,27 @@ parser.add_argument(
 )
 parser.add_argument("--native-transformers", action="store_true", help="using native transformers for speculative decoding")
 parser.add_argument("--turn-off-speculative-decoding", action="store_true", help="using origin hf text to generation path")
+parser.add_argument(
+    "--dtype",
+    type=str,
+    choices=["float32", "bfloat16", "float16"],
+    default="float32",
+    help="please set this parameter according to the model",
+)
 args = parser.parse_args()
 
 device = "xpu" if torch.xpu.is_available() else "cpu"
+amp_dtype = getattr(torch, args.dtype)
 
 print("start memory used total:", round(torch.xpu.memory_reserved() / 1024**3, 3), "GB")
 
 tokenizer = AutoTokenizer.from_pretrained(args.model_id)
 inputs = tokenizer("Once upon a time, there existed a little girl, who liked to have adventures.", return_tensors="pt").input_ids.to(device)
 
-model = AutoModelForCausalLM.from_pretrained(args.model_id, torch_dtype=torch.float16).to(device)
+model = AutoModelForCausalLM.from_pretrained(args.model_id, torch_dtype=amp_dtype).to(device)
 model = model.to(memory_format=torch.channels_last)
 
-assistant_model = AutoModelForCausalLM.from_pretrained(args.assistant_model_id, torch_dtype=torch.float16).to(device)
+assistant_model = AutoModelForCausalLM.from_pretrained(args.assistant_model_id, torch_dtype=amp_dtype).to(device)
 assistant_model = assistant_model.to(memory_format=torch.channels_last)
 
 generate_kwargs = dict(do_sample=True, temperature=0.5)
