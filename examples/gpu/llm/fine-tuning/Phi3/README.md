@@ -130,6 +130,7 @@ Example: Phi-3 Mini 4k LoRA fine-tuning.
 
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 
@@ -158,6 +159,7 @@ Example: Phi3-Mini 4k LoRA fine-tuning.
 
 
 ```bash
+export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 
@@ -180,6 +182,7 @@ accelerate launch --config_file "fsdp_config.yaml"  phi3_ft.py \
     --logging_steps=1 \
     --save_total_limit=8 
 ```
+
 
 
 
