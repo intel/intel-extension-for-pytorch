@@ -21,7 +21,7 @@
   },
   "deepspeed": {
     "version": "",
-    "commit": "e06bb518aa7dafef1e98a1da63362e1586b2ddd5"
+    "commit": "c7f58c899f6f099a35d968bdad973f24b842c8c6"
   },
   "oneCCL": {
     "commit": "2021.12"
