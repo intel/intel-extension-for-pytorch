@@ -18,6 +18,10 @@ supported:
 # - col2im.out
 # - im2col
 # - im2col.out
+#  - sort
+#  - sort.stable
+#  - sort.values
+#  - sort.values_stable
 ################## override below ops due to performance issues
 # - convolution_overrideable
 # - convolution_backward_overrideable
@@ -585,10 +589,6 @@ supported:
 #  - softplus_backward.grad_input
 #  - softshrink.out
 #  - softshrink_backward.grad_input
-  - sort
-#  - sort.stable
-  - sort.values
-#  - sort.values_stable
   - special_entr.out
   - special_erfcx.out
   - special_i0e.out
