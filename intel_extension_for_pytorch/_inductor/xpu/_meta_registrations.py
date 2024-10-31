@@ -80,3 +80,10 @@ def meta_torch_ipex_convolution_binary_inplace(
     unary_algorithm,
 ):
     return other
+
+
+@register_meta("_linear_pointwise", "default")
+def meta_torch_ipex_linear_pointwise_default(
+    input_tensor, weight, bias, attr, scalars, algorithm
+):
+    return input_tensor.new_empty((*input_tensor.shape[:-1], weight.shape[0]))
