@@ -416,26 +416,6 @@ Tensor dpcpp_linear(
   return linear_wrapper.call(result, input, weight, bias, post_op);
 }
 
-Tensor linear_pointwise_meta(
-    const Tensor& input_t,
-    const Tensor& weight_t,
-    const c10::optional<Tensor>& bias_opt,
-    c10::string_view attr,
-    torch::List<c10::optional<at::Scalar>> scalars,
-    c10::optional<c10::string_view> algorithm) {
-  Attr att;
-  att = construct_unary_attr(attr, scalars, algorithm, att);
-  Tensor result;
-  Tensor _bias = bias_opt.has_value() ? bias_opt.value() : at::Tensor();
-  Tensor _input = input_t.dim() <= 2
-      ? input_t
-      : torch_ipex::xpu::oneDNN::contiguous_if_needed(input_t);
-  bool is_fused = false;
-  result = matmul_fusion_variants_meta(
-      result, _input, weight_t, true, att, /*is_fused*/ is_fused, _bias);
-  return result;
-}
-
 Tensor linear_pointwise(
     const Tensor& input_t,
     const Tensor& weight_t,
@@ -479,10 +459,6 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
 }
 
 TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
-  m.impl(
-      TORCH_SELECTIVE_NAME("torch_ipex::_linear_pointwise"),
-      c10::DispatchKey::Meta,
-      TORCH_FN(linear_pointwise_meta));
   m.impl(
       TORCH_SELECTIVE_NAME("torch_ipex::_linear_pointwise"),
       c10::DispatchKey::XPU,
