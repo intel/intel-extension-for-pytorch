@@ -341,13 +341,17 @@ class _IPEXFastLayerNormCPU(nn.Module):
 
 class _IPEXPagedAttentionCPU:
     @classmethod
-    def reshape_and_cache(cls, key, value, key_cache, value_cache, slot_mapping):
+    def reshape_and_cache(
+        cls, key, value, key_cache, value_cache, slot_mapping, k_scale=1.0, v_scale=1.0
+    ):
         torch.ops.torch_ipex.reshape_and_cache(
             key,
             value,
             key_cache,
             value_cache,
             slot_mapping.int() if slot_mapping.dtype is torch.long else slot_mapping,
+            k_scale,
+            v_scale,
         )
 
     @classmethod
@@ -364,6 +368,8 @@ class _IPEXPagedAttentionCPU:
         block_size,
         max_context_len,
         alibi_slopes,
+        k_scale=1.0,
+        v_scale=1.0,
     ):
         torch.ops.torch_ipex.single_query_cached_kv_attention(
             output,
@@ -377,6 +383,8 @@ class _IPEXPagedAttentionCPU:
             block_size,
             max_context_len,
             alibi_slopes,
+            k_scale,
+            v_scale,
         )
 
     @classmethod
@@ -393,9 +401,9 @@ class _IPEXPagedAttentionCPU:
         scale,
         is_causal,
         block_table,
-        k_scale,
-        v_scale,
         alibi_slopes=None,
+        k_scale=1.0,
+        v_scale=1.0,
     ):
         torch.ops.torch_ipex.flash_attn_varlen_func(
             output,
@@ -409,9 +417,9 @@ class _IPEXPagedAttentionCPU:
             scale,
             is_causal,
             block_table,
+            alibi_slopes,
             k_scale,
             v_scale,
-            alibi_slopes,
         )
 
 

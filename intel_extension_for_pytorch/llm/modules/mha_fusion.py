@@ -472,9 +472,9 @@ class PagedAttention:
                                                             context_lens,
                                                             block_size,
                                                             max_context_len,
+                                                            alibi_slopes,
                                                             k_scale,
                                                             v_scale,
-                                                            alibi_slopes
                                                             )
 
     This operator is used to be calculated the scale-dot-product based on the paged attention.
@@ -518,9 +518,9 @@ class PagedAttention:
         scale,
         is_cusal,
         block_tables,
+        alibi_slopes,
         key_cache,
         val_cache,
-        alibi_slopes
     )
 
     Args:
@@ -539,9 +539,9 @@ class PagedAttention:
         is_cusal (bool): Whether to apply causal attention masking. Default is True. False is not supported yet.
         block_tables:(torch.Tensor): The mapping table used to mapping the logical sequence
             to the physical sequence. The shape should be [batch_size, max_num_blocks_per_seq].
+        alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
         k_scale (float): The scale used by the fp8 key cache.
         v_scale (float): The scale used by the fp8 value cache.
-        alibi_slopes (torch.Tensor, optinal): which is the alibi slope with the shape of (num_heads).
 
     """
 
@@ -555,8 +555,8 @@ class PagedAttention:
         key_cache: torch.Tensor,
         value_cache: torch.Tensor,
         slot_mapping: torch.Tensor,
-        k_scale: float,
-        v_scale: float,
+        k_scale: float = 1.0,
+        v_scale: float = 1.0,
     ):
         return cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
@@ -577,9 +577,9 @@ class PagedAttention:
         context_lens: torch.Tensor,
         block_size: int,
         max_context_len: int,
-        k_scale: float,
-        v_scale: float,
         alibi_slopes: torch.Tensor,
+        k_scale: float = 1.0,
+        v_scale: float = 1.0,
     ):
         return cls.runtime_ops.get_module_from_device(
             output.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
@@ -594,9 +594,9 @@ class PagedAttention:
             context_lens,
             block_size,
             max_context_len,
+            alibi_slopes,
             k_scale,
             v_scale,
-            alibi_slopes,
         )
 
     @classmethod
@@ -613,9 +613,9 @@ class PagedAttention:
         scale,
         is_cusal: bool,
         block_tables: torch.Tensor,
-        k_scale: float,
-        v_scale: float,
         alibi_slopes: torch.Tensor,
+        k_scale: float = 1.0,
+        v_scale: float = 1.0,
     ):
         return cls.runtime_ops.get_module_from_device(
             output.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
@@ -631,9 +631,9 @@ class PagedAttention:
             scale,
             is_cusal,
             block_tables,
+            alibi_slopes,
             k_scale,
             v_scale,
-            alibi_slopes,
         )
 
 

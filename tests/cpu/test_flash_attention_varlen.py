@@ -133,8 +133,6 @@ class TestFlashAttnVarLen(TestCase):
             scale,
             True,
             block_table,
-            1.0,
-            1.0,
             None,
         )
         assert torch.allclose(

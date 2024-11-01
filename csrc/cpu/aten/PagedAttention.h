@@ -19,9 +19,9 @@ void single_query_cached_kv_attention(
     at::Tensor& context_lens, // [num_seqs]
     int64_t block_size,
     int64_t max_context_len,
+    const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale,
-    const c10::optional<at::Tensor>& alibi_slopes);
+    const double v_scale);
 }
 
 void reshape_and_cache(
@@ -45,9 +45,9 @@ void flash_attn_varlen(
     const double softmax_scale,
     bool is_causal,
     at::Tensor& block_table,
+    const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale,
-    const c10::optional<at::Tensor>& alibi_slopes);
+    const double v_scale);
 
 using single_query_cached_kv_attention_fn = void (*)(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
@@ -60,9 +60,9 @@ using single_query_cached_kv_attention_fn = void (*)(
     at::Tensor& context_lens, // [num_seqs]
     int64_t block_size,
     int64_t max_context_len,
+    const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale,
-    const c10::optional<at::Tensor>& alibi_slopes);
+    const double v_scale);
 
 using reshape_and_cache_fn = void (*)(
     at::Tensor& key,
@@ -85,9 +85,9 @@ using flash_attn_var_len_fn = void (*)(
     const double softmax_scale,
     bool is_causal,
     at::Tensor& block_table,
+    const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale,
-    const c10::optional<at::Tensor>& alibi_slopes);
+    const double v_scale);
 
 IPEX_DECLARE_DISPATCH(
     single_query_cached_kv_attention_fn,

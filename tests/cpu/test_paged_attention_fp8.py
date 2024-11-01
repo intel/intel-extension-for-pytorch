@@ -200,9 +200,9 @@ class PagedAttentionTest(TestCase):
             context_lens,
             block_size,
             max_context_len,
+            alibi_slopes,
             k_scale,
             v_scale,
-            alibi_slopes,
         )
 
         # Run the reference implementation.

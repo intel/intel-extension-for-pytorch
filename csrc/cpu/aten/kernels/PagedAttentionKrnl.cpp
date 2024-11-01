@@ -409,10 +409,10 @@ inline void _mul_reduce_max_fusion_kernel(
  * @param block_size    The block size which means the number of token in every
  * block.
  * @param max_context_len Maximum context length.
- * @param k_scale       Scaling factor for key cache of data type fp8.
- * @param v_scale       Scaling factor for value cache of data type fp8.
  * @param alibi_slopes  Optional tensor of alibi slopes with the shape of
  * (num_heads).
+ * @param k_scale       Scaling factor for key cache of data type fp8.
+ * @param v_scale       Scaling factor for value cache of data type fp8.
  */
 template <typename scalar_t, typename cache_t>
 void single_query_cached_kv_attention_kernel(
@@ -425,9 +425,9 @@ void single_query_cached_kv_attention_kernel(
     at::Tensor& context_lens,
     int64_t block_size,
     int64_t max_context_len,
+    const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale,
-    const c10::optional<at::Tensor>& alibi_slopes) {
+    const double v_scale) {
   auto out_ptr = out.data_ptr<scalar_t>();
   auto query_ptr = query.data_ptr<scalar_t>();
   auto key_cache_ptr = key_cache.data_ptr<cache_t>();
@@ -807,9 +807,9 @@ void flash_attn_varlen_kernel(
     const double softmax_scale, // scale for softmax
     bool is_causal, // whether the attention is causal
     at::Tensor& block_table,
+    const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale,
-    const c10::optional<at::Tensor>& alibi_slopes) {
+    const double v_scale) {
   auto kv_block_strideN = key_cache.stride(0);
   auto kv_block_strideH = key_cache.stride(1);
   auto kv_block_strideP = key_cache.stride(2);
@@ -1027,9 +1027,9 @@ void single_query_cached_kv_attention_kernel_impl(
     at::Tensor& context_lens, // [num_seqs]
     int64_t block_size,
     int64_t max_context_len,
+    const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale,
-    const c10::optional<at::Tensor>& alibi_slopes) {
+    const double v_scale) {
   RECORD_FUNCTION(
       "ipex::single_query_cached_kv_attention_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
@@ -1046,9 +1046,9 @@ void single_query_cached_kv_attention_kernel_impl(
         context_lens,
         block_size,
         max_context_len,
+        alibi_slopes,
         k_scale,
-        v_scale,
-        alibi_slopes);
+        v_scale);
   } else if (out.scalar_type() == at::ScalarType::Float) {
     single_query_cached_kv_attention_kernel<float, float>(
         out,
@@ -1060,9 +1060,9 @@ void single_query_cached_kv_attention_kernel_impl(
         context_lens,
         block_size,
         max_context_len,
+        alibi_slopes,
         k_scale,
-        v_scale,
-        alibi_slopes);
+        v_scale);
   } else if (out.scalar_type() == at::ScalarType::BFloat16) {
     single_query_cached_kv_attention_kernel<at::BFloat16, at::BFloat16>(
         out,
@@ -1074,9 +1074,9 @@ void single_query_cached_kv_attention_kernel_impl(
         context_lens,
         block_size,
         max_context_len,
+        alibi_slopes,
         k_scale,
-        v_scale,
-        alibi_slopes);
+        v_scale);
   } else if (out.scalar_type() == at::ScalarType::Half) {
     single_query_cached_kv_attention_kernel<at::Half, at::Half>(
         out,
@@ -1088,9 +1088,9 @@ void single_query_cached_kv_attention_kernel_impl(
         context_lens,
         block_size,
         max_context_len,
+        alibi_slopes,
         k_scale,
-        v_scale,
-        alibi_slopes);
+        v_scale);
   } else {
     TORCH_CHECK(
         false, "Unsupported data type for single_query_cached_kv_attention");
@@ -1152,9 +1152,9 @@ void flash_attn_varlen_cpu_kernel_impl(
     const double softmax_scale,
     bool is_causal,
     at::Tensor& block_table,
+    const c10::optional<at::Tensor>& alibi_slopes,
     const double k_scale,
-    const double v_scale,
-    const c10::optional<at::Tensor>& alibi_slopes) {
+    const double v_scale) {
   TORCH_CHECK(
       key.scalar_type() == value.scalar_type(),
       "key and value should have the same data type");
@@ -1173,7 +1173,6 @@ void flash_attn_varlen_cpu_kernel_impl(
   if (query.scalar_type() == at::ScalarType::Float) {
     if (max_seqlen_q >= 768) {
       flash_attn_varlen_kernel<float, float, 128>(
-
           out,
           query,
           key,
@@ -1185,9 +1184,9 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          alibi_slopes,
           k_scale,
-          v_scale,
-          alibi_slopes);
+          v_scale);
     } else if (max_seqlen_q >= 192) {
       flash_attn_varlen_kernel<float, float, 64>(
           out,
@@ -1201,9 +1200,9 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          alibi_slopes,
           k_scale,
-          v_scale,
-          alibi_slopes);
+          v_scale);
     } else {
       flash_attn_varlen_kernel<float, float, 32>(
           out,
@@ -1217,9 +1216,9 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          alibi_slopes,
           k_scale,
-          v_scale,
-          alibi_slopes);
+          v_scale);
     }
 
   } else if (query.scalar_type() == at::ScalarType::BFloat16) {
@@ -1236,9 +1235,9 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          alibi_slopes,
           k_scale,
-          v_scale,
-          alibi_slopes);
+          v_scale);
     } else if (max_seqlen_q >= 192) {
       flash_attn_varlen_kernel<at::BFloat16, at::BFloat16, 64>(
           out,
@@ -1252,9 +1251,9 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          alibi_slopes,
           k_scale,
-          v_scale,
-          alibi_slopes);
+          v_scale);
     } else {
       flash_attn_varlen_kernel<at::BFloat16, at::BFloat16, 32>(
           out,
@@ -1268,9 +1267,9 @@ void flash_attn_varlen_cpu_kernel_impl(
           softmax_scale,
           is_causal,
           block_table,
+          alibi_slopes,
           k_scale,
-          v_scale,
-          alibi_slopes);
+          v_scale);
     }
 
   } else {
