@@ -7,5 +7,8 @@ set(target example-usm)
 add_executable(${target} example-usm.cpp)
 target_link_libraries(${target} ${TORCH_IPEX_LIBRARIES})
 list(APPEND CMAKE_CXX_FLAGS "-fsycl")
+if(LINUX)
+  list(APPEND CMAKE_CXX_FLAGS " -fpreview-breaking-changes")
+endif()
 
 set_property(TARGET ${target} PROPERTY CXX_STANDARD 17)

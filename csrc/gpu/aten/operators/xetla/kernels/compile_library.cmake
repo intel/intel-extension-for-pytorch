@@ -6,6 +6,9 @@ function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
     -fsycl-device-code-split=per_kernel
     -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS}
   )
+  if(LINUX)
+    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fpreview-breaking-changes)
+  endif()
 
   if (AOT_DEVLIST)
     set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -fsycl-targets=spir64_gen)
@@ -67,6 +70,9 @@ function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
 
   target_link_options(${TARGET} PRIVATE ${XETLA_KERNEL_FLAGS})
   target_compile_options(${TARGET} PRIVATE -fsycl)
+  if(LINUX)
+    target_compile_options(${TARGET} PRIVATE -fpreview-breaking-changes)
+  endif()
   if (AOT_DEVLIST)
     target_compile_options(${TARGET} PRIVATE -fsycl-targets=spir64_gen)
   endif()
