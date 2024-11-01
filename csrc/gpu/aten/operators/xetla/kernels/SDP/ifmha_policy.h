@@ -5,7 +5,6 @@
 namespace gpu::xetla {
 
 struct base_policy {
-  static constexpr uint32_t accum_step_bmbc = 64;
   static constexpr uint32_t stages_bmbc = 1;
   static constexpr uint32_t sync_freq_bmbc = 0;
 
@@ -23,23 +22,35 @@ struct base_policy {
 /* Note:
   kHm / kSgHm == kBc / kSgBc
   kSgHm and kSgBc should be a multiple of 16
+  kHm should be a multiple of accum_step_bmbc
 */
 
-struct ifmha_policy_64x64 : base_policy {
+struct ifmha_policy_h64 : base_policy {
+  static constexpr uint32_t accum_step_bmbc = 64;
   static constexpr uint32_t kBc = 64;
   static constexpr uint32_t kSgBc = 16;
   static constexpr uint32_t kHm = 64;
   static constexpr uint32_t kSgHm = 16;
 };
 
-struct ifmha_policy_128x64 : base_policy {
+struct ifmha_policy_h96 : base_policy {
+  static constexpr uint32_t accum_step_bmbc = 32;
+  static constexpr uint32_t kBc = 192;
+  static constexpr uint32_t kSgBc = 32;
+  static constexpr uint32_t kHm = 96;
+  static constexpr uint32_t kSgHm = 16;
+};
+
+struct ifmha_policy_h128 : base_policy {
+  static constexpr uint32_t accum_step_bmbc = 64;
   static constexpr uint32_t kBc = 256;
   static constexpr uint32_t kSgBc = 32;
   static constexpr uint32_t kHm = 128;
   static constexpr uint32_t kSgHm = 16;
 };
 
-struct ifmha_policy_256x64 : base_policy {
+struct ifmha_policy_h256 : base_policy {
+  static constexpr uint32_t accum_step_bmbc = 64;
   static constexpr uint32_t kBc = 512;
   static constexpr uint32_t kSgBc = 64;
   static constexpr uint32_t kHm = 256;

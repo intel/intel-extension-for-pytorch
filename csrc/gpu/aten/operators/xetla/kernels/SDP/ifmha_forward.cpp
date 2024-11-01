@@ -269,11 +269,13 @@ cgfs_t ifmha_forward(
   // occupancy first
   constexpr int hardware_concurrent_wg = 64;
   if (head_size <= 64) {
-    return CALL_IMPL_FUNC(ifmha_policy_64x64);
+    return CALL_IMPL_FUNC(ifmha_policy_h64);
+  } else if (head_size <= 96) {
+    return CALL_IMPL_FUNC(ifmha_policy_h96);
   } else if (head_size <= 128) {
-    return CALL_IMPL_FUNC(ifmha_policy_128x64);
+    return CALL_IMPL_FUNC(ifmha_policy_h128);
   } else if (head_size <= 256) {
-    return CALL_IMPL_FUNC(ifmha_policy_256x64);
+    return CALL_IMPL_FUNC(ifmha_policy_h256);
   } else {
     TORCH_CHECK(0, "SDP Index fusion kernel requires head_dim <= 256 ...");
     return {};
