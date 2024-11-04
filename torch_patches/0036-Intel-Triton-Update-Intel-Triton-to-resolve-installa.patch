@@ -1,7 +1,7 @@
 From b0ea97cadbe5f9af9b0d60a7b778b10fdb6386a8 Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Thu, 4 Jul 2024 14:05:21 +0800
-Subject: [PATCH 36/39] [Intel Triton] Update Intel Triton to resolve
+Subject: [PATCH 36/40] [Intel Triton] Update Intel Triton to resolve
  installation issue on manylinux. (#129847) (#268)
 
 Pull Request resolved: https://github.com/pytorch/pytorch/pull/129847

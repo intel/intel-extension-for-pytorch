@@ -1,7 +1,7 @@
 From 1f7dc28c2fe6ce2e1bf51dab69ec49f9071af60a Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Wed, 3 Jul 2024 09:41:56 +0800
-Subject: [PATCH 35/39] [Inductor] Cherry pick upstreamed XPU code (#254)
+Subject: [PATCH 35/40] [Inductor] Cherry pick upstreamed XPU code (#254)
 
 * [dynamo] Delay cuda device registration (#122795)
 

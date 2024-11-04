@@ -1,7 +1,7 @@
 From 60c90f06aeee12db6784cadb21941bd9ea6f6d78 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Tue, 16 Jul 2024 11:29:59 +0800
-Subject: [PATCH 39/39] Support XPU on the Accelerator (#274)
+Subject: [PATCH 39/40] Support XPU on the Accelerator (#274)
 
 * XPUHooksInterface inherits from AcceleratorHooksInterface
 

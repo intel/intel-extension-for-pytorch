@@ -1,7 +1,7 @@
 From b417985634eeb3060c1f6fe648969f311a6cf18d Mon Sep 17 00:00:00 2001
 From: Jing Xu <jing.xu@intel.com>
 Date: Thu, 27 Jun 2024 18:25:23 +0900
-Subject: [PATCH 33/39] mkl static link (#266)
+Subject: [PATCH 33/40] mkl static link (#266)
 
 * Fix mkl cmake not support static mkl on Windows. (#124925)
 

@@ -1,7 +1,7 @@
 From 4b42623cd0fba37fccc52b9c3cdd28a7f3c1adda Mon Sep 17 00:00:00 2001
 From: Stonepia <tong.su@intel.com>
 Date: Fri, 21 Jun 2024 10:13:58 +0800
-Subject: [PATCH 30/39] [Inductor] Cherry-pick `make triton` for xpu (#263)
+Subject: [PATCH 30/40] [Inductor] Cherry-pick `make triton` for xpu (#263)
 
 * [XPU] Add xpu support of `make triton` (#126513)
 

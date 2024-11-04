@@ -1,0 +1,77 @@
+From fab4830010ee07c4c767ec9dd91120f2a19df961 Mon Sep 17 00:00:00 2001
+From: Ratnam Parikh <114774508+ratnampa@users.noreply.github.com>
+Date: Wed, 23 Oct 2024 23:22:53 -0700
+Subject: [PATCH 40/40] [2.3.110]Update sycl default context windows (#305)
+
+* SYCL default context windows
+
+---------
+
+Co-authored-by: Jojimon Varghese <jojimon.varghese@intel.com>
+---
+ aten/src/ATen/xpu/detail/XPUHooks.cpp | 12 ------------
+ c10/xpu/XPUFunctions.cpp              | 12 +-----------
+ 2 files changed, 1 insertion(+), 23 deletions(-)
+
+diff --git a/aten/src/ATen/xpu/detail/XPUHooks.cpp b/aten/src/ATen/xpu/detail/XPUHooks.cpp
+index 589e792ef47..d0e1ac23be2 100644
+--- a/aten/src/ATen/xpu/detail/XPUHooks.cpp
++++ b/aten/src/ATen/xpu/detail/XPUHooks.cpp
+@@ -25,13 +25,7 @@ std::string XPUHooks::showConfig() const {
+ 
+ int32_t XPUHooks::getGlobalIdxFromDevice(const at::Device& device) const {
+   TORCH_CHECK(device.is_xpu(), "Only the XPU device type is expected.");
+-#ifdef _WIN32
+-  TORCH_CHECK(
+-      false,
+-      "Default context is not supported on XPU on Windows. So we can NOT find its global index of the ATen device.");
+-#else
+   return at::xpu::getGlobalIdxFromDevice(device.index());
+-#endif
+ }
+ 
+ Generator XPUHooks::getXPUGenerator(DeviceIndex device_index) const {
+@@ -44,13 +38,7 @@ const Generator& XPUHooks::getDefaultXPUGenerator(
+ }
+ 
+ Device XPUHooks::getDeviceFromPtr(void* data) const {
+-#ifdef _WIN32
+-  TORCH_CHECK(
+-      false,
+-      "Default context is not supported on XPU on Windows. So we can NOT find the ATen device of a pointer.");
+-#else
+   return at::xpu::getDeviceFromPtr(data);
+-#endif
+ }
+ 
+ c10::DeviceIndex XPUHooks::getNumGPUs() const {
+diff --git a/c10/xpu/XPUFunctions.cpp b/c10/xpu/XPUFunctions.cpp
+index 4996e7f6ec3..2b4e3b5cfea 100644
+--- a/c10/xpu/XPUFunctions.cpp
++++ b/c10/xpu/XPUFunctions.cpp
+@@ -50,21 +50,11 @@ inline void initGlobalDevicePoolState() {
+     TORCH_WARN("XPU device count is zero!");
+     return;
+   }
+-
+-#ifdef _WIN32
+-  // default context feature is disabled by default on Windows.
+-  std::vector<sycl::device> deviceList;
+-  for (auto it = gDevicePool.devices.begin(); it != gDevicePool.devices.end();
+-       ++it) {
+-    deviceList.push_back(*(*it));
+-  }
+-  gDevicePool.context = std::make_unique<sycl::context>(deviceList);
+-#else
+   // The default context is utilized for each Intel GPU device, allowing the
+   // retrieval of the context from any GPU device.
+   gDevicePool.context = std::make_unique<sycl::context>(
+       gDevicePool.devices[0]->get_platform().ext_oneapi_get_default_context());
+-#endif
++
+ }
+ 
+ inline void initDevicePoolCallOnce() {
+-- 
+2.34.1
+

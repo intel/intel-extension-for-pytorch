@@ -1,7 +1,7 @@
 From 30e5844ceddd7054f78cfcd97ccc9c35e4708bcd Mon Sep 17 00:00:00 2001
 From: xingyuan li <108672484+hoshibara@users.noreply.github.com>
 Date: Thu, 28 Mar 2024 14:01:35 +0800
-Subject: [PATCH 04/39] Hide MKL symbols (#211) (#219)
+Subject: [PATCH 04/40] Hide MKL symbols (#211) (#219)
 
 Co-authored-by: Cui, Yifeng <yifeng.cui@intel.com>
 ---

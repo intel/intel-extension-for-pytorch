@@ -1,7 +1,7 @@
 From 28cf030d1ad5dcde5aae86a3546fd2ede47ed7f3 Mon Sep 17 00:00:00 2001
 From: "Yu, Guangye" <106960996+guangyey@users.noreply.github.com>
 Date: Fri, 21 Jun 2024 15:12:14 +0800
-Subject: [PATCH 31/39] Enable deterministic support for oneDNN (#127277)
+Subject: [PATCH 31/40] Enable deterministic support for oneDNN (#127277)
  (#264)
 
 This PR is a part of RFC https://github.com/pytorch/pytorch/issues/114848.
