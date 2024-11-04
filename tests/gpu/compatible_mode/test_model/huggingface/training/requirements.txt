@@ -1,0 +1,11 @@
+datasets==2.20.0
+evaluate
+tf-keras
+scikit-learn
+accelerate
+nltk
+rouge_score
+transformers
+sentencepiece
+seqeval
+jiwer

@@ -82,7 +82,6 @@ CMD_BLANK_SPACE = 150
 all_models_list = [
     "BERT_pytorch",
     "Background_Matting",
-    "DALLE2_pytorch",
     "LearningToPaint",
     "Super_SloMo",
     "alexnet",
@@ -178,7 +177,12 @@ all_models_list = [
     "tts_angular",
     "vgg16",
     "vision_maskrcnn",
-    "yolov3"
+    "yolov3",
+    "sam_fast",
+    "moondream",
+    "microbench_unbacked_tolist_sum",
+    "llava",
+    "hf_Roberta_base"
 ]
 #all_models_list = [
 #            "BERT_pytorch"]
@@ -231,13 +235,17 @@ specific_models_with_bs: Dict[str, int] = {
 if os.getenv("PRECISIONS"):
     precision_list = os.getenv("PRECISIONS").split("|")
 else:
-    precision_list = ["fp32", "fp16", "amp", "amp_fp16", "bf16", "amp_bf16"]
+    precision_list = ["fp32", "fp16", "amp", "amp_fp16", "bf16"]
 print(precision_list)
 #precision_list = ["amp"]
 
 # this list contains the backends we will try to test
 #backend_list = ["eager", "torchscript"]
-backend_list = ["eager"]
+if os.getenv("BACKENDS"):
+    backend_list = os.getenv("BACKENDS").split("|")
+else:
+    backend_list = ["eager"]
+print(backend_list)
 
 
 
@@ -411,18 +419,24 @@ def testing(model, test_mode, precison, backend, count):
         results_summary[model][result_key]['pass'] = True
     else:
         print('[', count, '][', test_mode, '][error]   fail model: ', model, model_space, 'cmd: ', str_cmd, cmd_space, 'time(s): ', duration)
-        print(stderr_msg.splitlines()[-1])
+        simple_error = "no error or fail found in stderr"
+        for i in range(1, len(stderr_msg.splitlines())):
+            #print(f'i is {i} and msg={stderr_msg.splitlines()[-i]}')
+            if "error" in stderr_msg.splitlines()[-i].lower() or "fail" in stderr_msg.splitlines()[-i].lower() or "fault" in stderr_msg.splitlines()[-i].lower():
+                simple_error = stderr_msg.splitlines()[-i]
+                print(simple_error)
+                break
         # not supported train or inf
         if is_not_supported:
             #print(f'-----------{model},{result_key}--------')
             not_supported_model_cnt += 1
             results_summary[model][result_key]['Notsupported'] = stderr_msg
-            results_summary[model][result_key]['simple_Notsupported'] = stderr_msg.splitlines()[-1]
+            results_summary[model][result_key]['simple_Notsupported'] = simple_error
         else:
             # real failed
             fail_model_cnt += 1
             results_summary[model][result_key]['failed'] = stderr_msg
-            results_summary[model][result_key]['simple_failed'] = stderr_msg.splitlines()[-1]
+            results_summary[model][result_key]['simple_failed'] = simple_error
 
 print('[info] running models number: ', num_models)
 print('[info] begin test all models......')
@@ -550,7 +564,7 @@ with open("details.log", 'w') as f:
 with open("results_summary.log", "w") as f:
     json.dump(results_summary, f)
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 wb = Workbook()
 #sheet = wb.active
 
@@ -602,6 +616,13 @@ for key in summary_total:
     ws_s.append((key, summary_total[key]["passes"], summary_total[key]["error"], summary_total[key]["notsupport"], summary_total[key]["total"], summary_total[key]["passrate_wo"], summary_total[key]["passrate"], summary_total[key]["failrate"]))
 
 
+ws_diff = wb.create_sheet(title="diff")
+ws_diff.append(("modelname", "usecase", "backend", "precision", "result","refresult","simple detail","ref_simple", "result details", "ref_details"))
+reffile = "reftorchbench.xlsx"
+refexcel = load_workbook(reffile, data_only=True)
+sheetnames = refexcel.sheetnames
+print(sheetnames)
+
 for key in details:
     ws = wb.create_sheet(title=key)
     ws.append(("modelname", "usecase", "backend", "precision", "result", "simple detail", "result details"))
@@ -618,14 +639,38 @@ for key in details:
             if result == "error":
                 result_detail = results_summary[mymodel][result_key]['failed']
                 simple_detail = results_summary[mymodel][result_key]['simple_failed']
+                if key in sheetnames:
+                    refsheet = refexcel[key]
+                    for i in range(2, int(refsheet.max_row)):
+                        model_name = refsheet["A" + str(i)].value
+                        if model_name == mymodel:
+                            ref_result = refsheet["E" + str(i)].value
+                            ref_simple = refsheet["F" + str(i)].value if refsheet["F" + str(i)].value else ""
+                            ref_detail = refsheet["G" + str(i)].value
+                            if ref_result != result or ref_simple != simple_detail:
+                                #print(f'{model_name} ref_simple={ref_simple}')
+                                #print(f'simple_detail={simple_detail}')
+                                ws_diff.append((mymodel, usecase, backend, precision, result,ref_result, simple_detail,ref_simple, result_detail, ref_detail))
             elif result == "notsupport":
                 result_detail = results_summary[mymodel][result_key]['Notsupported']
                 simple_detail = results_summary[mymodel][result_key]['simple_Notsupported']
+                if key in sheetnames:
+                    refsheet = refexcel[key]
+                    for i in range(2, int(refsheet.max_row)):
+                        model_name = refsheet["A" + str(i)].value
+                        if model_name == mymodel:
+                            ref_result = refsheet["E" + str(i)].value
+                            ref_simple = refsheet["F" + str(i)].value if refsheet["F" + str(i)].value else ""
+                            ref_detail = refsheet["G" + str(i)].value
+                            if ref_result != result or ref_simple != simple_detail:
+                                #print(f'{model_name} ref_simple={ref_simple}')
+                                #print(f'simple_detail={simple_detail}')
+                                ws_diff.append((mymodel, usecase, backend, precision, result,ref_result, simple_detail,ref_simple, result_detail, ref_detail))
             else:
                 result_detail = ""
                 simple_detail = ""
             ws.append((mymodel, usecase, backend, precision, result, simple_detail, result_detail))
-
+refexcel.close()
 wb.save("torchbench.xlsx")
 
 
