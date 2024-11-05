@@ -2078,9 +2078,11 @@ def ipex_disable_attn_mask_prepare(model):
 
     model_list = {
         transformers.models.llama.modeling_llama.LlamaForCausalLM: "LlamaModel",
-        transformers.models.phi3.modeling_phi3.Phi3ForCausalLM: "Phi3Model",
         transformers.models.qwen2.modeling_qwen2.Qwen2ForCausalLM: "Qwen2Model",
     }
+    # phi3 is not an attribute of transformers.models in Transformers 4.38.1.
+    if hasattr(transformers.models, "phi3"):
+        model_list[transformers.models.phi3.modeling_phi3.Phi3ForCausalLM] = "Phi3Model"
 
     if type(model) in model_list.keys():
         base_module = type(model).__base__.__module__
