@@ -869,7 +869,7 @@ supported:
 #  - mish.out
 #  - polar.out
 #  - var.correction_out
-  - matrix_exp
+#  - matrix_exp
 #  - logit_backward.grad_input
   - binomial
   - _standard_gamma
