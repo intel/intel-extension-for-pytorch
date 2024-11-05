@@ -29,6 +29,9 @@ from intel_extension_for_pytorch.quantization import (
     WoqWeightQScheme,
     WoqActQuantMode,
 )
+import os
+
+curpath = os.path.abspath(os.path.dirname(__file__))
 
 
 class TestDefaultRecipe(JitLlgaTestCase):
@@ -670,6 +673,81 @@ class TestDefaultRecipe(JitLlgaTestCase):
         qconfig_mapping = ipex.quantization.default_static_qconfig_mapping
         with self.assertRaises(AssertionError):
             prepared_model = ipex.quantization.prepare(m, qconfig_mapping)
+
+    def test_qwen_smooth_quant_with_amp(self):
+        from hf_configs.qwen.modeling_qwen import QWenLMHeadModel
+        from transformers import AutoConfig
+
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/{'qwen'}",
+            trust_remote_code=True,
+        )
+        user_model = QWenLMHeadModel(config).eval()
+        global_past_key_value = [
+            (
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([1, 32, 1, 128]).contiguous(),
+                torch.zeros([1, 32, 1, 128]).contiguous(),
+                torch.zeros((2048, 1), dtype=torch.long).contiguous(),
+            )
+        ]
+        input_ids = torch.ones(32).to(torch.long)
+        attention_mask = torch.ones(len(input_ids))
+        example_inputs = (
+            input_ids.unsqueeze(0),
+            attention_mask.unsqueeze(0),
+            tuple(global_past_key_value),
+        )
+
+        class DemoCalibDataloader:
+            def __init__(self):
+                self.batch_size = 1
+
+            def __iter__(self):
+                input_ids = torch.randint_like(
+                    torch.empty(32, dtype=torch.long), 0, 50256
+                )
+                attention_mask = torch.ones(len(input_ids))
+                yield (
+                    input_ids.unsqueeze(0),
+                    attention_mask.unsqueeze(0),
+                    tuple(global_past_key_value),
+                ), 0
+
+        calib_dataloader = DemoCalibDataloader()
+
+        def calib_func(prepared_model):
+            for i, (model_inputs, last_ind) in enumerate(calib_dataloader):
+                if i >= 2:
+                    break
+                prepared_model(*model_inputs)
+
+        from intel_extension_for_pytorch.quantization import convert
+
+        qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
+        user_model = ipex.llm.optimize(
+            user_model.eval(),
+            dtype=torch.bfloat16,
+            quantization_config=qconfig,
+            inplace=True,
+            deployment_mode=False,
+        )
+        smoothquant_args = {"alpha": 0.5}
+        prepared_model = ipex.quantization.autotune(
+            user_model,
+            calib_dataloader,
+            calib_func=calib_func,
+            op_type_dict={},
+            smoothquant_args=smoothquant_args,
+        )
+        with torch.no_grad(), torch.cpu.amp.autocast():
+            convert_model = convert(prepared_model.eval(), inplace=True).eval()
+            self_jit = torch.jit.trace(
+                convert_model.eval(), example_inputs, strict=False, check_trace=False
+            )
+            self_jit = torch.jit.freeze(self_jit.eval())
+            self_jit(*example_inputs)
+            self_jit(*example_inputs)
 
 
 class WeightOnlyQuantizationTester(TestCase):

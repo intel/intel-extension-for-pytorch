@@ -109,6 +109,7 @@ static void ReplaceTypeAsWithTo(Block* block) {
             g->insert(aten::to, {node->input(0), outputDtype.value()});
         replacementNodeOutput->setType(
             nodeOutputTypePtr->withScalarType(outputDtype.value()));
+        replacementNodeOutput->node()->moveBefore(node);
         node->outputs()[0]->replaceAllUsesWith(replacementNodeOutput);
       }
     }
