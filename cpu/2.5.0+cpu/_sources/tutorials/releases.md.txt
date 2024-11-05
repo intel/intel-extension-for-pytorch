@@ -1,6 +1,33 @@
 Releases
 ========
 
+## 2.5.0
+
+We are excited to announce the release of Intel® Extension for PyTorch* 2.5.0+cpu which accompanies PyTorch 2.5. This release mainly brings you the support for Llama3.2, optimization on newly launched Intel® Xeon® 6 P-core platform, GPTQ/AWQ format support, and latest optimization to push better performance for LLM models. This release also includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.
+
+### Highlights
+
+* Llama 3.2 support
+
+Meta has newly released [Llama 3.2](https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/), which includes small and medium-sized vision LLMs (11B and 90B), and lightweight, text-only models (1B and 3B). Intel® Extension for PyTorch* provides [support of Llama 3.2](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-ai-solutions-support-the-new-llama-3-2-model.html) since its launch date with early release version, and now support with this official release.
+
+* Optimization for Intel® Xeon® 6
+Intel® Xeon® 6 deliver new degrees of performance with more cores, a choice of microarchitecture, additional memory bandwidth, and exceptional input/output (I/O) across a range of workloads. Intel® Extension for PyTorch* provides dedicated optimization on this new processor family for features like Multiplexed Rank DIMM (MRDIMM), SNC=3 scenario, etc..
+
+* Large Language Model (LLM) optimization:
+Intel® Extension for PyTorch* provides more feature support of the weight only quantization including GPTQ/AWQ format support, symmetric quantization of activation and weight, and added chunked prefill/prefix prefill support in LLM module API, etc.. These features enable better adoption of community model weight and provides better performance for low-precision scenarios. This release also extended the optimized models to include newly published Llama 3.2 vision models. A full list of optimized models can be found at [LLM optimization](https://github.com/intel/intel-extension-for-pytorch/tree/v2.5.0+cpu/examples/cpu/llm/inference).
+
+* Bug fixing and other optimization
+    - Optimized the performance of the IndirectAccessKVCacheAttention kernel
+[#3185](https://github.com/intel/intel-extension-for-pytorch/commit/8572e1faf97998783ea2a7fc6ee3094090feebc4) [#3209](https://github.com/intel/intel-extension-for-pytorch/commit/65e96630a2e17f7b762c5c765f10264ad08db098) [#3214](https://github.com/intel/intel-extension-for-pytorch/commit/a04214f7ab4e43648d75abdcf0fae53e5076be2b) [#3218](https://github.com/intel/intel-extension-for-pytorch/commit/f219012ab1babbc67c9b545fa7251cd981a2a3a2) [#3248](https://github.com/intel/intel-extension-for-pytorch/commit/9f6178eb028d36b3ed1f5985e57b7cf160acf38a)
+    - Fixed the Segmentation fault in the IndirectAccessKVCacheAttention kernel [#3246](https://github.com/intel/intel-extension-for-pytorch/commit/bee5ab644086c9b25eb61916c6773932c74667d3)
+    - Fixed the correctness issue in the PagedAttention kernel for Llama-68M-Chat-v1 [#3307](https://github.com/intel/intel-extension-for-pytorch/commit/638a7d26acb33af450ea9869b5b43ccdbe0e962b)
+    - Fixed the support in `ipex.llm.optimize` to ensure `model.generate` returns the correct output type when `return_dict_in_generate` is set to `True`. [#3333](https://github.com/intel/intel-extension-for-pytorch/commit/584a4e2e2c6193b926554f951d2608489cac5d7a)
+    - Optimized the performance of the Flash Attention kernel [#3291](https://github.com/intel/intel-extension-for-pytorch/commit/8fb43ec45ed93b62efef07f4b2e8dcd7dd502b8b)
+    - Upgraded oneDNN to v3.6 [#3305](https://github.com/intel/intel-extension-for-pytorch/commit/91639fa0812ee3c12c672002c2bf5cf1cac4bc0a)
+
+**Full Changelog**: https://github.com/intel/intel-extension-for-pytorch/compare/v2.4.0+cpu...v2.5.0+cpu
+
 ## 2.4.0
 
 We are excited to announce the release of Intel® Extension for PyTorch\* 2.4.0+cpu which accompanies PyTorch 2.4. This release mainly brings you the support for Llama3.1, basic support for LLM serving frameworks like vLLM/TGI, and a set of optimization to push better performance for LLM models. This release also extends the list of optimized LLM models to a broader level and includes a set of bug fixing and small optimizations. We want to sincerely thank our dedicated community for your contributions. As always, we encourage you to try this release and feedback as to improve further on this product.

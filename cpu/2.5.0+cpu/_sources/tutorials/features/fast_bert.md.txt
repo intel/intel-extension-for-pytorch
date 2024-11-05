@@ -9,7 +9,7 @@ Currently `ipex.fast_bert` API is only well optimized for training. For inferenc
 
 ### Prerequisite
 
-- Transformers 4.6.0 ~ 4.43.2
+- Transformers 4.6.0 ~ 4.45.0
 
 ### Usage Example
 
@@ -20,7 +20,7 @@ An API `ipex.fast_bert` is provided for a simple usage. Usage of this API follow
 import torch
 from transformers import BertModel
 
-model = BertModel.from_pretrained("bert-base-uncased")
+model = BertModel.from_pretrained("bert-base-uncased", attn_implementation="eager")
 model.eval()
 
 vocab_size = model.config.vocab_size
