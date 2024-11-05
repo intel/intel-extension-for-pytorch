@@ -27,9 +27,6 @@ class TestNNMethod(TestCase):
         torch.xpu.using_onednn_layout(),
         reason="channels last does not support onednn block format",
     )
-    @pytest.mark.skip(
-        reason="PT2.5: Booleans mismatch: False is not True",
-    )
     def test_model_conversion_channels_last_1d(self, dtype=torch.float):
         model = Model()
         test_input = torch.rand([2, 3, 4])

@@ -5208,6 +5208,90 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> batch_norm_backward_reduce(
       grad_output, input, mean, invstd, weight_opt, input_g, weight_g, bias_g);
 }
 
+#ifdef USE_OVERRIDE_OP
+// Rename below functions because they have overload with the same name
+// and can't be registered.
+std::tuple<Tensor, Tensor, Tensor> _native_batch_norm_legit_(
+    const Tensor& self,
+    const c10::optional<Tensor>& weight_opt,
+    const c10::optional<Tensor>& bias_opt,
+    Tensor& running_mean,
+    Tensor& running_var,
+    bool train,
+    double momentum,
+    double epsilon) {
+  return at::AtenIpexTypeXPU::_native_batch_norm_legit(
+      self,
+      weight_opt,
+      bias_opt,
+      running_mean,
+      running_var,
+      train,
+      momentum,
+      epsilon);
+}
+
+std::tuple<Tensor, Tensor, Tensor> _native_batch_norm_legit_no_state(
+    const Tensor& self,
+    const c10::optional<Tensor>& weight_opt,
+    const c10::optional<Tensor>& bias_opt,
+    bool train,
+    double momentum,
+    double epsilon) {
+  return at::AtenIpexTypeXPU::_native_batch_norm_legit(
+      self, weight_opt, bias_opt, train, momentum, epsilon);
+}
+
+std::tuple<Tensor&, Tensor&, Tensor&> _native_batch_norm_legit_out_(
+    const Tensor& self,
+    const c10::optional<Tensor>& weight_opt,
+    const c10::optional<Tensor>& bias_opt,
+    Tensor& running_mean,
+    Tensor& running_var,
+    bool train,
+    double momentum,
+    double epsilon,
+    Tensor& output,
+    Tensor& save_mean,
+    Tensor& save_invstd) {
+  return at::AtenIpexTypeXPU::_native_batch_norm_legit_out(
+      self,
+      weight_opt,
+      bias_opt,
+      running_mean,
+      running_var,
+      train,
+      momentum,
+      epsilon,
+      output,
+      save_mean,
+      save_invstd);
+}
+
+std::tuple<Tensor&, Tensor&, Tensor&> _native_batch_norm_legit_no_state_out(
+    const Tensor& self,
+    const c10::optional<Tensor>& weight_opt,
+    const c10::optional<Tensor>& bias_opt,
+    bool train,
+    double momentum,
+    double epsilon,
+    Tensor& output,
+    Tensor& save_mean,
+    Tensor& save_invstd) {
+  return at::AtenIpexTypeXPU::_native_batch_norm_legit_out(
+      self,
+      weight_opt,
+      bias_opt,
+      train,
+      momentum,
+      epsilon,
+      output,
+      save_mean,
+      save_invstd);
+}
+
+#endif
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
@@ -5223,6 +5307,18 @@ IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl(
       "native_batch_norm_backward",
       TORCH_FN((&at::AtenIpexTypeXPU::native_batch_norm_backward)));
+  m.impl(
+      "_native_batch_norm_legit",
+      TORCH_FN((&at::AtenIpexTypeXPU::_native_batch_norm_legit_)));
+  m.impl(
+      "_native_batch_norm_legit.out",
+      TORCH_FN((&at::AtenIpexTypeXPU::_native_batch_norm_legit_out_)));
+  m.impl(
+      "_native_batch_norm_legit.no_stats",
+      TORCH_FN((&at::AtenIpexTypeXPU::_native_batch_norm_legit_no_state)));
+  m.impl(
+      "_native_batch_norm_legit.no_stats_out",
+      TORCH_FN((&at::AtenIpexTypeXPU::_native_batch_norm_legit_no_state_out)));
 }
 
 } // namespace

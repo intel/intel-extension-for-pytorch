@@ -61,9 +61,6 @@ class TestTorchMethod(TestCase):
                                 rtol=1e-5,
                             )
 
-    @pytest.mark.skip(
-        reason="PT2.5: Assertion `vec_idx < num_row` failed",
-    )
     def test_embeddingbag_out_of_bounds(self):
         stderr = TestCase.runWithPytorchAPIUsageStderr(
             f"""\

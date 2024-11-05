@@ -1439,6 +1439,9 @@ Tensor& index_select_out(
     int64_t dim,
     const Tensor& index,
     Tensor& out) {
+  TORCH_CHECK(self.is_xpu(), "self must be a XPU tensor.");
+  TORCH_CHECK(out.is_xpu(), "out must be a XPU tensor.");
+
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND5(
       at::ScalarType::Half,
       at::ScalarType::BFloat16,
@@ -2334,6 +2337,9 @@ Tensor& index_out(
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl(
       "_index_put_impl_", TORCH_FN((&at::AtenIpexTypeXPU::_index_put_impl_)));
+  m.impl("index_select", TORCH_FN((&at::AtenIpexTypeXPU::index_select)));
+  m.impl(
+      "index_select.out", TORCH_FN((&at::AtenIpexTypeXPU::index_select_out)));
   m.impl("nonzero", TORCH_FN((&at::AtenIpexTypeXPU::nonzero)));
   m.impl("nonzero.out", TORCH_FN((&at::AtenIpexTypeXPU::nonzero_out)));
 }
