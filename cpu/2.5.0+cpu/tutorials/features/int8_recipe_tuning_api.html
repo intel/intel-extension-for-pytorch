@@ -1,0 +1,409 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INT8 Recipe Tuning API (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.5.0+cpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=01a6a0bb" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Smooth Quant Recipe Tuning API (Prototype)" href="sq_recipe_tuning_api.html" />
+    <link rel="prev" title="Intel® Extension for PyTorch* optimizations for quantization" href="int8_overview.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../features.html">Features</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../features.html#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#large-language-models-llm-new-feature-from-2-1-0">Large Language Models (LLM, <em>NEW feature from 2.1.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#torch-compile-beta-new-feature-from-2-0-0">torch.compile (Beta, <em>NEW feature from 2.0.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#isa-dynamic-dispatching">ISA Dynamic Dispatching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-channels-last">Auto Channels Last</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-optimization">Graph Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#operator-optimization">Operator Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#optimizer-optimization">Optimizer Optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#runtime-extension">Runtime Extension</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../features.html#int8-quantization">INT8 Quantization</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="int8_overview.html">Intel® Extension for PyTorch* optimizations for quantization</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">INT8 Recipe Tuning API (Prototype)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#usage-example">Usage Example</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#smooth-quantization-autotune">Smooth Quantization Autotune</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#algorithm-auto-tuning-of-alpha">Algorithm: Auto-tuning of $\alpha$.</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#alpha-usage">$\alpha$ Usage</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#using-a-fixed-alpha">Using a fixed <code class="docutils literal notranslate"><span class="pre">alpha</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#determining-the-alpha-through-auto-tuning">Determining the <code class="docutils literal notranslate"><span class="pre">alpha</span></code> through auto-tuning</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sq_recipe_tuning_api.html">Smooth Quant Recipe Tuning API (Prototype)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#codeless-optimization-prototype-new-feature-from-1-13-0">Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#graph-capture-prototype-new-feature-from-1-13-0">Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#hypertune-prototype-new-feature-from-1-13-0">HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../features.html#fast-bert-optimization-prototype-new-feature-from-2-0-0">Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheat_sheet.html">Cheat Sheet</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">PERFORMANCE TUNING</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning/tuning_guide.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning/launch_script.html">Launch Script Usage Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning/torchserve.html">TorchServe with Intel® Extension for PyTorch*</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../features.html">Features</a></li>
+      <li class="breadcrumb-item active">INT8 Recipe Tuning API (Prototype)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/features/int8_recipe_tuning_api.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="int8-recipe-tuning-api-prototype">
+<h1>INT8 Recipe Tuning API (Prototype)<a class="headerlink" href="#int8-recipe-tuning-api-prototype" title="Link to this heading"></a></h1>
+<p>This <a class="reference external" href="../api_doc.html#ipex.quantization.autotune">new API</a> <code class="docutils literal notranslate"><span class="pre">ipex.quantization.autotune</span></code> supports INT8 recipe tuning by using Intel® Neural Compressor as the backend in Intel® Extension for PyTorch*. In general, we provid default recipe in Intel® Extension for PyTorch*, and we still recommend users to try out the default recipe first without bothering tuning. If the default recipe doesn’t bring about desired accuracy, users can use this API to tune for a more advanced receipe.</p>
+<p>Users need to provide a fp32 model and some parameters required for tuning. The API will return a prepared model with tuned qconfig loaded.</p>
+<section id="usage-example">
+<h2>Usage Example<a class="headerlink" href="#usage-example" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Static Quantization
+Please refer to <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/features/int8_recipe_tuning/imagenet_autotune.py">static_quant example</a>.</p></li>
+<li><p>Smooth Quantization
+Please refer to <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm/inference/single_instance/run_quantization.py">LLM SmoothQuant example</a>.</p></li>
+</ul>
+</section>
+<section id="smooth-quantization-autotune">
+<h2>Smooth Quantization Autotune<a class="headerlink" href="#smooth-quantization-autotune" title="Link to this heading"></a></h2>
+<section id="algorithm-auto-tuning-of-alpha">
+<h3>Algorithm: Auto-tuning of $\alpha$.<a class="headerlink" href="#algorithm-auto-tuning-of-alpha" title="Link to this heading"></a></h3>
+<p>SmoothQuant method aims to split the quantization difficulty of weight and activation by using a fixed-value $\alpha$ for an entire model. However, as the distributions of activation outliers vary not only across different models but also across different layers within a model, we hereby propose a method to obtain layer-wise optimal $\alpha$ values with the ability to tune automatically.
+Currently, both layer-wise and block-wise auto-tuning methods are supported and the default option is layer-wise.
+In block-wise auto-tuning, layers within one block (e.g an OPTDecoderLayer) would share the same alpha value; users could set <em>‘do_blockwise’: True</em> in <em>auto_alpha_args</em> to enable it.</p>
+<p>Our proposed method consists of 8 major steps:</p>
+<ul class="simple">
+<li><p>Hook input minimum and maximum values of layers to be smoothed using register_forward_hook.</p></li>
+<li><p>Find a list of layers on which smoothquant could be performed.</p></li>
+<li><p>Generate a list of $\alpha$ values of a user-defined range and set a default $\alpha$ value.</p></li>
+<li><p>Calculate smoothing factor using default $\alpha$ value, adjust parameters accordingly and forward the adjusted model given an input sample.</p></li>
+<li><p>Perform per-channel quantization_dequantization of weights and per-tensor quantization_dequantization of activations to predict output.</p></li>
+<li><p>Calculate the layer-wise/block-wise loss with respect to FP32 output, iterate the previous two steps given each $\alpha$ value and save the layer-wise/block-wise loss per alpha.</p></li>
+<li><p>Apply criterion on input LayerNorm op and obtain the optimal alpha values of a single input sample.</p></li>
+<li><p>Iterate the previous three steps over a number of input samples and save the layer-wise/block-wise optimal $\alpha$ values.</p></li>
+</ul>
+<p>Multiple criteria (e.g min, max and mean) are supported to determine the $\alpha$ value of an input LayerNorm op of a transformer block. Both alpha range and criterion could be configured in auto_alpha_args.</p>
+<p>In our experiments, an $\alpha$ range of [0.0, 1.0] with a step_size of 0.1 is found to be well-balanced one for the majority of models.</p>
+</section>
+<section id="alpha-usage">
+<h3>$\alpha$ Usage<a class="headerlink" href="#alpha-usage" title="Link to this heading"></a></h3>
+<p>There are two ways to apply smooth quantization: 1) using a fixed <code class="docutils literal notranslate"><span class="pre">alpha</span></code> for the entire model or 2) determining the <code class="docutils literal notranslate"><span class="pre">alpha</span></code> through auto-tuning.</p>
+<section id="using-a-fixed-alpha">
+<h4>Using a fixed <code class="docutils literal notranslate"><span class="pre">alpha</span></code><a class="headerlink" href="#using-a-fixed-alpha" title="Link to this heading"></a></h4>
+<p>To set a fixed alpha for the entire model, users can follow this example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="n">smoothquant_args</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;alpha&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;folding&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+<span class="n">tuned_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">autotune</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">calib_dataloader</span><span class="p">,</span> <span class="n">eval_func</span><span class="p">,</span> <span class="n">smoothquant_args</span><span class="o">=</span><span class="n">smoothquant_args</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">smoothquant_args</span></code> description:
+“alpha”: a float value. Default is 0.5.
+“folding”: whether to fold mul into the previous layer, where mul is required to update the input distribution during smoothing.</p>
+<ul class="simple">
+<li><p>True: Fold inserted <code class="docutils literal notranslate"><span class="pre">mul</span></code> into the previous layer in the model graph. IPEX will only insert <code class="docutils literal notranslate"><span class="pre">mul</span></code> for layers that can do folding.</p></li>
+<li><p>False: Allow inserting <code class="docutils literal notranslate"><span class="pre">mul</span></code> to update the input distribution without folding in the graph explicitly. IPEX (version&gt;=2.1) will fuse inserted <code class="docutils literal notranslate"><span class="pre">mul</span></code> automatically in the backend.</p></li>
+</ul>
+</section>
+<section id="determining-the-alpha-through-auto-tuning">
+<h4>Determining the <code class="docutils literal notranslate"><span class="pre">alpha</span></code> through auto-tuning<a class="headerlink" href="#determining-the-alpha-through-auto-tuning" title="Link to this heading"></a></h4>
+<p>Users can search for the best <code class="docutils literal notranslate"><span class="pre">alpha</span></code> at two levels: a) for the entire model, and b) for each layer/block.</p>
+<ol class="simple">
+<li><p>Auto-tune the <code class="docutils literal notranslate"><span class="pre">alpha</span></code> for the entire model
+The tuning process looks for the optimal <code class="docutils literal notranslate"><span class="pre">alpha</span></code> value from a list of <code class="docutils literal notranslate"><span class="pre">alpha</span></code> values provided by the user.</p></li>
+</ol>
+<blockquote>
+<div><p>Please note that, it may use a considerable amount of time as the tuning process applies each <code class="docutils literal notranslate"><span class="pre">alpha</span></code> to the entire model and uses the evaluation result on the entire dataset as the metric to determine the best <code class="docutils literal notranslate"><span class="pre">alpha</span></code>.
+Here is an example:</p>
+</div></blockquote>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="n">smoothquant_args</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;alpha&quot;</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()}</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>Auto-tune the <code class="docutils literal notranslate"><span class="pre">alpha</span></code> for each layer/block
+In this case, the tuning process searches the optimal <code class="docutils literal notranslate"><span class="pre">alpha</span></code> of each layer of the block by evaluating the loss with respect to FP32 output on a few batches of data.
+Here is an example:</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">smoothquant_args</span><span class="o">=</span><span class="p">{</span>
+    <span class="s2">&quot;alpha&quot;</span><span class="p">:</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;auto_alpha_args&quot;</span><span class="p">{</span>
+        <span class="s2">&quot;init_alpha&quot;</span><span class="p">:</span> <span class="mf">0.8</span><span class="p">,</span> <span class="c1"># baseline alpha-value for auto-tuning</span>
+        <span class="s2">&quot;alpha_min&quot;</span><span class="p">:</span> <span class="mf">0.8</span><span class="p">,</span> <span class="c1"># min value of auto-tuning alpha search space</span>
+        <span class="s2">&quot;alpha_max&quot;</span><span class="p">:</span> <span class="mf">0.99</span><span class="p">,</span> <span class="c1"># max value of auto-tuning alpha search space</span>
+        <span class="s2">&quot;alpha_step&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span> <span class="c1"># step_size of auto-tuning alpha search space</span>
+        <span class="s2">&quot;shared_criterion&quot;</span><span class="p">:</span> <span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="c1"># criterion for input LayerNorm op of a transformer block</span>
+        <span class="s2">&quot;enable_blockwise_loss&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># whether to enable block-wise auto-tuning</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">DataLoader</span>
+<span class="kn">from</span> <span class="nn">torchvision</span> <span class="kn">import</span> <span class="n">datasets</span>
+<span class="kn">from</span> <span class="nn">torchvision.transforms</span> <span class="kn">import</span> <span class="n">ToTensor</span>
+
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+
+<span class="c1">########################################################################  # noqa F401</span>
+<span class="c1"># Reference for training portion:</span>
+<span class="c1"># https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html</span>
+
+<span class="c1"># Download training data from open datasets.</span>
+<span class="n">training_data</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">.</span><span class="n">FashionMNIST</span><span class="p">(</span>
+    <span class="n">root</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">,</span>
+    <span class="n">train</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">transform</span><span class="o">=</span><span class="n">ToTensor</span><span class="p">(),</span>
+<span class="p">)</span>
+
+<span class="c1"># Download test data from open datasets.</span>
+<span class="n">test_data</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">.</span><span class="n">FashionMNIST</span><span class="p">(</span>
+    <span class="n">root</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">,</span>
+    <span class="n">train</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">transform</span><span class="o">=</span><span class="n">ToTensor</span><span class="p">(),</span>
+<span class="p">)</span>
+<span class="n">batch_size</span> <span class="o">=</span> <span class="mi">64</span>
+
+<span class="c1"># Create data loaders.</span>
+<span class="n">train_dataloader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">training_data</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span>
+<span class="n">test_dataloader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">test_data</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">test_dataloader</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shape of X [N, C, H, W]: </span><span class="si">{</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shape of y: </span><span class="si">{</span><span class="n">y</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">y</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">break</span>
+
+
+<span class="c1"># Define model</span>
+<span class="k">class</span> <span class="nc">NeuralNetwork</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flatten</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Flatten</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">linear_relu_stack</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">28</span> <span class="o">*</span> <span class="mi">28</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">512</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">logits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear_relu_stack</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">logits</span>
+
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">NeuralNetwork</span><span class="p">()</span>
+<span class="n">loss_fn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">()</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="n">dataloader</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">loss_fn</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">):</span>
+    <span class="n">size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataloader</span><span class="o">.</span><span class="n">dataset</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">batch</span><span class="p">,</span> <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">dataloader</span><span class="p">):</span>
+
+        <span class="c1"># Compute prediction error</span>
+        <span class="n">pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">pred</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+        <span class="c1"># Backpropagation</span>
+        <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+        <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+        <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">batch</span> <span class="o">%</span> <span class="mi">100</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">loss</span><span class="p">,</span> <span class="n">current</span> <span class="o">=</span> <span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">batch</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;loss: </span><span class="si">{</span><span class="n">loss</span><span class="si">:</span><span class="s2">&gt;7f</span><span class="si">}</span><span class="s2">    [</span><span class="si">{</span><span class="n">current</span><span class="si">:</span><span class="s2">&gt;5d</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">size</span><span class="si">:</span><span class="s2">&gt;5d</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
+
+
+<span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">)</span>
+
+<span class="n">epochs</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">epochs</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Epoch </span><span class="si">{</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="se">\n</span><span class="s2">-------------------------------&quot;</span><span class="p">)</span>
+    <span class="n">train</span><span class="p">(</span><span class="n">train_dataloader</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">loss_fn</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Done!&quot;</span><span class="p">)</span>
+
+<span class="c1">################################ QUANTIZE ##############################  # noqa F401</span>
+<span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+
+<span class="k">def</span> <span class="nf">evaluate</span><span class="p">(</span><span class="n">dataloader</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+    <span class="n">size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataloader</span><span class="o">.</span><span class="n">dataset</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="n">accuracy</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">dataloader</span><span class="p">:</span>
+            <span class="c1"># X, y = X.to(&#39;cpu&#39;), y.to(&#39;cpu&#39;)</span>
+            <span class="n">pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+            <span class="n">accuracy</span> <span class="o">+=</span> <span class="p">(</span><span class="n">pred</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="n">y</span><span class="p">)</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+    <span class="n">accuracy</span> <span class="o">/=</span> <span class="n">size</span>
+    <span class="k">return</span> <span class="n">accuracy</span>
+
+
+<span class="c1">######################## recipe tuning with INC ########################  # noqa F401</span>
+<span class="k">def</span> <span class="nf">eval</span><span class="p">(</span><span class="n">prepared_model</span><span class="p">):</span>
+    <span class="n">accu</span> <span class="o">=</span> <span class="n">evaluate</span><span class="p">(</span><span class="n">test_dataloader</span><span class="p">,</span> <span class="n">prepared_model</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">accu</span><span class="p">)</span>
+
+
+<span class="n">tuned_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">autotune</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">test_dataloader</span><span class="p">,</span>
+    <span class="n">eval_func</span><span class="o">=</span><span class="nb">eval</span><span class="p">,</span>
+    <span class="n">sampling_sizes</span><span class="o">=</span><span class="p">[</span><span class="mi">100</span><span class="p">],</span>
+    <span class="n">accuracy_criterion</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;relative&quot;</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">},</span>
+    <span class="n">tuning_time</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="c1">########################################################################  # noqa F401</span>
+
+<span class="c1"># run tuned model</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">28</span><span class="p">,</span> <span class="mi">28</span><span class="p">)</span>
+<span class="n">convert_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">quantization</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">tuned_model</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">convert_model</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+    <span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">traced_model</span><span class="p">)</span>
+    <span class="n">traced_model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+<span class="c1"># save tuned qconfig file</span>
+<span class="n">tuned_model</span><span class="o">.</span><span class="n">save_qconf_summary</span><span class="p">(</span><span class="n">qconf_summary</span><span class="o">=</span><span class="s2">&quot;tuned_conf.json&quot;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Execution finished&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="int8_overview.html" class="btn btn-neutral float-left" title="Intel® Extension for PyTorch* optimizations for quantization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sq_recipe_tuning_api.html" class="btn btn-neutral float-right" title="Smooth Quant Recipe Tuning API (Prototype)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x74cfa9e9e3e0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

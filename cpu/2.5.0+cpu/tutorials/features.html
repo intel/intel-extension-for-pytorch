@@ -1,0 +1,459 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Features &mdash; Intel&amp;#174 Extension for PyTorch* 2.5.0+cpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=01a6a0bb" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="ISA Dynamic Dispatching" href="features/isa_dynamic_dispatch.html" />
+    <link rel="prev" title="Introduction" href="introduction.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Features</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#large-language-models-llm-new-feature-from-2-1-0">Large Language Models (LLM, <em>NEW feature from 2.1.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#torch-compile-beta-new-feature-from-2-0-0">torch.compile (Beta, <em>NEW feature from 2.0.0</em>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#isa-dynamic-dispatching">ISA Dynamic Dispatching</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/isa_dynamic_dispatch.html">ISA Dynamic Dispatching</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#auto-channels-last">Auto Channels Last</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/nhwc.html">Channels Last</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/auto_channels_last.html">Auto Channels Last</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/amp.html">Auto Mixed Precision (AMP)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#graph-optimization">Graph Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/graph_optimization.html">Graph Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#operator-optimization">Operator Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.nn.FrozenBatchNorm2d"><code class="docutils literal notranslate"><span class="pre">FrozenBatchNorm2d</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.nn.functional.interaction"><code class="docutils literal notranslate"><span class="pre">interaction()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.nn.modules.MergedEmbeddingBag"><code class="docutils literal notranslate"><span class="pre">MergedEmbeddingBag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ipex.nn.modules.MergedEmbeddingBagWithSGD"><code class="docutils literal notranslate"><span class="pre">MergedEmbeddingBagWithSGD</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#optimizer-optimization">Optimizer Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/optimizer_fusion.html">Optimizer Fusion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/split_sgd.html">Split SGD</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#runtime-extension">Runtime Extension</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/runtime_extension.html">Runtime Extension</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#int8-quantization">INT8 Quantization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/int8_overview.html">Intel® Extension for PyTorch* optimizations for quantization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/int8_recipe_tuning_api.html">INT8 Recipe Tuning API (Prototype)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/sq_recipe_tuning_api.html">Smooth Quant Recipe Tuning API (Prototype)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#codeless-optimization-prototype-new-feature-from-1-13-0">Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/codeless_optimization.html">Codeless Optimization (Prototype)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#graph-capture-prototype-new-feature-from-1-13-0">Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/graph_capture.html">Graph Capture (Prototype)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#hypertune-prototype-new-feature-from-1-13-0">HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/hypertune.html">HyperTune (Prototype)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#fast-bert-optimization-prototype-new-feature-from-2-0-0">Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/fast_bert.html">Fast BERT (Prototype)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blogs_publications.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cheat_sheet.html">Cheat Sheet</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">PERFORMANCE TUNING</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/tuning_guide.html">Performance Tuning Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/launch_script.html">Launch Script Usage Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance_tuning/torchserve.html">TorchServe with Intel® Extension for PyTorch*</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Features</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/features.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="features">
+<h1>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h1>
+<p>This section provides a detailed overview of supported features.</p>
+<section id="easy-to-use-python-api">
+<h2>Easy-to-use Python API<a class="headerlink" href="#easy-to-use-python-api" title="Link to this heading"></a></h2>
+<p>With only two or three clauses added to your original code, Intel® Extension for PyTorch* provides simple frontend Python APIs and utilities to get performance optimizations such as graph optimization and operator optimization.</p>
+<p>Check the <a class="reference external" href="api_doc.html">API Documentation</a> for API functions description and <a class="reference external" href="examples.html">Examples</a> for usage guidance.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The package name used when you import Intel® Extension for PyTorch* changed
+from <code class="docutils literal notranslate"><span class="pre">intel_pytorch_extension</span></code> (for versions 1.2.0 through 1.9.0) to
+<code class="docutils literal notranslate"><span class="pre">intel_extension_for_pytorch</span></code> (for versions 1.10.0 and later). Use the
+correct package name depending on the version you are using.</p>
+</div>
+</section>
+<section id="large-language-models-llm-new-feature-from-2-1-0">
+<h2>Large Language Models (LLM, <em>NEW feature from 2.1.0</em>)<a class="headerlink" href="#large-language-models-llm-new-feature-from-2-1-0" title="Link to this heading"></a></h2>
+<p>In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. Large Language Models (LLMs) have emerged as the dominant models driving these GenAI applications. Starting from 2.1.0, specific optimizations for certain LLM models are
+introduced in the Intel® Extension for PyTorch*.</p>
+<p>For more detailed information, check <a class="reference external" href="./llm.html">LLM Optimizations Overview</a>.</p>
+</section>
+<section id="torch-compile-beta-new-feature-from-2-0-0">
+<h2>torch.compile (Beta, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#torch-compile-beta-new-feature-from-2-0-0" title="Link to this heading"></a></h2>
+<p>PyTorch* 2.0 introduces a new feature <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to speed up PyTorch* code. It makes PyTorch code run faster by JIT-compiling of PyTorch code into optimized kernels. Intel® Extension for PyTorch* enables a backend, <code class="docutils literal notranslate"><span class="pre">ipex</span></code>, in the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to optimize generation of the graph model.</p>
+<p>To use the feature, import the Intel® Extension for PyTorch* and set the backend parameter of the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> to <code class="docutils literal notranslate"><span class="pre">ipex</span></code>.</p>
+<p>With <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend set to <code class="docutils literal notranslate"><span class="pre">ipex</span></code>, the following will happen:</p>
+<ol class="arabic simple">
+<li><p>Register Intel® Extension for PyTorch* operators to Inductor.</p></li>
+<li><p>Custom fusions at FX graph level, e.g., the migration of existing TorchScript-based fusion kernels in IPEX to inductor, pattern-based fusions to achieve peak performance.</p></li>
+</ol>
+<p>While optimizations with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> apply to backend, invocation of the <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> function is highly recommended as well to apply optimizations in frontend.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="o">...</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">weights_prepack</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s1">&#39;ipex&#39;</span><span class="p">)</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+</section>
+<section id="isa-dynamic-dispatching">
+<h2>ISA Dynamic Dispatching<a class="headerlink" href="#isa-dynamic-dispatching" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* features dynamic dispatching functionality to automatically adapt execution binaries to the most advanced instruction set available on your machine.</p>
+<p>For details, refer to <a class="reference external" href="features/isa_dynamic_dispatch.html">ISA Dynamic Dispatching</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="auto-channels-last">
+<h2>Auto Channels Last<a class="headerlink" href="#auto-channels-last" title="Link to this heading"></a></h2>
+<p>Comparing to the default NCHW memory format, using channels_last (NHWC) memory format could further accelerate convolutional neural networks. In Intel® Extension for PyTorch*, NHWC memory format has been enabled for most key CPU operators. More detailed information is available at <a class="reference external" href="features/nhwc.html">Channels Last</a>.</p>
+<p>Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with <code class="docutils literal notranslate"><span class="pre">ipex.optimize(model)</span></code>. With this feature, there is no need to manually apply <code class="docutils literal notranslate"><span class="pre">model=model.to(memory_format=torch.channels_last)</span></code> anymore. More detailed information is available at <a class="reference external" href="features/auto_channels_last.html">Auto Channels Last</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="auto-mixed-precision-amp">
+<h2>Auto Mixed Precision (AMP)<a class="headerlink" href="#auto-mixed-precision-amp" title="Link to this heading"></a></h2>
+<p>Low precision data type BFloat16 has been natively supported on 3rd Generation Xeon® Scalable Processors (aka Cooper Lake) with AVX512 instruction set. It will also be supported on the next generation of Intel® Xeon® Scalable Processors with Intel® Advanced Matrix Extensions (Intel® AMX) instruction set providing further boosted performance. The support of Auto Mixed Precision (AMP) with BFloat16 for CPU and BFloat16 optimization of operators has been enabled in Intel® Extension for PyTorch*, and partially upstreamed to PyTorch master branch. These optimizations will be landed in PyTorch master through PRs that are being submitted and reviewed.</p>
+<p>Prefer to use <cite>torch.cpu.amp.autocast()</cite> instead of <cite>torch.autocast(device_name=”cpu”)</cite>.</p>
+<p>For details, refer to <a class="reference external" href="features/amp.html">Auto Mixed Precision (AMP)</a>.</p>
+<p>Bfloat16 computation can be conducted on platforms with AVX512 instruction set. On platforms with <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/articles/technical/intel-deep-learning-boost-new-instruction-bfloat16.html">AVX512 BFloat16 instruction</a>, there will be an additional performance boost.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="graph-optimization">
+<h2>Graph Optimization<a class="headerlink" href="#graph-optimization" title="Link to this heading"></a></h2>
+<p>To further optimize TorchScript performance, Intel® Extension for PyTorch* supports transparent fusion of frequently used operator patterns such as Conv2D+ReLU and Linear+ReLU.
+For more detailed information, check <a class="reference external" href="features/graph_optimization.html">Graph Optimization</a>.</p>
+<p>Compared to eager mode, graph mode in PyTorch normally yields better performance from optimization methodologies such as operator fusion. Intel® Extension for PyTorch* provides further optimizations in graph mode. We recommend taking advantage of Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a>. You may wish to run with the <code class="docutils literal notranslate"><span class="pre">torch.jit.trace()</span></code> function first, since it generally works better with Intel® Extension for PyTorch* than using the <code class="docutils literal notranslate"><span class="pre">torch.jit.script()</span></code> function. More detailed information can be found at the <a class="reference external" href="https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html#tracing-modules">pytorch.org website</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="operator-optimization">
+<h2>Operator Optimization<a class="headerlink" href="#operator-optimization" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* also optimizes operators and implements several customized operators for performance boosts. A few ATen operators are replaced by their optimized counterparts in Intel® Extension for PyTorch* via the ATen registration mechanism. Some customized operators are implemented for several popular topologies. For instance, ROIAlign and NMS are defined in Mask R-CNN. To improve performance of these topologies, Intel® Extension for PyTorch* also optimized these customized operators.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.nn.FrozenBatchNorm2d">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.</span></span><span class="sig-name descname"><span class="pre">FrozenBatchNorm2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-05</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.FrozenBatchNorm2d" title="Link to this definition"></a></dt>
+<dd><p>BatchNorm2d where the batch statistics and the affine parameters are fixed</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>num_features</strong> (<em>int</em>) – <code class="docutils literal notranslate"><span class="pre">C</span></code> from an expected input of size <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">C,</span> <span class="pre">H,</span> <span class="pre">W)</span></code>.
+Input shape: <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">C,</span> <span class="pre">H,</span> <span class="pre">W)</span></code>.
+Output shape: <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">C,</span> <span class="pre">H,</span> <span class="pre">W)</span></code> (same shape as input).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ipex.nn.functional.interaction">
+<span class="sig-prename descclassname"><span class="pre">ipex.nn.functional.</span></span><span class="sig-name descname"><span class="pre">interaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.functional.interaction" title="Link to this definition"></a></dt>
+<dd><p>Get the interaction feature beyond different kinds of features (like gender
+or hobbies), used in DLRM model.</p>
+<p>For now, we only optimized “dot” interaction at <a class="reference external" href="https://github.com/facebookresearch/dlrm/blob/main/dlrm_s_pytorch.py#L475-L495">DLRM Github repo</a>.
+Through this, we use the dot product to represent the interaction feature
+between two features.</p>
+<p>For example, if feature 1 is “Man” which is represented by [0.1, 0.2, 0.3],
+and feature 2 is “Like play football” which is represented by [-0.1, 0.3, 0.2].</p>
+<p>The dot interaction feature is
+([0.1, 0.2, 0.3] * [-0.1, 0.3, 0.2]^T) =  -0.1 + 0.6 + 0.6 = 1.1</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>*args</strong> – Multiple tensors which represent different features.
+Input shape: <code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">*</span> <span class="pre">(B,</span> <span class="pre">D)</span></code>, where N is the number of different kinds of features,
+B is the batch size, D is feature size.
+Output shape: <code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">D</span> <span class="pre">+</span> <span class="pre">N</span> <span class="pre">*</span> <span class="pre">(</span> <span class="pre">N</span> <span class="pre">-</span> <span class="pre">1</span> <span class="pre">)</span> <span class="pre">/</span> <span class="pre">2)</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.nn.modules.MergedEmbeddingBag">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.modules.</span></span><span class="sig-name descname"><span class="pre">MergedEmbeddingBag</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">embedding_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">EmbeddingSpec</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.modules.MergedEmbeddingBag" title="Link to this definition"></a></dt>
+<dd><p>Merge multiple Pytorch <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.nn.EmbeddingBag.html#embeddingbag">EmbeddingBag</a> objects into a single <cite>torch.nn.Module</cite> object.</p>
+<p>At the current stage:</p>
+<p><cite>MergedEmbeddingBag</cite> assumes to be constructed from <cite>nn.EmbeddingBag</cite> with <cite>sparse=False</cite>, returns dense gradients.</p>
+<p><cite>MergedEmbeddingBagWithSGD</cite> does not return gradients, backward step and weights update step are fused.</p>
+<p>Native usage of multiple <cite>EmbeddingBag</cite> objects is:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">EmbLists</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Modulist</span><span class="p">(</span><span class="n">emb1</span><span class="p">,</span> <span class="n">emb2</span><span class="p">,</span> <span class="n">emb3</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">emb_m</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">in1</span><span class="p">,</span> <span class="n">in2</span><span class="p">,</span> <span class="n">in3</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">in_m</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outputs</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">EmbLists</span><span class="p">)):</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Emb</span><span class="p">[</span><span class="n">in_i</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>The optimized path is:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">EmbLists</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Modulist</span><span class="p">(</span><span class="n">emb1</span><span class="p">,</span> <span class="n">emb2</span><span class="p">,</span> <span class="n">emb3</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">emb_m</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">merged_emb</span> <span class="o">=</span> <span class="n">MergedEmbeddingBagWithSGD</span><span class="o">.</span><span class="n">from_embeddingbag_list</span><span class="p">(</span><span class="n">EmbLists</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outputs</span> <span class="o">=</span> <span class="n">MergedEmbeddingBagWithSGD</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Computation benefits from the optimized path:</p>
+<blockquote>
+<div><p>1). Pytorch OP dispatching overhead is minimized. If <cite>EmbeddingBag</cite> operations are not heavy, this dispatching
+overhead brings big impact.</p>
+<p>2). Parallelizations over embedding tables are merged into that over a single merged embedding table. This
+could benefit low parallelization efficiency scenarios when data size read out from embedding tables are not
+large enough.</p>
+</div></blockquote>
+<p>Now <cite>MergedEmbeddingBagWithSGD</cite> is the only option running with an optimizer. We plan to add more optimizer support
+in the future. Visit <cite>MergedEmbeddingBagWithSGD</cite> for introduction of <cite>MergedEmbeddingBagWith[Optimizer]</cite>.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ipex.nn.modules.MergedEmbeddingBagWithSGD">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ipex.nn.modules.</span></span><span class="sig-name descname"><span class="pre">MergedEmbeddingBagWithSGD</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">embedding_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">EmbeddingSpec</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_decay</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ipex.nn.modules.MergedEmbeddingBagWithSGD" title="Link to this definition"></a></dt>
+<dd><p>To support training with <cite>MergedEmbeddingBag</cite> for good performance, optimizer step is fused with backward function.</p>
+<p>Native usage for multiple EmbeddingBag is:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">EmbLists</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Modulist</span><span class="p">(</span><span class="n">emb1</span><span class="p">,</span> <span class="n">emb2</span><span class="p">,</span> <span class="n">emb3</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">emb_m</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sgd</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">EmbLists</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="n">weight_decay</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">in1</span><span class="p">,</span> <span class="n">in2</span><span class="p">,</span> <span class="n">in3</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">in_m</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outputs</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">EmbLists</span><span class="p">)):</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Emb</span><span class="p">[</span><span class="n">in_i</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sgd</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">)):</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">out</span><span class="o">.</span><span class="n">backward</span><span class="p">(</span><span class="n">grads</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sgd</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The optimized path is:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># create MergedEmbeddingBagWithSGD module with optimizer args (lr and weight decay)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">EmbLists</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Modulist</span><span class="p">(</span><span class="n">emb1</span><span class="p">,</span> <span class="n">emb2</span><span class="p">,</span> <span class="n">emb3</span><span class="p">,</span> <span class="o">...</span><span class="p">,</span> <span class="n">emb_m</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">merged_emb</span> <span class="o">=</span> <span class="n">MergedEmbeddingBagWithSGD</span><span class="o">.</span><span class="n">from_embeddingbag_list</span><span class="p">(</span><span class="n">EmbLists</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="n">weight_decay</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># if you need to train with BF16 dtype, we provide split sgd on it</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># merged_emb.to_bfloat16_train()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">merged_input</span> <span class="o">=</span> <span class="n">merged_emb</span><span class="o">.</span><span class="n">linearize_indices_and_offsets</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outputs</span> <span class="o">=</span> <span class="n">MergedEmbeddingBagWithSGD</span><span class="p">(</span><span class="n">merged_input</span><span class="p">,</span> <span class="n">need_linearize_indices_and_offsets</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">BoolTensor</span><span class="p">([</span><span class="kc">False</span><span class="p">]))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">outputs</span><span class="o">.</span><span class="n">backward</span><span class="p">(</span><span class="n">grads</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Training benefits further from this optimization:</p>
+<blockquote>
+<div><p>1). Pytorch OP dispatching overhead in backward and weight update process is saved.</p>
+<p>2). Thread loading becomes more balanced during backward/weight update. In real world scenarios, <cite>Embedingbag</cite>
+are often used to represent categorical features, while the categorical features often fit power law
+distribution. For example, if we use one embedding table to represent the age range of a video game website
+users, we might find most of them are between 10-19 or 20-29. So we may need to update the row which represent
+10-19 or 20-29 frequently. Since updating these rows needs to write at the same memory address, we need to write
+it by 1 thread (otherwise we will have write conflict or overhead to solve the conflict). The potential memory
+write conflict can be simply addressed by merging multiple tables together.</p>
+<p>3). Weights update is fused with backward together. We can immediately update the weight right after we get
+gradients from the backward step and thus the memory access pattern becomes more friendly. Data access will
+happen on cache more than on memory.</p>
+</div></blockquote>
+</dd></dl>
+
+<p><strong>Auto kernel selection</strong> is a feature that enables users to tune for better performance with GEMM operations. We aim to provide good default performance by leveraging the best of math libraries and enabling <cite>weights_prepack</cite>. The feature was tested with broad set of models. If you want to try other options, you can use <cite>auto_kernel_selection</cite> toggle in <cite>ipex.optimize()</cite> to switch, and you can disable <cite>weights_prepack</cite> in <cite>ipex.optimize()</cite> if you are more concerned about the memory footprint than performance gain. However, in most cases, we recommend sticking with the default settings for the best experience.</p>
+</section>
+<section id="optimizer-optimization">
+<h2>Optimizer Optimization<a class="headerlink" href="#optimizer-optimization" title="Link to this heading"></a></h2>
+<p>Optimizers are one of key parts of the training workloads. Intel® Extension for PyTorch* brings two types of optimizations to optimizers:</p>
+<ol class="arabic simple">
+<li><p>Operator fusion for the computation in the optimizers.</p></li>
+<li><p>SplitSGD for BF16 training, which reduces the memory footprint of the master weights by half.</p></li>
+</ol>
+<p>For details, refer to <a class="reference external" href="features/optimizer_fusion.html">Optimizer Fusion</a> and <a class="reference external" href="features/split_sgd.html">Split SGD</a></p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="runtime-extension">
+<h2>Runtime Extension<a class="headerlink" href="#runtime-extension" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* Runtime Extension provides PyTorch frontend APIs for users to get finer-grained control of the thread runtime and provides:</p>
+<ul class="simple">
+<li><p>Multi-stream inference via the Python frontend module MultiStreamModule.</p></li>
+<li><p>Spawn asynchronous tasks from both Python and C++ frontend.</p></li>
+<li><p>Program core bindings for OpenMP threads from both Python and C++ frontend.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Intel® Extension for PyTorch* Runtime extension is still in the prototype stage. The API is subject to change. More detailed descriptions are available in the <a class="reference external" href="api_doc.html">API Documentation</a>.</p>
+</div>
+<p>For more detailed information, check <a class="reference external" href="features/runtime_extension.html">Runtime Extension</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="int8-quantization">
+<h2>INT8 Quantization<a class="headerlink" href="#int8-quantization" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* provides built-in quantization recipes to deliver good statistical accuracy for most popular DL workloads including CNN, NLP and recommendation models.</p>
+<p>Users are always recommended to try quantization with the built-in quantization recipe first with Intel® Extension for PyTorch* quantization APIs. For even higher accuracy demandings, users can try with separate <a class="reference external" href="features/int8_recipe_tuning_api.html">recipe tuning APIs</a>. The APIs are powered by Intel® Neural Compressor to take advantage of its tuning feature.</p>
+<p>Smooth quantization (SmoothQuant) is a more recent post-training quantization (PTQ) solution which tackles the quantization error problem caused by systematic outliers in activations. SmoothQuant is commonly used for LLM quantization, and Intel® Extension for PyTorch* has provided built-in support for this solution.</p>
+<p>Check more detailed information for <a class="reference external" href="features/int8_overview.html">INT8 Quantization</a> and <a class="reference external" href="features/int8_recipe_tuning_api.html">INT8 recipe tuning API guide (Prototype)</a>. In addition, SmoothQuant specific argument introduction and examples can be checked in <a class="reference external" href="features/sq_recipe_tuning_api.html">SmoothQuant recipe tuning API guide (Prototype)</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="codeless-optimization-prototype-new-feature-from-1-13-0">
+<h2>Codeless Optimization (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#codeless-optimization-prototype-new-feature-from-1-13-0" title="Link to this heading"></a></h2>
+<p>This feature enables users to get performance benefits from Intel® Extension for PyTorch* without changing Python scripts. It hopefully eases the usage and has been verified working well with broad scope of models, though in few cases there could be small overhead comparing to applying optimizations with Intel® Extension for PyTorch* APIs.</p>
+<p>For more detailed information, check <a class="reference external" href="features/codeless_optimization.html">Codeless Optimization</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="graph-capture-prototype-new-feature-from-1-13-0">
+<h2>Graph Capture (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#graph-capture-prototype-new-feature-from-1-13-0" title="Link to this heading"></a></h2>
+<p>Since graph mode is key for deployment performance, this feature automatically captures graphs based on set of technologies that PyTorch supports, such as TorchScript and TorchDynamo. Users won’t need to learn and try different PyTorch APIs to capture graphs, instead, they can turn on a new boolean flag <cite>–graph_mode</cite> (default off) in <cite>ipex.optimize()</cite> to get the best of graph optimization.</p>
+<p>For more detailed information, check <a class="reference external" href="features/graph_capture.html">Graph Capture</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="hypertune-prototype-new-feature-from-1-13-0">
+<h2>HyperTune (Prototype, <em>NEW feature from 1.13.0</em>)<a class="headerlink" href="#hypertune-prototype-new-feature-from-1-13-0" title="Link to this heading"></a></h2>
+<p>HyperTune is an prototype feature to perform hyperparameter/execution configuration searching. The searching is used in various areas such as optimization of hyperparameters of deep learning models. The searching is extremely useful in real situations when the number of hyperparameters, including configuration of script execution, and their search spaces are huge that manually tuning these hyperparameters/configuration is impractical and time consuming. Hypertune automates this process of execution configuration searching for the <a class="reference external" href="performance_tuning/launch_script.html">launcher</a> and Intel® Extension for PyTorch*.</p>
+<p>For more detailed information, check <a class="reference external" href="features/hypertune.html">HyperTune</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="fast-bert-optimization-prototype-new-feature-from-2-0-0">
+<h2>Fast BERT Optimization (Prototype, <em>NEW feature from 2.0.0</em>)<a class="headerlink" href="#fast-bert-optimization-prototype-new-feature-from-2-0-0" title="Link to this heading"></a></h2>
+<p>Intel proposed a technique to speed up BERT workloads. Implementation is integrated into Intel® Extension for PyTorch*. An API <cite>ipex.fast_bert()</cite> is provided for a simple usage.</p>
+<p>Currently <cite>ipex.fast_bert</cite> API is well optimized for training tasks. It works for inference tasks, though, please use the <cite>ipex.optimize</cite> API with graph mode to achieve the peak performance.</p>
+<p>For more detailed information, check <a class="reference external" href="features/fast_bert.html">Fast BERT</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="features/isa_dynamic_dispatch.html" class="btn btn-neutral float-right" title="ISA Dynamic Dispatching" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x74cfa9e85b10> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
