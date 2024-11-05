@@ -210,6 +210,44 @@ def ipex_mm_qkv(m, n, k, dtype, with_bias):
     return c_, c_cpu_
 
 
+def ipex_mm_qkv_out_autocast(m, n, k, with_bias):
+    a = torch.rand(2, m, k).type(torch.float32).xpu()
+    wq = torch.rand(k, n).type(torch.half).xpu()
+    wk = torch.rand(k, n).type(torch.half).xpu()
+    wv = torch.rand(k, n).type(torch.half).xpu()
+    wqkv = torch.stack([wq, wk, wv]).contiguous().xpu()
+    bias = torch.rand(3, n).type(torch.half).xpu()
+    q_out = torch.rand(2, m, n).type(torch.float32).xpu()
+    k_out = torch.rand(2, m, n).type(torch.float32).xpu()
+    v_out = torch.rand(2, m, n).type(torch.float32).xpu()
+
+    a_cpu = a.cpu().float()
+    wq_cpu = wq.cpu().float()
+    wk_cpu = wk.cpu().float()
+    wv_cpu = wv.cpu().float()
+    # wqkv_cpu = wqkv.cpu().float()
+    bias_cpu = bias.cpu().float()
+
+    if with_bias:
+        with torch.xpu.amp.autocast(enabled=True, dtype=torch.half):
+            torch.ops.torch_ipex.mm_qkv_out(a, wqkv, bias, q_out, k_out, v_out)
+        c0_cpu = a_cpu @ wq_cpu + bias_cpu[0]
+        c1_cpu = a_cpu @ wk_cpu + bias_cpu[1]
+        c2_cpu = a_cpu @ wv_cpu + bias_cpu[2]
+    else:
+        with torch.xpu.amp.autocast(enabled=True, dtype=torch.half):
+            torch.ops.torch_ipex.mm_qkv_out(a, wqkv, None, q_out, k_out, v_out)
+        c0_cpu = a_cpu @ wq_cpu
+        c1_cpu = a_cpu @ wk_cpu
+        c2_cpu = a_cpu @ wv_cpu
+
+    c = torch.stack([q_out, k_out, v_out])
+    c_cpu = torch.stack([c0_cpu, c1_cpu, c2_cpu])
+    c_, c_cpu_ = c.cpu().float(), c_cpu
+    print("ipex_mm_qkv_out_autocast:", (c_ - c_cpu_).abs().max().item())
+    return c_, c_cpu_
+
+
 def ipex_mm_qkv_group(m, n, k, dtype, with_bias):
     bs = 1
     a = torch.rand(bs, m, k).type(dtype).xpu()
@@ -312,6 +350,11 @@ class TestNNMethod(TestCase):
             out, ref = ipex_mm_qkv(shape[0], shape[1], shape[2], torch.half, False)
             self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
 
+            out, ref = ipex_mm_qkv_out_autocast(shape[0], shape[1], shape[2], True)
+            self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+            out, ref = ipex_mm_qkv_out_autocast(shape[0], shape[1], shape[2], False)
+            self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+
     @pytest.mark.skipif(
         (not torch.xpu.has_xetla()) or (not ipex._C._has_2d_block_array(0)),
         reason="ipex build without xetla or is atsm",
@@ -390,4 +433,9 @@ class TestNNMethod(TestCase):
                 out, ref = ipex_mm_qkv(shape[0], shape[1], shape[2], torch.half, True)
                 self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
                 out, ref = ipex_mm_qkv(shape[0], shape[1], shape[2], torch.half, False)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+
+                out, ref = ipex_mm_qkv_out_autocast(shape[0], shape[1], shape[2], True)
+                self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
+                out, ref = ipex_mm_qkv_out_autocast(shape[0], shape[1], shape[2], False)
                 self.assertEqual(out, ref, atol=1e-2, rtol=1e-2)
