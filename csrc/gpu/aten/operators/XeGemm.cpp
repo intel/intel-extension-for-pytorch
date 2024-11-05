@@ -723,9 +723,9 @@ static void mm_qkv_out_autocast(
     mm_qkv_out(input_, weight_, bias_, out0_, out1_, out2_);
   } else {
     auto casted_input = cached_cast(to_type, input_, c10::DeviceType::XPU);
-    auto out0 = at::empty_like(casted_input, at::MemoryFormat::Contiguous);
-    auto out1 = at::empty_like(casted_input, at::MemoryFormat::Contiguous);
-    auto out2 = at::empty_like(casted_input, at::MemoryFormat::Contiguous);
+    auto out0 = at::empty_like(out0_, to_type, at::MemoryFormat::Contiguous);
+    auto out1 = at::empty_like(out1_, to_type, at::MemoryFormat::Contiguous);
+    auto out2 = at::empty_like(out2_, to_type, at::MemoryFormat::Contiguous);
     mm_qkv_out(
         casted_input,
         cached_cast(to_type, weight_, c10::DeviceType::XPU),
@@ -733,6 +733,9 @@ static void mm_qkv_out_autocast(
         out0,
         out1,
         out2);
+    out0_.copy_(out0);
+    out1_.copy_(out1);
+    out2_.copy_(out2);
   }
 }
 
