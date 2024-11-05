@@ -2,11 +2,9 @@ import torch
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch  # noqa
-import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip(reason="PT2.5: Tensor-likes are not close!")
     def test_p2p_copy(self):
         device_count = torch.xpu.device_count()
         print("device_count:", device_count)

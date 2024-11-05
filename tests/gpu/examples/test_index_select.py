@@ -3,7 +3,6 @@ from torch.testing._internal.common_utils import TestCase
 import intel_extension_for_pytorch  # noqa
 
 import numpy as np
-import pytest
 
 np.set_printoptions(threshold=np.inf)
 
@@ -12,9 +11,6 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skip(
-        reason="PT2.5: 'index_select_xpu' not implemented for 'Float8_e4m3fn"
-    )
     def test_index_select(self, dtype=torch.float):
         dim_size = 10
         dims = 3

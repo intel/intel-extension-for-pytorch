@@ -3,6 +3,9 @@
 #include <ATen/OpMathType.h>
 #include <ATen/TensorUtils.h>
 #include <runtime/Utils.h>
+#ifdef USE_OVERRIDE_OP
+#include "utils/CustomOperatorRegistration.h"
+#endif
 #include <utils/DPCPP.h>
 
 #include "Loops.h"
@@ -208,3 +211,16 @@ Tensor glu_backward_jvp(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+#ifdef USE_OVERRIDE_OP
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("glu_backward", TORCH_FN((&at::AtenIpexTypeXPU::glu_backward)));
+  m.impl(
+      "glu_backward.grad_input",
+      TORCH_FN((&at::AtenIpexTypeXPU::glu_backward_out)));
+}
+
+} // namespace
+#endif

@@ -7,7 +7,6 @@ from torch.overrides import is_tensor_like
 from itertools import product
 
 import intel_extension_for_pytorch  # noqa
-import pytest
 
 cpu_device = torch.device("cpu")
 dpcpp_device = torch.device("xpu")
@@ -136,9 +135,6 @@ def _get_analytical_jacobian_forward_ad_backward(
 
 
 class TestNNMethod(TestCase):
-    @pytest.mark.skip(
-        reason="PT2.5: Tensor-likes are not close!",
-    )
     def test_glu(self):
         for dt in [torch.float32, torch.bfloat16, torch.float16]:
             input_cpu = torch.randn(4, 6, dtype=dt)

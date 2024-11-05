@@ -4,6 +4,9 @@
 #include <core/Memory.h>
 #include <runtime/Utils.h>
 #include <torch/torch.h>
+#ifdef USE_OVERRIDE_OP
+#include "utils/CustomOperatorRegistration.h"
+#endif
 #include <utils/DPCPP.h>
 
 #include "BitonicMergeSort.h"
@@ -1294,3 +1297,16 @@ Tensor _embedding_bag_per_sample_weights_backward(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+#ifdef USE_OVERRIDE_OP
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("_embedding_bag", TORCH_FN((&at::AtenIpexTypeXPU::_embedding_bag)));
+  m.impl(
+      "_embedding_bag_forward_only",
+      TORCH_FN((&at::AtenIpexTypeXPU::_embedding_bag_forward_only)));
+}
+
+} // namespace
+#endif
