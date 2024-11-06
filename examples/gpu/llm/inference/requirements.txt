@@ -1,2 +1,3 @@
 numpy
 deepspeed==0.14.4
+tiktoken==0.8.0
