@@ -143,7 +143,7 @@ class Test4bitDequant(TestCase):
 
         return out
 
-    def test_nf4_woq_linear(self):
+    def test_nf4_dequant_woqlinear(self):
         shapes = [(4096, 4096), (4096, 11008), (11008, 4096)]
         blocksize = 128
         for dtype in [torch.bfloat16, torch.float16]:
@@ -158,10 +158,20 @@ class Test4bitDequant(TestCase):
 
                 # dequantize ref
                 dequant_ref = self.dequantize_nf4(quant_weight, state, quant_type="nf4")
-                output_ref = torch.nn.functional.linear(input, dequant_ref.t())
+                linear_ref = torch.nn.functional.linear(input, dequant_ref.t())
+
+                # nf4 dequantize
+                dequant_output = torch.ops.torch_ipex.dequantize_4bit(
+                    quant_weight,
+                    "nf4",
+                    state["shape"],
+                    state["absmax"],
+                    None,
+                    state["blocksize"],
+                )
 
                 # nf4 woq linear
-                output = torch.ops.torch_ipex.woq_linear(
+                linear_output = torch.ops.torch_ipex.woq_linear(
                     input,
                     quant_weight.reshape([weight.shape[0], weight.shape[1] // 2]),
                     "nf4",
@@ -177,5 +187,8 @@ class Test4bitDequant(TestCase):
                 )
 
                 self.assertEqual(
-                    output_ref, output, atol=checking_atol, rtol=checking_rtol
+                    dequant_ref, dequant_output, atol=checking_atol, rtol=checking_rtol
+                )
+                self.assertEqual(
+                    linear_ref, linear_output, atol=checking_atol, rtol=checking_rtol
                 )
