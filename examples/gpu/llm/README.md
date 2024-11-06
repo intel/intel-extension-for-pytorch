@@ -18,7 +18,7 @@ git checkout v2.3.110+xpu
 git submodule sync
 git submodule update --init --recursive
 
-# Build an image with the provided Dockerfile by compiling Intel® Extension for PyTorch* from source
+# Build an image with the provided Dockerfile by installing Intel® Extension for PyTorch* with prebuilt wheels
 docker build -f examples/gpu/llm/Dockerfile -t ipex-llm:23110 .
 
 # Run the container with command below
@@ -50,7 +50,7 @@ conda create -n llm python=3.10 -y
 conda activate llm
 # Setup the environment with the provided script
 cd examples/gpu/llm
-# If you want to install Intel® Extension for PyTorch\* from source, use the commands below:
+# If you want to install Intel® Extension for PyTorch\* with prebuilt wheels, use the commands below:
 bash ./tools/env_setup.sh 7
 conda deactivate
 conda activate llm

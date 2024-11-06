@@ -1,3 +1,5 @@
 numpy
 transformers==4.38.1
 deepspeed==0.14.4
+tiktoken==0.8.0
+

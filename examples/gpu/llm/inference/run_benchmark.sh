@@ -172,6 +172,8 @@ Run_benchmark_chatglm3-6b-chat() {
 
 ## Phi3-mini
 Run_benchmark_Phi3-mini() {
+    # beam=4 is not supported for phi3, set beam=1
+    beam=1
     model=microsoft/Phi-3-mini-4k-instruct
     sub_model_name=phi3-mini
     dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
