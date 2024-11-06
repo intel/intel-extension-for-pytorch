@@ -20,8 +20,8 @@
     "version": "2.4.0+cpu"
   },
   "deepspeed": {
-    "version": "0.15.3",
-    "commit": "v0.15.3"
+    "version": "",
+    "commit": "e06bb518aa7dafef1e98a1da63362e1586b2ddd5"
   },
   "oneCCL": {
     "commit": "2021.12"

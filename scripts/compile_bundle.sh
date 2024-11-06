@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-VER_IPEX=main
+VER_IPEX=v2.5.0+cpu
 
 # Mode: Select which components to install. PyTorch and Intel® Extension for PyTorch* are always installed.
 # High bit: 8 7 6 5 4 3 2 1 :Low bit
@@ -23,7 +23,7 @@ if [ $# -gt 0 ]; then
 fi
 
 # Check existance of required Linux commands
-for CMD in git nproc; do
+for CMD in git nproc make; do
     command -v ${CMD} > /dev/null || (echo "Error: Command \"${CMD}\" not found." ; exit 1)
 done
 
@@ -75,7 +75,7 @@ if [ -z "${MAX_JOBS}" ]; then
 fi
 
 # Install dependencies
-python -m pip install cmake==3.28.4 make
+python -m pip install cmake==3.28.4
 
 # Compare the torch torchvision and torchaudio version
 function ver_compare_eq() {
@@ -207,6 +207,8 @@ else
         DIR_GCC=$(which gcc)
         if [ ! -z ${CONDA_PREFIX} ] && [[ ${DIR_GCC} =~ ${CONDA_PREFIX} ]]; then
             GCC_CONDA=2
+        else
+            GCC_CONDA=1
         fi
     fi
 fi
@@ -294,6 +296,7 @@ python -m pip install --force-reinstall dist/*.whl
 cd ..
 #  Torch-CCL
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
+    conda install -y gcc==11.4 gxx==11.4 cxx-compiler -c conda-forge
     cd torch-ccl
     python setup.py clean
     python setup.py bdist_wheel 2>&1 | tee build.log

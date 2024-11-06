@@ -21,28 +21,27 @@ RUN apt update && \
     curl \
     wget \
     vim \
-    python3 \
-    python3-dev \
-    python3-pip \
     numactl \
     gcc-12 \
     g++-12 \
-    make \
-    cmake
+    make
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 && \
     update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 && \
     update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100 && \
-    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100 && \
-    update-alternatives --install /usr/bin/python python /usr/bin/python3 100
+    update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 100
 
 WORKDIR /root
-ENV PATH=/root/.local/bin:${PATH}
+
+RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/download/24.7.1-2/Miniforge3-24.7.1-2-Linux-x86_64.sh && \
+    bash miniforge.sh -b -p ./miniforge3 && \
+    rm miniforge.sh
 
 # --build-arg COMPILE=ON to compile from source
 FROM base AS dev
 ARG COMPILE
 COPY . ./intel-extension-for-pytorch
-RUN cd intel-extension-for-pytorch/examples/cpu/llm && \
+RUN . ~/miniforge3/bin/activate && conda create -y -n compile_py310 python=3.10 && conda activate compile_py310 && \
+    cd intel-extension-for-pytorch/examples/cpu/llm && \
     export CC=gcc && export CXX=g++ && \
     if [ -z ${COMPILE} ]; then bash tools/env_setup.sh 6; else bash tools/env_setup.sh 2; fi && \
     unset CC && unset CXX
@@ -58,8 +57,8 @@ RUN apt update && \
     if [ -f /etc/apt/apt.conf.d/proxy.conf ]; then rm /etc/apt/apt.conf.d/proxy.conf; fi
 COPY --from=dev /root/intel-extension-for-pytorch/examples/cpu/llm ./llm
 COPY --from=dev /root/intel-extension-for-pytorch/tools/get_libstdcpp_lib.sh ./llm/tools
-RUN cd /usr/lib/x86_64-linux-gnu/ && ln -s libtcmalloc.so.4 libtcmalloc.so && cd && \
-    echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ./.bashrc && \
+RUN . ~/miniforge3/bin/activate && conda create -y -n py310 python=3.10 && conda activate py310 && \
+    cd /usr/lib/x86_64-linux-gnu/ && ln -s libtcmalloc.so.4 libtcmalloc.so && cd && \
     cd ./llm && \
     bash tools/env_setup.sh 1 && \
     python -m pip cache purge && \
@@ -74,3 +73,15 @@ RUN mkdir /var/run/sshd && \
     mv /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys && \
     echo "Host *\n    Port ${PORT_SSH}\n    IdentityFile /root/.ssh/id_rsa\n    StrictHostKeyChecking no" > /root/.ssh/config
 EXPOSE ${PORT_SSH}
+RUN ENTRYPOINT=/usr/local/bin/entrypoint.sh && \
+    echo "#!/bin/bash" > ${ENTRYPOINT} && \
+    echo "CMDS=(); while [ \$# -gt 0 ]; do CMDS+=(\$1); shift; done;" >> ${ENTRYPOINT} && \
+    echo "CMD=\"\"; for i in \${!CMDS[@]}; do CMD=\"\${CMD} \${CMDS[\$i]}\"; done;" >> ${ENTRYPOINT} && \
+    echo ". ~/miniforge3/bin/activate" >> ${ENTRYPOINT} && \
+    echo "conda activate py310" >> ${ENTRYPOINT} && \
+    echo "TMP=\$(python -c \"import torch; import os; print(os.path.abspath(os.path.dirname(torch.__file__)))\")" >> ${ENTRYPOINT} && \
+    echo ". \${TMP}/../oneccl_bindings_for_pytorch/env/setvars.sh" >> ${ENTRYPOINT} && \
+    echo "echo \"**Note:** For better performance, please consider to launch workloads with command 'ipexrun'.\"" >> ${ENTRYPOINT} && \
+    echo "exec \${CMD}" >> ${ENTRYPOINT} && \
+    chmod +x ${ENTRYPOINT}
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

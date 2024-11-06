@@ -183,7 +183,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     rm -rf lm-evaluation-harness
 
     # Install DeepSpeed
-    if [ $((${MODE} & 0x08)) -ne 0 ]; then
+    if [ $((${MODE} & 0x08)) -ge 0 ]; then
         if [ -d DeepSpeed ]; then
             rm -rf DeepSpeed
         fi
