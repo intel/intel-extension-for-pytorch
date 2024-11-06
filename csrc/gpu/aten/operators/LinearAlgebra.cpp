@@ -781,10 +781,5 @@ Tensor linalg_matrix_exp(const Tensor& a) {
   }
 }
 
-// Alias
-Tensor matrix_exp(const Tensor& a) {
-  return AtenIpexTypeXPU::linalg_matrix_exp(a);
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
