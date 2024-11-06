@@ -1,5 +1,4 @@
 #include <ATen/ATen.h>
-// #include <c10/util/Exception.h>
 #include <core/Device.h>
 #include <core/Memory.h>
 #include <float.h>
@@ -96,8 +95,8 @@ void kDequantizeBlockwise_kernel(
       qvals[j] = A[(i + item.get_local_id(0) * NUM_PER_TH + j)];
 
       // unpack to val and dequant
-      vals[j * 2] = dDequantizeNF4<T>(qvals[j] >> 4) * local_abs_max;
-      vals[j * 2 + 1] = dDequantizeNF4<T>(qvals[j] & 0x0F) * local_abs_max;
+      vals[j * 2] = dDequantizeNF4<T>(qvals[j] & 0x0F) * local_abs_max;
+      vals[j * 2 + 1] = dDequantizeNF4<T>(qvals[j] >> 4) * local_abs_max;
 
       // write to output
       out[i * 2 + item.get_local_id(0) * NUM_PER_TH * 2 + j * 2] =
@@ -167,6 +166,50 @@ void dequantizeBlockwise(
   DPCPP_Q_SUBMIT(sycl_queue, cgf);
 }
 
+at::Tensor dequantize_4bit(
+    const at::Tensor& qweight,
+    const c10::string_view& weight_dtype,
+    const std::vector<int64_t>& weight_shape,
+    const at::Tensor& weight_scales,
+    const c10::optional<at::Tensor>& weight_zeros,
+    int64_t group_size) {
+  static const std::map<c10::string_view, int64_t> WOQ_DTYPE_MAP = {
+      {"int8", WOQ_DTYPE_INT8},
+      {"int4", WOQ_DTYPE_INT4},
+      {"nf4", WOQ_DTYPE_NF4},
+  };
+  TORCH_CHECK(
+      WOQ_DTYPE_MAP.find(weight_dtype) != WOQ_DTYPE_MAP.end(),
+      "Unsupported weight dtype: ",
+      weight_dtype);
+  TORCH_CHECK(
+      WOQ_DTYPE_MAP.at(weight_dtype) == WOQ_DTYPE_NF4,
+      "Only NF4 is supported Now!");
+  int64_t n = weight_shape[0] * weight_shape[1];
+  auto dqout_shape = weight_shape;
+  at::Tensor dq_output = at::zeros(
+      dqout_shape, weight_scales.options().dtype(weight_scales.scalar_type()));
+  // Output dtype is set the same as input activation
+  uint8_t* qweight_ptr = (uint8_t*)qweight.data_ptr();
+  if (dq_output.scalar_type() == at::ScalarType::Float) {
+    float* absmax_ptr = (float*)weight_scales.data_ptr();
+    auto dq_output_ptr = (float*)dq_output.data_ptr();
+    dequantizeBlockwise<float, WOQ_DTYPE_NF4>(
+        NULL, qweight_ptr, absmax_ptr, dq_output_ptr, group_size, n);
+  } else if (dq_output.scalar_type() == at::ScalarType::Half) {
+    auto dq_output_ptr = (at::Half*)dq_output.data_ptr();
+    at::Half* absmax_ptr = (at::Half*)weight_scales.data_ptr();
+    dequantizeBlockwise<at::Half, WOQ_DTYPE_NF4>(
+        NULL, qweight_ptr, absmax_ptr, dq_output_ptr, group_size, n);
+  } else if (dq_output.scalar_type() == at::ScalarType::BFloat16) {
+    auto dq_output_ptr = (at::BFloat16*)dq_output.data_ptr();
+    at::BFloat16* absmax_ptr = (at::BFloat16*)weight_scales.data_ptr();
+    dequantizeBlockwise<at::BFloat16, WOQ_DTYPE_NF4>(
+        NULL, qweight_ptr, absmax_ptr, dq_output_ptr, group_size, n);
+  }
+  return dq_output;
+}
+
 at::Tensor woq_linear(
     const at::Tensor& input,
     const at::Tensor& qweight,
@@ -198,8 +241,8 @@ at::Tensor woq_linear(
   int64_t n = weight_shape[0] * weight_shape[1];
 
   auto dqout_shape = weight_shape;
-  at::Tensor dq_output =
-      at::zeros(dqout_shape, input.options().dtype(input.scalar_type()));
+  at::Tensor dq_output = at::zeros(
+      dqout_shape, weight_scales.options().dtype(weight_scales.scalar_type()));
 
   // Output dtype is set the same as input activation
   uint8_t* qweight_ptr = (uint8_t*)qweight.data_ptr();
@@ -228,15 +271,12 @@ at::Tensor woq_linear(
   }
 
   // step 2: OneDNN gemm
+  dq_output = dq_output.to(input.scalar_type());
   Attr attr;
-  auto inputf = input.flatten(0, -2);
-
-  int size_m = inputf.sizes()[0];
-  int size_n = dq_output.sizes()[1];
-  auto result = at::empty({size_m, size_n}, input.options());
-
-  torch_ipex::xpu::oneDNN::matmul(
-      result, inputf, dq_output, at::Tensor(), true, Attr());
+  bool is_fused;
+  Tensor result;
+  return impl::matmul_fusion_variants(
+      result, input, dq_output, true, attr, is_fused);
 
   return result;
 }
@@ -247,7 +287,11 @@ at::Tensor woq_linear(
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
-      "woq_linear", at::AtenIpexTypeXPU::woq_linear, c10::DispatchKey::XPU);
+      "dequantize_4bit.xpu",
+      AtenIpexTypeXPU::dequantize_4bit,
+      c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH(
+      "woq_linear.xpu", at::AtenIpexTypeXPU::woq_linear, c10::DispatchKey::XPU);
 }
 
 } // namespace
