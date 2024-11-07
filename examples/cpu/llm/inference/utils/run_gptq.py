@@ -28,6 +28,11 @@ parser.add_argument("--use-max-length", default=False, type=bool)
 args = parser.parse_args()
 
 
+print(
+    "\nWarning: This script is deprecated. Please use Intel(R) Neural Compressor to run GPTQ instead.\n"
+)
+
+
 class Evaluator:
     def __init__(
         self, dataset, tokenizer, batch_size=8, pad_val=1, pad_max=196, is_calib=False

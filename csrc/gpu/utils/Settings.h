@@ -135,7 +135,6 @@ class IPEX_API Settings final {
 
   ENV_VAL sync_mode_enabled;
   ENV_VAL onednn_layout_enabled;
-
 };
 
 } // namespace dpcpp

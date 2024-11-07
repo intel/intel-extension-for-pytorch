@@ -1462,6 +1462,97 @@ def WhisperDecoderLayer_forward(
     return outputs
 
 
+def MllamaCrossAttentionDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    cross_attention_states: torch.Tensor,
+    cross_attention_mask: torch.Tensor,
+    attention_mask: torch.Tensor,
+    full_text_row_masked_out_mask: Tuple[torch.Tensor, torch.Tensor],
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+) -> torch.Tensor:
+    residual = hidden_states
+    hidden_states = self.input_layernorm(hidden_states)
+    hidden_states, attn_weights, past_key_value = self.cross_attn(
+        hidden_states=hidden_states,
+        attention_mask=cross_attention_mask,
+        cross_attention_states=cross_attention_states,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+    )
+    hidden_states = residual + self.cross_attn_attn_gate.tanh() * hidden_states
+
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+
+    mlp_gate = self.linear_silu_mul(hidden_states)
+    hidden_states = self.mlp.down_proj(mlp_gate)
+
+    if full_text_row_masked_out_mask is not None:
+        hidden_states = full_text_row_masked_out_mask[:, 0] * hidden_states  # type: ignore
+    hidden_states = residual + self.cross_attn_mlp_gate.tanh() * hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (attn_weights,)
+
+    if use_cache:
+        outputs += (past_key_value,)
+
+    return outputs
+
+
+def GPTNeoXLayer_forward(
+    self,
+    hidden_states: Optional[torch.FloatTensor],
+    attention_mask: Optional[torch.FloatTensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    head_mask: Optional[torch.FloatTensor] = None,
+    use_cache: Optional[bool] = False,
+    layer_past: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+):
+    attention_layer_outputs = self.attention(
+        self.input_layernorm(hidden_states),
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        layer_past=layer_past,
+        head_mask=head_mask,
+        use_cache=use_cache,
+        output_attentions=output_attentions,
+    )
+    attn_output = attention_layer_outputs[
+        0
+    ]  # output_attn: attn_output, present, (attn_weights)
+    attn_output = self.post_attention_dropout(attn_output)
+    outputs = attention_layer_outputs[1:]
+
+    if self.use_parallel_residual:
+        # pseudocode:
+        # x = x + attn(ln1(x)) + mlp(ln2(x))
+        mlp_output = self.mlp(self.post_attention_layernorm(hidden_states))
+        mlp_output = self.post_mlp_dropout(mlp_output)
+        hidden_states = mlp_output + attn_output + hidden_states
+    else:
+        # pseudocode:
+        # x = x + attn(ln1(x))
+        # x = x + mlp(ln2(x))
+        attn_output = attn_output + hidden_states
+        mlp_output = self.mlp(self.post_attention_layernorm(attn_output))
+        mlp_output = self.post_mlp_dropout(mlp_output)
+        hidden_states = mlp_output + attn_output
+
+    if use_cache:
+        outputs = (hidden_states,) + outputs  # hidden_states, present, (attn_weights)
+    else:
+        outputs = (hidden_states,) + outputs[1:]  # hidden_states, (attn_weights)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1481,15 +1572,23 @@ class _IPEXDecoderLayerRef(nn.Module):
             del self.__dict__["_modules"]["mlp"].fc_in
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "BaichuanForCausalLM",
             "MistralForCausalLM",
             "Qwen2ForCausalLM",
         ]:
-            if not self.distributed:
-                self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
-                self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
-                del self.__dict__["_modules"]["self_attn"].o_proj
-                del self.__dict__["_modules"]["mlp"].down_proj
+            self.is_cross_decoder = False
+            if (
+                self.model_backbone == "MllamaForConditionalGeneration"
+                and module._get_name() == "MllamaCrossAttentionDecoderLayer"
+            ):
+                self.is_cross_decoder = True
+            else:
+                if not self.distributed:
+                    self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
+                    self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
+                    del self.__dict__["_modules"]["self_attn"].o_proj
+                    del self.__dict__["_modules"]["mlp"].down_proj
             self.linear_silu_mul = _IPEXlinearSiluMulRef(
                 module.mlp.gate_proj, module.mlp.up_proj
             )
@@ -1699,6 +1798,9 @@ class _IPEXDecoderLayerRef(nn.Module):
     def forward(
         self,
         hidden_states: Optional[torch.FloatTensor],
+        cross_attention_states: torch.Tensor = None,
+        cross_attention_mask: torch.Tensor = None,
+        full_text_row_masked_out_mask: Tuple[torch.Tensor, torch.Tensor] = None,
         layer_past: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[torch.FloatTensor] = None,
         layer_head_mask: Optional[torch.Tensor] = None,
@@ -1730,16 +1832,43 @@ class _IPEXDecoderLayerRef(nn.Module):
                 use_cache,
                 output_attentions,
             )
-        elif self.model_backbone == "LlamaForCausalLM":
-            return LlamaDecoderLayer_forward(
+        elif self.model_backbone == "GPTNeoXForCausalLM":
+            return GPTNeoXLayer_forward(
                 self,
                 hidden_states,
                 attention_mask,
                 position_ids,
-                past_key_value,
-                output_attentions,
+                head_mask,
                 use_cache,
+                layer_past,
+                output_attentions,
             )
+        elif (
+            self.model_backbone == "LlamaForCausalLM"
+            or self.model_backbone == "MllamaForConditionalGeneration"
+        ):
+            if not self.is_cross_decoder:
+                return LlamaDecoderLayer_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    position_ids,
+                    past_key_value,
+                    output_attentions,
+                    use_cache,
+                )
+            else:
+                return MllamaCrossAttentionDecoderLayer_forward(
+                    self,
+                    hidden_states,
+                    cross_attention_states,
+                    cross_attention_mask,
+                    attention_mask,
+                    full_text_row_masked_out_mask,
+                    past_key_value,
+                    output_attentions,
+                    use_cache,
+                )
         elif self.model_backbone == "Qwen2ForCausalLM":
             return Qwen2DecoderLayer_forward(
                 self,

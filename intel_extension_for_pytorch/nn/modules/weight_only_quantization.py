@@ -11,8 +11,8 @@ from intel_extension_for_pytorch.quantization import (
     quantize_per_channel,
     quantize_per_block,
     WoqWeightDtype,
+    WoqWeightQScheme,
 )
-from ...utils._logger import logger, WarningType
 from intel_extension_for_pytorch.nn.utils._model_convert import (
     prepack_awq_weight,
     _convert_optimum_format_to_desired,
@@ -23,6 +23,7 @@ from intel_extension_for_pytorch.quantization._qconfig import (
     WOQ_LOWP_MODE_TO_STR,
     WOQ_ACT_QUANT_MODE_TO_STR,
     WOQ_DTYPE_TO_STR,
+    WOQ_QSCHEME_TO_STR,
 )
 
 
@@ -50,6 +51,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self._act_quant_mode = 0
         self._group_size = -1
         self._cache_weight_for_large_batch = False
+        self._weight_qscheme = WoqWeightQScheme.ASYMMETRIC
 
     def pre_ipex_gemm(self, input):
         return input
@@ -79,6 +81,9 @@ class WeightOnlyQuantizedLinear(nn.Module):
         extra_repr_str += ", group_size={}".format(self._group_size)
         extra_repr_str += ", cache_weight_for_large_batch={}".format(
             self._cache_weight_for_large_batch
+        )
+        extra_repr_str += ", weight_qscheme={}".format(
+            WOQ_QSCHEME_TO_STR[self._weight_qscheme]
         )
         return extra_repr_str
 
@@ -111,22 +116,18 @@ class WeightOnlyQuantizedLinear(nn.Module):
             return mod
 
         lowp_mode = qconfig.lowp_mode
-        if qconfig.lowp_mode == 3 and qconfig.weight_dtype == WoqWeightDtype.INT8:
-            # lowp_mode=3 (INT8) is not supported for INT8 weight
-            # Fall back to lowp_mode=2 in such case
-            # TODO(Weiwen) Support lowp_mode=3
-            lowp_mode = 2
-            logger.warning(
-                "Warning: lowp_mode=3(INT8) is not supported yet for INT8 weight. "
-                + "Falling back to 2(BF16).",
-                _type=WarningType.NotSupported,
-            )
         act_quant_mode = qconfig.act_quant_mode
         dtype = qconfig.weight_dtype
         group_size = qconfig.group_size
         # if dtype = int8, lowp-mode = int8, we want zero points to be 0
         # otherwise, it may overflow when we subtract zero points from int8 weight.
-        sym_quant = dtype == WoqWeightDtype.INT8 and lowp_mode == 3
+        sym_quant = qconfig.weight_qscheme == WoqWeightQScheme.SYMMETRIC
+        if dtype == WoqWeightDtype.NF4 or (
+            dtype == WoqWeightDtype.INT8 and lowp_mode == 3
+        ):
+            assert (
+                sym_quant is True
+            ), "WOQ NF4 and INT8 with lowp-mode 3 must use symmetric quantization"
 
         if group_size == -1:
             qweight, scales, zero_points = quantize_per_channel(
@@ -245,6 +246,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
         qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch
+        qlinear._weight_qscheme = (
+            WoqWeightQScheme.ASYMMETRIC
+            if zero_points is not None
+            else WoqWeightQScheme.SYMMETRIC
+        )
         del qweight
         return qlinear
 
@@ -281,14 +287,15 @@ class WeightOnlyQuantizedLinear(nn.Module):
         lowp_mode = 2
         act_quant_mode = 1
         cache_weight_for_large_batch = False
-        if qconfig is not None:
-            if hasattr(qconfig, "lowp_mode"):
-                lowp_mode = qconfig.lowp_mode
-            if hasattr(qconfig, "act_quant_mode"):
-                act_quant_mode = qconfig.act_quant_mode
-            if hasattr(qconfig, "cache_weight_for_large_batch"):
+        if qconfig is not None and hasattr(qconfig, "global_qconfig"):
+            if hasattr(qconfig.global_qconfig, "lowp_mode"):
+                lowp_mode = qconfig.global_qconfig.lowp_mode
+            if hasattr(qconfig.global_qconfig, "act_quant_mode"):
+                act_quant_mode = qconfig.global_qconfig.act_quant_mode
+            if hasattr(qconfig.global_qconfig, "cache_weight_for_large_batch"):
                 cache_weight_for_large_batch = (
-                    qconfig.cache_weight_for_large_batch and lowp_mode == 2
+                    qconfig.global_qconfig.cache_weight_for_large_batch
+                    and lowp_mode in (2, 3)
                 )
 
         w_dtype = qweight.dtype
@@ -333,6 +340,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
         qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch
+        qlinear._weight_qscheme = (
+            WoqWeightQScheme.ASYMMETRIC
+            if zero_points is not None
+            else WoqWeightQScheme.SYMMETRIC
+        )
         del qweight
         return qlinear
 
@@ -348,8 +360,8 @@ class WeightOnlyQuantizedLinear(nn.Module):
         bias: Optional[torch.Tensor] = None,
         group_size: int = -1,
         g_idx: Optional[torch.Tensor] = None,
-        quant_method: QuantMethod = QuantMethod.GPTQ_GEMM,
         dtype: int = 0,
+        quant_method: QuantMethod = QuantMethod.GPTQ_GEMM,
         **kwargs,
     ):
         r"""Create a weight-only quantized module from weight
@@ -428,6 +440,11 @@ class WeightOnlyQuantizedLinear(nn.Module):
         qlinear._act_quant_mode = act_quant_mode
         qlinear._group_size = group_size
         qlinear._cache_weight_for_large_batch = cache_weight_for_large_batch
+        qlinear._weight_qscheme = (
+            WoqWeightQScheme.ASYMMETRIC
+            if zero_points is not None
+            else WoqWeightQScheme.SYMMETRIC
+        )
         return qlinear
 
 

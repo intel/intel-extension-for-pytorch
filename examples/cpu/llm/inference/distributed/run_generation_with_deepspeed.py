@@ -61,6 +61,11 @@ parser.add_argument(
     help="the huggingface mdoel id",
 )
 parser.add_argument(
+    "--vision-text-model",
+    action="store_true",
+    help="whether or not it is vision-text multi-model structure",
+)
+parser.add_argument(
     "--dtype",
     type=str,
     help="float16 or bfloat16",
@@ -151,8 +156,17 @@ parser.add_argument(
 )
 parser.add_argument(
     "--act-quant-mode",
-    choices=["PER_TENSOR", "PER_IC_BLOCK", "PER_BATCH", "PER_BATCH_IC_BLOCK"],
-    default="PER_IC_BLOCK",
+    choices=[
+        "PER_TENSOR",
+        "PER_IC_BLOCK",
+        "PER_BATCH",
+        "PER_BATCH_IC_BLOCK",
+        "PER_TENSOR_SYM",
+        "PER_IC_BLOCK_SYM",
+        "PER_BATCH_SYM",
+        "PER_BATCH_IC_BLOCK_SYM",
+    ],
+    default="PER_BATCH_IC_BLOCK_SYM",
     type=str,
     help="Quantization mode for activation with different granularity. "
     "For lowp-mode=INT8 only. For other cases, it has no effect. "
@@ -161,6 +175,10 @@ parser.add_argument(
     "PER_IC_BLOCK(1): quantize per group along IC with group size = IC_BLOCK; "
     "PER_BATCH(2): quantize per batch; "
     "PER_BATCH_IC_BLOCK(3): quantize per block of size 1 x IC_BLOCK. "
+    "PER_TENSOR_SYM(4): symmetrically quantize per tensor; "
+    "PER_IC_BLOCK_SYM(5): symmetrically quantize per group along IC with group size = IC_BLOCK; "
+    "PER_BATCH_SYM(6): symmetrically quantize per batch; "
+    "PER_BATCH_IC_BLOCK_SYM(7): symmetrically quantize per block of size 1 x IC_BLOCK. "
     "IC_BLOCK is determined by IC automatically.",
 )
 parser.add_argument(
@@ -172,6 +190,12 @@ parser.add_argument(
 )
 parser.add_argument(
     "--config-file", default=None, type=str, help="specific configuration file"
+)
+parser.add_argument(
+    "--woq-sym-quant-weight",
+    action="store_true",
+    help="Quantize weight symmetrically for weight only quantization. It usually brings better latency at"
+    " the cost of accuracy. It has not effect if you are loading low-precision checkpoints.",
 )
 args = parser.parse_args()
 
@@ -272,6 +296,8 @@ tp_presharded_mode = True if model_name in tp_presharded_models else False
 
 print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), "auto")
+if model_type == "llama" and args.vision_text_model:
+    model_type = "mllama"
 model_class = MODEL_CLASSES[model_type]
 tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=True)
 
@@ -355,6 +381,7 @@ elif world_size == 1 or model_type in [
     "baichuan2",
     "gptbigcode",
     "git",
+    "mllama",
     "qwen",
     "yuan",
     "whisper",
@@ -444,7 +471,10 @@ if args.benchmark:
 if use_ipex:
     ipex_woq_enabled = args.ipex_weight_only_quantization
     if ipex_woq_enabled:
-        from intel_extension_for_pytorch.quantization import WoqWeightDtype
+        from intel_extension_for_pytorch.quantization import (
+            WoqWeightDtype,
+            WoqWeightQScheme,
+        )
 
         if args.weight_dtype == "INT8":
             weight_dtype = WoqWeightDtype.INT8
@@ -472,12 +502,22 @@ if use_ipex:
             "PER_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
             "PER_BATCH": ipex.quantization.WoqActQuantMode.PER_BATCH,
             "PER_BATCH_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK,
+            "PER_TENSOR_SYM": ipex.quantization.WoqActQuantMode.PER_TENSOR_SYM,
+            "PER_IC_BLOCK_SYM": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK_SYM,
+            "PER_BATCH_SYM": ipex.quantization.WoqActQuantMode.PER_BATCH_SYM,
+            "PER_BATCH_IC_BLOCK_SYM": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
         }
+        weight_qscheme = (
+            WoqWeightQScheme.SYMMETRIC
+            if args.woq_sym_quant_weight
+            else WoqWeightQScheme.UNDEFINED
+        )
         qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
             weight_dtype=weight_dtype,
             lowp_mode=lowp_mode,
             act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
             group_size=args.group_size,
+            weight_qscheme=weight_qscheme,
         )
     model = ipex.llm.optimize(
         model.eval(),
@@ -578,6 +618,41 @@ elif model_type == "whisper":
     prompt = sample[0]
     inputs = [prompt] * args.batch_size
     generate_kwargs.pop("min_new_tokens", None)
+elif model_type == "mllama":
+    from PIL import Image
+
+    def load_image(image_file):
+        if image_file.startswith("http://") or image_file.startswith("https://"):
+            import requests
+
+            raw_image = Image.open(requests.get(args.image_url, stream=True).raw)
+        else:
+            raw_image = Image.open(image_file)
+        return raw_image
+
+    current_path = pathlib.Path(__file__).parent.resolve()
+    with open(str(current_path) + "/prompt.json") as f:
+        prompt_pool = json.load(f)
+    if args.prompt is not None:
+        prompt = args.prompt
+    elif model_type == "auto":
+        raise SystemExit(
+            "[ERROR] model prompt is not supported, please use --prompt for this model: "
+            + args.model_id
+        )
+    # elif int(args.input_tokens) > 8192:
+    #     prompt = prompt_pool[model_type]["8192"] * int(int(args.input_tokens) / 8192)
+    elif args.input_tokens in prompt_pool[model_type]:
+        prompt = prompt_pool[model_type][args.input_tokens]
+    else:
+        raise SystemExit("[ERROR] Plese use --prompt if want to use custom input.")
+
+    raw_image = load_image(args.image_url)
+    raw_image = [raw_image] * args.batch_size
+    inputs = tokenizer(raw_image, prompt, return_tensors="pt")
+    input_size = inputs["input_ids"].size(dim=1)
+    print("---- Prompt size:", input_size)
+    inputs = [prompt] * args.batch_size
 else:
     # input tokens
     input_sentences = []
@@ -639,6 +714,11 @@ def generate():
     elif model_type == "whisper":
         input_tokens = tokenizer(inputs, sampling_rate=16000, return_tensors="pt")
         input_ids = input_tokens.input_features
+    elif model_type == "mllama":
+        raw_image = load_image(args.image_url)
+        raw_image = [raw_image] * args.batch_size
+        input_tokens = tokenizer(raw_image, prompt, return_tensors="pt")
+        input_ids = input_tokens["input_ids"]
     else:
         input_tokens = tokenizer.batch_encode_plus(
             inputs, return_token_type_ids=False, return_tensors="pt"

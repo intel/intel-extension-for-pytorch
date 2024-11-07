@@ -5,7 +5,7 @@ import math
 from torch.nn import functional as F
 
 
-@torch.library.impl("myops::longrope", "cpu")
+@torch.library.impl("myops::longrope", "CPU")
 def longrope(
     inv_freq,
     max_seq_len_cached,
@@ -319,6 +319,7 @@ class _IPEXRopeRef(nn.Module):
                 x = self.apply_rotary_pos_emb_gptj(x, sin, cos)
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "LlavaLlamaForCausalLM",
@@ -460,11 +461,12 @@ class _IPEXScaleDotProductRef(nn.Module):
         super().__init__()
         self.model_backbone = config.architectures[0]
         if self.model_backbone == "GPTJForCausalLM":
-            self.bias = module.bias
+            self.bias = module.bias if hasattr(module, "bias") else None
             self.scale_attn = module.scale_attn
             self.attn_dropout = module.attn_dropout
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",
@@ -515,7 +517,13 @@ class _IPEXScaleDotProductRef(nn.Module):
             self.head_dim = module.head_dim
             self.scale_attn = module.scale_attn
             self.attn_dropout = module.attn_dropout
-            self.causal_mask = module.causal_mask
+            if hasattr(module, "causal_mask"):
+                self.causal_mask = module.causal_mask
+            else:
+                max_positions = config.max_position_embeddings
+                self.causal_mask = torch.tril(
+                    torch.ones((max_positions, max_positions), dtype=torch.bool)
+                ).view(1, 1, max_positions, max_positions)
         elif self.model_backbone == "BaichuanForCausalLM":
             self.head_dim = module.head_dim
             self.num_heads = module.num_heads
@@ -683,6 +691,7 @@ class _IPEXScaleDotProductRef(nn.Module):
             )
         elif self.model_backbone in [
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "MistralForCausalLM",
             "MixtralForCausalLM",
             "StableLmForCausalLM",

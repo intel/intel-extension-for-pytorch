@@ -10,7 +10,6 @@ from intel_extension_for_pytorch.quantization import (
     get_weight_only_quant_qconfig_mapping,
     dequantize_per_channel,
     dequantize_per_block,
-    WoqWeightDtype,
 )
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
     _enable_tpp,
@@ -335,11 +334,13 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
             cache_weight_for_large_batch = self.linear_list[
                 0
             ]._cache_weight_for_large_batch
+            weight_qscheme = self.linear_list[0]._weight_qscheme
             qconfig_mapping = get_weight_only_quant_qconfig_mapping(
                 weight_dtype=w_dtype,
                 lowp_mode=lowp_mode,
                 act_quant_mode=act_quant_mode,
                 group_size=group_size,
+                weight_qscheme=weight_qscheme,
             )
             if cache_weight_for_large_batch:
                 from intel_extension_for_pytorch.utils.weight_only_quantization import (
@@ -411,21 +412,9 @@ class _IPEXConcatLinearCPU(_IPEXlinearFusionCPU):
                 mod.weight = nn.Parameter(concat_weight)
                 mod.bias = nn.Parameter(concat_bias) if use_bias else None
                 mod.qconfig = qconfig
-                if w_dtype == WoqWeightDtype.INT4:
-                    self.concat_linear = (
-                        WeightOnlyQuantizedLinear.from_float_and_int4_weight(
-                            mod,
-                            concat_weight,
-                            concat_scales,
-                            concat_zeros,
-                            group_size=group_size,
-                        )
-                    )
-                else:  # int8 or nf4
-                    assert w_dtype in (WoqWeightDtype.INT8, WoqWeightDtype.NF4)
-                    self.concat_linear = WeightOnlyQuantizedLinear.from_float(
-                        mod, concat_scales, concat_zeros
-                    )
+                self.concat_linear = WeightOnlyQuantizedLinear.from_float(
+                    mod, concat_scales, concat_zeros
+                )
         elif hasattr(module, "concat_linear") and module.concat_linear is not None:
             self.concat_linear = module.concat_linear
         else:

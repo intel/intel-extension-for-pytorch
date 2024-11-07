@@ -221,6 +221,9 @@ static at::Tensor dequantize_woq_weight(
   if (group_size <= 0) {
     if (qw_type == WOQ_DTYPE_NF4) {
       dqw = map_nf4_tensor_to_float(w_int8) * scale;
+    } else if (qw_type == WOQ_DTYPE_INT4 && sym_quant) {
+      // shift from [0, 15] to [-8, 7]
+      dqw = (w_int8.to(at::kFloat) - 8) * scale;
     } else {
       dqw = sym_quant ? w_int8.to(at::kFloat) * scale
                       : (w_int8.to(at::kFloat) - zp) * scale;
@@ -230,6 +233,10 @@ static at::Tensor dequantize_woq_weight(
     auto rem = K % group_size;
     auto w_fp = qw_type == WOQ_DTYPE_NF4 ? map_nf4_tensor_to_float(w_int8)
                                          : w_int8.to(at::kFloat);
+    if (qw_type == WOQ_DTYPE_INT4 && sym_quant) {
+      // shift from [0, 15] to [-8, 7]
+      w_fp -= 8;
+    }
     if (rem > 0) {
       dqw = at::empty({N, K}, qw.options().dtype(at::kFloat));
       auto w_com = w_fp.slice(1, 0, K - rem).view({N, -1, group_size});

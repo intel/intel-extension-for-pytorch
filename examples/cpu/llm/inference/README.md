@@ -4,43 +4,45 @@
 
 | MODEL FAMILY | MODEL NAME (Huggingface hub) | FP32 | BF16 | Static quantization INT8 | Weight only quantization INT8 | Weight only quantization INT4 |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|LLAMA| meta-llama/Llama-2-7b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |LLAMA| meta-llama/Llama-2-13b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |LLAMA| meta-llama/Llama-2-70b-hf | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
-|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-3.2-3B-Instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | 🟩 | 🟩 |   | 🟩 |   |
 |GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
-|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟨 | 🟨 | 🟩 | 🟨 |
-|FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 |   |
-|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
+|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|FALCON| tiiuae/falcon-7b  | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|FALCON| tiiuae/falcon-11b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |FALCON| tiiuae/falcon-40b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
-|OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
-|Bloom| bigscience/bloom-1b7 | 🟩 | 🟨 | 🟩 | 🟩  | 🟨 |
+|OPT| facebook/opt-30b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|OPT| facebook/opt-1.3b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Bloom| bigscience/bloom-1b7 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |CodeGen| Salesforce/codegen-2B-multi | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
-|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟨 | 🟩 | 🟩 | 🟨 |
-|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
-|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟨 | 🟩 |   |
+|Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|ChatGLM| THUDM/chatglm3-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|ChatGLM| THUDM/chatglm2-6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|GPTBigCode| bigcode/starcoder | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|T5| google/flan-t5-xl | 🟩 | 🟩 | 🟩 | 🟩 |   |
 |MPT| mosaicml/mpt-7b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |  | 🟩 | 🟨 |
-|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Mixtral| mistralai/Mixtral-8x7B-v0.1 | 🟩 | 🟩 |   | 🟩 | 🟩 |
+|Stablelm| stabilityai/stablelm-2-1_6b | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Qwen| Qwen/Qwen-7B-Chat | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Qwen| Qwen/Qwen2-7B | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |LLaVA| liuhaotian/llava-v1.5-7b | 🟩 | 🟩 |   | 🟩 | 🟩 |
 |GIT| microsoft/git-base | 🟩 | 🟩 |   | 🟩 |   |
-|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟨 |   |
-|Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟨 |
-|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
-|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟨 | 🟩 | 🟨 |
+|Yuan| IEITYuan/Yuan2-102B-hf | 🟩 | 🟩 |   | 🟩 |   |
+|Phi| microsoft/phi-2 | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-mini-4k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-mini-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
+|Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |Whisper| openai/whisper-large-v2 | 🟩 | 🟩 | 🟩 | 🟩 |   |
 
 ## 1.2 Verified for distributed inference mode via DeepSpeed
@@ -53,18 +55,20 @@
 |LLAMA| meta-llama/Meta-Llama-3-8B | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3-70B | 🟩 | 🟩 |
 |LLAMA| meta-llama/Meta-Llama-3.1-8B-Instruct | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-3.2-3B-Instruct | 🟩 | 🟩 |
+|LLAMA| meta-llama/Llama-3.2-11B-Vision-Instruct | 🟩 | 🟩 |
 |GPT-J| EleutherAI/gpt-j-6b | 🟩 | 🟩 |
-|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟨 | 🟩 |
-|DOLLY| databricks/dolly-v2-12b | 🟨 | 🟩 |
+|GPT-NEOX| EleutherAI/gpt-neox-20b | 🟩 | 🟩 |
+|DOLLY| databricks/dolly-v2-12b | 🟩 | 🟩 |
 |FALCON| tiiuae/falcon-11b | 🟩 | 🟩 |
 |FALCON| tiiuae/falcon-40b | 🟩 | 🟩 |
-|OPT| facebook/opt-30b | 🟨 | 🟩 |
+|OPT| facebook/opt-30b | 🟩 | 🟩 |
 |OPT| facebook/opt-1.3b | 🟩 | 🟩 |
-|Bloom| bigscience/bloom-1b7 | 🟨 | 🟩 |
+|Bloom| bigscience/bloom-1b7 | 🟩 | 🟩 |
 |CodeGen| Salesforce/codegen-2B-multi |  🟩 | 🟩 |
 |Baichuan| baichuan-inc/Baichuan2-7B-Chat | 🟩 | 🟩 |
 |Baichuan| baichuan-inc/Baichuan2-13B-Chat | 🟩 | 🟩 |
-|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟨 | 🟩 |
+|Baichuan| baichuan-inc/Baichuan-13B-Chat | 🟩 | 🟩 |
 |GPTBigCode| bigcode/starcoder | 🟩 | 🟩 |
 |T5| google/flan-t5-xl | 🟩 | 🟩 |
 |Mistral| mistralai/Mistral-7B-v0.1 | 🟩 | 🟩 |
@@ -80,14 +84,6 @@
 |Phi| microsoft/Phi-3-medium-4k-instruct | 🟩 | 🟩 |
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 |
 |Whisper| openai/whisper-large-v2 | 🟩 | 🟩 |
-
-- 🟩 signifies that the model can perform well and with good accuracy (<1% difference as compared with FP32).
-
-- 🟨 signifies that the model can perform well while accuracy may not been in a perfect state (>1% difference as compared with FP32).
-
-*Note*: As the modeling file of `meta-llama/Llama-2-7b-hf` is updated,
-the previous static quantization INT8 recipe is invalid and retuning is not completed yet.
-If needed, you can try to retune the model yourself with the [autotune API](../../../../docs/tutorials/features/sq_recipe_tuning_api.md).
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family)
 are well supported with all optimizations like indirect access KV cache, fused ROPE, and customized linear kernels.
@@ -107,7 +103,9 @@ python run.py --help # for more detailed usages
 | Key args of run.py | Notes |
 |---|---|
 | generation | default: beam search (beam size = 4), "--greedy" for greedy search |
-| input tokens | default: 32, provide fixed sizes for input prompt size, use "--input-tokens" for [32, 64, 128, 256, 512, 1024, 2016, 2017, 2048, 4096, 8192]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
+| input tokens or prompt | provide fixed sizes for input prompt size, use "--input-tokens" for <INPUT_LENGTH> in [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 32768, 130944]; if "--input-tokens" is not used, use "--prompt" to choose other strings as inputs|
+| input images | default: None, use "--image-url" to choose the image link address for vision-text tasks |
+| vision text tasks | default: False, use "--vision-text-model" to choose if your model (like llama3.2 11B model) is running for vision-text generation tasks, default False meaning text generation tasks only|
 | output tokens | default: 32, use "--max-new-tokens" to choose any other size |
 | batch size |  default: 1, use "--batch-size" to choose any other size |
 | token latency |  enable "--token-latency" to print out the first or next token latency |
@@ -303,7 +301,7 @@ We provide the following qconfig summary files with good quality (calibration on
 | microsoft/phi-2 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/phi-2_qconfig.json) |
 | openai/whisper-large-v2 | [link](https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/cpu/2/whisper_qconfig.json) |
 
-If you would like to generate qconfig summary files (due to changes on model variants or calibration dataset), we provide the [autotune API](../../../../docs/tutorials/features/sq_recipe_tuning_api.md) and its [tuning examples](llm_sq_recipes.md), which allows an automatic global smoothquant tuning, and automatic layer-by-layer tuning provided by Intel® Neural Compressor for the best accuracy.
+If you would like to generate qconfig summary files (due to changes on model variants or calibration dataset), please follow the [tuning examples](https://github.com/intel/neural-compressor/tree/master/examples/pytorch/nlp/huggingface_models/language-modeling/quantization/llm) provided by Intel® Neural Compressor.
 
 #### 2.2.1.4 Weight-only quantization:
 
@@ -491,68 +489,24 @@ deepspeed --bind_cores_to_rank run.py --benchmark -m ./local_llama2_7b --dtype b
 
 ## 3.1 Weight-only quantization with low precision checkpoint (Prototype)
 
-Using INT4 weights can further improve performance by reducing memory bandwidth. However, direct per-channel quantization of weights to INT4 probably results in poor accuracy. Some algorithms can modify weights through calibration before quantizing weights to minimize accuracy drop. GPTQ is one of such algorithms. You may generate modified weights and quantization info (scales, zero points) for a certain model with a dataset by such algorithms. The low precision checkpoint is saved as a `state_dict` in a `.pt` file and can be loaded later for weight only quantization. We provide an example here to run GPTQ.
+Quantizing weight to INT4 can further improve performance by reducing memory bandwidth.
+However, the naive round-to-nearest quantization method probably results in poor accuracy.
+Some algorithms can quantize weights to INT4 while minimize accuracy drop.
+GPTQ is one of such algorithms.
+You may use [Intel(R) Neural Compressor](https://github.com/intel/neural-compressor) to run GPTQ and generate low-precision checkpoints for inference.
 
-*Note:* The GPTQ API is verified on the following models: gpt-j, opt, llama, Llama-2, Llama-3, chatglm2, chatglm3, bloom, bloomz, dolly-v1, dolly-v2, gpt-neo, gpt-neox, mpt, falcon, starcoder, condegen, mistral, Qwen, mixtral, stablelm, phi-2, phi-3. Pleaes note that it's still experimental, please use with care.
-
-Here is how to use it:
-
-```bash
-# Step 1: Generate modified weights and quantization info and save as checkpoint
-python utils/run_gptq.py --model <MODEL_ID> --output-dir ./saved_results
-```
-
-The dataset for calibration is `NeelNanda/pile-10k` by default. To use other dataset, such as lambada, you may use `--dataset <dataset id>` to specify. Group size is specified by `--group-size <group_size>` (default is 128). You can specify calibration sample size by modifying `--nsamples <int>` (default is 128); you can also choose whether or not to align calibration data to a fixed length by modifying `--use_max_length <bool>` and `--pad_max_length <int>`. For details please refer to [GPTQ](../../../../intel_extension_for_pytorch/quantization/_GPTQ/README.md)
-
-It may take a few hours to finish. Modified weights and their quantization info are stored in `gptq_checkpoint_g128.pt`, where g128 means group size for input channel is 128 by default. Group size controls the granularity of quantization of weight along input channel. 
-Then generate model for weight only quantization with INT4 weights and run tasks.
+To convert model and run inference with INT4 checkpoints, you can run the following command:
 
 ```bash
-# Step 2: Generate quantized model with INT4 weights
-# Provide checkpoint file name by --low-precision-checkpoint <file name>
-python single_instance/run_quantization.py --ipex-weight-only-quantization --quant-with-amp -m <MODEL_ID> --low-precision-checkpoint "saved_results/gptq_checkpoint_g128.pt" --output-dir "saved_results" 
-
-# Step 3: Run quantized model for latency benchmark
-OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python single_instance/run_quantization.py -m <MODEL_ID> --benchmark --quant-with-amp --quantized-model-path "./saved_results/best_model.pt" 
+# Provide checkpoint file name by --low-precision-checkpoint <path-to-files>
+OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run.py -m <MODEL_ID> --benchmark --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint <PATH_TO_CHECKPOINT>
 ```
 
 To run accuracy tests, please follow the instructions in the [Accuracy Test](#32-accuracy-test) part
 
-If the checkpoint is generated by some other methods and has different keys in the state_dict, you will need to specify the keys for weight, scales, zero points and bias. Bias is optional in the state_dict while others are required. Default keys are:
-
-```python
-{
-    "weight_key": "packed_weight",
-    "scale_key": "scale",
-    "zero_point_key": "packed_zp",
-    "bias_key": "bias",
-}
-```
-
-You need to make a config dict like above and pass it to `ipex.llm.optimize` together with the state_dict from the checkpoint as a tuple `(state_dict, config_dict)`. You will need to modify the example script.
-
-```python
-low_precision_checkpoint = torch.load(args.low_precision_checkpoint)
-config_dict = {
-    "weight_key": "...",
-    "scale_key": "...",
-    "zero_point_key": "...",
-    "bias_key": "...",
-}
-state_dict_and_config = (low_precision_checkpoint, config_dict)
-user_model = ipex.llm.optimize(
-    user_model.eval(),
-    dtype=amp_dtype,
-    quantization_config=qconfig,
-    inplace=True,
-    low_precision_checkpoint=state_dict_and_config,
-    deployment_mode=False,
-)
-```
-
 **Example**
 
-Intel® Extension for PyTorch\* with INT4 weight only quantization has been used in latest MLPerf submission (August 2023) to fully maximize the power of Intel® Xeon®, and also shows good accuracy as comparing with FP32. This example is a simplified version of the MLPerf task. It will download a finetuned FP32 GPT-J model used for MLPerf submission, quantize the model to INT4 and run a text summarization task on the `cnn_dailymail` dataset. The example runs for 1000 samples, which is a good approximation of the results for the entire dataset and saves time.
+Intel® Extension for PyTorch\* with INT4 weight only quantization has been used in MLPerf submission (August 2023) to fully maximize the power of Intel® Xeon®, and also shows good accuracy as comparing with FP32. This example is a simplified version of the MLPerf task. It will download a finetuned FP32 GPT-J model used for MLPerf submission, quantize the model to INT4 and run a text summarization task on the `cnn_dailymail` dataset. The example runs for 1000 samples, which is a good approximation of the results for the entire dataset and saves time.
 
 ```bash
 pip install evaluate nltk absl-py rouge_score
@@ -563,14 +517,16 @@ Please note that 100 GB disk space, 100 GB memory and Internet access are needed
 
 **Checkpoint Requirements**
 
-IPEX now only supports some certain cases. Weights must be N by K and asymmetrically quantized to UINT4 and then compressed along K axis to `torch.int32`. Data type of scales can be any floating point types. Shape of scales should be [N, number_of_groups] or with additional dimensions whose length is 1. Zero points should have the same shape as scales and stored as `torch.int32` but the true data type is UINT4. Bias is optional in the `state_dict` (checkpoint). If it is present, we read bias in the `state_dict`. Otherwise we read bias from the original model. Bias is `None` if it cannot be found in both cases.
+IPEX now only supports the GPTQ format and AWQ format on HuggingFace. Checkpoints generated by Intel(R) Neural Compressor have the same format.
+Only INT4 is supported.
 
 ## 3.2 Accuracy test
 
-We leverage [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) for the accuracy test.
-
-We verify and recommend to test accuracy of most models with "lambada_openai" task.
-For some models, like `Salesforce/codegen-2B-multi` and `mosaicml/mpt-7b`, we verify and recommend to test their accuracy with "hellaswag" task.
+`ipex.llm` is focusing on LLM performance optimizations,
+yet we also provide example scripts for the validation of the model from accuracy perspective.
+We leverage [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) for the accuracy test,
+and recommend to test accuracy of most models with "lambada_openai" task.
+For some models, like `Salesforce/codegen-2B-multi` and `mosaicml/mpt-7b`, we recommend to test their accuracy with "hellaswag" task.
 For more candidate tasks for accuracy validation, please check [lm-evaluation-harness task table](https://github.com/EleutherAI/lm-evaluation-harness/blob/master/docs/task_table.md).
 
 ### 3.2.1 Run with one instance

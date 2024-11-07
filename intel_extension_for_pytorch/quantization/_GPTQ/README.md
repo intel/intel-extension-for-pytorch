@@ -1,6 +1,8 @@
 GPTQ
 ====
 
+**Warning: The API is deprecated. Please use the Intel(R) Neural Compressor to run GPTQ instead.**
+
 ## Introduction
 Compared to normal quantization like W8A8, weight only quantization is probably a better trade-off to balance the performance and the accuracy. There are many excellent works for weight only quantization to improve its accuracy performance. GPTQ is a new one-shot weight quantization method based on approximate second-order information, that is both highly-accurate and highly-efficient. The weights of each column are updated based on the fixed-scale pseudo-quantization error and the inverse of the Hessian matrix calculated from the activations. The updated columns sharing the same scale may generate a new max/min value, so the scale needs to be saved for restoration.
 
