@@ -577,7 +577,7 @@ static void register_xpu_device_info(PyObject* module) {
       .def_readonly("max_num_sub_groups", &DeviceInfo::max_num_sub_groups)
       .def_readonly("sub_group_sizes", &DeviceInfo::sub_group_sizes)
       .def_readonly("has_fp64", &DeviceInfo::support_fp64)
-      .def_readonly("has_bf16_conversion", &DeviceInfo::has_bf16_conversion)
+      .def_readonly("has_bfloat16_conversions", &DeviceInfo::has_bfloat16_conversions)
       .def_readonly(
           "has_subgroup_matrix_multiply_accumulate",
           &DeviceInfo::has_subgroup_matrix_multiply_accumulate)
@@ -599,7 +599,7 @@ static void register_xpu_device_info(PyObject* module) {
                << "MB, max_compute_units=" << info.max_compute_units
                << ", gpu_eu_count=" << info.gpu_eu_count
                << ", device_arch=" << info.device_arch
-               << ", has_bf16_conversion=" << info.has_bf16_conversion
+               << ", has_bfloat16_conversions=" << info.has_bfloat16_conversions
                << ", has_subgroup_matrix_multiply_accumulate="
                << info.has_subgroup_matrix_multiply_accumulate
                << ", has_subgroup_matrix_multiply_accumulate_tensor_float32="

@@ -34,7 +34,7 @@ struct DeviceInfo {
   uint32_t max_num_sub_groups;
   std::vector<size_t> sub_group_sizes;
   bool support_fp64;
-  bool has_bf16_conversion;
+  bool has_bfloat16_conversions;
   bool has_subgroup_matrix_multiply_accumulate;
   bool has_subgroup_matrix_multiply_accumulate_tensor_float32;
   bool has_subgroup_2d_block_io;
