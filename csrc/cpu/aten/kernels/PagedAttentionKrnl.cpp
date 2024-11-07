@@ -485,6 +485,12 @@ void single_query_cached_kv_attention_kernel(
 
   auto thread_numbers = omp_get_max_threads();
   auto max_parallel_parts = thread_numbers * 4;
+
+  auto tmp_logits = at::empty(
+      {thread_numbers, kv_head_group_size, PARTITION_SIZE},
+      query.options().dtype(at::ScalarType::Float));
+  auto logits_ptrs = tmp_logits.data_ptr<float>();
+
   if (alibi_slopes.has_value()) {
     auto alibi_slopes_size = alibi_slopes.value().size(0);
     TORCH_CHECK(
@@ -497,6 +503,7 @@ void single_query_cached_kv_attention_kernel(
          partition_id++) {
       for (auto head_group_start = 0; head_group_start < num_heads;
            head_group_start += kv_head_group_size) {
+        auto omp_thread_id = omp_get_thread_num();
         auto context_len = context_lens_ptr[seq_id];
         auto partition_start = partition_id * PARTITION_SIZE;
         if (partition_start >= context_len)
@@ -517,7 +524,8 @@ void single_query_cached_kv_attention_kernel(
         //{num_seqs, num_heads, max_num_partitions, head_size}
         auto tmp_out_start = tmp_out_ptr + seq_id * tmp_out_strideN +
             head_group_start * tmp_out_strideH + partition_id * tmp_out_strideS;
-        float logits[16 * PARTITION_SIZE] __attribute__((aligned(64))) = {0};
+        float* logits =
+            logits_ptrs + omp_thread_id * PARTITION_SIZE * kv_head_group_size;
         auto logits_position = 0;
         // 1)calculate the matmul(query, key) for this partition
         for (auto logical_block_id = logical_block_start;

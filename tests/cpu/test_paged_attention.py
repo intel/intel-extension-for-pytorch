@@ -1,4 +1,5 @@
 import torch
+import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 import unittest
 import random
@@ -175,7 +176,7 @@ class PagedAttentionTest(TestCase):
         key_cache, value_cache = key_caches[0], value_caches[0]
         # Call the paged attention kernel.
         output = torch.empty_like(query)
-        torch.ops.torch_ipex.single_query_cached_kv_attention(
+        ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
             output,
             query,
             key_cache,
@@ -187,8 +188,6 @@ class PagedAttentionTest(TestCase):
             block_size,
             max_context_len,
             alibi_slopes,
-            1.0,
-            1.0,
         )
 
         # Run the reference implementation.
@@ -212,7 +211,7 @@ class PagedAttentionTest(TestCase):
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         num_gen_seqs = [7]  # Arbitrary values for testing
-        num_heads = [(40, 40), (64, 16)]  # Arbitrary values for testing
+        num_heads = [(40, 40), (64, 16), (71, 1)]  # Arbitrary values for testing
         head_sizes = [64, 80, 128, 96, 112, 128, 256]
         block_sizes = [16, 32]
         use_alibis = [True, False]
@@ -285,8 +284,12 @@ class PagedAttentionTest(TestCase):
         cloned_value_cache = value_cache.clone()
 
         # Call the reshape_and_cache kernel.
-        torch.ops.torch_ipex.reshape_and_cache(
-            key, value, key_cache, value_cache, slot_mapping, 1.0, 1.0
+        ipex.llm.modules.PagedAttention.reshape_and_cache(
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping,
         )
 
         # Run the reference implementation.

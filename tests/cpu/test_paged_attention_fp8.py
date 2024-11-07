@@ -1,4 +1,5 @@
 import torch
+import intel_extension_for_pytorch as ipex
 from common_utils import TestCase
 import unittest
 import random
@@ -189,7 +190,7 @@ class PagedAttentionTest(TestCase):
         value_cache = value_cache_fp8.to(dtype)
         # Call the paged attention kernel.
         output = torch.empty_like(query)
-        torch.ops.torch_ipex.single_query_cached_kv_attention(
+        ipex.llm.modules.PagedAttention.single_query_cached_kv_attention(
             output,
             query,
             key_cache_fp8,
@@ -312,7 +313,7 @@ class PagedAttentionTest(TestCase):
         value_cache_fp8 = value_cache.to(qtype)
 
         # Call the reshape_and_cache kernel.
-        torch.ops.torch_ipex.reshape_and_cache(
+        ipex.llm.modules.PagedAttention.reshape_and_cache(
             key, value, key_cache_fp8, value_cache_fp8, slot_mapping, k_scale, v_scale
         )
 
