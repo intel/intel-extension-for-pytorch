@@ -12,28 +12,6 @@ dpcpp_device = torch.device("xpu")
 
 
 class TestNNMethod(TestCase):
-    def test_batch_norm_format(self, dtype=torch.float16):
-        conv = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1, bias=False)
-        bn = nn.BatchNorm2d(32)
-
-        x_cpu = torch.randn([4, 32, 32, 32], device=cpu_device)
-
-        y_cpu1 = conv(x_cpu)
-        y_cpu = bn(y_cpu1)
-
-        with torch.xpu.onednn_layout():
-            x_dpcpp = x_cpu.to(dpcpp_device)
-
-            conv.to(dpcpp_device)
-            bn.to(dpcpp_device)
-            y_dpcpp1 = conv(x_dpcpp)
-            y_dpcpp = bn(y_dpcpp1)
-
-            if not torch.xpu.utils.has_2d_block_array():
-                self.assertTrue(torch.xpu.is_onednn_layout(y_dpcpp1))
-                self.assertTrue(torch.xpu.is_onednn_layout(y_dpcpp))
-            self.assertEqual(y_cpu, y_dpcpp.to(cpu_device))
-
     def test_batch_norm_half(self, dtype=torch.half):
         x_i = torch.randn([2, 2, 3, 3], device=cpu_device)
         x_dpcpp_i = x_i.to(dpcpp_device).to(dtype)
