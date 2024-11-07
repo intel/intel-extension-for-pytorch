@@ -162,7 +162,7 @@ Run_benchmark_baichuan2-13b-chat() {
     sub_model_name=baichuan2-13b
     dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
     mkdir -p ${dir}
-    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency --disable-auto-cast 2>&1 | tee log_e2e
     mv log_e2e ${dir}
     PROFILE=1 python -u run_generation.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
     mv profile*pt ${dir}

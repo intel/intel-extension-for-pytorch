@@ -115,6 +115,7 @@ parser.add_argument(
 parser.add_argument("--acc-iter", default=-1, type=int)
 parser.add_argument("--use-static-cache", default=False, action="store_true", help="use static kv cache")
 parser.add_argument("--use-hf-code", default=True, action="store_false", help="use hf transformers code")
+parser.add_argument("--disable-auto-cast", default=False, action="store_true", help="whether to disable auto-mixed-precision feature")
 args = parser.parse_args()
 print(args)
 
@@ -144,7 +145,7 @@ if args.ipex:
 #    torch._C._jit_set_texpr_fuser_enabled(False)
 
 # dtype
-amp_enabled = True if args.dtype != "float32" else False
+amp_enabled = True if args.dtype != "float32" and not args.disable_auto_cast else False
 amp_dtype = getattr(torch, args.dtype)
 
 # load model
