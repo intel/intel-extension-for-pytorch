@@ -1,0 +1,81 @@
+name: E2E CI Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [dev/triton-test-3.0]
+  merge_group:
+    branches: [dev/triton-test-3.0]
+    types: [checks_requested]
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Inductor-XPU-E2E-CI-Tests:
+    runs-on: [self-hosted, Inductor_test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare Conda ENV
+        run: |
+          which conda
+          conda remove -yn e2e_ci --all
+          if conda env list | grep -q "^e2e_ci "; then source activate e2e_ci; else conda create -n e2e_ci python=3.9 cmake ninja -y; fi
+          conda install intel::mkl-static intel::mkl-include -y
+          pip install pandas scipy tqdm
+      - name: Prepare Pytorch
+        run: |
+          source activate e2e_ci
+          pwd
+          cd ../ && rm -rf pytorch
+          git clone -b dev/triton-test-3.0 https://github.com/Stonepia/pytorch.git pytorch
+          cd pytorch && git log -n 1 && git submodule sync && git submodule update --init --recursive
+          conda install -c conda-forge libstdcxx-ng -y
+          pip install pyyaml
+          pip install -r requirements.txt
+          python setup.py develop
+
+      - name: Prepare IPEX
+        run: |
+          source activate e2e_ci
+          source /opt/intel/oneapi/setvars.sh
+          python -c "import torch;print(f'torch version {torch.__version__}')"
+          python -m pip uninstall intel_extension_for_pytorch -y
+          export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
+          cd ${{ github.workspace }}
+          git submodule sync && git submodule update --init --recursive --jobs 0
+          python -m pip install -r requirements.txt
+          python setup.py bdist_wheel
+          pip install --force-reinstall dist/*.whl
+
+      - name: Triton Installation
+        run: |
+          source activate e2e_ci
+          TRITON_PINNED_COMMIT=$(cat .github/ci_commit_pins/triton.txt)
+          echo ${TRITON_REPO}@${TRITON_PINNED_COMMIT}
+          cd ${{ github.workspace }} 
+          cd ..
+          TRITON_REPO="https://github.com/intel/intel-xpu-backend-for-triton"
+          echo ${TRITON_REPO}@${TRITON_PINNED_COMMIT}
+          pip install --force-reinstall "git+${TRITON_REPO}@${TRITON_PINNED_COMMIT}#subdirectory=python"
+
+      - name: E2E dependancy install
+        uses: ./.github/scripts/install-e2e-suites
+
+      - name: Huggingface AMP_BF16 Inference Accuracy Test
+        run: |
+          bash .github/scripts/inductor-xpu-e2e.sh
+      
+      - name: Upload Triton Inductor E2E CI Data
+        uses: actions/upload-artifact@v3
+        with:
+          name: Triton-Inductor-E2E-CI-Data
+          path: /home/ipex/actions-runner/_work/intel-extension-for-pytorch/pytorch/inductor_log/
+
+      - name: Test Result Check
+        run: |
+          bash .github/scripts/results-check.sh
