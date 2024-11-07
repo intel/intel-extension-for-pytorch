@@ -5,9 +5,6 @@
 
 #include <core/AllocationInfo.h>
 #include <runtime/Device.h>
-#include <runtime/XPUGraph.h>
-
-#include <c10/util/flat_hash_map.h>
 
 #include <algorithm>
 #include <bitset>
@@ -32,8 +29,6 @@ class CachingDeviceAllocator final {
     LARGE_POOL = 1,
     SMALL_POOL = 2,
   };
-
-  struct PrivatePool;
 
   struct Block {
     Block(DeviceId device, sycl::queue queue, size_t size);
@@ -76,8 +71,6 @@ class CachingDeviceAllocator final {
     Block* m_prev;
     Block* m_next;
     int m_event_cnt;
-    // Store pointer to private pool for tracing back
-    PrivatePool* m_owner_private_pool;
   };
 
   using BlockPool = std::set<Block*, decltype(Block::Comparator)*>;
@@ -90,70 +83,6 @@ class CachingDeviceAllocator final {
   BlockPool small_blocks;
   std::unordered_map<void*, Block*> allocated_blocks;
   std::deque<std::pair<sycl::event, Block*>> dpcpp_events;
-
-  // Members specific to XPU graphs
-
-  // A recorded graph should retain its memory pool in order all graphs to
-  // replay many times on the same active zone, which should not be freed
-  // or replaced or modified by other tensors.
-  //
-  // To identify the pools used only for graphs and should be kept unless
-  // no graphs related remained, the graph mechanism has MempoolId_t to
-  // mark each pool either created by user or by other graphs. But our
-  // allocator is global for all devices but ids are not unique across
-  // devices, so there is a need to combine DeviceId together in a key.
-  struct PrivatePool {
-    PrivatePool()
-        : use_count(1),
-          large_blocks(Block::Comparator),
-          small_blocks(Block::Comparator) {}
-    PrivatePool(const PrivatePool&) = delete;
-    PrivatePool(PrivatePool&&) = delete;
-    PrivatePool& operator=(const PrivatePool&) = delete;
-    // Number of live graphs using this pool. When use_count
-    // equals to 0, this pool can be destroyed safely.
-    // Because SYCL doesn't has the ability to unmap blocks instead of
-    // freeing them immediately, there is no need to count remained
-    // blocks here as all of them should be considered to be freed once
-    // no graph would use this pool anymore.
-    int use_count;
-    // Totally a mirror copy of a normal block pool, and will always be
-    // initialized as empty set when newly create a PrivatePool instance.
-    BlockPool large_blocks;
-    BlockPool small_blocks;
-  };
-
-  struct MempoolHash {
-    std::size_t operator()(const std::pair<DeviceId, MempoolId_t>& p) const {
-      auto h1 = std::hash<DeviceId>{}(p.first);
-      auto h2 = std::hash<CaptureId_t>{}(p.second.first);
-      auto h3 = std::hash<CaptureId_t>{}(p.second.second);
-      return h1 ^ (h2 << 1) ^ (h3 << 2);
-    }
-  };
-
-  // Private pools for XPU graphs
-  // As DeviceCachingAllocator in IPEX is designed as an singleton running on
-  // multi-devices, which is different to the allocator upstream to PyTorch,
-  // there is a must to add `DeviceId` into the maping keys list.
-  ska::flat_hash_map<
-      std::pair<DeviceId, MempoolId_t>,
-      std::unique_ptr<PrivatePool>,
-      MempoolHash>
-      graph_pools;
-  // Pools no longer referenced by any graph. Their BlockPools are eligible for
-  // free_blocks. The reason to use map here is the need to erase PrivatePools
-  // in graph_pools at the same time with same search keys.
-  ska::
-      flat_hash_map<std::pair<DeviceId, MempoolId_t>, PrivatePool*, MempoolHash>
-          graph_pools_freeable;
-  // Store pools underway in recording.
-  std::vector<std::pair<
-      std::pair<DeviceId, MempoolId_t>,
-      std::function<bool(sycl::queue*)>>>
-      recordings_underway;
-
-  MempoolId_t get_mempool_id(DeviceId device);
 
   DeviceStats& get_stats_for_device(DeviceId device);
 
@@ -229,15 +158,6 @@ class CachingDeviceAllocator final {
   std::vector<SegmentInfo> snapshot() const;
 
   void dumpMemoryStatus(DeviceId deviceIndex);
-
-  void beginAllocateToPool(
-      DeviceId deviceIndex,
-      MempoolId_t mempoolId,
-      std::function<bool(sycl::queue*)> filter);
-
-  void endAllocateToPool(DeviceId deviceIndex, MempoolId_t mempoolId);
-
-  void releasePool(DeviceId deviceIndex, MempoolId_t mempoolId);
 };
 
 } // namespace dpcpp

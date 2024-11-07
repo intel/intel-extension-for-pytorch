@@ -96,8 +96,7 @@ CachingDeviceAllocator::Block::Block(
       m_allocated(0),
       m_prev(nullptr),
       m_next(nullptr),
-      m_event_cnt(0),
-      m_owner_private_pool(nullptr) {
+      m_event_cnt(0) {
   auto device_cnt = at::xpu::device_count();
   std::vector<DeviceStats> dev_stats;
 }
@@ -117,8 +116,7 @@ CachingDeviceAllocator::Block::Block(
       m_allocated(false),
       m_prev(nullptr),
       m_next(nullptr),
-      m_event_cnt(0),
-      m_owner_private_pool(nullptr) {}
+      m_event_cnt(0) {}
 
 bool CachingDeviceAllocator::Block::is_split() const {
   return (m_prev != nullptr) || (m_next != nullptr);
@@ -202,39 +200,13 @@ void CachingDeviceAllocator::malloc(
   }
 
   BlockPool* pool = nullptr;
-  PrivatePool* private_pool = nullptr;
   PoolType pool_type = PoolType::UNDEF;
-  Block* block = nullptr;
-
-  if (recordings_underway.size()) {
-    // graph path, try to find the blocks pointer which related to the
-    // PrivatePool who is recording graph on current queue.
-    for (auto& entry : recordings_underway) {
-      if (entry.second(queue)) {
-        auto it1 = graph_pools.find(entry.first);
-        TORCH_INTERNAL_ASSERT(it1 != graph_pools.end());
-        if (size <= kSmallSize) {
-          pool_type = PoolType::SMALL_POOL;
-          pool = &it1->second->small_blocks;
-        } else {
-          pool_type = PoolType::LARGE_POOL;
-          pool = &it1->second->large_blocks;
-        }
-        private_pool = it1->second.get();
-      }
-    }
-  }
-  // fallback check. It's not suitable to change it to 'else' statement.
-  if (pool == nullptr) {
-    // normal path, search and return aiming block for allocation in
-    // DeviceCachingAllocator's own pool.
-    if (size <= kSmallSize) {
-      pool_type = PoolType::SMALL_POOL;
-      pool = &small_blocks;
-    } else {
-      pool_type = PoolType::LARGE_POOL;
-      pool = &large_blocks;
-    }
+  if (size <= kSmallSize) {
+    pool_type = PoolType::SMALL_POOL;
+    pool = &small_blocks;
+  } else {
+    pool_type = PoolType::LARGE_POOL;
+    pool = &large_blocks;
   }
 
   Block search_key(curDevID, *queue, size);
@@ -253,7 +225,7 @@ void CachingDeviceAllocator::malloc(
   stat_types[static_cast<size_t>(StatType::AGGREGATE)] = true;
   stat_types[static_cast<size_t>(get_stat_type_for_pool(pool_type))] = true;
   DeviceStats& stats = get_stats_for_device(curDevID);
-  block = find_free_block();
+  Block* block = find_free_block();
 
   if (block == nullptr) {
     void* buffer;
@@ -296,9 +268,6 @@ void CachingDeviceAllocator::malloc(
 
   Block* remaining = nullptr;
   AT_ASSERT(block);
-
-  // need to record the block's owner pool for lazy releasing
-  block->m_owner_private_pool = private_pool;
 
   const bool already_split = block->is_split();
   if (block->should_split(size)) {
@@ -448,18 +417,10 @@ void CachingDeviceAllocator::free_block(Block* block) {
   size_t original_block_size = block->m_size;
 
   BlockPool* pool = nullptr;
-  if (block->m_owner_private_pool == nullptr) {
-    if (block->m_pool_type == PoolType::LARGE_POOL) {
-      pool = &large_blocks;
-    } else if (block->m_pool_type == PoolType::SMALL_POOL) {
-      pool = &small_blocks;
-    }
-  } else {
-    if (block->m_pool_type == PoolType::LARGE_POOL) {
-      pool = &block->m_owner_private_pool->large_blocks;
-    } else if (block->m_pool_type == PoolType::SMALL_POOL) {
-      pool = &block->m_owner_private_pool->small_blocks;
-    }
+  if (block->m_pool_type == PoolType::LARGE_POOL) {
+    pool = &large_blocks;
+  } else if (block->m_pool_type == PoolType::SMALL_POOL) {
+    pool = &small_blocks;
   }
 
   int64_t net_change_inactive_split_blocks = 0;
@@ -673,17 +634,6 @@ void CachingDeviceAllocator::free_cached_blocks(DeviceId di) {
   free_blocks(large_blocks, begin, end);
   find_cached_blocks_bound(di, small_blocks, begin, end);
   free_blocks(small_blocks, begin, end);
-
-  // Release graph private pools
-  for (auto it = graph_pools_freeable.begin();
-       it != graph_pools_freeable.end();) {
-    TORCH_INTERNAL_ASSERT(it->second->use_count == 0);
-    free_blocks(it->second->small_blocks, begin, end);
-    free_blocks(it->second->large_blocks, begin, end);
-    auto erase_count = graph_pools.erase(it->first);
-    TORCH_INTERNAL_ASSERT(erase_count == 1);
-    it = graph_pools_freeable.erase(it);
-  }
 }
 
 void CachingDeviceAllocator::synchronize_and_free_events(
@@ -831,63 +781,6 @@ void CachingDeviceAllocator::dumpMemoryStatus(DeviceId deviceIndex) {
       "Reserved: ",
       format_size(stats.reserved_bytes[static_cast<size_t>(StatType::AGGREGATE)]
                       .current));
-}
-
-// Called by XPUGraph::begin_recording
-void CachingDeviceAllocator::beginAllocateToPool(
-    DeviceId deviceIndex,
-    MempoolId_t mempoolId,
-    std::function<bool(sycl::queue*)> filter) {
-  std::lock_guard<std::recursive_mutex> lock(mutex);
-  auto search_key = std::make_pair(deviceIndex, mempoolId);
-  auto it = graph_pools.find(search_key);
-  if (it == graph_pools.end()) {
-    graph_pools.emplace(search_key, std::make_unique<PrivatePool>());
-  } else {
-    TORCH_INTERNAL_ASSERT(it->second->use_count > 0);
-    it->second->use_count += 1;
-  }
-  for (auto it2 = recordings_underway.begin(); it2 != recordings_underway.end();
-       ++it2) {
-    TORCH_CHECK(
-        it2->first != search_key,
-        "beginAllocateToPool: already recording to mempool_id");
-  }
-  recordings_underway.emplace_back(search_key, std::move(filter));
-}
-
-// Called by XPUGraph::end_recording
-void CachingDeviceAllocator::endAllocateToPool(
-    DeviceId deviceIndex,
-    MempoolId_t mempoolId) {
-  std::lock_guard<std::recursive_mutex> lock(mutex);
-  auto search_key = std::make_pair(deviceIndex, mempoolId);
-  for (auto it = recordings_underway.begin(); it != recordings_underway.end();
-       ++it) {
-    if (it->first == search_key) {
-      recordings_underway.erase(it);
-      return;
-    }
-  }
-  TORCH_CHECK(
-      false, "endAllocateToPool: not currently recording to mempool_id");
-}
-
-// Called by XPUGraph::reset
-void CachingDeviceAllocator::releasePool(
-    DeviceId deviceIndex,
-    MempoolId_t mempoolId) {
-  std::lock_guard<std::recursive_mutex> lock(mutex);
-  auto search_key = std::make_pair(deviceIndex, mempoolId);
-  auto it = graph_pools.find(search_key);
-  TORCH_INTERNAL_ASSERT(it != graph_pools.end());
-  auto uc = --(it->second->use_count);
-  TORCH_INTERNAL_ASSERT(uc >= 0);
-  if (uc == 0) {
-    bool inserted =
-        graph_pools_freeable.insert({search_key, it->second.get()}).second;
-    TORCH_INTERNAL_ASSERT(inserted);
-  }
 }
 
 } // namespace dpcpp

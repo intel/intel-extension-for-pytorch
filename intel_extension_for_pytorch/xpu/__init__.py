@@ -29,14 +29,6 @@ from .overrides import (
     override_assert_equal,
 )
 
-from .graphs import (
-    XPUGraph,
-    graph,
-    graph_pool_handle,
-    is_current_stream_capturing,
-    make_graphed_callables,
-)
-
 import intel_extension_for_pytorch.optim as optim
 from intel_extension_for_pytorch._version import (
     __version__,

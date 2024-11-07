@@ -1,5 +1,4 @@
 from torch.testing._internal.common_utils import TestCase
-import torch
 
 
 class TestVerbose(TestCase):
@@ -14,11 +13,6 @@ res["res"] = torch.xpu.get_log_level()"""
         res = {}
         exec(cmd)
         assert "INFO" in str(res["res"]), "Required info log level not found"
-
-        # Disable log_level to clear test environment
-        import intel_extension_for_pytorch  # noqa
-
-        torch.xpu.set_log_level(-1)
 
     def test_ipex_log_component(self):
         cmd = """
