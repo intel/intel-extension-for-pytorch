@@ -13,14 +13,22 @@ To overcome this issue, we propose quantization methods that reduce the size and
 
 | Support Device |  RTN*  |  AWQ*  |  TEQ* |  GPTQ*  |  AutoRound*  | Data type of quantized weight |
 |:--------------:|:----------:|:----------:|:----------:|:----:|:----:|:------------------------:|
-|     GPU        |  &#10004;  |  stay tuned*  |  stay tuned*  |  stay tuned*  |  stay tuned*  | int4_fullrange |
+|     GPU        |  &#10004;  |  &#10004;  |  stay tuned*  |  &#10004;  |  stay tuned*  | int4_fullrange |
 
-| Model |   Datatype  |    Platform    |  Device  |   Algorithm   |
-|:--------------:|:----------:|:----------:|:----------:|:----------:|
-|       Qwen-7B      |  INT4  |  Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics  |  Intel® GPU  |  RTN  |
-|       GPT-J-6B      |  INT4  |  Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics   |  Intel® GPU  |  RTN  |
+| Model |   Datatype  |    Device  |   Algorithm   |
+|:--------------:|:----------:|:----------:|:----------:|
+|       Llama3-8B     |  INT4  |  Intel® iGPU and dGPU  |  RTN, GPTQ  |
+|       Phi3-mini     |  INT4  |  Intel® iGPU and dGPU  |  RTN, GPTQ  |
+|       GPT-J-6B      |  INT4  |  Intel® iGPU and dGPU  |  RTN, GPTQ  |
+|       Qwen2-7B      |  INT4  |  Intel® iGPU and dGPU  |  RTN, GPTQ  |
+|       GLM-4-9b-chat |  INT4  |  Intel® iGPU and dGPU  |  RTN, GPTQ  |
 
-> Note: RTN algorithm is supported by Intel® Extension for PyTorch\*. For other algorithms, we mark as 'stay tuned' and highly recommend you waiting for the availability of the INT4 models on the HuggingFace Model Hub, since the LLM quantization procedure is significantly constrained by the machine's host memory and computation capabilities.
+ Validation Platforms
+ * Intel® Data Center GPU Max Series
+ * Intel® Arc™ A-Series Graphics
+ * Intel® Core™ Ultra series
+
+> Note: For algorithms marked as 'stay tuned' are highly recommended to wait for the availability of the INT4 models on the HuggingFace Model Hub, since the LLM quantization procedure is significantly constrained by the machine's host memory and computation capabilities.
 
 **RTN**[[1]](#1): Rounding to Nearest (RTN) is an intuitively simple method that rounds values to the nearest integer. It boasts simplicity, requiring no additional datasets, and offers fast quantization. Besides, it could be easily applied in other datatype like NF4 (non-uniform). Typically, it performs well on configurations such as W4G32 or W8, but worse than advanced algorithms at lower precision level.
 
@@ -29,7 +37,7 @@ To overcome this issue, we propose quantization methods that reduce the size and
 **TEQ**[[3]](#3): To our knowledge, it is the first trainable equivalent ransformation method (summited for peer review in 202306). However,  it requires more memory than other methods as model-wise loss is used and the equivalent transformation imposes certain requirements on model architecture.
 
 
-**GPTQ**[[4]](#4): GPTQ is a widely adopted method based on the Optimal Brain Surgeon. It quantizes weight block by block and fine-tunes the remaining unquantized ones to mitigate quantization errors. Occasionally, Non-positive semidefinite matrices may occur, necessitating adjustments to hyperparameters.
+**GPTQ**[[4]](#4): GPTQ is a widely adopted method based on the Optimal Brain Surgeon. It quantizes weight block by block and fine-tunes the remaining unquantized ones to mitigate quantization errors. Occasionally, non-positive semidefinite matrices may occur, necessitating adjustments to hyperparameters.
 
 **AutoRound**[[5]](#5): AutoRound utilizes sign gradient descent to optimize rounding values and minmax values of weights within just 200 steps, showcasing impressive performance compared to recent methods like GPTQ/AWQ. Additionally, it offers hypeparameters tuning compatibility to further enhance performance. However, due to its reliance on gradient backpropagation, currently it is not quite fit for backends like ONNX. 
 
@@ -91,15 +99,15 @@ In Weight-Only Quantization INT4 case, when using `AutoModelForCausalLM.from_pre
                                                 scale_dtype=convert_dtype_str2torch("fp16"))
 ```
 
-When running on Intel® GPU, it will replace the linear in the model with `WeightOnlyQuantizedLinear`. After that, the model linear weight loaded by `ipex.llm.optimize` is in INT4 format, and it contains not only weight and bias information, but also scales, zero_points, and blocksize information. When optimizing transformers at the front end, Intel® Extension for PyTorch\* will use `WeightOnlyQuantizedLinear` to initialize these information in the model if they are present, otherwise, it will use `IPEXTransformerLinear` to initialize the linear parameters in the model.
+When running on Intel® GPU, it will replace the linear in the model with `WeightOnlyQuantizedLinear`. After that, the model linear weight loaded by `ipex.llm.optimize` is in INT4 format, and it contains not only weight and bias information, but also scales, zero_points, and blocksize information. When optimizing transformers at the front end, Intel® Extension for PyTorch\* will use `WeightOnlyQuantizedLinear` to initialize this information in the model if they are present, otherwise, it will use `IPEXTransformerLinear` to initialize the linear parameters in the model.
 
 
 ### Weight-Only Quantization Runtime
-On Intel® GPU, after using `ipex.llm.optimize`, Intel® Extension for PyTorch\* will automatically replace the original attention module with `IPEXTransformerAttnOptimizedInt4` and the original mlp module with `IPEXTransformerMLPOptimizedInt4` in the model.
+On Intel® GPU, after using `ipex.llm.optimize`, Intel® Extension for PyTorch\* will automatically replace the original attention module with `IPEXTransformerAttnOptimizedInt4` and the original MLP module with `IPEXTransformerMLPOptimizedInt4` in the model.
 
 The major changes between `IPEXTransformerAttnOptimizedInt4` for INT4 scenario and `ipex.llm.optimize` for FP16 scenario include: replace the linear used to calculate qkv with `torch.ops.torch_ipex.mm_qkv_out_int4` and out_linear with `torch.ops.torch_ipex.mm_bias_int4`.
 
-The major changes between `IPEXTransformerMLPOptimizedInt4` for INT4 scenario and `ipex.llm.optimize` for FP16 scenario include: replace the linear used in mlp with `torch.ops.torch_ipex.mm_bias_int4`, if activation is used in the mlp module, then correspondingly, it will be replaced with our fused linear+activation kernel, such as `torch.ops.torch_ipex.mm_silu_mul_int4`.
+The major changes between `IPEXTransformerMLPOptimizedInt4` for INT4 scenario and `ipex.llm.optimize` for FP16 scenario include: replace the linear used in MLP with `torch.ops.torch_ipex.mm_bias_int4`, if activation is used in the MLP module, then correspondingly, it will be replaced with our fused linear+activation kernel, such as `torch.ops.torch_ipex.mm_silu_mul_int4`.
 
 ### Weight-Only Quantization Linear Dispatch
 As explained before, after applying `ipex.llm.optimize`, The linear kernel that Intel® Extension for PyTorch* has registered to substitute the original linear will be used in the model.
@@ -142,13 +150,11 @@ tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 prompt = "Once upon a time, there existed a little girl,"
 inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
 
-# woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=64)
-# qmodel = AutoModelForCausalLM.from_pretrained(model_name, device_map="xpu", quantization_config=woq_quantization_config, trust_remote_code=True)
-
-qmodel = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, device_map="xpu", trust_remote_code=True)
+woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=128)
+qmodel = AutoModelForCausalLM.from_pretrained(model_name, device_map="xpu", quantization_config=woq_quantization_config, trust_remote_code=True)
 
 # optimize the model with Intel® Extension for PyTorch*, it will improve performance.
-qmodel = ipex.llm.optimize(qmodel, inplace=True, dtype=torch.float16, woq=True, device="xpu")
+qmodel = ipex.llm.optimize(qmodel, inplace=True, dtype=torch.float16, quantization_config=woq_quantization_config, device="xpu")
 
 output = qmodel.generate(inputs)
 ```
