@@ -128,7 +128,7 @@ class XPUCachingAutotuner(CachingAutotuner):
                 ),
             )
 
-            target = (compile_meta["device_type"], torch.xpu.device(torch.xpu.current_device()).sycl_device)
+            target = (compile_meta["device_type"], cc)
             options = {
                 "num_warps": compile_meta["num_warps"],
                 "num_stages": compile_meta["num_stages"],
