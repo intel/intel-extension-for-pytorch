@@ -43,3 +43,28 @@ class TestTorchMethod(TestCase):
         out_xpu = F.scaled_dot_product_attention(query.xpu(), key.xpu(), value.xpu())
 
         self.assertEqual(out_cpu, out_xpu.cpu().float(), atol=1e-3, rtol=1e-3)
+
+    def test_sdp_math_fp32(self, dtype=torch.float):
+        head_dim = 256
+        seq_lenth = 1
+        k_seq_lenth = 33
+        v_seq_lenth = 33
+        scale = head_dim**-0.5
+        query = torch.rand(1, 16, seq_lenth, head_dim, dtype=dtype)
+        key = torch.rand(1, 16, k_seq_lenth, head_dim, dtype=dtype)
+        value = torch.rand(1, 16, v_seq_lenth, head_dim, dtype=dtype)
+
+        out_cpu = F.scaled_dot_product_attention(
+            query.float(),
+            key.float(),
+            value.float(),
+            scale=scale,
+        )
+        out_xpu = F.scaled_dot_product_attention(
+            query.xpu(),
+            key.xpu(),
+            value.xpu(),
+            scale=scale,
+        )
+
+        self.assertEqual(out_cpu, out_xpu.cpu().float(), atol=1e-3, rtol=1e-3)

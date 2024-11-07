@@ -61,7 +61,7 @@ inline c10::SymFloat calculate_scale(
     const at::Tensor& query,
     c10::optional<double> scale) {
   const auto softmax_scale = scale.has_value()
-      ? scale.value()
+      ? (c10::SymFloat(1.0) / scale.value())
       : c10::SymFloat(query.sym_size(-1)).sqrt();
   return c10::SymFloat(softmax_scale);
 }
