@@ -20,10 +20,6 @@ supported:
 # - im2col.out
 # - _embedding_bag
 # - _embedding_bag_forward_only
-# - _native_batch_norm_legit
-# - _native_batch_norm_legit.out
-# - _native_batch_norm_legit.no_stats
-# - _native_batch_norm_legit.no_stats_out
 # - glu_backward
 # - glu_backward.grad_input
 # - index_select

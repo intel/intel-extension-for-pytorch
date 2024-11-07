@@ -574,8 +574,8 @@ class TestNNMethod(TestCase):
     def test_batch_norm_legit_simple(self):
         input_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
         n_input = input_cpu.size(1)
-        weight_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
-        bias_cpu = torch.randn(1, 2, 3, 3, dtype=torch.float, device=cpu_device)
+        weight_cpu = torch.randn(2, dtype=torch.float, device=cpu_device)
+        bias_cpu = torch.randn(2, dtype=torch.float, device=cpu_device)
         train = True
         momentum = 0.1
         epsilon = 1e-5
