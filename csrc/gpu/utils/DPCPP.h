@@ -251,6 +251,9 @@ using dpcpp_dev_single_fp_config = sycl::info::device::single_fp_config;
 using dpcpp_dev_double_fp_config = sycl::info::device::double_fp_config;
 // Returns the size of global device memory in bytes
 using dpcpp_dev_global_mem_size = sycl::info::device::global_mem_size;
+// Return the architecture for device.
+using dpcpp_dev_architecture =
+    sycl::ext::oneapi::experimental::info::device::architecture;
 // Returns the type of global memory cache supported.
 using dpcpp_dev_global_mem_cache_type =
     sycl::info::device::global_mem_cache_type;

@@ -137,6 +137,10 @@ struct DeviceProp {
   dpcpp_info_t<dpcpp_dev_ext_intel_gpu_eu_simd_width> gpu_eu_simd_width;
   dpcpp_info_t<dpcpp_dev_ext_intel_gpu_hw_threads_per_eu> gpu_hw_threads_per_eu;
 #endif
+#if (defined(__INTEL_LLVM_COMPILER) && __INTEL_LLVM_COMPILER >= 20240100)
+  dpcpp_info_t<dpcpp_dev_architecture> device_arch;
+#endif
+
   bool support_fp64;
   bool support_atomic64;
 };
