@@ -24,48 +24,78 @@ LLM Inference
    :header-rows: 1
 
    * - Model Family
-     - Verified < MODEL ID > (Huggingface hub)
+     - Verified models from Huggingface hub
+     - Dynamic KV-Cache
+     - Static KV-Cache
      - FP16
-     - INT4 WOQ
+     - INT4 WoQ
    * - Llama2
-     - "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf"
+     - meta-llama/Llama-2-7b-hf, meta-llama/Llama-2-13b-hf, meta-llama/Llama-2-70b-hf
+     - ✅
+     - ✅
      - ✅
      - ✅
    * - Llama3
-     - "meta-llama/Meta-Llama-3-8B"
+     - meta-llama/Meta-Llama-3-8B-Instruct, meta-llama/Meta-Llama-3-70B-Instruct
+     - ✅
+     - ✅
      - ✅
      - ✅
    * - Phi-3 mini
-     - "microsoft/Phi-3-mini-128k-instruct"
+     - microsoft/Phi-3-mini-4k-instruct, microsoft/Phi-3-mini-128k-instruct
+     - ✅
+     - ✅
      - ✅
      - ✅
    * - GPT-J
-     - "EleutherAI/gpt-j-6b"
+     - EleutherAI/gpt-j-6b
+     - ✅
+     - ✅
      - ✅
      - ✅
    * - Qwen 
-     - "Qwen/Qwen-7B"
+     - Qwen/Qwen2-VL-7B-Instruct
      - ✅
      - ✅
-   * - OPT 
-     - "facebook/opt-30b", "facebook/opt-1.3b"
      - ✅
-     - ❎
+     - ✅
+   * - GLM-Chat
+     - THUDM/glm-4-9b-chat
+     - ✅
+     - ✅
+     - ✅
+     - ✅
    * - Bloom 
-     - "bigscience/bloom-7b1", "bigscience/bloom"
+     - bigscience/bloom-7b1
      - ✅
-     - ❎
-   * - ChatGLM3-6B
-     - "THUDM/chatglm3-6b"
      - ✅
-     - ❎
-   * - Baichuan2-13B
-     - "baichuan-inc/Baichuan2-13B-Chat"
      - ✅
-     - ❎
+     - 
+   * - Baichuan2
+     - baichuan-inc/Baichuan2-13B-Chat
+     - ✅
+     - ✅
+     - ✅
+     - 
+   * - Falcon
+     - tiiuae/falcon-40b-instruct
+     - ✅
+     - 
+     - ✅
+     - 
+   * - OPT 
+     - facebook/opt-6.7b, facebook/opt-30b
+     - ✅
+     - 
+     - ✅
+     - 
 
+Platforms
+~~~~~~~~~~~~~
+All above workloads are validated on Intel® Data Center Max 1550 GPU. 
+The WoQ (Weight Only Quantization) int4 workloads are also partially validated on Intel® Core™ Ultra series (Lunar Lake) with Intel® Arc™ Graphics. Refer to Weight Only Quantization INT4 section.
 
-*Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp16). For other LLMs families, we are working in progress to cover those optimizations, which will expand the model list above.
+*Note*: The above verified models (including other models in the same model family, like "meta-llama/Llama-2-7b-hf" from Llama family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp16). For other LLMs families, we are working in progress to cover those optimizations, which will expand the model list above.
 
 LLM fine-tuning on Intel® Data Center Max 1550 GPU
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,55 +105,37 @@ LLM fine-tuning on Intel® Data Center Max 1550 GPU
    :header-rows: 1
 
    * - Model Family
-     - Verified < MODEL ID > (Huggingface hub)
+     - Verified models from Huggingface hub
      - Mixed Precision (BF16+FP32)
      - Full fine-tuning
      - LoRA
    * - Llama2
-     - "meta-llama/Llama-2-7b-hf"
+     - meta-llama/Llama-2-7b-hf
      - ✅
      - ✅
      - ✅
    * - Llama2
-     - "meta-llama/Llama-2-70b-hf",
+     - meta-llama/Llama-2-70b-hf
      - ✅
-     - ❎
+     - 
      - ✅
    * - Llama3
-     - "meta-llama/Meta-Llama-3-8B"
+     - meta-llama/Meta-Llama-3-8B
      - ✅
      - ✅
      - ✅
    * - Qwen
-     - "Qwen/Qwen-7B"
+     - Qwen/Qwen-1.5B
      - ✅
      - ✅
      - ✅
    * - Phi-3-mini 3.8B
-     - "Phi-3-mini-4k-instruct"
+     - Phi-3-mini-4k-instruct
      - ✅
      - ✅
      - ✅
 
-LLM fine-tuning on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. list-table::
-   :widths: auto
-   :header-rows: 1
-
-   * - Model Family
-     - Verified < MODEL ID > (Huggingface hub)
-     - Mixed Precision (BF16+FP32)
-     - Full fine-tuning
-     - LoRA
-   * - Phi-3-mini 3.8B
-     - "Phi-3-mini-4k-instruct"
-     - ✅
-     - ✅
-     - ✅
-
-Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.3.110/examples/gpu/llm>`_ for instructions to install/setup environment and example scripts..
+Check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.5.10/examples/gpu/llm>`_ for instructions to install/setup environment and example scripts..
 
 Optimization Methodologies
 --------------------------
@@ -198,9 +210,9 @@ Large Language Models (LLMs) have shown remarkable performance in various natura
 
 However, deploying them on devices with limited resources is challenging due to their high computational and memory requirements. 
 
-To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike `normal quantization <https://github.com/intel/intel-extension-for-transformers/blob/main/docs/quantization.md>`_, such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WOQ), which only quantizes the weights statically. WOQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WOQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.
+To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike `normal quantization <https://github.com/intel/intel-extension-for-transformers/blob/main/docs/quantization.md>`_, such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WoQ), which only quantizes the weights statically. WoQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WoQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.
 
-For more detailed information, check `WOQ INT4 <llm/int4_weight_only_quantization.html>`_.
+For more detailed information, check `WoQ INT4 <llm/int4_weight_only_quantization.html>`_.
 
 .. toctree::
    :hidden:
