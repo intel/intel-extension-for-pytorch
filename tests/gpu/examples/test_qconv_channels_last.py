@@ -47,7 +47,9 @@ class TestTorchMethod(TestCase):
 
                     inputs = inputs.to(memory_format=torch.channels_last)
                     inputs_gpu = inputs.to("xpu")
-                    filters_gpu = filters.to("xpu")
+                    filters_gpu = filters.to("xpu").to(
+                        memory_format=torch.channels_last
+                    )
                     bias_gpu = bias.to("xpu")
 
                     q_inputs_gpu = torch.quantize_per_tensor(
@@ -117,7 +119,9 @@ class TestTorchMethod(TestCase):
 
                     inputs = inputs.to(memory_format=torch.channels_last_3d)
                     inputs_gpu = inputs.to("xpu")
-                    filters_gpu = filters.to("xpu")
+                    filters_gpu = filters.to("xpu").to(
+                        memory_format=torch.channels_last_3d
+                    )
                     bias_gpu = bias.to("xpu")
                     q_inputs_gpu = torch.quantize_per_tensor(
                         inputs_gpu, scale_in, zero_point_in, dtype_inputs
