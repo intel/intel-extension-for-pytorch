@@ -99,20 +99,16 @@ static std::tuple<memory::desc, memory::desc, memory::desc> qconv_get_plain_md(
     memory::desc wgh_usr_md,
     memory::desc dst_usr_md,
     memory::dims wgh_tz,
-    bool is_channels_last_suggested) {
+    const int64_t ndim,
+    int64_t groups,
+    bool is_wgh_channels_last) {
   // create memory desc for conv primitive and query the blocked format
   memory::desc src_md, wgh_md, dst_md;
   src_md = src_usr_md;
   dst_md = dst_usr_md;
-  if (is_channels_last_suggested) {
-    // TODO: remove this path when oneDNN fix the accuracy issue.
-    // in ChannelsLast senario, fmt_wgh should be nhwc instead of any
-    auto fmt_any = memory::format_tag::any;
-    auto wei_data_t = memory::data_type::s8;
-    wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_any);
-  } else {
-    wgh_md = wgh_usr_md;
-  }
+  auto fmt_wgh = conv_wgh_fmt(ndim, groups != 1, is_wgh_channels_last);
+  auto wei_data_t = memory::data_type::s8;
+  wgh_md = memory::desc(wgh_tz, wei_data_t, fmt_wgh);
   return {src_md, wgh_md, dst_md};
 }
 
@@ -326,21 +322,19 @@ static at::Tensor quantized_convolution(
     conv_fwd_pd = convolution_forward::primitive_desc(
         const_cast<dnnl_primitive_desc_t>(conv_fwd_pd_t));
   } else {
-    if (is_onednn_layout_suggested) {
-      std::tie(src_md, wgh_md, dst_md) =
-          qconv_get_blocked_md(src, src_usr_md, wgh_usr_md, dst_usr_md);
-    } else {
-      auto ic = src.size(1);
-      auto oc = dst.size(1);
-      memory::dims wgh_tz =
-          compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
-      std::tie(src_md, wgh_md, dst_md) = qconv_get_plain_md(
-          src_usr_md,
-          wgh_usr_md,
-          dst_usr_md,
-          wgh_tz,
-          is_channels_last_suggested);
-    }
+    auto ic = src.size(1);
+    auto oc = dst.size(1);
+    memory::dims wgh_tz =
+        compatible_wgh_dims(ndim, groups, oc, ic, wgh.sizes());
+    std::tie(src_md, wgh_md, dst_md) = qconv_get_plain_md(
+        src_usr_md,
+        wgh_usr_md,
+        dst_usr_md,
+        wgh_tz,
+        ndim,
+        groups,
+        wgh.is_contiguous(at::MemoryFormat::ChannelsLast) ||
+            wgh.is_contiguous(at::MemoryFormat::ChannelsLast3d));
 
     pattr.set_scales_mask(DNNL_ARG_SRC, mask_ac);
     pattr.set_scales_mask(DNNL_ARG_WEIGHTS, mask_wgh);
@@ -406,18 +400,6 @@ static at::Tensor quantized_convolution(
     src_m = dpcpp_onednn_memory(src_usr_md, engine, src.data_ptr());
     dst_m = dpcpp_onednn_memory(dst_usr_md, engine, dst.data_ptr());
     wgh_m = dpcpp_onednn_memory(wgh_usr_md, engine, wgh.data_ptr());
-    if (memory_layout_for_conv == MEMORY_LAYOUT_FOR_CONV::ChannelsLast) {
-      // TODO: Should remove after oneDNN fix the accuracy issue
-      auto expected_wgh_md = conv_fwd_pd.weights_desc();
-      wgh_m = qconv_get_expected_wgh_memory(
-          wgh,
-          wgh_blocked,
-          wgh_usr_md,
-          expected_wgh_md,
-          wgh_scales,
-          engine,
-          weight_cache_optimization);
-    }
   }
 
   std::unordered_map<int, memory> args;
