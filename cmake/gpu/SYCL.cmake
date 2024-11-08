@@ -101,11 +101,6 @@ set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fhonor-nans)
 set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fhonor-infinities)
 set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fno-associative-math)
 set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fno-approx-func)
-# It informs compiler to link the ABI-neutral library.
-if(LINUX)
-  set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fpreview-breaking-changes)
-  set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -fpreview-breaking-changes)
-endif()
 
 # Explicitly limit the index range (< Max int32) in kernel
 # set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fsycl-id-queries-fit-in-int)

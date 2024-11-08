@@ -21,7 +21,7 @@ Troubleshooting
   - **Cause**: DPC++ does not support `_GLIBCXX_USE_CXX11_ABI=0`, Intel® Extension for PyTorch\* is always compiled with `_GLIBCXX_USE_CXX11_ABI=1`. This symbol undefined issue appears when PyTorch\* is
     compiled with `_GLIBCXX_USE_CXX11_ABI=0`.
   - **Solution**: Pass `export GLIBCXX_USE_CXX11_ABI=1` and compile PyTorch\* with particular compiler which supports `_GLIBCXX_USE_CXX11_ABI=1`. We recommend using prebuilt wheels
-    in [download server](https:// developer.intel.com/ipex-whl-stable-xpu) to avoid this issue. Please **note** that starting from Intel® Extension for PyTorch\* 2.5, it supports both new and old C++ ABIs. Previously, it only supported the new C++ ABI.
+    in [download server](https:// developer.intel.com/ipex-whl-stable-xpu) to avoid this issue.
 - **Problem**: `-997 runtime error` when running some AI models on Intel® Arc™ A-Series GPUs.
   - **Cause**:  Some of the `-997 runtime error` are actually out-of-memory errors. As Intel® Arc™ A-Series GPUs have less device memory than Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU
     Max  Series, running some AI models on them may trigger out-of-memory errors and cause them to report failure such as `-997 runtime error` most likely. This is expected. Memory usage optimization is a work in progress to allow Intel® Arc™ A-Series GPUs to support more AI models.

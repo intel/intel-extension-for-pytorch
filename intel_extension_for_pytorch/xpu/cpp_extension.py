@@ -33,7 +33,6 @@ CLIB_PREFIX = "" if IS_WINDOWS else "lib"
 CLIB_EXT = ".dll" if IS_WINDOWS else ".so"
 SHARED_FLAG = "/DLL" if IS_WINDOWS else "-shared"
 SYCL_FLAG = "-fsycl"
-ABI_FLAG = "-fpreview-breaking-changes" if IS_LINUX else ""
 
 MINIMUM_GCC_VERSION = (5, 0, 0)
 MINIMUM_MSVC_VERSION = (19, 0, 24215)
@@ -322,7 +321,7 @@ class DpcppBuildExtension(build_ext, object):
 
             libraries_args = []
             libraries_args += [f"-l{x}" for x in libraries]
-            common_args = [SHARED_FLAG] + [SYCL_FLAG] + [ABI_FLAG]
+            common_args = [SHARED_FLAG] + [SYCL_FLAG]
 
             """
             link command formats:
@@ -453,7 +452,7 @@ class DpcppBuildExtension(build_ext, object):
             # create output directories avoid linker error.
             create_parent_dirs_by_path(output_libname)
 
-            ldflags = [SHARED_FLAG] + [SYCL_FLAG] + [ABI_FLAG]
+            ldflags = [SHARED_FLAG] + [SYCL_FLAG]
             ldflags += [f"-L{x}" for x in library_dirs]
             ldflags += [f"-L{x}" for x in runtime_library_dirs]
             ldflags += extra_postargs
@@ -511,7 +510,7 @@ class DpcppBuildExtension(build_ext, object):
 
                         if "-fPIC" in cflags:  # Windows does not support this argument
                             cflags.remove("-fPIC")
-                        cflags = cflags + ["-std=c++17", SYCL_FLAG, ABI_FLAG]
+                        cflags = cflags + ["-std=c++17", SYCL_FLAG]
 
                         cmd = [_bin, "-c", src, "-o", obj] + include_list + cflags
                     elif isinstance(self.cflags, dict):
@@ -1005,11 +1004,9 @@ def library_paths() -> List[str]:
 def _prepare_compile_flags(extra_compile_args):
     if isinstance(extra_compile_args, List):
         extra_compile_args.append(SYCL_FLAG)
-        extra_compile_args.append(ABI_FLAG)
     elif isinstance(extra_compile_args, dict):
         cl_flags = extra_compile_args.get("cxx", [])
         cl_flags.append(SYCL_FLAG)
-        cl_flags.append(ABI_FLAG)
         extra_compile_args["cxx"] = cl_flags
 
     return extra_compile_args
@@ -1051,7 +1048,7 @@ def _prepare_ldflags(extra_ldflags, verbose, is_standalone):
     oneapi_link_args += ["-Wl,--start-group"]
     oneapi_link_args += [f"{x}" for x in get_one_api_help().get_onemkl_libraries()]
     oneapi_link_args += ["-Wl,--end-group"]
-    oneapi_link_args += ["-lOpenCL", "-lpthread", "-lm", "-ldl"]
+    oneapi_link_args += ["-lsycl", "-lOpenCL", "-lpthread", "-lm", "-ldl"]
 
     # Append IPEX link parameters.
     oneapi_link_args += ["-lintel-ext-pt-gpu"]
@@ -1247,12 +1244,7 @@ def _write_ninja_file_to_build_library(
         return target
 
     objects = [object_file_path(src) for src in sources]
-    ldflags = (
-        ([] if is_standalone else [SHARED_FLAG])
-        + [SYCL_FLAG]
-        + [ABI_FLAG]
-        + extra_ldflags
-    )
+    ldflags = ([] if is_standalone else [SHARED_FLAG]) + [SYCL_FLAG] + extra_ldflags
 
     # The darwin linker needs explicit consent to ignore unresolved symbols.
     if IS_MACOS:
