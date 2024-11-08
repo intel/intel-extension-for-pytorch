@@ -229,7 +229,12 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         # if attention_mask is not None:
         #     attention_mask = self.get_blocked_attn_mask(attention_mask)
         if alibi is not None:
-            alibi = self.get_blocked_alibi(alibi, key.size(2))
+            if isinstance(past_key_value, IPEXStaticCache):
+                alibi = self.get_blocked_alibi(
+                    alibi, past_key_value.get_seq_length() + key.size(2)
+                )
+            else:
+                alibi = self.get_blocked_alibi(alibi, key.size(2))
         if (
             self.beam_idx is not None
             and query.size(-2) == 1
