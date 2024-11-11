@@ -21,6 +21,13 @@ from intel_extension_for_pytorch.transformers.models.cpu.fusions.mha_fusion impo
     _IPEXPagedAttentionCPU,
 )
 
+from intel_extension_for_pytorch.transformers.models.xpu.fusions.linear_fusion import (
+    _IPEXlinearAddXPU,
+    _IPEXlinearAddAddXPU,
+    _IPEXlinearGeluXPU,
+    _IPEXlinearSiluMulXPU,
+)
+
 from intel_extension_for_pytorch.transformers.models.xpu.fusions.mha_fusion import (
     _IPEXFastLayerNormXPU,
     _IPEXRopeXPU,
@@ -75,6 +82,10 @@ XPU_fusion_modules = {
     IPEXCustomOpType.PAGED_ATTENTION: _IPEXPagedAttentionXPU,
     IPEXCustomOpType.FAST_LAYERNORM: _IPEXFastLayerNormXPU,
     IPEXCustomOpType.VARLEN_ATTENTION: _IPEXVarlenScaledDotProductXPU,
+    IPEXCustomOpType.LINEAR_ADD: _IPEXlinearAddXPU,
+    IPEXCustomOpType.LINEAR_ADD_ADD: _IPEXlinearAddAddXPU,
+    IPEXCustomOpType.LINEAR_GELU: _IPEXlinearGeluXPU,
+    IPEXCustomOpType.LINEAR2_SILU_MUL: _IPEXlinearSiluMulXPU,
 }
 
 
