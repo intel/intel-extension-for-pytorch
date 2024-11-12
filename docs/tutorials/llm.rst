@@ -14,7 +14,7 @@ These LLM-specific optimizations can be automatically applied with a single fron
    llm/llm_optimize
 
 `ipex.llm` Optimized Model List for Inference
--------------------------------
+---------------------------------------------
 
 Verified for single instance mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
