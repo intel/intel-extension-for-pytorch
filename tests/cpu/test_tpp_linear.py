@@ -146,6 +146,7 @@ class TestTPPlinear(TestCase):
                             assert model.mlp.use_tpp is True
                         self.assertEqual(out, ref_out)
                         _disable_tpp()
+            os.environ["BF16_OPTIMIZED_THROUGHPUT"] = "0"
 
     def test_tpp_linear_fallback_flag(self):
         x1 = torch.rand(1, 1, 4097)

@@ -59,8 +59,8 @@ def TPPLinear_weight_prepack(m, bk=None, bc=None, layer_dtype=torch.float32):
 #
 # For long term, mark as TODO, we will tune TPP block layout/loop order to make it on par with oneDNN.
 
-fallback_ic_shape_list = [13824, 11008]
-fallback_oc_shape_list = [4096, 5120]
+fallback_ic_shape_list = [13824, 11008, 16384, 4096]
+fallback_oc_shape_list = [4096, 5120, 16384, 12288]
 
 
 def Apply_TPPLinear_weight_prepack(m, dtype, device="cpu"):
