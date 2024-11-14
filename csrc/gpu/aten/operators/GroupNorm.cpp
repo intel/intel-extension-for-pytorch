@@ -1,4 +1,7 @@
 #include "Norm.h"
+#ifdef USE_OVERRIDE_OP
+#include "utils/CustomOperatorRegistration.h"
+#endif
 
 using namespace at::AtenIpexTypeXPU::normalization;
 
@@ -987,3 +990,17 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_backward(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+#ifdef USE_OVERRIDE_OP
+namespace {
+
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl(
+      "native_group_norm", TORCH_FN((&at::AtenIpexTypeXPU::native_group_norm)));
+  m.impl(
+      "native_group_norm_backward",
+      TORCH_FN((&at::AtenIpexTypeXPU::native_group_norm_backward)));
+}
+
+} // namespace
+#endif
