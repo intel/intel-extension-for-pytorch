@@ -214,9 +214,16 @@ class WrapHelper:
         torch.cuda.amp.autocast = fake_autocast
 
         # here is corner case for tensor.cuda(), it will call .to method without device args()
-        def fake_cuda(tensor_input, index=-1):
+        def fake_cuda(tensor_input, index=-1, non_blocking=None):
             if isinstance(index, str):
                 index = index.replace("cuda", "xpu")
+            # if non_blocking is bool, it means caller use this args
+            if isinstance(non_blocking, bool):
+                return (
+                    tensor_input.xpu(index, non_blocking=non_blocking)
+                    if index != -1
+                    else tensor_input.xpu(non_blocking=non_blocking)
+                )
             return tensor_input.xpu(index) if index != -1 else tensor_input.xpu()
 
         def is_cuda(input_args):

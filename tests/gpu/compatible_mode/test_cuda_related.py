@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase
 
 import intel_extension_for_pytorch as ipex  # noqa
@@ -20,3 +19,8 @@ class TestTorchMethod(TestCase):
     def test_tensor_is_cuda(self):
         x = torch.rand(2, 3, device="cuda")
         self.assertEqual(x.is_cuda(), True)
+
+    def test_cuda_non_blocking(self):
+        a = torch.rand(1, 2, 3, 4)
+        b = a.cuda(non_blocking=True)
+        self.assertEqual(b.is_cuda(), True)
