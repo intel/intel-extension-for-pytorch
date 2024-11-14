@@ -386,8 +386,8 @@ class TestInt4Linear(TestCase):
             None,
             group_size,
             g_idx4kernel,
-            ipex.llm.quantization.QuantMethod.AWQ_GEMM,
             ipex.llm.quantization.QuantDtype.INT4,
+            ipex.llm.quantization.QuantMethod.AWQ_GEMM,
         )
         out_xetla = woqlinear(input)
         out_torch = torch.matmul(input_torch, weight_fp16)
