@@ -42,8 +42,6 @@ from .transformer_modules.XPUAttentionfp16 import (
 from .transformer_modules.XPUAttentionInt4 import (
     IPEXAttentionInt4,
     IPEXAttentionInt4OneDNN,
-    IPEXAttentionInt4Grouped,
-    IPEXAttentionInt4GroupedOneDNN,
 )
 
 
@@ -323,18 +321,10 @@ class NewIPEXCHATGLMBlock(IPEXTransformerBlock):
                 else IPEXAttention(self.ipex_config, module.layer_number - 1)
             )
         elif dtype == "int4" and xpu_gemm_use_xetla():
-            self.attn = (
-                IPEXAttentionInt4Grouped(self.ipex_config, module.layer_number - 1)
-                if grouped
-                else IPEXAttentionInt4(self.ipex_config, module.layer_number - 1)
-            )
+            self.attn = IPEXAttentionInt4(self.ipex_config, module.layer_number - 1)
         elif dtype == "int4" and not xpu_gemm_use_xetla():
-            self.attn = (
-                IPEXAttentionInt4GroupedOneDNN(
-                    self.ipex_config, module.layer_number - 1
-                )
-                if grouped
-                else IPEXAttentionInt4OneDNN(self.ipex_config, module.layer_number - 1)
+            self.attn = IPEXAttentionInt4OneDNN(
+                self.ipex_config, module.layer_number - 1
             )
         else:
             raise NotImplementedError(

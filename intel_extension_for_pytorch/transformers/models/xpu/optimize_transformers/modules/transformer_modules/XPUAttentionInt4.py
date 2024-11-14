@@ -92,6 +92,7 @@ class IPEXAttentionInt4(IPEXAttention):
         )
 
     def transpose_parameter(self):
+        # Xetla path requires column major layout.
         self.q_proj_quant.qweight.data = self.q_proj_quant.qweight.transpose(
             0, 1
         ).contiguous()
@@ -190,15 +191,28 @@ class IPEXAttentionInt4(IPEXAttention):
                 and self.qkv_proj_quant.qweight is not None
             ):
                 qkv_out = dequant_gemm_block(hidden_states, self.qkv_proj_quant)
-                m = query.shape[-1]
+                mq = query.shape[-1]
+                mk = key.shape[-1]
                 if IPEXAttention.cache_type == "static":
-                    query = qkv_out[:, :, :m]
-                    key.copy_(qkv_out[:, :, m : 2 * m].transpose(0, 1)).contiguous()
-                    value.copy_(qkv_out[:, :, 2 * m :].transpose(0, 1)).contiguous()
+                    if (
+                        IPEXAttention.cache_format == CacheFormat.FBNH
+                        and not self.beam_search_first_iter(hidden_states.shape[1])
+                    ):
+                        query = qkv_out[:, :, :mq].transpose(0, 1)
+                        key.copy_(
+                            qkv_out[:, :, mq : mq + mk].transpose(0, 1)
+                        ).contiguous()
+                        value.copy_(
+                            qkv_out[:, :, mq + mk :].transpose(0, 1)
+                        ).contiguous()
+                    else:
+                        query = qkv_out[:, :, :mq]
+                        key.copy_(qkv_out[:, :, mq : mq + mk]).contiguous()
+                        value.copy_(qkv_out[:, :, mq + mk :]).contiguous()
                 else:
-                    query = qkv_out[:, :, :m]
-                    key.copy_(qkv_out[:, :, m : 2 * m])
-                    value.copy_(qkv_out[:, :, 2 * m :])
+                    query = qkv_out[:, :, :mq]
+                    key = qkv_out[:, :, mq : mq + mk]
+                    value = qkv_out[:, :, mq + mk :]
             else:
                 dequant_gemm_block(hidden_states, self.q_proj_quant, output=query)
                 dequant_gemm_block(hidden_states, self.k_proj_quant, output=key)
@@ -349,56 +363,8 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
     ) -> None:
         super().__init__(config, layer_idx)
 
-    def load_parameter(self, q_proj, k_proj, v_proj, out_proj):
-        self.q_proj_quant.set_weights_bias(q_proj.qweight, q_proj.bias)
-        self.q_proj_quant.set_scales_zps_gidx(
-            q_proj.scales, q_proj.qzeros, q_proj.g_idx
-        )
-        self.q_proj_quant.blocksize = q_proj.blocksize
-
-        self.k_proj_quant.set_weights_bias(k_proj.qweight, k_proj.bias)
-        self.k_proj_quant.set_scales_zps_gidx(
-            k_proj.scales, k_proj.qzeros, k_proj.g_idx
-        )
-        self.k_proj_quant.blocksize = k_proj.blocksize
-
-        self.v_proj_quant.set_weights_bias(v_proj.qweight, v_proj.bias)
-        self.v_proj_quant.set_scales_zps_gidx(
-            v_proj.scales, v_proj.qzeros, v_proj.g_idx
-        )
-        self.v_proj_quant.blocksize = v_proj.blocksize
-
-        self.out_proj_quant.set_weights_bias(out_proj.qweight, out_proj.bias)
-        self.out_proj_quant.set_scales_zps_gidx(
-            out_proj.scales, out_proj.qzeros, out_proj.g_idx
-        )
-        self.out_proj_quant.blocksize = out_proj.blocksize
-
-        q_proj.qweight = None
-        q_proj.bias = None
-        q_proj.scales = None
-        q_proj.qzeros = None
-
-        k_proj.qweight = None
-        k_proj.bias = None
-        k_proj.scales = None
-        k_proj.qzeros = None
-
-        v_proj.qweight = None
-        v_proj.bias = None
-        v_proj.scales = None
-        v_proj.qzeros = None
-
-        out_proj.qweight = None
-        out_proj.bias = None
-        out_proj.scales = None
-        out_proj.qzeros = None
-
-        self.position_embed = self.config.rotary_embedding_class(
-            self.config, torch.float16
-        )
-
     def transpose_parameter(self):
+        # OneDNN path requires column major layout under row major shape.
         self.q_proj_quant.qweight.data = (
             self.q_proj_quant.qweight.transpose(0, 1).contiguous().transpose(0, 1)
         )
@@ -420,7 +386,7 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
         self.k_proj_quant.scales.data = self.k_proj_quant.scales
         self.v_proj_quant.scales.data = self.v_proj_quant.scales
         self.out_proj_quant.scales.data = self.out_proj_quant.scales
-
+        # Assign zero point and OneDNN will broadcast it automatically.
         self.q_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
 
         self.k_proj_quant.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
@@ -446,23 +412,26 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
                 self.qkv_proj_quant.blocksize,
                 self.qkv_proj_quant.g_idx,
             )
-            m = query.shape[-1]
+            mq = query.shape[-1]
+            mk = key.shape[-1]
+            # Statice Cache needs to store the key and value in the applied space.
+            # Dynamic Cache will cat the new key and value, so that does not need inplace operation.
             if IPEXAttention.cache_type == "static":
                 if (
                     IPEXAttention.cache_format == CacheFormat.FBNH
                     and not self.beam_search_first_iter(hidden_states.shape[1])
                 ):
-                    query = qkv_out[:, :, :m].transpose(0, 1).contiguous()
-                    key.copy_(qkv_out[:, :, m : 2 * m].transpose(0, 1))
-                    value.copy_(qkv_out[:, :, 2 * m :].transpose(0, 1))
+                    query = qkv_out[:, :, :mq].transpose(0, 1).contiguous()
+                    key.copy_(qkv_out[:, :, mq : mq + mk].transpose(0, 1))
+                    value.copy_(qkv_out[:, :, mq + mk :].transpose(0, 1))
                 else:
-                    query = qkv_out[:, :, :m].contiguous()
-                    key.copy_(qkv_out[:, :, m : 2 * m])
-                    value.copy_(qkv_out[:, :, 2 * m :])
+                    query = qkv_out[:, :, :mq].contiguous()
+                    key.copy_(qkv_out[:, :, mq : mq + mk])
+                    value.copy_(qkv_out[:, :, mq + mk :])
             elif IPEXAttention.cache_type == "dynamic":
-                query = qkv_out[:, :, :m].contiguous()
-                key = qkv_out[:, :, m : 2 * m].contiguous()
-                value = qkv_out[:, :, 2 * m :].contiguous()
+                query = qkv_out[:, :, :mq].contiguous()
+                key = qkv_out[:, :, mq : mq + mk].contiguous()
+                value = qkv_out[:, :, mq + mk :].contiguous()
             return query, key, value
         else:
             query = torch.ops.torch_ipex.mm_bias_int4(
@@ -504,92 +473,3 @@ class IPEXAttentionInt4OneDNN(IPEXAttentionInt4):
                 return query, key, value
             elif IPEXAttention.cache_type == "dynamic":
                 return query, key_out, value_out
-
-
-class IPEXAttentionInt4Grouped(IPEXAttentionInt4):
-    def __init__(
-        self, config: IPEXTransformerConfig, layer_idx: Optional[int] = None
-    ) -> None:
-        super().__init__(config, layer_idx)
-        self.num_kv_head = config.num_key_value_head // self.tp_size
-        self.num_kv_group = self.num_attn_head // self.num_kv_head
-
-
-class IPEXAttentionInt4GroupedOneDNN(IPEXAttentionInt4OneDNN, IPEXAttentionInt4Grouped):
-    def __init__(
-        self, config: IPEXTransformerConfig, layer_idx: Optional[int] = None
-    ) -> None:
-        super().__init__(config, layer_idx)
-        self.num_kv_head = config.num_key_value_head // self.tp_size
-        self.num_kv_group = self.num_attn_head // self.num_kv_head
-
-    def cat_qkv(self):
-        pass
-
-    def compute_qkv_gemm(self, hidden_states, query, key, value):
-        if self.num_kv_group <= 1:
-            return super().compute_qkv_gemm(hidden_states, query, key, value)
-        if (
-            self.q_proj_quant.qweight is None
-            and self.qkv_proj_quant.qweight is not None
-        ):
-            qkv_out = torch.ops.torch_ipex.mm_bias_int4(
-                hidden_states,
-                self.qkv_proj_quant.qweight,
-                self.qkv_proj_quant.bias,
-                self.qkv_proj_quant.scales,
-                self.qkv_proj_quant.qzeros,
-                self.qkv_proj_quant.blocksize,
-                self.qkv_proj_quant.g_idx,
-            )
-            m_query = query.shape[-1]
-            m_key = key.shape[-1]
-            if IPEXAttention.cache_type == "static":
-                if (
-                    IPEXAttention.cache_format == CacheFormat.FBNH
-                    and not self.beam_search_first_iter(hidden_states.shape[1])
-                ):
-                    query = qkv_out[:, :, :m_query].transpose(0, 1).contiguous()
-                    key.copy_(qkv_out[:, :, m_query : m_query + m_key].transpose(0, 1))
-                    value.copy_(qkv_out[:, :, m_query + m_key :].transpose(0, 1))
-                else:
-                    query = qkv_out[:, :, :m_query].contiguous()
-                    key.copy_(qkv_out[:, :, m_query : m_query + m_key])
-                    value.copy_(qkv_out[:, :, m_query + m_key :])
-            if IPEXAttention.cache_type == "dynamic":
-                query = qkv_out[:, :, :m_query].contiguous()
-                key.copy_(qkv_out[:, :, m_query : m_query + m_key].contiguous())
-                value.copy_(qkv_out[:, :, m_query + m_key :].contiguous())
-        else:
-            query = torch.ops.torch_ipex.mm_bias_int4(
-                hidden_states,
-                self.q_proj_quant.qweight,
-                self.q_proj_quant.bias,
-                self.q_proj_quant.scales,
-                self.q_proj_quant.qzeros,
-                self.q_proj_quant.blocksize,
-                self.q_proj_quant.g_idx,
-            )
-            key.copy_(
-                torch.ops.torch_ipex.mm_bias_int4(
-                    hidden_states,
-                    self.k_proj_quant.qweight,
-                    self.k_proj_quant.bias,
-                    self.k_proj_quant.scales,
-                    self.k_proj_quant.qzeros,
-                    self.k_proj_quant.blocksize,
-                    self.k_proj_quant.g_idx,
-                )
-            )
-            value.copy_(
-                torch.ops.torch_ipex.mm_bias_int4(
-                    hidden_states,
-                    self.v_proj_quant.qweight,
-                    self.v_proj_quant.bias,
-                    self.v_proj_quant.scales,
-                    self.v_proj_quant.qzeros,
-                    self.v_proj_quant.blocksize,
-                    self.v_proj_quant.g_idx,
-                )
-            )
-        return query, key, value
