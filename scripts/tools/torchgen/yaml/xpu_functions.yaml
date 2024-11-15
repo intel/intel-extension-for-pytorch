@@ -24,10 +24,10 @@ supported:
 # - glu_backward.grad_input
 # - index_select
 # - index_select.out
-# - sort
-# - sort.stable
-# - sort.values
-# - sort.values_stable
+  - sort
+  - sort.stable
+  - sort.values
+  - sort.values_stable
 ################## override below ops due to performance issues
 # - convolution_overrideable
 # - convolution_backward_overrideable
