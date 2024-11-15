@@ -23,6 +23,10 @@ from .chatglm import (
     GLMTransformer_forward,
     GLMModel_forward,
 )
+from .opt import (
+    IPEXOPTDecoder_forward,
+    OPT_prepare_inputs_for_generation,
+)
 
 
 class IPEXLLMResourceContrainer:
@@ -63,6 +67,11 @@ def opt_forward_hook(model):
 
     if type(model) == transformers.models.opt.modeling_opt.OPTForCausalLM:
         pad_for_gptj_lm_head(model, is_int4(model))
+        model.prepare_inputs_for_generation = partial(
+            OPT_prepare_inputs_for_generation, model
+        )
+    if type(model) == transformers.models.opt.modeling_opt.OPTDecoder:
+        model.forward = partial(IPEXOPTDecoder_forward, model)
 
 
 def falcon_forward_hook(model):
@@ -1948,6 +1957,7 @@ IPEX_STATIC_CACHE_MODEL_LIST = [
     "ChatGLMForConditionalGeneration",
     "GPTJForCausalLM",
     "Qwen2ForCausalLM",
+    "OPTForCausalLM",
 ]
 
 
