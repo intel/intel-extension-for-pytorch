@@ -99,6 +99,16 @@ struct get_packed_num {
 };
 
 template <>
+struct get_packed_num<int4x2> {
+  static constexpr uint32_t value = 2;
+};
+
+template <>
+struct get_packed_num<int4x8> {
+  static constexpr uint32_t value = 8;
+};
+
+template <>
 struct get_packed_num<mx_fp4> {
   static constexpr uint32_t value = 2;
 };
@@ -151,6 +161,17 @@ struct is_integral {
 };
 template <typename T>
 inline constexpr bool is_integral_v = is_integral<T>::value;
+
+/// @brief Used to check if the type is int4.
+/// @tparam T is the data type
+template <typename T>
+struct is_int4 {
+  static constexpr bool value =
+      std::is_same<remove_const_t<T>, int4x2>::value ||
+      std::is_same<remove_const_t<T>, int4x8>::value;
+};
+template <typename T>
+inline constexpr bool is_int4_v = is_int4<T>::value;
 
 /// @brief Set the native data type of T
 /// @tparam T is the data type

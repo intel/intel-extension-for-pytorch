@@ -875,14 +875,13 @@ class paged_attention_kernel {
   }
 
   // Helper function to get the nd_range.
-  static sycl::nd_range<3> get_nd_range(
+  static inline sycl::nd_range<3> get_nd_range(
       uint32_t num_seqs,
       uint32_t num_heads,
       uint32_t max_num_partitions) {
-    sycl::range<3> local_range = sycl::range<3>{1, 1, wg_size};
+    static const sycl::range<3> local_range = sycl::range<3>{1, 1, wg_size};
     sycl::range<3> group_range =
         sycl::range<3>{num_heads, num_seqs, max_num_partitions};
-
     return sycl::nd_range<3>{group_range * local_range, local_range};
   };
 
@@ -1330,10 +1329,11 @@ class paged_attention_reduce {
   }
 
   // Helper function to get the nd_range.
-  static sycl::nd_range<3> get_nd_range(uint32_t num_seqs, uint32_t num_heads) {
-    sycl::range<3> local_range = sycl::range<3>{1, 1, wg_size};
+  static inline sycl::nd_range<3> get_nd_range(
+      uint32_t num_seqs,
+      uint32_t num_heads) {
+    static const sycl::range<3> local_range = sycl::range<3>{1, 1, wg_size};
     sycl::range<3> group_range = sycl::range<3>{num_seqs, num_heads, 1};
-
     return sycl::nd_range<3>{group_range * local_range, local_range};
   };
 

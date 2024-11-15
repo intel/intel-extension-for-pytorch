@@ -10,6 +10,11 @@
 #include "XeGemm.h"
 #endif
 
+#define RECORD_ONEDNN_FUNCTION_IMPL(F)                     \
+  char str__[100];                                         \
+  sprintf(str__, "onednn_%s(%d, %d, %d)", "" #F, m, n, k); \
+  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -34,20 +39,22 @@ Tensor& addmm_out(
       mat1.dtype(),
       " != ",
       mat2.dtype())
-  TORCH_CHECK(
-      mat1.sizes()[1] == mat2.sizes()[0],
-      "mat1 and mat2 shapes cannot be multiplied (",
-      mat1.sizes()[0],
-      "x",
-      mat1.sizes()[1],
-      " and ",
-      mat2.sizes()[0],
-      "x",
-      mat2.sizes()[1],
-      ")");
+
   int m = mat1.sizes()[0];
   int n = mat2.sizes()[1];
   int k = mat2.sizes()[0];
+
+  TORCH_CHECK(
+      mat1.sizes()[1] == k,
+      "mat1 and mat2 shapes cannot be multiplied (",
+      m,
+      "x",
+      mat1.sizes()[1],
+      " and ",
+      k,
+      "x",
+      n,
+      ")");
 
   std::vector<int64_t> result_shape = {mat1.size(0), mat2.size(1)};
   result.resize_(result_shape);
@@ -91,44 +98,29 @@ Tensor& addmm_out(
 #endif
   }
 
-  DeviceId curDevID = at::xpu::current_device();
-  bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
-
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
-  torch_ipex::xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, self, mat1, mat2);
-  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
-  bool xetla_valid = fp64_valid && compute_eng_valid;
-  if (dpcppGetDeviceHasXMX()) {
+  if (hgemm_xetla_valid(mat1, mat2, self)) {
+    gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_xetla_current_arch_tag();
     if (alpha.to<float>() == 1.f && self.dim() == 1) {
+      HGEMM_XETLA<1> hgemm_bias(arch_tag);
       auto policy =
-          HGEMM_XETLA()
-              .add_matrix_c(result)
-              .add_matrix_a(mat1)
-              .add_matrix_b(mat2)
-              .add_epilogue(
-                  self, HGEMM_XETLA::EpilogueType::BIAS, beta.to<float>())
+          hgemm_bias.add_operands(result, mat1, mat2)
+              .add_epilogue(self, EpilogueType::BIAS, beta.to<float>())
               .build();
-      if (xetla_valid && policy.valid()) {
-        auto status = policy.run();
-        if (status == torch_ipex::xpu::xetla::GemmStatus::kSuccess)
+      if (policy.valid()) {
+        if (policy.run() == torch_ipex::xpu::xetla::GemmStatus::kSuccess)
           return result;
       }
     } else if (
         self.dim() == 2 && self.sizes()[0] == mat1.sizes()[0] &&
         self.sizes()[1] == mat2.sizes()[1]) {
+      HGEMM_XETLA<1> hgemm_res(arch_tag);
       auto policy =
-          HGEMM_XETLA()
-              .add_alpha(alpha.to<float>())
-              .add_matrix_c(result)
-              .add_matrix_a(mat1)
-              .add_matrix_b(mat2)
-              .add_epilogue(
-                  self, HGEMM_XETLA::EpilogueType::RES_ADD, beta.to<float>())
+          hgemm_res.add_operands(result, mat1, mat2, alpha.to<float>())
+              .add_epilogue(self, EpilogueType::RES_ADD, beta.to<float>())
               .build();
-      if (xetla_valid && policy.valid()) {
-        auto status = policy.run();
-        if (status == torch_ipex::xpu::xetla::GemmStatus::kSuccess)
+      if (policy.valid()) {
+        if (policy.run() == torch_ipex::xpu::xetla::GemmStatus::kSuccess)
           return result;
       }
     }
@@ -136,9 +128,7 @@ Tensor& addmm_out(
 #endif
 
   // general case
-  char str__[100];
-  sprintf(str__, "onednn_addmm(%d, %d, %d)", m, n, k);
-  RECORD_FUNCTION(str__, c10::ArrayRef<c10::IValue>({}));
+  RECORD_ONEDNN_FUNCTION_IMPL(addmm)
   Tensor bias = at::Tensor();
   Attr attr;
   float beta_ = beta.to<float>();
@@ -196,16 +186,20 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
       self.dtype(),
       " != ",
       mat2.dtype())
+
+  int m = self.sizes()[0];
+  int n = mat2.sizes()[1];
+  int k = mat2.sizes()[0];
   TORCH_CHECK(
-      self.sizes()[1] == mat2.sizes()[0],
+      self.sizes()[1] == k,
       "mat1 and mat2 shapes cannot be multiplied (",
-      self.sizes()[0],
+      m,
       "x",
       self.sizes()[1],
       " and ",
-      mat2.sizes()[0],
+      k,
       "x",
-      mat2.sizes()[1],
+      n,
       ")");
 
   result.resize_({self.size(0), mat2.size(1)});
@@ -225,28 +219,19 @@ Tensor& mm_out(const Tensor& self, const Tensor& mat2, Tensor& result) {
 #endif
   }
 
-  DeviceId curDevID = at::xpu::current_device();
-  bool fp64_valid = Settings::I().has_2d_block_array(curDevID);
-
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
-  torch_ipex::xpu::COMPUTE_ENG real_eng =
-      choose_compute_eng(torch_ipex::xpu::COMPUTE_ENG::XETLA, self, mat2);
-  bool compute_eng_valid = (real_eng == torch_ipex::xpu::COMPUTE_ENG::XETLA);
-  bool xetla_valid = fp64_valid && compute_eng_valid;
-  if (dpcppGetDeviceHasXMX()) {
-    auto policy = HGEMM_XETLA()
-                      .add_matrix_c(result)
-                      .add_matrix_a(self)
-                      .add_matrix_b(mat2)
-                      .build();
-    if (xetla_valid && policy.valid()) {
-      auto status = policy.run();
-      if (status == torch_ipex::xpu::xetla::GemmStatus::kSuccess)
+  if (hgemm_xetla_valid(self, mat2)) {
+    gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_xetla_current_arch_tag();
+    HGEMM_XETLA<0> hgemm_common(arch_tag);
+    auto policy = hgemm_common.add_operands(result, self, mat2).build();
+    if (policy.valid()) {
+      if (policy.run() == torch_ipex::xpu::xetla::GemmStatus::kSuccess)
         return result;
     }
   }
 #endif
 
+  RECORD_ONEDNN_FUNCTION_IMPL(mm_out)
   torch_ipex::xpu::oneDNN::matmul(
       result, self, mat2, at::Tensor(), true, Attr());
   return result;

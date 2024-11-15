@@ -67,7 +67,7 @@ static void mm_qkv_out_wint4(
         weight.scalar_type() == kQUInt8 || weight.scalar_type() == kByte ||
         weight.scalar_type() == kChar || weight.scalar_type() == kInt)
 
-    static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
+    gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_xetla_current_arch_tag();
     auto policy = HGEMMXetla_INT4()
                       .add_matrix_out(out0)
                       .add_matrix_out(out1)
@@ -300,7 +300,7 @@ static inline HGEMMXetla_INT4 mlp_mul_dispatch(
       gate_up_wei.scalar_type() == kQUInt8 ||
       gate_up_wei.scalar_type() == kInt);
 
-  static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
+  gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_xetla_current_arch_tag();
   auto dispatcher = HGEMMXetla_INT4()
                         .add_matrix_out(*output)
                         .add_matrix_inp(input)
@@ -511,7 +511,7 @@ static inline HGEMMXetla_INT4 mm_int4_dispatch(
   int n = weight_flat.sizes()[0];
   *output = output->defined() ? output->flatten(0, -2)
                               : at::empty({m, n}, input.options());
-  static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
+  gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_xetla_current_arch_tag();
   auto dispatcher = HGEMMXetla_INT4()
                         .add_matrix_out(*output)
                         .add_matrix_inp(input_flat)
@@ -1194,7 +1194,7 @@ Tensor _weight_int4pack_mm(
   auto q_zeros = q_scale_and_zeros_vec[1].reshape({-1, N}).contiguous();
   TORCH_CHECK(A.dim() == 2 && b_recast.dim() == 2);
 
-  static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
+  gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_xetla_current_arch_tag();
   auto policy = HGEMMXetla_INT4()
                     .add_matrix_out(C)
                     .add_matrix_inp(A)

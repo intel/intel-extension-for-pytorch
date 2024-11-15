@@ -1,26 +1,22 @@
+#ifdef USE_XETLA_XE_HPC
+
 #pragma once
-#include <sycl/sycl.hpp>
-#include "xetla_kernel_api.h"
+#include "../../xetla_kernel_api.h"
 
-namespace torch_ipex::xpu::xetla {
+namespace torch_ipex::xpu::xetla::xehpc {
 
-enum class GemmStatus { kSuccess, kError };
-
-XETLA_KERNEL_API int hgemm_find_policy_id(
+int hgemm_find_policy_id(
     const int m,
     const int n,
     const int k,
-    const bool is_b_row_major,
-    const gpu::xetla::gpu_arch arch_tag);
-
-XETLA_KERNEL_API int hgemm_qkv_find_policy_id(
+    const bool is_b_row_major);
+int hgemm_qkv_find_policy_id(
     const int m,
     const int n,
     const int k,
-    const bool is_b_row_major,
-    const gpu::xetla::gpu_arch arch_tag);
+    const bool is_b_row_major);
 
-XETLA_KERNEL_API cgfs_t hgemm_addmm(
+cgfs_t hgemm_addmm(
     const int policy_id,
     sycl::half* out,
     const sycl::half* res,
@@ -32,10 +28,9 @@ XETLA_KERNEL_API cgfs_t hgemm_addmm(
     const int n,
     const int k,
     const float alpha,
-    const float beta,
-    const gpu::xetla::gpu_arch arch_tag);
+    const float beta);
 
-XETLA_KERNEL_API cgfs_t hgemm_common(
+cgfs_t hgemm_common(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -44,10 +39,9 @@ XETLA_KERNEL_API cgfs_t hgemm_common(
     uint32_t* cnt_ptr,
     const int m,
     const int n,
-    const int k,
-    const gpu::xetla::gpu_arch arch_tag);
+    const int k);
 
-XETLA_KERNEL_API cgfs_t hgemm_res(
+cgfs_t hgemm_res(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -58,10 +52,9 @@ XETLA_KERNEL_API cgfs_t hgemm_res(
     const int m,
     const int n,
     const int k,
-    const float res_factor,
-    const gpu::xetla::gpu_arch arch_tag);
+    const float res_factor);
 
-XETLA_KERNEL_API cgfs_t hgemm_res_res(
+cgfs_t hgemm_res_res(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -74,10 +67,9 @@ XETLA_KERNEL_API cgfs_t hgemm_res_res(
     const int n,
     const int k,
     const float res0_factor,
-    const float res1_factor,
-    const gpu::xetla::gpu_arch arch_tag);
+    const float res1_factor);
 
-XETLA_KERNEL_API cgfs_t hgemm_bias(
+cgfs_t hgemm_bias(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -88,10 +80,9 @@ XETLA_KERNEL_API cgfs_t hgemm_bias(
     const int m,
     const int n,
     const int k,
-    const float bias_factor,
-    const gpu::xetla::gpu_arch arch_tag);
+    const float bias_factor);
 
-XETLA_KERNEL_API cgfs_t hgemm_bias_res(
+cgfs_t hgemm_bias_res(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -104,10 +95,9 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_res(
     const int n,
     const int k,
     const float bias_factor,
-    const float res_factor,
-    const gpu::xetla::gpu_arch arch_tag);
+    const float res_factor);
 
-XETLA_KERNEL_API cgfs_t hgemm_bias_res_res(
+cgfs_t hgemm_bias_res_res(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -122,10 +112,9 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_res_res(
     const int k,
     const float bias_factor,
     const float res0_factor,
-    const float res1_factor,
-    const gpu::xetla::gpu_arch arch_tag);
+    const float res1_factor);
 
-XETLA_KERNEL_API cgfs_t hgemm_bias_relu(
+cgfs_t hgemm_bias_relu(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -136,10 +125,9 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_relu(
     const int m,
     const int n,
     const int k,
-    const float bias_factor,
-    const gpu::xetla::gpu_arch arch_tag);
+    const float bias_factor);
 
-XETLA_KERNEL_API cgfs_t hgemm_bias_gelu(
+cgfs_t hgemm_bias_gelu(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -150,10 +138,9 @@ XETLA_KERNEL_API cgfs_t hgemm_bias_gelu(
     const int m,
     const int n,
     const int k,
-    const float bias_factor,
-    const gpu::xetla::gpu_arch arch_tag);
+    const float bias_factor);
 
-XETLA_KERNEL_API cgfs_t hgemm_resmul(
+cgfs_t hgemm_resmul(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -163,10 +150,9 @@ XETLA_KERNEL_API cgfs_t hgemm_resmul(
     uint32_t* cnt_ptr,
     const int m,
     const int n,
-    const int k,
-    const gpu::xetla::gpu_arch arch_tag);
+    const int k);
 
-XETLA_KERNEL_API cgfs_t hgemm_silu(
+cgfs_t hgemm_silu(
     const int policy_id,
     sycl::half* out,
     const sycl::half* a,
@@ -175,10 +161,9 @@ XETLA_KERNEL_API cgfs_t hgemm_silu(
     uint32_t* cnt_ptr,
     const int m,
     const int n,
-    const int k,
-    const gpu::xetla::gpu_arch arch_tag);
+    const int k);
 
-XETLA_KERNEL_API cgfs_t hgemm_qkv(
+cgfs_t hgemm_qkv(
     const int policy_id,
     sycl::half* out0,
     sycl::half* out1,
@@ -189,10 +174,9 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv(
     uint32_t* cnt_ptr,
     const int m,
     const int n,
-    const int k,
-    const gpu::xetla::gpu_arch arch_tag);
+    const int k);
 
-XETLA_KERNEL_API cgfs_t hgemm_qkv_bias(
+cgfs_t hgemm_qkv_bias(
     const int policy_id,
     sycl::half* out0,
     sycl::half* out1,
@@ -204,10 +188,9 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv_bias(
     uint32_t* cnt_ptr,
     const int m,
     const int n,
-    const int k,
-    const gpu::xetla::gpu_arch arch_tag);
+    const int k);
 
-XETLA_KERNEL_API cgfs_t hgemm_qkv_group(
+cgfs_t hgemm_qkv_group(
     const int policy_id,
     sycl::half* out0,
     sycl::half* out1,
@@ -221,10 +204,9 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv_group(
     const int k,
     const int num_kv_head,
     const int group,
-    const int head_dim,
-    const gpu::xetla::gpu_arch arch_tag);
+    const int head_dim);
 
-XETLA_KERNEL_API cgfs_t hgemm_qkv_group_bias(
+cgfs_t hgemm_qkv_group_bias(
     const int policy_id,
     sycl::half* out0,
     sycl::half* out1,
@@ -239,7 +221,8 @@ XETLA_KERNEL_API cgfs_t hgemm_qkv_group_bias(
     const int k,
     const int num_kv_head,
     const int group,
-    const int head_dim,
-    const gpu::xetla::gpu_arch arch_tag);
+    const int head_dim);
 
-} // namespace torch_ipex::xpu::xetla
+} // namespace torch_ipex::xpu::xetla::xehpc
+
+#endif

@@ -77,10 +77,10 @@ class fmha_forward_v2_t {
 
   /// @brief Helper function to get the nd_range under the Fmha policy.
   /// @return Expected nd_range.
-  static sycl::nd_range<3> get_nd_range(
+  static inline sycl::nd_range<3> get_nd_range(
       uint32_t num_batch,
       uint32_t num_heads) {
-    sycl::range<3> local_range = sycl::range<3>{1, 1, sg_num};
+    static const sycl::range<3> local_range = sycl::range<3>{1, 1, sg_num};
     sycl::range<3> group_range{num_batch, num_heads, 1};
     return sycl::nd_range<3>{group_range * local_range, local_range};
   };

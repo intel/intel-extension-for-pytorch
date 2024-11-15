@@ -139,6 +139,13 @@ class gemm_universal_t<
 
   static constexpr uint32_t counter_size = 8;
 
+  static constexpr uint32_t local_range_m =
+      (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
+  static constexpr uint32_t local_range_n =
+      (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
+  static_assert(
+      local_range_m * local_range_n * num_local_kslicing <=
+      arch_attr_t<arch_tag>::thread_per_wg);
   using tile_shape_cnt = group::tile_shape_t<
       ks_coop_num_x * wg_size_x,
       ks_coop_num_y * wg_size_y,
@@ -447,16 +454,15 @@ class gemm_universal_t<
   /// @brief Host helper function to get the expected local range under the
   /// current GEMM config.
   /// @return Expected local range.
-  static cl::sycl::range<3> get_local_range() {
-    uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
-    uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
+  static inline const cl::sycl::range<3> get_local_range() {
     XETLA_PRINTF(
         "Local range: {%d, %d, %d}",
         num_local_kslicing,
         local_range_m,
         local_range_n);
-    assert(local_range_m * local_range_n * num_local_kslicing <= 32);
-    return cl::sycl::range<3>{num_local_kslicing, local_range_m, local_range_n};
+    static const cl::sycl::range<3> local_range =
+        cl::sycl::range<3>{num_local_kslicing, local_range_m, local_range_n};
+    return local_range;
   };
 
   /// @brief Host helper function to get the expected group range under the
@@ -466,7 +472,7 @@ class gemm_universal_t<
   /// @param matrix_n Is the size of the n dimension of the matrix
   /// multiplication (m x k x n).
   /// @return Expected group range.
-  static cl::sycl::range<3> get_group_range(
+  static inline cl::sycl::range<3> get_group_range(
       uint32_t matrix_m,
       uint32_t matrix_n) {
     uint32_t group_range_m = (matrix_m + wg_tile_m - 1) / wg_tile_m;
@@ -487,8 +493,9 @@ class gemm_universal_t<
   /// variables.
   /// @return Expected nd_range.
   template <quant_mode quant_mode>
-  static cl::sycl::nd_range<3> get_nd_range(arguments_t<quant_mode>& args) {
-    cl::sycl::range<3> local_range = get_local_range();
+  static inline cl::sycl::nd_range<3> get_nd_range(
+      arguments_t<quant_mode>& args) {
+    const cl::sycl::range<3> local_range = get_local_range();
     cl::sycl::range<3> group_range =
         get_group_range(args.matrix_m, args.matrix_n);
     return cl::sycl::nd_range<3>{group_range * local_range, local_range};

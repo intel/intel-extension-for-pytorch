@@ -182,7 +182,9 @@ class fmha_forward_t {
   static_assert(
       kHm / kSgHm == kBc / kSgBc,
       "wg_size_x must be the same between Hm and Bc");
-  static_assert(wg_size <= 32, "The number of threads should be less than 32!");
+  static_assert(
+      wg_size <= arch_attr_t<arch_tag>::thread_per_wg,
+      "The number of threads should be less than threads in one workgroup!");
 
   // --------------------- // Memory desc // ---------------------- //
   // suffix: L -> local; T -> transpose
@@ -375,7 +377,7 @@ class fmha_forward_t {
             args.V_ptr,
             {end_y, end_x, b_stride * args.uB},
             {start_acc, start_x});
-      } else if (kVarlen) {
+      } else if constexpr (kVarlen) {
         int32_t start_x = startT + args.cu_seqlen_k[batch_id];
         uint32_t end_x = start_x + kBc;
         int32_t limit_x = args.cu_seqlen_k[batch_id + 1];
@@ -947,11 +949,12 @@ class fmha_forward_t {
 
   /// @brief Helper function to get the nd_range under the Fmha policy.
   /// @return Expected nd_range.
-  static sycl::nd_range<3> get_nd_range(
+  static inline sycl::nd_range<3> get_nd_range(
       uint32_t total_batches,
       uint32_t num_queries) {
     // local range
-    sycl::range<3> local_range = sycl::range<3>{1, wg_size_y, wg_size_x};
+    static const sycl::range<3> local_range =
+        sycl::range<3>{1, wg_size_y, wg_size_x};
     // group range
     uint32_t group_range_m = (num_queries + kBr - 1) / kBr;
     sycl::range<3> group_range{total_batches, group_range_m, 1};

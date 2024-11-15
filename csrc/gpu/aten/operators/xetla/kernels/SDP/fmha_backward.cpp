@@ -159,7 +159,9 @@ class fmha_backward_t {
   static_assert(
       kBr / kSgBr == kBc / kBcHm_SgBc,
       "wg_size_y must be the same between Br and Bc_M");
-  static_assert(wg_size <= 32, "The number of threads should be less than 32!");
+  static_assert(
+      wg_size <= arch_attr_t<arch_tag>::thread_per_wg,
+      "The number of threads should be less than threads in one workgroup!");
 
   // --------------------- // Memory desc // ---------------------- //
   // suffix: L -> local; T -> transpose
@@ -949,9 +951,10 @@ class fmha_backward_t {
 
   /// @brief Helper function to get the nd_range under the Fmha policy.
   /// @return Expected nd_range.
-  static sycl::nd_range<3> get_nd_range(uint32_t total_batches) {
+  static inline sycl::nd_range<3> get_nd_range(uint32_t total_batches) {
     // local range
-    sycl::range<3> local_range = sycl::range<3>{1, wg_size_y, wg_size_x};
+    static const sycl::range<3> local_range =
+        sycl::range<3>{1, wg_size_y, wg_size_x};
     // group range
     sycl::range<3> group_range = sycl::range<3>{total_batches, 1, 1};
     return sycl::nd_range<3>{group_range * local_range, local_range};

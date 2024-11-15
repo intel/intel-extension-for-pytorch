@@ -5,10 +5,11 @@
 #include "include/common/core/arch_config.hpp"
 
 namespace gpu::xetla {
-static inline gpu_arch get_device_gpu_arch(at::DeviceIndex device_id = 0) {
+static inline gpu_arch get_device_gpu_arch() {
   using namespace sycl::ext;
   using namespace sycl::ext::oneapi;
 
+  at::DeviceIndex device_id = at::xpu::current_device();
   sycl::device& device = at::xpu::get_raw_device(device_id);
   auto deviceArch = device.get_info<experimental::info::device::architecture>();
   switch (deviceArch) {
@@ -49,6 +50,11 @@ static inline gpu_arch get_device_gpu_arch(at::DeviceIndex device_id = 0) {
 #endif
 
   return gpu_arch::XeLpg;
+}
+
+static inline gpu_arch get_xetla_current_arch_tag() {
+  static gpu_arch arch_tag = get_device_gpu_arch();
+  return arch_tag;
 }
 
 } // namespace gpu::xetla

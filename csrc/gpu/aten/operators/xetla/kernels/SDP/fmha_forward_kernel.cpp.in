@@ -94,8 +94,9 @@ cgfs_t xetla_fmha_forward_kernel(const dispatch_fmha_forward_args_t<T>& args) {
     FmhaForwardKernelFunctor<fmha_forward_op_t, T, kUseV2> kfn(args);
     return {[=](sycl::handler& cgh) { cgh.parallel_for(NdRange, kfn); }};
   } else {
+    static constexpr uint32_t sg_num = arch_attr_t<arch_tag>::thread_per_wg;
     using fmha_forward_op_t =
-        fmha_forward_v2_t<T, arch_tag, 64, fmha_policy::value, kUseBias>;
+        fmha_forward_v2_t<T, arch_tag, sg_num, fmha_policy::value, kUseBias>;
 
     sycl::nd_range<3> NdRange =
         fmha_forward_op_t::get_nd_range(args.num_batches, args.num_heads);

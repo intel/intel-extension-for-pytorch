@@ -49,25 +49,29 @@ struct load_store_has_block2d_attr_base_t {
 template <>
 struct load_store_attr_t<msg_type::block_2d, gpu_arch::XeHpc>
     : public load_store_has_block2d_attr_base_t {
-  static constexpr uint32_t alignment_in_bytes = 16;
+  static constexpr uint32_t alignment_in_bytes = 8;
+  static constexpr uint32_t base_align_in_bytes = 64;
 };
 
 template <>
 struct load_store_attr_t<msg_type::block_2d, gpu_arch::XeHpc_vg>
     : public load_store_has_block2d_attr_base_t {
-  static constexpr uint32_t alignment_in_bytes = 16;
+  static constexpr uint32_t alignment_in_bytes = 8;
+  static constexpr uint32_t base_align_in_bytes = 64;
 };
 
 template <>
 struct load_store_attr_t<msg_type::block_2d, gpu_arch::Xe2Hpg>
     : public load_store_has_block2d_attr_base_t {
   static constexpr uint32_t alignment_in_bytes = 4;
+  static constexpr uint32_t base_align_in_bytes = 4;
 };
 
 template <>
 struct load_store_attr_t<msg_type::block_2d, gpu_arch::Xe2Lpg>
     : public load_store_has_block2d_attr_base_t {
   static constexpr uint32_t alignment_in_bytes = 4;
+  static constexpr uint32_t base_align_in_bytes = 4;
 };
 
 struct load_store_no_block2d_attr_base_t {
@@ -288,18 +292,36 @@ struct lm_attr_t<gpu_arch::XeLpg> {
 
 /// work group attr
 template <gpu_arch arch_tag>
-struct wg_attr_t {
+struct wg_attr_t {};
+
+template <>
+struct wg_attr_t<gpu_arch::XeLpg> {
+  static constexpr uint32_t max_wg_num = 8;
+  static constexpr uint32_t core_per_ss = 16;
+};
+
+template <>
+struct wg_attr_t<gpu_arch::XeHpg> {
+  static constexpr uint32_t max_wg_num = 32;
+  static constexpr uint32_t core_per_ss = 16;
+};
+
+template <>
+struct wg_attr_t<gpu_arch::XeHpc> {
   static constexpr uint32_t max_wg_num = 64;
+  static constexpr uint32_t core_per_ss = 8;
 };
 
 template <>
 struct wg_attr_t<gpu_arch::Xe2Lpg> {
   static constexpr uint32_t max_wg_num = 8;
+  static constexpr uint32_t core_per_ss = 8;
 };
 
 template <>
 struct wg_attr_t<gpu_arch::Xe2Hpg> {
   static constexpr uint32_t max_wg_num = 40;
+  static constexpr uint32_t core_per_ss = 8;
 };
 
 /// arch attr
@@ -315,7 +337,11 @@ struct arch_attr_t {
 
   static constexpr uint32_t local_mem_size =
       lm_attr_t<arch_tag>::local_mem_size;
+
   static constexpr uint32_t max_wg_num = wg_attr_t<arch_tag>::max_wg_num;
+  static constexpr uint32_t thread_per_wg = (GRF == grf_mode::normal_grf)
+      ? wg_attr_t<arch_tag>::core_per_ss * 8
+      : wg_attr_t<arch_tag>::core_per_ss * 4;
 };
 
 /// @} xetla_core_arch_config

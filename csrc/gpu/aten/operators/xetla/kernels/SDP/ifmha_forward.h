@@ -1086,11 +1086,12 @@ class ifmha_forward_t {
 
   /// @brief Helper function to get the nd_range under the ifmha policy.
   /// @return Expected nd_range.
-  static sycl::nd_range<2> get_nd_range(
+  static inline sycl::nd_range<2> get_nd_range(
       uint32_t num_batches,
       uint32_t num_beams,
       uint32_t num_heads) {
-    sycl::range<2> local_range = sycl::range<2>{num_beams, wg_size_x};
+    static const sycl::range<2> local_range =
+        sycl::range<2>{num_beams, wg_size_x};
     sycl::range<2> group_range = sycl::range<2>{num_batches, num_heads};
 
     return sycl::nd_range<2>{group_range * local_range, local_range};

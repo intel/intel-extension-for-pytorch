@@ -62,6 +62,12 @@ class gemm_universal_t<
   // tile_k used in GEMMs
   static constexpr uint32_t k_stride = gemm_t::k_stride;
 
+  static constexpr uint32_t local_range_m =
+      (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
+  static constexpr uint32_t local_range_n =
+      (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
+  static_assert(
+      local_range_m * local_range_n <= arch_attr_t<arch_tag>::thread_per_wg);
   using work_group_t = typename gemm_t::work_group_t;
 
   static_assert(arch_tag == gemm_t::arch_tag, "arch_tag should be the same");
@@ -255,21 +261,18 @@ class gemm_universal_t<
   /// @brief Host helper function to get the expected local range under the
   /// current GEMM config.
   /// @return Expected local range.
-  static cl::sycl::range<3> get_local_range() {
-    uint32_t local_range_m = (wg_tile_m + sg_tile_m - 1) / sg_tile_m;
-    uint32_t local_range_n = (wg_tile_n + sg_tile_n - 1) / sg_tile_n;
-    std::cout << "Local range: {" << 1 << ", " << local_range_m << ", "
-              << local_range_n << "} \n";
-    assert(local_range_m * local_range_n <= 32);
+  static inline const cl::sycl::range<3> get_local_range() {
     // Linearize for stream_k algorithm
-    return cl::sycl::range<3>{1, 1, local_range_m * local_range_n};
+    static const cl::sycl::range<3> local_range =
+        cl::sycl::range<3>{1, 1, local_range_m * local_range_n};
+    return local_range;
   };
 
   /// @brief Host helper function to get the expected nd_range under the current
   /// GEMM config.
   /// @return Expected nd_range.
-  static cl::sycl::nd_range<3> get_nd_range(arguments_t& args) {
-    cl::sycl::range<3> local_range = get_local_range();
+  static inline cl::sycl::nd_range<3> get_nd_range(arguments_t& args) {
+    const cl::sycl::range<3> local_range = get_local_range();
     cl::sycl::range<3> group_range = args.stream_k_args.get_group_range();
     return cl::sycl::nd_range<3>{group_range * local_range, local_range};
   };
