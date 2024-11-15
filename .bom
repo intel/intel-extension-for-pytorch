@@ -74,6 +74,7 @@ python-idna
 scipy
 TorchDynamo
 gperftools
+google-perftools
 numpy
 PyBind11
 open-mpi
@@ -150,3 +151,14 @@ typing-extensions
 unidiff
 soundfile
 openjdk
+tritonserver
+configargparse
+tritonclient
+vim
+make
+openssh-server
+net-tools
+python3-div
+python3-venv
+gcc-12
+g++-12
