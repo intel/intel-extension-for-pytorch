@@ -9,6 +9,7 @@ import time
 from argparse import ArgumentParser
 from pathlib import Path
 import torch
+import re
 
 import deepspeed
 from deepspeed.accelerator import get_accelerator
@@ -156,7 +157,7 @@ def get_repo_root(model_name_or_path):
             model_name_or_path,
             local_files_only=is_offline_mode(),
             cache_dir=os.getenv("TRANSFORMERS_CACHE", None),
-            ignore_patterns=["*.safetensors", "*.msgpack", "*.h5"],
+            ignore_patterns=["*.msgpack", "*.h5"],
             resume_download=True,
         )
 
@@ -166,7 +167,7 @@ def get_repo_root(model_name_or_path):
         model_name_or_path,
         local_files_only=is_offline_mode(),
         cache_dir=os.getenv("TRANSFORMERS_CACHE", None),
-        ignore_patterns=["*.safetensors", "*.msgpack", "*.h5"],
+        ignore_patterns=["*.msgpack", "*.h5"],
         resume_download=True,
     )
 
@@ -174,9 +175,15 @@ def get_repo_root(model_name_or_path):
 def get_checkpoint_files(model_name_or_path):
     cached_repo_dir = get_repo_root(model_name_or_path)
 
-    # extensions: .bin | .pt
+    # extensions: .bin | .pt | .safetensors
     # creates a list of paths from all downloaded files in cache dir
-    file_list = [str(entry) for entry in Path(cached_repo_dir).rglob("*.[bp][it][n]") if entry.is_file()]
+    file_list = list()
+    pattern_sample = re.compile(r'(.*).(safetensors|bin|pt)$')
+    for entry in Path(cached_repo_dir).rglob("*"):
+        match = re.match(pattern=pattern_sample, string=str(entry))
+        if match:
+            file_list.append(str(entry))
+
     return file_list
 
 
