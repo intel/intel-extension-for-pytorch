@@ -669,13 +669,6 @@ std::tuple<Tensor, Tensor> std_mean(
       "std_mean", result1, result2, self, _dim, _correction, keepdim, true);
 }
 
-Tensor view_as_real(const at::Tensor& self) {
-  return at::native::view_as_real(self);
-}
-
-Tensor view_as_complex(const Tensor& self) {
-  return at::native::view_as_complex(self);
-}
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {

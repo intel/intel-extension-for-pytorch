@@ -16,10 +16,6 @@ Tensor as_strided(
   return at::native::as_strided_tensorimpl(self, size, stride, storage_offset);
 }
 
-Tensor view(const Tensor& self, IntArrayRef size) {
-  return at::native::view(self, size);
-}
-
 Tensor unfold(
     const Tensor& self,
     int64_t dimension,
