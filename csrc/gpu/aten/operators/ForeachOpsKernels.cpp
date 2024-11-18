@@ -217,7 +217,6 @@ NUM_OP(floating_complex_half_bfloat16, log, Log);
 NUM_OP(floating_complex_half_bfloat16, log10, Log10);
 NUM_OP(floating_complex_half_bfloat16, log2, Log2);
 NUM_OP(floating_complex_half_bfloat16, cos, Cos);
-NUM_OP(floating_complex_half_bfloat16, sqrt, Sqrt);
 
 NUM_OP(floating_half_bfloat16, log1p, Log1p);
 NUM_OP(floating_half_bfloat16, erf, Erf);

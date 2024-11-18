@@ -217,22 +217,9 @@ std::vector<Tensor> all_types_complex_half_bfloat16(
 
 FOREACH_BINARY_OP_LIST_ALPHA(
     all_types_complex_bool_half_bfloat16,
-    add,
-    std::plus);
-FOREACH_BINARY_OP_LIST_ALPHA(
-    all_types_complex_bool_half_bfloat16,
     sub,
     std::minus);
-FOREACH_BINARY_OP_LIST(
-    all_types_complex_bool_half_bfloat16,
-    mul,
-    std::multiplies,
-    /*division_op*/ false);
-FOREACH_BINARY_OP_LIST(
-    all_types_complex_bool_half_bfloat16,
-    div,
-    std::divides,
-    /*division_op*/ true);
+
 FOREACH_BINARY_OP_LIST(
     all_types_half_bfloat16,
     clamp_max,

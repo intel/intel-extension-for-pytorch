@@ -166,16 +166,6 @@ void all_types_complex_half_bfloat16_(
   }
 
 FOREACH_BINARY_OP_SCALAR(
-    all_types_complex_bool_half_bfloat16,
-    add,
-    std::plus,
-    false);
-FOREACH_BINARY_OP_SCALAR(
-    all_types_complex_bool_half_bfloat16,
-    mul,
-    std::multiplies,
-    false);
-FOREACH_BINARY_OP_SCALAR(
     all_types_complex_half_bfloat16,
     pow,
     power_functor,
@@ -190,15 +180,6 @@ std::vector<Tensor> _foreach_pow(
   return all_types_complex_half_bfloat16<reverse_power_functor>(
       exponent, scalar);
 }
-
-// In the case of division, integer inputs will result in float.
-// Currently multi tensor apply can only return result of the same type as
-// input.
-FOREACH_BINARY_OP_SCALAR(
-    all_types_complex_bool_half_bfloat16,
-    div,
-    std::divides,
-    true);
 
 // In the case of subtraction, we dont allow scalar to be boolean following the
 // torch.sub logic
