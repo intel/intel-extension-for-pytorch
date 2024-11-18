@@ -1,8 +1,13 @@
-from typing import Optional, Tuple
-
+from typing import Optional, Tuple, Union
 import torch
 import torch.nn as nn
-
+from transformers.cache_utils import Cache, DynamicCache
+from transformers.modeling_attn_mask_utils import (
+    AttentionMaskConverter,
+    _prepare_4d_causal_attention_mask,
+    _prepare_4d_causal_attention_mask_for_sdpa,
+)
+from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
 from ._transformer_configuration import IPEXTransformerConfig, SupportedActivation
 from ._transformers import MAX_OUT_SEQ_LEN, MAX_SEQ_LEN
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
@@ -14,9 +19,11 @@ from .transformer_modules.Mlp import *  # noqa
 from .transformer_modules.NaiveAttention import IPEXTransformerAttnNaive  # noqa
 from .transformer_modules.QuantizedAttention import (  # noqa F401; noqa
     IPEXTransformerAttnOptimizedFp16,
-    IPEXTransformerAttnOptimizedInt4,
 )
 from .transformer_modules.RoPE import LlamaRotaryEmbedding
+from .transformer_modules.XPUAttentionfp16 import (
+    IPEXGroupedAttention,
+)
 
 
 class NewIPEXFalconBlock(IPEXTransformerBlock):
@@ -36,8 +43,12 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         self.ipex_config = self.build_ipex_transformer_config(
             config, device, dtype, impl_mode, tp_size, tp_group
         )
-        self.attn = self.build_attention_from_config(grouped=True)
-        self.attn.module = [self.module.self_attention]
+        if dtype == "fp16":
+            self.attn = IPEXGroupedAttention(self.ipex_config)
+        else:
+            raise NotImplementedError(
+                "IPEXAttention dose not support this modelType {} !".format(dtype)
+            )
         self.mlp = self.build_mlp_from_config("Falcon")
         self.ln_attn = nn.LayerNorm(
             self.ipex_config.embedding_dim, eps=self.ipex_config.norm_eps
@@ -131,8 +142,10 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         hidden_states: torch.Tensor,
         alibi: Optional[torch.Tensor],
         attention_mask: torch.Tensor,
+        cache_position: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        layer_idx: int = 0,
         head_mask: Optional[torch.Tensor] = None,
         use_cache: bool = False,
         output_attentions: bool = False,
@@ -141,57 +154,18 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]
     ]:
         bs = IPEXTransformerAttn.batch_size
-        dim = hidden_states.dim()
-        if dim == 3:
-            beam = hidden_states.shape[0] // bs
-            seq = hidden_states.shape[1]
-        elif dim == 4:
-            beam = hidden_states.shape[1]
-            seq = hidden_states.shape[2]
-        else:
-            print("Unsupported input shape")
-            return
-        IPEXTransformerAttn.beam_size = beam
-        first_token = True if layer_past is None else False
-        hidden_size = hidden_states.shape[-1]
-        hidden_shape = [bs, beam, seq, hidden_size]
-        if first_token and beam > 1:
-            # for 1st token, keep the original layout
-            # reduce the duplicated info in beam dim
-            # shape -> [bs*beam, seq, hidden_size]
-            # layout -> [bs*beam, seq, hidden_size]
-            hidden_states = hidden_states.view(hidden_shape)[:, 0, :, :].contiguous()
-            if position_ids is not None:
-                position_ids = position_ids.view(bs, beam, position_ids.shape[1])[
-                    :, 0, :
-                ].view(bs, position_ids.shape[1])
-            if attention_mask is not None:
-                attention_mask = attention_mask.view(
-                    bs,
-                    beam,
-                    attention_mask.shape[1],
-                    attention_mask.shape[2],
-                    attention_mask.shape[3],
-                )[:, 0, :, :, :].view(
-                    bs,
-                    attention_mask.shape[1],
-                    attention_mask.shape[2],
-                    attention_mask.shape[3],
-                )
-        else:
-            # for 2nd to last token, we convert the layout
-            # shape -> [bs*beam, seq, hidden_size]
-            # convert layout form [bs*beam, seq, hidden_size] to [seq, bs*beam, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1).contiguous()
+        IPEXTransformerAttn.beam_size = hidden_states.shape[0] // bs
 
-        # revert _convert_to_rw_cache in transformers
-        if layer_past is not None and layer_past[0].dim() == 3:
-            batch_size_times_num_heads, kv_length, head_dim = layer_past[0].shape
-            num_heads = batch_size_times_num_heads // bs
-            layer_past = (
-                layer_past[0].view(bs, num_heads, kv_length, head_dim),
-                layer_past[1].view(bs, num_heads, kv_length, head_dim),
-            )
+        if layer_past.get_seq_length() and len(layer_past.key_cache) > layer_idx:
+            if layer_past.key_cache[layer_idx].dim() == 3:
+                key_cache = layer_past.key_cache[layer_idx]
+                value_cache = layer_past.value_cache[layer_idx]
+                batch_size_times_num_heads, kv_length, head_dim = key.cache.shape
+                num_heads = batch_size_times_num_heads // bs
+                key_cache = key_cache.view(bs, num_heads, kv_length, head_dim)
+                value_cache = value_cache.view(bs, num_heads, kv_length, head_dim)
+                layer_past.key_cache[layer_idx] = key_cache
+                layer_past.value_cache[layer_idx] = value_cache
 
         residual = hidden_states
         attention_layernorm_out = torch.ops.torch_ipex.fast_layer_norm(
@@ -210,15 +184,15 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         )
         attn_outputs = self.attn(
             hidden_states=attention_layernorm_out,
-            layer_past=layer_past,
-            attention_mask=attention_mask,
+            past_key_value=layer_past,
+            attention_mask=None,
+            cache_position=cache_position,
             position_ids=position_ids,
             head_mask=head_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
             residual=residual,
             alibi=alibi,
-            first_token=first_token,
             **kwargs,
         )
 
@@ -229,25 +203,291 @@ class NewIPEXFalconBlock(IPEXTransformerBlock):
         mlp_output = self.mlp(mlp_layernorm_out, attention_output)
         hidden_states = mlp_output
 
-        if first_token and beam > 1:
-            # for 1st token, expand the result with beam
-            hidden_states = hidden_states.view(bs, 1, seq, hidden_size)
-            hidden_states = hidden_states.expand([bs, beam, seq, hidden_size])
-        else:
-            # for 2nd to last token, we convert the layout back
-            # convert hidden_states form [seq, bs_beam, hidden_size] back to [bs_beam, seq, hidden_size]
-            hidden_states = hidden_states.transpose(0, 1)
+        next_cache = None
         if use_cache:
-            # revert _convert_cache_to_standard_format in transformers
             layer_past = outputs[0]
-            batch_size, num_heads, kv_length, head_dim = layer_past[0].shape
-            batch_size_times_num_heads = batch_size * num_heads
-            # layer_past[0][0].shape[2] is used to get seq_length.
-            layer_past = (
-                layer_past[0],
-                layer_past[1],
-            )
             outputs = (hidden_states, layer_past) + outputs[1:]
         else:
             outputs = (hidden_states,) + outputs[1:]
         return outputs
+
+
+def IPEXFalconModel_forward(
+    self,
+    input_ids: Optional[torch.LongTensor] = None,
+    past_key_values: Optional[Tuple[Tuple[torch.Tensor, torch.Tensor], ...]] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    cache_position: Optional[torch.LongTensor] = None,
+    head_mask: Optional[torch.LongTensor] = None,
+    inputs_embeds: Optional[torch.LongTensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+) -> Union[Tuple[torch.Tensor, ...], BaseModelOutputWithPastAndCrossAttentions]:
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
+    output_hidden_states = (
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
+    )
+    use_cache = use_cache if use_cache is not None else self.config.use_cache
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
+
+    if input_ids is not None and inputs_embeds is not None:
+        raise ValueError(
+            "You cannot specify both input_ids and inputs_embeds at the same time"
+        )
+    elif input_ids is not None:
+        batch_size, seq_length = input_ids.shape
+    elif inputs_embeds is not None:
+        batch_size, seq_length, _ = inputs_embeds.shape
+    else:
+        raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+    if past_key_values is None:
+        past_key_values = tuple([None] * len(self.h))
+
+    use_legacy_cache = False
+    if use_cache and not isinstance(past_key_values, Cache) and not self.training:
+        use_legacy_cache = True
+        past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+
+    if inputs_embeds is None:
+        inputs_embeds = self.word_embeddings(input_ids)
+
+    hidden_states = inputs_embeds
+
+    if self.gradient_checkpointing and self.training:
+        if use_cache:
+            logger.warning(
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+            )
+            use_cache = False
+    presents = () if use_cache else None
+    all_self_attentions = () if output_attentions else None
+    all_hidden_states = () if output_hidden_states else None
+    past_key_values_length = 0
+    # Compute alibi tensor: check build_alibi_tensor documentation
+    if isinstance(past_key_values, Cache) and past_key_values.get_seq_length() > 0:
+        past_key_values_length = past_key_values.get_seq_length()
+
+    if self.use_alibi:
+        mask = (
+            torch.ones(
+                (batch_size, seq_length + past_key_values_length),
+                device=inputs_embeds.device,
+                dtype=torch.long,
+            )
+            if attention_mask is None
+            else attention_mask
+        )
+        alibi = build_alibi_tensor(mask, self.num_heads, dtype=hidden_states.dtype)
+    else:
+        alibi = None
+        if position_ids is None:
+            device = input_ids.device if input_ids is not None else inputs_embeds.device
+            position_ids = torch.arange(
+                past_key_values_length,
+                seq_length + past_key_values_length,
+                dtype=torch.long,
+                device=device,
+            )
+            position_ids = position_ids.unsqueeze(0)
+
+    if cache_position is None:
+        past_seen_tokens = past_key_values_length
+        cache_position = torch.arange(
+            past_seen_tokens,
+            past_seen_tokens + inputs_embeds.shape[1],
+            device=inputs_embeds.device,
+        )
+    if position_ids is None:
+        position_ids = cache_position.unsqueeze(0)
+
+    if self._use_flash_attention_2:
+        # 2d mask is passed through the layers
+        attention_mask = (
+            attention_mask
+            if (attention_mask is not None and 0 in attention_mask)
+            else None
+        )
+    elif self._use_sdpa and not output_attentions:
+        # output_attentions=True can not be supported when using SDPA, and we fall back on
+        # the manual implementation that requires a 4D causal mask in all cases.
+        if alibi is None:
+            attention_mask = _prepare_4d_causal_attention_mask_for_sdpa(
+                attention_mask,
+                (batch_size, seq_length),
+                inputs_embeds,
+                past_key_values_length,
+            )
+        elif head_mask is None:
+            alibi = alibi.reshape(batch_size, -1, *alibi.shape[1:])
+
+            # We don't call _prepare_4d_causal_attention_mask_for_sdpa as we
+            # need to mask alibi using the 4D attention_mask untouched.
+            attention_mask = _prepare_4d_causal_attention_mask(
+                attention_mask,
+                (batch_size, seq_length),
+                inputs_embeds,
+                past_key_values_length,
+            )
+
+            # We take care to integrate alibi bias in the attention_mask here.
+            min_dtype = torch.finfo(alibi.dtype).min
+            attention_mask = torch.masked_fill(
+                alibi / math.sqrt(self.config.hidden_size // self.num_heads),
+                attention_mask < -1,
+                min_dtype,
+            )
+
+            # From PyTorch 2.1 onwards, F.scaled_dot_product_attention with the memory-efficient attention backend
+            # produces nans if sequences are completely unattended in the attention mask.
+            # Details: https://github.com/pytorch/pytorch/issues/110213
+            if seq_length > 1 and attention_mask.device.type == "cuda":
+                attention_mask = AttentionMaskConverter._unmask_unattended(
+                    attention_mask, min_dtype=min_dtype
+                )
+        else:
+            # PyTorch SDPA does not support head_mask, we fall back on the eager implementation in this case.
+            attention_mask = _prepare_4d_causal_attention_mask(
+                attention_mask,
+                (batch_size, seq_length),
+                inputs_embeds,
+                past_key_values_length,
+            )
+    else:
+        # 4d mask is passed through the layers
+        attention_mask = _prepare_4d_causal_attention_mask(
+            attention_mask,
+            (batch_size, seq_length),
+            inputs_embeds,
+            past_key_values_length,
+        )
+
+    # Prepare head mask if needed
+    # 1.0 in head_mask indicate we keep the head
+    # attention_probs has shape batch_size x num_heads x N x N
+    # head_mask has shape n_layer x batch x num_heads x N x N
+    head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
+    for i, block in enumerate(self.h):
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        if self.gradient_checkpointing and self.training:
+            outputs = self._gradient_checkpointing_func(
+                block.__call__,
+                hidden_states,
+                alibi,
+                attention_mask,
+                position_ids,
+                head_mask[i],
+                layer_past,
+                use_cache,
+                output_attentions,
+            )
+        else:
+            outputs = block(
+                hidden_states,
+                layer_past=past_key_values,
+                layer_idx=i,
+                attention_mask=attention_mask,
+                cache_position=cache_position,
+                position_ids=position_ids,
+                head_mask=head_mask[i],
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+                alibi=alibi,
+            )
+
+        hidden_states = outputs[0]
+        if use_cache is True:
+            presents = outputs[1]
+
+        if output_attentions:
+            all_self_attentions = all_self_attentions + (
+                outputs[2 if use_cache else 1],
+            )
+
+    # Add last hidden state
+    hidden_states = self.ln_f(hidden_states)
+
+    if output_hidden_states:
+        all_hidden_states = all_hidden_states + (hidden_states,)
+
+    next_cache = None
+    if use_cache:
+        next_cache = presents.to_legacy_cache() if use_legacy_cache else presents
+    if not return_dict:
+        return tuple(
+            v
+            for v in [hidden_states, next_cache, all_hidden_states, all_self_attentions]
+            if v is not None
+        )
+    return BaseModelOutputWithPastAndCrossAttentions(
+        last_hidden_state=hidden_states,
+        past_key_values=next_cache,
+        hidden_states=all_hidden_states,
+        attentions=all_self_attentions,
+    )
+
+
+def Falcon_prepare_inputs_for_generation(
+    self,
+    input_ids: torch.LongTensor,
+    past_key_values: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.Tensor] = None,
+    inputs_embeds: Optional[torch.Tensor] = None,
+    **kwargs,
+) -> dict:
+    if isinstance(past_key_values, Cache) and past_key_values.get_seq_length():
+        past_length = past_key_values.get_seq_length()
+
+        # Some generation methods already pass only the last input ID
+        if input_ids.shape[1] > past_length:
+            remove_prefix_length = past_length
+        else:
+            # Default to old behavior: keep only final ID
+            remove_prefix_length = input_ids.shape[1] - 1
+
+        input_ids = input_ids[:, remove_prefix_length:]
+
+    # Note: versions of Falcon with alibi do not use position_ids. It is used with RoPE.
+    if (
+        not self.transformer.use_alibi
+        and attention_mask is not None
+        and position_ids is None
+    ):
+        # create position_ids on the fly for batch generation
+        position_ids = attention_mask.long().cumsum(-1) - 1
+        position_ids.masked_fill_(attention_mask == 0, 1)
+        if past_key_values:
+            position_ids = position_ids[:, -input_ids.shape[1] :]
+
+    if inputs_embeds is not None and past_key_values is None:
+        model_inputs = {"inputs_embeds": inputs_embeds}
+    else:
+        # The clone here is for the same reason as for `position_ids`.
+        model_inputs = {
+            "input_ids": input_ids.clone(memory_format=torch.contiguous_format),
+            "inputs_embeds": None,
+        }
+
+    model_inputs.update(
+        {
+            "position_ids": position_ids,
+            "past_key_values": past_key_values,
+            "use_cache": kwargs.get("use_cache"),
+            "attention_mask": attention_mask,
+        }
+    )
+    return model_inputs

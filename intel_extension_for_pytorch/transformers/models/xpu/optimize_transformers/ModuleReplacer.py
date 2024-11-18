@@ -134,6 +134,8 @@ class ModuleReplacer:
         if config is not None and not hasattr(config, "num_key_value_heads"):
             if hasattr(config, "n_head"):
                 config.num_key_value_heads = config.n_head
+            elif hasattr(config, "num_kv_heads"):
+                config.num_key_value_heads = config.num_kv_heads
             elif hasattr(config, "multi_query_group_num"):
                 config.num_key_value_heads = config.multi_query_group_num
             else:
