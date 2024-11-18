@@ -218,8 +218,7 @@ if [ ${GCC_CONDA} -eq 1 ]; then
         echo "Command \"conda\" not found. Exit."
         exit 2
     fi
-    conda install -y sysroot_linux-64 -c conda-forge
-    conda install -y gcc==12.3 gxx==12.3 cxx-compiler zstd -c conda-forge
+    conda install -y sysroot_linux-64==2.28 c-compiler cxx-compiler gcc==12.3 gxx==12.3 zstd -c conda-forge
 fi
 if [ ${GCC_CONDA} -ge 1 ]; then
     if [ -z ${CONDA_BUILD_SYSROOT} ]; then
@@ -296,7 +295,7 @@ python -m pip install --force-reinstall dist/*.whl
 cd ..
 #  Torch-CCL
 if [ $((${MODE} & 0x01)) -ne 0 ]; then
-    conda install -y gcc==11.4 gxx==11.4 cxx-compiler -c conda-forge
+    conda install -y gcc==11.4 gxx==11.4 -c conda-forge
     cd torch-ccl
     python setup.py clean
     python setup.py bdist_wheel 2>&1 | tee build.log
