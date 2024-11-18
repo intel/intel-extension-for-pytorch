@@ -745,46 +745,6 @@ Tensor upsample_bilinear2d_backward(
   return grad_input;
 }
 
-Tensor& upsample_linear1d_out(
-    const Tensor& input,
-    IntArrayRef output_size,
-    bool align_corners,
-    c10::optional<double> scales,
-    Tensor& output) {
-  TORCH_CHECK(
-      align_corners == false,
-      "We don't support align_corners currently as oneDNN don't support this "
-      "algorithm!\n");
-  torch_ipex::xpu::oneDNN::resample(
-      input,
-      output,
-      output_size,
-      algorithm::resampling_linear,
-      scales.has_value() ? static_cast<double>(scales.value()) : 0.0f);
-  return output;
-}
-
-Tensor& upsample_linear1d_backward_out(
-    const Tensor& grad_output,
-    IntArrayRef output_size,
-    IntArrayRef input_size,
-    bool align_corners,
-    c10::optional<double> scales,
-    Tensor& grad_input) {
-  TORCH_CHECK(
-      align_corners == false,
-      "We don't support align_corners currently as oneDNN don't support this "
-      "algorithm!\n");
-  torch_ipex::xpu::oneDNN::resample_backward(
-      grad_input,
-      grad_output,
-      input_size,
-      output_size,
-      algorithm::resampling_linear,
-      scales.has_value() ? static_cast<double>(scales.value()) : 0.0f);
-  return grad_input;
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
 

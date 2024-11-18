@@ -1820,14 +1820,6 @@ Tensor diag(const Tensor& self, int64_t diagonal) {
   return at::AtenIpexTypeXPU::diag_out(self, diagonal, out);
 }
 
-Tensor trace(const Tensor& self) {
-  TORCH_CHECK(self.dim() == 2, "expected a matrix");
-  Tensor diag = at::AtenIpexTypeXPU::diag(self, 0);
-  optional<ScalarType> dtype;
-  Tensor out = at::AtenIpexTypeXPU::sum(diag, dtype);
-  return out;
-}
-
 template <typename scalar_t, typename mask_t>
 struct masked_fill_kernel_functor {
   scalar_t operator()(scalar_t self, mask_t mask) const {
