@@ -16,14 +16,6 @@ Tensor as_strided(
   return at::native::as_strided_tensorimpl(self, size, stride, storage_offset);
 }
 
-Tensor unfold(
-    const Tensor& self,
-    int64_t dimension,
-    int64_t size,
-    int64_t step) {
-  return at::native::unfold(self, dimension, size, step);
-}
-
 // NOTE [ Unsafe View ]
 // _unsafe_view() differs from view() in that the returned tensor isn't treated
 // as a view for the purposes of automatic differentiation. (It's not listed in
