@@ -244,42 +244,6 @@ inline void _rrelu_with_noise_train(
 }
 
 template <typename scalar_t>
-struct PreluKernelDpcppFunctor {
-  scalar_t operator()(scalar_t input, scalar_t weight) const {
-    return (input > 0) ? input : weight * input;
-  }
-};
-
-inline void _prelu_kernel_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      kBFloat16, kHalf, iter.dtype(), "prelu_dpcpp", [&] {
-        PreluKernelDpcppFunctor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-}
-
-template <typename scalar_t>
-struct PreluKernelBackwardDpcppFunctor {
-  std::tuple<scalar_t, scalar_t> operator()(
-      scalar_t input,
-      scalar_t weight,
-      scalar_t grad) const {
-    auto mask = input > 0;
-    auto grad_input = mask ? grad : weight * grad;
-    auto grad_weight = mask ? scalar_t{0} : input * grad;
-    return {grad_input, grad_weight};
-  }
-};
-
-inline void _prelu_kernel_backward_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      kBFloat16, kHalf, iter.dtype(), "prelu_backward_dpcpp", [&] {
-        PreluKernelBackwardDpcppFunctor<scalar_t> f;
-        dpcpp_kernel_multiple_outputs_for_tensor_iter(iter, f);
-      });
-}
-
-template <typename scalar_t>
 struct ThresholdOutFunctor {
   scalar_t operator()(scalar_t x, scalar_t other) const {
     return x <= _threshold ? _value : other;
@@ -569,35 +533,6 @@ Tensor rrelu_with_noise_backward(
     auto mid = (l + u) / 2.;
     return at::leaky_relu_backward(grad_output, self, mid, self_is_result);
   }
-}
-
-Tensor _prelu_kernel(const Tensor& self, const Tensor& weight) {
-  // Weight broadcasts over self and they have the same dtype
-  auto result = at::empty_like(self);
-  auto iter = TensorIteratorConfig()
-                  .add_output(result)
-                  .add_input(self)
-                  .add_input(weight)
-                  .build();
-  impl::_prelu_kernel_dpcpp(iter);
-  return result;
-}
-
-std::tuple<Tensor, Tensor> _prelu_kernel_backward(
-    const Tensor& grad_out,
-    const Tensor& self,
-    const Tensor& weight) {
-  Tensor grad_self = at::empty({0}, self.options());
-  Tensor grad_weight = at::empty({0}, weight.options());
-  auto iter = TensorIteratorConfig()
-                  .add_output(grad_self)
-                  .add_output(grad_weight)
-                  .add_input(self)
-                  .add_input(weight)
-                  .add_input(grad_out)
-                  .build();
-  impl::_prelu_kernel_backward_dpcpp(iter);
-  return {grad_self, grad_weight};
 }
 
 template <typename scalar_t>

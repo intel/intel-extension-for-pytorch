@@ -103,13 +103,6 @@ Tensor repeat_interleave(
   return output;
 }
 
-Tensor _reshape_alias(
-    const Tensor& self,
-    IntArrayRef size,
-    IntArrayRef stride) {
-  return at::native::_reshape_alias(self, size, stride);
-}
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
