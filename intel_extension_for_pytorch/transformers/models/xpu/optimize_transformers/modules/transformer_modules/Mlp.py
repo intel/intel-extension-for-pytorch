@@ -287,3 +287,22 @@ class IPEXTransformerMLPOptimizedFp16SiluPhi3(IPEXTransformerMLP):
             return torch.ops.torch_ipex.mm_bias_resadd(
                 up_states, self.fc_out.weight, self.fc_out.bias, 1.0, residual, 1.0
             )
+
+
+class IPEXTransformerMLPOptimizedFp16GegeluPhi3small(IPEXTransformerMLP):
+    def __init__(self, config):
+        super().__init__(config)
+        self.gegelu_limit = config.gegelu_limit
+
+    def forward(self, hidden_states, residual=None):
+        # fc_in ==> up_proj
+        # fc_out ==> down_proj
+        hidden_states = self.act(self.fc_in(hidden_states), limit=self.gegelu_limit)
+        if self.fc_out.bias is None:
+            return torch.ops.torch_ipex.mm_resadd(
+                hidden_states, self.fc_out.weight, residual, 1.0
+            )
+        else:
+            return torch.ops.torch_ipex.mm_bias_resadd(
+                hidden_states, self.fc_out.weight, self.fc_out.bias, 1.0, residual, 1.0
+            )

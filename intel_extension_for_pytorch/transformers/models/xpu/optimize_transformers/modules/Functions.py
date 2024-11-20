@@ -23,6 +23,9 @@ from .chatglm import (
     GLMTransformer_forward,
     GLMModel_forward,
 )
+from .phi3_small import (
+    phi3small_prepare_inputs_for_generation,
+)
 from .falcon import (
     IPEXFalconModel_forward,
     Falcon_prepare_inputs_for_generation,
@@ -231,6 +234,12 @@ def ipex_prepare_model_inputs(model):
 
 def ipex_prepare_inputs_for_generation(model):
     if hasattr(model, "prepare_inputs_for_generation"):
+        if model.__class__.__name__ == "Phi3SmallForCausalLM":
+            setattr(  # noqa B010
+                model,
+                "prepare_inputs_for_generation",
+                partial(phi3small_prepare_inputs_for_generation, model),
+            )
         func_ptr = model.prepare_inputs_for_generation
 
         def prepare_inputs_for_generation_ipex_wrapper(self, *args, **kwargs):
@@ -1961,6 +1970,7 @@ def ipex_beam_search_without_optimize(model):
 
 IPEX_STATIC_CACHE_MODEL_LIST = [
     "Phi3ForCausalLM",
+    "Phi3SmallForCausalLM",
     "BaichuanForCausalLM",
     "BloomForCausalLM",
     "ChatGLMForConditionalGeneration",

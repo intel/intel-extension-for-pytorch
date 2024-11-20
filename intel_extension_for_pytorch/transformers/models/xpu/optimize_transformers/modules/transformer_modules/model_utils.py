@@ -3,12 +3,18 @@ import intel_extension_for_pytorch as ipex  # noqa F401
 from .RoPE import apply_rotary_pos_emb
 
 
-def load_attn_fused_qkv_params(self, qkv_layer, out_layer, dtype):
+def load_attn_fused_qkv_params(self, qkv_layer, out_layer, dtype, grouped=False):
     if dtype == "fp16":
         self.qkv_proj.weight = qkv_layer.weight
         if qkv_layer.bias is not None:
             self.qkv_proj.bias = qkv_layer.bias
-            self.qkv_proj.bias.data = self.qkv_proj.bias.reshape(3, -1).contiguous()
+            if grouped:
+                num_group = self.num_heads // self.num_kv_heads
+                self.qkv_proj.bias.data = self.qkv_proj.bias.reshape(
+                    self.num_kv_heads, num_group + 2, self.head_dim
+                ).contiguous()
+            else:
+                self.qkv_proj.bias.data = self.qkv_proj.bias.reshape(3, -1).contiguous()
 
         self.out_proj.weight = out_layer.weight
         self.out_proj.bias = out_layer.bias
@@ -32,13 +38,23 @@ def load_attn_fused_qkv_params(self, qkv_layer, out_layer, dtype):
         out_layer.qzeros = None
 
 
-def transpose_attn_fused_qkv_params(self, dtype):
+def transpose_attn_fused_qkv_params(self, dtype, grouped=False):
     if dtype == "fp16":
-        self.qkv_proj.weight.data = (
-            self.qkv_proj.weight.reshape(3, -1, self.embed_dim)
-            .permute(0, 2, 1)
-            .contiguous()
-        )
+        if grouped:
+            num_group = self.num_heads // self.num_kv_heads
+            self.qkv_proj.weight.data = (
+                self.qkv_proj.weight.reshape(
+                    self.num_kv_heads, num_group + 2, self.head_dim, self.embed_dim
+                )
+                .permute(3, 0, 1, 2)
+                .contiguous()
+            )
+        else:
+            self.qkv_proj.weight.data = (
+                self.qkv_proj.weight.reshape(3, -1, self.embed_dim)
+                .permute(0, 2, 1)
+                .contiguous()
+            )
         self.out_proj.weight.data = self.out_proj.weight.transpose(0, 1).contiguous()
     elif dtype == "int4":
         if xpu_gemm_use_xetla():

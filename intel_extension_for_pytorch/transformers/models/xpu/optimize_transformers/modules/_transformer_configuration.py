@@ -1,7 +1,7 @@
 import torch
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, Dict, Union, List
 
 
 class ImplementMode(Enum):
@@ -16,6 +16,7 @@ class SupportedActivation(Enum):
     silu: str = "silu"
     tanh: str = "tanh"
     bloom_gelu: str = "bloom_gelu"
+    gegelu: str = "gegelu"
 
 
 @dataclass
@@ -63,6 +64,26 @@ class IPEXTransformerConfigChatGLM(IPEXTransformerConfig):
     apply_residual_connection_post_layernorm: bool = False
     multi_query_attention: bool = True
     rmsnorm: bool = True
+
+
+@dataclass
+class IPEXTransformerConfigPhi3Small(IPEXTransformerConfig):
+    rope_position_scale: float = 1.0
+    rope_scaling: Optional[Dict[str, Union[float, List[float], int]]] = None
+    # Block Sparse Attention Pattern
+    blocksparse_homo_head_pattern: bool = False
+    blocksparse_block_size: int = 64
+    blocksparse_num_local_blocks: int = 16
+    blocksparse_vert_stride: int = 8
+    blocksparse_triton_kernel_block_size: int = 64
+    # Frequency of block sparsity
+    dense_attention_every_n_layers: Optional[int] = 2
+    # for gegelu activation
+    gegelu_limit: float = 20.0
+    # MuP parameters
+    mup_use_scaling: bool = True
+    mup_attn_multiplier: bool = 1.0
+    ffn_dropout_prob: float = 0.1
 
 
 @dataclass

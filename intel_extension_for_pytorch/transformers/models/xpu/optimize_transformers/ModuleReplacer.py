@@ -46,6 +46,7 @@ from .modules.chatglm import (
 from .modules.DiffusersTransformer import NewIPEXBasicTransformerBlock
 from .modules.bert import NewIPEXBertSelfAttention
 from .modules.phi3 import NewIPEXPhi3DecoderLayer
+from .modules.phi3_small import NewIPEXPhi3SmallDecoderLayer
 
 import os
 
@@ -257,6 +258,21 @@ class ModuleReplacer:
                 if new_module is not None:
                     setattr(model, name, new_module)
                     is_replace_success = True
+            elif child.__class__.__name__ == "Phi3SmallDecoderLayer":
+                new_module = NewIPEXPhi3SmallDecoderLayer(
+                    child,
+                    config,
+                    layer_idx=child.self_attn.layer_idx,
+                    dtype=dtype,
+                    device="xpu",
+                    module_name=module_name + name,
+                    impl_mode=impl_mode,
+                    tp_size=self.tp_size,
+                    tp_group=self.tp_group,
+                )
+                if new_module is not None:
+                    setattr(model, name, new_module)
+                    is_replace_success = True
             else:
                 is_replace_success = (
                     self.replace_module(child, dtype, config, module_name + name)
@@ -274,6 +290,7 @@ class ModuleReplacer:
                 or child.__class__.__name__ == "BertModel"
                 or child.__class__.__name__ == "GLMBlock"
                 or child.__class__.__name__ == "Phi3DecoderLayer"
+                or child.__class__.__name__ == "Phi3SmallDecoderLayer"
             ):
                 continue
             if name == "lm_head":

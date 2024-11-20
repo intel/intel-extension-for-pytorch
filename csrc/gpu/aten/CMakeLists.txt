@@ -1,4 +1,4 @@
-FILE(GLOB aten_ops_src "operators/*.cpp" "operators/sparse/*.cpp" "operators/transformers/*.cpp" "operators/fp8/*.cpp")
+FILE(GLOB aten_ops_src "operators/*.cpp" "operators/sparse/*.cpp" "operators/transformers/*.cpp" "operators/fp8/*.cpp" "operators/transformers_esimd/*.cpp")
 
 # Reset the order of src files to compile slow files first
 list(APPEND slow_patterns
@@ -52,4 +52,6 @@ FILE(GLOB xetla_ops_src
   "operators/XeInt4Dequantize.cpp"
 )
 set(IPEX_ATEN_XETLA_OPS_SRCS "${xetla_ops_src}" PARENT_SCOPE)
+set(esimd_ops_src "operators/transformers_esimd/attention_mtl.cpp")
+set(IPEX_ATEN_ESIMD_OPS_SRCS "${esimd_ops_src}" PARENT_SCOPE)
 set(XETLA_LIBS ${XETLA_LIBS} PARENT_SCOPE)

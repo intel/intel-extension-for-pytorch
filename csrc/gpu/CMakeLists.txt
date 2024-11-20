@@ -45,6 +45,9 @@ if(USE_XETLA)
   add_subdirectory(${IPEX_GPU_XETLA_DIR})
 endif()
 
+set(IPEX_GPU_ESIMD_DIR "${IPEX_GPU_ROOT_DIR}/aten/operators/esimd/")
+add_subdirectory(${IPEX_GPU_ESIMD_DIR})
+
 if(USE_DS_KERNELS)
   set(IPEX_GPU_DEEPSPEED_SRC_DIR "${IPEX_GPU_ROOT_DIR}/deepspeed")
   add_subdirectory(${IPEX_GPU_DEEPSPEED_SRC_DIR})
@@ -88,6 +91,9 @@ if(BUILD_SEPARATE_OPS)
       add_library(${op_lib} SHARED ${op_src})
       if(USE_XETLA AND "${op_src}" IN_LIST IPEX_ATEN_XETLA_OPS_SRCS)
         target_link_libraries(${op_lib} PRIVATE xetla_kernels)
+      endif()
+      if ("${op_src}" IN_LIST IPEX_ATEN_ESIMD_OPS_SRCS)
+        target_link_libraries(${op_lib} PRIVATE esimd_kernels)
       endif()
       target_include_directories(${op_lib} PUBLIC ${IPEX_INCLUDE_DIRS})
       target_compile_options(${op_lib} PRIVATE ${IPEX_SYCL_KERNEL_FLAGS})
@@ -141,6 +147,8 @@ endif()
 if(USE_XETLA)
   target_link_libraries(intel-ext-pt-gpu PUBLIC xetla_kernels)
 endif()
+
+target_link_libraries(intel-ext-pt-gpu PUBLIC esimd_kernels)
 
 if(USE_DS_KERNELS)
   target_link_libraries(intel-ext-pt-gpu PUBLIC intel-ext-pt-gpu-deepspeed)
@@ -342,6 +350,12 @@ if(USE_XETLA)
     list(APPEND LIBRARIES_INSTALL ${LIB})
   endforeach()
 endif()
+
+install(TARGETS esimd_kernels
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+list(APPEND LIBRARIES_INSTALL esimd_kernels)
 
 if(USE_DS_KERNELS)
   install(TARGETS intel-ext-pt-gpu-deepspeed

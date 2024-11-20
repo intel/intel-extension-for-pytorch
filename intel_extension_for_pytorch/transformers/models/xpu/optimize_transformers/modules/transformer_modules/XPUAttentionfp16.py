@@ -424,6 +424,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             or past_key_value is None
             else past_key_value
         )
+
         # need to repeat kv for beam search next token
         if self.num_heads != self.num_kv_heads and self.beam_search_next_token(
             query.size(2)

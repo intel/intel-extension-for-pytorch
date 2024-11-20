@@ -1,4 +1,5 @@
 import torch
+from .Activation import ACT2FN
 import intel_extension_for_pytorch as ipex
 from .Mlp import IPEXTransformerMLP
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
@@ -729,3 +730,57 @@ class IPEXTransformerMLPOptimizedInt4SiluPhi3OneDNN(
                 self.fc_out_quant.g_idx,
             )
         return output
+
+
+class IPEXTransformerMLPOptimizedInt4GegeluPhi3smallOneDNN(
+    IPEXTransformerMLPOptimizedInt4OneDNN
+):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+        self.gegelu_limit = config.gegelu_limit
+        self.act = ACT2FN[config.activation_function]
+
+    def forward(self, hidden_states, residual=None):
+        # fc_in ==> up_proj
+        # fc_out ==> down_proj
+        if self.fc_in_quant.bias is None:
+            up_states = torch.ops.torch_ipex.mm_int4(
+                hidden_states,
+                self.fc_in_quant.qweight,
+                self.fc_in_quant.scales,
+                self.fc_in_quant.qzeros,
+                self.fc_in_quant.blocksize,
+                self.fc_out_quant.g_idx,
+            )
+        else:
+            up_states = torch.ops.torch_ipex.mm_bias_int4(
+                hidden_states,
+                self.fc_in_quant.qweight,
+                self.fc_in_quant.bias,
+                self.fc_in_quant.scales,
+                self.fc_in_quant.qzeros,
+                self.fc_in_quant.blocksize,
+                self.fc_out_quant.g_idx,
+            )
+        up_states = self.act(up_states, limit=self.gegelu_limit)
+        if self.fc_out_quant.bias is None:
+            return torch.ops.torch_ipex.mm_add_int4(
+                up_states,
+                self.fc_out_quant.qweight,
+                self.fc_out_quant.scales,
+                self.fc_out_quant.qzeros,
+                self.fc_out_quant.blocksize,
+                residual,
+                self.fc_out_quant.g_idx,
+            )
+        else:
+            return torch.ops.torch_ipex.mm_bias_add_int4(
+                up_states,
+                self.fc_out_quant.qweight,
+                self.fc_out_quant.bias,
+                self.fc_out_quant.scales,
+                self.fc_out_quant.qzeros,
+                self.fc_out_quant.blocksize,
+                residual,
+                self.fc_out_quant.g_idx,
+            )
