@@ -24,7 +24,7 @@ git submodule update --init --recursive
 docker build -f examples/cpu/llm/Dockerfile --build-arg COMPILE=ON --build-arg PORT_SSH=2345 -t ipex-llm:main .
 
 # Run the container with command below
-docker run --rm -it --privileged -v /dev/shm:/dev/shm ipex-llm:main bash
+docker run --rm -it --net host --privileged -v /dev/shm:/dev/shm ipex-llm:main bash
 
 # When the command prompt shows inside the docker container, enter llm examples directory
 cd llm
@@ -56,6 +56,42 @@ bash ./tools/env_setup.sh
 # set bash script argument to "inference" or "fine-tuning" for different usages
 source ./tools/env_activate.sh [inference|fine-tuning]
 ```
+
+## 2.3 [Optional] Setup for Running Jupyter Notebooks
+
+After setting up your docker or conda environment, you may follow these additional steps to setup and run Jupyter Notebooks. The port number can be changed.
+
+### 2.3.1 Jupyter Notebooks for Docker-based Environments
+
+```bash
+# Install dependencies
+pip install notebook matplotlib
+
+# Launch Jupyter Notebook
+jupyter notebook --ip 0.0.0.0 --port 8888 --allow-root
+```
+
+1. Open up a web browser with the given URL and token.
+2. Open the notebook.
+3. Run all cells. 
+
+### 2.3.2 Jupyter Notebooks for Conda-based Environments
+
+```bash
+# Install dependencies
+pip install notebook ipykernel matplotlib
+
+# Register ipykernel with Conda
+python -m ipykernel install --user --name=IPEX-LLM
+
+# Launch Jupyter Notebook
+jupyter notebook --ip 0.0.0.0 --port 8888 --allow-root
+```
+
+1. Open up a web browser with the given URL and token.
+2. Open the notebook.
+3. Change your Jupyter Notebook kernel to IPEX-LLM.
+4. Run all cells. 
 
 <br>
 

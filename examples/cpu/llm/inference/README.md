@@ -114,6 +114,10 @@ python run.py --help # for more detailed usages
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
+**Alternatively, you can run the Jupyter Notebook to see ipex.llm with BF16 and various other quick start examples.**
+
+Additional setup instructions for running the notebook can be found [here](../README.md#23-optional-setup-for-running-jupyter-notebooks).
+
 ## 2.1 Quick example for running Llama2-7b
 
 ### 2.1.1 To run generation task and benchmark performance
