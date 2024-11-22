@@ -396,15 +396,16 @@ class fmha_forward_t {
       // B, N, 1, T
       // gid * T + startT
       if constexpr (kUseAlibi && !kVarlen) {
-        int32_t batch_start = gid * args.uAT;
-        int32_t start_x = batch_start + startT;
-        uint32_t end_x = startT + kBc;
+        int32_t start_x = startT;
+        uint32_t end_x = start_x + kBc;
         uint32_t boundary_x = args.uT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
-        end_x += batch_start;
+
+        int32_t start_y = gid;
+        uint32_t end_y = start_y + 1;
 
         mem_desc_Ai.init(
-            args.A_ptr, {end_x, 1, args.uAT * args.uN * args.uB}, {start_x, 0});
+            args.A_ptr, {end_x, end_y, args.uAT}, {start_x, start_y});
       }
 
       // B, N or N

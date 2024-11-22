@@ -177,7 +177,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             dist.all_reduce(reduce_target, group=self.tp_group)
         return
 
-    def get_blocked_alibi(self, alibi, seq_len):
+    def get_blocked_alibi(self, alibi, seq_len, dtype):
         if self.layer_idx == 0:
             cache_len = (
                 self.max_position
@@ -190,7 +190,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 cache_len,
             ]  # [beam*num_head, q_len, kv_len]
             IPEXAttention.blocked_alibi = torch.empty(
-                shape, device=alibi.device, dtype=alibi.dtype
+                shape, device=alibi.device, dtype=dtype
             )
             kv_len = alibi.shape[2]
             IPEXAttention.blocked_alibi[:, :, 0:kv_len] = alibi
@@ -228,13 +228,14 @@ class IPEXAttention(IPEXTransformerAttnNaive):
 
         # if attention_mask is not None:
         #     attention_mask = self.get_blocked_attn_mask(attention_mask)
+        # use key/value's data type as alibi's data type
         if alibi is not None:
             if isinstance(past_key_value, IPEXStaticCache):
                 alibi = self.get_blocked_alibi(
-                    alibi, past_key_value.get_seq_length() + key.size(2)
+                    alibi, past_key_value.get_seq_length() + key.size(2), key.dtype
                 )
             else:
-                alibi = self.get_blocked_alibi(alibi, key.size(2))
+                alibi = self.get_blocked_alibi(alibi, key.size(2), key.dtype)
         if (
             self.beam_idx is not None
             and query.size(-2) == 1
@@ -304,7 +305,6 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 if not self.is_beam_search() and query.size(-2) == 1:
                     key = key.permute(2, 0, 1, 3).contiguous().permute(1, 2, 0, 3)
                     value = value.permute(2, 0, 1, 3).contiguous().permute(1, 2, 0, 3)
-
                 attention_output = torch.xpu.IpexSDP(
                     query,
                     key,
