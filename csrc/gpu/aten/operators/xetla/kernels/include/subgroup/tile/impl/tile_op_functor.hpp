@@ -609,7 +609,7 @@ struct bias_add_op_t<
     using bias_payload_t = mem_payload_t<
         mem_desc_bias_t,
         bias_tile_desc_t,
-        msg_type_v<bias_tile_desc_t, mem_desc_bias_t>,
+        msg_type::block_2d,
         arch_tag>;
     coord_t bias_coord(coord.x, 0);
     mem_desc_bias_t mem_desc_bias(args.base, args.shape, bias_coord);
