@@ -41,9 +41,9 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> ipex_sdp_dropout_backward(
     c10::optional<double> scale);
 
 inline Tensor _scaled_dot_product_efficient_attention_impl(
-    const Tensor& query,
-    const Tensor& key,
-    const Tensor& value,
+    const Tensor& _query,
+    const Tensor& _key,
+    const Tensor& _value,
     const c10::optional<Tensor>& attn_mask,
     const c10::optional<at::Tensor>& dropout_mask,
     const c10::optional<at::Tensor>& seed_t,
@@ -63,10 +63,10 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
     attn_mask_padded_block_size = alignTo * ((lastDim + alignTo - 1) / alignTo);
   }
 
-  // check q, k, v
-  CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(query);
-  CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(key);
-  CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(value);
+  // make q, k, v strided
+  auto query = _query.transpose(1, 2).contiguous().transpose(1, 2);
+  auto key = _key.transpose(1, 2).contiguous().transpose(1, 2);
+  auto value = _value.transpose(1, 2).contiguous().transpose(1, 2);
 
   // create strided output
   // size [bs, num_head, qsize, head_size]
@@ -102,12 +102,7 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
        query.size(3),
        query.size(2),
        key.size(2),
-       query.stride(0),
-       query.stride(1),
        query.stride(2),
-       key.stride(0),
-       key.stride(1),
-       key.stride(2),
        attn_mask.has_value() ? attn_mask->stride(0) : -1,
        attn_mask.has_value() ? attn_mask->stride(1) : -1,
        attn_mask.has_value() ? attn_mask->stride(2) : -1,
@@ -1134,12 +1129,7 @@ Tensor varlen_fwd(
        head_dim,
        num_queries,
        num_keys,
-       /* q_strideB */ query.stride(0),
-       /* q_strideN */ query.stride(1),
        /* q_strideF */ query.stride(2),
-       /* kv_strideB */ key.stride(0),
-       /* kv_strideN */ key.stride(1),
-       /* kv_strideT */ key.stride(2),
        /* bias_strideB */ -1,
        /* bias_strideN */ -1,
        /* bias_strideF */ -1,
@@ -1255,12 +1245,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
        head_dim,
        M,
        N,
-       query.stride(0),
-       query.stride(1),
        query.stride(2),
-       key.stride(0),
-       key.stride(1),
-       key.stride(2),
        attn_mask.has_value() ? attn_mask_bc.stride(0) : -1,
        attn_mask.has_value() ? attn_mask_bc.stride(1) : -1,
        attn_mask.has_value() ? attn_mask_bc.stride(2) : -1,
