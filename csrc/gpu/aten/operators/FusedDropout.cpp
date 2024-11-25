@@ -514,33 +514,6 @@ Tensor dropout_backward_dpcpp(
 
 } // namespace impl
 
-std::tuple<Tensor, Tensor> native_dropout(
-    const Tensor& self,
-    double p,
-    c10::optional<bool> train) {
-  // short-cut for train == false
-  if (train.has_value() && !train.value()) {
-    return std::make_tuple(
-        self.clone(),
-        at::ones_like(
-            self, self.options().dtype(c10::CppTypeToScalarType<bool>::value)));
-  }
-  // short-cut
-  if (p == 1) {
-    // native_dropout is in file yaml, so we don't need to add data
-    // dependency from output to input for autograd
-    auto ret = at::zeros_like(self);
-    auto mask = at::zeros_like(
-        self, self.options().dtype(c10::CppTypeToScalarType<bool>::value));
-    return std::tuple<Tensor, Tensor>(ret, mask);
-  }
-
-  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
-      c10::nullopt, at::xpu::detail::getDefaultXPUGenerator());
-  double p1m = 1. - p;
-  return impl::dropout_template<bool>(gen, self, p1m);
-}
-
 // NOTE: _fused_dropout will be removed, see PR #63937
 std::tuple<Tensor, Tensor> _fused_dropout(
     const Tensor& self,
@@ -549,17 +522,6 @@ std::tuple<Tensor, Tensor> _fused_dropout(
   auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
       gen_, at::xpu::detail::getDefaultXPUGenerator());
   return impl::dropout_template<uint8_t>(gen, self, p);
-}
-
-Tensor native_dropout_backward(
-    const Tensor& grad,
-    const Tensor& mask,
-    double scale) {
-  TORCH_CHECK(
-      mask.scalar_type() == at::ScalarType::Bool,
-      "Mask should be Bool Scalar Type",
-      mask.scalar_type());
-  return impl::dropout_backward_dpcpp<bool>(grad, mask, scale);
 }
 
 // NOTE: _masked_scale will be removed, see PR #63937

@@ -538,7 +538,7 @@ Tensor add_add_layer_norm(
         } else
           input_ = add1 + input_;
       }
-      output = std::get<0>(at::AtenIpexTypeXPU::native_layer_norm(
+      output = std::get<0>(at::native_layer_norm(
           input_, normalized_shape, weight_opt, bias_opt, epsilon));
     }
   }

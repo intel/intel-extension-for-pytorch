@@ -34,20 +34,12 @@ const Tensor& resize_as_(const Tensor& self, const Tensor& the_template) {
 
 } // namespace impl
 
-const Tensor& resize_(
-    const Tensor& self,
-    IntArrayRef size,
-    c10::optional<MemoryFormat> memory_format) {
-  impl::resize_(self, size, memory_format);
-  return self;
-}
-
 const Tensor& resize_as_(
     const Tensor& self,
     const Tensor& the_template,
     c10::optional<MemoryFormat> memory_format) {
-  return at::AtenIpexTypeXPU::resize_(
-      self, the_template.sizes(), memory_format);
+  impl::resize_(self, the_template.sizes(), memory_format);
+  return self;
 }
 
 bool resize_output_check(const Tensor& output, IntArrayRef shape) {
