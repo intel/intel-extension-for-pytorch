@@ -5229,11 +5229,10 @@ class IPEX_LLM_Model_Return(torch.nn.Module):
         super().__init__()
         self.config = model.config
         self.optimized_model = optimized_model
-        self.model = model
 
     def forward(self, *args, **kwargs):
         outputs = self.optimized_model(*args, **kwargs)
-        return output_hook(self.model, args, kwargs, outputs)
+        return output_hook(self, args, kwargs, outputs)
 
     def save(self, path):
         self.optimized_model.save(path)
