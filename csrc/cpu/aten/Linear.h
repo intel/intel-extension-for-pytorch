@@ -247,12 +247,19 @@ using woq_dequant_int4_to_int8_packed_fn = at::Tensor (*)(
     int64_t,
     at::Tensor&);
 
+using dequant_nf4_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    int64_t,
+    c10::ScalarType);
+
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 IPEX_DECLARE_DISPATCH(
     woq_dequant_int4_to_int8_packed_fn,
     woq_dequant_int4_to_int8_packed_stub);
+IPEX_DECLARE_DISPATCH(dequant_nf4_fn, dequant_nf4_stub);
 
 // Fusion types
 #define WOQ_FUSE_NONE 0x0

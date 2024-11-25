@@ -8,6 +8,7 @@
 #include "aten/utils/woq.h"
 #include "csrc/cpu/tpp/kernels/TPPGEMMKrnl.h"
 #include "csrc/cpu/tpp/woq/tla.h"
+#include "csrc/cpu/vec/vec.h"
 
 #ifdef __GNUC__
 #include <features.h>
@@ -4981,6 +4982,122 @@ at::Tensor dequantize_int4_weight_to_int8_packed(
   return dqw;
 }
 
+at::Tensor dequantize_nf4(
+    const at::Tensor& t,
+    const at::Tensor& scales,
+    int64_t group_size,
+    c10::ScalarType out_dtype) {
+  TORCH_CHECK(
+      t.dim() == 2,
+      "dequantize_nf4 only supports 2D input, but got ",
+      t.dim(),
+      "D");
+  TORCH_CHECK(
+      t.scalar_type() == c10::kByte || t.scalar_type() == c10::kChar,
+      "dequantize_nf4 only supports uint8 or int8 input, but got ",
+      t.scalar_type());
+  TORCH_CHECK(
+      scales.dim() <= 2,
+      "dequantize_nf4: scales must be 1D (per-channel) or 2D (per-group), but got ",
+      scales.dim(),
+      "D");
+  TORCH_CHECK(
+      out_dtype == c10::kFloat || out_dtype == c10::kBFloat16 ||
+          out_dtype == c10::kHalf,
+      "dequantize_nf4 only supports float, bfloat16 or float16 output, but got ",
+      out_dtype);
+  auto N = t.size(0);
+  auto K = t.size(1) * 2;
+  using Tcomp = float;
+  constexpr auto VEC_LEN = sizeof(__m512i) / sizeof(Tcomp);
+  if (K % VEC_LEN == 0 && (group_size >= VEC_LEN || group_size < 0)) {
+    auto n_groups = K / group_size;
+    torch::Tensor out = torch::empty({N, K}, out_dtype);
+    product_dispatcher<
+        std::tuple<c10::ScalarType, c10::ScalarType>,
+        std::tuple<
+            enumerate_dispatcher<
+                c10::ScalarType,
+                c10::kFloat,
+                c10::kBFloat16,
+                c10::kHalf>,
+            enumerate_dispatcher<
+                c10::ScalarType,
+                c10::kFloat,
+                c10::kBFloat16,
+                c10::kHalf>>>::
+        call(
+            std::make_tuple(out_dtype, scales.scalar_type()),
+            [&](auto tuple) {
+              // Note: we don't use the `Dequantize` utilities because they are
+              // designed for packed layout but we are handling plain layout
+              // here.
+              auto out_dtype_ = std::get<0>(tuple);
+              auto scales_dtype_ = std::get<1>(tuple);
+              using T =
+                  typename c10::impl::ScalarTypeToCPPType<out_dtype_>::type;
+              using Tscale =
+                  typename c10::impl::ScalarTypeToCPPType<scales_dtype_>::type;
+              using VT = typename VecType<Tcomp>::type;
+              using V = VecOps<VT>;
+              VT lut = V::set_nf4_lut();
+              constexpr auto k_step = VEC_LEN / 2;
+              auto pt = GetVLAPtr<uint8_t>(
+                  (uint8_t*)t.data_ptr(), {t.size(1) / k_step, k_step});
+              auto pscales = group_size < 0
+                  ? GetVLAPtr<Tscale>(scales, {1})
+                  : GetVLAPtr<Tscale>(scales, {n_groups});
+              auto out_ptr = GetVLAPtr<T>(out, {K / VEC_LEN, VEC_LEN});
+
+              auto dequant_loop = ThreadedLoop<2>({{N}}, /* loop_scheme */ "A");
+              dequant_loop(
+                  [&](int* idx) {
+                    int n = idx[0];
+                    for (int k = 0; k < t.size(1); k += k_step) {
+                      // Load 64 bits of nf4 data and a single scale data
+                      auto p = pt[n][k / k_step];
+                      auto scale_idx = group_size < 0 ? 0 : k * 2 / group_size;
+                      auto vscales = V::set1((float)pscales[n][scale_idx]);
+                      uint64_t packed = reinterpret_cast<uint64_t*>(p)[0];
+                      // unpack nf4 data to 32-bit integers
+                      uint64_t high = 0;
+                      uint64_t low = 0;
+                      for (int i = 0; i < 8; ++i) {
+                        low |= ((packed >> (i * 4)) & 0xf) << (i * 8);
+                        high |= ((packed >> (i * 4 + 32)) & 0xf) << (i * 8);
+                      }
+                      __m128i packed_128 = _mm_set_epi64x(high, low);
+                      __m512i vint32 = _mm512_cvtepu8_epi32(packed_128);
+                      // Table look-up
+                      __m512 vout = _mm512_permutexvar_ps(vint32, lut);
+                      // Apply scale
+                      vout = V::mul(vout, vscales);
+                      // Store results
+                      auto pout = out_ptr[n][k / k_step];
+                      if constexpr (std::is_same<T, float>()) {
+                        _mm512_storeu_ps(pout, vout);
+                      } else if constexpr (std::is_same<T, at::BFloat16>()) {
+                        _mm256_storeu_si256(
+                            (__m256i*)pout, cvt_fp32_to_bf16(vout));
+                      } else if constexpr (std::is_same<T, at::Half>()) {
+                        _mm256_storeu_si256(
+                            (__m256i*)pout, cvt_fp32_to_fp16(vout));
+                      } else {
+                        TORCH_CHECK(false, "Unexpected dtype");
+                      }
+                    }
+                  },
+                  [&]() {},
+                  [&]() {});
+            },
+            [&](auto out_dtype_) { failing_fallback(); });
+    return out;
+  }
+  auto out = dequantize_woq_weight(
+      t, {N, K}, scales.unsqueeze(-1), at::Tensor(), WOQ_DTYPE_NF4, group_size);
+  return out.to(out_dtype);
+}
+
 #else // defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
 
 #define SMALL_BATCH_THRESHOLD 32
@@ -5087,6 +5204,19 @@ at::Tensor dequantize_int4_weight_to_int8_packed(
     at::Tensor& compensation) {
   return qw_packed;
 }
+
+at::Tensor dequantize_nf4(
+    const at::Tensor& t,
+    const at::Tensor& scales,
+    int64_t group_size,
+    c10::ScalarType out_dtype) {
+  auto N = t.size(0);
+  auto K = t.size(1) * 2;
+  auto out = dequantize_woq_weight(
+      t, {N, K}, scales.unsqueeze(-1), at::Tensor(), WOQ_DTYPE_NF4, group_size);
+  return out.to(out_dtype);
+}
+
 #endif // defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
 
 } // namespace
@@ -5097,6 +5227,7 @@ IPEX_REGISTER_DISPATCH(woq_tpp_gemm_unpackB_stub, &qlinear_woq_unpack);
 IPEX_REGISTER_DISPATCH(
     woq_dequant_int4_to_int8_packed_stub,
     &dequantize_int4_weight_to_int8_packed);
+IPEX_REGISTER_DISPATCH(dequant_nf4_stub, &dequantize_nf4);
 
 } // namespace cpu
 } // namespace torch_ipex

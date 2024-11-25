@@ -2319,6 +2319,41 @@ class WeightOnlyQuantizationTester(TestCase):
             test(M, use_bias, w_dtype)
 
 
+class QuantizedOpTester(TestCase):
+    def test_dequantize_nf4(self):
+        dtype_list = [torch.float, torch.bfloat16, torch.half]
+        group_size_list = [-1, 32, 128]
+        cases = itertools.product(dtype_list, group_size_list)
+        for dtype, group_size in cases:
+            t_fp = torch.randn(1024, 1024, dtype=dtype)
+            scale_dtype_list = list(set([dtype, torch.float]))
+            for scale_dtype in scale_dtype_list:
+                if group_size < 0:
+                    t, scales, zp = quantize_per_channel(
+                        t_fp, WoqWeightDtype.NF4, None, None, sym_quant=True
+                    )
+                    scales = scales.to(scale_dtype)
+                    out_ref = dequantize_per_channel(
+                        t, scales, zp, WoqWeightDtype.NF4, t_fp.shape
+                    ).to(dtype)
+                    out = torch.ops.torch_ipex.dequantize_nf4(
+                        t, scales, group_size, dtype
+                    )
+                    assert torch.allclose(out, out_ref)
+                else:
+                    t, scales, zp = quantize_per_block(
+                        t_fp, WoqWeightDtype.NF4, group_size, None, None, sym_quant=True
+                    )
+                    scales = scales.to(scale_dtype)
+                    out_ref = dequantize_per_block(
+                        t, scales, zp, WoqWeightDtype.NF4, group_size, t_fp.shape
+                    ).to(dtype)
+                    out = torch.ops.torch_ipex.dequantize_nf4(
+                        t, scales, group_size, dtype
+                    )
+                    assert torch.allclose(out, out_ref)
+
+
 if __name__ == "__main__":
     test = unittest.main()
     run_tests()
