@@ -725,24 +725,16 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
     unpacked_weight = woq_shuffle_weight_back_by_group_idx(
         unpacked_weight, context.weight_shape_, g_idx, group_size);
   }
-  if (tensor.dim() > 2) {
-    auto scales = context.scales_list_[0];
-    auto zero_points = context.zero_points_list_[0];
-    if (context.is_4bit_) {
-      auto unpacked_shape = unpacked_weight.sizes().vec(); // = N * K/2
-      auto shape = context.weight_shape_;
-      shape.back() /= 2;
-      at::Tensor qweight =
-          at::empty(shape, device(c10::kCPU).dtype(c10::kByte));
-      assert(qweight.numel() % 2 == 0);
-      std::memcpy(
-          qweight.data_ptr(), unpacked_weight.data_ptr(), qweight.numel());
-      return qweight;
-    } else { // int8
-      return unpacked_weight;
-    }
+  auto shape = context.weight_shape_;
+  if (context.is_4bit_) {
+    shape.back() = (shape.back() + 1) / 2;
   }
-  return unpacked_weight;
+  // weight may be padded. Copy data according to original shape
+  at::Tensor qweight =
+      at::empty(shape, device(c10::kCPU).dtype(unpacked_weight.scalar_type()));
+  assert(qweight.numel() % 2 == 0);
+  std::memcpy(qweight.data_ptr(), unpacked_weight.data_ptr(), qweight.numel());
+  return qweight;
 }
 
 template <typename T, typename Tg, bool is_4bit = false>

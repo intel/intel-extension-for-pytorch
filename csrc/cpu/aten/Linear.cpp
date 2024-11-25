@@ -404,7 +404,10 @@ at::Tensor woq_linear_pack_weight(
           kCPU, weight_int4, weight_dtype, block_n, block_k, lowp_mode);
     }
     if (N % block_n) {
-      return weight;
+      at::Tensor weight_padded =
+          at::pad(weight, {0, 0, 0, block_n - N % block_n}, "constant", 0);
+      return woq_tpp_gemm_packB_stub(
+          kCPU, weight_padded, weight_dtype, block_n, block_k, lowp_mode);
     } else {
       return woq_tpp_gemm_packB_stub(
           kCPU, weight, weight_dtype, block_n, block_k, lowp_mode);
