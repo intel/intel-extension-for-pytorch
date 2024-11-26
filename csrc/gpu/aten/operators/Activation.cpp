@@ -244,50 +244,6 @@ inline void _rrelu_with_noise_train(
 }
 
 template <typename scalar_t>
-struct ThresholdOutFunctor {
-  scalar_t operator()(scalar_t x, scalar_t other) const {
-    return x <= _threshold ? _value : other;
-  }
-
-  ThresholdOutFunctor(scalar_t _threshold, scalar_t _value)
-      : _threshold(_threshold), _value(_value) {}
-
- private:
-  scalar_t _threshold;
-  scalar_t _value;
-};
-
-inline Tensor threshold_out(
-    optional<Tensor> opt_result,
-    const Tensor& self,
-    const Scalar& threshold,
-    const Scalar& value,
-    const Tensor& other) {
-  Tensor result = opt_result.value_or(Tensor());
-  return unary_out_with_onednn_and_loops_bw<dnnl::algorithm::eltwise_relu>(
-      TensorIterator::binary_op,
-      result,
-      self,
-      other,
-      [=](TensorIteratorBase& iter) {
-        IPEX_DISPATCH_ALL_TYPES_AND2(
-            at::ScalarType::BFloat16,
-            at::ScalarType::Half,
-            iter.dtype(),
-            "threshold",
-            [&] {
-              scalar_t _threshold = threshold.to<scalar_t>();
-              scalar_t _value = value.to<scalar_t>();
-              ThresholdOutFunctor<scalar_t> f(_threshold, _value);
-              dpcpp_kernel_for_tensor_iter(iter, f);
-            });
-      },
-      0.0f,
-      0.0f,
-      0.0 == threshold.to<float>() && 0.0 == value.to<float>());
-}
-
-template <typename scalar_t>
 inline scalar_t relu_forward(scalar_t self) {
   if (at::_isnan(self)) {
     return self;
@@ -319,42 +275,6 @@ template <typename scalar_t>
 inline scalar_t gelu_quick_forward(scalar_t x) {
   using opmath_t = at::opmath_type<scalar_t>;
   return (scalar_t)(((opmath_t)x) / (1.0f + expf(-1.702f * (opmath_t)x)));
-}
-
-template <typename scalar_t>
-inline scalar_t gelu_erf_backward(scalar_t dy, scalar_t x) {
-  using opmath_t = at::opmath_type<scalar_t>;
-  constexpr opmath_t kBeta = M_2_SQRTPI * M_SQRT1_2 * opmath_t(0.5);
-  constexpr opmath_t kAlpha = M_SQRT1_2;
-  const opmath_t cdf =
-      opmath_t(0.5) * (opmath_t(1) + ::erf(static_cast<opmath_t>(x) * kAlpha));
-  const opmath_t pdf = Numerics<opmath_t>::exp(
-                           opmath_t(-0.5) * static_cast<opmath_t>(x) *
-                           static_cast<opmath_t>(x)) *
-      kBeta;
-  return static_cast<opmath_t>(dy) * (cdf + static_cast<opmath_t>(x) * pdf);
-}
-
-template <typename scalar_t>
-inline scalar_t gelu_tanh_backward(scalar_t dy, scalar_t x) {
-  using opmath_t = at::opmath_type<scalar_t>;
-  constexpr opmath_t kBeta = M_SQRT2 * M_2_SQRTPI * opmath_t(0.5);
-  constexpr opmath_t kKappa = 0.044715;
-  auto x_sq = static_cast<opmath_t>(x) * static_cast<opmath_t>(x);
-  auto x_cube = x_sq * static_cast<opmath_t>(x);
-  auto inner = kBeta * (static_cast<opmath_t>(x) + kKappa * x_cube);
-  auto tanh_inner = Numerics<opmath_t>::tanh(inner);
-
-  auto left = opmath_t(0.5) * static_cast<opmath_t>(x);
-  auto right = opmath_t(1) + tanh_inner;
-
-  auto left_derivative = opmath_t(0.5) * right;
-
-  auto tanh_derivative = opmath_t(1) - tanh_inner * tanh_inner;
-  auto inner_derivative = kBeta * (opmath_t(1) + opmath_t(3) * kKappa * x_sq);
-  auto right_derivative = left * tanh_derivative * inner_derivative;
-
-  return static_cast<opmath_t>(dy) * (left_derivative + right_derivative);
 }
 
 template <typename scalar_t>
@@ -424,43 +344,6 @@ Tensor& relu_(Tensor& self) {
               dpcpp_kernel_for_tensor_iter(iter, f);
             });
       });
-}
-
-Tensor& threshold_(Tensor& self, const Scalar& threshold, const Scalar& value) {
-  impl::threshold_out(make_optional(self), self, threshold, value, self);
-  return self;
-}
-
-Tensor threshold(
-    const Tensor& self,
-    const Scalar& threshold,
-    const Scalar& value) {
-  return impl::threshold_out(nullopt, self, threshold, value, self);
-}
-
-Tensor& threshold_out(
-    const Tensor& self,
-    const Scalar& threshold,
-    const Scalar& value,
-    Tensor& result) {
-  impl::threshold_out(make_optional(result), self, threshold, value, self);
-  return result;
-}
-
-Tensor threshold_backward(
-    const Tensor& grad,
-    const Tensor& self,
-    const Scalar& threshold) {
-  return impl::threshold_out(nullopt, self, threshold, 0, grad);
-}
-
-Tensor& threshold_backward_out(
-    const Tensor& grad,
-    const Tensor& self,
-    const Scalar& threshold,
-    Tensor& gradInput) {
-  impl::threshold_out(make_optional(gradInput), self, threshold, 0, grad);
-  return gradInput;
 }
 
 Tensor& rrelu_with_noise_out(
@@ -609,111 +492,6 @@ Tensor hardshrink_backward(
   return hardshrink_backward_out(grad, self, lambd, result);
 }
 
-template <typename scalar_t, typename accscalar_t>
-struct HardswishOutFunctor {
-  scalar_t operator()(scalar_t self_val) const {
-    accscalar_t x = static_cast<accscalar_t>(self_val);
-    return x * std::min(std::max(x + three, zero), six) * one_sixth;
-  }
-
-  HardswishOutFunctor(
-      const accscalar_t zero,
-      const accscalar_t one_sixth,
-      const accscalar_t three,
-      const accscalar_t six)
-      : zero(zero), one_sixth(one_sixth), three(three), six(six) {}
-
- private:
-  const accscalar_t zero;
-  const accscalar_t one_sixth;
-  const accscalar_t three;
-  const accscalar_t six;
-};
-
-Tensor& hardswish_out(const Tensor& self, Tensor& result) {
-  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_hardswish>(
-      TensorIterator::unary_op,
-      result,
-      self,
-      [=](TensorIteratorBase& iter) {
-        IPEX_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::BFloat16,
-            at::ScalarType::Half,
-            iter.dtype(),
-            "hardswish",
-            [&]() {
-              using accscalar_t = at::opmath_type<scalar_t>;
-              const accscalar_t zero(0.0f);
-              const accscalar_t one_sixth(1.0f / 6.0f);
-              const accscalar_t three(3.0f);
-              const accscalar_t six(6.0f);
-              HardswishOutFunctor<scalar_t, accscalar_t> f(
-                  zero, one_sixth, three, six);
-              dpcpp_kernel_for_tensor_iter(iter, f);
-            });
-      },
-      /* alpha = */ 1.0f / 6.0f,
-      /* beta = */ 1.0f / 2.0f);
-}
-
-Tensor hardswish(const Tensor& self) {
-  Tensor result = at::empty_like(self);
-  return at::AtenIpexTypeXPU::hardswish_out(self, result);
-}
-
-Tensor& hardswish_(Tensor& self) {
-  return at::AtenIpexTypeXPU::hardswish_out(self, self);
-}
-
-template <typename scalar_t, typename accscalar_t>
-struct HardswishBackwardFunctor {
-  scalar_t operator()(scalar_t grad_val_, scalar_t self_val_) const {
-    accscalar_t grad_val = static_cast<accscalar_t>(grad_val_);
-    accscalar_t self_val = static_cast<accscalar_t>(self_val_);
-    if (self_val < neg_three) {
-      return zero;
-    } else if (self_val <= three) {
-      return grad_val * ((self_val / three) + one_half);
-    } else {
-      return grad_val;
-    }
-  }
-
-  HardswishBackwardFunctor(
-      const accscalar_t zero,
-      const accscalar_t three,
-      const accscalar_t neg_three,
-      const accscalar_t one_half)
-      : zero(zero), three(three), neg_three(neg_three), one_half(one_half) {}
-
- private:
-  const accscalar_t zero;
-  const accscalar_t three;
-  const accscalar_t neg_three;
-  const accscalar_t one_half;
-};
-
-Tensor hardswish_backward(const Tensor& grad_output, const Tensor& self) {
-  auto result = at::empty_like(grad_output);
-  auto iter = TensorIterator::binary_op(result, grad_output, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      iter.dtype(),
-      "hardswish_backward",
-      [&]() {
-        using accscalar_t = at::opmath_type<scalar_t>;
-        const accscalar_t zero(0.0f);
-        const accscalar_t three(3.0f);
-        const accscalar_t neg_three(-3.0f);
-        const accscalar_t one_half(0.5f);
-        HardswishBackwardFunctor<scalar_t, accscalar_t> f(
-            zero, three, neg_three, one_half);
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-  return result;
-}
-
 template <typename scalar_t>
 struct GeluTanhOutFunctor {
   scalar_t operator()(scalar_t self) const {
@@ -768,11 +546,6 @@ Tensor& gelu_out(
   }
 }
 
-Tensor gelu(const Tensor& self, c10::string_view approximate) {
-  Tensor result;
-  return gelu_out(self, approximate, result);
-}
-
 Tensor gelu_quick_out(const Tensor& self, Tensor& result) {
   bool out_defined = result.defined();
   auto iter = TensorIterator::unary_op(result, self);
@@ -798,141 +571,8 @@ Tensor gelu_quick(const Tensor& self) {
   return gelu_quick_out(self, result);
 }
 
-template <typename scalar_t>
-struct GeluTanhBackwardOutKernelFunctor {
-  scalar_t operator()(scalar_t self, scalar_t grad) const {
-    return impl::gelu_tanh_backward<scalar_t>(grad, self);
-  }
-};
-
-template <typename scalar_t>
-struct GeluErfBackwardOutKernelFunctor {
-  scalar_t operator()(scalar_t self, scalar_t grad) const {
-    return impl::gelu_erf_backward<scalar_t>(grad, self);
-  }
-};
-
-Tensor& gelu_backward_out(
-    const Tensor& grad,
-    const Tensor& self,
-    c10::string_view approximate,
-    Tensor& grad_input) {
-  auto _approximate = at::native::get_gelutype_enum(approximate);
-  if (_approximate == at::native::GeluType::Tanh) {
-    return unary_out_with_onednn_and_loops_bw<
-        dnnl::algorithm::eltwise_gelu_tanh>(
-        TensorIterator::binary_op,
-        grad_input,
-        self,
-        grad,
-        [=](TensorIteratorBase& iter) {
-          IPEX_DISPATCH_FLOATING_TYPES_AND2(
-              at::ScalarType::BFloat16,
-              at::ScalarType::Half,
-              iter.dtype(),
-              "gelu_backward",
-              [&]() {
-                GeluTanhBackwardOutKernelFunctor<scalar_t> f;
-                dpcpp_kernel_with_scalars(iter, f);
-              });
-        });
-  } else {
-    return unary_out_with_onednn_and_loops_bw<
-        dnnl::algorithm::eltwise_gelu_erf>(
-        TensorIterator::binary_op,
-        grad_input,
-        self,
-        grad,
-        [=](TensorIteratorBase& iter) {
-          IPEX_DISPATCH_FLOATING_TYPES_AND2(
-              at::ScalarType::BFloat16,
-              at::ScalarType::Half,
-              iter.dtype(),
-              "gelu_backward",
-              [&]() {
-                GeluErfBackwardOutKernelFunctor<scalar_t> f;
-                dpcpp_kernel_with_scalars(iter, f);
-              });
-        });
-  }
-}
-
-Tensor gelu_backward(
-    const Tensor& grad,
-    const Tensor& self,
-    c10::string_view approximate) {
-  Tensor result;
-  return gelu_backward_out(grad, self, approximate, result);
-}
-
 Tensor& silu_out(const Tensor& self, Tensor& output) {
   return impl::silu_out_kernel(self, output);
-}
-
-template <typename scalar_t>
-struct SiluBackwardOutFunctor {
-  scalar_t operator()(scalar_t dy, scalar_t x) const {
-    using accscalar_t = at::opmath_type<scalar_t>;
-    const accscalar_t dy_acc = static_cast<accscalar_t>(dy);
-    const accscalar_t x_acc = static_cast<accscalar_t>(x);
-    const accscalar_t one = static_cast<accscalar_t>(1);
-    const accscalar_t s_acc = one / (one + Numerics<accscalar_t>::exp(-x_acc));
-    return dy_acc * s_acc * (one + x_acc * (one - s_acc));
-  }
-};
-
-Tensor& silu_backward_out(
-    const Tensor& grad_output,
-    const Tensor& output,
-    Tensor& grad_input) {
-  return unary_out_with_onednn_and_loops_bw<dnnl::algorithm::eltwise_swish>(
-      TensorIterator::binary_op,
-      grad_input,
-      grad_output,
-      output,
-      [=](TensorIteratorBase& iter) {
-        IPEX_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half,
-            at::ScalarType::BFloat16,
-            iter.dtype(),
-            "silu_backward_out",
-            [&]() {
-              SiluBackwardOutFunctor<scalar_t> f;
-              dpcpp_kernel_for_tensor_iter(iter, f);
-            });
-      },
-      /* alpha = */ 1.0f);
-}
-
-Tensor silu_backward(const Tensor& grad_output, const Tensor& output) {
-  Tensor grad_input = at::empty_like(grad_output);
-  return silu_backward_out(grad_output, output, grad_input);
-}
-
-template <typename scalar_t>
-struct MishOutFunctor {
-  scalar_t operator()(scalar_t self) const {
-    using accscalar_t = at::opmath_type<scalar_t>;
-    const accscalar_t x_acc = static_cast<accscalar_t>(self);
-    return x_acc *
-        Numerics<accscalar_t>::tanh(
-               Numerics<accscalar_t>::log1p(Numerics<accscalar_t>::exp(x_acc)));
-  }
-};
-
-at::Tensor& mish_out(const at::Tensor& self, at::Tensor& out) {
-  return unary_out_with_onednn_and_loops<dnnl::algorithm::eltwise_mish>(
-      TensorIterator::unary_op, out, self, [=](TensorIteratorBase& iter) {
-        IPEX_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::BFloat16,
-            at::ScalarType::Half,
-            iter.dtype(),
-            "mish",
-            [&]() {
-              MishOutFunctor<scalar_t> f;
-              dpcpp_kernel_for_tensor_iter(iter, f);
-            });
-      });
 }
 
 template <typename scalar_t>
