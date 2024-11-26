@@ -77,22 +77,5 @@ Tensor amax(const Tensor& self, IntArrayRef dim, bool keepdim) {
   return at::AtenIpexTypeXPU::amax_out(self, dim, keepdim, result);
 }
 
-Tensor max(const Tensor& self) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::amax_out(
-      self, std::vector<int64_t>{}, false, result);
-}
-
-Tensor& max_out(const Tensor& self, Tensor& out) {
-  TORCH_CHECK(self.device() == out.device());
-
-  TORCH_CHECK(canCast(
-      typeMetaToScalarType(self.dtype()), typeMetaToScalarType(out.dtype())));
-
-  resize_output(out, {});
-  at::AtenIpexTypeXPU::amax_out(self, std::vector<int64_t>{}, false, out);
-  return out;
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at

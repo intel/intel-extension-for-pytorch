@@ -72,36 +72,17 @@ Tensor& amin_out(
   return result;
 }
 
-Tensor min_out(
-    Tensor& result,
-    const Tensor& self,
-    IntArrayRef dim,
-    bool keepdim) {
+Tensor min(const Tensor& self) {
+  Tensor result;
   ScalarType dtype = get_dtype(result, self, c10::nullopt);
-  auto iter = meta::make_reduction("min", result, self, dim, keepdim, dtype);
+  auto iter = meta::make_reduction(
+      "min", result, self, std::vector<int64_t>{}, false, dtype);
   if (iter.numel() == 0) {
     result.zero_();
   } else {
     min_kernel(iter);
   }
   return result;
-}
-
-Tensor min(const Tensor& self) {
-  Tensor result;
-  return at::AtenIpexTypeXPU::min_out(
-      result, self, std::vector<int64_t>{}, false);
-}
-
-Tensor& min_out(const Tensor& self, Tensor& out) {
-  TORCH_CHECK(self.device() == out.device());
-
-  TORCH_CHECK(canCast(
-      typeMetaToScalarType(self.dtype()), typeMetaToScalarType(out.dtype())));
-
-  resize_output(out, {});
-  at::AtenIpexTypeXPU::min_out(out, self, std::vector<int64_t>{}, false);
-  return out;
 }
 
 } // namespace AtenIpexTypeXPU

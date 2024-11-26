@@ -115,18 +115,10 @@ Tensor& mean_out(
   return result;
 }
 
-Tensor mean(
-    const Tensor& self,
-    c10::OptionalArrayRef<int64_t> opt_dim,
-    bool keepdim,
-    optional<ScalarType> dtype) {
-  Tensor result;
-  return at::AtenIpexTypeXPU::mean_out(self, opt_dim, keepdim, dtype, result);
-}
-
 Tensor mean(const Tensor& self, optional<ScalarType> dtype) {
-  return at::AtenIpexTypeXPU::mean(
-      self, OptionalIntArrayRef{IntArrayRef{}}, false, dtype);
+  Tensor result;
+  return at::AtenIpexTypeXPU::mean_out(
+      self, OptionalIntArrayRef{IntArrayRef{}}, false, dtype, result);
 }
 
 } // namespace AtenIpexTypeXPU

@@ -137,44 +137,6 @@ Tensor& eye_out_dpcpp(Tensor& result, int64_t n) {
   return eye_out_dpcpp(result, n, n);
 }
 
-template <typename scalar_t>
-struct randperm_dpcpp_lt_functor {
-  auto operator()(scalar_t a, scalar_t b) const {
-    return Numerics<scalar_t>::lt(a, b);
-  }
-};
-
-template <typename scalar_t>
-Tensor randperm_dpcpp(
-    Tensor& result,
-    int64_t n,
-    c10::optional<Generator> generator) {
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-  auto keys = at::empty(result.sizes(), result.options()).random_(generator);
-  scalar_t* keys_data = keys.data_ptr<scalar_t>();
-
-  Tensor shuffled;
-  scalar_t* shuffled_data;
-  if (result.is_contiguous()) {
-    shuffled = result;
-    shuffled_data = result.data_ptr<scalar_t>();
-  } else {
-    shuffled = at::empty(n, result.options());
-    shuffled_data = shuffled.data_ptr<scalar_t>();
-  }
-
-  torch_ipex::xpu::pstl::iota(shuffled_data, shuffled_data + n, scalar_t(0));
-  randperm_dpcpp_lt_functor<scalar_t> f;
-  torch_ipex::xpu::pstl::merge_sort<scalar_t, scalar_t>(
-      keys_data, shuffled_data, keys.size(0), f);
-
-  if (!result.is_contiguous()) {
-    result.copy_(shuffled);
-  }
-  return result;
-}
-
 namespace triangle_dpcpp {
 // To find the max integer that does not exceed the root of an int64_t variable,
 // we could use a loop to test one bit at a time, which takes up to 31
@@ -529,24 +491,6 @@ Tensor& eye_out(int64_t n, Tensor& out) {
 Tensor& eye_out(int64_t n, int64_t m, Tensor& out) {
   AtenIpexTypeXPU::impl::eye_out_dpcpp(out, n, m);
   return out;
-}
-
-Tensor& randperm_out(
-    int64_t n,
-    c10::optional<Generator> generator,
-    Tensor& result) {
-  TORCH_CHECK(n >= 0, "n must be non-negative, got", n);
-  check_supported_max_int_with_precision(n, result);
-  result.resize_({n});
-  if (n == 0) {
-    return result;
-  }
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, result.scalar_type(), "randperm", [&]() -> void {
-        AtenIpexTypeXPU::impl::randperm_dpcpp<scalar_t>(result, n, generator);
-      });
-
-  return result;
 }
 
 Tensor tril_indices(

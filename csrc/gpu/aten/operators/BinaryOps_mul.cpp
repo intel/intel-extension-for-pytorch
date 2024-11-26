@@ -60,16 +60,8 @@ Tensor mul(const Tensor& self, const Tensor& other) {
       [=](TensorIteratorBase& iter) { impl::mul_kernel_dpcpp(iter); });
 }
 
-Tensor& mul_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::mul_out(self, other, self);
-}
-
 Tensor mul(const Tensor& self, const Scalar& other) {
   return at::AtenIpexTypeXPU::mul(self, wrapped_scalar_tensor(other));
-}
-
-Tensor& mul_(Tensor& self, const Scalar& other) {
-  return at::AtenIpexTypeXPU::mul_out(self, wrapped_scalar_tensor(other), self);
 }
 
 } // namespace AtenIpexTypeXPU
