@@ -27,54 +27,6 @@ static c10::MaybeOwned<Tensor> contiguous_out_arg(const Tensor& tensor) {
       at::empty(tensor.sizes(), tensor.options()));
 }
 
-Tensor& cumsum_out(
-    const Tensor& self,
-    int64_t dim,
-    c10::optional<at::ScalarType> dtype,
-    Tensor& out) {
-  // convert input tensor datatype to handle different input/output datatypes
-  // case.
-  Tensor self_tensor = self.to(out.scalar_type());
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
-      ScalarType::Half,
-      ScalarType::BFloat16,
-      self_tensor.scalar_type(),
-      "cumsum",
-      [&]() {
-        scan<INCLUSIVE_TYPE, scalar_t, scalar_t>(
-            out,
-            self_tensor,
-            dim,
-            ScalarConvert<float, scalar_t>::to(0.0),
-            AddOp<scalar_t>());
-      });
-  return out;
-}
-
-Tensor& cumprod_out(
-    const Tensor& self,
-    int64_t dim,
-    c10::optional<at::ScalarType> dtype,
-    Tensor& out) {
-  // convert input tensor datatype to handle different input/output datatypes
-  // case.
-  Tensor self_tensor = self.to(out.scalar_type());
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(
-      ScalarType::Half,
-      ScalarType::BFloat16,
-      self_tensor.scalar_type(),
-      "cumprod",
-      [&]() {
-        scan<INCLUSIVE_TYPE, scalar_t, scalar_t>(
-            out,
-            self_tensor,
-            dim,
-            ScalarConvert<float, scalar_t>::to(1.0),
-            MulOp<scalar_t>());
-      });
-  return out;
-}
-
 void _cummin_helper(
     const Tensor& self,
     Tensor& values,

@@ -471,7 +471,6 @@ namespace AtenIpexTypeXPU {
 Tensor& copy_(Tensor& self, const Tensor& src, bool non_blocking) {
   return impl::copy_(self, src, non_blocking);
 }
-
 Tensor _to_copy(
     const Tensor& self,
     c10::optional<ScalarType> dtype,
