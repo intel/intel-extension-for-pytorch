@@ -9,6 +9,12 @@ from intel_extension_for_pytorch.transformers.models.xpu.fusions.activation_fusi
     add_rms_norm_xpu,
     add_layer_norm_xpu,
     rotary_embedding_batched_xpu,
+    bgmv_shrink_xpu,
+    bgmv_expand_xpu,
+    bgmv_expand_slice_xpu,
+    sgmv_shrink_xpu,
+    sgmv_expand_xpu,
+    sgmv_expand_slice_xpu,
 )
 from intel_extension_for_pytorch.transformers.models.cpu.fusions.mha_fusion import (  # noqa F401
     silu_mul_cpu,

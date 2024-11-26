@@ -13,4 +13,10 @@ from .fusions import (
     silu_and_mul,
     gelu_and_mul,
     rotary_embedding_batched,
+    bgmv_shrink,
+    bgmv_expand,
+    bgmv_expand_slice,
+    sgmv_shrink,
+    sgmv_expand,
+    sgmv_expand_slice,
 )

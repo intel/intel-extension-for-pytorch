@@ -498,3 +498,255 @@ def add_layer_norm(
     """
     f = _get_function_from_device(x.device.type, add_layer_norm)
     return f(residual, x, weight, bias, eps, add_back)
+
+
+def bgmv_shrink(
+    inputs: torch.Tensor,
+    lora_a_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    scaling: float = 1.0,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/bgmv_shrink.py
+
+    Args:
+        inputs (torch.Tensor): Shape: `[batch_size, hidden_size]`.
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`.
+        output_tensor (torch.Tensor): Shape: `[batch_size, rank]`.
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`. The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        scaling (float):  Scaling factor.
+
+    Semantics:
+      for i in range(inputs.size(0)):
+        output_tensor[i] +=
+            inputs[i] @ lora_a_weights[lora_indices_tensor[i]] * scale
+    """
+    f = _get_function_from_device(inputs.device.type, bgmv_shrink)
+    f(inputs, lora_a_weights, output_tensor, lora_indices_tensor, scaling)
+    return
+
+
+def bgmv_expand(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    add_inputs: bool = True,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/bgmv_expand.py
+
+    Args:
+        inputs (torch.Tensor): Shape: `[batch_size, hidden_size]`.
+        lora_b_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`.
+        output_tensor (torch.Tensor): Shape: `[batch_size, rank]`.
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`. The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        add_inputs (bool, optional):  Defaults to False. adds the final lora
+            results to the output.
+
+    Semantics:
+      for i in range(inputs.size(0)):
+        output_tensor[i] =
+            inputs[i] @ lora_b_weights[lora_indices_tensor[i]]
+            + (inputs[i] if add_inputs else 0)
+    """
+    f = _get_function_from_device(inputs.device.type, bgmv_expand)
+    f(inputs, lora_b_weights, output_tensor, lora_indices_tensor, add_inputs)
+    return
+
+
+def bgmv_expand_slice(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    slice_offset: int,
+    slice_size: int,
+    add_inputs: bool = True,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/bgmv_expand_slice.py
+
+    Args:
+        inputs (torch.Tensor): Shape: `[batch_size, hidden_size]`.
+        lora_b_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`.
+        output_tensor (torch.Tensor): Shape: `[batch_size, rank]`.
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`. The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        slice_offset (int): output_tensor's offset
+        slice_size (int): current output_tensor's size
+        add_inputs (bool, optional):  Defaults to False. adds the final lora
+            results to the output.
+
+    Semantics:
+      for i in range(inputs.size(0)):
+        output_tensor[i][slice_offset:slice_offset+slice_size] =
+            inputs[i] @ lora_b_weights[lora_indices_tensor[i]]
+            + (inputs[i] if add_inputs else 0)
+    """
+    f = _get_function_from_device(inputs.device.type, bgmv_expand_slice)
+    f(
+        inputs,
+        lora_b_weights,
+        output_tensor,
+        lora_indices_tensor,
+        slice_offset,
+        slice_size,
+        add_inputs,
+    )
+    return
+
+
+def sgmv_shrink(
+    inputs: torch.Tensor,
+    lora_a_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    b_seq_start_loc: torch.Tensor,
+    seq_len_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    batches: int,
+    max_seq_length: int,
+    scaling: float,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/sgmv_shrink.py
+
+    Args:
+        inputs (torch.Tensor): Shape: `[num_token, hidden_size]`
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`
+        output_tensor (torch.Tensor): Shape: `[num_token, rank]`.
+        b_seq_start_loc (torch.Tensor): Shape: `[batch_size]`. The cumulative
+            sequence lengths of the sequences in the batch, used to index
+            into sequence. E.g.,if the sequence length is [4, 6], it is
+            [0, 4].
+        seq_len_tensor (torch.Tensor): Shape: `[batch_size]`. Record the sequence
+            length of the sequences in the batch
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`.  The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        batches (int): batch size
+        max_seq_length (int): The max sequence lengths of the sequences
+            in the batch
+        scaling (float):  Scaling factor.
+    """
+    f = _get_function_from_device(inputs.device.type, sgmv_shrink)
+    f(
+        inputs,
+        lora_a_weights,
+        output_tensor,
+        b_seq_start_loc,
+        seq_len_tensor,
+        lora_indices_tensor,
+        batches,
+        max_seq_length,
+        scaling,
+    )
+    return
+
+
+def sgmv_expand(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    b_seq_start_loc: torch.Tensor,
+    seq_len_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    batches: int,
+    max_seq_length: int,
+    add_inputs: bool = False,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/sgmv_expand.py
+
+    Args:
+        inputs (torch.Tensor): Shape: `[num_token, hidden_size]`.
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`.
+        output_tensor (torch.Tensor): Shape: `[num_token, rank]`.
+        b_seq_start_loc (torch.Tensor): Shape: `[batch_size]`. The cumulative
+            sequence lengths of the sequences in the batch, used to index
+            into sequence. E.g.,if the sequence length is [4, 6], it is
+            [0, 4].
+        seq_len_tensor (torch.Tensor): Shape: `[batch_size]`. Record the sequence
+            length of the sequences in the batch
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`.  The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        batches (int): batch size
+        max_seq_length (int): The max sequence lengths of the sequences
+            in the batch
+        add_inputs (bool, optional):  Defaults to False. adds the final lora
+            results to the output.
+    """
+    f = _get_function_from_device(inputs.device.type, sgmv_expand)
+    f(
+        inputs,
+        lora_b_weights,
+        output_tensor,
+        b_seq_start_loc,
+        seq_len_tensor,
+        lora_indices_tensor,
+        batches,
+        max_seq_length,
+        add_inputs,
+    )
+    return
+
+
+def sgmv_expand_slice(
+    inputs: torch.Tensor,
+    lora_b_weights: torch.Tensor,
+    output_tensor: torch.Tensor,
+    b_seq_start_loc: torch.Tensor,
+    seq_len_tensor: torch.Tensor,
+    lora_indices_tensor: torch.Tensor,
+    batches: int,
+    max_seq_length: int,
+    slice_offset: int,
+    slice_size: int,
+    add_inputs: bool = False,
+):
+    """
+    This function is generally the same as the one in vllm/lora/ops/sgmv_expand.py
+
+    Args:
+        inputs (torch.Tensor): Shape: `[num_token, hidden_size]`.
+        lora_a_weights (torch.Tensor): Shape: `[lora_num, rank, hidden_size]`.
+        output_tensor (torch.Tensor): Shape: `[num_token, rank]`.
+        b_seq_start_loc (torch.Tensor): Shape: `[batch_size]`. The cumulative
+            sequence lengths of the sequences in the batch, used to index
+            into sequence. E.g.,if the sequence length is [4, 6], it is
+            [0, 4].
+        seq_len_tensor (torch.Tensor): Shape: `[batch_size]`. Record the sequence
+            length of the sequences in the batch
+        lora_indices_tensor (torch.Tensor): Shape: `[batch_size]`.  The LoRA index
+            corresponding to each batch. An index of -1 means no lora should be
+            applied.
+        batches (int): batch size
+        max_seq_length (int): The max sequence lengths of the sequences
+            in the batch
+        slice_offset (int): output_tensor's offset
+        slice_size (int): current output_tensor's size
+        add_inputs (bool, optional):  Defaults to False. adds the final lora
+            results to the output.
+    """
+    f = _get_function_from_device(inputs.device.type, sgmv_expand_slice)
+    f(
+        inputs,
+        lora_b_weights,
+        output_tensor,
+        b_seq_start_loc,
+        seq_len_tensor,
+        lora_indices_tensor,
+        batches,
+        max_seq_length,
+        slice_offset,
+        slice_size,
+        add_inputs,
+    )
+    return
