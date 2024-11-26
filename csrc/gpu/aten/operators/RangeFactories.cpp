@@ -348,61 +348,6 @@ Tensor& logspace_dpcpp_out(
 }
 
 template <typename scalar_t, typename accscalar_t>
-struct range_dpcpp_out_functor {
-  scalar_t operator()(int64_t ind) const {
-    accscalar_t inc = xstep * static_cast<accscalar_t>(ind);
-    accscalar_t val = xstart + inc;
-    return static_cast<scalar_t>(val);
-  }
-
-  range_dpcpp_out_functor(accscalar_t xstart, accscalar_t xstep)
-      : xstart(xstart), xstep(xstep) {}
-
- private:
-  accscalar_t xstart;
-  accscalar_t xstep;
-};
-
-Tensor& range_dpcpp_out(Tensor& result, Scalar start, Scalar end, Scalar step) {
-  IPEX_DISPATCH_ALL_TYPES_AND(
-      at::ScalarType::Half, result.scalar_type(), "range_dpcpp", [&]() {
-        using accscalar_t = acc_type<scalar_t>;
-        auto xstart = start.to<accscalar_t>();
-        auto xend = end.to<accscalar_t>();
-        auto xstep = step.to<accscalar_t>();
-
-        TORCH_CHECK(xstep > 0 || xstep < 0, "step must be nonzero");
-        TORCH_CHECK(
-            std::isfinite(static_cast<double>(xstart)) &&
-                std::isfinite(static_cast<double>(xend)),
-            "unsupported range: ",
-            xstart,
-            " -> ",
-            xend);
-        TORCH_CHECK(
-            ((xstep > 0) && (xend >= xstart)) ||
-                ((xstep < 0) && (xend <= xstart)),
-            "upper bound and larger bound inconsistent with step sign");
-        int64_t size = static_cast<int64_t>(((xend - xstart) / xstep) + 1);
-        if (result.numel() != size) {
-          result.resize_({size});
-        }
-        Tensor r = result.is_contiguous() ? result : result.contiguous();
-        LinspaceOp<scalar_t, accscalar_t> linspace_method(xstart, xstep);
-        auto& dpcpp_queue = dpcppGetCurrentQueue();
-
-        range_dpcpp_out_functor<scalar_t, accscalar_t> f(xstart, xstep);
-        dpcpp_elementwise_kernel_with_index(r, f);
-
-        if (!result.is_contiguous()) {
-          result.copy_(r);
-        }
-      });
-
-  return result;
-}
-
-template <typename scalar_t, typename accscalar_t>
 struct ArangeDpcppOutKernelFunctor {
   void operator()(sycl::nd_item<1> item_id) const {
     slm_xstart[0] = xstart;
@@ -561,14 +506,6 @@ Tensor& logspace_out(
   return out;
 }
 
-Tensor& range_out(
-    const Scalar& start,
-    const Scalar& end,
-    const Scalar& step,
-    Tensor& out) {
-  impl::range_dpcpp_out(out, start, end, step);
-  return out;
-}
 Tensor& arange_out(
     const Scalar& start,
     const Scalar& end,
