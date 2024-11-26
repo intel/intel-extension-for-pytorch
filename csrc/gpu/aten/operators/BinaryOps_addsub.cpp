@@ -56,10 +56,6 @@ void add_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
       });
 }
 
-void sub_kernel_dpcpp(TensorIteratorBase& iter, Scalar alpha_scalar) {
-  return add_kernel_dpcpp(iter, -alpha_scalar);
-}
-
 // alpha_check
 inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
   TORCH_CHECK(
@@ -70,19 +66,6 @@ inline void alpha_check(const TensorIterator& iter, Scalar alpha) {
           alpha.isIntegral(true),
       "For integral input tensors, argument alpha must not be a floating "
       "point number.");
-}
-
-// Basic checking for all sub functions.
-inline void sub_check(const Tensor& self, const Tensor& other) {
-  TORCH_CHECK(
-      self.scalar_type() != kBool || other.scalar_type() != kBool,
-      "Subtraction, the `-` operator, with two bool tensors is not supported. "
-      "Use the `^` or `logical_xor()` operator instead.");
-  TORCH_CHECK(
-      self.scalar_type() != kBool && other.scalar_type() != kBool,
-      "Subtraction, the `-` operator, with a bool tensor is not supported. "
-      "If you are trying to invert a mask, use the `~` or `logical_not()` "
-      "operator instead.");
 }
 
 } // namespace impl
@@ -126,35 +109,6 @@ Tensor& add_(Tensor& self, const Tensor& other, const Scalar& alpha) {
 
 Tensor add(const Tensor& self, const Scalar& other, const Scalar& alpha) {
   return at::AtenIpexTypeXPU::add(self, wrapped_scalar_tensor(other), alpha);
-}
-
-Tensor& add_(Tensor& self, const Scalar& other, const Scalar& alpha) {
-  return at::AtenIpexTypeXPU::add_(self, wrapped_scalar_tensor(other), alpha);
-}
-
-Tensor& sub_out(
-    const Tensor& self,
-    const Tensor& other,
-    const Scalar& alpha,
-    Tensor& result) {
-  impl::sub_check(self, other);
-  return binary_out_template<dnnl::algorithm::binary_sub>(
-      TensorIterator::binary_op,
-      result,
-      self,
-      other,
-      [=](TensorIteratorBase& iter) {
-        impl::alpha_check(iter, alpha);
-        impl::sub_kernel_dpcpp(iter, alpha);
-      },
-      ((!alpha.isComplex()) && (1.0 == alpha.to<float>())));
-}
-
-Tensor rsub(const Tensor& self, const Tensor& other, const Scalar& alpha) {
-  Tensor out;
-  auto iter = TensorIterator::binary_op(out, other, self);
-  out = iter.output();
-  return AtenIpexTypeXPU::sub_out(other, self, alpha, out);
 }
 
 } // namespace AtenIpexTypeXPU
