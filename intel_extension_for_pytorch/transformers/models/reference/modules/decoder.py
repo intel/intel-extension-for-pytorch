@@ -8,8 +8,10 @@ from ...reference.fusions.linear_fusion import (
     _IPEXlinearReluRef,
     _IPEXlinearGeluRef,
     _IPEXlinearMulRef,
+    _IPEXlinearSiluRef,
     _IPEXlinearSiluMulRef,
 )
+from .....llm.functional.fusions import add_layer_norm
 from torch.nn import functional as F
 from .....utils._logger import logger, WarningType
 
@@ -61,6 +63,54 @@ def LlamaDecoderLayer_forward(
 
     if use_cache:
         outputs += (present_key_value,)
+
+    return outputs
+
+
+def MllamaVisionEncoderLayer_forward(
+    self,
+    hidden_state: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    output_attentions: bool = None,
+):
+    # Self Attention
+    residual = hidden_state
+    hidden_state = self.input_layernorm(hidden_state)
+    hidden_state, attn_weights = self.self_attn(
+        hidden_state, attention_mask=attention_mask
+    )
+    if self.is_gated:
+        hidden_state = self.gate_attn.tanh() * hidden_state
+
+    hidden_state = add_layer_norm(
+        residual,
+        hidden_state,
+        self.post_attention_layernorm.weight,
+        self.post_attention_layernorm.bias,
+        self.post_attention_layernorm.eps,
+        True,
+    )
+
+    hidden_states = self.self.linear_silu(hidden_states)
+
+    if self.is_gated:
+        if self.distributed:
+            hidden_states = self.mlp.fc2(hidden_states)
+            hidden_state = self.gate_ffn.tanh() * hidden_state
+        else:
+            hidden_state = self.mlp_linear_mul(hidden_state, self.gate_ffn.tanh())
+        hidden_state = residual + hidden_state
+    else:
+        if self.distributed:
+            hidden_states = self.mlp.fc2(hidden_states)
+            hidden_state = residual + hidden_state
+        else:
+            hidden_state = self.mlp_linear_add(hidden_state, residual)
+
+    outputs = (hidden_state,)
+
+    if output_attentions:
+        outputs += (attn_weights,)
 
     return outputs
 
@@ -2088,6 +2138,48 @@ class _IPEXDecoderLayerRef(nn.Module):
                 )
             return WhisperEncoderLayer_forward(
                 self, hidden_states, attention_mask, layer_head_mask, output_attentions
+            )
+        else:
+            AssertionError(False, "Do not support the optimization of your model yet")
+
+
+class _IPEXEncoderLayerRef(nn.Module):
+    def __init__(self, module, config, distributed=False):
+        super().__init__()
+        for k, v in module.__dict__.items():
+            setattr(self, k, v)
+        for k, v in module.__class__.__dict__.items():
+            if k.startswith("__") or k.startswith("forward"):
+                continue
+            setattr(self.__class__, k, getattr(module.__class__, k))
+        self.distributed = distributed
+        self.model_backbone = config.architectures[0]
+        if self.model_backbone in [
+            "MllamaForConditionalGeneration",
+        ]:
+            if not self.distributed:
+                if self.is_gated:
+                    self.mlp_linear_mul = _IPEXlinearMulRef(module.mlp.fc2)
+                else:
+                    self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.fc2)
+                del self.__dict__["_modules"]["mlp"].fc2
+            self.linear_silu = _IPEXlinearSiluRef(module.mlp.fc1)
+            del self.__dict__["_modules"]["mlp"].fc1
+        else:
+            AssertionError(False, "Do not support the optimization of your model yet")
+
+    def forward(
+        self,
+        hidden_state: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        output_attentions: bool = None,
+    ):
+        if self.model_backbone == "MllamaForConditionalGeneration":
+            return MllamaVisionEncoderLayer_forward(
+                self,
+                hidden_state,
+                attention_mask,
+                output_attentions,
             )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

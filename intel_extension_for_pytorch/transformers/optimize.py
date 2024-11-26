@@ -150,7 +150,10 @@ def model_convert_reference(_model):
     )
 
     # model wise optimization for Feedforward and Decoder layer modules
-    from .models.reference.modules.decoder import _IPEXDecoderLayerRef
+    from .models.reference.modules.decoder import (
+        _IPEXDecoderLayerRef,
+        _IPEXEncoderLayerRef,
+    )
 
     # generation length or model forward order
     from .models.reference.models import (
@@ -569,6 +572,16 @@ def model_convert_reference(_model):
             _model,
             supported_decoder_class,
             _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+    for supported_encoder_class in [
+        transformers.models.mllama.modeling_mllama.MllamaVisionEncoderLayer
+    ]:
+        convert_class(
+            _model,
+            supported_encoder_class,
+            _IPEXEncoderLayerRef,
             _model.config,
             distributed=distributed,
         )
@@ -1374,12 +1387,18 @@ def model_convert_lowering(
     cache_weight_for_large_batch=False,
 ):
     from .models.reference.modules.attentions import _IPEXAttentionRef
-    from .models.reference.modules.decoder import _IPEXDecoderLayerRef
+    from .models.reference.modules.decoder import (
+        _IPEXDecoderLayerRef,
+        _IPEXEncoderLayerRef,
+    )
 
     if device == "cpu":
         from .models.cpu.modules.attentions import _IPEXAttentionCPU
         from .models.cpu.fusions.mha_fusion import _IPEXRMSNormCPU
-        from .models.cpu.modules.decoder import _IPEXDecoderLayerCPU
+        from .models.cpu.modules.decoder import (
+            _IPEXDecoderLayerCPU,
+            _IPEXEncoderLayerCPU,
+        )
 
         _disable_tpp()
         if not is_quantization:
@@ -1479,7 +1498,15 @@ def model_convert_lowering(
                 tpp=True if _using_tpp() else False,
                 woq=woq,
             )
-
+        for supported_mlp_class in [_IPEXEncoderLayerRef]:
+            lowering_class_cpu(
+                _model,
+                supported_mlp_class,
+                _IPEXEncoderLayerCPU,
+                _model.config,
+                tpp=True if _using_tpp() else False,
+                woq=woq,
+            )
         for supported_mha_class in [_IPEXAttentionRef]:
             lowering_class_cpu(
                 _model,

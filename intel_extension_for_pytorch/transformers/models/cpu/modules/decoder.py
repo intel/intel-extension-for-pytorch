@@ -6,6 +6,7 @@ from ...cpu.fusions.linear_fusion import (
     _IPEXlinearReluCPU,
     _IPEXlinearGeluCPU,
     _IPEXlinearMulCPU,
+    _IPEXlinearSiluCPU,
     _IPEXlinearSiluMulCPU,
 )
 
@@ -114,6 +115,35 @@ class _IPEXDecoderLayerCPU(nn.Module):
             if hasattr(module, "linear_relu"):
                 self.linear_relu = _IPEXlinearReluCPU(
                     module.linear_relu.linear, tpp=tpp, woq=woq
+                )
+        else:
+            AssertionError(False, "Do not support the optimization of your model yet")
+
+
+class _IPEXEncoderLayerCPU(nn.Module):
+    def __init__(self, module, config, tpp=False, woq=False):
+        super().__init__()
+        for k, v in module.__dict__.items():
+            setattr(self, k, v)
+        for k, v in module.__class__.__dict__.items():
+            if k.startswith("__"):
+                continue
+            setattr(self.__class__, k, getattr(module.__class__, k))
+        if self.model_backbone in [
+            "MllamaForConditionalGeneration",
+        ]:
+            if not self.distributed:
+                if hasattr(module, "mlp_linear_add"):
+                    self.mlp_linear_add = _IPEXlinearAddCPU(
+                        module.mlp_linear_add.linear, tpp=tpp, woq=woq
+                    )
+                if hasattr(module, "mlp_linear_mul"):
+                    self.mlp_linear_mul = _IPEXlinearMulCPU(
+                        module.mlp_linear_mul.linear, tpp=tpp, woq=woq
+                    )
+            if hasattr(module, "linear_silu"):
+                self.linear_silu = _IPEXlinearSiluCPU(
+                    module.linear_silu.linear, tpp=tpp, woq=woq
                 )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
