@@ -43,10 +43,10 @@ namespace {
 // namespace.
 #define DEFINE_BINARY_FUNC(func)                          \
   static Tensor func(Tensor& src, const Tensor& binary) { \
-    return AtenIpexTypeXPU::func(src, binary);            \
+    return at::func(src, binary);                         \
   }                                                       \
   static Tensor func(Tensor& src, const Scalar& binary) { \
-    return AtenIpexTypeXPU::func(src, binary);            \
+    return at::func(src, binary);                         \
   }
 
 DEFINE_BINARY_FUNC(mul)
