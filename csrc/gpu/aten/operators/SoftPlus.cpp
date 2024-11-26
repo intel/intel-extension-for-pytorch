@@ -63,46 +63,5 @@ Tensor softplus(
   return at::AtenIpexTypeXPU::softplus_out(self, beta, threshold, out);
 }
 
-template <typename scalar_t, typename opmath_t>
-struct softplus_backward_out_functor {
-  scalar_t operator()(scalar_t grad_output_data, scalar_t output_data) const {
-    opmath_t beta_out = b * static_cast<opmath_t>(output_data);
-    opmath_t exp_bo = std::exp(beta_out);
-    return beta_out > t ? static_cast<opmath_t>(grad_output_data)
-                        : static_cast<opmath_t>(grad_output_data) * exp_bo /
-            (exp_bo + opmath_t(1.));
-  }
-
-  softplus_backward_out_functor(opmath_t b, opmath_t t) : b(b), t(t) {}
-
- private:
-  opmath_t b;
-  opmath_t t;
-};
-
-Tensor& softplus_backward_out(
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Scalar& beta,
-    const Scalar& threshold,
-    Tensor& grad_input) {
-  auto iter =
-      TensorIterator::borrowing_binary_op(grad_input, grad_output, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.dtype(),
-      "softplus_backward",
-      [&]() {
-        using opmath_t = at::opmath_type<scalar_t>;
-        auto b = beta.to<opmath_t>();
-        auto t = threshold.to<opmath_t>();
-        softplus_backward_out_functor<scalar_t, opmath_t> f(b, t);
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-
-  return grad_input;
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
