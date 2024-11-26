@@ -42,26 +42,15 @@ void ne_kernel_dpcpp(TensorIterator& iter) {
 
 /*=========================== ne ==========================*/
 
-Tensor& ne_out(const Tensor& self, const Tensor& other, Tensor& out) {
-  auto iter = TensorIterator::comparison_op(out, self, other);
-  impl::ne_kernel_dpcpp(iter);
-  return out;
-}
-
 Tensor ne(const Tensor& self, const Tensor& other) {
   Tensor result = at::empty({0}, self.options().dtype(kBool));
-  return at::AtenIpexTypeXPU::ne_out(self, other, result);
-}
-
-Tensor& ne_out(const Tensor& self, const Scalar& other_, Tensor& out) {
-  at::AtenIpexTypeXPU::ne_out(self, wrapped_scalar_tensor(other_), out);
-  return out;
+  auto iter = TensorIterator::comparison_op(result, self, other);
+  impl::ne_kernel_dpcpp(iter);
+  return result;
 }
 
 Tensor ne(const Tensor& self, const Scalar& other_) {
-  auto result = at::empty({0}, self.options().dtype(kBool));
-  return at::AtenIpexTypeXPU::ne_out(
-      self, wrapped_scalar_tensor(other_), result);
+  return at::AtenIpexTypeXPU::ne(self, wrapped_scalar_tensor(other_));
 }
 
 } // namespace AtenIpexTypeXPU
