@@ -950,12 +950,19 @@ def get_src_lib_and_dst():
     return ret
 
 
-def get_src_py_and_dst():
+def get_src_py_and_yaml_and_dst():
     ret = []
-    generated_python_files = glob.glob(
+    generated_python_and_yaml_files = glob.glob(
         os.path.join(get_project_dir(), PACKAGE_NAME, "**/*.py"), recursive=True
     )
-    for src in generated_python_files:
+    generated_python_and_yaml_files += glob.glob(
+        os.path.join(
+            get_project_dir(),
+            PACKAGE_NAME,
+            "compatible_mode/yaml/register_support_api.yaml",
+        )
+    )
+    for src in generated_python_and_yaml_files:
         dst = os.path.join(
             get_package_base_dir(),
             PACKAGE_NAME,
@@ -982,7 +989,7 @@ class IPEXInstallCmd(install, object):
 
 class IPEXPythonPackageBuild(build_py, object):
     def run(self) -> None:
-        ret = get_src_py_and_dst()
+        ret = get_src_py_and_yaml_and_dst()
         for src, dst in ret:
             self.copy_file(src, dst)
         super(IPEXPythonPackageBuild, self).finalize_options()
