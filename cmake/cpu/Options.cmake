@@ -9,7 +9,7 @@ include(CMakeDependentOption)
 
 option(BUILD_LIBXSMM_VIA_CMAKE "Build LIBXSMM via CMake" ON)
 option(USE_LIBXSMM "Enable LIBXSMM" ON)
-option(USE_DNNL_GRAPH_COMPILER "Build with DNNL Graph Compiler" ON)
+option(USE_DNNL_GRAPH_COMPILER  "Build with DNNL Graph Compiler" ON)
 if(WIN32)
   set(USE_LIBXSMM ON)
 endif()

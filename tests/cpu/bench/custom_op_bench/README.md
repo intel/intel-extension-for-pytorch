@@ -5,7 +5,7 @@ Follow [performance_tuning_guide](../../../../tutorials/Performance_Tuning.md) t
 Install intel-openmp:
 
 ```
-conda install intel-openmp
+pip install intel-openmp=2024.1.2
 ```
 
 ## Evaluate [Interaction](../../../../intel_extension_for_pytorch/nn/functional/interaction.py)

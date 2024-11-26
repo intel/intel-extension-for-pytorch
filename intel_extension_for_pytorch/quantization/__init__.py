@@ -10,6 +10,7 @@ from ._qconfig import (
     WoqActQuantMode,
     QConfigWoq,
     WoqWeightDtype,
+    WoqWeightQScheme,
 )
 from ._autotune import autotune
 from ._quantize_utils import (

@@ -47,6 +47,14 @@ def _update_model_kwargs_for_generation(
     standardize_cache_format: bool = False,
     num_new_tokens: int = 1,
 ) -> Dict[str, Any]:
+
+    cross_attention_mask_prev = model_kwargs.get("cross_attention_mask", None)
+    # add cross-attn mask for new token
+    if cross_attention_mask_prev is not None:
+        model_kwargs["cross_attention_mask"] = torch.cat(
+            [cross_attention_mask_prev, cross_attention_mask_prev[:, -1:, ...]], dim=1
+        )
+
     try:
         # update past_key_values keeping its naming used in model code
         cache_name, cache = self._extract_past_from_model_output(
@@ -166,7 +174,7 @@ def whisper_generate(
     synced_gpus: bool = False,
     return_timestamps: Optional[bool] = None,
     task: Optional[str] = None,
-    language: Optional[str] = None,
+    language: Optional[Union[str, List[str]]] = None,
     is_multilingual: Optional[bool] = None,
     prompt_ids: Optional[torch.Tensor] = None,
     prompt_condition_type: Optional[str] = None,  # first-segment, all-segments
@@ -208,7 +216,7 @@ def whisper_generate(
 
     # 3. Make sure generation config is correctly set
     # Make sure the generation config is correctly set depending on whether timestamps are to be returned or not
-    self._set_return_outputs(
+    return_dict_in_generate = self._set_return_outputs(
         return_dict_in_generate=return_dict_in_generate,
         return_token_timestamps=return_token_timestamps,
         logprob_threshold=logprob_threshold,
@@ -399,6 +407,8 @@ def whisper_generate(
             return_token_timestamps=return_token_timestamps,
             do_condition_on_prev_tokens=do_condition_on_prev_tokens,
             is_shortform=is_shortform,
+            batch_size=batch_size,
+            attention_mask=attention_mask,
             kwargs=kwargs,
         )
 
@@ -474,7 +484,7 @@ def whisper_generate(
         else:
             outputs = sequences
 
-        if generation_config.return_dict_in_generate:
+        if return_dict_in_generate and generation_config.return_dict_in_generate:
             dict_outputs = self._stack_split_outputs(
                 seek_outputs, model_output_type, sequences.device, kwargs
             )

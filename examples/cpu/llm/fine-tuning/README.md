@@ -34,6 +34,8 @@ mv alpaca.json ./templates
 export LOCAL_BATCH_SIZE=32 #32 is default one, you can choose per need
 export MODEL_NAME_OR_PATH="YOUR LOCAL PATH or MODEL_ID (HF)"
 export MAXSTEP=-1 #default is -1, which means running all steps
+mkdir ./outputs
+export OUTPUT_DIR=./outputs
 
 #[optional] you may need to get access to llama2 weights from HF
 Apply the access in this page [LLaMA2 7B](https://huggingface.co/meta-llama/Llama-2-7b-hf) with your huggingface account

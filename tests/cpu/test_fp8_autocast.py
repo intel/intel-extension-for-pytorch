@@ -177,7 +177,7 @@ class TestFP8Cases(TestCase):
         my_linear_inference.eval()
         out_nn_iter5 = my_linear_inference(inp1[4])
 
-        fp8_linear_inference = prepare_fp8(my_linear_inference, device="cpu")
+        fp8_linear_inference = prepare_fp8(my_linear_inference)
         # Do calibration to store amax of input and weight
         for i in range(4):
             with fp8_autocast(
@@ -215,7 +215,7 @@ class TestFP8Cases(TestCase):
         nn_linear = torch.nn.Linear(2, 2)
         nn_linear.weight = torch.nn.Parameter(nn_linear.weight.transpose(0, 1))
         inp = torch.ones(3, 2)
-        fp8_linear = prepare_fp8(nn_linear, device="cpu")
+        fp8_linear = prepare_fp8(nn_linear)
         with fp8_autocast(
             enabled=True,
             fp8_recipe=DelayedScaling(fp8_format=Format.E4M3),

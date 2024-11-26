@@ -24,7 +24,14 @@ from transformers.utils import (
     extract_commit_hash,
     is_offline_mode,
     try_to_load_from_cache,
+    PaddingStrategy,
+    is_tf_tensor,
+    is_torch_tensor,
+    to_py_obj,
 )
+from transformers.tokenization_utils_base import BatchEncoding, EncodedInput
+from collections.abc import Mapping, Sized
+import numpy as np
 
 
 def _get_relative_imports(module_file):
@@ -465,3 +472,184 @@ def _get_class_from_dynamic_module(
             class_name, final_module.replace(".py", "").replace("-", "_")
         )
     return get_class_in_module(class_name, final_module.replace("-", "_"))
+
+
+def _pad(
+    self,
+    encoded_inputs: Union[
+        BatchEncoding,
+        List[BatchEncoding],
+        Dict[str, EncodedInput],
+        Dict[str, List[EncodedInput]],
+        List[Dict[str, EncodedInput]],
+    ],
+    padding=True,
+    max_length: Optional[int] = None,
+    pad_to_multiple_of: Optional[int] = None,
+    padding_side: Optional[bool] = None,
+    return_attention_mask: Optional[bool] = None,
+    return_tensors=None,
+    verbose: bool = True,
+) -> BatchEncoding:
+    """
+    Pad a single encoded input or a batch of encoded inputs up to predefined length or to the max sequence length
+    in the batch.
+    Padding side (left/right) padding token ids are defined at the tokenizer level (with `self.padding_side`,
+    `self.pad_token_id` and `self.pad_token_type_id`).
+    Please note that with a fast tokenizer, using the `__call__` method is faster than using a method to encode the
+    text followed by a call to the `pad` method to get a padded encoding.
+    <Tip>
+    If the `encoded_inputs` passed are dictionary of numpy arrays, PyTorch tensors or TensorFlow tensors, the
+    result will use the same type unless you provide a different tensor type with `return_tensors`. In the case of
+    PyTorch tensors, you will lose the specific device of your tensors however.
+    </Tip>
+    Args:
+        encoded_inputs ([`BatchEncoding`], list of [`BatchEncoding`], `Dict[str, List[int]]`, `Dict[str, List[List[int]]`
+            or `List[Dict[str, List[int]]]`):
+            Tokenized inputs. Can represent one input ([`BatchEncoding`] or `Dict[str, List[int]]`) or a batch of
+            tokenized inputs (list of [`BatchEncoding`], *Dict[str, List[List[int]]]* or *List[Dict[str,
+            List[int]]]*) so you can use this method during preprocessing as well as in a PyTorch Dataloader
+            collate function.
+            Instead of `List[int]` you can have tensors (numpy arrays, PyTorch tensors or TensorFlow tensors), see
+            the note above for the return type.
+        padding (`bool`, `str` or [`~utils.PaddingStrategy`], *optional*, defaults to `True`):
+                Select a strategy to pad the returned sequences (according to the model's padding side and padding
+                index) among:
+            - `True` or `'longest'`: Pad to the longest sequence in the batch (or no padding if only a single
+                sequence if provided).
+            - `'max_length'`: Pad to a maximum length specified with the argument `max_length` or to the maximum
+                acceptable input length for the model if that argument is not provided.
+            - `False` or `'do_not_pad'` (default): No padding (i.e., can output a batch with sequences of different
+                lengths).
+        max_length (`int`, *optional*):
+            Maximum length of the returned list and optionally padding length (see above).
+        pad_to_multiple_of (`int`, *optional*):
+            If set will pad the sequence to a multiple of the provided value.
+            This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability
+            `>= 7.5` (Volta).
+        padding_side (`str`, *optional*):
+            The side on which the model should have padding applied. Should be selected between ['right', 'left'].
+            Default value is picked from the class attribute of the same name.
+        return_attention_mask (`bool`, *optional*):
+            Whether to return the attention mask. If left to the default, will return the attention mask according
+            to the specific tokenizer's default, defined by the `return_outputs` attribute.
+            [What are attention masks?](../glossary#attention-mask)
+        return_tensors (`str` or [`~utils.TensorType`], *optional*):
+            If set, will return tensors instead of list of python integers. Acceptable values are:
+            - `'tf'`: Return TensorFlow `tf.constant` objects.
+            - `'pt'`: Return PyTorch `torch.Tensor` objects.
+            - `'np'`: Return Numpy `np.ndarray` objects.
+        verbose (`bool`, *optional*, defaults to `True`):
+            Whether or not to print more information and warnings.
+    """
+    if self.__class__.__name__.endswith("Fast"):
+        if not self.deprecation_warnings.get("Asking-to-pad-a-fast-tokenizer", False):
+            logger.warning_advice(
+                f"You're using a {self.__class__.__name__} tokenizer. Please note that with a fast tokenizer,"
+                " using the `__call__` method is faster than using a method to encode the text followed by a call"
+                " to the `pad` method to get a padded encoding."
+            )
+            self.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
+    # If we have a list of dicts, let's convert it in a dict of lists
+    # We do this to allow using this method as a collate_fn function in PyTorch Dataloader
+    if isinstance(encoded_inputs, (list, tuple)) and isinstance(
+        encoded_inputs[0], Mapping
+    ):
+        encoded_inputs = {
+            key: [example[key] for example in encoded_inputs]
+            for key in encoded_inputs[0].keys()
+        }
+    # The model's main input name, usually `input_ids`, has been passed for padding
+    if self.model_input_names[0] not in encoded_inputs:
+        raise ValueError(
+            "You should supply an encoding or a list of encodings to this method "
+            f"that includes {self.model_input_names[0]}, but you provided {list(encoded_inputs.keys())}"
+        )
+    required_input = encoded_inputs[self.model_input_names[0]]
+    if required_input is None or (
+        isinstance(required_input, Sized) and len(required_input) == 0
+    ):
+        if return_attention_mask:
+            encoded_inputs["attention_mask"] = []
+        return encoded_inputs
+    # If we have PyTorch/TF/NumPy tensors/arrays as inputs, we cast them as python objects
+    # and rebuild them afterwards if no return_tensors is specified
+    # Note that we lose the specific device the tensor may be on for PyTorch
+    first_element = required_input[0]
+    if isinstance(first_element, (list, tuple)):
+        # first_element might be an empty list/tuple in some edge cases so we grab the first non empty element.
+        for item in required_input:
+            if len(item) != 0:
+                first_element = item[0]
+                break
+    # At this state, if `first_element` is still a list/tuple, it's an empty one so there is nothing to do.
+    if not isinstance(first_element, (int, list, tuple)):
+        if is_tf_tensor(first_element):
+            return_tensors = "tf" if return_tensors is None else return_tensors
+        elif is_torch_tensor(first_element):
+            return_tensors = "pt" if return_tensors is None else return_tensors
+        elif isinstance(first_element, np.ndarray):
+            return_tensors = "np" if return_tensors is None else return_tensors
+        else:
+            raise ValueError(
+                f"type of {first_element} unknown: {type(first_element)}. "
+                "Should be one of a python, numpy, pytorch or tensorflow object."
+            )
+        for key, value in encoded_inputs.items():
+            encoded_inputs[key] = to_py_obj(value)
+    # Convert padding_strategy in PaddingStrategy
+    padding_strategy, _, max_length, _ = self._get_padding_truncation_strategies(
+        padding=padding, max_length=max_length, verbose=verbose
+    )
+    required_input = encoded_inputs[self.model_input_names[0]]
+    if required_input and not isinstance(required_input[0], (list, tuple)):
+        try:
+            encoded_inputs = self._pad(
+                encoded_inputs,
+                max_length=max_length,
+                padding_strategy=padding_strategy,
+                pad_to_multiple_of=pad_to_multiple_of,
+                padding_side=padding_side,
+                return_attention_mask=return_attention_mask,
+            )
+        except TypeError:
+            encoded_inputs = self._pad(
+                encoded_inputs,
+                max_length=max_length,
+                padding_strategy=padding_strategy,
+                pad_to_multiple_of=pad_to_multiple_of,
+                return_attention_mask=return_attention_mask,
+            )
+        return BatchEncoding(encoded_inputs, tensor_type=return_tensors)
+    batch_size = len(required_input)
+    assert all(
+        len(v) == batch_size for v in encoded_inputs.values()
+    ), "Some items in the output dictionary have a different batch size than others."
+    if padding_strategy == PaddingStrategy.LONGEST:
+        max_length = max(len(inputs) for inputs in required_input)
+        padding_strategy = PaddingStrategy.MAX_LENGTH
+    batch_outputs = {}
+    for i in range(batch_size):
+        inputs = {k: v[i] for k, v in encoded_inputs.items()}
+        try:
+            outputs = self._pad(
+                inputs,
+                max_length=max_length,
+                padding_strategy=padding_strategy,
+                pad_to_multiple_of=pad_to_multiple_of,
+                padding_side=padding_side,
+                return_attention_mask=return_attention_mask,
+            )
+        except TypeError:
+            outputs = self._pad(
+                inputs,
+                max_length=max_length,
+                padding_strategy=padding_strategy,
+                pad_to_multiple_of=pad_to_multiple_of,
+                return_attention_mask=return_attention_mask,
+            )
+        for key, value in outputs.items():
+            if key not in batch_outputs:
+                batch_outputs[key] = []
+            batch_outputs[key].append(value)
+    return BatchEncoding(batch_outputs, tensor_type=return_tensors)

@@ -25,6 +25,9 @@ struct VecOps {
   static VT set_0_to_15() {
     TLA_ASSERT(false, "should not reach here");
   }
+  static VT set_neg_8_to_7() {
+    TLA_ASSERT(false, "should not reach here");
+  }
   static VT set_nf4_lut() {
     TLA_ASSERT(false, "should not reach here");
   }
@@ -79,6 +82,25 @@ struct VecOps<__m512> {
         2.0f,
         1.0f,
         0.0f);
+  }
+  static inline __m512 set_neg_8_to_7() {
+    return _mm512_set_ps(
+        7.0f,
+        6.0f,
+        5.0f,
+        4.0f,
+        3.0f,
+        2.0f,
+        1.0f,
+        0.0f,
+        -1.0f,
+        -2.0f,
+        -3.0f,
+        -4.0f,
+        -5.0f,
+        -6.0f,
+        -7.0f,
+        -8.0f);
   }
   static inline __m512 set_nf4_lut() {
     return _mm512_set_ps(
@@ -168,6 +190,41 @@ struct VecOps<__m512h> {
         static_cast<_Float16>(2.0f),
         static_cast<_Float16>(1.0f),
         static_cast<_Float16>(0.0f));
+  }
+  static inline __m512h set_neg_8_to_7() {
+    return _mm512_set_ph(
+        static_cast<_Float16>(7.0f),
+        static_cast<_Float16>(6.0f),
+        static_cast<_Float16>(5.0f),
+        static_cast<_Float16>(4.0f),
+        static_cast<_Float16>(3.0f),
+        static_cast<_Float16>(2.0f),
+        static_cast<_Float16>(1.0f),
+        static_cast<_Float16>(0.0f),
+        static_cast<_Float16>(-1.0f),
+        static_cast<_Float16>(-2.0f),
+        static_cast<_Float16>(-3.0f),
+        static_cast<_Float16>(-4.0f),
+        static_cast<_Float16>(-5.0f),
+        static_cast<_Float16>(-6.0f),
+        static_cast<_Float16>(-7.0f),
+        static_cast<_Float16>(-8.0f),
+        static_cast<_Float16>(7.0f),
+        static_cast<_Float16>(6.0f),
+        static_cast<_Float16>(5.0f),
+        static_cast<_Float16>(4.0f),
+        static_cast<_Float16>(3.0f),
+        static_cast<_Float16>(2.0f),
+        static_cast<_Float16>(1.0f),
+        static_cast<_Float16>(0.0f),
+        static_cast<_Float16>(-1.0f),
+        static_cast<_Float16>(-2.0f),
+        static_cast<_Float16>(-3.0f),
+        static_cast<_Float16>(-4.0f),
+        static_cast<_Float16>(-5.0f),
+        static_cast<_Float16>(-6.0f),
+        static_cast<_Float16>(-7.0f),
+        static_cast<_Float16>(-8.0f));
   }
   static inline __m512h set_nf4_lut() {
     return _mm512_set_ph(

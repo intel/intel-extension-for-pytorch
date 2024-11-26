@@ -146,8 +146,17 @@ parser.add_argument(
 )
 parser.add_argument(
     "--act-quant-mode",
-    choices=["PER_TENSOR", "PER_IC_BLOCK", "PER_BATCH", "PER_BATCH_IC_BLOCK"],
-    default="PER_IC_BLOCK",
+    choices=[
+        "PER_TENSOR",
+        "PER_IC_BLOCK",
+        "PER_BATCH",
+        "PER_BATCH_IC_BLOCK",
+        "PER_TENSOR_SYM",
+        "PER_IC_BLOCK_SYM",
+        "PER_BATCH_SYM",
+        "PER_BATCH_IC_BLOCK_SYM",
+    ],
+    default="PER_BATCH_IC_BLOCK_SYM",
     type=str,
     help="Quantization mode for activation with different granularity. "
     "For lowp-mode=INT8 only. For other cases, it has no effect. "
@@ -156,6 +165,10 @@ parser.add_argument(
     "PER_IC_BLOCK(1): quantize per group along IC with group size = IC_BLOCK; "
     "PER_BATCH(2): quantize per batch; "
     "PER_BATCH_IC_BLOCK(3): quantize per block of size 1 x IC_BLOCK. "
+    "PER_TENSOR_SYM(4): symmetrically quantize per tensor; "
+    "PER_IC_BLOCK_SYM(5): symmetrically quantize per group along IC with group size = IC_BLOCK; "
+    "PER_BATCH_SYM(6): symmetrically quantize per batch; "
+    "PER_BATCH_IC_BLOCK_SYM(7): symmetrically quantize per block of size 1 x IC_BLOCK. "
     "IC_BLOCK is determined by IC automatically.",
 )
 parser.add_argument(
@@ -171,6 +184,12 @@ parser.add_argument(
     help="Cache an extra linear weight for large batch inference, such as the first token (prefill phase)."
     " It brings better performance at the cost of higher memory usage. It is only valid for full bf16 path"
     " and weight-only quantization with lowp-mode=BF16. Otherwise, it has no effect.",
+)
+parser.add_argument(
+    "--woq-sym-quant-weight",
+    action="store_true",
+    help="Quantize weight symmetrically for weight only quantization. It usually brings better latency at"
+    " the cost of accuracy. It has not effect if you are loading low-precision checkpoints.",
 )
 args = parser.parse_args()
 print(args)
@@ -301,7 +320,10 @@ if args.ipex:
         cache_weight_for_large_batch=args.cache_weight_for_large_batch,
     )
 elif args.ipex_weight_only_quantization:
-    from intel_extension_for_pytorch.quantization import WoqWeightDtype
+    from intel_extension_for_pytorch.quantization import (
+        WoqWeightDtype,
+        WoqWeightQScheme,
+    )
 
     if args.weight_dtype == "INT8":
         weight_dtype = WoqWeightDtype.INT8
@@ -330,12 +352,22 @@ elif args.ipex_weight_only_quantization:
         "PER_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
         "PER_BATCH": ipex.quantization.WoqActQuantMode.PER_BATCH,
         "PER_BATCH_IC_BLOCK": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK,
+        "PER_TENSOR_SYM": ipex.quantization.WoqActQuantMode.PER_TENSOR_SYM,
+        "PER_IC_BLOCK_SYM": ipex.quantization.WoqActQuantMode.PER_IC_BLOCK_SYM,
+        "PER_BATCH_SYM": ipex.quantization.WoqActQuantMode.PER_BATCH_SYM,
+        "PER_BATCH_IC_BLOCK_SYM": ipex.quantization.WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
     }
+    weight_qscheme = (
+        WoqWeightQScheme.SYMMETRIC
+        if args.woq_sym_quant_weight
+        else WoqWeightQScheme.UNDEFINED
+    )
     qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
         weight_dtype=weight_dtype,
         lowp_mode=lowp_mode,
         act_quant_mode=act_quant_mode_dict[args.act_quant_mode],
         group_size=args.group_size,
+        weight_qscheme=weight_qscheme,
     )
     if args.low_precision_checkpoint != "":
         low_precision_checkpoint = torch.load(args.low_precision_checkpoint)

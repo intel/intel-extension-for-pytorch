@@ -557,6 +557,22 @@ class TestOptimizeCases(TestCase):
                     origin_model_state[var_name], ipex_model_state[var_name]
                 )
 
+    def test_conv_with_str_padding(self):
+        for padding in ["same", "valid"]:
+            for dilation in [1, 2]:
+                for convtype in [torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.Conv3d]:
+                    conv = convtype(
+                        3, 64, kernel_size=7, dilation=dilation, padding=padding
+                    )
+                    model = torch.nn.Sequential(conv).eval()
+                    input = torch.randn(1, 3, 224)
+                    if convtype == torch.nn.Conv2d:
+                        input = torch.randn(1, 3, 224, 224)
+                    elif convtype == torch.nn.Conv3d:
+                        input = torch.randn(1, 3, 224, 224, 224)
+                    opt_model = ipex.optimize(model, sample_input=input)
+                    self.assertEqual(opt_model(input), model(input))
+
     def test_partial_model_update(self):
         class M(torch.nn.Module):
             def __init__(self):

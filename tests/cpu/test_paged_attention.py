@@ -252,6 +252,8 @@ class PagedAttentionTest(TestCase):
         num_blocks: int,
         dtype: torch.dtype,
         seed: int,
+        key_is_contiguous: bool,
+        value_is_contiguous: bool,
     ) -> None:
         random.seed(seed)
         torch.random.manual_seed(seed)
@@ -264,6 +266,13 @@ class PagedAttentionTest(TestCase):
 
         qkv = torch.randn(num_token, 3, num_head, head_size, dtype=dtype, device="cpu")
         _, key, value = qkv.unbind(dim=1)
+        if key.shape[0] != 1:
+            if not key_is_contiguous:
+                key = key.transpose(0, 1).contiguous()
+                key = key.transpose(0, 1)
+            if not value_is_contiguous:
+                value = value.transpose(0, 1).contiguous()
+                value = value.transpose(0, 1)
         # Create the KV caches.
         key_caches, value_caches = self.create_kv_caches(
             num_blocks, block_size, 1, num_head, head_size, dtype, seed
@@ -300,6 +309,8 @@ class PagedAttentionTest(TestCase):
         head_sizes = [64, 80, 128, 96, 112, 128, 256]
         block_sizes = [16, 32]
         dtypes = [torch.bfloat16, torch.float]
+        key_modes = [True, False]
+        value_modes = [True, False]
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         seeds = [0]
@@ -310,6 +321,8 @@ class PagedAttentionTest(TestCase):
             block_size,
             dtype,
             seed,
+            key_is_contiguous,
+            value_is_contiguous,
         ) in product(
             num_tokens,
             num_kv_heads,
@@ -317,9 +330,19 @@ class PagedAttentionTest(TestCase):
             block_sizes,
             dtypes,
             seeds,
+            key_modes,
+            value_modes,
         ):
             self._test_reshape_and_cache_func(
-                num_token, num_kv_head, head_size, block_size, num_blocks, dtype, seed
+                num_token,
+                num_kv_head,
+                head_size,
+                block_size,
+                num_blocks,
+                dtype,
+                seed,
+                key_is_contiguous,
+                value_is_contiguous,
             )
 
 

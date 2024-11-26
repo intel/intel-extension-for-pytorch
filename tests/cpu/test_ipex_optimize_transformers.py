@@ -17,7 +17,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.43.2"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.45.0"]
     )
     import transformers
     from transformers import AutoConfig
@@ -344,61 +344,6 @@ class OptimizeTransformersTester(TestCase):
                 if not hasattr(ipex_m, "trace_graph"):
                     AssertionError(False)
 
-    def test_weight_only_quant_gptq_legacy(self):
-        # Test the legacy format
-        config = AutoConfig.from_pretrained(
-            f"{curpath}/hf_configs/gptj", return_dict=False
-        )
-        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
-        ipex_m = copy.deepcopy(m)
-        with tempfile.TemporaryDirectory() as work_dir:
-            # Generate dummy checkpoint
-            checkpoint_file_name = work_dir + "/checkpoint.pt"
-            state_dict = ipex_m.state_dict()
-            linear_keys = []
-            for k, v in state_dict.items():
-                if any(
-                    k.endswith(suffix)
-                    for suffix in ["proj.weight", "fc_in.weight", "fc_out.weight"]
-                ):
-                    linear_keys.append(k[:-7])
-            for k in linear_keys:
-                N = state_dict[k + ".weight"].shape[0]
-                K = state_dict[k + ".weight"].shape[1]
-                del state_dict[k + ".weight"]
-                state_dict[k + ".packed_weight"] = torch.randint(
-                    -(2**31), 2**31 - 1, (N, K // 8), dtype=torch.int32
-                )
-                state_dict[k + ".scale"] = torch.ones((N, 1), dtype=torch.half) * 0.5
-                state_dict[k + ".packed_zp"] = torch.ones((N, 1), dtype=torch.int32) * 4
-
-            torch.save(state_dict, checkpoint_file_name)
-            state_dict = torch.load(checkpoint_file_name)
-
-            # test loading checkpoint and quant info
-            lowp_mode = ipex.quantization.WoqLowpMode.INT8
-            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
-                lowp_mode=lowp_mode
-            )
-            config_dict = (
-                ipex.utils.weight_only_quantization._legacy_lowp_checkpoint_config()
-            )
-            ipex_m = ipex.llm.optimize(
-                ipex_m,
-                dtype=torch.float,
-                quantization_config=qconfig,
-                low_precision_checkpoint=(state_dict, config_dict),
-                deployment_mode=True,
-                inplace=True,
-            )
-            assert hasattr(ipex_m, "trace_graph")
-
-            # Ensure model can run without errors
-            with torch.no_grad():
-                example_inputs = _get_gptj_example_inputs()
-                # the optimized model is ipex_m.trace_graph
-                ipex_m.trace_graph(*example_inputs)
-
     def test_weight_only_quant_gptq(self):
         # Test the HuggingFace Optimum format
         config = AutoConfig.from_pretrained(
@@ -464,6 +409,70 @@ class OptimizeTransformersTester(TestCase):
                 # the optimized model is ipex_m.trace_graph
                 ipex_m.trace_graph(*example_inputs)
 
+    def test_weight_only_quant_awq(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptj", return_dict=False
+        )
+        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+        ipex_m = copy.deepcopy(m)
+        with tempfile.TemporaryDirectory() as work_dir:
+            # Generate dummy checkpoint
+            checkpoint_file_name = work_dir + "/checkpoint.pt"
+            state_dict = ipex_m.state_dict()
+            linear_keys = []
+            for k, v in state_dict.items():
+                if any(
+                    k.endswith(suffix)
+                    for suffix in ["proj.weight", "fc_in.weight", "fc_out.weight"]
+                ):
+                    linear_keys.append(k[:-7])
+            group_size = 128
+            comp_ratio = 8
+            for k in linear_keys:
+                N = state_dict[k + ".weight"].shape[0]
+                K = state_dict[k + ".weight"].shape[1]
+                del state_dict[k + ".weight"]
+                n_groups = K // group_size
+                stored_weight_shape = (K, N // comp_ratio)
+                stored_scales_shape = (n_groups, N)
+                stored_zeros_shape = (n_groups, N // comp_ratio)
+                state_dict[k + ".qweight"] = torch.randint(
+                    -(2**31), 2**31 - 1, stored_weight_shape, dtype=torch.int32
+                )
+                state_dict[k + ".scales"] = torch.randn(
+                    stored_scales_shape, dtype=torch.half
+                )
+                state_dict[k + ".qzeros"] = torch.randint(
+                    -(2**31), 2**31 - 1, stored_zeros_shape, dtype=torch.int32
+                )
+                g_idx = torch.arange(n_groups).repeat(group_size)
+                g_idx[:] = g_idx[torch.randperm(K)]
+                state_dict[k + ".g_idx"] = g_idx
+
+            torch.save(state_dict, checkpoint_file_name)
+            state_dict = torch.load(checkpoint_file_name)
+
+            # test loading checkpoint and quant info
+            lowp_mode = ipex.quantization.WoqLowpMode.INT8
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                lowp_mode=lowp_mode
+            )
+            ipex_m = ipex.llm.optimize(
+                ipex_m,
+                dtype=torch.float,
+                quantization_config=qconfig,
+                low_precision_checkpoint=(state_dict, {"quant_method": "awq"}),
+                deployment_mode=True,
+                inplace=True,
+            )
+            assert hasattr(ipex_m, "trace_graph")
+
+            # Ensure model can run without errors
+            with torch.no_grad():
+                example_inputs = _get_gptj_example_inputs()
+                # the optimized model is ipex_m.trace_graph
+                ipex_m.trace_graph(*example_inputs)
+
     def test_generate_functions(self):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
@@ -514,6 +523,13 @@ class OptimizeTransformersTester(TestCase):
                     ipex_res = ipex_m.generate(input_ids, **generate_kwargs)
                     ref_res = ref_m.generate(input_ids, **generate_kwargs)
                     self.assertEqual(ipex_res, ref_res)
+                    ipex_res_dict = ipex_m.generate(
+                        input_ids, return_dict_in_generate=True, **generate_kwargs
+                    )
+                    ref_res_dict = ref_m.generate(
+                        input_ids, return_dict_in_generate=True, **generate_kwargs
+                    )
+                    self.assertEqual(ipex_res_dict.sequences, ref_res_dict.sequences)
 
     def test_cache_weight_for_large_batch(self):
         config = AutoConfig.from_pretrained(

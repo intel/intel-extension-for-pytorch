@@ -2,36 +2,18 @@ import torch
 from torch import nn
 import torch.distributed as dist
 from ...utils._logger import logger, WarningType
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Union, List
 from transformers.generation.stopping_criteria import (
     StoppingCriteriaList,
     validate_stopping_criteria,
 )
 from transformers.generation.logits_process import LogitsProcessorList
 from transformers.generation.beam_search import BeamScorer
-from transformers.utils import ModelOutput
 import time
-
-
-class BeamSearchEncoderDecoderOutput(ModelOutput):
-    sequences: torch.LongTensor = None
-    sequences_scores: Optional[torch.FloatTensor] = None
-    scores: Optional[Tuple[torch.FloatTensor]] = None
-    beam_indices: Optional[torch.LongTensor] = None
-    encoder_attentions: Optional[Tuple[torch.FloatTensor]] = None
-    encoder_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    decoder_attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    cross_attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    decoder_hidden_states: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-
-
-class BeamSearchDecoderOnlyOutput(ModelOutput):
-    sequences: torch.LongTensor = None
-    sequences_scores: Optional[torch.FloatTensor] = None
-    scores: Optional[Tuple[torch.FloatTensor]] = None
-    beam_indices: Optional[torch.LongTensor] = None
-    attentions: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    hidden_states: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+from transformers.generation.utils import (
+    BeamSearchEncoderDecoderOutput,
+    BeamSearchDecoderOnlyOutput,
+)
 
 
 BeamSearchOutput = Union[BeamSearchEncoderDecoderOutput, BeamSearchDecoderOnlyOutput]
@@ -55,6 +37,7 @@ def _beam_search(
 ) -> Union[BeamSearchOutput, torch.LongTensor]:
     new_generation_config = model_kwargs.pop("generation_config", None)
     if new_generation_config is not None:
+        return_dict_in_generate = new_generation_config.return_dict_in_generate
         if new_generation_config.do_sample:
             return self._beam_sample(
                 input_ids,
@@ -196,6 +179,7 @@ def _beam_search(
         if self.model_backbone in [
             "GPTJForCausalLM",
             "LlamaForCausalLM",
+            "MllamaForConditionalGeneration",
             "GPTNeoXForCausalLM",
             "OPTForCausalLM",
             "FalconForCausalLM",
@@ -344,41 +328,78 @@ def _beam_search(
                     num_hidden_layers = self.config.n_layer
                 elif hasattr(self.config, "num_hidden_layers"):
                     num_hidden_layers = self.config.num_hidden_layers
+                elif hasattr(self.config, "text_config") and hasattr(
+                    self.config.text_config, "num_hidden_layers"
+                ):
+                    num_hidden_layers = self.config.text_config.num_hidden_layers
                 elif hasattr(self.config, "num_layers"):
                     num_hidden_layers = self.config.num_layers
                 elif hasattr(self.config, "n_layers"):
                     num_hidden_layers = self.config.n_layers
                 beam_idx_tmp = torch.zeros(
                     (2048, int(batch_size * num_beams)), dtype=torch.long
-                ).contiguous()
-                model_inputs["past_key_values"] = tuple(
-                    [
-                        (
-                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            torch.zeros([1, 1, 1, 1]).contiguous(),
-                            beam_idx_tmp,
-                        )
-                        for i in range(num_hidden_layers)
-                    ]
                 )
-                new_attention_mask = model_inputs["attention_mask"][:batch_size].clone()
-                new_input_ids = model_inputs["input_ids"][:batch_size].clone()
-                if has_position_id:
-                    new_position_ids = model_inputs["position_ids"][:batch_size].clone()
-                for i in range(batch_size):
-                    new_attention_mask[i] = model_inputs["attention_mask"][
-                        i * num_beams
-                    ]
-                    new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
+
+                if self.model_backbone == "MllamaForConditionalGeneration":
+                    head_dim = self.config.text_config.hidden_size // (
+                        self.config.text_config.num_hidden_layers
+                        - len(self.config.text_config.cross_attention_layers)
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                (
+                                    torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    beam_idx_tmp,
+                                )
+                                if i
+                                not in self.config.text_config.cross_attention_layers
+                                else (
+                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                )
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
+                else:
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                beam_idx_tmp,
+                            )
+                            for i in range(num_hidden_layers)
+                        ]
+                    )
+                if self.model_backbone != "MllamaForConditionalGeneration":
+                    new_attention_mask = model_inputs["attention_mask"][
+                        :batch_size
+                    ].clone()
+                    new_input_ids = model_inputs["input_ids"][:batch_size].clone()
                     if has_position_id:
-                        new_position_ids[i] = model_inputs["position_ids"][
+                        new_position_ids = model_inputs["position_ids"][
+                            :batch_size
+                        ].clone()
+                    for i in range(batch_size):
+                        new_attention_mask[i] = model_inputs["attention_mask"][
                             i * num_beams
                         ]
-                model_inputs["attention_mask"] = new_attention_mask
-                model_inputs["input_ids"] = new_input_ids
-                if has_position_id:
-                    model_inputs["position_ids"] = new_position_ids
+                        new_input_ids[i] = model_inputs["input_ids"][i * num_beams]
+                        if has_position_id:
+                            new_position_ids[i] = model_inputs["position_ids"][
+                                i * num_beams
+                            ]
+                    model_inputs["attention_mask"] = new_attention_mask
+                    model_inputs["input_ids"] = new_input_ids
+                    if has_position_id:
+                        model_inputs["position_ids"] = new_position_ids
             model_inputs.pop("use_cache", None)
             model_inputs.pop("token_type_ids", None)
             if "return_last_logit" in model_inputs:
@@ -421,6 +442,7 @@ def _beam_search(
             if (
                 first_token
                 and self.model_backbone != "YuanForCausalLM"
+                and self.model_backbone != "MllamaForConditionalGeneration"
                 and len(model_inputs["past_key_values"][0]) == 4
             ):
                 if isinstance(outputs, dict):

@@ -85,7 +85,7 @@ def convert(model, optimizer, device="xpu"):
 def convert_rec(m, optimizer, device="xpu"):
     new_m = convert(m, optimizer, device)
     for name, sub_m in m.named_children():
-        setattr(new_m, name, convert_rec(sub_m, optimizer)[0])
+        setattr(new_m, name, convert_rec(sub_m, optimizer, device)[0])
     return new_m, optimizer
 
 
@@ -93,7 +93,7 @@ def prepare_fp8(model, optimizer=None, device="xpu"):
     """Convert modules to FP8 modules (e.g, convert nn.Linear to FP8Linear) in the model."""
     FP8GlobalStateManager.set_fp8_device_type(device)
     optimized_model, optimized_optimizer = _copy_model_and_optimizer(model, optimizer)
-    new_m, new_optimizer = convert_rec(optimized_model, optimized_optimizer)
+    new_m, new_optimizer = convert_rec(optimized_model, optimized_optimizer, device)
     if optimizer is None:
         return new_m
     return new_m, new_optimizer

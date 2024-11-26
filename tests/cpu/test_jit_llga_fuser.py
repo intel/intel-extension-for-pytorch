@@ -1152,7 +1152,11 @@ for model_name, enabled in [
     ["squeezenet1_0", True],
     ["vgg16", True],
     ["alexnet", True],
-    ["shufflenet_v2_x1_0", True],
+    [
+        "shufflenet_v2_x1_0",
+        False,
+    ],  # TODO: the test fails starting from oneDNN commit 6e75504d89a66efaeea4a9d6bc2b2aa80a2075bc.
+    # Re-enable the test after fixing it.
     ["wide_resnet50_2", True],
 ]:
 

@@ -27,7 +27,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     at::Tensor&& weight,
     at::Tensor&& scales,
-    at::Tensor&& zero_points,
+    c10::optional<at::Tensor>&& zeros,
     c10::optional<at::Tensor>&& bias,
     c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
@@ -35,6 +35,29 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     int64_t lowp_mode,
     int64_t act_quant_mode,
     bool cache_weight_for_large_batch = false);
+
+std::tuple<
+    at::Tensor,
+    std::vector<at::Tensor>,
+    c10::optional<std::vector<at::Tensor>>,
+    c10::optional<std::vector<at::Tensor>>,
+    c10::optional<at::Tensor>>
+packWoqLinearWeight(
+    at::Tensor&& weight,
+    c10::string_view&& weight_dtype,
+    std::vector<int64_t>&& weight_shape,
+    at::Tensor&& scales,
+    c10::optional<at::Tensor>&& zero_points,
+    c10::optional<at::Tensor>&& bias,
+    c10::optional<at::Tensor>&& g_idx,
+    int64_t group_size,
+    int64_t lowp_mode);
+
+at::Tensor unpackWoqLinearWeight(
+    at::Tensor&& weight,
+    c10::string_view&& weight_dtype,
+    std::vector<int64_t>&& weight_shape,
+    int64_t lowp_mode);
 
 at::Tensor woq_linear_run(
     const at::Tensor& input,

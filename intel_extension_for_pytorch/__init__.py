@@ -158,7 +158,7 @@ from .frontend import set_fp32_math_mode, get_fp32_math_mode, FP32MathMode
 if has_cpu():
     from .transformers import _set_optimized_model_for_generation
     from .cpu._auto_kernel_selection import _enable_dnnl, _disable_dnnl, _using_dnnl
-    from .cpu.utils.verbose import verbose
+    from .cpu.utils.verbose import verbose, VERBOSE_OFF, VERBOSE_ON, VERBOSE_ON_CREATION
     from .cpu.tpp.fused_bert import fast_bert
     from ._inductor.cpu.compiler import (
         _set_compiler_backend,

@@ -40,12 +40,19 @@ parser.add_argument(
 parser.add_argument(
     "--local_rank", required=False, type=int, default=0, help="used by dist launchers"
 )
+parser.add_argument(
+    "--vision-text-model",
+    action="store_true",
+    help="whether or not it is vision-text multi-model structure",
+)
 args = parser.parse_args()
 print(args)
 if args.local_rank == 0:
     model_type = next(
         (x for x in MODEL_CLASSES.keys() if x in args.model_id.lower()), "auto"
     )
+    if model_type == "llama" and args.vision_text_model:
+        model_type = "mllama"
     model_class = MODEL_CLASSES[model_type]
     load_dtype = torch.float32
     if args.dtype == "float16":

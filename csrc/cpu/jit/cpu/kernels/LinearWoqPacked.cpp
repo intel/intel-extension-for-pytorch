@@ -52,7 +52,7 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     at::Tensor&& weight,
     at::Tensor&& scales,
-    at::Tensor&& zero_points,
+    c10::optional<at::Tensor>&& zeros,
     c10::optional<at::Tensor>&& bias,
     c10::optional<at::Tensor>&& g_idx,
     c10::optional<int64_t> batch_size,
@@ -74,36 +74,40 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
   auto scales_fp32 = scales.squeeze().to(c10::ScalarType::Float);
 
   at::Tensor zp_fp32;
+  bool has_zeros = zeros.has_value() && zeros.value().defined();
 
-  if (zero_points.scalar_type() == c10::kInt) {
-    // Two cases: (1) each int32 contains 8 values of zero points
-    // (2) each int32 is a single value of zero point
-    if (zero_points.numel() != scales_fp32.numel()) {
-      // Assume group_size > 0 and zero point data are compressed
-      TORCH_CHECK(scales_fp32.dim() == 2 && zero_points.dim() == 2)
-      TORCH_CHECK(scales_fp32.size(0) == zero_points.size(0))
-      auto num_row = scales_fp32.size(0);
-      auto num_col = scales_fp32.size(1);
-      auto num_col_zp = zero_points.size(1);
-      // Convert compressed zero points to float
-      zp_fp32 = at::empty_like(scales_fp32);
-      float* zp_fp32_ptr = reinterpret_cast<float*>(zp_fp32.data_ptr());
-      uint32_t* zp_int32_ptr =
-          reinterpret_cast<uint32_t*>(zero_points.data_ptr());
-      for (size_t i = 0; i < num_row; ++i) {
-        for (size_t j = 0; j < num_col; ++j) {
-          zp_fp32_ptr[i * num_col + j] =
-              (float)((zp_int32_ptr[i * num_col_zp + j / 8] >> ((j % 8) * 4)) & 0xf);
+  if (has_zeros) {
+    auto zero_points = zeros.value();
+    if (zero_points.scalar_type() == c10::kInt) {
+      // Two cases: (1) each int32 contains 8 values of zero points
+      // (2) each int32 is a single value of zero point
+      if (zero_points.numel() != scales_fp32.numel()) {
+        // Assume group_size > 0 and zero point data are compressed
+        TORCH_CHECK(scales_fp32.dim() == 2 && zero_points.dim() == 2)
+        TORCH_CHECK(scales_fp32.size(0) == zero_points.size(0))
+        auto num_row = scales_fp32.size(0);
+        auto num_col = scales_fp32.size(1);
+        auto num_col_zp = zero_points.size(1);
+        // Convert compressed zero points to float
+        zp_fp32 = at::empty_like(scales_fp32);
+        float* zp_fp32_ptr = reinterpret_cast<float*>(zp_fp32.data_ptr());
+        uint32_t* zp_int32_ptr =
+            reinterpret_cast<uint32_t*>(zero_points.data_ptr());
+        for (size_t i = 0; i < num_row; ++i) {
+          for (size_t j = 0; j < num_col; ++j) {
+            zp_fp32_ptr[i * num_col + j] =
+                (float)((zp_int32_ptr[i * num_col_zp + j / 8] >> ((j % 8) * 4)) & 0xf);
+          }
         }
+      } else if (zero_points.numel() == scales_fp32.numel()) {
+        // Not compressed
+        zp_fp32 = zero_points.squeeze().to(c10::kFloat);
+      } else {
+        TORCH_CHECK(false, "IPEX WOQ INT4: unexpected zero points size");
       }
-    } else if (zero_points.numel() == scales_fp32.numel()) {
-      // Not compressed
-      zp_fp32 = zero_points.squeeze().to(c10::kFloat);
     } else {
-      TORCH_CHECK(false, "IPEX WOQ INT4: unexpected zero points size");
+      zp_fp32 = zero_points.squeeze().to(c10::kFloat);
     }
-  } else {
-    zp_fp32 = zero_points.squeeze().to(c10::kFloat);
   }
   // Support two cases here:
   // 1. fp32/bf16 weight after calibration
@@ -140,14 +144,23 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
       auto weight_view =
           weight_fp32.view({-1, weight.size(1) / group_size, group_size});
       auto scale_view = scales_fp32.unsqueeze(2);
-      auto zp_view = zp_fp32.unsqueeze(2);
-      weight_int4_as_uint8 =
-          at::round(weight_view / scale_view + zp_view).to(c10::kByte);
+      if (has_zeros) {
+        auto zp_view = zp_fp32.unsqueeze(2);
+        weight_int4_as_uint8 =
+            at::round(weight_view / scale_view + zp_view).to(c10::kByte);
+      } else {
+        weight_int4_as_uint8 =
+            at::round(weight_view / scale_view).to(c10::kByte);
+      }
     } else {
       auto scale_view = scales_fp32.unsqueeze(1);
-      auto zp_view = zp_fp32.unsqueeze(1);
-      weight_int4_as_uint8 =
-          at::round(weight / scale_view + zp_view).to(c10::kByte);
+      if (has_zeros) {
+        auto zp_view = zp_fp32.unsqueeze(1);
+        weight_int4_as_uint8 =
+            at::round(weight / scale_view + zp_view).to(c10::kByte);
+      } else {
+        weight_int4_as_uint8 = at::round(weight / scale_view).to(c10::kByte);
+      }
     }
     weight_int4_as_uint8 = weight_int4_as_uint8.view(weight_shape);
     using at::indexing::None;
@@ -164,12 +177,13 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
         "IPEX WOQ INT4: unexpected weight data type: ",
         weight.scalar_type());
   }
+  auto optional_zeros = has_zeros ? c10::make_optional(zp_fp32) : c10::nullopt;
   return IpexWoqLinearOpContext::create_context(
       std::move(weight_int4),
       /*weight_dtype*/ WOQ_DTYPE_INT4,
       std::move(weight_shape),
       std::move(scales_fp32),
-      std::move(zp_fp32),
+      std::move(optional_zeros),
       std::move(bias),
       std::move(g_idx),
       batch_size,
@@ -177,6 +191,78 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
       lowp_mode,
       act_quant_mode,
       cache_weight_for_large_batch);
+}
+
+static const std::map<c10::string_view, int64_t> WOQ_DTYPE_MAP = {
+    {"int8", WOQ_DTYPE_INT8},
+    {"int4", WOQ_DTYPE_INT4},
+    {"nf4", WOQ_DTYPE_NF4},
+};
+
+// output:
+// 0: packed weight, 1: scales, 2: zero_points, 3: bias, 4: compensation
+std::tuple<
+    at::Tensor,
+    std::vector<at::Tensor>,
+    c10::optional<std::vector<at::Tensor>>,
+    c10::optional<std::vector<at::Tensor>>,
+    c10::optional<at::Tensor>>
+packWoqLinearWeight(
+    at::Tensor&& weight,
+    c10::string_view&& weight_dtype,
+    std::vector<int64_t>&& weight_shape,
+    at::Tensor&& scales,
+    c10::optional<at::Tensor>&& zero_points,
+    c10::optional<at::Tensor>&& bias,
+    c10::optional<at::Tensor>&& g_idx,
+    int64_t group_size,
+    int64_t lowp_mode) {
+  bool has_zeros = zero_points.has_value();
+  bool has_bias = bias.has_value();
+  // Flags like act_quant_mode and cache_weight_for_large_batch are not used
+  auto&& context = create(
+      weight,
+      WOQ_DTYPE_MAP.at(weight_dtype),
+      weight_shape,
+      scales,
+      zero_points,
+      bias,
+      g_idx,
+      /* batch_size */ c10::nullopt,
+      group_size,
+      lowp_mode,
+      /*act_quant_mode*/ 0,
+      /*cache_weight_for_large_batch*/ false);
+  auto& packed_weight = context.at_weight_;
+  auto& new_scales = context.scales_list_;
+  auto& new_zeros = context.zero_points_list_;
+  auto& new_bias = context.bias_list_;
+  c10::optional<std::vector<at::Tensor>> optional_zeros =
+      has_zeros ? c10::make_optional(new_zeros) : c10::nullopt;
+  c10::optional<std::vector<at::Tensor>> optional_bias =
+      has_bias ? c10::make_optional(new_bias) : c10::nullopt;
+  auto compensation = context.cached_compensation_;
+  return std::make_tuple(
+      packed_weight, new_scales, optional_zeros, optional_bias, compensation);
+}
+
+at::Tensor unpackWoqLinearWeight(
+    at::Tensor&& weight,
+    c10::string_view&& weight_dtype,
+    std::vector<int64_t>&& weight_shape,
+    int64_t lowp_mode) {
+  int64_t w_dtype = WOQ_DTYPE_MAP.at(weight_dtype);
+  auto unpacked_weight = woq_linear_unpack_weight(weight, w_dtype, lowp_mode);
+  int64_t N = weight_shape[0];
+  int64_t K = weight_shape[1];
+  if (w_dtype == WOQ_DTYPE_INT4 || w_dtype == WOQ_DTYPE_NF4) {
+    K = (K + 1) / 2;
+  }
+  if (unpacked_weight.size(0) != N || unpacked_weight.size(1) != K) {
+    // narrow unpacked weight to original shape
+    return unpacked_weight.narrow(0, 0, N).narrow(1, 0, K).contiguous();
+  }
+  return unpacked_weight;
 }
 
 at::Tensor woq_linear_run(

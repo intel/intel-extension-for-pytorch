@@ -1,4 +1,4 @@
-accelerate==0.28.0
+accelerate
 appdirs
 bitsandbytes
 black
@@ -6,6 +6,6 @@ black[jupyter]
 datasets
 fire
 peft
-transformers==4.43.2
+transformers==4.45.0
 gradio
 sentencepiece
