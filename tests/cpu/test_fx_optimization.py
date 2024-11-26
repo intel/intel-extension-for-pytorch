@@ -104,7 +104,7 @@ class FxTester(TestCase):
         config = AutoConfig.from_pretrained(loc + "/bert-base-config.json")
         model = AutoModelForCausalLM.from_config(config)
         model.eval()
-        inputs = torch.load(loc + "/bert-inputs.pt")
+        inputs = torch.load(loc + "/bert-inputs.pt", weights_only=False)
         gm = hf_symbolic_trace(model, input_names=list(inputs.keys()))
         ref_out = gm(**inputs)
         concat_gm = ipex.fx.concat_linear.concat_linear(copy.deepcopy(gm), inplace=True)
@@ -125,7 +125,7 @@ class FxTester(TestCase):
         loc = os.path.dirname(os.path.abspath(__file__))
         config = AutoConfig.from_pretrained(loc + "/bert-base-config.json")
         base_model = AutoModelForCausalLM.from_config(config).eval()
-        inputs = torch.load(loc + "/bert-inputs.pt")
+        inputs = torch.load(loc + "/bert-inputs.pt", weights_only=False)
         for dtype in [torch.float, torch.bfloat16]:
             for inplace in [True, False]:
                 model = copy.deepcopy(base_model)

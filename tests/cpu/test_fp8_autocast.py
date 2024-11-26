@@ -193,7 +193,7 @@ class TestFP8Cases(TestCase):
         fp8_linear_with_calibration = MyModel()
         fp8_linear_with_calibration = prepare_fp8(fp8_linear_with_calibration)
         fp8_linear_with_calibration.load_state_dict(
-            torch.load("fp8_linear_inference.pt")
+            torch.load("fp8_linear_inference.pt", weights_only=False)
         )
         fp8_linear_with_calibration.eval()
 
