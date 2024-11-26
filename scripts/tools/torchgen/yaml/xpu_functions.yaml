@@ -208,21 +208,21 @@ supported:
 #  - binary_cross_entropy_backward.grad_input
 #  - bincount
 #  - bitwise_and.Tensor_out
-  - bitwise_not
+#  - bitwise_not #Redundant registration
 #  - bitwise_not.out
-  - bitwise_not_
+#  - bitwise_not_ #Redundant registration
 #  - bitwise_or.Tensor_out
 #  - bitwise_xor.Tensor_out
 #  - bitwise_left_shift.Tensor_out
-  - bitwise_left_shift.Tensor_Scalar
-  - bitwise_left_shift_.Tensor_Scalar
-  - bitwise_left_shift.Tensor_Scalar_out
-  - bitwise_left_shift.Scalar_Tensor
+#  - bitwise_left_shift.Tensor_Scalar #Redundant registration
+#  - bitwise_left_shift_.Tensor_Scalar #Redundant registration
+#  - bitwise_left_shift.Tensor_Scalar_out #Redundant registration
+#  - bitwise_left_shift.Scalar_Tensor #Redundant registration
 #  - bitwise_right_shift.Tensor_out
-  - bitwise_right_shift.Tensor_Scalar
-  - bitwise_right_shift_.Tensor_Scalar
-  - bitwise_right_shift.Tensor_Scalar_out
-  - bitwise_right_shift.Scalar_Tensor
+#  - bitwise_right_shift.Tensor_Scalar #Redundant registration
+#  - bitwise_right_shift_.Tensor_Scalar #Redundant registration
+#  - bitwise_right_shift.Tensor_Scalar_out #Redundant registration
+#  - bitwise_right_shift.Scalar_Tensor #Redundant registration
   - cauchy_
 #  - cholesky
 #  - cholesky.out
