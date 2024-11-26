@@ -298,6 +298,8 @@ print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), "auto")
 if model_type == "llama" and args.vision_text_model:
     model_type = "mllama"
+if model_type == "maira-2":
+    model_type = "maira2"
 model_class = MODEL_CLASSES[model_type]
 tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=True)
 
@@ -350,6 +352,8 @@ if model_type == "llava":
 
 if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
+if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generation"):
+    config.text_config.lm_head_generation = True
 num_beams = 1 if args.greedy else 4
 if model_type in ["git", "llava"]:
     config.batch_size = int(args.batch_size) * num_beams
@@ -389,7 +393,13 @@ elif world_size == 1 or model_type in [
     model = model_class[0].from_pretrained(
         model_name,
         config=config,
-        low_cpu_mem_usage=True,
+        low_cpu_mem_usage=True if model_type != "maira2" else False,
+        torch_dtype=load_dtype,
+        trust_remote_code=True,
+    )
+elif model_type == "maira2":
+    model = model_class[0].from_pretrained(
+        model_name,
         torch_dtype=load_dtype,
         trust_remote_code=True,
     )
@@ -653,6 +663,22 @@ elif model_type == "mllama":
     input_size = inputs["input_ids"].size(dim=1)
     print("---- Prompt size:", input_size)
     inputs = [prompt] * args.batch_size
+elif model_type == "maira2":
+    from PIL import Image
+    import requests
+
+    def download_and_open(url: str) -> Image.Image:
+        response = requests.get(url, headers={"User-Agent": "MAIRA-2"}, stream=True)
+        return Image.open(response.raw)
+
+    prompt = args.prompt
+    sample = download_and_open(args.image_url)
+    process_input_func = (
+        tokenizer.process_reporting_input
+        if hasattr(tokenizer, "process_reporting_input")
+        else tokenizer.format_and_preprocess_reporting_input
+    )
+    inputs = [prompt] * args.batch_size
 else:
     # input tokens
     input_sentences = []
@@ -719,6 +745,19 @@ def generate():
         raw_image = [raw_image] * args.batch_size
         input_tokens = tokenizer(raw_image, prompt, return_tensors="pt")
         input_ids = input_tokens["input_ids"]
+    elif model_type == "maira2":
+        input_tokens = process_input_func(
+            current_frontal=sample,
+            current_lateral=None,
+            prior_frontal=None,
+            indication=None,
+            technique=None,
+            comparison=None,
+            prior_report=None,
+            return_tensors="pt",
+            get_grounding=False,
+        )
+        input_ids = input_tokens["input_ids"]
     else:
         input_tokens = tokenizer.batch_encode_plus(
             inputs, return_token_type_ids=False, return_tensors="pt"
@@ -743,7 +782,11 @@ def generate():
         for i, o in zip(input_tokens_lengths, output_tokens_lengths)
     ]
     gen_text = tokenizer.batch_decode(
-        gen_ids[:, input_ids.shape[1] :] if model_type == "llava" else gen_ids,
+        (
+            gen_ids[:, input_ids.shape[1] :]
+            if model_type in ["llava", "maira2"]
+            else gen_ids
+        ),
         skip_special_tokens=True,
     )
 

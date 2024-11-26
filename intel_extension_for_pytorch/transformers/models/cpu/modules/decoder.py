@@ -59,6 +59,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "QWenLMHeadModel",
             "Qwen2ForCausalLM",
             "YuanForCausalLM",
+            "Maira2ForConditionalGeneration",
         ]:
             if not self.distributed:
                 if hasattr(module, "linear_add"):
@@ -116,6 +117,12 @@ class _IPEXDecoderLayerCPU(nn.Module):
                 self.linear_relu = _IPEXlinearReluCPU(
                     module.linear_relu.linear, tpp=tpp, woq=woq
                 )
+            if hasattr(module, "linear_gelus"):
+                linear_gelus = [
+                    _IPEXlinearGeluCPU(linear_gelu.linear, tpp=tpp, woq=woq)
+                    for linear_gelu in module.linear_gelus
+                ]
+                self.linear_gelus = nn.Sequential(*linear_gelus)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 

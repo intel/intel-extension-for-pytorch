@@ -579,6 +579,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 "phi-3": ("/phi-3_local_shard"),
                 "phi": ("/phi_local_shard"),
                 "whisper": ("/whisper_local_shard"),
+                "maira": ("/maira2_local_shard"),
             }
             model_type = next(
                 (

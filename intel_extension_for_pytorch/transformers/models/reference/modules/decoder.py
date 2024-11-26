@@ -1603,6 +1603,23 @@ def GPTNeoXLayer_forward(
     return outputs
 
 
+def Maira2ViTDecoderLayer_forward(self, x: torch.Tensor) -> torch.Tensor:
+    x = x + self.ls1(self.attn(self.norm1(x)))
+    norm = self.norm2(x)
+    act = self.linear_gelu(norm)
+    fc2 = self.mlp.fc2(act)
+    x = x + self.ls2(fc2)
+    return x
+
+
+def Maira2MultiModalProjector_forward(self, x: torch.Tensor) -> torch.FloatTensor:
+    for layer in self.linear_gelus:
+        x = layer(x)
+    for layer in self.layers:
+        x = layer(x)
+    return x  # type: ignore[no-any-return]
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1842,6 +1859,18 @@ class _IPEXDecoderLayerRef(nn.Module):
                     del self.__dict__["_modules"]["encoder_attn"].out_proj
             self.linear_gelu = _IPEXlinearGeluRef(module.fc1)
             del self.__dict__["_modules"]["fc1"]
+        elif self.model_backbone == "Maira2ForConditionalGeneration":
+            self.is_vision = True if hasattr(module, "ls1") else False
+            if self.is_vision:
+                self.linear_gelu = _IPEXlinearGeluRef(module.mlp.fc1)
+                del self.__dict__["_modules"]["mlp"].fc1
+            else:
+                linear_gelus = []
+                for i in range(0, len(module.layers) - 1, 2):
+                    linear_gelus.append(_IPEXlinearGeluRef(module.layers[i]))
+                self.linear_gelus = torch.nn.Sequential(*linear_gelus)
+                for i in range(len(module.layers) - 1):
+                    del self.__dict__["_modules"]["layers"][0]
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2139,6 +2168,11 @@ class _IPEXDecoderLayerRef(nn.Module):
             return WhisperEncoderLayer_forward(
                 self, hidden_states, attention_mask, layer_head_mask, output_attentions
             )
+        elif self.model_backbone == "Maira2ForConditionalGeneration":
+            if self.is_vision:
+                return Maira2ViTDecoderLayer_forward(self, hidden_states)
+            else:
+                return Maira2MultiModalProjector_forward(self, hidden_states)
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 

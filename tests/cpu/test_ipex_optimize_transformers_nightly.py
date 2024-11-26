@@ -17,6 +17,7 @@ from hf_configs.llava.modeling_llavallama import LlavaLlamaForCausalLM
 from hf_configs.yuan.yuan_hf_model import YuanForCausalLM
 from hf_configs.phi.modeling_phi import PhiForCausalLM
 from hf_configs.phi3.modeling_phi3 import Phi3ForCausalLM
+from hf_configs.maira2.modeling_maira2 import Maira2ForConditionalGeneration
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _disable_tpp
 
 try:
@@ -24,7 +25,7 @@ try:
     from transformers import AutoConfig
 except ImportError:
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "transformers==4.45.0"]
+        [sys.executable, "-m", "pip", "install", "transformers==4.46.2"]
     )
     import transformers
     from transformers import AutoConfig
@@ -201,6 +202,13 @@ supported_models = [
         lambda m: m.language_model.model.layers[0].self_attn.__class__,
         lambda m: m.language_model.model.layers[0].__class__,
     ),
+    model_info(
+        "maira2",
+        Maira2ForConditionalGeneration,
+        True,
+        lambda m: m.language_model.model.layers[0].self_attn.__class__,
+        lambda m: m.language_model.model.layers[0].__class__,
+    ),
 ]
 
 
@@ -300,6 +308,18 @@ class OptimizeTransformersNightlyTester(TestCase):
             input_dict["aspect_ratio_mask"] = aspect_ratio_mask
             input_dict["aspect_ratio_ids"] = aspect_ratio_ids
             input_dict["cross_attention_mask"] = cross_attention_mask
+        if m.name == "maira2":
+            input_ids = torch.ones(1448).to(torch.long).unsqueeze(0)
+            input_ids[:, 31:1400] = model.config.image_token_index
+            attention_mask = torch.ones_like(input_ids)
+            position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
+            pixel_values = torch.rand(1, 3, 518, 518)
+            input_dict = {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "position_ids": position_ids,
+                "pixel_values": pixel_values,
+            }
 
         with torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if dtype in [torch.bfloat16, torch.float16] else False,

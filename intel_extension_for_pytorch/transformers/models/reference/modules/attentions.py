@@ -2714,6 +2714,7 @@ class _IPEXAttentionRef(nn.Module):
         pixel_values_present: Optional[bool] = False,
         vision: Optional[bool] = False,
         cross_attention_states: Optional[torch.Tensor] = None,
+        cache_position=None,
     ):
         if self.model_backbone == "GPTJForCausalLM":
             return _GPTJAttention_forward(

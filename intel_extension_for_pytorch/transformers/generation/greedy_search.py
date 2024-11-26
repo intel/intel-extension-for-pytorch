@@ -167,6 +167,7 @@ def _greedy_search(
             "Phi3ForCausalLM",
             "WhisperForConditionalGeneration",
             "Qwen2ForCausalLM",
+            "Maira2ForConditionalGeneration",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -351,6 +352,11 @@ def _greedy_search(
                 model_inputs.pop("decoder_attention_mask", None)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            if (
+                not first_token
+                and self.model_backbone == "Maira2ForConditionalGeneration"
+            ):
+                model_inputs.pop("pixel_values", None)
             model_inputs.pop("cache_position", None)
             if hasattr(self, "trace_graph"):
                 model_inputs.pop("use_cache", None)

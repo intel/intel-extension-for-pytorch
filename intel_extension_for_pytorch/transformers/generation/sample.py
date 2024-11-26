@@ -194,6 +194,7 @@ def _sample(
             "Phi3ForCausalLM",
             "WhisperForConditionalGeneration",
             "Qwen2ForCausalLM",
+            "Maira2ForConditionalGeneration",
         ]:
             first_token = False
             input_bs = input_ids.size()[0]
@@ -372,6 +373,11 @@ def _sample(
                 model_inputs = self.prepare_inputs_labels_for_multimodal(**model_inputs)
             if first_token and self.model_backbone == "YuanForCausalLM":
                 model_inputs.pop("past_key_values", None)
+            if (
+                not first_token
+                and self.model_backbone == "Maira2ForConditionalGeneration"
+            ):
+                model_inputs.pop("pixel_values", None)
             if self.model_backbone == "WhisperForConditionalGeneration":
                 model_inputs["encoder_outputs"] = (
                     model_inputs["encoder_outputs"]["last_hidden_state"],

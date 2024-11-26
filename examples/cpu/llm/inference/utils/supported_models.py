@@ -32,6 +32,8 @@ MODEL_CLASSES = {
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "phi": (AutoModelForCausalLM, AutoTokenizer),
     "whisper": (WhisperForConditionalGeneration, AutoProcessor),
+    "maira2": (AutoModelForCausalLM, AutoProcessor),
+    "maira-2": (AutoModelForCausalLM, AutoProcessor),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

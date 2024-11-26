@@ -92,7 +92,7 @@ def _set_optimized_model_for_generation(
 def check_transformers_for_llm_support():
     installed_pkg = {pkg.key for pkg in pkg_resources.working_set}
     min_version = "4.28.1"
-    validated_version = "4.45.0"
+    validated_version = "4.46.2"
     if "transformers" not in installed_pkg:
         raise RuntimeError(
             "ipex.llm.optimize requires transformers package with version at least {} , fallback".format(
@@ -182,6 +182,7 @@ def model_convert_reference(_model):
         T5ForConditionalGeneration_forward,
         T5DenseGatedActDense_forward,
         T5DenseActDense_forward,
+        T5Stack_forward,
         MistralForCausalLM_forward,
         MistralModel_forward,
         MptForCausalLM_forward,
@@ -207,6 +208,7 @@ def model_convert_reference(_model):
         WhisperForConditionalGeneration_forward,
         WhisperModel_forward,
         WhisperDecoderLayer_forward,
+        LlavaForConditionalGeneration_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptj,
         prepare_inputs_for_generation_gptbigcode,
@@ -216,6 +218,7 @@ def model_convert_reference(_model):
         prepare_inputs_for_generation_chatglm,
         prepare_inputs_for_generation_gptneox,
         prepare_inputs_for_generation_git,
+        prepare_inputs_for_generation_llava,
         detect_language,
         _postprocess_outputs_whisper,
         _prepare_encoder_decoder_kwargs_for_generation,
@@ -408,6 +411,12 @@ def model_convert_reference(_model):
         == transformers.models.t5.modeling_t5.T5ForConditionalGeneration
     ):
         convert_function(_model, "forward", T5ForConditionalGeneration_forward)
+        convert_functions(
+            _model,
+            transformers.models.t5.modeling_t5.T5Stack,
+            "forward",
+            T5Stack_forward,
+        )
         convert_function(
             _model,
             "_prepare_encoder_decoder_kwargs_for_generation",
@@ -995,7 +1004,26 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-
+    elif _model.config.architectures[0] == "Maira2ForConditionalGeneration":
+        convert_function(
+            _model, "prepare_inputs_for_generation", prepare_inputs_for_generation_llava
+        )
+        convert_function(_model, "forward", LlavaForConditionalGeneration_forward)
+        if hasattr(_model, "vision_tower") and hasattr(_model.vision_tower, "vit"):
+            convert_class(
+                _model,
+                type(_model.vision_tower.vit.blocks[0]),
+                _IPEXDecoderLayerRef,
+                _model.config,
+                distributed=distributed,
+            )
+        convert_class(
+            _model,
+            type(_model.multi_modal_projector),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     return _model
 
 
@@ -1279,7 +1307,25 @@ def get_dummy_input(_model, return_dict=False):
             if return_dict
             else (input_ids, attention_mask, position_ids, past_key_values)
         )
-
+    if _model.config.architectures[0] == "Maira2ForConditionalGeneration":
+        input_ids = torch.ones(1448).to(torch.long).unsqueeze(0)
+        input_ids[:, 31:1400] = _model.config.image_token_index
+        attention_mask = torch.ones_like(input_ids)
+        position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
+        if return_dict:
+            sample_inputs = {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "position_ids": position_ids,
+                "past_key_values": past_key_values,
+            }
+        else:
+            sample_inputs = (
+                input_ids,
+                attention_mask,
+                position_ids,
+                past_key_values,
+            )
     if "return_last_logit" in model_inputs:
         if return_dict:
             sample_inputs["return_last_logit"] = torch.tensor(True)
@@ -1590,6 +1636,22 @@ def model_convert_lowering(
                         optimized_model=trace_model,
                         first_token_optimized_model=trace_model_first,
                     )
+                if _model.config.architectures[0] == "Maira2ForConditionalGeneration":
+                    pixel_values = torch.zeros(1, 3, 518, 518)
+                    sample_inputs["pixel_values"] = pixel_values
+                    trace_model_first = torch.jit.trace(
+                        _model,
+                        example_kwarg_inputs=sample_inputs,
+                        strict=False,
+                        check_trace=False,
+                    )
+                    trace_model_first = torch.jit.freeze(trace_model_first)
+                    _model = _set_optimized_model_for_generation(
+                        _model,
+                        optimized_model=trace_model,
+                        first_token_optimized_model=trace_model_first,
+                    )
+
                 else:
                     _model = _set_optimized_model_for_generation(
                         _model, optimized_model=trace_model
@@ -1727,15 +1789,32 @@ def optimize(
                 "PhiForCausalLM",
                 "Phi3ForCausalLM",
                 "WhisperForConditionalGeneration",
+                "Maira2ForConditionalGeneration",
             ]
         if well_supported_model:
             check_transformers_for_llm_support()
+            if model.config.architectures[
+                0
+            ] == "Maira2ForConditionalGeneration" and hasattr(model, "language_model"):
+                model.language_model = optimize(
+                    model.language_model,
+                    optimizer=optimizer,
+                    dtype=dtype,
+                    inplace=inplace,
+                    device=device,
+                    quantization_config=quantization_config,
+                    qconfig_summary_file=qconfig_summary_file,
+                    low_precision_checkpoint=low_precision_checkpoint,
+                    sample_inputs=sample_inputs,
+                    deployment_mode=False,
+                    cache_weight_for_large_batch=cache_weight_for_large_batch,
+                )
         else:
             if quantization_config is not None:
                 logger.warning(
                     "ipex.llm.optimize supports quantizations on Llama, MLlama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen,"
                     + " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, Llava, Yuan,"
-                    + " Phi, and Whisper, fallback to origin model"
+                    + " Phi, Whisper, and Maira2, fallback to origin model"
                 )
                 return model
 

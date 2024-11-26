@@ -43,6 +43,7 @@ from llm.inference.utils.model_class.phi import PhiConfig
 from llm.inference.utils.model_class.phi import Phi3Config
 from llm.inference.utils.model_class.yuan import YuanConfig
 from llm.inference.utils.model_class.whisper import WhisperConfig
+from llm.inference.utils.model_class.maira2 import MAIRA2Config
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -421,6 +422,15 @@ elif re.search("whisper", config.architectures[0], re.IGNORECASE):
     import librosa
 
     model = WhisperConfig(args.model_id)
+elif re.search("maira2", config.architectures[0], re.IGNORECASE):
+    from PIL import Image
+    import requests
+
+    def download_and_open(url: str) -> Image.Image:
+        response = requests.get(url, headers={"User-Agent": "MAIRA-2"}, stream=True)
+        return Image.open(response.raw)
+
+    model = MAIRA2Config(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -449,7 +459,8 @@ if model.name == "whisper":
 
 if args.lm_head_generation and not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
-
+if model.name == "maira2" and not hasattr(config.text_config, "lm_head_generation"):
+    config.text_config.lm_head_generation = True
 
 user_model = model.get_user_model(config, args.benchmark)
 
@@ -491,7 +502,7 @@ def _get_target_nums(names):
     exit(0)
 
 
-if model.name != "mllama":
+if model.name not in ["mllama", "maira2"]:
     num_heads_names = ["num_attention_heads", "n_head", "num_heads", "n_heads"]
     num_layers_names = ["num_hidden_layers", "n_layer", "num_layers", "n_layers"]
     hidden_size_names = ["hidden_size", "n_embd"]
@@ -544,6 +555,18 @@ if model.name == "mllama":
             for i in range(user_model.config.text_config.num_hidden_layers)
         ]
     )
+if model.name == "maira2":
+    global_past_key_value = tuple(
+        [
+            (
+                torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros(1, 4, dtype=torch.long),
+            )
+            for i in range(user_model.config.text_config.num_hidden_layers)
+        ]
+    )
 
 
 def get_example_inputs(model):
@@ -559,6 +582,17 @@ def get_example_inputs(model):
                 input_ids.unsqueeze(0)[:, -1:],
                 attention_mask.unsqueeze(0)[:, -1:],
                 position_ids.unsqueeze(0)[:, -1:],
+                tuple(global_past_key_value),
+            )
+        elif model.name == "maira2":
+            input_ids = torch.ones(1448).to(torch.long).unsqueeze(0)
+            input_ids[:, 31:1400] = user_model.config.image_token_index
+            attention_mask = torch.ones_like(input_ids)
+            position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
+            example_inputs = (
+                input_ids,
+                attention_mask,
+                position_ids,
                 tuple(global_past_key_value),
             )
         else:
@@ -1225,6 +1259,14 @@ elif args.ipex_weight_only_quantization:
             )
             self_jit_first = torch.jit.freeze(self_jit_first.eval())
             self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
+        elif model.name == "maira2":
+            pixel_values = torch.rand(1, 3, 518, 518)
+            example_inputs = example_inputs + (pixel_values,)
+            self_jit_first = torch.jit.trace(
+                user_model.eval(), example_inputs, strict=False, check_trace=False
+            )
+            self_jit_first = torch.jit.freeze(self_jit_first.eval())
+            self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
 
 
 if args.benchmark:
@@ -1242,13 +1284,13 @@ if args.benchmark:
         try:
             self_jit = torch.jit.load(args.quantized_model_path)
             self_jit = torch.jit.freeze(self_jit.eval())
-            if model.name == "yuan" or model.name == "mllama":
+            if model.name in ["yuan", "mllama", "maira2"]:
                 self_jit_first = torch.jit.load(args.quantized_model_path + "2")
                 self_jit_first = torch.jit.freeze(self_jit_first.eval())
         except Exception as e:
             print("warning: loading failed.", e)
             self_jit = quant_model
-        if model.name == "yuan" or model.name == "mllama":
+        if model.name in ["yuan", "mllama", "maira2"]:
             ipex._set_optimized_model_for_generation(
                 user_model,
                 optimized_model=self_jit,
@@ -1284,6 +1326,14 @@ if args.benchmark:
         sample = librosa.load(args.audio, sr=16000)
         prompt = sample[0]
         generate_kwargs.pop("min_new_tokens", None)
+    elif model.name == "maira2":
+        prompt = args.prompt
+        sample = download_and_open(args.image_url)
+        process_input_func = (
+            tokenizer.process_reporting_input
+            if hasattr(tokenizer, "process_reporting_input")
+            else tokenizer.format_and_preprocess_reporting_input
+        )
     else:
         # input prompt
         current_path = pathlib.Path(__file__).parent.resolve()
@@ -1353,12 +1403,30 @@ if args.benchmark:
                 inputs = tokenizer(raw_image, prompt, return_tensors="pt")
                 input_ids = inputs["input_ids"]
                 output = user_model.generate(**inputs, **generate_kwargs)
+            elif model.name == "maira2":
+                processed_inputs = process_input_func(
+                    current_frontal=sample,
+                    current_lateral=None,
+                    prior_frontal=None,
+                    indication=None,
+                    technique=None,
+                    comparison=None,
+                    prior_report=None,
+                    return_tensors="pt",
+                    get_grounding=False,
+                )
+                input_ids = processed_inputs["input_ids"]
+                output = user_model.generate(**processed_inputs, **generate_kwargs)
             else:
                 input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                 output = user_model.generate(input_ids, **generate_kwargs)
             gen_ids = output[0] if args.token_latency else output
             gen_text = tokenizer.batch_decode(
-                gen_ids[:, input_ids.shape[1] :] if model.name == "llava" else gen_ids,
+                (
+                    gen_ids[:, input_ids.shape[1] :]
+                    if model.name in ["llava", "maira2"]
+                    else gen_ids
+                ),
                 skip_special_tokens=True,
             )
             toc = time.time()
@@ -1423,6 +1491,20 @@ if args.benchmark:
                     inputs = tokenizer(raw_image, prompt, return_tensors="pt")
                     input_ids = inputs["input_ids"]
                     output = user_model.generate(**inputs, **generate_kwargs)
+                elif model.name == "maira2":
+                    processed_inputs = process_input_func(
+                        current_frontal=sample,
+                        current_lateral=None,
+                        prior_frontal=None,
+                        indication=None,
+                        technique=None,
+                        comparison=None,
+                        prior_report=None,
+                        return_tensors="pt",
+                        get_grounding=False,
+                    )
+                    input_ids = processed_inputs["input_ids"]
+                    output = user_model.generate(**processed_inputs, **generate_kwargs)
                 else:
                     input_ids = tokenizer(prompt, return_tensors="pt").input_ids
                     output = user_model.generate(input_ids, **generate_kwargs)
