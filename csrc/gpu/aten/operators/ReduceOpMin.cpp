@@ -51,27 +51,6 @@ static void min_kernel(TensorIterator& iter) {
       [&]() { min_kernel_impl<scalar_t>(iter); });
 }
 
-Tensor& amin_out(
-    const Tensor& self,
-    IntArrayRef dim,
-    bool keepdim,
-    Tensor& result) {
-  TORCH_CHECK(
-      self.scalar_type() == result.scalar_type(),
-      "Illegal dtype for self, and out:",
-      self.scalar_type(),
-      result.scalar_type());
-  if (self.numel() == 0) {
-    zero_numel_check_dims(self, dim, "amin()");
-  }
-  auto iter = meta::make_reduction(
-      "amin", result, self, dim, keepdim, self.scalar_type());
-  if (iter.numel() != 0) {
-    min_kernel(iter);
-  }
-  return result;
-}
-
 Tensor min(const Tensor& self) {
   Tensor result;
   ScalarType dtype = get_dtype(result, self, c10::nullopt);

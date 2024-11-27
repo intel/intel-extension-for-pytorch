@@ -118,11 +118,6 @@ void angle_kernel(TensorIteratorBase& iter) {
 
 } // namespace impl
 
-Tensor& abs_out(const Tensor& self, Tensor& result) {
-  return impl::unary_op_impl_with_complex_to_float_out(
-      result, self, impl::abs_kernel, /*promotes_integer_to_float=*/false);
-}
-
 Tensor& angle_out(const Tensor& self, Tensor& result) {
   return impl::unary_op_impl_with_complex_to_float_out(
       result, self, impl::angle_kernel, /*promotes_integer_to_float=*/true);

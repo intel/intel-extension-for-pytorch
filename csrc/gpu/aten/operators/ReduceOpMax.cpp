@@ -72,10 +72,5 @@ Tensor& amax_out(
   return result;
 }
 
-Tensor amax(const Tensor& self, IntArrayRef dim, bool keepdim) {
-  Tensor result = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::amax_out(self, dim, keepdim, result);
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at
