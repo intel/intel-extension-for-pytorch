@@ -60,29 +60,6 @@ void igammac_kernel_xpu(TensorIterator& iter) {
 
 } // namespace impl
 
-static inline void lgamma_check(const Tensor& self) {
-  TORCH_INTERNAL_ASSERT(
-      at::isFloatingType(self.scalar_type()),
-      "Only support floating data type for now.");
-}
-
-template <typename scalar_t>
-struct lgamma_out_functor {
-  scalar_t operator()(scalar_t a) const {
-    return Numerics<scalar_t>::lgamma(a);
-  }
-};
-
-Tensor& lgamma_out(const Tensor& self, Tensor& out) {
-  auto iter = TensorIterator::unary_float_op(out, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      kHalf, kBFloat16, iter.common_dtype(), "lgamma", [&]() {
-        lgamma_out_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-  return out;
-}
-
 Tensor& mvlgamma_out(const Tensor& self, int64_t p, Tensor& out) {
   auto output = self.mvlgamma(p);
   TORCH_CHECK(
