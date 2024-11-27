@@ -296,164 +296,6 @@ void nonzero(Tensor& tensor, const Tensor& self_) {
 }
 
 template <typename scalar_t>
-void _index_add(
-    Tensor& dst,
-    int64_t dim,
-    const Tensor& indices,
-    const Tensor& src,
-    const Scalar& alpha) {
-  scalar_t alpha_val = alpha.to<scalar_t>();
-  dim = maybe_wrap_dim(dim, dst.dim());
-  auto numIndices = indices.numel();
-  TORCH_CHECK(
-      indices.dim() <= 1, "index_add_(): Index is supposed to be a vector");
-  TORCH_CHECK(
-      indices.scalar_type() == ScalarType::Long,
-      "index_add_(): Expected dtype int64 for index");
-  TORCH_CHECK(
-      dst.scalar_type() == src.scalar_type(),
-      "index_add_(): self and source must have the same scalar type");
-  TORCH_CHECK(
-      dim == 0 || dim < src.dim(),
-      "index_add_(): Indexing dim ",
-      dim,
-      " is out of bounds of tensor");
-  TORCH_CHECK(
-      numIndices == (src.dim() == 0 ? 1 : src.size(dim)),
-      "index_add_(): Number of indices should be equal to self.size(dim)");
-
-  at::assert_no_internal_overlap(dst);
-  at::assert_no_overlap(dst, indices);
-  at::assert_no_overlap(dst, src);
-
-  TORCH_CHECK(
-      dst.dim() <= MAX_DPCPPTORCH_DIMS,
-      "tensor has too many (>",
-      DPCPPTORCH_DIM_WARNING,
-      ") dims");
-  TORCH_CHECK(
-      src.dim() <= MAX_DPCPPTORCH_DIMS,
-      "tensor has too many (>",
-      DPCPPTORCH_DIM_WARNING,
-      ") dims");
-  TORCH_CHECK(
-      indices.dim() <= MAX_DPCPPTORCH_DIMS,
-      "tensor has too many (>",
-      DPCPPTORCH_DIM_WARNING,
-      ") dims");
-
-  // See Note [Enabling Deterministic Operations]
-  if (globalContext().deterministicAlgorithms()) {
-    torch::List<c10::optional<Tensor>> indices_list;
-    indices_list.reserve(dim + 1);
-    for (const auto i : c10::irange(dim)) {
-      indices_list.emplace_back();
-    }
-    indices_list.emplace_back(indices.to(at::kLong));
-    dst.index_put_(indices_list, src * alpha, true);
-    return;
-  }
-
-  // Scalars are treated as 1-d tensor
-  Tensor dst_ = (dst.dim() == 0) ? dst.view(1) : dst;
-  Tensor src_ = (src.dim() == 0) ? src.view(1) : src;
-
-  // The `src` is partitioned into two parts:
-  // -the size of each slice we are indexing, which is the
-  // total size of the tensor ignoring dimension `dim`;
-  // -the number of indices we are choosing, which is the total size
-  // of the tensor `indices`.
-
-  int dstDims = dst_.dim() == 0 ? 1 : dst_.dim();
-  int srcDims = src_.dim() == 0 ? 1 : src_.dim();
-  ptrdiff_t dstSliceSize = 1;
-  for (int d = 0; d < dstDims; d++) {
-    if (d != dim) {
-      dstSliceSize *= dst_.dim() == 0 ? 1 : dst_.size(d);
-    }
-  }
-
-  ptrdiff_t srcSliceSize = 1;
-  bool mismatch = false;
-
-  if (dstDims != srcDims)
-    mismatch = true;
-
-  for (int d = 0; d < srcDims; d++) {
-    if (d != dim) {
-      srcSliceSize *= src_.dim() == 0 ? 1 : src_.size(d);
-      if (!mismatch &&
-          (dst_.dim() == 0 ? 1 : dst_.size(d)) !=
-              (src_.dim() == 0 ? 1 : src_.size(d)))
-        mismatch = true;
-    }
-  }
-
-  TORCH_CHECK(
-      dstSliceSize == srcSliceSize,
-      "Source/destination tensor have different slice sizes");
-
-  if (mismatch) {
-    static bool warningShown = false;
-    if (!warningShown) {
-      warningShown = true;
-      fprintf(
-          stderr,
-          "Warning: source/destination slices have same size but different "
-          "shape for an index operation. This behavior is deprecated.\n");
-    }
-  }
-
-  ptrdiff_t sliceSize = dstSliceSize;
-  ptrdiff_t srcTotalSize = src_.numel();
-  int64_t dstAddDimSize = dst_.dim() == 0 ? 1 : dst_.size(dim);
-
-  if (sliceSize == 0) {
-    return;
-  }
-
-  TensorInfo<int64_t, int64_t> indices_info =
-      getTensorInfo<int64_t, int64_t>(indices);
-  indices_info.collapseDims();
-
-  TensorInfo<scalar_t, int64_t> src_info =
-      getTensorInfo<scalar_t, int64_t>(src_);
-
-  TensorInfo<scalar_t, int64_t> dst_info =
-      getTensorInfo<scalar_t, int64_t>(dst_);
-  int new_indexing_dim = dst_info.collapseDims(dim);
-
-  _index_add_kernel(
-      src_info, dst_info, indices_info, alpha_val, new_indexing_dim);
-}
-
-template <typename scalar_t>
-void _index_fill(
-    Tensor& dst,
-    int64_t dim,
-    const Tensor& indices,
-    Scalar val_scalar) {
-  auto val = val_scalar.to<scalar_t>();
-  auto dst_ptr = dst.data_ptr<scalar_t>();
-  auto idx_ptr = indices.data_ptr<int64_t>();
-  int64_t indexing = dst.size(dim);
-  int64_t inner = dst.stride(dim);
-  int64_t outter = dst.numel() / (indexing * inner);
-
-  TensorInfo<int64_t, int64_t> indices_info =
-      getTensorInfo<int64_t, int64_t>(indices);
-  indices_info.collapseDims();
-
-  TensorInfo<scalar_t, int64_t> dst_info =
-      getTensorInfo<scalar_t, int64_t>(dst);
-  int dim_after_collapse = dst_info.collapseDims(dim);
-
-  _index_fill_kernel(dst_info, indices_info, dim_after_collapse, val);
-
-  return;
-}
-
-template <typename scalar_t>
 struct DiagKernelFunctor {
   void operator()(sycl::item<1> item_id) const {
     size_t id = item_id.get_id(0);
@@ -1497,26 +1339,6 @@ Tensor nonzero(const at::Tensor& self) {
   return at::AtenIpexTypeXPU::nonzero_out(self, out);
 }
 
-Tensor& index_add_out(
-    const Tensor& self,
-    int64_t dim,
-    const Tensor& index,
-    const Tensor& source,
-    const Scalar& alpha,
-    Tensor& out) {
-  if (!out.is_same(self)) {
-    out.copy_(self);
-  }
-  if (index.numel() == 0) {
-    return out;
-  }
-  IPEX_DISPATCH_ATOMIC_ALL_TYPES_AND_COMPLEX(
-      out.scalar_type(), "index_add_", [&] {
-        impl::_index_add<scalar_t>(out, dim, index, source, alpha);
-      });
-  return out;
-}
-
 at::Tensor index_copy_meta(
     const at::Tensor& self,
     int64_t& dim,
@@ -1720,84 +1542,6 @@ Tensor& index_copy_out(
 
   index_copy_kernel(dim, index, source, out);
   return out;
-}
-
-Tensor& index_fill_(
-    Tensor& self,
-    int64_t dim,
-    const Tensor& index,
-    const Scalar& value) {
-  if (index.numel() == 0)
-    return self;
-  TORCH_CHECK_INDEX(
-      index.scalar_type() == ScalarType::Long,
-      "index_fill_(): Expected dtype int64 for index.");
-
-  at::assert_no_overlap(self, index);
-  if (at::has_internal_overlap(self) == at::MemOverlap::Yes) {
-    TORCH_WARN(
-        "Use of index_fill_ on expanded tensors is deprecated. "
-        "Please clone() the tensor before performing this operation. "
-        "This also applies to advanced indexing e.g. tensor[mask] = scalar");
-  }
-
-  if (!self.is_complex() && value.isComplex()) {
-    TORCH_CHECK(
-        false,
-        "index_fill_(): Converting complex Scalar to non-complex type is not supported");
-  }
-
-  // Handle the case when `self` is 0-dim
-  Tensor self_nonzero_dim = (self.dim() == 0) ? self.unsqueeze(-1) : self;
-
-  dim = at::maybe_wrap_dim(dim, self_nonzero_dim);
-  TORCH_CHECK(index.dim() <= 1, "Index has to be a vector/scalar");
-  TORCH_CHECK(self.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(index.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-
-  // The `src` is partitioned into two parts:
-  // -the size of each slice we are indexing, which is the
-  // total size of the tensor ignoring dimension `dim`;
-  // -the number of indices we are choosing, which is the total size
-  // of the tensor `indices`.
-  int selfDims = self.dim() == 0 ? 1 : self.dim();
-
-  TORCH_CHECK(dim >= 0 && dim < selfDims, "Indexing dim is out of bounds");
-
-  ptrdiff_t sliceSize = 1;
-  for (int d = 0; d < selfDims; d++) {
-    if (d != dim) {
-      sliceSize *= self.dim() == 0 ? 1 : self.size(d);
-    }
-  }
-  if (sliceSize == 0) {
-    return self;
-  }
-
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      at::ScalarType::Half,
-      at::ScalarType::Bool,
-      at::ScalarType::BFloat16,
-      self.scalar_type(),
-      "index_fill",
-      [&]() {
-        impl::_index_fill<scalar_t>(self_nonzero_dim, dim, index, value);
-      });
-  return self;
-}
-
-Tensor& index_fill_(
-    Tensor& self,
-    int64_t dim,
-    const Tensor& index,
-    const Tensor& value) {
-  TORCH_CHECK(
-      value.dim() == 0,
-      "index_fill_ only supports a 0-dimensional value tensor, but got tensor "
-      "with ",
-      value.dim(),
-      " dimension(s).");
-  return at::AtenIpexTypeXPU::index_fill_(self, dim, index, value.item());
 }
 
 Tensor& diag_out(const Tensor& self, int64_t diagonal, Tensor& out) {
@@ -2042,55 +1786,6 @@ Tensor& put_(
 
   return self;
 }
-
-void check_indices_on_cpu_or_selfdevice(
-    const Tensor& self,
-    const c10::List<c10::optional<Tensor>>& indices) {
-  auto dev = self.device();
-  bool indices_on_cpu_or_dev = std::all_of(
-      indices.begin(), indices.end(), [=](const c10::optional<Tensor>& opt) {
-        if (opt.has_value()) {
-          // for optional<Undefined tensor> cases
-          if (!opt->defined()) {
-            return true;
-          }
-          return (opt->is_cpu() || opt->device() == dev);
-        } else {
-          return true;
-        }
-      });
-  TORCH_CHECK(
-      indices_on_cpu_or_dev,
-      "indices should be either on ",
-      at::kCPU,
-      " or on the same device as the indexed tensor (",
-      dev,
-      ")");
-}
-
-Tensor index(
-    const Tensor& self,
-    const c10::List<c10::optional<Tensor>>& indices) {
-  TORCH_CHECK(
-      indices.size() <= (size_t)self.dim(),
-      "too many indices for tensor of dimension ",
-      self.dim(),
-      " (got ",
-      indices.size(),
-      ")");
-
-  check_indices_on_cpu_or_selfdevice(self, indices);
-  auto info = make_info(self, indices);
-  auto iter = make_index_iterator(info);
-  impl::index(
-      iter,
-      info.indexed_sizes,
-      info.indexed_strides,
-      info.non_indexed_sizes,
-      info.non_indexed_strides);
-  return iter.output();
-}
-
 Tensor _unsafe_index(
     const Tensor& self,
     const torch::List<c10::optional<Tensor>>& indices) {
@@ -2105,7 +1800,7 @@ Tensor _unsafe_index(
           dtype);
     }
   }
-  return at::AtenIpexTypeXPU::index(self, indices);
+  return at::index(self, indices);
 }
 
 template <typename scalar_t>
@@ -2257,68 +1952,6 @@ Tensor& take_out(const Tensor& self, const Tensor& index, Tensor& out) {
 Tensor take(const Tensor& self, const Tensor& index) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::take_out(self, index, out);
-}
-
-static TensorIterator make_index_out_iterator(
-    const AdvancedIndex& info,
-    Tensor& result) {
-  TensorIteratorConfig config;
-  // info.src is a restrided view of result
-  config.set_check_mem_overlap(false)
-      .check_all_same_dtype(false)
-      .add_output(result)
-      .add_input(info.src);
-  for (auto& index : info.indices) {
-    config.add_input(index);
-  }
-  return config.build();
-}
-
-template <typename dtype>
-struct index_out_functor {
-  void operator()(char* out_data, char* in_data, int64_t offset) const {
-    *(dtype*)out_data = *(dtype*)(in_data + offset);
-  }
-};
-
-Tensor& index_out(
-    const Tensor& self,
-    const c10::List<c10::optional<Tensor>>& indices,
-    Tensor& result) {
-  TORCH_CHECK(
-      indices.size() <= (size_t)self.dim(),
-      "too many indices for tensor of dimension ",
-      self.dim(),
-      " (got ",
-      indices.size(),
-      ")");
-
-  check_indices_on_cpu_or_selfdevice(self, indices);
-  at::assert_no_internal_overlap(result);
-  at::assert_no_overlap(result, self);
-
-  for (const c10::optional<Tensor>& index : indices) {
-    if (index.has_value()) {
-      at::assert_no_overlap(result, *index);
-    }
-  }
-
-  auto info = make_info(self, indices);
-  auto iter = make_index_out_iterator(info, result);
-
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND4(
-      kComplexHalf, kHalf, kBool, kBFloat16, iter.dtype(), "index_dpcpp", [&] {
-        using dtype = impl::OpaqueType<sizeof(scalar_t)>;
-        index_out_functor<dtype> f;
-        dpcpp_index_kernel(
-            iter,
-            info.indexed_sizes,
-            info.indexed_strides,
-            info.non_indexed_sizes,
-            info.non_indexed_strides,
-            f);
-      });
-  return result;
 }
 
 #ifdef USE_OVERRIDE_OP

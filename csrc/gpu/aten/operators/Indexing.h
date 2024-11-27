@@ -366,32 +366,6 @@ class IndexFillOperator {
   }
 };
 
-template <class ValInfo, class IdxInfo>
-static inline void _index_fill_kernel(
-    ValInfo& self_info,
-    IdxInfo& index_info,
-    int64_t dim,
-    typename ValInfo::scalar_t val) {
-  using scalar_t = typename ValInfo::scalar_t;
-  using DstInfo = ValInfo;
-  using SrcInfo = ValInfo;
-  auto src_info = SrcInfo();
-  auto cfg = IndexKernelConfig<
-      SrcInfo,
-      DstInfo,
-      IdxInfo,
-      IndexFillOperator<scalar_t>>::
-      make_config(
-          src_info,
-          self_info,
-          index_info,
-          val,
-          dim,
-          true,
-          IndexFillOperator<scalar_t>());
-  launch_index_kernel(cfg);
-}
-
 template <typename ValType>
 class IndexCopyOperator {
  public:
@@ -443,27 +417,6 @@ class IndexAddOperator {
         (dpcpp_global_ptr_pt<ValType>)(dst + dst_off), src[src_off] * alpha);
   }
 };
-
-template <class SrcInfo, class DstInfo, class IdxInfo>
-static inline void _index_add_kernel(
-    SrcInfo& src_info,
-    DstInfo& dst_info,
-    IdxInfo& index_info,
-    typename SrcInfo::scalar_t alpha,
-    int64_t dim) {
-  using scalar_t = typename SrcInfo::scalar_t;
-  auto cfg =
-      IndexKernelConfig<SrcInfo, DstInfo, IdxInfo, IndexAddOperator<scalar_t>>::
-          make_config(
-              src_info,
-              dst_info,
-              index_info,
-              alpha,
-              dim,
-              true,
-              IndexAddOperator<scalar_t>());
-  launch_index_kernel(cfg);
-}
 
 template <typename ValType>
 class IndexSelectOperator {
