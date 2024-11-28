@@ -118,25 +118,6 @@ Tensor empty_strided_dpcpp(
   return t;
 }
 
-Tensor& eye_out_dpcpp(Tensor& result, int64_t n, int64_t m) {
-  TORCH_CHECK(n >= 0, "n must be greater or equal to 0, got ", n);
-  TORCH_CHECK(m >= 0, "m must be greater or equal to 0, got ", m);
-
-  result.resize_({n, m});
-  result.zero_();
-
-  int64_t sz = std::min<int64_t>(n, m);
-  int64_t stride = result.stride(0) + result.stride(1);
-
-  Tensor diag = result.as_strided({sz}, {stride});
-  diag.fill_(1);
-  return result;
-}
-
-Tensor& eye_out_dpcpp(Tensor& result, int64_t n) {
-  return eye_out_dpcpp(result, n, n);
-}
-
 namespace triangle_dpcpp {
 // To find the max integer that does not exceed the root of an int64_t variable,
 // we could use a loop to test one bit at a time, which takes up to 31
@@ -467,16 +448,6 @@ Tensor empty_strided(
       TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
           pin_memory);
   return AtenIpexTypeXPU::impl::empty_strided_dpcpp(size, stride, options);
-}
-
-Tensor& eye_out(int64_t n, Tensor& out) {
-  AtenIpexTypeXPU::impl::eye_out_dpcpp(out, n);
-  return out;
-}
-
-Tensor& eye_out(int64_t n, int64_t m, Tensor& out) {
-  AtenIpexTypeXPU::impl::eye_out_dpcpp(out, n, m);
-  return out;
 }
 
 Tensor tril_indices(

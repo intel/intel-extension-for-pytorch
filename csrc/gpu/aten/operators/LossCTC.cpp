@@ -1498,7 +1498,7 @@ Tensor ctc_loss_backward_template(
                    (2 * num_labels) / 10) > 450;
   if (is_large) { // large alphabet, large batch
     // this computes the probs, minuend in (16)
-    exp_out(grad, log_probs);
+    at::exp_out(grad, log_probs);
     // now we compute the subtrahend for the blanks. It is a straightforward
     // reduction because we know that
     // blanks are in every other position.
