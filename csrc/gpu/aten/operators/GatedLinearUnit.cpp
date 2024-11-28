@@ -18,29 +18,6 @@ using namespace torch_ipex::xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 namespace impl {
-
-template <typename scalar_t>
-void GatedLinearUnit_updateOutput(
-    Tensor& output,
-    const Tensor& input,
-    int64_t dim) {
-  auto wrap_dim = maybe_wrap_dim(dim, input.dim());
-  const int64_t nln = input.size(wrap_dim);
-  TORCH_CHECK(
-      nln % 2 == 0,
-      "Halving dimension must be even, but dimension",
-      wrap_dim,
-      " is size ",
-      nln);
-  const int64_t inputSize = nln / 2;
-  Tensor firstHalf = input.narrow(wrap_dim, 0, inputSize);
-  Tensor secondHalf = input.narrow(wrap_dim, inputSize, inputSize);
-  // output = output + firstHalf * sigmoid(secondHalf)
-  Tensor sigNum = at::empty_like(secondHalf);
-  at::sigmoid_out(sigNum, secondHalf);
-  output = at::mul(firstHalf, sigNum);
-}
-
 template <typename scalar_t>
 void GatedLinearUnit_updateGradInput(
     Tensor& grad_input,
@@ -80,21 +57,6 @@ void GatedLinearUnit_updateGradInput(
 } // namespace impl
 
 // namespace AtenIpexTypeXPU
-Tensor& glu_out(const Tensor& self, int64_t dim, Tensor& out) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      self.scalar_type(),
-      "glu_out",
-      [&] { impl::GatedLinearUnit_updateOutput<scalar_t>(out, self, dim); });
-  return out;
-}
-
-Tensor glu(const Tensor& self, int64_t dim) {
-  Tensor out = at::empty({}, self.options());
-  return at::AtenIpexTypeXPU::glu_out(self, dim, out);
-}
-
 Tensor& glu_backward_out(
     const Tensor& grad_output,
     const Tensor& self,

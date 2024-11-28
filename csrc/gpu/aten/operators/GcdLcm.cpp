@@ -17,20 +17,6 @@ namespace AtenIpexTypeXPU {
 namespace impl {
 
 template <typename scalar_t>
-struct GcdKernelDpcppFunctor {
-  scalar_t operator()(scalar_t a, scalar_t b) const {
-    return calc_gcd(a, b);
-  }
-};
-
-static void gcd_kernel_dpcpp(TensorIterator& iter) {
-  IPEX_DISPATCH_INTEGRAL_TYPES(iter.common_dtype(), "gcd", [&]() {
-    GcdKernelDpcppFunctor<scalar_t> kfn;
-    dpcpp_fast_mode_kernel_with_scalars(iter, kfn);
-  });
-}
-
-template <typename scalar_t>
 struct LcmKernelDpcppFunctor {
   scalar_t operator()(scalar_t a, scalar_t b) const {
     scalar_t g = calc_gcd(a, b);
@@ -46,23 +32,6 @@ static void lcm_kernel_dpcpp(TensorIterator& iter) {
 }
 
 } // namespace impl
-
-at::Tensor gcd(const Tensor& self, const Tensor& other) {
-  Tensor out;
-  auto iter = TensorIterator::binary_op(out, self, other);
-  impl::gcd_kernel_dpcpp(iter);
-  return iter.output();
-}
-
-at::Tensor& gcd_out(const Tensor& self, const Tensor& other, Tensor& out) {
-  auto iter = TensorIterator::binary_op(out, self, other);
-  impl::gcd_kernel_dpcpp(iter);
-  return out;
-}
-
-at::Tensor& gcd_(Tensor& self, const Tensor& other) {
-  return at::AtenIpexTypeXPU::gcd_out(self, other, self);
-}
 
 at::Tensor lcm(const Tensor& self, const Tensor& other) {
   Tensor out;
