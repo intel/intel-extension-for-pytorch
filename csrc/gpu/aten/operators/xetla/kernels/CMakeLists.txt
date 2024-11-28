@@ -14,7 +14,7 @@ elseif(NOT USE_XETLA) # if(<variable>): True if given a variable that is defined
 endif()
 
 set(AOT_REGEX_XE_HPC "(xe-hpc.*|pvc|bmg-.*|lnl-.*|xe2-.*)")
-set(AOT_REGEX_XE_HPG "(xe-hpg.*|ats-m150|acm-.*|dg2-.*)")
+set(AOT_REGEX_XE_HPG "(xe-hpg.*|ats-m.*|acm-.*|dg2-.*)")
 set(AOT_REGEX_XE_LPG "(xe-lpg.*|mtl-.*|0x7d55|0x7dd5|0x7d57|0x7dd7)")
 
 foreach(used_arch IN LISTS USE_XETLA)
