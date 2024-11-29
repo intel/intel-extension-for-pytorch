@@ -308,6 +308,7 @@ void XPUGraphImpl::enable_debug_mode() {
 }
 
 void XPUGraphImpl::print_graph(const std::string& debug_path) {
+#if _GLIBCXX_USE_CXX11_ABI
   if (_xpu_graphs_debug) {
     TORCH_WARN("DEBUG: calling print_graph()");
     if (has_graph_) {
@@ -318,6 +319,10 @@ void XPUGraphImpl::print_graph(const std::string& debug_path) {
     TORCH_WARN(
         "XPU Graphs debug not enabled, set with intel_extension_for_pytorch.xpu._C._xpu_enable_graphs_debug_mode");
   }
+#else
+  TORCH_INTERNAL_ASSERT(
+      false, "XPU graph print is not supported by ABI=0 build");
+#endif
 }
 
 void XPUGraphImpl::reset() {
