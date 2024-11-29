@@ -47,6 +47,7 @@ function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
   target_include_directories(${TARGET} PRIVATE .)
   target_include_directories(${TARGET} PUBLIC ${XETLA_INCLUDE_DIR})
   target_include_directories(${TARGET} PUBLIC ${TORCH_INCLUDE_DIRS})
+  target_include_directories(${TARGET} PUBLIC ${SYCL_INCLUDE_DIR})
   target_link_libraries(${TARGET} PUBLIC ${GPU_TORCH_LIBS})
 
   # Set visibility to hidden to close the differences of Windows & Linux

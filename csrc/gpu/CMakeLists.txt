@@ -110,6 +110,7 @@ endif()
 
 if(USE_DS_KERNELS)
   target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${TORCH_INCLUDE_DIRS})
+  target_include_directories(intel-ext-pt-gpu-deepspeed PUBLIC ${SYCL_INCLUDE_DIR})
 endif()
 
 add_library(intel-ext-pt-gpu SHARED ${IPEX_GPU_CORE_SRC})
