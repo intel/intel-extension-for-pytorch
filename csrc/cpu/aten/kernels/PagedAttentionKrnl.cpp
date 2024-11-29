@@ -22,6 +22,7 @@
 
 #include <omp.h>
 #include <limits>
+#include "csrc/cpu/tpp/woq/tla.h"
 #include "vec/vec.h"
 
 #define PARTITION_SIZE 128
@@ -40,6 +41,7 @@ static inline scalar_t* conditional_data_ptr(float* ptr, scalar_t* ptr2) {
 }
 
 namespace torch_ipex {
+using namespace tpp;
 namespace cpu {
 
 namespace {
@@ -51,6 +53,23 @@ inline c10::SymFloat calculate_scale(
       ? scale.value()
       : (c10::SymFloat(1.0) / (c10::SymFloat(query.sym_size(-1)).sqrt()));
   return c10::SymFloat(softmax_scale);
+}
+
+template <typename QT, typename KT>
+void reduce_head(
+    const QT* q_ptr_start,
+    const KT* k_cache_start,
+    float* attn_w_pos,
+    int64_t head_size) {
+  attn_w_pos[0] = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  torch_ipex::cpu::kernel::_reduce_head<QT, KT, KT>(
+      q_ptr_start, k_cache_start, attn_w_pos, head_size, false, nullptr);
+#else
+  for (auto hsi = 0; hsi < head_size; hsi++) {
+    attn_w_pos[0] += (float)q_ptr_start[hsi] * (float)k_cache_start[hsi];
+  }
+#endif
 }
 
 template <typename QT, typename KT>
@@ -117,6 +136,65 @@ inline void mul_attenion_weights_and_value_of_head(
         attn_out_start[i * attn_out_strideH + hsi] =
             attn_w[i * attn_w_stride] * (float)v_cache_start[hsi];
       }
+    }
+  }
+#endif
+}
+
+template <typename OT, typename CT>
+inline void mul_attenion_weights_and_value_of_head(
+    const float& attn_w,
+    const CT* v_cache_start,
+    OT* attn_out_start,
+    int64_t head_size,
+    bool accumulated) {
+  auto vec_size = 16; // 512/32
+  auto hsi = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  torch_ipex::cpu::kernel::_mul_and_accumulate<CT, OT, CT>(
+      attn_w,
+      v_cache_start,
+      attn_out_start,
+      head_size,
+      false,
+      nullptr,
+      accumulated);
+#else
+  for (hsi = 0; hsi < head_size; hsi++) {
+    if (accumulated) {
+      attn_out_start[hsi] += attn_w * (float)v_cache_start[hsi];
+    } else {
+      attn_out_start[hsi] = attn_w * (float)v_cache_start[hsi];
+    }
+  }
+#endif
+}
+
+template <typename OT, typename CT>
+inline typename std::enable_if_t<is_reduced_floating_point_v<CT>, void>
+mul_attenion_weights_and_value_of_head(
+    const CT& attn_w,
+    const CT* v_cache_start,
+    OT* attn_out_start,
+    int64_t head_size,
+    bool accumulated) {
+  auto vec_size = 16; // 512/32
+  auto hsi = 0;
+#if defined(CPU_CAPABILITY_AVX512)
+  torch_ipex::cpu::kernel::_mul_and_accumulate<CT, OT, CT>(
+      attn_w,
+      v_cache_start,
+      attn_out_start,
+      head_size,
+      false,
+      nullptr,
+      accumulated);
+#else
+  for (hsi = 0; hsi < head_size; hsi++) {
+    if (accumulated) {
+      attn_out_start[hsi] += (float)attn_w * (float)v_cache_start[hsi];
+    } else {
+      attn_out_start[hsi] = (float)attn_w * (float)v_cache_start[hsi];
     }
   }
 #endif
@@ -210,6 +288,475 @@ inline void _mul_reduce_max_fusion_kernel(
   }
   max = tmp_max;
 }
+
+/**
+ * @param block_tables  Block tables tensor [num_seqs, max_num_blocks_per_seq].
+ * @return prompt_block_nums  Prompt block number for each batch [batch_size].
+ */
+at::Tensor deduce_prompt(
+    at::Tensor& block_tables) {
+  // deduce beam size
+  int beam_size = 1;
+  int num_seqs = block_tables.size(0);
+  int max_num_blocks_per_seq = block_tables.size(1);
+  auto block_tables_ptr = block_tables.data_ptr<int>();
+  auto first_block_id = block_tables_ptr[0];
+  for (int i=1; i<block_tables.size(0); i++) {
+    if (block_tables_ptr[i * max_num_blocks_per_seq] != first_block_id) {
+      break;
+    }
+    beam_size++;
+  }
+  TORCH_CHECK(num_seqs % beam_size == 0, "num seqs is not divisible by beam size.");
+  int batch_size = num_seqs / beam_size;
+  // deduce prompt len
+  auto prompt_block_nums = at::empty(
+      {batch_size},
+      block_tables.options().dtype());
+  auto prompt_block_nums_ptr = prompt_block_nums.data_ptr<int>();
+#pragma omp parallel for
+  for (int i=0; i<batch_size; i++) {
+    // find prompt blocks
+    int final_prompt_blocks = max_num_blocks_per_seq;
+    auto block_tables_offset = block_tables_ptr + i * beam_size * max_num_blocks_per_seq;
+    for (int j=1; j<beam_size; j++) {
+      int curr_blocks = 0;
+      while (curr_blocks < max_num_blocks_per_seq
+          && (block_tables_offset[curr_blocks] == block_tables_offset[j * max_num_blocks_per_seq + curr_blocks])) {
+        curr_blocks++;
+      }
+      final_prompt_blocks = std::min(final_prompt_blocks, curr_blocks);
+    }
+    prompt_block_nums_ptr[i] = final_prompt_blocks;
+  }
+  return prompt_block_nums;
+}
+
+/**
+ * Performs scale-dot-product for the next token based on cached key-value
+ * attention.
+ *
+ * This function computes the attention weights and applies the attention
+ * mechanism to obtain the final output. It takes in tensors representing the
+ * query, key cache, value cache, head mapping, scale, block tables, context
+ * lengths, block size, max context length, and optional alibi slopes. The
+ * output tensor is updated with the computed attention values.
+ *
+ * @param out           Output tensor [num_seqs, num_heads, head_size].
+ * @param query         Query tensor [num_seqs, num_heads, head_size].
+ * @param key_cache     The pre-allocated buffer to store the key cache. The
+ * shape should be [num_blocks, num_key_value_heads, block_size, head_size].
+ * @param value_cache   The pre-allocated buffer to store the value cache. The
+ * shape should be [num_blocks, num_key_value_heads, block_size, head_size].
+ * @param scale         Scaling factor for attention weights. In general, it is:
+ * float(1.0 / (head_size ** 0.5)).
+ * @param block_tables  Block tables tensor [num_seqs, max_num_blocks_per_seq].
+ * @param context_lens  Context lengths tensor [num_seqs].
+ * @param block_size    The block size which means the number of token in every
+ * block.
+ * @param max_context_len Maximum context length.
+ * @param alibi_slopes  Optional tensor of alibi slopes with the shape of
+ * (num_heads).
+ */
+template <typename scalar_t>
+void single_query_cached_kv_attention_opt_kernel(
+    at::Tensor& out,
+    at::Tensor& query,
+    at::Tensor& key_cache,
+    at::Tensor& value_cache,
+    const double scale,
+    at::Tensor& block_tables,
+    at::Tensor& context_lens,
+    int64_t block_size,
+    int64_t max_context_len,
+    const c10::optional<at::Tensor>& alibi_slopes) {
+  auto out_ptr = out.data_ptr<scalar_t>();
+  auto query_ptr = query.data_ptr<scalar_t>();
+  auto key_cache_ptr = key_cache.data_ptr<scalar_t>();
+  auto value_cache_ptr = value_cache.data_ptr<scalar_t>();
+  auto block_tables_ptr = block_tables.data_ptr<int>();
+  auto context_lens_ptr = context_lens.data_ptr<int>();
+  auto alibi_slopes_ptr = alibi_slopes.has_value()
+      ? alibi_slopes.value().data_ptr<float>()
+      : nullptr;
+  auto num_seqs = query.size(0);
+  auto num_heads = query.size(1);
+  auto head_size = query.size(2);
+  auto num_kv_heads = key_cache.size(1);
+  auto kv_head_group_size = num_heads / num_kv_heads;
+  auto max_num_blocks_per_seq = block_tables.size(1);
+
+  constexpr bool is_reduced_type = is_reduced_floating_point_v<scalar_t>;
+  auto prompt_block_nums = deduce_prompt(block_tables);
+  auto prompt_block_nums_ptr = prompt_block_nums.data_ptr<int>();
+  int batch_size = prompt_block_nums.size(0);
+  int beam_size = num_seqs / batch_size;
+
+  if (alibi_slopes.has_value()) {
+    auto alibi_slopes_size = alibi_slopes.value().size(0);
+    TORCH_CHECK(
+        alibi_slopes_size == num_heads,
+        "alibi_slopes size is not equal to num_heads");
+  }
+
+  auto thread_numbers = omp_get_max_threads();
+  auto attn_weights = at::empty(
+      {num_seqs, num_heads, max_context_len},
+      query.options().dtype(at::ScalarType::Float));
+  auto attn_weights_reduced = at::empty(
+      {num_seqs, num_heads, is_reduced_type ? max_context_len : 0},
+      query.options());
+  auto fp32_attn_outs = at::zeros({num_seqs, num_heads, head_size}, at::kFloat);
+  at::Tensor key_t_reorder = at::empty(
+        {thread_numbers, head_size, block_size},
+        c10::CppTypeToScalarType<scalar_t>::value);
+  at::Tensor value_t_reorder = at::empty(
+        {thread_numbers, block_size, head_size},
+        c10::CppTypeToScalarType<scalar_t>::value);
+
+  // strides
+  auto kv_block_strideN = key_cache.stride(0);
+  auto kv_block_strideP = key_cache.stride(2);
+  auto kv_block_strideH = key_cache.stride(1);
+  auto fp32_attn_out_strideN = fp32_attn_outs.stride(0);
+  auto fp32_attn_out_strideH = fp32_attn_outs.stride(1);
+  auto attn_out_strideN = out.stride(0);
+  auto attn_out_strideH = out.stride(1);
+  auto q_strideN = query.stride(0);
+  auto q_strideH = query.stride(1);
+  auto attn_weights_strideN = attn_weights.stride(0);
+  auto attn_weights_strideH = attn_weights.stride(1);
+  auto key_t_reorder_strideT = key_t_reorder.stride(0);
+  auto value_t_reorder_strideT = value_t_reorder.stride(0);
+
+  // get pointers
+  auto attn_weights_ptr = attn_weights.data_ptr<float>();
+  auto attn_weights_reduced_ptr = is_reduced_type ?
+        attn_weights_reduced.data_ptr<scalar_t>() : nullptr;
+  auto fp32_attn_out_ptr = fp32_attn_outs.data_ptr<float>();
+  auto key_t_reorder_ptr = key_t_reorder.data_ptr<scalar_t>();
+  auto value_t_reorder_ptr = value_t_reorder.data_ptr<scalar_t>();
+
+  // TODO: support padding
+  TORCH_CHECK(
+    head_size % 2 == 0,
+    "head size is not even");
+  auto k_xform = SCOPEIT(
+      XformExtTPP<scalar_t>(
+          /*in_rows*/ block_size,
+          /*in_cols*/ head_size,
+          /*out_rows*/ head_size,
+          /*out_cols*/ block_size,
+          /*ldi*/ kv_block_strideP,
+          /*ldo*/ block_size,
+          /*xtype*/ XformTPP::XFORM_XPOSE_N2V_TPP,
+          /*ignore_vnni_for_fp32*/ true),
+      XPOSE);
+
+  // TODO: support padding
+  TORCH_CHECK(
+    block_size % 2 == 0,
+    "block size is not even");
+  auto v_xform = SCOPEIT(
+      XformExtTPP<scalar_t>(
+          /*in_rows*/ block_size,
+          /*in_cols*/ head_size,
+          /*out_rows*/ block_size,
+          /*out_cols*/ head_size,
+          /*ldi*/ kv_block_strideP,
+          /*ldo*/ head_size,
+          /*xtype*/ XformTPP::XFORM_N2V_TPP,
+          /*ignore_vnni_for_fp32*/ true),
+      XPOSE);
+
+  auto qk_gemm_prompt = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ beam_size,
+      /*N*/ block_size,
+      /*K*/ head_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ q_strideN,
+      /*ldb*/ block_size,
+      /*ldc*/ attn_weights_strideN,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+  auto qk_gemm_rest = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ 1,
+      /*N*/ block_size,
+      /*K*/ head_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ q_strideN,
+      /*ldb*/ block_size,
+      /*ldc*/ attn_weights_strideN,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+  auto av_gemm_prompt = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ beam_size,
+      /*N*/ head_size,
+      /*K*/ block_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ attn_weights_strideN,
+      /*ldb*/ head_size,
+      /*ldc*/ fp32_attn_out_strideN,
+      /*beta*/ 1.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+  auto av_gemm_rest = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ 1,
+      /*N*/ head_size,
+      /*K*/ block_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ attn_weights_strideN,
+      /*ldb*/ head_size,
+      /*ldc*/ fp32_attn_out_strideN,
+      /*beta*/ 1.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+#pragma omp parallel for collapse(2) schedule(static, 1)
+  for (auto head_id = 0; head_id < num_heads; head_id++) {
+    for (auto batch_id = 0; batch_id < batch_size; batch_id++) {
+      auto ompIdx = omp_get_thread_num();
+      auto k_cache_reorder = key_t_reorder_ptr + ompIdx * key_t_reorder_strideT;
+      int kv_head_id = head_id / kv_head_group_size;
+      auto seq_id_start = batch_id * beam_size;
+      int context_len = context_lens_ptr[seq_id_start]; // the beams in one batch have the same context_len
+      int complete_block_num = int(context_len / block_size);
+      int prompt_block_num = std::min(prompt_block_nums_ptr[batch_id], complete_block_num);
+      int complete_token_length = complete_block_num * block_size;
+      auto query_ptr_start = query_ptr + seq_id_start * q_strideN + head_id * q_strideH;
+      auto attn_weights_ptr_start = attn_weights_ptr
+          + seq_id_start * attn_weights_strideN
+          + head_id * attn_weights_strideH;
+      // for prompt
+      for (auto seq_block_id = 0; seq_block_id < prompt_block_num; seq_block_id++) {
+        auto block_id = block_tables_ptr
+            [seq_id_start * max_num_blocks_per_seq + seq_block_id];
+        auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
+            kv_head_id * kv_block_strideH;
+        k_xform(k_cache_start, k_cache_reorder);
+        qk_gemm_prompt(
+            query_ptr_start,
+            k_cache_reorder,
+            attn_weights_ptr_start + seq_block_id * block_size,
+            1);
+      }
+      // for the rest complete blocks
+      for (auto beam_id = 0; beam_id < beam_size; beam_id++) {
+        auto seq_id = seq_id_start + beam_id;
+        auto q_ptr_start = query_ptr_start + beam_id * q_strideN;
+        for (auto seq_block_id = prompt_block_num; seq_block_id < complete_block_num; seq_block_id++) {
+          auto attn_w_pos = attn_weights_ptr_start
+              + beam_id * attn_weights_strideN
+              + seq_block_id * block_size;
+          auto block_id = block_tables_ptr
+              [seq_id * max_num_blocks_per_seq + seq_block_id];
+          auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
+              kv_head_id * kv_block_strideH;
+          k_xform(k_cache_start, k_cache_reorder);
+          qk_gemm_rest(
+              q_ptr_start,
+              k_cache_reorder,
+              attn_w_pos,
+              1);
+        }
+      }
+      // for the rest tail
+      for (auto beam_id = 0; beam_id < beam_size; beam_id++) {
+        auto seq_id = seq_id_start + beam_id;
+        auto q_ptr_start = query_ptr_start + beam_id * q_strideN;
+        for (auto token_id = complete_token_length; token_id < context_len; token_id++) {
+          auto attn_w_pos = attn_weights_ptr_start
+              + beam_id * attn_weights_strideN
+              + token_id;
+          auto block_id = block_tables_ptr
+              [seq_id * max_num_blocks_per_seq + token_id / block_size];
+          auto block_offset = token_id % block_size;
+          auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
+              block_offset * kv_block_strideP +
+              kv_head_id * kv_block_strideH;
+          reduce_head<scalar_t, scalar_t>(
+              q_ptr_start, k_cache_start, attn_w_pos, head_size);
+        }
+      }
+    }
+  }
+
+// div+add+softmax
+#pragma omp parallel for collapse(2) schedule(static, 1)
+  for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
+    for (auto head_id = 0; head_id < num_heads; head_id++) {
+      auto max_val = -10000.0f;
+      float sum = 0.0f;
+      auto context_len = context_lens_ptr[seq_id];
+      auto attn_w_start = attn_weights_ptr
+          + seq_id * attn_weights_strideN
+          + head_id * attn_weights_strideH;
+      auto attn_w_start_reduced = is_reduced_type ? attn_weights_reduced_ptr
+          + seq_id * attn_weights_strideN
+          + head_id * attn_weights_strideH : nullptr;
+#if defined(CPU_CAPABILITY_AVX512)
+      if (alibi_slopes_ptr != nullptr) {
+        auto alibi_slope = alibi_slopes_ptr[head_id];
+        torch_ipex::cpu::kernel::
+            _dil_div_add_alibi_and_reduce_max_fusion_kernel<float>(
+                attn_w_start,
+                scale,
+                context_len,
+                attn_w_start,
+                max_val,
+                alibi_slope,
+                true);
+      } else {
+        torch_ipex::cpu::kernel::
+            _dil_div_add_alibi_and_reduce_max_fusion_kernel<float>(
+                attn_w_start,
+                scale,
+                context_len,
+                attn_w_start,
+                max_val,
+                1,
+                false);
+      }
+      torch_ipex::cpu::kernel::_dil_exp_reduce_sum_fusion_kernel(
+          attn_w_start, context_len, attn_w_start, max_val);
+      torch_ipex::cpu::kernel::_dil_normalization_kernel<scalar_t>(
+          attn_w_start, max_val, context_len,
+          conditional_data_ptr(attn_w_start, attn_w_start_reduced));
+
+#else
+      // div+add+softmax
+      for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+        attn_w_start[token_id] = attn_w_start[token_id] * scale;
+        if (alibi_slopes_ptr != nullptr) {
+          auto alibi_slope = alibi_slopes_ptr[head_id];
+          auto alibi_slopes_val =
+              alibi_slope * (token_id + 1 - context_lens_ptr[seq_id]);
+          attn_w_start[token_id] = attn_w_start[token_id] + alibi_slopes_val;
+        }
+        if (attn_w_start[token_id] > max_val) {
+          max_val = attn_w_start[token_id];
+        }
+      }
+      // exp and sum
+      for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+        attn_w_start[token_id] = exp(attn_w_start[token_id] - max_val);
+        sum += attn_w_start[token_id];
+      }
+      // normalize
+      if (is_reduced_type) {
+        for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+          attn_w_start_reduced[token_id] = (scalar_t)(attn_w_start[token_id] / sum);
+        }
+      } else {
+        for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+          attn_w_start[token_id] = attn_w_start[token_id] / sum;
+        }
+      }
+#endif
+    }
+  }
+
+// mul and accumulate
+#pragma omp parallel for collapse(2) schedule(static, 1)
+  for (auto head_id = 0; head_id < num_heads; head_id++) {
+    for (auto batch_id = 0; batch_id < batch_size; batch_id++) {
+      auto ompIdx = omp_get_thread_num();
+      auto v_cache_reorder = value_t_reorder_ptr + ompIdx * value_t_reorder_strideT;
+      int kv_head_id = head_id / kv_head_group_size;
+      int context_len = context_lens_ptr[batch_id * beam_size]; // the beams in one batch have the same context_len
+      int complete_block_num = int(context_len / block_size);
+      int prompt_block_num = std::min(prompt_block_nums_ptr[batch_id], complete_block_num);
+      int complete_token_length = complete_block_num * block_size;
+      auto seq_id_start = batch_id * beam_size;
+      auto attn_weights_start = conditional_data_ptr(attn_weights_ptr, attn_weights_reduced_ptr)
+            + seq_id_start * attn_weights_strideN +
+               head_id * attn_weights_strideH;
+      auto fp32_attn_out_start = fp32_attn_out_ptr + seq_id_start * fp32_attn_out_strideN
+              + head_id * fp32_attn_out_strideH;
+      // for prompt
+      for (auto seq_block_id = 0; seq_block_id < prompt_block_num; seq_block_id++) {
+        auto block_id = block_tables_ptr
+            [seq_id_start * max_num_blocks_per_seq + seq_block_id];
+        auto v_cache_start = value_cache_ptr + block_id * kv_block_strideN +
+            kv_head_id * kv_block_strideH;
+        v_xform(v_cache_start, v_cache_reorder);
+        av_gemm_prompt(
+            attn_weights_start + seq_block_id * block_size,
+            v_cache_reorder,
+            fp32_attn_out_start,
+            1);
+      }
+      // for the rest complete blocks
+      for (auto beam_id = 0; beam_id < beam_size; beam_id++) {
+        auto seq_id = seq_id_start + beam_id;
+        auto attn_out_start = fp32_attn_out_start +
+            beam_id * fp32_attn_out_strideN;
+        for (auto seq_block_id = prompt_block_num; seq_block_id < complete_block_num; seq_block_id++) {
+          auto attn_w = attn_weights_start
+              + beam_id * attn_weights_strideN + seq_block_id * block_size;
+          auto block_id = block_tables_ptr
+              [seq_id * max_num_blocks_per_seq + seq_block_id];
+          auto v_cache_start = value_cache_ptr + block_id * kv_block_strideN +
+              kv_head_id * kv_block_strideH;
+          v_xform(v_cache_start, v_cache_reorder);
+          av_gemm_rest(
+              attn_w,
+              v_cache_reorder,
+              attn_out_start,
+              1);
+        }
+        if (complete_token_length == context_len) {
+          // write to the output after the last token is done
+          auto out_start = out_ptr +
+            seq_id * attn_out_strideN + head_id * attn_out_strideH;
+          torch_ipex::cpu::kernel::move_ker<scalar_t, float>(
+              out_start, attn_out_start, head_size);
+        }
+      }
+      // for the rest tail
+      for (auto beam_id = 0; beam_id < beam_size; beam_id++) {
+        auto seq_id = seq_id_start + beam_id;
+        auto attn_out_start = fp32_attn_out_start +
+            beam_id * fp32_attn_out_strideN;
+        for (auto token_id = complete_token_length; token_id < context_len; token_id++) {
+          auto attn_w = attn_weights_start
+              [beam_id * attn_weights_strideN + token_id];
+          auto block_id = block_tables_ptr
+              [seq_id * max_num_blocks_per_seq + token_id / block_size];
+          auto block_offset = token_id % block_size;
+          auto v_cache_start = value_cache_ptr + block_id * kv_block_strideN +
+              block_offset * kv_block_strideP +
+              kv_head_id * kv_block_strideH;
+          mul_attenion_weights_and_value_of_head<float, scalar_t>(
+              attn_w,
+              v_cache_start,
+              attn_out_start,
+              head_size,
+              token_id);
+        }
+        // write to the output after the last token is done
+        auto out_start = out_ptr +
+          seq_id * attn_out_strideN + head_id * attn_out_strideH;
+        torch_ipex::cpu::kernel::move_ker<scalar_t, float>(
+            out_start, attn_out_start, head_size);
+      }
+    }
+  }
+
+} // single_query_cached_kv_attention_opt_kernel
 
 /**
  * Performs scale-dot-product for the next token based on cached key-value
@@ -848,45 +1395,89 @@ void single_query_cached_kv_attention_kernel_impl(
       "ipex::single_query_cached_kv_attention_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
   // dispatch kernel according to the data type of input tensor
-  if (out.scalar_type() == at::ScalarType::Float) {
-    single_query_cached_kv_attention_kernel<float>(
-        out,
-        query,
-        key_cache,
-        value_cache,
-        scale,
-        block_tables,
-        context_lens,
-        block_size,
-        max_context_len,
-        alibi_slopes);
-  } else if (out.scalar_type() == at::ScalarType::BFloat16) {
-    single_query_cached_kv_attention_kernel<at::BFloat16>(
-        out,
-        query,
-        key_cache,
-        value_cache,
-        scale,
-        block_tables,
-        context_lens,
-        block_size,
-        max_context_len,
-        alibi_slopes);
-  } else if (out.scalar_type() == at::ScalarType::Half) {
-    single_query_cached_kv_attention_kernel<at::Half>(
-        out,
-        query,
-        key_cache,
-        value_cache,
-        scale,
-        block_tables,
-        context_lens,
-        block_size,
-        max_context_len,
-        alibi_slopes);
+  auto head_size = query.size(2);
+  if (head_size % 2 == 0 && block_size % 2 == 0) {
+    if (out.scalar_type() == at::ScalarType::Float) {
+      single_query_cached_kv_attention_opt_kernel<float>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes);
+    } else if (out.scalar_type() == at::ScalarType::BFloat16) {
+      single_query_cached_kv_attention_opt_kernel<at::BFloat16>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes);
+    } else if (out.scalar_type() == at::ScalarType::Half) {
+      single_query_cached_kv_attention_opt_kernel<at::Half>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes);
+    } else {
+      TORCH_CHECK(
+          false, "Unsupported data type for single_query_cached_kv_attention");
+    }
   } else {
-    TORCH_CHECK(
-        false, "Unsupported data type for single_query_cached_kv_attention");
+    if (out.scalar_type() == at::ScalarType::Float) {
+      single_query_cached_kv_attention_kernel<float>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes);
+    } else if (out.scalar_type() == at::ScalarType::BFloat16) {
+      single_query_cached_kv_attention_kernel<at::BFloat16>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes);
+    } else if (out.scalar_type() == at::ScalarType::Half) {
+      single_query_cached_kv_attention_kernel<at::Half>(
+          out,
+          query,
+          key_cache,
+          value_cache,
+          scale,
+          block_tables,
+          context_lens,
+          block_size,
+          max_context_len,
+          alibi_slopes);
+    } else {
+      TORCH_CHECK(
+          false, "Unsupported data type for single_query_cached_kv_attention");
+    }
   }
 }
 

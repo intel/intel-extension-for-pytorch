@@ -9,6 +9,7 @@
 #include <torch/types.h>
 #include <limits>
 #include "utils.h"
+#include <ATen/cpu/vec/vec.h>
 
 namespace torch_ipex {
 namespace cpu {
@@ -694,6 +695,45 @@ inline void _mul_and_accumulate(
       attn_out_start[hsi] += attn_w * (float)v_ptr_start[hsi];
     } else {
       attn_out_start[hsi] = attn_w * (float)v_ptr_start[hsi];
+    }
+    if (store_value) {
+      v_cache_start[hsi] = (float)v_ptr_start[hsi];
+    }
+  }
+}
+
+template <typename VT, typename OT, typename CT>
+inline typename std::enable_if_t<is_reduced_floating_point_v<VT>, void>
+_mul_and_accumulate(
+    const VT& attn_w,
+    const VT* v_ptr_start,
+    OT* attn_out_start,
+    int64_t head_size,
+    bool store_value,
+    CT* v_cache_start,
+    int accumulated) {
+  auto vec_size = 16; // 512/32
+  auto hsi = 0;
+  for (hsi = 0; hsi <= head_size - vec_size; hsi += vec_size) {
+    auto attn_w_vec = _mm512_set1_ps((float)attn_w);
+    auto v_vec = _loadu(v_ptr_start + hsi);
+    if (accumulated) {
+      auto attn_out_vec = _loadu(attn_out_start + hsi);
+      auto attn_out_vec_new = _mm512_fmadd_ps(attn_w_vec, v_vec, attn_out_vec);
+      _storeu(attn_out_start + hsi, attn_out_vec_new);
+    } else {
+      auto attn_out_vec_new = _mm512_mul_ps(attn_w_vec, v_vec);
+      _storeu(attn_out_start + hsi, attn_out_vec_new);
+    }
+    if (store_value) {
+      _storeu(v_cache_start + hsi, v_vec);
+    }
+  }
+  for (; hsi < head_size; hsi++) {
+    if (accumulated) {
+      attn_out_start[hsi] += (float)attn_w * (float)v_ptr_start[hsi];
+    } else {
+      attn_out_start[hsi] = (float)attn_w * (float)v_ptr_start[hsi];
     }
     if (store_value) {
       v_cache_start[hsi] = (float)v_ptr_start[hsi];
