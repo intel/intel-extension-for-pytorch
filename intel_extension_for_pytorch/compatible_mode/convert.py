@@ -279,8 +279,12 @@ class WrapHelper:
                     # met string here, may be cuda:0 or cuda
                     # need to check torch.xpu.current_device to get index
                     device_item = device_item.replace("cuda", "xpu")
-
-                    if i == -1 and device_item.find(":") == -1:
+                    # prevent bad fork process go through here
+                    if (
+                        i == -1
+                        and device_item.find(":") == -1
+                        and not torch.xpu._is_in_bad_fork()
+                    ):
                         current_device = torch.xpu.current_device()
                         if current_device != 0:
                             i = current_device
