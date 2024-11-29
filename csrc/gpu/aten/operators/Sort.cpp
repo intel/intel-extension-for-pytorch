@@ -49,11 +49,5 @@ std::tuple<Tensor&, Tensor&> sort_out(
     Tensor& indices) {
   return sort_out_stable(self, stable, dim, descending, values, indices);
 }
-
-Tensor argsort(const Tensor& self, bool stable, int64_t dim, bool descending) {
-  Tensor sorted, indices;
-  return std::get<1>(
-      sort_out_stable(self, stable, dim, descending, sorted, indices));
-}
 } // namespace AtenIpexTypeXPU
 } // namespace at

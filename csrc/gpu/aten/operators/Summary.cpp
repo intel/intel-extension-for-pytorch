@@ -223,48 +223,6 @@ bool dpcpp_tensor_histogram(
   return true;
 }
 
-template <typename input_t, typename weights_t>
-Tensor bincount_template(
-    const Tensor& self,
-    const Tensor& weights,
-    int64_t minlength) {
-  if (minlength < 0) {
-    TORCH_CHECK(0, "minlength should be >= 0");
-  }
-  if (self.dim() == 1 && self.numel() == 0) {
-    return at::zeros({minlength}, device(kXPU).dtype(kLong));
-  }
-  if (self.dim() != 1 ||
-      (!std::is_same<input_t, uint8_t>::value &&
-       *self.min().cpu().data_ptr<input_t>() < 0)) {
-    TORCH_CHECK(0, "bincount only supports 1-d non-negative integral inputs.");
-  }
-
-  bool has_weights = weights.defined();
-  if (has_weights && weights.size(0) != self.size(0)) {
-    TORCH_CHECK(0, "input and weights should have the same length");
-  }
-
-  const int64_t nbins =
-      std::max(*self.max().cpu().data_ptr<input_t>() + (int64_t)1, minlength);
-  const input_t minvalue = 0;
-  const input_t maxvalue = nbins;
-  // alloc output counter on GPU
-  Tensor output;
-  if (has_weights) {
-    output = at::zeros({nbins}, weights.options());
-    auto ret = dpcpp_tensor_histogram<weights_t, input_t, true>(
-        output, self, weights, nbins, minvalue, maxvalue);
-  } else {
-    output = at::zeros({nbins}, device(DeviceType::XPU).dtype(kLong));
-    auto ret = dpcpp_tensor_histogram<
-        typename c10::impl::ScalarTypeToCPPType<kLong>::type,
-        input_t,
-        false>(output, self, weights, nbins, minvalue, maxvalue);
-  }
-  return output;
-}
-
 template <typename scalar_t, typename input_t>
 Tensor histc_template(
     const Tensor& self,
@@ -299,22 +257,6 @@ Tensor histc_template(
 }
 
 } // namespace impl
-
-Tensor bincount(
-    const Tensor& self,
-    const c10::optional<Tensor>& weights,
-    int64_t minlength) {
-  Tensor weights_t = weights.has_value() ? weights.value() : Tensor();
-  return IPEX_DISPATCH_INTEGRAL_TYPES(
-      self.scalar_type(), "bincount_dpcpp", [&] {
-        const auto scalar = weights_t.scalar_type();
-        if (scalar == ScalarType::Undefined || scalar == ScalarType::Float)
-          return impl::bincount_template<scalar_t, float>(
-              self, weights_t, minlength);
-        return impl::bincount_template<scalar_t, double>(
-            self, weights_t.to(kDouble), minlength);
-      });
-}
 
 Tensor histc(
     const Tensor& self,

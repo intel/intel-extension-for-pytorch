@@ -4,18 +4,6 @@
 namespace at {
 namespace AtenIpexTypeXPU {
 
-Tensor as_strided(
-    const Tensor& self,
-    IntArrayRef size,
-    at::IntArrayRef stride,
-    c10::optional<int64_t> storage_offset) {
-  if (self.is_quantized()) {
-    return at::native::as_strided_qtensorimpl(
-        self, size, stride, storage_offset);
-  }
-  return at::native::as_strided_tensorimpl(self, size, stride, storage_offset);
-}
-
 // NOTE [ Unsafe View ]
 // _unsafe_view() differs from view() in that the returned tensor isn't treated
 // as a view for the purposes of automatic differentiation. (It's not listed in
