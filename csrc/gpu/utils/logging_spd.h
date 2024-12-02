@@ -16,14 +16,6 @@
 #include "LogUtils.h"
 #include "logging_utils.h"
 
-enum class LoggerTypes {
-  IPEX_OPS,
-  IPEX_MEMORY,
-  IPEX_RUNTIME,
-  IPEX_SYNGRAPH,
-  LOG_MAX // Don't use it
-};
-
 #include <iostream>
 #define VA_ARGS_TO_FMT_AND_ARGS_TRACE(STRING_MOD, FMT, ...)                 \
   if (static_cast<LoggerTypes>(STRING_MOD) == LoggerTypes::IPEX_OPS) {      \
