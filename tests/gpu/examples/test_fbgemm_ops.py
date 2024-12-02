@@ -30,7 +30,7 @@ class TestFbGEMMOp(TestCase):
         self.assertEqual(expected_out, out_cpu)
         self.assertEqual(expected_out, out_xpu.cpu())
 
-    @parametrize("dtype", [torch.int64, torch.float, torch.half])
+    @parametrize("dtype", [torch.int64, torch.float, torch.half, torch.bfloat16])
     def test_dense_to_jagged(self, dtype):
         dense_cpu = torch.tensor(
             [[[1, 1], [0, 0], [0, 0]], [[2, 2], [3, 3], [0, 0]]], dtype=dtype
@@ -43,6 +43,24 @@ class TestFbGEMMOp(TestCase):
         expected_out = torch.tensor([[1, 1], [2, 2], [3, 3]], dtype=dtype)
         self.assertEqual(expected_out, out_cpu[0])
         self.assertEqual(expected_out, out_xpu[0].cpu())
+
+    @parametrize("dtype", [torch.int64, torch.float, torch.half, torch.bfloat16])
+    def test_jagged_to_padded_dense(self, dtype):
+        dense_cpu = torch.tensor([[1, 1], [2, 2], [3, 3], [4, 4]], dtype=dtype)
+        x_offsets_cpu = torch.tensor([0, 1, 3])
+        dense_xpu = dense_cpu.xpu()
+        x_offsets_xpu = x_offsets_cpu.xpu()
+        out_cpu = torch.ops.fbgemm.jagged_to_padded_dense(
+            dense_cpu, [x_offsets_cpu], [3], 7
+        )
+        out_xpu = torch.ops.fbgemm.jagged_to_padded_dense(
+            dense_xpu, [x_offsets_xpu], [3], 7
+        )
+        expected_out = torch.tensor(
+            [[[1, 1], [7, 7], [7, 7]], [[2, 2], [3, 3], [7, 7]]], dtype=dtype
+        )
+        self.assertEqual(expected_out, out_cpu)
+        self.assertEqual(expected_out, out_xpu.cpu())
 
 
 instantiate_parametrized_tests(TestFbGEMMOp)
