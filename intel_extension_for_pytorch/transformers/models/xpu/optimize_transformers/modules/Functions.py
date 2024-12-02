@@ -221,6 +221,7 @@ def _ipex_prepare_model_inputs(
     bs = inputs.shape[0]
     IPEXTransformerAttn.batch_size = bs
     IPEXTransformerAttn.reset_timestamp()
+    IPEXTransformerAttn.reset_layerid()
     IPEXTransformerAttn.release_resources()
     return inputs, input_name, model_kwargs
 

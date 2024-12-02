@@ -100,6 +100,10 @@ class IPEXTransformerAttn(nn.Module):
     def reset_timestamp():
         IPEXTransformerAttn.timestamp = 0
 
+    @staticmethod
+    def reset_layerid():
+        IPEXTransformerAttn.layer_id_static = 0
+
     def qkv_gemm(self, hidden_states, **kwargs):
         raise NotImplementedError
 
