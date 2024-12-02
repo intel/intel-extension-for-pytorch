@@ -264,6 +264,9 @@ class fmha_forward_t {
     uint32_t head_id;
     uint32_t head_id_kv;
 
+    int32_t kv_offset_y;
+    int32_t kv_offset_x;
+
     inline context_t() = default;
 
     /// @brief Initialize invariant variables in the flash mha loop
@@ -284,6 +287,12 @@ class fmha_forward_t {
       batch_id = gid / args.uN; // get batch idx
       head_id = gid % args.uN; // get head idx
       head_id_kv = head_id / (args.uN / args.uNkv); // get head idx for kv
+
+      kv_offset_y =
+          (batch_id * args.kv_strideB + head_id_kv * args.kv_strideN) /
+          args.kv_strideT;
+      kv_offset_x =
+          args.kv_strideT > args.kv_strideN ? head_id_kv * args.kv_strideN : 0;
 
       if constexpr (kSeqLast) { // 2d mem: [F, BxNxH]
         // startF
@@ -320,25 +329,26 @@ class fmha_forward_t {
         mem_desc_Oi.init(
             args.O_ptr, {end_x, end_y, ld_qo}, {start_acc, start_y});
       } else { // 2d mem: [BxF, NxH]
-        uint32_t ptr_offset =
-            batch_id * args.q_strideB + head_id * args.q_strideN;
-        auto Q_ptr = args.Q_ptr + ptr_offset;
-        auto O_ptr = args.O_ptr + ptr_offset;
+        int32_t ptr_offset_y =
+            (batch_id * args.q_strideB + head_id * args.q_strideN) /
+            args.q_strideF;
+        int32_t ptr_offset_x =
+            args.q_strideF > args.q_strideN ? head_id * args.q_strideN : 0;
 
         // startF
-        int32_t start_y = item.get_group(1) * kBr;
+        int32_t start_y = ptr_offset_y + item.get_group(1) * kBr;
         uint32_t end_y = start_y + kBr;
         // boundaryF
-        uint32_t boundary_y = args.uF;
+        uint32_t boundary_y = ptr_offset_y + args.uF;
         end_y = end_y > boundary_y ? boundary_y : end_y;
 
-        int32_t start_acc = 0;
+        int32_t start_acc = ptr_offset_x;
         uint32_t end_acc = start_acc + args.uH;
 
         mem_desc_Qi.init(
-            Q_ptr, {end_acc, end_y, args.q_strideF}, {start_acc, start_y});
+            args.Q_ptr, {end_acc, end_y, args.q_strideF}, {start_acc, start_y});
         mem_desc_Oi.init(
-            O_ptr, {end_acc, end_y, args.q_strideF}, {start_acc, start_y});
+            args.O_ptr, {end_acc, end_y, args.q_strideF}, {start_acc, start_y});
       }
 
       int32_t start_x_ml = item.get_group(1) * kBr + sg_idy * kSgBr;
@@ -396,23 +406,22 @@ class fmha_forward_t {
             {start_acc, start_x});
 
       } else {
-        uint32_t ptr_offset =
-            batch_id * args.kv_strideB + head_id_kv * args.kv_strideN;
-        auto K_ptr = args.K_ptr + ptr_offset;
-        auto V_ptr = args.V_ptr + ptr_offset;
-
-        int32_t start_x = startT;
+        int32_t start_x = kv_offset_y + startT;
         uint32_t end_x = start_x + kBc;
-        uint32_t boundary_x = args.uT;
+        uint32_t boundary_x = kv_offset_y + args.uT;
         end_x = end_x > boundary_x ? boundary_x : end_x;
 
-        int32_t start_acc = 0;
+        int32_t start_acc = kv_offset_x;
         uint32_t end_acc = start_acc + args.uH;
 
         mem_desc_Kj_T.init(
-            K_ptr, {end_x, end_acc, args.kv_strideT}, {start_x, start_acc});
+            args.K_ptr,
+            {end_x, end_acc, args.kv_strideT},
+            {start_x, start_acc});
         mem_desc_Vj.init(
-            V_ptr, {end_acc, end_x, args.kv_strideT}, {start_acc, start_x});
+            args.V_ptr,
+            {end_acc, end_x, args.kv_strideT},
+            {start_acc, start_x});
       }
 
       // B, N, 1, T
