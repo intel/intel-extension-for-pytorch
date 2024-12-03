@@ -219,6 +219,8 @@ def model_convert_reference(_model):
         prepare_inputs_for_generation_gptneox,
         prepare_inputs_for_generation_git,
         prepare_inputs_for_generation_llava,
+        prepare_inputs_for_generation_opt_mpt,
+        prepare_inputs_for_generation_t5,
         detect_language,
         _postprocess_outputs_whisper,
         _prepare_encoder_decoder_kwargs_for_generation,
@@ -362,6 +364,11 @@ def model_convert_reference(_model):
             "forward",
             OPTForCausalLM_forward,
         )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_opt_mpt,
+        )
     elif (
         hasattr(_model, "__class__")
         and _model.__class__
@@ -438,6 +445,9 @@ def model_convert_reference(_model):
             transformers.models.t5.modeling_t5.T5DenseGatedActDense,
             "forward",
             T5DenseGatedActDense_forward,
+        )
+        convert_function(
+            _model, "prepare_inputs_for_generation", prepare_inputs_for_generation_t5
         )
 
     # checking if model has been wrapped by deepspeed (distributed or not)
@@ -741,6 +751,11 @@ def model_convert_reference(_model):
             _IPEXDecoderLayerRef,
             _model.config,
             distributed=distributed,
+        )
+        convert_function(
+            _model,
+            "prepare_inputs_for_generation",
+            prepare_inputs_for_generation_opt_mpt,
         )
     elif _model.config.architectures[0] == "MixtralForCausalLM":
         convert_function(_model, "forward", MixtralForCausalLM_forward)
