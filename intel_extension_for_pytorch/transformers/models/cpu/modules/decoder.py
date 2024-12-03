@@ -6,7 +6,6 @@ from ...cpu.fusions.linear_fusion import (
     _IPEXlinearReluCPU,
     _IPEXlinearGeluCPU,
     _IPEXlinearMulCPU,
-    _IPEXlinearSiluCPU,
     _IPEXlinearSiluMulCPU,
 )
 
@@ -148,9 +147,9 @@ class _IPEXEncoderLayerCPU(nn.Module):
                     self.mlp_linear_mul = _IPEXlinearMulCPU(
                         module.mlp_linear_mul.linear, tpp=tpp, woq=woq
                     )
-            if hasattr(module, "linear_silu"):
-                self.linear_silu = _IPEXlinearSiluCPU(
-                    module.linear_silu.linear, tpp=tpp, woq=woq
+            if hasattr(module, "linear_gelu"):
+                self.linear_silu = _IPEXlinearGeluCPU(
+                    module.linear_gelu.linear, tpp=tpp, woq=woq
                 )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")

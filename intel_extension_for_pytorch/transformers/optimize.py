@@ -584,9 +584,14 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-    for supported_encoder_class in [
-        transformers.models.mllama.modeling_mllama.MllamaVisionEncoderLayer
-    ]:
+    mllama_encoder_layers = (
+        [
+            transformers.models.mllama.modeling_mllama.MllamaVisionEncoderLayer,
+        ]
+        if hasattr(transformers.models, "mllama")
+        else []
+    )
+    for supported_encoder_class in mllama_encoder_layers:
         convert_class(
             _model,
             supported_encoder_class,
