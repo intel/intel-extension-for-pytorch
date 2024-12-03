@@ -234,6 +234,32 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     int64_t,
     const c10::optional<at::Tensor>&);
 
+using woq_gemm_kernel_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const std::vector<at::Tensor>&,
+    const std::vector<at::Tensor>&,
+    const std::vector<at::Tensor>&,
+    const int,
+    int64_t,
+    const std::vector<at::Tensor>&,
+    int64_t,
+    int64_t);
+
+using woq_int8_gemm_kernel_fn = at::Tensor (*)(
+    const at::Tensor&,
+    const at::Tensor&,
+    const std::vector<at::Tensor>&,
+    const std::vector<at::Tensor>&,
+    const std::vector<at::Tensor>&,
+    const int,
+    int64_t,
+    const std::vector<at::Tensor>&,
+    int64_t,
+    int64_t,
+    int64_t,
+    const c10::optional<at::Tensor>&);
+
 using woq_tpp_gemm_packB_fn =
     at::Tensor (*)(const at::Tensor&, int, size_t, size_t, int64_t);
 
@@ -254,32 +280,27 @@ using dequant_nf4_fn = at::Tensor (*)(
     c10::ScalarType);
 
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_kernel_fn, woq_tpp_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_fp32_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_fp16_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(woq_gemm_kernel_fn, woq_bf16_gemm_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    woq_int8_gemm_kernel_fn,
+    woq_int8_gemm_pre_tensor_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    woq_int8_gemm_kernel_fn,
+    woq_int8_gemm_pre_k_block_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    woq_int8_gemm_kernel_fn,
+    woq_int8_gemm_pre_m_block_kernel_stub);
+IPEX_DECLARE_DISPATCH(
+    woq_int8_gemm_kernel_fn,
+    woq_int8_gemm_pre_m_k_block_kernel_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_packB_fn, woq_tpp_gemm_packB_stub);
 IPEX_DECLARE_DISPATCH(woq_tpp_gemm_unpackB_fn, woq_tpp_gemm_unpackB_stub);
 IPEX_DECLARE_DISPATCH(
     woq_dequant_int4_to_int8_packed_fn,
     woq_dequant_int4_to_int8_packed_stub);
 IPEX_DECLARE_DISPATCH(dequant_nf4_fn, dequant_nf4_stub);
-
-// Fusion types
-#define WOQ_FUSE_NONE 0x0
-// Unary post ops
-#define WOQ_FUSE_GELU_ERF 0x1
-#define WOQ_FUSE_GELU_TANH 0x2
-#define WOQ_FUSE_RELU 0x3
-#define WOQ_FUSE_SILU 0x4
-// Binary post ops
-#define WOQ_FUSE_ADD 0x10
-#define WOQ_FUSE_ADD_ADD 0x20
-#define WOQ_FUSE_MUL 0x30
-
-// weight quant mode
-#define QUANT_W_PER_CHANNEL 0
-#define QUANT_W_PER_K_BLOCK 1
-#define QUANT_W_PER_CHANNEL_SYM 2
-#define QUANT_W_PER_K_BLOCK_SYM 3
-
-#define WOQ_N_BLOCK_SIZE 32
 
 #endif
 

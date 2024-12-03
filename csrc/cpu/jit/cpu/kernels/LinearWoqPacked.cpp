@@ -3,7 +3,7 @@
 #include <ideep.hpp>
 #include "aten/Linear.h"
 #include "aten/WeightPack.h"
-#include "aten/utils/woq.h"
+#include "aten/utils/woq_utils.h"
 #include "csrc/cpu/aten/TPPGEMM.h"
 #include "csrc/cpu/tpp/utils.h"
 #include "csrc/cpu/tpp/woq/tla.h"

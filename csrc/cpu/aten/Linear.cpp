@@ -6,6 +6,7 @@
 #include "WeightPack.h"
 #include "autocast/autocast_mode.h"
 #include "ideep/IDeepConversions.h"
+#include "utils/woq_defines.h"
 
 namespace torch_ipex {
 namespace cpu {
