@@ -6,7 +6,6 @@ from transformers.modeling_outputs import BaseModelOutputWithPast
 from transformers.cache_utils import Cache, DynamicCache
 
 from .transformer_modules.Norm import LlamaRMSNorm
-from .transformer_modules.CacheUtils import IPEXStaticCache, CacheFormat
 
 from ._transformers import MAX_SEQ_LEN, MAX_OUT_SEQ_LEN
 from .transformer_modules.BaseAttention import IPEXTransformerAttn
@@ -236,12 +235,10 @@ def baichuan_transpose_parameter(self):
     torch.xpu.synchronize()
 
 
-def sdp(self, query, key, value, past_key_value, attention_mask, head_mask, alibi):
+def prepare_sdp_input(self, query, key, value, past_key_value, attention_mask, alibi):
     scale = 1.0 / math.sqrt(self.head_dim)
-    use_casual = False
+    use_causal = False
 
-    # we are not plan to support attention mask here, for it should be in None
-    # at all of our test case.
     if attention_mask is not None:
         if query.size()[2] == 1:  # inference with cache
             if len(attention_mask.size()) == 4:
@@ -251,95 +248,7 @@ def sdp(self, query, key, value, past_key_value, attention_mask, head_mask, alib
 
     if attention_mask is not None:
         attention_mask = self.get_blocked_attn_mask(attention_mask)
-    if alibi is not None:
-        alibi = self.get_blocked_alibi(alibi, key.size(1))
-    if (
-        self.beam_idx is not None
-        and query.size(-2) == 1
-        and isinstance(past_key_value, IPEXStaticCache)
-    ):
-        use_casual = False
-        key_prompt, value_prompt = past_key_value.get_prompt_for_beam_search(
-            self.layer_idx
-        )
-        prompt_length = key_prompt.size(2)
-        seqlen = key.size(2)
-        # TODO: remove this after ifmha support combined kv cache with both prompt
-        # and decode in [bs, seqlen, num_head, head_dim] layout
-        key = key[:, :, prompt_length:, :]
-        value = value[:, :, prompt_length:, :]
-        # TODO: remove this after ifmha support [bs, seqlen, num_head, head_dim] layout
-        if (
-            isinstance(past_key_value, IPEXStaticCache)
-            and past_key_value.cache_format == CacheFormat.BFNH
-        ):  # for BFNH format
-            key = key.permute(2, 0, 1, 3).contiguous().permute(1, 2, 0, 3)
-            value = (
-                value.permute(2, 0, 1, 3)
-                .contiguous()
-                .permute(
-                    1,
-                    2,
-                    0,
-                )
-            )
-
-        attention_output = torch.xpu.IpexSDP_Index(
-            query,
-            key_prompt,
-            value_prompt,
-            key,
-            value,
-            self.beam_idx,
-            alibi,
-            attention_mask,
-            head_mask,
-            seqlen,
-            scale,
-            1.0,
-            0.0,
-            use_casual,
-        )
-    else:
-        # TODO: remove this after fmha support strided fmha on F dim
-        if (
-            isinstance(past_key_value, IPEXStaticCache)
-            and past_key_value.cache_format == CacheFormat.FBNH
-        ):  # for BFNH format
-            attention_output = torch.xpu.IpexSDP(
-                query,
-                key,
-                value,
-                alibi,
-                attention_mask,
-                head_mask,
-                scale,
-                1.0,
-                0.0,
-                use_casual,
-                self.beam_idx is None,
-            )
-        else:  # for BFNH format
-            # TODO: remove this after fmha support strided fmha on F dim
-            if query.size(0) > 1:
-                key = key.transpose(1, 2).contiguous().transpose(1, 2)
-                value = value.transpose(1, 2).contiguous().transpose(1, 2)
-
-            attention_output = torch.xpu.IpexSDP(
-                query,
-                key,
-                value,
-                alibi,
-                attention_mask,
-                head_mask,
-                scale,
-                1.0,
-                0.0,
-                use_casual,
-                False,
-            )
-
-    return attention_output, None
+    return scale, use_causal, attention_mask, alibi
 
 
 class NewIPEXBaichuanBlock(IPEXTransformerBlock):
@@ -373,7 +282,7 @@ class NewIPEXBaichuanBlock(IPEXTransformerBlock):
 
         self.attn.load_parameter = partial(baichuan_load_parameter, self.attn)
         self.attn.transpose_parameter = partial(baichuan_transpose_parameter, self.attn)
-        self.attn.sdp = partial(sdp, self.attn)
+        self.attn.prepare_sdp_input = partial(prepare_sdp_input, self.attn)
 
         self.input_layernorm = LlamaRMSNorm(
             self.ipex_config.embedding_dim, self.ipex_config.norm_eps

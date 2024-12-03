@@ -216,18 +216,20 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             IPEXAttention.blocked_attn_mask[:, :, :, 0 : attn_mask.shape[3]] = attn_mask
         return IPEXAttention.blocked_attn_mask
 
-    def sdp(self, query, key, value, past_key_value, attention_mask, head_mask, alibi):
-
+    def prepare_sdp_input(
+        self, query, key, value, past_key_value, attention_mask, alibi
+    ):
         scale = 1.0 / math.sqrt(self.head_dim)
-        use_casual = False
+        use_causal = False
         if query.size(2) == key.size(2):
-            use_casual = True
+            use_causal = True
 
         # we are not plan to support attention mask here, for it should be in None
         # at all of our test case.
 
         # if attention_mask is not None:
         #     attention_mask = self.get_blocked_attn_mask(attention_mask)
+        attention_mask = None
         # use key/value's data type as alibi's data type
         if alibi is not None:
             if isinstance(past_key_value, IPEXStaticCache):
@@ -236,12 +238,26 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 )
             else:
                 alibi = self.get_blocked_alibi(alibi, key.size(2), key.dtype)
+        return scale, use_causal, attention_mask, alibi
+
+    def sdp(
+        self,
+        query,
+        key,
+        value,
+        past_key_value,
+        attention_mask,
+        head_mask,
+        alibi,
+        scale,
+        use_causal,
+    ):
         if (
             self.beam_idx is not None
             and query.size(-2) == 1
             and isinstance(past_key_value, IPEXStaticCache)
         ):
-            use_casual = False
+            use_causal = False
             key_prompt, value_prompt = past_key_value.get_prompt_for_beam_search(
                 self.layer_idx
             )
@@ -269,13 +285,13 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 value,
                 self.beam_idx,
                 alibi,
-                None,
+                attention_mask,
                 head_mask,
                 curr_len,
                 scale,
                 1.0,
                 0.0,
-                use_casual,
+                use_causal,
             )
         else:
             # TODO: remove this after fmha support strided fmha on F dim
@@ -288,12 +304,12 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                     key,
                     value,
                     alibi,
-                    None,
+                    attention_mask,
                     head_mask,
                     scale,
                     1.0,
                     0.0,
-                    use_casual,
+                    use_causal,
                     self.beam_idx is None,
                 )
             else:  # for BFNH format
@@ -310,12 +326,12 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                     key,
                     value,
                     alibi,
-                    None,
+                    attention_mask,
                     head_mask,
                     scale,
                     1.0,
                     0.0,
-                    use_casual,
+                    use_causal,
                     False,
                 )
 
@@ -433,8 +449,19 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             key = self.repeat_kv(key, num_group)
             value = self.repeat_kv(value, num_group)
 
+        scale, use_causal, attention_mask, alibi = self.prepare_sdp_input(
+            query, key, value, past_key_value, attention_mask, alibi
+        )
         attn_output, attn_weight = self.sdp(
-            query, key, value, past_key_value, attention_mask, head_mask, alibi
+            query,
+            key,
+            value,
+            past_key_value,
+            attention_mask,
+            head_mask,
+            alibi,
+            scale,
+            use_causal,
         )
 
         # transpose back to [bs, curr_len, num_heads, head_dim]
