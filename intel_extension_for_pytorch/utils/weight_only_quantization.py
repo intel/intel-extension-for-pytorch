@@ -1,6 +1,9 @@
 import copy
 import torch
-from intel_extension_for_pytorch.nn.modules import WeightOnlyQuantizedLinear
+from intel_extension_for_pytorch.nn.modules import (
+    WeightOnlyQuantizedLinear,
+    IpexWoqLinearAllreduce,
+)
 from intel_extension_for_pytorch.quantization import QConfigWoq, WoqLowpMode
 from torch.ao.quantization import PlaceholderObserver, QConfigMapping
 from intel_extension_for_pytorch.nn.utils._model_convert import (
@@ -118,6 +121,9 @@ def _get_linear_parameters(attr_name, state_dict, checkpoint_config):
     elif checkpoint_config["name"] == "awq":
         group_size = -1
         if qweight is not None and scales is not None:
+            assert (
+                qweight.size(0) % scales.size(0) == 0
+            ), "Uneven group sizes are not supported"
             group_size = qweight.size(0) // scales.size(0)
             qweight, scales, qzeros = prepack_awq_weight(
                 qweight, qzeros, scales, 4, group_size
@@ -178,21 +184,41 @@ def _convert_woq_with_low_precision_checkpoint(
         if all(keys_found):
             break
     assert all(keys_found), "Error: Format of checkpoint and config do not match"
+    q_op_map = {
+        torch.nn.Linear: WeightOnlyQuantizedLinear,
+    }
+
+    from intel_extension_for_pytorch.nn.utils._weight_prepack import (
+        may_import_deepspeed_modules,
+    )
+
+    deepspeed_modules = may_import_deepspeed_modules()
+    if deepspeed_modules is not None:
+        LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules[:]
+        q_op_map.update(
+            {
+                LinearAllreduce: IpexWoqLinearAllreduce,
+                LinearLayer: WeightOnlyQuantizedLinear,
+            }
+        )
 
     def _convert(mod, attr_name):
-        if isinstance(mod, torch.nn.Linear):
+        # lm_head is not quantized in int4 checkpoint, LmHeadLinearAllReduce is not handled here
+        if isinstance(mod, (torch.nn.Linear, LinearAllreduce, LinearLayer)):
             mod.qconfig = qconfig_mapping.global_qconfig
             qweight, scales, qzeros, bias, group_size, g_idx = _get_linear_parameters(
                 attr_name, state_dict, checkpoint_config
             )
             if any(i is None for i in [qweight, scales, qzeros]):
                 return mod
-            mod_new = WeightOnlyQuantizedLinear.from_float_and_int4_weight(
+            mod_new = q_op_map[type(mod)].from_float_and_int4_weight(
                 mod, qweight, scales, qzeros, bias, group_size=group_size, g_idx=g_idx
             )
             return mod_new
         elif hasattr(mod, "weight") and isinstance(mod.weight, torch.nn.Parameter):
             mod.weight.data = state_dict.get(attr_name + ".weight", mod.weight.data)
+            if hasattr(mod, "bias") and isinstance(mod.bias, torch.nn.Parameter):
+                mod.bias.data = state_dict.get(attr_name + ".bias", mod.bias.data)
             return mod
 
         mod_new = mod

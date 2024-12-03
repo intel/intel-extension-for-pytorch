@@ -59,10 +59,7 @@ def is_distributed(m, ds_layers):
     for _, sub_m in m.named_children():
         if isinstance(
             sub_m,
-            ds_layers[0],
-        ) or isinstance(
-            sub_m,
-            ds_layers[1],
+            ds_layers,
         ):
             global distributed
             distributed = True
@@ -453,8 +450,9 @@ def model_convert_reference(_model):
     # checking if model has been wrapped by deepspeed (distributed or not)
     try:
         from deepspeed.module_inject.layers import LinearAllreduce, LinearLayer
+        from intel_extension_for_pytorch.nn.modules import IpexWoqLinearAllreduce
 
-        ds_layers = [LinearAllreduce, LinearLayer]
+        ds_layers = (LinearAllreduce, LinearLayer, IpexWoqLinearAllreduce)
         is_distributed(_model, ds_layers)
     except ImportError:
         # distributed uses default False

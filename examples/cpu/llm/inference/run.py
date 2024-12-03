@@ -656,6 +656,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--prompt", str(args.prompt)])
         if args.config_file is not None:
             infer_cmd.extend(["--config-file", str(args.config_file)])
+        if args.low_precision_checkpoint != "":
+            infer_cmd.extend(
+                ["--low-precision-checkpoint", str(args.low_precision_checkpoint)]
+            )
 
         if args.ipex_weight_only_quantization:
             infer_cmd.extend(["--ipex-weight-only-quantization"])
