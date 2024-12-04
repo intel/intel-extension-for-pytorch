@@ -8,6 +8,11 @@ import math
 import copy
 from common_utils import TestCase
 
+skipIfNoBF16Supported = unittest.skipIf(
+    not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+    "mkldnn bf16 is not supported on this device",
+)
+
 
 # (from Diffusers 0.12.1)
 class SD_MHA_Model_v1(nn.Module):
@@ -461,11 +466,13 @@ class TransFreeMHATester(TestCase):
                     any(n.kind() == "ipex::sd_flash_mha" for n in mha_graph.nodes())
                 )
 
+    @skipIfNoBF16Supported
     def test_sd_mha_bf16_v1(self):
         mat = torch.randn(2, 4096, 320)
         sd_mha_model = SD_MHA_Model_v1(0.3, 8, 320, 320).eval()
         self.sd_mha_bf16_common(sd_mha_model, mat)
 
+    @skipIfNoBF16Supported
     def test_sd_mha_bf16_v2(self):
         mat1 = torch.randn(2, 4096, 320)
         mat2 = torch.randn(2, 77, 320)
@@ -494,6 +501,7 @@ class TransFreeMHATester(TestCase):
     #     sd_mha_model = SD_MHA_Model_scale_v4(8, 320, 320, 0.11).eval()
     #     self.sd_mha_bf16_common(sd_mha_model, mat1, mat2)
 
+    @skipIfNoBF16Supported
     def test_fake_sd_mha_bf16(self):
         mat1 = (torch.randn(1, 2, 64, 64) + 20).to(torch.bfloat16)
         mat2 = (torch.randn(1, 2, 64, 64) - 20).to(torch.bfloat16)
@@ -526,6 +534,7 @@ class TransFreeMHATester(TestCase):
                 any(n.kind() == "ipex::mha_scores_calc" for n in fake_mha_graph.nodes())
             )
 
+    @skipIfNoBF16Supported
     def test_transfree_mha_bf16(self):
         for i in range(len(bs)):
             mat = torch.randn(bs[i], seq[i], num_heads[i] * head_dims[i]).to(
@@ -612,6 +621,7 @@ class TransFreeMHATester(TestCase):
                         )
                     )
 
+    @skipIfNoBF16Supported
     def test_fake_mha_bf16(self):
         mat = torch.randn(16, 16, 256).to(torch.bfloat16)
         mask_base = torch.randn(16, 1, 1, 16).to(torch.bfloat16)

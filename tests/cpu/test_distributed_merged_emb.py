@@ -87,11 +87,10 @@ class DistMergedEmbeddingTester(TestCase):
                     )
                     for i in range(NUM_TABLE)
                 ]
-                for dtype in [
-                    torch.bfloat16,
-                    torch.float32,
-                    torch.float64,
-                ]:
+                dtypes = [torch.float32, torch.float64]
+                if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                    dtypes.append(torch.bfloat16)
+                for dtype in dtypes:
                     for NUM_DIM in [64, 65, 128, 256]:
                         emb_list = EmbeddingBagList(
                             NUM_TABLE,

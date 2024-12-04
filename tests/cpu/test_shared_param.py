@@ -68,8 +68,13 @@ class TestParamSharing(TestCase):
             self.assertEqual(state_dict["shared.weight"].dtype, torch.float)
 
         def test_inference(model):
+            dtypes = [
+                torch.float32,
+            ]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             params_dict = {
-                "dtype": [torch.float, torch.bfloat16],
+                "dtype": dtypes,
                 "level": ["O0", "O1"],
                 "inplace": [True, False],
             }
@@ -82,8 +87,13 @@ class TestParamSharing(TestCase):
                 check_shared_in_state_dict(opt_M.state_dict())
 
         def test_training(model):
+            dtypes = [
+                torch.float32,
+            ]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
             params_dict = {
-                "dtype": [torch.float, torch.bfloat16],
+                "dtype": dtypes,
                 "level": ["O0", "O1"],
                 "inplace": [True, False],
                 "optimizer": [
@@ -120,6 +130,10 @@ class TestParamSharing(TestCase):
         test_inference(SharedParaModel())
         test_training(SharedParaModel())
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_nocast_since_shared(self):
         class NoCastforSharingPara(torch.nn.Module):
             def __init__(self):
@@ -169,30 +183,39 @@ class TestParamSharing(TestCase):
                 return x
 
         model = NoPrepackforSharingPara()
-        for level in ["O0", "O1"]:
-            for train in [True, False]:
-                test_model = copy.deepcopy(model)
-                if train:
-                    optimizer = SGD(model.parameters(), lr=10.01, momentum=0.1)
-                    opt_M, _ = ipex.optimize(
-                        test_model,
-                        weights_prepack=True,
-                        optimizer=optimizer,
-                        dtype=torch.bfloat16,
-                        level=level,
-                    )
-                else:
-                    opt_M = ipex.optimize(
-                        test_model.eval(),
-                        weights_prepack=True,
-                        dtype=torch.bfloat16,
-                        level=level,
-                    )
-                self.assertEqual(
-                    opt_M.shared.weight.data_ptr(),
-                    opt_M.no_prepack_linear.weight.data_ptr(),
+        dtypes = [
+            torch.float32,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
+        options = itertools.product(
+            ["O0", "O1"],
+            [True, False],
+            dtypes,
+        )
+        for level, train, dtype in options:
+            test_model = copy.deepcopy(model)
+            if train:
+                optimizer = SGD(model.parameters(), lr=10.01, momentum=0.1)
+                opt_M, _ = ipex.optimize(
+                    test_model,
+                    weights_prepack=True,
+                    optimizer=optimizer,
+                    dtype=dtype,
+                    level=level,
                 )
-                self.assertTrue(isinstance(opt_M.no_prepack_linear, torch.nn.Linear))
+            else:
+                opt_M = ipex.optimize(
+                    test_model.eval(),
+                    weights_prepack=True,
+                    dtype=dtype,
+                    level=level,
+                )
+            self.assertEqual(
+                opt_M.shared.weight.data_ptr(),
+                opt_M.no_prepack_linear.weight.data_ptr(),
+            )
+            self.assertTrue(isinstance(opt_M.no_prepack_linear, torch.nn.Linear))
 
 
 if __name__ == "__main__":

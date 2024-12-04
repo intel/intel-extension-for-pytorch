@@ -893,9 +893,14 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
             [Linear_with_bias, Linear_without_bias],
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
             [True, False],
@@ -930,8 +935,13 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_gelu_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
             [True, False],
@@ -970,8 +980,13 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_silu_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
             [True, False],
@@ -1010,8 +1025,13 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_relu_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
             [True, False],
@@ -1050,8 +1070,13 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_mul_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
             [True, False],
@@ -1090,8 +1115,13 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_add_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
             [True, False],
@@ -1130,8 +1160,13 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_add2_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
             [True, False],

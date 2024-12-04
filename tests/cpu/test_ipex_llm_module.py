@@ -308,7 +308,11 @@ class TestLLMModules(TestCase):
             ipex.llm.modules.LinearRelu,
             ipex.llm.modules.Linear2SiluMul,
         ]
-        dtypes = [torch.float32, torch.bfloat16]
+        dtypes = [
+            torch.float32,
+        ]
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         with torch.no_grad():
@@ -353,7 +357,11 @@ class TestLLMModules(TestCase):
             ipex.llm.modules.LinearAdd,
             ipex.llm.modules.LinearSiluMul,
         ]
-        dtypes = [torch.float32, torch.bfloat16]
+        dtypes = [
+            torch.float32,
+        ]
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         with torch.no_grad():
@@ -390,7 +398,11 @@ class TestLLMModules(TestCase):
         x2 = copy.deepcopy(x1)
         ref_scope = [Linear_add_add]
         ipex_scope = [ipex.llm.modules.LinearAddAdd]
-        dtypes = [torch.float32, torch.bfloat16]
+        dtypes = [
+            torch.float32,
+        ]
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         with torch.no_grad():

@@ -76,7 +76,11 @@ class FxTester(TestCase):
         _bias = [True, False]
         _inplace = [True, False]
         _in_feature = [16, 129]
-        _dtype = [torch.float, torch.bfloat16]
+        _dtype = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            _dtype.append(torch.bfloat16)
         options = itertools.product(_bias, _inplace, _in_feature, _dtype)
         for bias, inplace, in_feature, dtype in options:
             x = torch.randn(100, in_feature, dtype=dtype)
@@ -126,7 +130,12 @@ class FxTester(TestCase):
         config = AutoConfig.from_pretrained(loc + "/bert-base-config.json")
         base_model = AutoModelForCausalLM.from_config(config).eval()
         inputs = torch.load(loc + "/bert-inputs.pt", weights_only=False)
-        for dtype in [torch.float, torch.bfloat16]:
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
+        for dtype in dtypes:
             for inplace in [True, False]:
                 model = copy.deepcopy(base_model)
                 auto_cast = dtype == torch.bfloat16
@@ -191,7 +200,12 @@ class FxTester(TestCase):
                     torch.tensor(921),
                     torch.randn(2, 77, 768),
                 )
-            for dtype in [torch.float, torch.bfloat16]:
+            dtypes = [
+                torch.float,
+            ]
+            if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                dtypes.append(torch.bfloat16)
+            for dtype in dtypes:
                 for inplace in [True, False]:
                     model1 = copy.deepcopy(base_model)
                     model2 = copy.deepcopy(base_model)

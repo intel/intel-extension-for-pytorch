@@ -383,6 +383,10 @@ class TransFreeBF16BmmTester(TestCase):
                             any(n.kind() == "ipex::matmul" for n in bmm_graph.nodes())
                         )
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_transfree_bf16_bmm(self):
         x1 = [
             torch.randn(32, 13, 27, 25).to(torch.bfloat16),
