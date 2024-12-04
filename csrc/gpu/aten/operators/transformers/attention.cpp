@@ -1078,33 +1078,6 @@ Tensor varlen_fwd(
 
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
 
-  // If head dim < 64, we g
-  if (!check_if_xetla_valid_for_varlen(query, head_dim)) {
-    return varlen_fwd_math_impl(
-        query,
-        key,
-        value,
-        out,
-        cu_seqlens_q,
-        cu_seqlens_k,
-        seqused_k,
-        alibi_slopes_,
-        num_queries,
-        num_keys,
-        batch_size,
-        num_heads_q,
-        num_heads_k,
-        head_dim,
-        max_seqlen_q,
-        max_seqlen_k,
-        p_dropout,
-        softmax_scale,
-        zero_tensors,
-        is_causal,
-        return_softmax,
-        softcap);
-  }
-
 #if defined(USE_XETLA)
   TORCH_CHECK(
       dpcppGetDeviceHasXMX(),

@@ -5,7 +5,7 @@ import pytest
 import math
 
 # The largest head dim we can support is 256
-HEAD_DIM = [64, 128, 256]
+HEAD_DIM = [64, 70, 96, 128, 256]
 
 NUM_HEADS = [(32, 32), (32, 8)]
 
@@ -110,6 +110,12 @@ def varlen_fwd_reference(
     pad_k = pad_k.permute(0, 2, 1, 3)
     pad_v = pad_v.permute(0, 2, 1, 3)
 
+    if head_size % 32 != 0:
+        pad_size = 32 - head_size % 32
+        pad_q = torch.nn.functional.pad(pad_q, (0, pad_size))
+        pad_k = torch.nn.functional.pad(pad_k, (0, pad_size))
+        pad_v = torch.nn.functional.pad(pad_v, (0, pad_size))
+
     out_ = torch.ops.torch_ipex.xetla_fsdp_forward_atten_mask_alibi_strided(
         pad_q,
         pad_k,
@@ -123,6 +129,8 @@ def varlen_fwd_reference(
         is_causal,
         False,
     )
+    if head_size % 32 != 0:
+        out_ = out_[:, :, :, :head_size]
     q_mask = torch.arange(0, max_seqlen_q, device=query.device)[None, :].repeat(
         batch_size, 1
     )

@@ -288,11 +288,22 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
         assert seqused_k is None, "IPEX only support seqused_k as None yet"
         assert block_tables_ is None, "IPEX only support block_tables_ as None yet"
         if torch.xpu.has_2d_block_array():
+            head_dim = query.size(-1)
+            pad_query = query
+            pad_key = key
+            pad_value = value
+            pad_out = out
+            if head_dim % 32 != 0:
+                pad_size = 32 - head_dim % 32
+                pad_query = torch.nn.functional.pad(query, (0, pad_size))
+                pad_key = torch.nn.functional.pad(key, (0, pad_size))
+                pad_value = torch.nn.functional.pad(value, (0, pad_size))
+                pad_out = torch.nn.functional.pad(out, (0, pad_size))
             torch.ops.torch_ipex.varlen_fwd(
-                query,
-                key,
-                value,
-                out,
+                pad_query,
+                pad_key,
+                pad_value,
+                pad_out,
                 seqlen_q,
                 seqlen_k,
                 seqused_k,  # seqused_k
@@ -307,6 +318,8 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
                 gen_,
                 softcap,
             )
+            if head_dim % 32 != 0:
+                out.copy_(pad_out[:, :, :head_dim])
         else:
             torch.xpu.varlen_fwd(
                 query,
