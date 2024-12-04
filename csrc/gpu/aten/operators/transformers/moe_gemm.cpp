@@ -92,7 +92,8 @@ Tensor moe_gemm(
         "Error in moegemm: run into Unsupported data type, only support half and bfloat16 now. ");
   }
 #else
-  AT_ERROR(": xetla library not found in compilation");
+  AT_ERROR(
+      "MoE GEMM failed to compile because the current hardware does not support 2D load and DPAS instructions.");
 #endif
   return output;
 }

@@ -32,6 +32,10 @@ class TestTorchMethod:
 
         return output
 
+    @pytest.mark.skipif(
+        (not torch.xpu.has_2d_block_array()) or (not torch.xpu.has_xmx()),
+        reason="ipex build without xetla",
+    )
     @pytest.mark.parametrize("total_m", [1, 32, 1024])
     @pytest.mark.parametrize("gemm_k", [1024, 4096])
     @pytest.mark.parametrize("gemm_n", [1024, 4096])
