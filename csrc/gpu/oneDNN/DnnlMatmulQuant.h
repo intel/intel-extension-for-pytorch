@@ -57,6 +57,7 @@ static at::Tensor dnnl_matmul_w4a16(
       bias,
       result,
       scale,
+      zp,
       group_size,
       engine,
       [](primitive_attr& pattr) {});
@@ -71,13 +72,35 @@ static at::Tensor dnnl_matmul_w4a16(
         return dpcpp_onednn_memory(
             get_onednn_md(scale), engine, scale.data_ptr());
       });
-  matmul_ext.set_attribute(
-      arg_off++,
-      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
-      zp.data_ptr(),
-      [&]() {
-        return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
-      });
+
+  // set zp_md for symmetric quantization
+  if (zp.dim() == 1) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
+        });
+  } else {
+    // set zp_md for asymmetric quantization
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          int m = mat1.sizes()[0];
+          int n = mat2.sizes()[1];
+          int k = mat1.sizes()[1];
+
+          const uint64_t num_groups = (uint64_t)(k / group_size);
+          memory zp_B_u4_m(
+              {{num_groups, n}, memory::data_type::u4, {n, 1}},
+              engine,
+              zp.data_ptr());
+          return zp_B_u4_m;
+        });
+  }
 
   // set general args
   std::vector<std::pair<int, void*>> arg_handles;
@@ -141,7 +164,7 @@ static at::Tensor dnnl_matmul_w4a16_and_silu(
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
-      mat1, mat2, bias, result, scale, group_size, engine, silu);
+      mat1, mat2, bias, result, scale, zp, group_size, engine, silu);
   // set scale and zero point for matmul args
   int arg_off = 0;
   matmul_ext.set_attribute(
@@ -152,13 +175,38 @@ static at::Tensor dnnl_matmul_w4a16_and_silu(
         return dpcpp_onednn_memory(
             get_onednn_md(scale), engine, scale.data_ptr());
       });
-  matmul_ext.set_attribute(
-      arg_off++,
-      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
-      zp.data_ptr(),
-      [&]() {
-        return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
-      });
+
+  // set zp_md for symmetric quantization
+  if (zp.dim() == 1) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
+        });
+  } else {
+    // set zp_md for asymmetric quantization
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          int m = mat1.sizes()[0];
+          int n = mat2.sizes()[1];
+          int k = mat1.sizes()[1];
+
+          const uint64_t num_groups = (uint64_t)(k / group_size);
+          memory zp_B_u4_m(
+              {{num_groups, n}, memory::data_type::u4, {n, 1}},
+              engine,
+              zp.data_ptr());
+          return zp_B_u4_m;
+          /* return dpcpp_onednn_memory(get_onednn_md(zp), engine,
+           * zp.data_ptr());
+           */
+        });
+  }
 
   // set general args
   std::vector<std::pair<int, void*>> arg_handles;
@@ -226,7 +274,7 @@ static at::Tensor dnnl_matmul_w4a16_and_resmul(
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
-      mat1, mat2, bias, result, scale, group_size, engine, resmul);
+      mat1, mat2, bias, result, scale, zp, group_size, engine, resmul);
   // set scale and zero point for matmul args
   int arg_off = 0;
   matmul_ext.set_attribute(
@@ -237,13 +285,39 @@ static at::Tensor dnnl_matmul_w4a16_and_resmul(
         return dpcpp_onednn_memory(
             get_onednn_md(scale), engine, scale.data_ptr());
       });
-  matmul_ext.set_attribute(
-      arg_off++,
-      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
-      zp.data_ptr(),
-      [&]() {
-        return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
-      });
+
+  // set zp_md for symmetric quantization
+  if (zp.dim() == 1) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
+        });
+  } else {
+    // set zp_md for asymmetric quantization
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          int m = mat1.sizes()[0];
+          int n = mat2.sizes()[1];
+          int k = mat1.sizes()[1];
+
+          const uint64_t num_groups = (uint64_t)(k / group_size);
+          memory zp_B_u4_m(
+              {{num_groups, n}, memory::data_type::u4, {n, 1}},
+              engine,
+              zp.data_ptr());
+          return zp_B_u4_m;
+          /* return dpcpp_onednn_memory(get_onednn_md(zp), engine,
+           * zp.data_ptr());
+           */
+        });
+  }
+
   matmul_ext.set_attribute(
       arg_off++,
       DNNL_ARG_ATTR_MULTIPLE_POST_OP(0) | DNNL_ARG_SRC_1,
@@ -324,7 +398,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_gelu(
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
-      mat1, mat2, bias, result, scale, group_size, engine, bias_gelu);
+      mat1, mat2, bias, result, scale, zp, group_size, engine, bias_gelu);
   // set scale and zero point for matmul args
   int arg_off = 0;
   matmul_ext.set_attribute(
@@ -335,13 +409,38 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_gelu(
         return dpcpp_onednn_memory(
             get_onednn_md(scale), engine, scale.data_ptr());
       });
-  matmul_ext.set_attribute(
-      arg_off++,
-      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
-      zp.data_ptr(),
-      [&]() {
-        return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
-      });
+
+  // set zp_md for symmetric quantization
+  if (zp.dim() == 1) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
+        });
+  } else {
+    // set zp_md for asymmetric quantization
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          int m = mat1.sizes()[0];
+          int n = mat2.sizes()[1];
+          int k = mat1.sizes()[1];
+
+          const uint64_t num_groups = (uint64_t)(k / group_size);
+          memory zp_B_u4_m(
+              {{num_groups, n}, memory::data_type::u4, {n, 1}},
+              engine,
+              zp.data_ptr());
+          return zp_B_u4_m;
+          /* return dpcpp_onednn_memory(get_onednn_md(zp), engine,
+           * zp.data_ptr());
+           */
+        });
+  }
 
   // set general args
   std::vector<std::pair<int, void*>> arg_handles;
@@ -372,41 +471,35 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_gelu(
 static at::Tensor dnnl_matmul_w4a16_and_bias_resadd_resadd(
     Tensor& result, // dst, [b, M, N]
     const Tensor& mat1_, // src, [b, M, K]
-    const Tensor& mat2_, // quantized weight, [K/8, N]
+    const Tensor& mat2, // quantized weight, [K/8, N]
     const c10::optional<Tensor>& bias,
     const Tensor& scale, // [K/group_size, N]
     const Tensor& zp, // [k/group_size, N/8]
-    const Tensor& res0,
+    const Tensor& res,
     const Tensor& res1,
     int64_t group_size,
     bool m2_trans,
     const c10::optional<Tensor>& g_idx) {
   RECORD_FUNCTION(
       "dnnl_matmul_w4a16_and_bias_resadd_resadd",
-      std::vector<c10::IValue>({mat1_, mat2_}));
-  Tensor mat1;
-  if (g_idx.has_value()) {
-    mat1 = mat1_.index_select(-1, g_idx.value()).flatten(0, -2);
-  } else {
-    mat1 = mat1_.flatten(0, -2);
-  }
-  auto mat2 = mat2_.flatten(0, -2);
-  int m = mat1.sizes()[0];
-  int n = mat2.sizes()[1];
-  int k = mat1.sizes()[1];
-  result = at::empty({m, n}, mat1_.options());
-  size_t dims = result.dim();
+      std::vector<c10::IValue>({mat1_, mat2}));
+
+  auto mat1 = g_idx.has_value() ? mat1_.index_select(-1, g_idx.value()) : mat1_;
+  auto o_sz = mat1.sizes().vec();
+  auto b_sz = mat2.sizes();
+  *(o_sz.end() - 1) = *(b_sz.end() - 1);
+  result = at::empty(o_sz, mat1.options());
 
   // get device, engine, stream
   at::Device curDevice = at::Device(at::kXPU, at::xpu::current_device());
   auto engine = GpuEngineManager::Instance().get_engine(curDevice);
   // engine index means the engine created on which device
 
-  auto res0_flat = res0.flatten(0, -2);
-  auto res1_flat = res1.flatten(0, -2);
   auto bias_resadd_resadd = [&](primitive_attr& pattr) {
+    auto res_flat = res.flatten(0, -2);
+    auto res1_flat = res1.flatten(0, -2);
     post_ops po;
-    po.append_binary(algorithm::binary_add, get_onednn_md(res0_flat));
+    po.append_binary(algorithm::binary_add, get_onednn_md(res_flat));
     po.append_binary(algorithm::binary_add, get_onednn_md(res1_flat));
     pattr.set_post_ops(po);
   };
@@ -414,12 +507,14 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_resadd_resadd(
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
       mat1,
       mat2,
-      std::nullopt,
+      bias,
       result,
       scale,
+      zp,
       group_size,
       engine,
       bias_resadd_resadd);
+
   // set scale and zero point for matmul args
   int arg_off = 0;
   matmul_ext.set_attribute(
@@ -430,32 +525,61 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_resadd_resadd(
         return dpcpp_onednn_memory(
             get_onednn_md(scale), engine, scale.data_ptr());
       });
-  matmul_ext.set_attribute(
-      arg_off++,
-      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
-      zp.data_ptr(),
-      [&]() {
-        return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
-      });
+
+  // set zp_md for symmetric quantization
+  if (zp.dim() == 1) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
+        });
+  } else {
+    // set zp_md for asymmetric quantization
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          int m = mat1.sizes()[0];
+          int n = mat2.sizes()[1];
+          int k = mat1.sizes()[1];
+
+          const uint64_t num_groups = (uint64_t)(k / group_size);
+          memory zp_B_u4_m(
+              {{num_groups, n}, memory::data_type::u4, {n, 1}},
+              engine,
+              zp.data_ptr());
+          return zp_B_u4_m;
+          /* return dpcpp_onednn_memory(get_onednn_md(zp), engine,
+           * zp.data_ptr());
+           */
+        });
+  }
+
   matmul_ext.set_attribute(
       arg_off++,
       DNNL_ARG_ATTR_MULTIPLE_POST_OP(0) | DNNL_ARG_SRC_1,
-      res0_flat.data_ptr(),
+      res.data_ptr(),
       [&]() {
+        auto res_flat = res.flatten(0, -2);
         return dpcpp_onednn_memory(
-            get_onednn_md(res0_flat), engine, res0_flat.data_ptr());
+            get_onednn_md(res_flat), engine, res_flat.data_ptr());
       });
   matmul_ext.set_attribute(
       arg_off++,
       DNNL_ARG_ATTR_MULTIPLE_POST_OP(1) | DNNL_ARG_SRC_1,
-      res1_flat.data_ptr(),
+      res1.data_ptr(),
       [&]() {
+        auto res1_flat = res1.flatten(0, -2);
         return dpcpp_onednn_memory(
             get_onednn_md(res1_flat), engine, res1_flat.data_ptr());
       });
 
   // set general args
   std::vector<std::pair<int, void*>> arg_handles;
+  arg_handles.reserve(8);
 
   arg_handles.emplace_back(DNNL_ARG_SRC, mat1.data_ptr());
   arg_handles.emplace_back(DNNL_ARG_WEIGHTS, mat2.data_ptr());
@@ -475,8 +599,6 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_resadd_resadd(
   /* matmul_ext.execute(strm, engine, std::move(arg_handles), arg_off); */
   DPCPP_ONEDNN_EXEC_WITH_ARGHANDLES(
       matmul_ext, strm, engine, arg_handles, arg_off);
-
-  result = resize_as_onednn_mat1(mat1_, result);
   return result;
 }
 
@@ -521,7 +643,7 @@ static at::Tensor dnnl_matmul_w4a16_and_silu_mul(
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
-      mat1, mat2, bias, result, scale, group_size, engine, silu_mul);
+      mat1, mat2, bias, result, scale, zp, group_size, engine, silu_mul);
   // set scale and zero point for matmul args
   int arg_off = 0;
   matmul_ext.set_attribute(
@@ -532,13 +654,39 @@ static at::Tensor dnnl_matmul_w4a16_and_silu_mul(
         return dpcpp_onednn_memory(
             get_onednn_md(scale), engine, scale.data_ptr());
       });
-  matmul_ext.set_attribute(
-      arg_off++,
-      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
-      zp.data_ptr(),
-      [&]() {
-        return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
-      });
+
+  // set zp_md for symmetric quantization
+  if (zp.dim() == 1) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
+        });
+  } else {
+    // set zp_md for asymmetric quantization
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          int m = mat1.sizes()[0];
+          int n = mat2.sizes()[1];
+          int k = mat1.sizes()[1];
+
+          const uint64_t num_groups = (uint64_t)(k / group_size);
+          memory zp_B_u4_m(
+              {{num_groups, n}, memory::data_type::u4, {n, 1}},
+              engine,
+              zp.data_ptr());
+          return zp_B_u4_m;
+          /* return dpcpp_onednn_memory(get_onednn_md(zp), engine,
+           * zp.data_ptr());
+           */
+        });
+  }
+
   matmul_ext.set_attribute(
       arg_off++,
       DNNL_ARG_ATTR_MULTIPLE_POST_OP(1) | DNNL_ARG_SRC_1,
@@ -609,7 +757,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_silu_mul(
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
-      mat1, mat2, bias, result, scale, group_size, engine, silu_mul_int4);
+      mat1, mat2, bias, result, scale, zp, group_size, engine, silu_mul_int4);
 
   // set scale and zero point for matmul args
   int arg_off = 0;
@@ -621,13 +769,39 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_silu_mul(
         return dpcpp_onednn_memory(
             get_onednn_md(scale), engine, scale.data_ptr());
       });
-  matmul_ext.set_attribute(
-      arg_off++,
-      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
-      zp.data_ptr(),
-      [&]() {
-        return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
-      });
+
+  // set zp_md for symmetric quantization
+  if (zp.dim() == 1) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
+        });
+  } else {
+    // set zp_md for asymmetric quantization
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          int m = mat1.sizes()[0];
+          int n = mat2.sizes()[1];
+          int k = mat1.sizes()[1];
+
+          const uint64_t num_groups = (uint64_t)(k / group_size);
+          memory zp_B_u4_m(
+              {{num_groups, n}, memory::data_type::u4, {n, 1}},
+              engine,
+              zp.data_ptr());
+          return zp_B_u4_m;
+          /* return dpcpp_onednn_memory(get_onednn_md(zp), engine,
+           * zp.data_ptr());
+           */
+        });
+  }
+
   matmul_ext.set_attribute(
       arg_off++,
       DNNL_ARG_ATTR_MULTIPLE_POST_OP(1) | DNNL_ARG_SRC_1,
@@ -702,6 +876,7 @@ static at::Tensor dnnl_matmul_w4a16_and_add(
       std::nullopt,
       result,
       scale,
+      zp,
       group_size,
       engine,
       bias_add_int4);
@@ -716,13 +891,39 @@ static at::Tensor dnnl_matmul_w4a16_and_add(
         return dpcpp_onednn_memory(
             get_onednn_md(scale), engine, scale.data_ptr());
       });
-  matmul_ext.set_attribute(
-      arg_off++,
-      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
-      zp.data_ptr(),
-      [&]() {
-        return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
-      });
+
+  // set zp_md for symmetric quantization
+  if (zp.dim() == 1) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
+        });
+  } else {
+    // set zp_md for asymmetric quantization
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          int m = mat1.sizes()[0];
+          int n = mat2.sizes()[1];
+          int k = mat1.sizes()[1];
+
+          const uint64_t num_groups = (uint64_t)(k / group_size);
+          memory zp_B_u4_m(
+              {{num_groups, n}, memory::data_type::u4, {n, 1}},
+              engine,
+              zp.data_ptr());
+          return zp_B_u4_m;
+          /* return dpcpp_onednn_memory(get_onednn_md(zp), engine,
+           * zp.data_ptr());
+           */
+        });
+  }
+
   matmul_ext.set_attribute(
       arg_off++,
       DNNL_ARG_ATTR_MULTIPLE_POST_OP(0) | DNNL_ARG_SRC_1,
@@ -792,7 +993,7 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_add(
   };
 
   auto& matmul_ext = dnnlMatmulCreatePrimitive(
-      mat1, mat2, bias, result, scale, group_size, engine, bias_add_int4);
+      mat1, mat2, bias, result, scale, zp, group_size, engine, bias_add_int4);
 
   // set scale and zero point for matmul args
   int arg_off = 0;
@@ -804,13 +1005,39 @@ static at::Tensor dnnl_matmul_w4a16_and_bias_add(
         return dpcpp_onednn_memory(
             get_onednn_md(scale), engine, scale.data_ptr());
       });
-  matmul_ext.set_attribute(
-      arg_off++,
-      DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
-      zp.data_ptr(),
-      [&]() {
-        return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
-      });
+
+  // set zp_md for symmetric quantization
+  if (zp.dim() == 1) {
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          return dpcpp_onednn_memory(get_onednn_md(zp), engine, zp.data_ptr());
+        });
+  } else {
+    // set zp_md for asymmetric quantization
+    matmul_ext.set_attribute(
+        arg_off++,
+        DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS,
+        zp.data_ptr(),
+        [&]() {
+          int m = mat1.sizes()[0];
+          int n = mat2.sizes()[1];
+          int k = mat1.sizes()[1];
+
+          const uint64_t num_groups = (uint64_t)(k / group_size);
+          memory zp_B_u4_m(
+              {{num_groups, n}, memory::data_type::u4, {n, 1}},
+              engine,
+              zp.data_ptr());
+          return zp_B_u4_m;
+          /* return dpcpp_onednn_memory(get_onednn_md(zp), engine,
+           * zp.data_ptr());
+           */
+        });
+  }
+
   matmul_ext.set_attribute(
       arg_off++,
       DNNL_ARG_ATTR_MULTIPLE_POST_OP(0) | DNNL_ARG_SRC_1,

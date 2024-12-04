@@ -324,20 +324,21 @@ class TestInt4Linear(TestCase):
             weight, scales, zero_points, group_size, g_idx
         ).cpu()
 
-        woqlinear = ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight(
-            weight,
-            scales,
-            zero_points_kernel,
-            k,
-            n,
-            None,
-            None,
-            group_size,
-            g_idx.to("xpu") if g_idx is not None else None,
-            ipex.llm.quantization.QuantMethod.GPTQ_GEMM,
-            ipex.llm.quantization.QuantDtype.INT4,
-        )
-        out_xetla = woqlinear(input)
+        with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
+            woqlinear = ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight(
+                weight,
+                scales,
+                zero_points_kernel,
+                k,
+                n,
+                None,
+                None,
+                group_size,
+                g_idx.to("xpu") if g_idx is not None else None,
+                ipex.llm.quantization.QuantMethod.GPTQ_GEMM,
+                ipex.llm.quantization.QuantDtype.INT4,
+            )
+            out_xetla = woqlinear(input)
         out_torch = torch.matmul(input_torch, weight_fp16)
         self.assertEqual(
             out_xetla.cpu().float(),
@@ -376,20 +377,21 @@ class TestInt4Linear(TestCase):
         weight_fp16 = self.dequantize(
             weight_gptq, scales, zero_points_gptq, group_size, g_idx
         ).cpu()
-        woqlinear = ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight(
-            weight,
-            scales,
-            zero_points,
-            k,
-            n,
-            None,
-            None,
-            group_size,
-            g_idx4kernel,
-            ipex.llm.quantization.QuantDtype.INT4,
-            ipex.llm.quantization.QuantMethod.AWQ_GEMM,
-        )
-        out_xetla = woqlinear(input)
+        with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
+            woqlinear = ipex.llm.quantization.IPEXWeightOnlyQuantizedLinear.from_weight(
+                weight,
+                scales,
+                zero_points,
+                k,
+                n,
+                None,
+                None,
+                group_size,
+                g_idx4kernel,
+                ipex.llm.quantization.QuantMethod.AWQ_GEMM,
+                ipex.llm.quantization.QuantDtype.INT4,
+            )
+            out_xetla = woqlinear(input)
         out_torch = torch.matmul(input_torch, weight_fp16)
         print("out_xetla: ", out_xetla.cpu().float())
         print("out_torch: ", out_torch.float())

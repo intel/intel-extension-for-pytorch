@@ -337,7 +337,36 @@ class WeightOnlyQuantizedLinear(nn.Module):
         self.force_xetla = False
         self.quant_method = quant_method
 
-    # This api will force the xetla implementation, used it with caution !
+    def transpose_xetla_woq_format(self):
+        # The xetla int4 GEMM has the following requirements:
+        # - Weights need to be contiguous along the 'k' dimension.
+        # - Scales also need to be contiguous along the 'k' dimension.
+        # - Zero-point is set to 'none' in symmetric (symm) scenarios.
+        # - Zero-point remains unchanged in asymmetric (asymm) scenarios.
+        self.qweight.data = self.qweight.t().contiguous()
+        self.scales.data = self.scales.t().contiguous().to(torch.float16)
+        if self.bias is not None:
+            self.bias.data = self.bias.contiguous().to(torch.float16)
+        if self.scheme == "sym" and self.quant_method == 0:
+            self.qzeros = None
+        elif self.quant_method == 0:
+            self.qzeros += 0x11111111
+
+    def transpose_onednn_woq_format(self):
+        # The oneDNN int4 GEMM has the following requirements:
+        # - Weights need to be contiguous along the 'k' dimension, but the shape should remain (k, n/8).
+        # - Scales remains unchanged.
+        # - Zero-point is a scalar value of 8 in symmetric (symm) scenarios, allowing oneDNN to broadcast it.
+        # - Zero-point remains unchanged in asymmetric (asymm) scenarios.
+        self.qweight.data = self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
+        self.scales.data = self.scales.contiguous().to(torch.float16)
+        if self.bias is not None:
+            self.bias.data = self.bias.contiguous().to(torch.float16)
+        if self.scheme == "sym" and self.quant_method == 0:
+            self.qzeros = torch.Tensor([8]).to(torch.int8).to("xpu")
+        elif self.quant_method == 0:
+            self.qzeros += 0x11111111
+
     @classmethod
     def from_weight(
         cls,
@@ -387,14 +416,13 @@ class WeightOnlyQuantizedLinear(nn.Module):
         compression_dim = None
         compression_dtype = None
         if quant_method == QuantMethod.GPTQ_GEMM:
+            scheme = "sym"
             compression_dim = 1
             compression_dtype = torch.int32
         if quant_method == QuantMethod.AWQ_GEMM:
             scheme = "asym"
             compression_dim = 0
             compression_dtype = torch.int32
-        else:
-            scheme = "sym"
         cls_inst = WeightOnlyQuantizedLinear(
             in_features=in_feature,
             out_features=out_feature,
@@ -422,45 +450,35 @@ class WeightOnlyQuantizedLinear(nn.Module):
                 cls_inst.qweight, cls_inst.qzeros
             )
         if not cls_inst.weight_transposed:
-            cls_inst.qweight.data = cls_inst.qweight.t().contiguous()
-            cls_inst.scales.data = cls_inst.scales.t().contiguous().to(torch.float16)
-            if cls_inst.bias is not None:
-                cls_inst.bias.data = cls_inst.bias.contiguous().to(torch.float16)
-            if cls_inst.scheme == "sym" and quant_method == QuantMethod.GPTQ_GEMM:
-                cls_inst.qzeros = None
-            elif quant_method == QuantMethod.GPTQ_GEMM:
-                cls_inst.qzeros += 0x11111111
-            cls_inst.weight_transposed = True
+            if xpu_gemm_use_xetla():
+                # Transpose the weight/scale/zp to xetla format
+                cls_inst.transpose_xetla_woq_format()
 
-        # oneDNN dose not support gidx and other zero implementation for now
-        # we force xetla path in this api for upstream only
-        cls_inst.force_xetla = True
-        torch.xpu.set_compute_eng(torch.xpu.XPUComputeEng.XETLA)
+            else:
+                # Transpose the weight/scale/zp to oneDNN format
+                cls_inst.transpose_onednn_woq_format()
+
+            cls_inst.weight_transposed = True
+            cls_inst.use_optimum_format = False
+
         return cls_inst
 
     def forward(self, input: Tensor) -> Tensor:
         if self.compute_dtype == "fp16":
             input = input.to(convert_dtype_str2torch(self.compute_dtype))
         if not self.weight_transposed:
-            if xpu_gemm_use_xetla(self.force_xetla):
-                self.qweight.data = self.qweight.t().contiguous()
-                self.scales.data = self.scales.t().contiguous().to(torch.float16)
-                if self.bias is not None:
-                    self.bias.data = self.bias.contiguous().to(torch.float16)
-                if (
-                    self.scheme == "sym" and self.quant_method == 0
-                ):  # QuantMethod(GPTQ_GEMM)
-                    self.qzeros = None
-                elif self.quant_method == 0:  # QuantMethod(GPTQ_GEMM)
-                    self.qzeros += 0x11111111
+            if xpu_gemm_use_xetla():
+                # Transpose the weight/scale/zp to xetla format
+                self.transpose_xetla_woq_format()
+
             else:
-                self.qweight.data = (
-                    self.qweight.transpose(0, 1).contiguous().transpose(0, 1)
-                )
+                # Transpose the weight/scale/zp to oneDNN format
+                self.transpose_onednn_woq_format()
+
             self.weight_transposed = True
             self.use_optimum_format = False
 
-        if xpu_gemm_use_xetla(self.force_xetla):
+        if xpu_gemm_use_xetla():
             # TODO input.shape[1] > 1 seems not work on gidx scenario, need to fix this bug
             if input.dim() == 3:
                 m = input.size(1)

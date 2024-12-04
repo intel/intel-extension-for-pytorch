@@ -362,6 +362,7 @@ static inline primitive_ext& dnnlMatmulCreatePrimitive(
     const c10::optional<Tensor>& bias,
     Tensor& dst,
     const Tensor& scale,
+    const Tensor& zp,
     const int group_size,
     const engine& aengine,
     F attr) {
@@ -378,10 +379,17 @@ static inline primitive_ext& dnnlMatmulCreatePrimitive(
   memory::dims src_dims{m, k};
   memory::dims src_stride = {src.stride(0), src.stride(1)};
   memory::dims wei_dims(wei_sz.begin(), wei_sz.end());
+  memory::dims zp_dims(zp.sizes().begin(), zp.sizes().end());
 
   bool is_intype_bf16 = src.scalar_type() == at::ScalarType::BFloat16;
   auto pri_key = torch_ipex::xpu::oneDNN::concat(
-      src_dims, wei_dims, src_stride, is_intype_bf16, (bool)bias, group_size);
+      src_dims,
+      wei_dims,
+      src_stride,
+      zp_dims,
+      is_intype_bf16,
+      (bool)bias,
+      group_size);
 
   auto iter = cached.find(pri_key);
   if (iter == cached.end()) {
@@ -403,11 +411,24 @@ static inline primitive_ext& dnnlMatmulCreatePrimitive(
         {group_size, 1},
         get_onednn_dtype(scale));
 
-    pattr.set_zero_points(
-        DNNL_ARG_WEIGHTS,
-        /* mask */ 0,
-        {},
-        memory::data_type::s8);
+    if (zp.dim() == 1) {
+      pattr.set_zero_points(
+          DNNL_ARG_WEIGHTS,
+          /* mask */ 0,
+          {},
+          memory::data_type::s8);
+    } else {
+      const uint64_t num_groups = (uint64_t)(k / group_size);
+      auto zp_md = memory::desc(
+          {num_groups, n},
+          memory::data_type::u4,
+          memory::format_tag::ab); // {n, 1}
+      pattr.set_zero_points(
+          DNNL_ARG_WEIGHTS,
+          /* mask */ (1 << 0) + (1 << 1),
+          {group_size, 1},
+          memory::data_type::u4);
+    }
     pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
 
     attr(pattr);

@@ -170,10 +170,10 @@ static Tensor woq_matmul_int4(
   // convert torch dtype to oneDNN defined dtype
   // torch tensor of int32 dtype, corresponding to oneDNN s32
   auto m1_usr_dt = get_onednn_dtype(m1); // half <==> f16
-  //   auto m2_usr_dt = memory::data_type::s4; // int32, representing 8xint4
+  //   auto m2_usr_dt = memory::data_type::u4; // int32, representing 8xint4
   auto m2_usr_dt = get_onednn_dtype(m2);
   auto scale_user_dt = get_onednn_dtype(scale_); // half <==> fp16
-  //   auto zp_user_dt = memory::data_type::s4; // int32, representing 8xint4
+  //   auto zp_user_dt = memory::data_type::u4; // int32, representing 8xint4
   auto zp_user_dt = get_onednn_dtype(zp_);
   auto dst_usr_dt = get_onednn_dtype(dst); // half <==> f16
 
@@ -203,13 +203,23 @@ static Tensor woq_matmul_int4(
 
   m2_usr_dims = {compressed_k, n};
   scale_dims = {num_groups, n};
-  zp_dims = {1};
-  zp_usr_dims = {1};
+  if (zp.dim() == 1) {
+    zp_dims = {1};
+    zp_usr_dims = {1};
+  } else {
+    zp_dims = {num_groups, compressed_n};
+    zp_usr_dims = {num_groups, compressed_n};
+  }
 
   m2_usr_strides = {1, compressed_k};
-  scale_strides = {scale_.stride(1), scale_.stride(0)};
-  zp_strides = {1};
-  zp_usr_strides = {1};
+  scale_strides = {scale_.stride(0), scale_.stride(1)};
+  if (zp.dim() == 1) {
+    zp_strides = {1};
+    zp_usr_strides = {1};
+  } else {
+    zp_strides = {zp.stride(0), zp.stride(1)};
+    zp_usr_strides = {zp.stride(0), zp.stride(1)};
+  }
 
   if (dims == 2) {
     m1_dims = {m, k};
@@ -286,42 +296,6 @@ static Tensor woq_matmul_int4(
     zp_md = memory::desc(zp_dims, zp_dt, zp_strides);
     dst_md = memory::desc(dst_dims, dst_dt, dst_strides);
   }
-  // STEP2: creat attribute
-  primitive_attr pattr;
-  pattr.set_post_ops(po);
-
-#ifdef USE_SCRATCHPAD_MODE
-  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
-#endif
-  // Set scales with multiple scales along K dimension and with groups along
-  // K.
-  pattr.set_scales(
-      DNNL_ARG_WEIGHTS,
-      /* mask */ (1 << 0) + (1 << 1),
-      {group_size, 1},
-      scale_dt);
-  // Set a single zero point with s8 data type.
-  pattr.set_zero_points(
-      DNNL_ARG_WEIGHTS,
-      /* mask */ 0,
-      {},
-      memory::data_type::s8);
-  // Set fpmath mode with `apply_to_int=true` to apply fpmath mode behavior to
-  // integral primitives (in this example, matmul).
-  // pattr.set_fpmath_mode(
-  //     torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode(), true);
-  pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
-
-  if (with_bias) {
-    b_md = memory::desc(bias_dims, bias_dt, bias_strides);
-    matmul_pd = matmul::primitive_desc(
-        engine, m1_md, m2_u4_m.get_desc(), b_md, dst_md, pattr);
-  } else {
-    matmul_pd = matmul::primitive_desc(
-        engine, m1_md, m2_u4_m.get_desc(), dst_md, pattr);
-  }
-
-  matmul_p = dnnl::matmul(matmul_pd);
 
   auto dst_ctx = at::AtenIpexTypeXPU::DPCPPTensorContext::get_tensor_ctx(dst);
   auto dst_usr_m = dst_ctx.is_plain()
@@ -338,6 +312,57 @@ static Tensor woq_matmul_int4(
   auto zp_usr_m = zp_ctx.is_plain()
       ? dpcpp_onednn_memory(zp_usr_md, engine, zp.data_ptr())
       : dpcpp_onednn_memory({zp_ctx.meta()}, engine, zp.data_ptr());
+
+  // STEP2: creat attribute
+  primitive_attr pattr;
+  pattr.set_post_ops(po);
+
+#ifdef USE_SCRATCHPAD_MODE
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+#endif
+  // Set scales with multiple scales along K dimension and with groups along
+  // K.
+  pattr.set_scales(
+      DNNL_ARG_WEIGHTS,
+      /* mask */ (1 << 0) + (1 << 1),
+      {group_size, 1},
+      scale_dt);
+  // Set a single zero point with s8 data type.
+  if (zp.dim() == 1) {
+    pattr.set_zero_points(
+        DNNL_ARG_WEIGHTS,
+        /* mask */ 0,
+        {},
+        memory::data_type::s8);
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, zp_usr_m});
+  } else {
+    void* handle_zp = zp_usr_m.get_data_handle();
+    memory zp_B_u4_m(
+        {{num_groups, n}, memory::data_type::u4, {n, 1}}, engine, handle_zp);
+    // Set zero points with u4 data type.
+    pattr.set_zero_points(
+        DNNL_ARG_WEIGHTS,
+        /* mask */ (1 << 0) + (1 << 1),
+        /* groups */ {group_size, 1},
+        memory::data_type::u4);
+    args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, zp_B_u4_m});
+  }
+  // Set fpmath mode with `apply_to_int=true` to apply fpmath mode behavior to
+  // integral primitives (in this example, matmul).
+  // pattr.set_fpmath_mode(
+  //     torch_ipex::xpu::oneDNN::get_onednn_fpmath_mode(), true);
+  pattr.set_fpmath_mode(dnnl::fpmath_mode::f16, true);
+
+  if (with_bias) {
+    b_md = memory::desc(bias_dims, bias_dt, bias_strides);
+    matmul_pd = matmul::primitive_desc(
+        engine, m1_md, m2_u4_m.get_desc(), b_md, dst_md, pattr);
+  } else {
+    matmul_pd = matmul::primitive_desc(
+        engine, m1_md, m2_u4_m.get_desc(), dst_md, pattr);
+  }
+
+  matmul_p = dnnl::matmul(matmul_pd);
 
   auto expected_m1_md = matmul_pd.src_desc();
   auto expected_m2_md = matmul_pd.weights_desc();
@@ -392,7 +417,6 @@ static Tensor woq_matmul_int4(
   // add scale & zp
   // memory zp_m({{1}, memory::data_type::s8, {1}}, engine);
   args.insert({DNNL_ARG_ATTR_SCALES | DNNL_ARG_WEIGHTS, scale_m});
-  args.insert({DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_WEIGHTS, zp_usr_m});
 
   DPCPP_ONEDNN_EXEC(matmul_p, strm, args);
   if (is_onednn_layout_suggested && dst_m != dst_usr_m && dims == 2) {
