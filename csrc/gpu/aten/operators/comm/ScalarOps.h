@@ -14,9 +14,5 @@ static Tensor wrapped_scalar_tensor(
   return tensor;
 }
 
-static bool is_wrapped_number(const Tensor& t) {
-  return t.unsafeGetTensorImpl()->is_wrapped_number();
-}
-
 } // namespace AtenIpexTypeXPU
 } // namespace at

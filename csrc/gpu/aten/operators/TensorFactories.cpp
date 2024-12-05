@@ -478,11 +478,6 @@ Tensor triu_indices(
   return AtenIpexTypeXPU::impl::triu_indices_dpcpp(row, col, offset, options);
 }
 
-static TensorOptions options_to_value_type(TensorOptions opts) {
-  auto scalar_type = typeMetaToScalarType(opts.dtype());
-  return opts.dtype(c10::toRealValueType(scalar_type));
-}
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {

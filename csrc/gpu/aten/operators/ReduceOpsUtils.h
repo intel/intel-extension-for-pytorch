@@ -293,34 +293,6 @@ static TensorIterator make_reduction(
       viewed_result1, viewed_result2, self.to(dtype1));
 }
 
-static TensorIterator make_reduction(
-    const char* name,
-    Tensor& result1,
-    Tensor& result2,
-    const Tensor& self,
-    at::OptionalIntArrayRef dim,
-    bool keepdim,
-    ScalarType dtype) {
-  if ((result1.defined() && dtype != result1.scalar_type()) ||
-      (result2.defined() && dtype != result2.scalar_type())) {
-    std::string result_dtype_str = dtype == result1.scalar_type()
-        ? toString(result2.scalar_type())
-        : toString(result1.scalar_type());
-    result_dtype_str[0] += 32;
-    std::string self_dtype_str = toString(dtype);
-    self_dtype_str[0] += 32;
-    TORCH_CHECK(
-        false,
-        "Expected out tensor to have dtype ",
-        self_dtype_str,
-        ", but got ",
-        result_dtype_str,
-        " instead");
-  }
-  return make_reduction(
-      name, result1, result2, self, dim, keepdim, dtype, dtype);
-}
-
 } // namespace meta
 
 } // namespace AtenIpexTypeXPU

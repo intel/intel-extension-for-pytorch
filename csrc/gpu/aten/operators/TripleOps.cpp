@@ -129,20 +129,6 @@ static void mul_add_kernel_dpcpp(TensorIterator& iter, Scalar alpha_scalar) {
       });
 }
 
-// Basic checking for all input tensors.
-static inline void dim_check(
-    const Tensor& self,
-    const Tensor& other,
-    const Tensor& accumu) {
-  int64_t self_ndims = self.ndimension();
-  int64_t other_ndims = other.ndimension();
-  int64_t accumu_ndims = accumu.ndimension();
-
-  TORCH_CHECK(
-      self_ndims == other_ndims || other_ndims == accumu_ndims,
-      "The dimensions of three inputs tensor not equal is not supported. ");
-}
-
 std::vector<int64_t> dim_expand(
     const Tensor& a_tensor,
     const Tensor& b_tensor,
