@@ -17,6 +17,7 @@ from ._version import (
     __gpu_onednn_gitrev__,
     __cpu_ideep_gitrev__,
     __build_type__,
+    __build_aot__,
 )
 
 torch_version = ""

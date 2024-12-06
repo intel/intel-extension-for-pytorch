@@ -70,13 +70,6 @@ set(IPEX_GPU_CORE_SRC
         ${IPEX_GPU_GEN_FILES}
         ${IPEX_UTILS_SRCS})
 
-if(NOT WINDOWS)
-  foreach(RPATH ${RPATHS_LIST})
-    set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} ${RPATH})
-  endforeach()
-  set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} "-Wl,--disable-new-dtags")
-endif()
-
 # This workaround enables some definitions in PyTorch header file protected by USE_XPU macro.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_XPU")
 

@@ -50,12 +50,6 @@ target_include_directories(intel-ext-pt-python PUBLIC ${PYTHON_INCLUDE_DIR})
 target_include_directories(intel-ext-pt-python PUBLIC ${pybind11_INCLUDE_DIRS})
 
 target_link_directories(intel-ext-pt-python PRIVATE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
-if(NOT WINDOWS)
-  foreach(RPATH ${RPATHS_LIST})
-    target_link_options(intel-ext-pt-python PRIVATE ${RPATH})
-  endforeach()
-  target_link_options(intel-ext-pt-python PRIVATE "-Wl,--disable-new-dtags")
-endif()
 
 if(BUILD_STRIPPED_BIN)
   set_target_properties(intel-ext-pt-python PROPERTIES LINK_FLAGS_RELEASE -s)

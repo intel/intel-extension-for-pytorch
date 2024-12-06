@@ -1,6 +1,32 @@
 #!/bin/bash
 set -e
 
+VER_ONEAPI=2025.0
+
+#VER_ICD_C=24.39.31294.21
+#VER_LIBZE_C=1.17.44.0
+#VER_LIBIGC_C=1.0.17791.16
+#VER_IGC_CM_C=1.0.176.54074
+#VER_GMMLIB_C=22.5.2
+#VER_OCLOC_C=${VER_ICD_C}
+#VER_SMI_C=1.2.39
+VER_DPCPP_C=${VER_ONEAPI}.1
+VER_MKL_C=${VER_ONEAPI}.1
+VER_CCL_C=2021.14.0
+VER_PTI_C=0.10.0
+
+#VER_ICD_U=${VER_ICD_C}-1032
+#VER_LIBZE_U=${VER_LIBZE_C}-1022
+#VER_LIBIGC_U=${VER_LIBIGC_C}-1032
+#VER_IGC_CM_U=1.0.224-821
+#VER_GMMLIB_U=${VER_GMMLIB_C}-1018
+#VER_OCLOC_U=${VER_OCLOC_C}-1032
+#VER_SMI_U=${VER_SMI_C}-66
+VER_DPCPP_U=${VER_DPCPP_C}-1240
+VER_MKL_U=${VER_MKL_C}-14
+VER_CCL_U=${VER_CCL_C}-505
+VER_PTI_U=${VER_PTI_C}-284
+
 if [ $# -eq 0 ]; then
     echo "Usage: bash $0 <MODE>"
     echo "MODE: \"driver\" for installing required driver packages."
@@ -100,7 +126,6 @@ function add-repo-basekit() {
     if [ "${OS_ID}" = "ubuntu" ]; then
         wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | ${SUDO} tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
         echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | ${SUDO} tee /etc/apt/sources.list.d/oneAPI.list
-        echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/intel-for-pytorch-gpu-dev all main" | ${SUDO} tee /etc/apt/sources.list.d/pti.list
         ${SUDO} apt update
     fi
     if [[ " rhel centos " =~ " ${OS_ID} " ]]; then
@@ -114,20 +139,9 @@ repo_gpgcheck=1
 gpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
 EOF
         ${SUDO} mv /tmp/oneAPI.repo /etc/yum.repos.d
-        tee > /tmp/intel-for-pytorch-gpu-dev.repo << EOF
-[intel-for-pytorch-gpu-dev]
-name=Intel for Pytorch GPU dev repository
-baseurl=https://yum.repos.intel.com/intel-for-pytorch-gpu-dev
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-EOF
-        ${SUDO} mv /tmp/intel-for-pytorch-gpu-dev.repo /etc/yum.repos.d
     fi
     if [ "${OS_ID}" = "opensuse-leap" ]; then
         ${SUDO} zypper addrepo https://yum.repos.intel.com/oneapi oneAPI
-        ${SUDO} zypper addrepo https://yum.repos.intel.com/intel-for-pytorch-gpu-dev intel-for-pytorch-gpu-dev
         ${SUDO} rpm --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
     fi
 }
@@ -150,27 +164,52 @@ function install-driver() {
             POSTFIX="24.04"
         fi
         ${SUDO} apt update
-        ${SUDO} apt install -y intel-opencl-icd=24.26.30049.10-950~${POSTFIX} \
-        libze1=1.17.6-950~${POSTFIX} \
-        libze-dev=1.17.6-950~${POSTFIX} \
-        intel-level-zero-gpu=1.3.30049.10-950~${POSTFIX} \
-        xpu-smi=1.2.35-59~${POSTFIX}
+        #${SUDO} apt install -y intel-opencl-icd=${VER_ICD_U}~${POSTFIX} \
+        #libze1=${VER_LIBZE_U}~${POSTFIX} \
+        #libze-dev=${VER_LIBZE_U}~${POSTFIX} \
+        #libigc1=${VER_LIBIGC_U}~${POSTFIX} \
+        #libigdfcl1=${VER_LIBIGC_U}~${POSTFIX} \
+        #intel-igc-cm=${VER_IGC_CM_U}~${POSTFIX} \
+        #libigdgmm12=${VER_GMMLIB_U}~${POSTFIX} \
+        #intel-ocloc=${VER_OCLOC_U}~${POSTFIX} \
+        #xpu-smi=${VER_SMI_U}~${POSTFIX}
+        ${SUDO} apt install -y intel-opencl-icd \
+        libze1 \
+        libze-dev \
+        intel-ocloc \
+        xpu-smi
     fi
     if [[ " rhel centos " =~ " ${OS_ID} " ]]; then
-        ${SUDO} dnf install -y intel-opencl-24.26.30049.10 \
-        level-zero-1.17.6 \
-        level-zero-devel-1.17.6 \
-        intel-level-zero-gpu-1.3.30049.10 \
-        intel-ocloc-24.26.30049.10 \
-        xpu-smi-1.2.35
+        #${SUDO} dnf install -y intel-opencl-${VER_ICD_C} \
+        #level-zero-${VER_LIBZE_C} \
+        #level-zero-devel-${VER_LIBZE_C} \
+        #intel-igc-core-${VER_LIBIGC_C} \
+        #intel-igc-opencl-${VER_LIBIGC_C} \
+        #intel-igc-cm-${VER_IGC_CM_C} \
+        #intel-gmmlib-${VER_GMMLIB_C} \
+        #intel-ocloc-${VER_OCLOC_C} \
+        #xpu-smi-${VER_SMI_C}
+        ${SUDO} dnf install -y intel-opencl \
+        level-zero \
+        level-zero-devel \
+        intel-ocloc \
+        xpu-smi
     fi
     if [ "${OS_ID}" = "opensuse-leap" ]; then
-        ${SUDO} zypper install -y --oldpackage intel-opencl-24.26.30049.10 \
-        level-zero-1.17.6 \
-        level-zero-devel-1.17.6 \
-        intel-level-zero-gpu-1.3.30049.10 \
-        intel-ocloc-24.26.30049.10 \
-        xpu-smi-1.2.35
+        #${SUDO} zypper install -y --oldpackage intel-opencl-${VER_ICD_C} \
+        #level-zero-${VER_LIBZE_C} \
+        #level-zero-devel-${VER_LIBZE_C} \
+        #intel-igc-core-${VER_LIBIGC_C} \
+        #intel-igc-opencl-${VER_LIBIGC_C} \
+        #intel-igc-cm-${VER_IGC_CM_C} \
+        #intel-gmmlib-${VER_GMMLIB_C} \
+        #intel-ocloc-${VER_OCLOC_C} \
+        #xpu-smi-${VER_SMI_C}
+        ${SUDO} zypper install -y intel-opencl \
+        level-zero \
+        level-zero-devel \
+        intel-ocloc \
+        xpu-smi
     fi
 }
 
@@ -192,22 +231,22 @@ function install-dev() {
             POSTFIX="24.04"
         fi
         ${SUDO} apt update
-        ${SUDO} apt install -y intel-oneapi-dpcpp-cpp-2024.2=2024.2.1-1079 \
-        intel-oneapi-mkl-devel=2024.2.1-103 \
-        intel-oneapi-ccl-devel=2021.13.1-31 \
-        intel-pti-dev=0.9.0-35
+        ${SUDO} apt install -y intel-oneapi-dpcpp-cpp-${VER_ONEAPI}=${VER_DPCPP_U} \
+        intel-oneapi-mkl-devel=${VER_MKL_U} \
+        intel-oneapi-ccl-devel=${VER_CCL_U} \
+        intel-pti-dev=${VER_PTI_U}
     fi
     if [[ " rhel centos " =~ " ${OS_ID} " ]]; then
-        ${SUDO} dnf install -y intel-oneapi-dpcpp-cpp-2024.2-2024.2.1 \
-        intel-oneapi-mkl-devel-2024.2.1 \
-        intel-oneapi-ccl-devel-2021.13.1 \
-        intel-pti-dev-0.9.0
+        ${SUDO} dnf install -y intel-oneapi-dpcpp-cpp-${VER_ONEAPI}-${VER_DPCPP_C} \
+        intel-oneapi-mkl-devel-${VER_MKL_C} \
+        intel-oneapi-ccl-devel-${VER_CCL_C} \
+        intel-pti-dev-${VER_PTI_C}
     fi
     if [ "${OS_ID}" = "opensuse-leap" ]; then
-        ${SUDO} zypper install -y --oldpackage intel-oneapi-dpcpp-cpp-2024.2-2024.2.1 \
-        intel-oneapi-mkl-devel-2024.2.1 \
-        intel-oneapi-ccl-devel-2021.13.1 \
-        intel-pti-dev-0.9.0
+        ${SUDO} zypper install -y --oldpackage intel-oneapi-dpcpp-cpp-${VER_ONEAPI}-${VER_DPCPP_C} \
+        intel-oneapi-mkl-devel-${VER_MKL_C} \
+        intel-oneapi-ccl-devel-${VER_CCL_C} \
+        intel-pti-dev-${VER_PTI_C}
     fi
 }
 
