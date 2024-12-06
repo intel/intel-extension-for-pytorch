@@ -26,6 +26,18 @@ using namespace torch::autograd;
 namespace at {
 namespace AtenIpexTypeXPU {
 
+bool is_fmha_supported_tensor(const Tensor& input, bool seq_last = false) {
+  // Normal tensors are in BNFH format
+  // In addition, BFNH format tensor is also supported
+  // If seq_last is true, the tensor could be in FBNH format
+  if (input.is_contiguous() || input.transpose(1, 2).is_contiguous() ||
+      (seq_last && input.permute({2, 0, 1, 3}).is_contiguous())) {
+    return true;
+  }
+
+  return false;
+}
+
 std::tuple<Tensor, Tensor, Tensor, Tensor> ipex_sdp_dropout_backward(
     const Tensor& grad_out,
     const Tensor& query,
@@ -63,29 +75,43 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
     attn_mask_padded_block_size = alignTo * ((lastDim + alignTo - 1) / alignTo);
   }
 
-  // check q, k, v
-  CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(query);
-  CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(key);
-  CHECK_NOSPARSE_LASTCONTIGUOUS_XPU(value);
+  Tensor query_in;
+  Tensor key_in;
+  Tensor value_in;
+
+  if (!is_fmha_supported_tensor(query)) {
+    query_in = query.contiguous();
+  } else
+    query_in = query;
+
+  if (!is_fmha_supported_tensor(key)) {
+    key_in = key.contiguous();
+  } else
+    key_in = key;
+
+  if (!is_fmha_supported_tensor(value)) {
+    value_in = value.contiguous();
+  } else
+    value_in = value;
 
   // create strided output
   // size [bs, num_head, qsize, head_size]
   // layout [bs, qsize, num_head, head_size]
-  auto output = at::empty_like(query);
+  auto output = at::empty_like(query_in);
   auto dpcpp_queue = dpcppGetCurrentQueue();
 
   const double softmax_scale =
-      scale.has_value() ? scale.value() : (1.0 / std::sqrt(query.size(-1)));
+      scale.has_value() ? scale.value() : (1.0 / std::sqrt(query_in.size(-1)));
 
   const bool use_dropout = std::fpclassify(dropout_p) != FP_ZERO;
-  auto xeType = sdp::aten_to_Xetla_dtype(query);
+  auto xeType = sdp::aten_to_Xetla_dtype(query_in);
   gpu::xetla::gpu_arch xeArch = gpu::xetla::get_xetla_current_arch_tag();
   auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,
       xeType,
-      {query.data_ptr(),
-       key.data_ptr(),
-       value.data_ptr(),
+      {query_in.data_ptr(),
+       key_in.data_ptr(),
+       value_in.data_ptr(),
        /* alibi */ nullptr,
        attn_mask.has_value() ? attn_mask->data_ptr() : (void*)nullptr,
        dropout_mask.has_value() ? dropout_mask->data_ptr() : (void*)nullptr,
@@ -96,18 +122,18 @@ inline Tensor _scaled_dot_product_efficient_attention_impl(
        dropout_p,
        nullptr,
        nullptr,
-       query.size(0),
-       query.size(1),
-       key.size(1),
-       query.size(3),
-       query.size(2),
-       key.size(2),
-       query.stride(0),
-       query.stride(1),
-       query.stride(2),
-       key.stride(0),
-       key.stride(1),
-       key.stride(2),
+       query_in.size(0),
+       query_in.size(1),
+       key_in.size(1),
+       query_in.size(3),
+       query_in.size(2),
+       key_in.size(2),
+       query_in.stride(0),
+       query_in.stride(1),
+       query_in.stride(2),
+       key_in.stride(0),
+       key_in.stride(1),
+       key_in.stride(2),
        attn_mask.has_value() ? attn_mask->stride(0) : -1,
        attn_mask.has_value() ? attn_mask->stride(1) : -1,
        attn_mask.has_value() ? attn_mask->stride(2) : -1,
@@ -1156,14 +1182,33 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   TORCH_CHECK(
       value.scalar_type() == at::kHalf, "IPEX SDP only supports half datatype");
 
-  int64_t B = query.size(0);
-  int64_t num_heads_q = query.size(1);
-  int64_t num_heads_k = key.size(1);
-  int64_t head_dim = query.size(3);
-  int64_t M = query.size(-2);
-  int64_t N = key.size(-2);
+  Tensor query_in;
+  Tensor key_in;
+  Tensor value_in;
 
-  auto output = at::empty_like(query);
+  if (!is_fmha_supported_tensor(query, seq_last)) {
+    query_in = query.contiguous();
+  } else
+    query_in = query;
+
+  if (!is_fmha_supported_tensor(key, seq_last)) {
+    key_in = key.contiguous();
+  } else
+    key_in = key;
+
+  if (!is_fmha_supported_tensor(value, seq_last)) {
+    value_in = value.contiguous();
+  } else
+    value_in = value;
+
+  int64_t B = query_in.size(0);
+  int64_t num_heads_q = query_in.size(1);
+  int64_t num_heads_k = key_in.size(1);
+  int64_t head_dim = query_in.size(3);
+  int64_t M = query_in.size(-2);
+  int64_t N = key_in.size(-2);
+
+  auto output = at::empty_like(query_in);
   auto dpcpp_queue = dpcppGetCurrentQueue();
   char str__[100];
   sprintf(
@@ -1182,7 +1227,7 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
   if (alibi.has_value()) {
     alibi_padded_block_size = alibi.value().size(-1);
     TORCH_CHECK(
-        (alibi_padded_block_size * key.itemsize() % 8 == 0),
+        (alibi_padded_block_size * key_in.itemsize() % 8 == 0),
         "XeTLA SDP Alibi needs 8bytes aligned on leading dimension ...");
   }
 
@@ -1194,24 +1239,24 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
     // align PyTorch mask preprocess (broadcast without memory change)
     // TODO: align padding strategy
     attn_mask_bc = attn_mask.value().expand(
-        {query.size(0),
-         query.size(1),
-         query.size(2),
+        {query_in.size(0),
+         query_in.size(1),
+         query_in.size(2),
          attn_mask_padded_block_size});
     TORCH_CHECK(
-        (attn_mask_padded_block_size * key.itemsize() % 8 == 0),
+        (attn_mask_padded_block_size * key_in.itemsize() % 8 == 0),
         "XeTLA SDP Attention mask needs 8bytes aligned on leading dimension ...");
   }
-  auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
+  auto softmax_lse = at::empty({}, query_in.options().dtype(at::kFloat));
 #if defined(USE_XETLA)
-  auto xeType = sdp::aten_to_Xetla_dtype(query);
+  auto xeType = sdp::aten_to_Xetla_dtype(query_in);
   gpu::xetla::gpu_arch xeArch = gpu::xetla::get_xetla_current_arch_tag();
   auto cgfs = gpu::xetla::fmha_forward_kernel(
       xeArch,
       xeType,
-      {query.data_ptr(),
-       key.data_ptr(),
-       value.data_ptr(),
+      {query_in.data_ptr(),
+       key_in.data_ptr(),
+       value_in.data_ptr(),
        alibi.has_value() ? alibi.value().data_ptr() : (void*)nullptr,
        attn_mask.has_value() ? attn_mask_bc.data_ptr() : (void*)nullptr,
        nullptr,
@@ -1228,12 +1273,12 @@ Tensor xetla_fsdp_forward_atten_mask_alibi_strided(
        head_dim,
        M,
        N,
-       query.stride(0),
-       query.stride(1),
-       query.stride(2),
-       key.stride(0),
-       key.stride(1),
-       key.stride(2),
+       query_in.stride(0),
+       query_in.stride(1),
+       query_in.stride(2),
+       key_in.stride(0),
+       key_in.stride(1),
+       key_in.stride(2),
        attn_mask.has_value() ? attn_mask_bc.stride(0) : -1,
        attn_mask.has_value() ? attn_mask_bc.stride(1) : -1,
        attn_mask.has_value() ? attn_mask_bc.stride(2) : -1,
