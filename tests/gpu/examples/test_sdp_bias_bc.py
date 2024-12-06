@@ -8,7 +8,14 @@ import pytest
 
 
 class TestTorchMethod(TestCase):
-    @pytest.mark.skipif(not torch.xpu.has_xetla(), reason="fallback is required")
+    @pytest.mark.skipif(
+        not (
+            torch.xpu.has_xetla()
+            and torch.xpu.has_2d_block_array()
+            and torch.xpu.has_xmx()
+        ),
+        reason="fallback is required",
+    )
     def test_sdp_bias_bc(self, dtype=torch.bfloat16):
         b = 2
         n = 2
