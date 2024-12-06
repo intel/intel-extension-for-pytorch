@@ -642,6 +642,19 @@ class PagedAttention:
         ).reshape_and_cache(key, value, key_cache, value_cache, slot_mapping)
 
     @classmethod
+    def reshape_and_cache_flash(
+        cls,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        key_cache: torch.Tensor,
+        value_cache: torch.Tensor,
+        slot_mapping: torch.Tensor,
+    ):
+        cls.runtime_ops.get_module_from_device(
+            key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
+        ).reshape_and_cache_flash(key, value, key_cache, value_cache, slot_mapping)
+
+    @classmethod
     def swap_blocks(cls, src, dst, block_map):
         return cls.runtime_ops.get_module_from_device(
             "xpu", IPEXCustomOpType.PAGED_ATTENTION, False

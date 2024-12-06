@@ -1602,6 +1602,268 @@ void paged_attention(
   }
 }
 
+Tensor chunked_prefill(
+    const at::Tensor& query, // [num_tokens_q, query_heads, head_dim]
+    const at::Tensor& key, // [num_blocks, block_size, key_heads, head_dim]
+    const at::Tensor& value, // [num_blocks, block_size, key_heads, head_dim]
+    Tensor& out_, // same as query
+    const at::Tensor& cu_seqlens_q, // [batch + 1]
+    const at::Tensor& cu_seqlens_k, // [batch + 1]
+    const c10::optional<at::Tensor>& seqused_k, // [batch]
+    const at::Tensor& block_table, // [batch, num_max_seq_block]
+    const c10::optional<at::Tensor>&
+        alibi_slopes_, // [num_heads] | [batch, num_heads]
+    int64_t max_seqlen_q,
+    const int64_t max_seqlen_k,
+    const double p_dropout,
+    const double softmax_scale,
+    const bool zero_tensors,
+    bool is_causal,
+    const bool return_softmax,
+    c10::optional<at::Generator> gen_) {
+  // Check datatype
+  TORCH_CHECK(
+      !seqused_k.has_value(), "We do not support seqused_k feature currently!");
+  auto q_scalar_type = query.scalar_type();
+  TORCH_CHECK(
+      q_scalar_type == key.scalar_type(),
+      "The datatype of key should be the same as query");
+  TORCH_CHECK(
+      q_scalar_type == value.scalar_type(),
+      "The datatype of value should be the same as query");
+  TORCH_CHECK(
+      cu_seqlens_q.scalar_type() == at::kInt,
+      "The datatype of cu_seqlens_q should be int32");
+  TORCH_CHECK(
+      cu_seqlens_k.scalar_type() == at::kInt,
+      "The datatype of cu_seqlens_k should be int32");
+  TORCH_CHECK(
+      block_table.scalar_type() == at::kInt, "The block_table should be int32");
+
+  // Check device
+  TORCH_CHECK(query.is_xpu(), "query must on XPU");
+  TORCH_CHECK(key.is_xpu(), "key must on XPU");
+  TORCH_CHECK(value.is_xpu(), "value must on XPU");
+  TORCH_CHECK(cu_seqlens_q.is_xpu(), "cu_seqlens_q must on XPU");
+  TORCH_CHECK(cu_seqlens_k.is_xpu(), "cu_seqlens_k must on XPU");
+  TORCH_CHECK(block_table.is_xpu(), "block_table must on XPU");
+
+  // Check contiguous
+  TORCH_CHECK(query.is_contiguous(), "query must be contiguous");
+  TORCH_CHECK(key.is_contiguous(), "key must be contiguous");
+  TORCH_CHECK(value.is_contiguous(), "value must be contiguous");
+  TORCH_CHECK(cu_seqlens_q.is_contiguous(), "cu_seqlens_q must be contiguous");
+  TORCH_CHECK(cu_seqlens_k.is_contiguous(), "cu_seqlens_k must be contiguous");
+  TORCH_CHECK(block_table.is_contiguous(), "block_table must be contiguous");
+
+  int batch_size = cu_seqlens_q.numel() - 1;
+  int num_tokens = query.size(0);
+  int num_heads_q = query.size(1);
+  int head_dim = query.size(2);
+  int num_queries = max_seqlen_q;
+  int num_heads_k = key.size(2);
+  int num_keys = max_seqlen_k;
+  int block_size = key.size(1);
+  int num_max_seq_block = block_table.size(1);
+
+  TORCH_CHECK(
+      block_table.size(0) == batch_size,
+      "The first dimension of block_table should be equal to batch_size");
+
+  Tensor out = out_;
+  TORCH_CHECK(out.is_xpu(), "Output tensor must on XPU");
+  TORCH_CHECK(out.is_contiguous(), "Output tensor must be contiguous");
+
+  auto dpcpp_queue = dpcppGetCurrentQueue();
+  char str__[100];
+  sprintf(
+      str__,
+      "chunk_prefill(Nq=%d, Nkv=%d, M=%d, N=%d)",
+      num_heads_q,
+      num_heads_k,
+      num_queries,
+      num_keys);
+  RECORD_FUNCTION(str__, {});
+
+  // check alibi padded
+  uint32_t alibi_padded_block_size = 0;
+  if (alibi_slopes_.has_value()) {
+    int ndim = alibi_slopes_->ndimension();
+    TORCH_CHECK(
+        ndim == 1 || ndim == 2,
+        "XeTLA ChunkPrefill: only support 1 dim or 2 dim alibi tensor!");
+    int last_dim = alibi_slopes_->size(-1);
+    if (ndim == 1) {
+      TORCH_CHECK(
+          last_dim == num_heads_q,
+          "XeTLA ChunkPrefill: The shape of alibi tensor should equal to [batch_size]");
+      alibi_padded_block_size = 0;
+    }
+    if (ndim == 2) {
+      TORCH_CHECK(
+          last_dim == num_heads_q && alibi_slopes_->size(-2) == batch_size,
+          "XeTLA ChunkPrefill: The shape of alibi tensor should equal to [batch_size, num_head]");
+      alibi_padded_block_size = alibi_slopes_.value().size(-1);
+    }
+  }
+
+  auto gen = at::get_generator_or_default<at::XPUGeneratorImpl>(
+      gen_, at::xpu::detail::getDefaultXPUGenerator());
+  std::pair<uint64_t, uint64_t> philox_state;
+  {
+    std::lock_guard<std::mutex> lock(gen->mutex_);
+    philox_state = gen->philox_engine_inputs(batch_size * num_heads_q * 32);
+  }
+  PhiloxState rng_engine_inputs(
+      std::get<0>(philox_state), std::get<1>(philox_state));
+  auto [seed, offset] = philox_unpack(rng_engine_inputs);
+  Tensor seed_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(seed)), at::dtype(at::kLong));
+  Tensor offset_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(offset)), at::dtype(at::kLong));
+
+  auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
+  constexpr const int partition_sizee = 512;
+
+  TORCH_CHECK(
+      check_if_xetla_valid_for_varlen(query, head_dim),
+      "Invalid head dim for chunked prefill");
+  printf("block size is: %d\n", block_size);
+  printf("max seqlen k: %d\n", max_seqlen_k);
+#if defined(USE_XETLA)
+  TORCH_CHECK(
+      dpcppGetDeviceHasXMX(),
+      "SDP kernel requires XMX, but the current platform has no XMX ...");
+  XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
+  static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
+  std::cout << "before kernel call" << std::endl;
+  if (block_size >= 64) {
+    auto cgfs = gpu::xetla::fmha_forward_kernel(
+        arch_tag,
+        xeType,
+        {query.data_ptr(),
+         key.data_ptr(),
+         value.data_ptr(),
+         alibi_slopes_.has_value() ? alibi_slopes_.value().data_ptr()
+                                   : (void*)nullptr,
+         nullptr,
+         nullptr,
+         out_.data_ptr(),
+         nullptr,
+         softmax_scale,
+         0.0,
+         p_dropout,
+         cu_seqlens_q.data_ptr<int32_t>(),
+         cu_seqlens_k.data_ptr<int32_t>(),
+         batch_size,
+         num_heads_q,
+         num_heads_k,
+         head_dim,
+         max_seqlen_q,
+         max_seqlen_k,
+         query.stride(0),
+         query.stride(1),
+         query.stride(2),
+         key.stride(0),
+         key.stride(1),
+         key.stride(2),
+         -1,
+         -1,
+         -1,
+         alibi_padded_block_size,
+         0,
+         is_causal,
+         false, // seqlast
+         false, // is_training
+         false, // use_dropout
+         true, // use_varlen
+         (uint64_t)0,
+         (uint64_t)0,
+         -1., // softcap
+         block_table.data_ptr<int32_t>(), // block_tables
+         num_max_seq_block, // max_blocks_per_seq
+         block_size}); // block_size
+    DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
+  } else {
+    constexpr const int partition_size = 512;
+    int32_t num_partitions =
+        (max_seqlen_k + partition_size - 1) / partition_size;
+    if (max_seqlen_k > partition_size) {
+      printf("split kv\n");
+      Tensor tmp_out = at::empty(
+          {num_tokens, num_heads_q, num_partitions, head_dim},
+          query.options().dtype(query.scalar_type()).device(query.device()));
+      Tensor max_logits = at::empty(
+          {num_tokens, num_heads_q, num_partitions},
+          query.options().dtype(at::kFloat).device(query.device()));
+      Tensor exp_sums = at::empty(
+          {num_tokens, num_heads_q, num_partitions},
+          query.options().dtype(at::kFloat).device(query.device()));
+
+      auto cgfs = gpu::xetla::chunked_prefill_split_kv(
+          arch_tag,
+          xeType,
+          {max_logits.data_ptr<float>(),
+           exp_sums.data_ptr<float>(),
+           tmp_out.data_ptr(),
+           out_.data_ptr(),
+           query.data_ptr(),
+           key.data_ptr(),
+           value.data_ptr(),
+           alibi_slopes_.has_value() ? alibi_slopes_.value().data_ptr()
+                                     : nullptr,
+           block_table.data_ptr<int32_t>(),
+           cu_seqlens_q.data_ptr<int32_t>(),
+           cu_seqlens_k.data_ptr<int32_t>(),
+           max_seqlen_k,
+           max_seqlen_q,
+           max_seqlen_k,
+           softmax_scale,
+           batch_size,
+           num_heads_q,
+           num_heads_k,
+           head_dim,
+           num_max_seq_block,
+           block_size,
+           is_causal});
+      DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
+    } else {
+      printf("slice kv\n");
+      auto cgfs = gpu::xetla::chunked_prefill_slice_kv(
+          arch_tag,
+          xeType,
+          {nullptr,
+           nullptr,
+           nullptr,
+           out_.data_ptr(),
+           query.data_ptr(),
+           key.data_ptr(),
+           value.data_ptr(),
+           alibi_slopes_.has_value() ? alibi_slopes_.value().data_ptr()
+                                     : nullptr,
+           block_table.data_ptr<int32_t>(),
+           cu_seqlens_q.data_ptr<int32_t>(),
+           cu_seqlens_k.data_ptr<int32_t>(),
+           max_seqlen_k,
+           max_seqlen_q,
+           max_seqlen_k,
+           softmax_scale,
+           batch_size,
+           num_heads_q,
+           num_heads_k,
+           head_dim,
+           num_max_seq_block,
+           block_size,
+           is_causal});
+      DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
+    }
+  }
+#else
+  AT_ERROR("XETLA ChunkPrefill: xetla library not found in compilation");
+#endif
+  return out;
+}
+
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeNestedTensorXPU {
@@ -2437,6 +2699,11 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
       "_native_multi_head_attention",
       at::AtenIpexTypeXPU::_native_multi_head_attention,
+      c10::DispatchKey::XPU)
+
+  IPEX_OP_REGISTER_DISPATCH(
+      "chunked_prefill",
+      at::AtenIpexTypeXPU::chunked_prefill,
       c10::DispatchKey::XPU);
 }
 

@@ -215,7 +215,12 @@ void copy_blocks(
       });
 }
 
-template <typename scalar_t, typename slot_type>
+
+enum class ReshapeAndCacheOp {
+  kChunkedPrefill = 0,
+  kPagedAttention = 1,
+};
+template <typename scalar_t, typename slot_type, ReshapeAndCacheOp op>
 struct ReshapeAndCache {
   ReshapeAndCache(
       const scalar_t* key,
@@ -257,19 +262,27 @@ struct ReshapeAndCache {
     for (int i = local_idx; i < n; i += local_range) {
       const int src_key_idx = group_idx * key_stride_ + i;
       const int src_value_idx = group_idx * value_stride_ + i;
+      if constexpr (op == ReshapeAndCacheOp::kPagedAttention) {
+        const int head_idx = i / head_size_;
+        const int head_offset = i % head_size_;
+        const int x_idx = head_offset / x_;
+        const int x_offset = head_offset % x_;
+        const int dst_key_idx = block_idx * n * block_size_ +
+            head_idx * head_size_ * block_size_ + x_idx * block_size_ * x_ +
+            block_offset * x_ + x_offset;
+        const int dst_value_idx = block_idx * n * block_size_ +
+            head_idx * head_size_ * block_size_ + head_offset * block_size_ +
+            block_offset;
+        key_cache_[dst_key_idx] = key_[src_key_idx];
+        value_cache_[dst_value_idx] = value_[src_value_idx];
+      } else {
       const int head_idx = i / head_size_;
       const int head_offset = i % head_size_;
-      const int x_idx = head_offset / x_;
-      const int x_offset = head_offset % x_;
-      const int dst_key_idx = block_idx * n * block_size_ +
-          head_idx * head_size_ * block_size_ + x_idx * block_size_ * x_ +
-          block_offset * x_ + x_offset;
-      const int dst_value_idx = block_idx * n * block_size_ +
-          head_idx * head_size_ * block_size_ + head_offset * block_size_ +
-          block_offset;
-      key_cache_[dst_key_idx] = key_[src_key_idx];
-      value_cache_[dst_value_idx] = value_[src_value_idx];
+      const int dst_idx = block_idx * block_size_ * n + block_offset * n + head_idx * head_size_ + head_offset;
+      key_cache_[dst_idx] = key_[src_key_idx];
+      value_cache_[dst_idx] = value_[src_value_idx];
     }
+  }
   }
 
  private:
@@ -300,28 +313,48 @@ void dpcpp_reshape_and_cache_kernel(
     int num_head,
     int head_size,
     int block_size,
-    int x) {
+    int x,
+    ReshapeAndCacheOp op) {
   auto& queue = dpcppGetCurrentQueue();
   auto dev_id = dpcppGetDeviceIdOfCurrentQueue();
   int max_wg_size = dpcppMaxWorkGroupSize(dev_id);
   int wg = std::min(max_wg_size, int(num_head * head_size));
   auto cgf = DPCPP_Q_CGF(cgh) {
-    auto kfn = ReshapeAndCache<scalar_t, slot_type>(
-        key,
-        value,
-        key_cache,
-        value_cache,
-        slot_mapping,
-        num_tokens,
-        key_stride,
-        value_stride,
-        num_head,
-        head_size,
-        block_size,
-        x);
-    cgh.parallel_for(
-        sycl::nd_range<1>(sycl::range<1>(num_tokens * wg), sycl::range<1>(wg)),
-        kfn);
+    if (op == ReshapeAndCacheOp::kPagedAttention) {
+      auto kfn = ReshapeAndCache<scalar_t, slot_type, ReshapeAndCacheOp::kPagedAttention>(
+          key,
+          value,
+          key_cache,
+          value_cache,
+          slot_mapping,
+          num_tokens,
+          key_stride,
+          value_stride,
+          num_head,
+          head_size,
+          block_size,
+          x);
+      cgh.parallel_for(
+          sycl::nd_range<1>(sycl::range<1>(num_tokens * wg), sycl::range<1>(wg)),
+          kfn);
+    } else {
+      auto kfn = ReshapeAndCache<scalar_t, slot_type, ReshapeAndCacheOp::kChunkedPrefill>(
+          key,
+          value,
+          key_cache,
+          value_cache,
+          slot_mapping,
+          num_tokens,
+          key_stride,
+          value_stride,
+          num_head,
+          head_size,
+          block_size,
+          x);
+      cgh.parallel_for(
+          sycl::nd_range<1>(sycl::range<1>(num_tokens * wg), sycl::range<1>(wg)),
+          kfn);
+    }
   };
   DPCPP_Q_SUBMIT(queue, cgf);
 }
@@ -359,7 +392,8 @@ void reshape_and_cache(
               num_heads,
               head_size,
               block_size,
-              x);
+              x,
+              ReshapeAndCacheOp::kPagedAttention);
         else
           dpcpp_reshape_and_cache_kernel(
               key.data_ptr<scalar_t>(),
@@ -373,7 +407,61 @@ void reshape_and_cache(
               num_heads,
               head_size,
               block_size,
-              x);
+              x,
+              ReshapeAndCacheOp::kPagedAttention);
+      });
+}
+
+void reshape_and_cache_flash(
+    at::Tensor& key, // [num_tokens, num_heads, head_size]
+    at::Tensor& value, // [num_tokens, num_heads, head_size]
+    at::Tensor&
+        key_cache, // [num_blocks, block_size, num_heads, head_size]
+    at::Tensor& value_cache, // [num_blocks, block_size, num_heads, head_size]
+    at::Tensor& slot_map) // [num_tokens]
+{
+  at::DeviceGuard device_guard(key.device());
+  int num_tokens = key.size(0);
+  int num_heads = key.size(1);
+  int head_size = key.size(2);
+  int block_size = key_cache.size(1);
+
+  int key_stride = key.stride(0);
+  int value_stride = value.stride(0);
+  // ReshapeAndCacheOp cache_op = ReshapeAndCacheOp::kChunkedPrefill;
+  IPEX_DISPATCH_ALL_TYPES_AND2(
+      at::kHalf, at::kBFloat16, key.scalar_type(), "reshape_and_cache", 
+      [&] {
+        if (slot_map.scalar_type() == at::kLong)
+          dpcpp_reshape_and_cache_kernel(
+              key.data_ptr<scalar_t>(),
+              value.data_ptr<scalar_t>(),
+              key_cache.data_ptr<scalar_t>(),
+              value_cache.data_ptr<scalar_t>(),
+              slot_map.data_ptr<int64_t>(),
+              num_tokens,
+              key_stride,
+              value_stride,
+              num_heads,
+              head_size,
+              block_size,
+              1,
+              ReshapeAndCacheOp::kChunkedPrefill);
+        else
+          dpcpp_reshape_and_cache_kernel(
+              key.data_ptr<scalar_t>(),
+              value.data_ptr<scalar_t>(),
+              key_cache.data_ptr<scalar_t>(),
+              value_cache.data_ptr<scalar_t>(),
+              slot_map.data_ptr<int32_t>(),
+              num_tokens,
+              key_stride,
+              value_stride,
+              num_heads,
+              head_size,
+              block_size,
+              1,
+              ReshapeAndCacheOp::kChunkedPrefill);
       });
 }
 
@@ -381,6 +469,7 @@ IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH("swap_blocks", swap_blocks, c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH("copy_blocks", copy_blocks, c10::DispatchKey::XPU);
   IPEX_OP_REGISTER_DISPATCH("reshape_and_cache", reshape_and_cache, c10::DispatchKey::XPU);
+  IPEX_OP_REGISTER_DISPATCH("reshape_and_cache_flash", reshape_and_cache_flash, c10::DispatchKey::XPU);
 }
 } // namespace cache_op
 } // namespace AtenIpexTypeXPU

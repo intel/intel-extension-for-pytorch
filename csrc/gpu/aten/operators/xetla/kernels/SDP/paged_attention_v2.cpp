@@ -17,6 +17,8 @@
 #include <c10/util/Exception.h>
 #include <limits>
 #include "../../mha.h"
+#include "blocked_attention_kernel.hpp"
+#include "blocked_attention_policy.hpp"
 #include "paged_attention_kernel.hpp"
 #include "paged_attention_policy.hpp"
 #include "xetla.hpp"
@@ -31,7 +33,7 @@ template <
     uint32_t HEAD_SIZE,
     uint32_t BLOCK_SIZE,
     gpu_arch arch_tag>
-std::vector<std::function<void(sycl::handler&)>> launch_paged_attention_v2(
+std::vector<std::function<void(sycl::handler&)>> launch_split_kv_kernels(
     paged_attention_fwd_kernel_args_t fwd_args) {
   using policy = paged_attention_policy_v2<HEAD_SIZE, BLOCK_SIZE>;
 
@@ -98,11 +100,95 @@ std::vector<std::function<void(sycl::handler&)>> launch_paged_attention_v2(
   };
   return {cgh0, cgh1};
 }
+
+template <
+    typename T,
+    typename U,
+    uint32_t HEAD_SIZE,
+    uint32_t BLOCK_SIZE,
+    gpu_arch arch_tag>
+cgfs_t launch_split_kv_kernels(chunked_prefill_fwd_kernel_args_t fwd_args) {
+  using policy = chunked_prefill_split_kv_policy<HEAD_SIZE, BLOCK_SIZE>;
+  int num_splits =
+      (fwd_args.max_keys + policy::partition_size - 1) / policy::partition_size;
+  std::function<void(sycl::handler&)> cgh0 = [=](sycl::handler& cgh) {
+    using kernel = blocked_attention_kernel<policy, T, arch_tag>;
+    constexpr const int block_m = 8;
+    int query_groups = (fwd_args.max_queries + block_m - 1) / block_m;
+
+    sycl::nd_range<3> nd_range = kernel::get_nd_range(
+        fwd_args.batch_size, fwd_args.num_heads_q, query_groups, num_splits);
+    std::cout << " num_heads_q: " << fwd_args.num_heads_q
+              << " num_heads_k: " << fwd_args.num_heads_k
+              << " head_size: " << fwd_args.head_size
+              << " max_blocks_per_seq: " << fwd_args.max_blocks_per_seq
+              << " max_queries: " << fwd_args.max_queries
+              << " max_keys: " << fwd_args.max_keys
+              << " batch_size: " << fwd_args.batch_size
+              << " num split: " << num_splits
+              << " query groups: " << query_groups << std::endl;
+    cgh.parallel_for<blocked_attention_kernel<policy, T, arch_tag>>(
+        nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
+          kernel kernel_fn;
+          typename kernel::arguments_t args(
+              reinterpret_cast<T*>(fwd_args.tmp_out),
+              fwd_args.max_logits,
+              fwd_args.exp_sums,
+              reinterpret_cast<T*>(fwd_args.query),
+              reinterpret_cast<T*>(fwd_args.key_cache),
+              reinterpret_cast<T*>(fwd_args.value_cache),
+              fwd_args.block_table,
+              fwd_args.cu_seqlen_q,
+              fwd_args.cu_seqlen_k,
+              fwd_args.sm_scale,
+              fwd_args.num_heads_q * fwd_args.head_size,
+              fwd_args.num_heads_k * fwd_args.head_size,
+              fwd_args.max_queries,
+              fwd_args.max_keys,
+              fwd_args.batch_size,
+              fwd_args.num_heads_q,
+              fwd_args.num_heads_k,
+              fwd_args.head_size,
+              fwd_args.max_blocks_per_seq,
+              num_splits,
+              fwd_args.is_causal);
+
+          kernel_fn(item, args);
+        });
+  };
+
+  std::function<void(sycl::handler&)> cgh1 = [=](sycl::handler& cgh) {
+    using reduce_kernel = chunked_prefill_reduce<policy, T, arch_tag>;
+    constexpr const int block_m = 8;
+    int query_groups = (fwd_args.max_queries + block_m - 1) / block_m;
+    sycl::nd_range<3> nd_range = reduce_kernel::get_nd_range(
+        fwd_args.batch_size, fwd_args.num_heads_q, query_groups);
+
+    cgh.parallel_for<chunked_prefill_reduce<policy, T, arch_tag>>(
+        nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
+          reduce_kernel reduce_kernel_fn;
+          typename reduce_kernel::arguments_t args(
+              reinterpret_cast<T*>(fwd_args.out),
+              reinterpret_cast<T*>(fwd_args.tmp_out),
+              fwd_args.max_logits,
+              fwd_args.exp_sums,
+              fwd_args.cu_seqlen_q,
+              fwd_args.cu_seqlen_k,
+              fwd_args.batch_size,
+              fwd_args.num_heads_q,
+              fwd_args.head_size,
+              num_splits);
+
+          reduce_kernel_fn(item, args);
+        });
+  };
+  return {cgh0, cgh1};
+}
 } // namespace attention
 
-#define CALL_V2_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE)                          \
-  attention::launch_paged_attention_v2<T, U, HEAD_SIZE, BLOCK_SIZE, arch_tag>( \
-      args);
+#define CALL_V2_LAUNCHER(T, U, HEAD_SIZE, BLOCK_SIZE)                        \
+  attention::launch_split_kv_kernels<T, U, HEAD_SIZE, BLOCK_SIZE, arch_tag>( \
+      args)
 
 // Note: only support block_size = 16/32, to reduce compiliation time
 #define CALL_V2_LAUNCHER_BLOCK_SIZE(T, U, HEAD_SIZE) \
@@ -119,9 +205,8 @@ std::vector<std::function<void(sycl::handler&)>> launch_paged_attention_v2(
     }                                                \
   }
 
-template <gpu::xetla::gpu_arch arch_tag, typename T>
-cgfs_t paged_attention_v2_dispatch(
-    gpu::xetla::paged_attention_fwd_kernel_args_t args) {
+template <gpu::xetla::gpu_arch arch_tag, typename T, typename arg_type>
+cgfs_t split_kv_dispatch(arg_type args) {
   using U = int32_t;
   if (args.head_size <= 64) {
     CALL_V2_LAUNCHER_BLOCK_SIZE(T, U, 64);
@@ -140,12 +225,12 @@ cgfs_t _paged_attention_v2(
     XetlaType xeType,
     paged_attention_fwd_kernel_args_t args) {
   if (xeType == gpu::xetla::XetlaType::fp16) {
-    return paged_attention_v2_dispatch<arch_tag, fp16>(args);
+    return split_kv_dispatch<arch_tag, fp16>(args);
   } else if (xeType == XetlaType::bf16) {
     // 2024.1 and below do not support bf16's operator< etc
     if constexpr (
         __INTEL_LLVM_COMPILER >= 20240200 && arch_tag != gpu_arch::XeLpg) {
-      return paged_attention_v2_dispatch<arch_tag, bf16>(args);
+      return split_kv_dispatch<arch_tag, bf16>(args);
     } else {
       printf("paged_attention: No bf16 support for current arch!!\n\n");
       return {};
@@ -177,6 +262,36 @@ XETLA_KERNEL_API cgfs_t paged_attention_v2(
 #endif
     default:
       printf("Unsupported gpu_arch of paged_attention_v2!!\n\n");
+      return {};
+  }
+}
+
+template <gpu_arch arch_tag>
+cgfs_t _chunked_prefill_split_kv(
+    XetlaType xeType,
+    chunked_prefill_fwd_kernel_args_t args) {
+  // Only support fp16 for now
+  if (xeType == XetlaType::fp16) {
+    return split_kv_dispatch<arch_tag, fp16>(args);
+  } else {
+    printf("chunked_prefill: Unsupported dtype!\n\n");
+    return {};
+  }
+}
+
+XETLA_KERNEL_API cgfs_t chunked_prefill_split_kv(
+    gpu_arch arch_tag,
+    XetlaType xeType,
+    chunked_prefill_fwd_kernel_args_t args) {
+  switch (arch_tag) {
+// no plan to support LPG yet
+#ifdef USE_XETLA_XE_HPC
+    case gpu::xetla::gpu_arch::XeHpc:
+      return _chunked_prefill_split_kv<gpu::xetla::gpu_arch::XeHpc>(
+          xeType, args);
+#endif
+    default:
+      printf("Unsupported gpu_arch of chunked_prefill_slice_kv!!\n\n");
       return {};
   }
 }

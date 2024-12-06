@@ -38,7 +38,18 @@ template <
 class fmha_forward_kernel_policy {
   template <typename fmha_policy, typename... Args>
   static cgfs_t policy(Args&&... args) {
+    if constexpr (arch_tag == gpu_arch::XeHpc) {
+      if (is_chunked_prefill(std::forward<Args>(args)...)) {
+        return chunked_prefill_wrapper<fmha_policy>(
+            std::forward<Args>(args)...);
+      }
+    }
     // check for param pack tricks: https://stackoverflow.com/a/2821244/9817693
+    return kernel_call<fmha_policy>(std::forward<Args>(args)...);
+  }
+  template <typename fmha_policy, typename... Args>
+  static cgfs_t kernel_call(Args&&... args) {
+    std::cout << "before real call" << std::endl;
     return fmha::xetla_fmha_forward_kernel<
         fmha_policy,
         T,
@@ -53,6 +64,51 @@ class fmha_forward_kernel_policy {
   }
 
  public:
+  static bool is_chunked_prefill(
+      const fmha::dispatch_fmha_forward_args_t<T>& args) {
+    return args.block_tables != nullptr;
+  }
+
+  template <typename fmha_policy>
+  static cgfs_t chunked_prefill_wrapper(
+      const fmha::dispatch_fmha_forward_args_t<T>& args) {
+    std::cout << "block tables: " << (args.block_tables == nullptr)
+              << std::endl;
+    if (args.block_size == 64) {
+      // std::cout << "block size 64" << std::endl;
+      if (args.head_size <= HEAD_SIZE_LIMIT_0) {
+        return kernel_call<fmha_policy_64x64x64>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
+        return kernel_call<fmha_policy_64x64x128>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_2) {
+        return kernel_call<fmha_policy_64x64x256>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_3) {
+        return kernel_call<fmha_policy_64x64x512>(args);
+      } else {
+        assert(false);
+        return {};
+      }
+    } else if (args.block_size == 128) {
+      // std::cout << "block size 128 " << std::endl;
+      if (args.head_size <= HEAD_SIZE_LIMIT_0) {
+        return kernel_call<fmha_policy_64x128x64>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_1) {
+        return kernel_call<fmha_policy_64x128x128>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_2) {
+        return kernel_call<fmha_policy_64x128x256>(args);
+      } else if (args.head_size <= HEAD_SIZE_LIMIT_3) {
+        return kernel_call<fmha_policy_64x128x512>(args);
+      } else {
+        assert(false);
+        return {};
+      }
+    } else {
+      std::cout << "unsupported block size " << std::endl;
+      assert(false);
+      return {};
+    }
+  }
+
   static cgfs_t run(const fmha::dispatch_fmha_forward_args_t<T>& args) {
 #ifdef SDP_DBG
     printf("\n%s\n", __PRETTY_FUNCTION__);

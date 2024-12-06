@@ -51,6 +51,9 @@ struct fmha_forward_kernel_args_t {
   uint64_t seed_t;
   uint64_t offset_t;
   float softcap = -1.;
+  int32_t* block_tables = nullptr;
+  uint32_t max_blocks_per_seq = 0;
+  uint32_t block_size = 0;
 };
 
 struct paged_attention_fwd_kernel_args_t {
@@ -72,6 +75,31 @@ struct paged_attention_fwd_kernel_args_t {
   uint32_t block_size;
   uint32_t max_blocks_per_seq;
   uint32_t max_context_len;
+};
+
+struct chunked_prefill_fwd_kernel_args_t {
+  float* max_logits;
+  float* exp_sums;
+  void* tmp_out;
+  void* out;
+  void* query;
+  void* key_cache;
+  void* value_cache;
+  void* alibi_slopes;
+  int32_t* block_table;
+  int32_t* cu_seqlen_q;
+  int32_t* cu_seqlen_k;
+  int64_t max_keys;
+  int64_t max_queries;
+  int64_t max_context_len;
+  double sm_scale;
+  int32_t batch_size;
+  int32_t num_heads_q;
+  int32_t num_heads_k;
+  int32_t head_size;
+  int32_t max_blocks_per_seq;
+  int32_t block_size;
+  bool is_causal;
 };
 
 // * General interface kernel for FSDP
@@ -151,4 +179,15 @@ XETLA_KERNEL_API cgfs_t paged_attention_v2(
     gpu_arch arch_tag,
     XetlaType xeType,
     paged_attention_fwd_kernel_args_t args);
+
+XETLA_KERNEL_API cgfs_t chunked_prefill_slice_kv(
+    gpu_arch arch_tag,
+    XetlaType xeType,
+    chunked_prefill_fwd_kernel_args_t args);
+
+XETLA_KERNEL_API cgfs_t chunked_prefill_split_kv(
+    gpu_arch arch_tag,
+    XetlaType xeType,
+    chunked_prefill_fwd_kernel_args_t args);
+
 } // namespace gpu::xetla

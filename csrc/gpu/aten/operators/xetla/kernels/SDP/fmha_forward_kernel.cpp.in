@@ -126,6 +126,14 @@ INSTANTIATE_POLICY(fmha_policy_128x128x256);
 INSTANTIATE_POLICY(fmha_policy_64x128x512);
 #endif
 
+// chunked prefill policy support only pvc now
+#if defined(GPU_ARCH_XeHpc)
+INSTANTIATE_POLICY(fmha_policy_64x64x64);
+INSTANTIATE_POLICY(fmha_policy_64x64x128);
+INSTANTIATE_POLICY(fmha_policy_64x64x256);
+INSTANTIATE_POLICY(fmha_policy_64x64x512);
+#endif
+
 INSTANTIATE_POLICY(fmha_policy_8x128x64);
 INSTANTIATE_POLICY(fmha_policy_64x128x64);
 

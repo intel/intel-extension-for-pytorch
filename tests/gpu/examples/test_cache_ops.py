@@ -2,6 +2,7 @@ import random
 import torch
 import pytest
 from typing import List, Tuple
+from enum import Enum
 import intel_extension_for_pytorch as ipex  # noqa
 
 COPYING_DIRECTION = [("xpu", "cpu"), ("xpu", "xpu"), ("cpu", "xpu")]
@@ -19,6 +20,14 @@ NUM_MAPPINGS = [256]  # Arbitrary values for testing
 SEEDS = [0]
 
 
+class KVCacheFormat(Enum):
+    Paged = 0
+    Chunked = 1
+
+
+CACHE_FORMAT = [KVCacheFormat.Paged, KVCacheFormat.Chunked]
+
+
 def kv_cache_factory(
     num_blocks: int,
     block_size: int,
@@ -28,6 +37,7 @@ def kv_cache_factory(
     dtype: torch.dtype,
     seed: int,
     device: str,
+    cache_format: KVCacheFormat = KVCacheFormat.Paged,
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
     torch.random.manual_seed(seed)
     if torch.cuda.is_available():
@@ -37,6 +47,8 @@ def kv_cache_factory(
     scale = head_size**-0.5
     x = 16 // torch.tensor([], dtype=dtype).element_size()
     key_cache_shape = (num_blocks, num_heads, head_size // x, block_size, x)
+    if cache_format == KVCacheFormat.Chunked:
+        key_cache_shape = (num_blocks, block_size, num_heads, head_size)
     key_caches = []
     for _ in range(num_layers):
         key_cache = torch.empty(size=key_cache_shape, dtype=dtype)
@@ -44,6 +56,8 @@ def kv_cache_factory(
         key_caches.append(key_cache)
 
     value_cache_shape = (num_blocks, num_heads, head_size, block_size)
+    if cache_format == KVCacheFormat.Chunked:
+        value_cache_shape = (num_blocks, block_size, num_heads, head_size)
     value_caches = []
     for _ in range(num_layers):
         value_cache = torch.empty(size=value_cache_shape, dtype=dtype)
@@ -209,6 +223,7 @@ def test_swap_blocks(
 @pytest.mark.parametrize("num_blocks", NUM_BLOCKS)
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("seed", SEEDS)
+@pytest.mark.parametrize("cache_format", CACHE_FORMAT)
 @torch.inference_mode()
 def test_reshape_and_cache(
     num_tokens: int,
@@ -218,6 +233,7 @@ def test_reshape_and_cache(
     num_blocks: int,
     dtype: torch.dtype,
     seed: int,
+    cache_format: KVCacheFormat,
     device: str = "xpu",
 ) -> None:
     random.seed(seed)
@@ -235,7 +251,15 @@ def test_reshape_and_cache(
 
     # Create the KV caches.
     key_caches, value_caches = kv_cache_factory(
-        num_blocks, block_size, 1, num_heads, head_size, dtype, seed, device
+        num_blocks,
+        block_size,
+        1,
+        num_heads,
+        head_size,
+        dtype,
+        seed,
+        device,
+        cache_format,
     )
     key_cache, value_cache = key_caches[0], value_caches[0]
 
@@ -247,24 +271,39 @@ def test_reshape_and_cache(
     cloned_value_cache_1 = value_cache.clone()
 
     # Call the reshape_and_cache kernel.
-    ipex.llm.modules.PagedAttention.reshape_and_cache(
-        key, value, cloned_key_cache_1, cloned_value_cache_1, slot_mapping
-    )
-    ipex.llm.modules.PagedAttention.reshape_and_cache(
-        key, value, key_cache, value_cache, slot_mapping.to(torch.int32)
-    )
+    if cache_format == KVCacheFormat.Paged:
+        ipex.llm.modules.PagedAttention.reshape_and_cache(
+            key, value, cloned_key_cache_1, cloned_value_cache_1, slot_mapping
+        )
+        ipex.llm.modules.PagedAttention.reshape_and_cache(
+            key, value, key_cache, value_cache, slot_mapping.to(torch.int32)
+        )
+    else:
+        ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
+            key, value, cloned_key_cache_1, cloned_value_cache_1, slot_mapping
+        )
+        ipex.llm.modules.PagedAttention.reshape_and_cache_flash(
+            key, value, key_cache, value_cache, slot_mapping.to(torch.int32)
+        )
 
     # Run the reference implementation.
-    reshaped_key = key.reshape(num_tokens, *key_cache[0, :, :, 0, :].shape)
     block_indicies = torch.div(slot_mapping, block_size, rounding_mode="floor")
     block_indicies = block_indicies.cpu().tolist()
     block_offsets = slot_mapping % block_size
     block_offsets = block_offsets.cpu().tolist()
-    for i in range(num_tokens):
-        block_idx = block_indicies[i]
-        block_offset = block_offsets[i]
-        cloned_key_cache[block_idx, :, :, block_offset, :] = reshaped_key[i]
-        cloned_value_cache[block_idx, :, :, block_offset] = value[i]
+    if cache_format == KVCacheFormat.Chunked:
+        for i in range(num_tokens):
+            block_idx = block_indicies[i]
+            block_offset = block_offsets[i]
+            cloned_key_cache[block_idx, block_offset, :, :] = key[i]
+            cloned_value_cache[block_idx, block_offset, :, :] = value[i]
+    else:
+        reshaped_key = key.reshape(num_tokens, *key_cache[0, :, :, 0, :].shape)
+        for i in range(num_tokens):
+            block_idx = block_indicies[i]
+            block_offset = block_offsets[i]
+            cloned_key_cache[block_idx, :, :, block_offset, :] = reshaped_key[i]
+            cloned_value_cache[block_idx, :, :, block_offset] = value[i]
 
     assert torch.allclose(key_cache, cloned_key_cache, atol=1e-2, rtol=1e-2)
     assert torch.allclose(value_cache, cloned_value_cache, atol=1e-2, rtol=1e-2)

@@ -33,8 +33,10 @@ class fmha_forward_t {
 
   struct arguments_t {
     // Input tensors
-    scalar_t* Q_ptr; // [B, F, N, H] - query
-    scalar_t* K_ptr; // [B, T, N, H] - key
+    scalar_t* Q_ptr; // [B, F, N, H] - query | [num_tokens, num_query_heads,
+                     // head_size]
+    scalar_t* K_ptr; // [B, T, N, H] - key   | [num_blocks, block_size,
+                     // num_kv_heads, head_size]
     scalar_t* V_ptr; // [B, T, N, H] - value
     scalar_t* A_ptr = nullptr; // [B, N, 1, T] - Alibi
     scalar_t* B_ptr = nullptr; // [1/B, 1/N, 1/F, M] - bias
@@ -72,6 +74,9 @@ class fmha_forward_t {
     uint64_t offset;
     bool is_bias_add;
     accum_t softcap;
+    int32_t* block_tables; // [B, max_blocks_per_seq]
+    uint32_t max_blocks_per_seq;
+    uint32_t block_size;
 
     inline arguments_t() = default;
     inline arguments_t(
@@ -106,7 +111,10 @@ class fmha_forward_t {
         uint32_t attn_mask_padded_block_size,
         uint64_t seed_t,
         uint64_t offset_t,
-        accum_t softcap = -1.)
+        accum_t softcap = -1.,
+        int32_t* block_tables = nullptr,
+        uint32_t max_blocks_per_seq = 0,
+        uint32_t block_size = 0)
         : Q_ptr(query),
           K_ptr(key),
           V_ptr(value),
@@ -140,7 +148,10 @@ class fmha_forward_t {
           seed(seed_t),
           offset(offset_t),
           is_bias_add(bias_strideF == 0),
-          softcap(softcap) {}
+          softcap(softcap),
+          block_tables(block_tables),
+          max_blocks_per_seq(max_blocks_per_seq),
+          block_size(block_size) {}
   };
 
  private:
@@ -388,11 +399,28 @@ class fmha_forward_t {
             {end_y, end_x, b_stride * args.uB},
             {start_acc, start_x});
       } else if constexpr (kVarlen) {
-        int32_t start_x = startT + args.cu_seqlen_k[batch_id];
-        uint32_t end_x = start_x + kBc;
-        int32_t limit_x = args.cu_seqlen_k[batch_id + 1];
-        end_x = end_x < limit_x ? end_x : limit_x;
-
+        // there is an assumption that kBc should equals to the block size, so
+        // the startT should always divisible by kBc
+        int32_t start_x;
+        int32_t end_x;
+        if (args.block_tables != nullptr) {
+          int32_t block_slot_offset = startT / args.block_size;
+          int32_t start_x_offset =
+              args.block_tables
+                  [batch_id * args.max_blocks_per_seq + block_slot_offset];
+          start_x = start_x_offset * args.block_size;
+          // end_x = start_x + args.block_size;
+          int32_t seqlen =
+              args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
+          int32_t remain_T = seqlen - startT;
+          remain_T = remain_T < args.block_size ? remain_T : args.block_size;
+          end_x = start_x + remain_T;
+        } else {
+          start_x = startT + args.cu_seqlen_k[batch_id];
+          end_x = start_x + kBc;
+          int32_t limit_x = args.cu_seqlen_k[batch_id + 1];
+          end_x = end_x < limit_x ? end_x : limit_x;
+        }
         int32_t start_acc = head_id * args.uNkv / args.uN * args.uH;
         uint32_t end_y = start_acc + args.uH;
         mem_desc_Kj_T.init(
@@ -999,9 +1027,13 @@ class fmha_forward_t {
     uint32_t startF = item.get_group(1) /* 0 */ * kBr /* 64 */;
     uint32_t endF = std::min(startF + kBr, args.uF);
     int32_t actual_seqlen = 0;
+    int32_t seqlen_diff = 0;
     if constexpr (kVarlen) {
       actual_seqlen =
           args.cu_seqlen_k[batch_id + 1] - args.cu_seqlen_k[batch_id];
+      int32_t seqlen_q =
+          args.cu_seqlen_q[batch_id + 1] - args.cu_seqlen_q[batch_id];
+      seqlen_diff = actual_seqlen - seqlen_q;
     }
 
     // iterate through the keys
@@ -1014,7 +1046,7 @@ class fmha_forward_t {
         }
       }
       if constexpr (kIsCausal) {
-        if (startT >= endF)
+        if (startT >= endF + seqlen_diff)
           break;
       }
       // update context for current loop
@@ -1023,7 +1055,7 @@ class fmha_forward_t {
       matAccSij_t matAccSij(0);
       gemm_Sij(matAccSij, args);
       // apply mask
-      apply_mask(item, matAccSij, args, startF, startT);
+      apply_mask(item, matAccSij, args, startF + seqlen_diff, startT);
       // softmax
       dp_mask_tile_t mask_in;
       softmax_fwd(matAccSij, matAccOi, mask_in, args);

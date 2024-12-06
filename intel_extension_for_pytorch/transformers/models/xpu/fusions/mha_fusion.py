@@ -387,6 +387,12 @@ class _IPEXPagedAttentionXPU:
         )
 
     @classmethod
+    def reshape_and_cache_flash(cls, key, value, key_cache, value_cache, slot_mapping):
+        torch.ops.torch_ipex.reshape_and_cache_flash(
+            key, value, key_cache, value_cache, slot_mapping
+        )
+
+    @classmethod
     def single_query_cached_kv_attention(
         cls,
         output,
@@ -445,6 +451,42 @@ class _IPEXPagedAttentionXPU:
             block_size,
             max_context_len,
             alibi_slopes,
+        )
+
+    @classmethod
+    def flash_attn_varlen_func(
+        cls,
+        output,
+        query,
+        k_cache,
+        v_cache,
+        cu_seqlens_q,
+        cu_seqlens_kv,
+        max_seqlen_q,
+        max_seqlen_kv,
+        scale,
+        is_causal,
+        block_table,
+        alibi_slopes=None,
+    ):
+        torch.ops.torch_ipex.chunked_prefill(
+            query,
+            k_cache,
+            v_cache,
+            output,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            None,
+            block_table,
+            alibi_slopes,
+            max_seqlen_q,
+            max_seqlen_kv,
+            0.0,
+            scale,
+            False,
+            is_causal,
+            False,
+            None,
         )
 
     @classmethod
