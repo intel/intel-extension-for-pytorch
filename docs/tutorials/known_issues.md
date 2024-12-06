@@ -83,14 +83,6 @@ Troubleshooting
 
     If you continue seeing similar issues for other shared object files, add the corresponding files under `${MKL_DPCPP_ROOT}/lib/intel64/` by `LD_PRELOAD`. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.
 
-- **Problem**: RuntimeError: could not create an engine.
-  - **Cause**: `OCL_ICD_VENDORS` path is wrongly set when activate a exist conda environment.
-  - **Solution**: `export OCL_ICD_VENDORS=/etc/OpenCL/vendors` after `conda activate`
-
-- **Problem**: If you encounter issues related to CCL environment variable configuration when running distributed tasks.
-  - **Cause**: `CCL_ROOT` path is wrongly set.
-  - **Solution**: `export CCL_ROOT=${CONDA_PREFIX}`
-
 - **Problem**: If you encounter issues related to MPI environment variable configuration when running distributed tasks.
   - **Cause**: MPI environment variable configuration not correct.
   - **Solution**: `conda deactivate` and then `conda activate` to activate the correct MPI environment variable automatically.
@@ -98,8 +90,41 @@ Troubleshooting
     ```
     conda deactivate
     conda activate
-    export OCL_ICD_VENDORS=/etc/OpenCL/vendors
     ```
+
+
+- **Problem**: If you encounter issues Runtime error related to C++ compiler with `torch.compile`. Runtime Error: Failed to find C++ compiler. Please specify via CXX environment variable.
+  - **Cause**: Not install and activate DPC++/C++ Compiler correctly.
+  - **Solution**: [Install DPC++/C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler-download.html) and activate it by following commands.
+ 
+    ```bash
+    # {dpcpproot} is the location for dpcpp ROOT path and it is where you installed oneAPI DPCPP, usually it is /opt/intel/oneapi/compiler/latest or ~/intel/oneapi/compiler/latest
+    source {dpcpproot}/env/vars.sh
+    ```
+
+- **Problem**: RuntimeError: Cannot find a working triton installation. Either the package is not installed or it is too old. More information on installing Triton can be found at https://github.com/openai/triton
+  - **Cause**: No pytorch-triton-xpu installed
+  - **Solution**: Resolve the issue with following command:
+
+    ```bash
+    # Install correct version of pytorch-triton-xpu
+    pip install --pre pytorch-triton-xpu==3.1.0+91b14bf559  --index-url https://download.pytorch.org/whl/nightly/xpu
+    ```
+
+
+- **Problem**: LoweringException: ImportError: cannot import name 'intel' from 'triton._C.libtriton'
+  - **Cause**: Installing Triton causes pytorch-triton-xpu to stop working.
+  - **Solution**: Resolve the issue with following command:
+
+    ```bash
+    pip list | grep triton
+    # If triton related packages are listed, remove them
+    pip uninstall triton
+    pip uninstall pytorch-triton-xpu
+    # Reinstall correct version of pytorch-triton-xpu
+    pip install --pre pytorch-triton-xpu==3.1.0+91b14bf559  --index-url https://download.pytorch.org/whl/nightly/xpu
+    ```
+
 
 ## Performance Issue
 

@@ -45,7 +45,6 @@ Remove the flags `--data_path` in fine-tuning command will load the guanaco-llam
 
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 
@@ -84,7 +83,6 @@ Remove the flags `--data_path` in fine-tuning command will load the guanaco-llam
 
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 

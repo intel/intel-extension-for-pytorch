@@ -175,7 +175,7 @@ model = model.to(memory_format=torch.channels_last)
 
 print(model)
 # to ipex
-model = ipex.optimize_transformers(model.eval(), device="xpu", inplace=True, quantization_config=woq_quantization_config)
+model = ipex.llm.optimize(model.eval(), device="xpu", inplace=True, quantization_config=woq_quantization_config)
 get_memory_usage("Ipex", args)
 
 

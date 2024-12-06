@@ -9,22 +9,22 @@ Intel® Extension for PyTorch\* now empowers users to seamlessly harness graph c
 # Required Dependencies
 
 **Verified version**:
-- `torch` : v2.3
-- `intel_extension_for_pytorch` : v2.3
-- `triton` : >= v3.0.0
+- `torch` : v2.5
+- `intel_extension_for_pytorch` : v2.5
+- `triton` : v3.1.0+91b14bf559
 
 
-Install [Intel® oneAPI Base Toolkit 2024.2.1](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html).
+Install [Intel® oneAPI DPC++/C++ Compiler 2025.0.4](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler-download.html).
 
 Follow [Intel® Extension for PyTorch\* Installation](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/) to install `torch` and `intel_extension_for_pytorch` firstly.
 
 Triton could be directly installed using the following command:
 
 ```Bash
-pip install --pre pytorch-triton-xpu==3.0.0+1b2f15840e --index-url https://download.pytorch.org/whl/nightly/xpu
+pip install --pre pytorch-triton-xpu==3.1.0+91b14bf559 --index-url https://download.pytorch.org/whl/nightly/xpu
 ```
 
-Remember to activate the oneAPI basekit by following commands.
+Remember to activate the oneAPI DPC++/C++ Compiler by following commands.
 
 ```bash
 # {dpcpproot} is the location for dpcpp ROOT path and it is where you installed oneAPI DPCPP, usually it is /opt/intel/oneapi/compiler/latest or ~/intel/oneapi/compiler/latest
@@ -39,19 +39,43 @@ source {dpcpproot}/env/vars.sh
 
 ```python
 import torch
+import torch.nn as nn
 import intel_extension_for_pytorch
 
-# create model
+# Define the SimpleNet model
+class SimpleNet(nn.Module):
+    def __init__(self):
+        super(SimpleNet, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(32 * 56 * 56, 128)
+        self.fc2 = nn.Linear(128, 10)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.pool(self.relu(self.conv1(x)))
+        x = self.pool(self.relu(self.conv2(x)))
+        x = x.view(-1, 32 * 56 * 56)
+        x = self.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+# Create model
 model = SimpleNet().to("xpu")
 
-# compile model
+# Compile model
 compiled_model = torch.compile(model, options={"freezing": True})
 
-# inference main
+# Inference main
 input = torch.rand(64, 3, 224, 224, device=torch.device("xpu"))
 with torch.no_grad():
     with torch.xpu.amp.autocast(dtype=torch.float16):
         output = compiled_model(input)
+
+# Print the output shape
+print(output.shape)
+print("Done for inference with torch.compile")
 ```
 
 ## Training with torch.compile
@@ -76,3 +100,7 @@ optimizer.zero_grad()
 loss.backward()
 optimizer.step()
 ```
+
+## Troubleshooting
+
+If you encounter any issue related to `torch.compile` or `triton`, please refer to Library Dependencies section in [known_issues](../known_issues.md).
