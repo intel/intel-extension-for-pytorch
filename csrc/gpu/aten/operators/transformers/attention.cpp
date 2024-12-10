@@ -1781,7 +1781,7 @@ Tensor chunked_prefill(
       "SDP kernel requires XMX, but the current platform has no XMX ...");
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
-  std::cout << "before kernel call" << std::endl;
+  // std::cout << "before kernel call" << std::endl;
   if (block_size >= 64) {
     auto cgfs = gpu::xetla::fmha_forward_kernel(
         arch_tag,

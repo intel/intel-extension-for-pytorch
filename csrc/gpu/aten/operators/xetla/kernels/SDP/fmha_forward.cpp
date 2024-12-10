@@ -49,7 +49,7 @@ class fmha_forward_kernel_policy {
   }
   template <typename fmha_policy, typename... Args>
   static cgfs_t kernel_call(Args&&... args) {
-    std::cout << "before real call" << std::endl;
+    // std::cout << "before real call" << std::endl;
     return fmha::xetla_fmha_forward_kernel<
         fmha_policy,
         T,
@@ -72,8 +72,8 @@ class fmha_forward_kernel_policy {
   template <typename fmha_policy>
   static cgfs_t chunked_prefill_wrapper(
       const fmha::dispatch_fmha_forward_args_t<T>& args) {
-    std::cout << "block tables: " << (args.block_tables == nullptr)
-              << std::endl;
+    // std::cout << "block tables: " << (args.block_tables == nullptr)
+    // << std::endl;
     if (args.block_size == 64) {
       // std::cout << "block size 64" << std::endl;
       if (args.head_size <= HEAD_SIZE_LIMIT_0) {

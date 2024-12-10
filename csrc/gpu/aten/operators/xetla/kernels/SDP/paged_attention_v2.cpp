@@ -118,15 +118,15 @@ cgfs_t launch_split_kv_kernels(chunked_prefill_fwd_kernel_args_t fwd_args) {
 
     sycl::nd_range<3> nd_range = kernel::get_nd_range(
         fwd_args.batch_size, fwd_args.num_heads_q, query_groups, num_splits);
-    std::cout << " num_heads_q: " << fwd_args.num_heads_q
-              << " num_heads_k: " << fwd_args.num_heads_k
-              << " head_size: " << fwd_args.head_size
-              << " max_blocks_per_seq: " << fwd_args.max_blocks_per_seq
-              << " max_queries: " << fwd_args.max_queries
-              << " max_keys: " << fwd_args.max_keys
-              << " batch_size: " << fwd_args.batch_size
-              << " num split: " << num_splits
-              << " query groups: " << query_groups << std::endl;
+    // std::cout << " num_heads_q: " << fwd_args.num_heads_q
+    //          << " num_heads_k: " << fwd_args.num_heads_k
+    //          << " head_size: " << fwd_args.head_size
+    //          << " max_blocks_per_seq: " << fwd_args.max_blocks_per_seq
+    //          << " max_queries: " << fwd_args.max_queries
+    //          << " max_keys: " << fwd_args.max_keys
+    //          << " batch_size: " << fwd_args.batch_size
+    //          << " num split: " << num_splits
+    //          << " query groups: " << query_groups << std::endl;
     cgh.parallel_for<blocked_attention_kernel<policy, T, arch_tag>>(
         nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
           kernel kernel_fn;
