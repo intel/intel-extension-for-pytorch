@@ -404,13 +404,13 @@ class HuggingFaceModel(BaseLM):
         self.model = self.model.module
         import pathlib
 
+        low_precision_checkpoint = None
         if args.low_precision_checkpoint != "":
             pathname = args.low_precision_checkpoint
             assert os.path.exists(
                 pathname
             ), f"Checkpoint file does not exist: {pathname}"
             if os.path.isfile(pathname):
-                low_precision_checkpoint = None
                 if pathname.endswith(".pt") or pathname.endswith(".pth"):
                     low_precision_checkpoint = torch.load(pathname, weights_only=True)
                 elif pathname.endswith(".safetensors"):
@@ -625,9 +625,12 @@ class HuggingFaceModel(BaseLM):
                             low_precision_checkpoint_dict[key] = data[
                                 :, q_head_start * dim : q_head_end * dim
                             ]
-                    low_precision_dict = (low_precision_checkpoint_dict, quant_method)
+                    low_precision_checkpoint = (
+                        low_precision_checkpoint_dict,
+                        quant_method,
+                    )
                 else:
-                    low_precision_dict = None
+                    low_precision_checkpoint = None
 
             self.model = ipex.llm.optimize(
                 self.model.eval(),
@@ -636,7 +639,7 @@ class HuggingFaceModel(BaseLM):
                 inplace=True,
                 deployment_mode=False,
                 cache_weight_for_large_batch=args.cache_weight_for_large_batch,
-                low_precision_checkpoint=low_precision_dict,
+                low_precision_checkpoint=low_precision_checkpoint,
             )
 
         self.base_model = self.model
