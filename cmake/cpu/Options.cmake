@@ -19,6 +19,9 @@ if(WIN32)
   set(BUILD_CPU_WITH_ONECCL OFF)
 endif()
 
+if(BUILD_CFG_HABANA)
+  set(USE_DNNL_GRAPH_COMPILER OFF)
+endif()
 
 function (print_cpu_config_summary)
   # Fetch configurations of intel-ext-pt-cpu
