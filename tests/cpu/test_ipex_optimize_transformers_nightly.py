@@ -195,14 +195,13 @@ supported_models = [
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
     ),
-    # TODO: uncomment when TPP issue is fixed
-    # model_info(
-    #     "mllama",
-    #     transformers.models.mllama.modeling_mllama.MllamaForConditionalGeneration,
-    #     True,
-    #     lambda m: m.language_model.model.layers[0].self_attn.__class__,
-    #     lambda m: m.language_model.model.layers[0].__class__,
-    # ),
+    model_info(
+        "mllama",
+        transformers.models.mllama.modeling_mllama.MllamaForConditionalGeneration,
+        True,
+        lambda m: m.language_model.model.layers[0].self_attn.__class__,
+        lambda m: m.language_model.model.layers[0].__class__,
+    ),
     model_info(
         "maira2",
         Maira2ForConditionalGeneration,
