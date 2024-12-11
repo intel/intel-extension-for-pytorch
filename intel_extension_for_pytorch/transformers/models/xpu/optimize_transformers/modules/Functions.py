@@ -1054,8 +1054,14 @@ def _ipex_beam_search_(
             next_token_logits, dim=-1
         )  # (batch_size * num_beams, vocab_size)
         next_token_logits = None
-        dummy_input_ids = torch.empty(
-            (batch_size * num_beams, cur_len), dtype=torch.long, device="meta"
+        dummy_input_ids = torch.cat(
+            (
+                origin_input_ids,
+                output_token_ids.transpose(0, 1)[
+                    :, : cur_len - origin_input_ids.shape[-1]
+                ],
+            ),
+            dim=1,
         )
         next_token_scores_processed = logits_processor(
             dummy_input_ids, next_token_scores
