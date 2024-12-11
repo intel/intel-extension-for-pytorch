@@ -280,8 +280,7 @@ XETLA_KERNEL_API cgfs_t fmha_forward_kernel(
       return _fmha_forward_kernel<gpu_arch::XeHpc>(xeType, args);
 #endif
     default:
-      printf("Unsupported gpu_arch of fmha_forward!!\n\n");
-      return {};
+      TORCH_CHECK(false, "Unsupported gpu_arch of fmha_forward!!\n\n");
   }
 }
 } // namespace gpu::xetla
