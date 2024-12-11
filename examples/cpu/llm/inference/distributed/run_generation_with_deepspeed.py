@@ -466,12 +466,36 @@ else:
     write_checkpoints_json()
     dist.barrier()
 
+tp_grain_size = 64
+if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
+    pathname = args.low_precision_checkpoint
+    assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
+    if os.path.isdir(pathname):
+        try:
+            with open(pathname + "/config.json") as f:
+                quant_model_config = json.load(f)
+                tp_grain_size = int(
+                    quant_model_config["quantization_config"]["group_size"]
+                )
+        except Exception as e:
+            print("Failed to get group_size from config.json")
+    elif args.group_size > 0:
+        tp_grain_size = args.group_size
+    else:
+        print(
+            "Warning: cannot get group_size from config.json or --group-size, "
+            "using default value 64 for tp_grain_size"
+        )
+
 model = deepspeed.init_inference(
     model,
     mp_size=world_size,
     base_dir=repo_root,
     dtype=infer_dtype,
     checkpoint=checkpoints_json,
+    tensor_parallel=deepspeed.inference.config.DeepSpeedTPConfig(
+        tp_grain_size=tp_grain_size
+    ),
     **kwargs,
 )
 
@@ -618,10 +642,13 @@ if use_ipex:
             num_heads = model.config.num_attention_heads
             rank = local_rank
 
-            layers_split_by_N = [
+            mha_layers_split_by_N = [
                 "q_proj",
                 "k_proj",
                 "v_proj",
+            ]
+            # mlp is split with grain size = tp_grain_size
+            mlp_layers_split_by_N = [
                 "gate_proj",
                 "up_proj",
                 "fc_in",
@@ -630,16 +657,20 @@ if use_ipex:
                 "w1",
                 "w3",
             ]
-            layers_split_by_K = [
+            mha_layers_split_by_K = [
                 "o_proj",
+                "out_proj",
+            ]
+            # mlp is split with grain size = tp_grain_size
+            mlp_layers_split_by_K = [
                 "down_proj",
                 "fc_out",
                 "fc2",
-                "out_proj",
                 "dense",
                 "dense_4h_to_h",
                 "w2",
             ]
+            # lm_head is split with grain size = tp_grain_size
             lm_head_layers = ["lm_head"]  # split by K but not quantized
             quantization_method = quant_model_config["quantization_config"][
                 "quant_method"
@@ -656,7 +687,7 @@ if use_ipex:
                 q_head_end = q_head_start + (head_range[rank + 1] - head_range[rank])
                 if "bias" in key:
                     continue
-                if any(substring in key for substring in layers_split_by_N):
+                if any(substring in key for substring in mha_layers_split_by_N):
                     data = low_precision_checkpoint_dict[key]
                     if quantization_method == "awq":
                         # awq qweight: [K, N // 8]
@@ -670,7 +701,44 @@ if use_ipex:
                         raise AssertionError(
                             f"{quantization_method} is not supported yet."
                         )
-                if any(substring in key for substring in layers_split_by_K):
+                elif any(substring in key for substring in mlp_layers_split_by_N):
+                    data = low_precision_checkpoint_dict[key]
+                    if quantization_method == "awq":
+                        # awq qweight: [K, N // 8]
+                        # awq scales: [K // G, N]
+                        # awq qzeros: [K // G, N // 8]
+                        if "scales" in key:
+                            assert (
+                                data.shape[1] % tp_grain_size == 0
+                            ), "N must be divisible by tp_grain_size"
+                            grains = data.shape[1] // tp_grain_size
+                            dim = tp_grain_size
+                        else:
+                            assert (
+                                data.shape[1] * 8
+                            ) % tp_grain_size == 0, (
+                                "N must be divisible by tp_grain_size"
+                            )
+                            grains = data.shape[1] // (tp_grain_size // 8)
+                            dim = tp_grain_size // 8
+                        grains_per_rank = grains // world_size
+                        grains_rem = grains % world_size
+                        grains_start = grains_per_rank * local_rank + min(
+                            local_rank, grains_rem
+                        )
+                        grains_end = (
+                            grains_start
+                            + grains_per_rank
+                            + (1 if local_rank < grains_rem else 0)
+                        )
+                        low_precision_checkpoint_dict[key] = data[
+                            :, grains_start * dim : grains_end * dim
+                        ]
+                    else:
+                        raise AssertionError(
+                            f"{quantization_method} is not supported yet."
+                        )
+                elif any(substring in key for substring in mha_layers_split_by_K):
                     data = low_precision_checkpoint_dict[key]
                     if quantization_method == "awq":
                         # awq qweight: [K, N // 8]
@@ -690,18 +758,59 @@ if use_ipex:
                         raise AssertionError(
                             f"{quantization_method} is not supported yet."
                         )
-                if any(substring in key for substring in lm_head_layers):
+                elif any(substring in key for substring in mlp_layers_split_by_K):
+                    data = low_precision_checkpoint_dict[key]
+                    if quantization_method == "awq":
+                        # awq qweight: [K, N // 8]
+                        # awq scales: [K // G, N]
+                        # awq qzeros: [K // G, N // 8]
+                        if "qweight" in key:
+                            assert (
+                                data.shape[0] % tp_grain_size == 0
+                            ), "K must be divisible by tp_grain_size"
+                            grains = data.shape[0] // tp_grain_size
+                            dim = tp_grain_size
+                        else:
+                            grains = data.shape[0]
+                            dim = 1
+                        grains_per_rank = grains // world_size
+                        grains_rem = grains % world_size
+                        grains_start = grains_per_rank * local_rank + min(
+                            local_rank, grains_rem
+                        )
+                        grains_end = (
+                            grains_start
+                            + grains_per_rank
+                            + (1 if local_rank < grains_rem else 0)
+                        )
+                        low_precision_checkpoint_dict[key] = data[
+                            grains_start * dim : grains_end * dim
+                        ]
+                    else:
+                        raise AssertionError(
+                            f"{quantization_method} is not supported yet."
+                        )
+                elif any(substring in key for substring in lm_head_layers):
                     # lm_head: [N, K] (not quantized)
                     # Same for both AWQ and GPTQ
                     data = low_precision_checkpoint_dict[key]
-                    if data.shape[-1] % head_range[-1] == 0:
-                        dim = data.shape[-1] // head_range[-1]
-                    else:
-                        dim = data.shape[-1] // world_size
-                        q_head_start = local_rank
-                        q_head_end = local_rank + 1
+                    assert (
+                        data.shape[1] % tp_grain_size == 0
+                    ), "K must be divisible by tp_grain_size"
+                    grains = data.shape[1] // tp_grain_size
+                    dim = tp_grain_size
+                    grains_per_rank = grains // world_size
+                    grains_rem = grains % world_size
+                    grains_start = grains_per_rank * local_rank + min(
+                        local_rank, grains_rem
+                    )
+                    grains_end = (
+                        grains_start
+                        + grains_per_rank
+                        + (1 if local_rank < grains_rem else 0)
+                    )
                     low_precision_checkpoint_dict[key] = data[
-                        :, q_head_start * dim : q_head_end * dim
+                        :, grains_start * dim : grains_end * dim
                     ]
             low_precision_checkpoint = (low_precision_checkpoint_dict, quant_method)
 

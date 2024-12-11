@@ -137,7 +137,6 @@ def unpack_awq_weight(
         torch.unsqueeze(qweight, 1), wf.unsqueeze(-1)
     ).to(torch.int16 if bits == 8 else torch.int8)
     torch.bitwise_and(weight, (2**bits) - 1, out=weight)
-    weight = weight.reshape(-1, group_size, weight.shape[2])
 
     weight = weight.view(-1, weight.shape[-1])
     zeros = zeros.view(-1, zeros.shape[-1])
