@@ -1,7 +1,7 @@
 From 76929b8e0ff49a6bf86bd7b2dfb4099293acceed Mon Sep 17 00:00:00 2001
 From: "Huaiyu, Zheng" <huaiyu.zheng@intel.com>
 Date: Thu, 10 Oct 2024 19:36:36 +0800
-Subject: [PATCH 3/5] Update torch-xpu-ops pin to 02060c6 (#303)
+Subject: [PATCH 3/6] Update torch-xpu-ops pin to 02060c6 (#303)
 
 ---
  third_party/xpu.txt | 2 +-

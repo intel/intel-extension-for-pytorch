@@ -1,7 +1,7 @@
 From bfbd223e97f4c80bddc8742efca7cd7c2b5261c0 Mon Sep 17 00:00:00 2001
 From: Ratnam Parikh <114774508+ratnampa@users.noreply.github.com>
 Date: Sun, 29 Sep 2024 04:28:17 -0700
-Subject: [PATCH 2/5] Fix windows build issue (#301)(#297)
+Subject: [PATCH 2/6] Fix windows build issue (#301)(#297)
 
 ---
  caffe2/CMakeLists.txt               | 5 +++++

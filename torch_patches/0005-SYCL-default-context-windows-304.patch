@@ -1,7 +1,7 @@
 From e84e33f7c021704112d5bce593c83df5044a290f Mon Sep 17 00:00:00 2001
 From: Ratnam Parikh <114774508+ratnampa@users.noreply.github.com>
 Date: Thu, 17 Oct 2024 21:25:38 -0700
-Subject: [PATCH 5/5] SYCL default context windows (#304)
+Subject: [PATCH 5/6] SYCL default context windows (#304)
 
 * SYCL default context windows
 

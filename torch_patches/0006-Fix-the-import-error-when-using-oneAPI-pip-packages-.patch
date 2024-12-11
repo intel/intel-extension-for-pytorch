@@ -1,0 +1,24 @@
+From 277419a77fed144f317f0274968768702ac5d513 Mon Sep 17 00:00:00 2001
+From: Stonepia <tong.su@intel.com>
+Date: Wed, 11 Dec 2024 10:21:28 +0800
+Subject: [PATCH 6/6] Fix the import error when using oneAPI pip packages (#310)
+
+* Update xpu.txt
+
+Fix the import error when using oneAPI pip packages
+
+* Update xpu.txt
+---
+ third_party/xpu.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/third_party/xpu.txt b/third_party/xpu.txt
+index 529b1942193..b1a0c9afb7d 100644
+--- a/third_party/xpu.txt
++++ b/third_party/xpu.txt
+@@ -1 +1 @@
+-02060c616661034286adb9d5ba493e234b8401c3
++6b9a52be28633de4f3c10a38d5fd5dc7e0c50a85
+-- 
+2.34.1
+
