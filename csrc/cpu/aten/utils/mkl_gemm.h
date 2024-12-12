@@ -87,5 +87,19 @@ inline void _mkl_gemm(
     const float& beta,
     float* c,
     const int& ldc) {
-  TORCH_CHECK(false, "_mkl_gemm does not support FP16 yet");
+  cblas_gemm_f16f16f32(
+      layout,
+      transa,
+      transb,
+      m,
+      n,
+      k,
+      alpha,
+      (const MKL_F16*)(a),
+      lda,
+      (const MKL_F16*)(b),
+      ldb,
+      beta,
+      c,
+      ldc);
 }

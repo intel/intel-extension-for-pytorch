@@ -35,7 +35,7 @@ set(mkl_root_hint)
 # install mkl-include and mkl-static for CPU build
 function (install_mkl_packages)
   message(STATUS "Download and install mkl-include and mkl-static for IPEX CPU build automatically.")
-  set(REQ_MKL_VERSION 2021.0.0)
+  set(REQ_MKL_VERSION 2024.0.0)
   execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install "mkl-include>=${REQ_MKL_VERSION}"
       RESULT_VARIABLE mkl_iret COMMAND_ERROR_IS_FATAL ANY)
   execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install --no-deps "mkl-static>=${REQ_MKL_VERSION}"

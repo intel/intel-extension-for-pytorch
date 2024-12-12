@@ -391,6 +391,7 @@ inline void reshape_attn_mask_to_4d(
  *@template scalar_t: q/k/v data type
  *@template q_split_size: q block size
  *@template kv_split_size: kv block size
+ *@template use_vnni: use vnni format
  *@param output: output result
  *@param logsumexp: logsumexp for backward
  *@param q: query
@@ -405,9 +406,9 @@ template <
     typename scalar_t,
     typename mask_t,
     int64_t q_split_size,
-    int64_t kv_split_size>
-inline typename std::enable_if_t<!is_reduced_floating_point_v<scalar_t>, void>
-cpu_flash_attention(
+    int64_t kv_split_size,
+    bool use_vnni>
+inline typename std::enable_if_t<!use_vnni, void> cpu_flash_attention(
     const at::Tensor& output,
     const at::Tensor& logsumexp,
     const at::Tensor& q,
@@ -427,6 +428,7 @@ cpu_flash_attention(
   at::Tensor key = k.transpose(1, 2);
   at::Tensor value = v.transpose(1, 2);
 
+  constexpr bool is_reduced_dtype = is_reduced_floating_point_v<scalar_t>;
   using accum_t = at::opmath_type<scalar_t>;
   using Vec = at::vec::Vectorized<accum_t>;
   accum_t scaling_factor = calculate_scale(query, scale).as_float_unchecked();
@@ -511,6 +513,15 @@ cpu_flash_attention(
   accum_t* lse_data = logsumexp.data_ptr<accum_t>();
   accum_t* buf_data = buf.data_ptr<accum_t>();
 
+  at::DataPtr buf_reduced;
+  scalar_t* buf_reduced_data = nullptr;
+  if (is_reduced_dtype) {
+    auto& cpu_allocator = *at::getCPUAllocator();
+    buf_reduced =
+        cpu_allocator.allocate(num_thread * qSplitSize * kvSplitSize * 2);
+    buf_reduced_data = reinterpret_cast<scalar_t*>(buf_reduced.get());
+  }
+
   at::parallel_for(
       0, batchSize * num_head * qSlice, 1, [&](int64_t begin, int64_t end) {
         int64_t i = 0, j = 0, k = 0;
@@ -522,6 +533,9 @@ cpu_flash_attention(
         accum_t* qk_max_data = qk_data + qSplitSize * kvSplitSize;
         accum_t* qk_sum_data = qk_max_data + qSplitSize;
         accum_t* dst_data = qk_sum_data + qSplitSize;
+        scalar_t* qk_reduced_data = is_reduced_dtype
+            ? buf_reduced_data + ompIdx * qSplitSize * kvSplitSize
+            : nullptr;
 
         for (const auto z : c10::irange(begin, end)) {
           (void)z; // Suppress unused variable
@@ -614,7 +628,8 @@ cpu_flash_attention(
               _exp_reduce_sum_fusion_kernel(
                   qk_data + row * kvBlockSize,
                   kvBlockSize,
-                  qk_data + row * kvBlockSize,
+                  conditional_data_ptr(qk_data, qk_reduced_data) +
+                      row * kvBlockSize,
                   tmp_sum);
               // exp_tmp <- exp(max[row] - max)
               exp_tmp = std::exp(qk_max_data[row] - tmp_max);
@@ -642,7 +657,7 @@ cpu_flash_attention(
                 static_cast<accum_t>(1),
                 v_data + i * vStrideB + j * vStrideH + n * vStrideN,
                 vStrideN,
-                qk_data,
+                conditional_data_ptr(qk_data, qk_reduced_data),
                 kvBlockSize,
                 n == 0 ? static_cast<accum_t>(0) : static_cast<accum_t>(1),
                 dst_data,
@@ -672,14 +687,14 @@ cpu_flash_attention(
       });
 }
 
-// Half/BFloat16
+// Half/BFloat16 with vnni
 template <
     typename scalar_t,
     typename mask_t,
     int64_t q_split_size,
-    int64_t kv_split_size>
-inline typename std::enable_if_t<is_reduced_floating_point_v<scalar_t>, void>
-cpu_flash_attention(
+    int64_t kv_split_size,
+    bool use_vnni>
+inline typename std::enable_if_t<use_vnni, void> cpu_flash_attention(
     const at::Tensor& output,
     const at::Tensor& logsumexp,
     const at::Tensor& q,
@@ -689,6 +704,9 @@ cpu_flash_attention(
     bool is_causal,
     c10::optional<at::Tensor> attention_mask,
     c10::optional<double> scale) {
+  TORCH_CHECK(
+      is_reduced_floating_point_v<scalar_t>,
+      "cpu_flash_attention with packing only supports Half/BFloat16");
   // Query (Batch x Num_heads  x Q_seq_len  x Dim_per_head)
   //    -> (Batch x Q_seq_len  x Num_heads  x Dim_per_head)
   // Key   (Batch x Num_heads  x KV_seq_len x Dim_per_head)
@@ -701,9 +719,6 @@ cpu_flash_attention(
 
   const auto dtype = query.scalar_type();
   const auto accumulate_dtype = at::toOpMathType(dtype);
-  const bool is_fp16 = dtype == at::kHalf;
-  const int vnni_pack =
-      (!is_fp16 || (is_fp16 && utils::isa_has_amx_fp16_support())) ? 1 : 0;
 
   using accum_t = at::opmath_type<scalar_t>;
   using Vec = at::vec::Vectorized<accum_t>;
@@ -797,7 +812,7 @@ cpu_flash_attention(
   // If K of Gemm is not even, use mkl gemm instead of tpp for BF16
   int qk_gemm_K = headSize_even ? headSize : headSize + 1;
 
-  auto qk_gemm = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+  auto qk_gemm = SCOPEITGEMM((BrgemmTPP<scalar_t, accum_t>(
       /*M*/ qSplitSize,
       /*N*/ kvSplitSize,
       /*K*/ qk_gemm_K,
@@ -808,9 +823,8 @@ cpu_flash_attention(
       /*ldc*/ kvSplitSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1,
-      /*b_vnni*/ vnni_pack)));
-  auto qk_gemm_ktail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*unroll_hint*/ 1)));
+  auto qk_gemm_ktail = SCOPEITGEMM((BrgemmTPP<scalar_t, accum_t>(
       /*M*/ qSplitSize,
       /*N*/ kvTail,
       /*K*/ qk_gemm_K,
@@ -821,9 +835,8 @@ cpu_flash_attention(
       /*ldc*/ kvTail,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1,
-      /*b_vnni*/ vnni_pack)));
-  auto qk_gemm_qtail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*unroll_hint*/ 1)));
+  auto qk_gemm_qtail = SCOPEITGEMM((BrgemmTPP<scalar_t, accum_t>(
       /*M*/ qTail,
       /*N*/ kvSplitSize,
       /*K*/ qk_gemm_K,
@@ -834,9 +847,8 @@ cpu_flash_attention(
       /*ldc*/ kvSplitSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1,
-      /*b_vnni*/ vnni_pack)));
-  auto qk_gemm_qktail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*unroll_hint*/ 1)));
+  auto qk_gemm_qktail = SCOPEITGEMM((BrgemmTPP<scalar_t, accum_t>(
       /*M*/ qTail,
       /*N*/ kvTail,
       /*K*/ qk_gemm_K,
@@ -847,8 +859,7 @@ cpu_flash_attention(
       /*ldc*/ kvTail,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1,
-      /*b_vnni*/ vnni_pack)));
+      /*unroll_hint*/ 1)));
 
   // Create tpp kernels for Attention @ Value
   bool av_gemm_K_even = kvSplitSize % 2 == 0;
@@ -859,88 +870,85 @@ cpu_flash_attention(
   int av_gemm_K_tail = av_gemm_K_tail_even ? kvTail : kvTail + 1;
 
   // [qSplitSize,kvSplitSize] x [kvSplitSize,headSize] -> [qSplitSize,headSize]
-  auto av_gemm = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+  auto av_gemm = SCOPEITGEMM((BrgemmTPP<scalar_t, accum_t>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ vnni_pack ? av_gemm_K : kvSplitSize,
+      /*K*/ av_gemm_K,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K,
-      /*ldb*/ vnni_pack ? headSize : vStrideN,
+      /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1,
-      /*b_vnni*/ vnni_pack)));
-  auto av_gemm_tail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*unroll_hint*/ 1)));
+  auto av_gemm_tail = SCOPEITGEMM((BrgemmTPP<scalar_t, accum_t>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ vnni_pack ? av_gemm_K_tail : kvTail,
+      /*K*/ av_gemm_K_tail,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K_tail,
-      /*ldb*/ vnni_pack ? headSize : vStrideN,
+      /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 0.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1,
-      /*b_vnni*/ vnni_pack)));
-  auto av_gemm_bias = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*unroll_hint*/ 1)));
+  auto av_gemm_bias = SCOPEITGEMM((BrgemmTPP<scalar_t, accum_t>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ vnni_pack ? av_gemm_K : kvSplitSize,
+      /*K*/ av_gemm_K,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K,
-      /*ldb*/ vnni_pack ? headSize : vStrideN,
+      /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1,
-      /*b_vnni*/ vnni_pack)));
-  auto av_gemm_bias_tail = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*unroll_hint*/ 1)));
+  auto av_gemm_bias_tail = SCOPEITGEMM((BrgemmTPP<scalar_t, accum_t>(
       /*M*/ qSplitSize,
       /*N*/ headSize,
-      /*K*/ vnni_pack ? av_gemm_K_tail : kvTail,
+      /*K*/ av_gemm_K_tail,
       /*str_a*/ 1,
       /*str_b*/ 1,
       /*lda*/ av_gemm_K_tail,
-      /*ldb*/ vnni_pack ? headSize : vStrideN,
+      /*ldb*/ headSize,
       /*ldc*/ headSize,
       /*beta*/ 1.0,
       /*a_trans*/ 0,
-      /*unroll_hint*/ 1,
-      /*b_vnni*/ vnni_pack)));
+      /*unroll_hint*/ 1)));
 
   // Buffer to store Key and Value after transforms
   at::Tensor key_t_reorder = at::empty(
-      {batchSize,
-       num_head,
-       (!headSize_even && is_fp16) ? qk_gemm_K : headSize,
-       kvSize},
+      {batchSize, num_head, !headSize_even ? qk_gemm_K : headSize, kvSize},
       c10::CppTypeToScalarType<scalar_t>::value);
   // Buffer to store padding key and query
+  at::DataPtr padding_data;
   scalar_t* key_padding_ptr = nullptr;
-  std::unique_ptr<unsigned short[]> key_padding_data;
   scalar_t* query_padding_ptr = nullptr;
-  std::unique_ptr<unsigned short[]> query_padding_data;
-  if (!headSize_even && is_fp16) {
-    query_padding_data = std::make_unique<unsigned short[]>(
-        num_thread * (qSlice * qSplitSize) * qk_gemm_K);
-    query_padding_ptr = reinterpret_cast<scalar_t*>(query_padding_data.get());
-    key_padding_data = std::make_unique<unsigned short[]>(
-        batchSize * num_head * kvSize * qk_gemm_K);
-    key_padding_ptr = reinterpret_cast<scalar_t*>(key_padding_data.get());
+  if (!headSize_even) {
+    auto& cpu_allocator = *at::getCPUAllocator();
+    padding_data = cpu_allocator.allocate(
+        (batchSize * num_head * kvSize * qk_gemm_K +
+         num_thread * qSplitSize * qk_gemm_K) *
+        2);
+    scalar_t* padding_data_ptr =
+        reinterpret_cast<scalar_t*>(padding_data.get());
+    key_padding_ptr = padding_data_ptr;
+    query_padding_ptr =
+        key_padding_ptr + batchSize * num_head * kvSize * qk_gemm_K;
   }
 
   auto key_reorder_ptr = key_t_reorder.data_ptr<scalar_t>();
   int kv_padding_size = (kvSize - 1) / kvSplitSize * av_gemm_K + av_gemm_K_tail;
   // Buffer to store padding value
   scalar_t* value_padding_ptr = nullptr;
-  std::unique_ptr<unsigned short[]> value_padding_data;
+  at::DataPtr value_padding_data;
   if (!av_gemm_K_even || !av_gemm_K_tail_even) {
-    value_padding_data = std::make_unique<unsigned short[]>(
-        batchSize * num_head * kv_padding_size * headSize);
+    auto& cpu_allocator = *at::getCPUAllocator();
+    value_padding_data = cpu_allocator.allocate(
+        batchSize * num_head * kv_padding_size * headSize * 2);
     value_padding_ptr = reinterpret_cast<scalar_t*>(value_padding_data.get());
   }
   at::Tensor value_t_reorder = at::empty(
@@ -958,7 +966,7 @@ cpu_flash_attention(
           /*ldi*/ headSize_even ? kStrideN : qk_gemm_K,
           /*ldo*/ kvSplitSize,
           /*xtype*/
-          vnni_pack ? XformTPP::XFORM_XPOSE_N2V_TPP : XformTPP::XFORM_XPOSE_TPP,
+          XformTPP::XFORM_XPOSE_N2V_TPP,
           /*ignore_vnni_for_fp32*/ true),
       XPOSE);
   auto k_xform_tail = SCOPEIT(
@@ -970,7 +978,7 @@ cpu_flash_attention(
           /*ldi*/ headSize_even ? kStrideN : qk_gemm_K,
           /*ldo*/ kvTail,
           /*xtype*/
-          vnni_pack ? XformTPP::XFORM_XPOSE_N2V_TPP : XformTPP::XFORM_XPOSE_TPP,
+          XformTPP::XFORM_XPOSE_N2V_TPP,
           /*ignore_vnni_for_fp32*/ true),
       XPOSE);
   // Create tpp transforms for Value
@@ -1014,7 +1022,7 @@ cpu_flash_attention(
                   k_data + i * kStrideB + j * kStrideH + n * kStrideN,
                   key_reorder_ptr + i * num_head * headSize * kvSize +
                       j * headSize * kvSize + n * headSize);
-            } else if (!headSize_even && is_fp16) {
+            } else {
               // padding
               // [kvSplitSize, headSize] -> [kvSplitSize, headSize + 1]
               pad_col_zero(
@@ -1031,26 +1039,24 @@ cpu_flash_attention(
                       j * qk_gemm_K * kvSize + n * qk_gemm_K);
             }
             if (!av_gemm_K_even) {
-              if (is_fp16 && vnni_pack) {
-                // padding
-                // [kvSplitSize, headSize] -> [kvSplitSize + 1, headSize]
-                pad_row_zero(
-                    v_data + i * vStrideB + j * vStrideH + n * vStrideN,
-                    value_padding_ptr +
-                        i * num_head * kv_padding_size * headSize +
-                        j * kv_padding_size * headSize + psize * headSize,
-                    av_gemm_K,
-                    headSize,
-                    vStrideN);
-                v_xform(
-                    value_padding_ptr +
-                        i * num_head * kv_padding_size * headSize +
-                        j * kv_padding_size * headSize + psize * headSize,
-                    value_reorder_ptr +
-                        i * num_head * kv_padding_size * headSize +
-                        j * kv_padding_size * headSize + psize * headSize);
-              }
-            } else if (vnni_pack) {
+              // padding
+              // [kvSplitSize, headSize] -> [kvSplitSize + 1, headSize]
+              pad_row_zero(
+                  v_data + i * vStrideB + j * vStrideH + n * vStrideN,
+                  value_padding_ptr +
+                      i * num_head * kv_padding_size * headSize +
+                      j * kv_padding_size * headSize + psize * headSize,
+                  av_gemm_K,
+                  headSize,
+                  vStrideN);
+              v_xform(
+                  value_padding_ptr +
+                      i * num_head * kv_padding_size * headSize +
+                      j * kv_padding_size * headSize + psize * headSize,
+                  value_reorder_ptr +
+                      i * num_head * kv_padding_size * headSize +
+                      j * kv_padding_size * headSize + psize * headSize);
+            } else {
               v_xform(
                   v_data + i * vStrideB + j * vStrideH + n * vStrideN,
                   value_reorder_ptr +
@@ -1064,7 +1070,7 @@ cpu_flash_attention(
                   k_data + i * kStrideB + j * kStrideH + n * kStrideN,
                   key_reorder_ptr + i * num_head * headSize * kvSize +
                       j * headSize * kvSize + n * headSize);
-            } else if (!headSize_even && is_fp16) {
+            } else {
               // padding
               // [kvtail, headSize] -> [kvtail, headSize + 1]
               pad_col_zero(
@@ -1081,26 +1087,24 @@ cpu_flash_attention(
                       j * qk_gemm_K * kvSize + n * qk_gemm_K);
             }
             if (!av_gemm_K_tail_even) {
-              if (is_fp16 && vnni_pack) {
-                // padding
-                // [kvtail, headSize] -> [kvtail + 1, headSize]
-                pad_row_zero(
-                    v_data + i * vStrideB + j * vStrideH + n * vStrideN,
-                    value_padding_ptr +
-                        i * num_head * kv_padding_size * headSize +
-                        j * kv_padding_size * headSize + psize * headSize,
-                    av_gemm_K_tail,
-                    headSize,
-                    vStrideN);
-                v_xform_tail(
-                    value_padding_ptr +
-                        i * num_head * kv_padding_size * headSize +
-                        j * kv_padding_size * headSize + psize * headSize,
-                    value_reorder_ptr +
-                        i * num_head * kv_padding_size * headSize +
-                        j * kv_padding_size * headSize + psize * headSize);
-              }
-            } else if (vnni_pack) {
+              // padding
+              // [kvtail, headSize] -> [kvtail + 1, headSize]
+              pad_row_zero(
+                  v_data + i * vStrideB + j * vStrideH + n * vStrideN,
+                  value_padding_ptr +
+                      i * num_head * kv_padding_size * headSize +
+                      j * kv_padding_size * headSize + psize * headSize,
+                  av_gemm_K_tail,
+                  headSize,
+                  vStrideN);
+              v_xform_tail(
+                  value_padding_ptr +
+                      i * num_head * kv_padding_size * headSize +
+                      j * kv_padding_size * headSize + psize * headSize,
+                  value_reorder_ptr +
+                      i * num_head * kv_padding_size * headSize +
+                      j * kv_padding_size * headSize + psize * headSize);
+            } else {
               v_xform_tail(
                   v_data + i * vStrideB + j * vStrideH + n * vStrideN,
                   value_reorder_ptr +
@@ -1126,7 +1130,7 @@ cpu_flash_attention(
         accum_t* dst_data = qk_sum_data + qSplitSize;
         scalar_t* qk_reduced_data =
             buf_reduced_data + ompIdx * qSplitSize * av_gemm_K;
-        scalar_t* query_t_padding_ptr = (is_fp16 && !headSize_even)
+        scalar_t* query_t_padding_ptr = !headSize_even
             ? query_padding_ptr + ompIdx * qSplitSize * qk_gemm_K
             : nullptr;
 
@@ -1143,7 +1147,7 @@ cpu_flash_attention(
               qk_sum_data, static_cast<accum_t>(0), qBlockSize);
           int64_t num_keys =
               is_causal ? std::min(m + qBlockSize, kvSize) : kvSize;
-          if (is_fp16 && !headSize_even) {
+          if (!headSize_even) {
             // pad query if headSize is not even for fp16
             // [qBlockSize, headSize] -> [qBlockSize, headSize + 1]
             pad_col_zero(
@@ -1156,69 +1160,51 @@ cpu_flash_attention(
           for (int64_t n = 0; n < num_keys; n += kvSplitSize) {
             int64_t kvBlockSize = std::min(kvSplitSize, kvSize - n);
             // Calculate scale * q @ k.T
-            if ((!is_fp16 && headSize_even) || is_fp16) {
-              if (qBlockSize == qSplitSize) {
-                // q main
-                if (n + kvSplitSize < kvSize) {
-                  // k main
-                  qk_gemm(
-                      (is_fp16 && !headSize_even)
-                          ? query_t_padding_ptr
-                          : q_data + i * qStrideB + j * qStrideH + m * qStrideM,
-                      key_reorder_ptr + i * num_head * qk_gemm_K * kvSize +
-                          j * qk_gemm_K * kvSize + n * qk_gemm_K,
-                      qk_data,
-                      1);
-                } else {
-                  // k tail
-                  qk_gemm_ktail(
-                      (is_fp16 && !headSize_even)
-                          ? query_t_padding_ptr
-                          : q_data + i * qStrideB + j * qStrideH + m * qStrideM,
-                      key_reorder_ptr + i * num_head * qk_gemm_K * kvSize +
-                          j * qk_gemm_K * kvSize + n * qk_gemm_K,
-                      qk_data,
-                      1);
-                }
+            if (qBlockSize == qSplitSize) {
+              // q main
+              if (n + kvSplitSize < kvSize) {
+                // k main
+                qk_gemm(
+                    !headSize_even
+                        ? query_t_padding_ptr
+                        : q_data + i * qStrideB + j * qStrideH + m * qStrideM,
+                    key_reorder_ptr + i * num_head * qk_gemm_K * kvSize +
+                        j * qk_gemm_K * kvSize + n * qk_gemm_K,
+                    qk_data,
+                    1);
               } else {
-                if (n + kvSplitSize < kvSize) {
-                  // k main
-                  qk_gemm_qtail(
-                      (is_fp16 && !headSize_even)
-                          ? query_t_padding_ptr
-                          : q_data + i * qStrideB + j * qStrideH + m * qStrideM,
-                      key_reorder_ptr + i * num_head * qk_gemm_K * kvSize +
-                          j * qk_gemm_K * kvSize + n * qk_gemm_K,
-                      qk_data,
-                      1);
-                } else {
-                  // k tail
-                  qk_gemm_qktail(
-                      (is_fp16 && !headSize_even)
-                          ? query_t_padding_ptr
-                          : q_data + i * qStrideB + j * qStrideH + m * qStrideM,
-                      key_reorder_ptr + i * num_head * qk_gemm_K * kvSize +
-                          j * qk_gemm_K * kvSize + n * qk_gemm_K,
-                      qk_data,
-                      1);
-                }
+                // k tail
+                qk_gemm_ktail(
+                    !headSize_even
+                        ? query_t_padding_ptr
+                        : q_data + i * qStrideB + j * qStrideH + m * qStrideM,
+                    key_reorder_ptr + i * num_head * qk_gemm_K * kvSize +
+                        j * qk_gemm_K * kvSize + n * qk_gemm_K,
+                    qk_data,
+                    1);
               }
             } else {
-              _mkl_gemm(
-                  CblasColMajor,
-                  CblasTrans,
-                  CblasNoTrans,
-                  kvBlockSize,
-                  qBlockSize,
-                  headSize,
-                  static_cast<accum_t>(1),
-                  k_data + i * kStrideB + j * kStrideH + n * kStrideN,
-                  kStrideN,
-                  q_data + i * qStrideB + j * qStrideH + m * qStrideM,
-                  qStrideM,
-                  static_cast<accum_t>(0),
-                  qk_data,
-                  kvBlockSize);
+              if (n + kvSplitSize < kvSize) {
+                // k main
+                qk_gemm_qtail(
+                    !headSize_even
+                        ? query_t_padding_ptr
+                        : q_data + i * qStrideB + j * qStrideH + m * qStrideM,
+                    key_reorder_ptr + i * num_head * qk_gemm_K * kvSize +
+                        j * qk_gemm_K * kvSize + n * qk_gemm_K,
+                    qk_data,
+                    1);
+              } else {
+                // k tail
+                qk_gemm_qktail(
+                    !headSize_even
+                        ? query_t_padding_ptr
+                        : q_data + i * qStrideB + j * qStrideH + m * qStrideM,
+                    key_reorder_ptr + i * num_head * qk_gemm_K * kvSize +
+                        j * qk_gemm_K * kvSize + n * qk_gemm_K,
+                    qk_data,
+                    1);
+              }
             }
             // Apply causal mask, fill unused with -inf
             if (is_causal && num_keys - n <= kvSplitSize) {
@@ -1308,78 +1294,47 @@ cpu_flash_attention(
             }
 
             // Calculate Softmax(q @ k.T) @ v
-            if (((!is_fp16 && av_gemm_K_even && av_gemm_K_tail_even) ||
-                 is_fp16)) {
-              int64_t psize = n / kvSplitSize * av_gemm_K;
-              if (n + kvSplitSize < kvSize) {
-                // main
-                if (n == 0) {
-                  av_gemm(
-                      qk_reduced_data,
-                      vnni_pack
-                          ? (value_reorder_ptr +
-                             i * num_head * kv_padding_size * headSize +
-                             j * kv_padding_size * headSize + psize * headSize)
-                          : (v_data + i * vStrideB + j * vStrideH +
-                             n * vStrideN),
-                      dst_data,
-                      1);
-                } else {
-                  // bias
-                  av_gemm_bias(
-                      qk_reduced_data,
-                      vnni_pack
-                          ? (value_reorder_ptr +
-                             i * num_head * kv_padding_size * headSize +
-                             j * kv_padding_size * headSize + psize * headSize)
-                          : (v_data + i * vStrideB + j * vStrideH +
-                             n * vStrideN),
-                      dst_data,
-                      1);
-                }
-              } else if (n + kvSplitSize >= kvSize) {
-                // tail
-                if (n == 0) {
-                  av_gemm_tail(
-                      qk_reduced_data,
-                      vnni_pack
-                          ? (value_reorder_ptr +
-                             i * num_head * kv_padding_size * headSize +
-                             j * kv_padding_size * headSize + psize * headSize)
-                          : (v_data + i * vStrideB + j * vStrideH +
-                             n * vStrideN),
-                      dst_data,
-                      1);
-                } else {
-                  // bias
-                  av_gemm_bias_tail(
-                      qk_reduced_data,
-                      vnni_pack
-                          ? (value_reorder_ptr +
-                             i * num_head * kv_padding_size * headSize +
-                             j * kv_padding_size * headSize + psize * headSize)
-                          : (v_data + i * vStrideB + j * vStrideH +
-                             n * vStrideN),
-                      dst_data,
-                      1);
-                }
+            int64_t psize = n / kvSplitSize * av_gemm_K;
+            if (n + kvSplitSize < kvSize) {
+              // main
+              if (n == 0) {
+                av_gemm(
+                    qk_reduced_data,
+                    value_reorder_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    dst_data,
+                    1);
+              } else {
+                // bias
+                av_gemm_bias(
+                    qk_reduced_data,
+                    value_reorder_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    dst_data,
+                    1);
               }
-            } else {
-              _mkl_gemm(
-                  CblasColMajor,
-                  CblasNoTrans,
-                  CblasNoTrans,
-                  headSize,
-                  qBlockSize,
-                  kvBlockSize,
-                  static_cast<accum_t>(1),
-                  v_data + i * vStrideB + j * vStrideH + n * vStrideN,
-                  vStrideN,
-                  qk_reduced_data,
-                  kvBlockSize % 2 == 0 ? kvBlockSize : kvBlockSize + 1,
-                  n == 0 ? static_cast<accum_t>(0) : static_cast<accum_t>(1),
-                  dst_data,
-                  headSize);
+            } else if (n + kvSplitSize >= kvSize) {
+              // tail
+              if (n == 0) {
+                av_gemm_tail(
+                    qk_reduced_data,
+                    value_reorder_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    dst_data,
+                    1);
+              } else {
+                // bias
+                av_gemm_bias_tail(
+                    qk_reduced_data,
+                    value_reorder_ptr +
+                        i * num_head * kv_padding_size * headSize +
+                        j * kv_padding_size * headSize + psize * headSize,
+                    dst_data,
+                    1);
+              }
             }
           }
           // dst <- dst / sum[row]
@@ -1421,6 +1376,48 @@ cpu_flash_attention(
                       AT_PRIVATE_CASE_TYPE_USING_HINT(               \
                           at::ScalarType::Half, mask_t, __VA_ARGS__))
 
+#define FLASH_ATTENTION_KERNEL(FNAME, PACK, TYPE1, TYPE2, SEQ1, SEQ2, ...) \
+  if (PACK) {                                                              \
+    FNAME<TYPE1, TYPE2, SEQ1, SEQ2, true>(__VA_ARGS__);                    \
+  } else {                                                                 \
+    FNAME<TYPE1, TYPE2, SEQ1, SEQ2, false>(__VA_ARGS__);                   \
+  }
+
+inline bool use_vnni(
+    const at::ScalarType dtype,
+    const int64_t batchSize,
+    const int64_t qSize,
+    const int64_t kvSize,
+    const int64_t num_head,
+    const int64_t headSize,
+    const bool is_causal) {
+  if (!((dtype == at::kHalf && utils::isa_has_amx_fp16_support()) ||
+        (dtype == at::kBFloat16))) {
+    return false;
+  }
+  int64_t q_split_size = qSize >= 768 ? 256 : (qSize >= 192 ? 64 : 32);
+  int64_t qSplitSize = q_split_size > qSize ? qSize : q_split_size;
+  int64_t qSlice = (qSize - 1) / qSplitSize + 1;
+  int64_t num_thread = at::get_num_threads();
+
+  // BFloat16 requires larger size as the fallback implementation
+  // mkl_gemm_bf16bf16f32 is faster than mkl_gemm_f16f16f32
+  int64_t thresh_size = (dtype == at::kBFloat16) ? 64 : 16;
+  bool need_pack = kvSize >= thresh_size && qSize >= thresh_size;
+  // When the number of gemm is greater than the number of pack,
+  // the pack overhead can be overlaped.
+  if (need_pack) {
+    double pack_size = batchSize * num_head * kvSize * headSize;
+    double qs_per_thread =
+        (batchSize * num_head * qSlice + num_thread - 1) / num_thread;
+    double gemm_size_per_thread = qs_per_thread * qSplitSize *
+        (is_causal ? std::min(qSize, kvSize) : kvSize) * headSize;
+    need_pack =
+        gemm_size_per_thread / pack_size >= (dtype == at::kBFloat16 ? 4 : 1);
+  }
+  return need_pack;
+}
+
 void flash_attention_kernel_impl(
     const at::Tensor& output,
     const at::Tensor& logsumexp,
@@ -1433,11 +1430,26 @@ void flash_attention_kernel_impl(
     c10::optional<double> scale) {
   auto q_seq_len = query.size(2);
 
+  // cpu_flash_attention with vnni format could have better performance.
+  bool vnni = use_vnni(
+      /*dtype*/ query.scalar_type(),
+      /*batchSize*/ query.size(0),
+      /*qSize*/ q_seq_len,
+      /*kvSize*/ value.size(2),
+      /*num_head*/ query.size(1),
+      /*headSize*/ query.size(3),
+      /*is_causal*/ is_causal);
   AT_DISPATCH_FLOATING_TYPES_AND2(
       kBFloat16, kHalf, query.scalar_type(), "flash_attention", [&] {
         if (!attention_mask.has_value()) {
           if (q_seq_len >= 768) {
-            cpu_flash_attention<scalar_t, scalar_t, 256, 512>(
+            FLASH_ATTENTION_KERNEL(
+                cpu_flash_attention,
+                vnni,
+                scalar_t,
+                scalar_t,
+                256,
+                512,
                 output,
                 logsumexp,
                 query,
@@ -1448,7 +1460,13 @@ void flash_attention_kernel_impl(
                 attention_mask,
                 scale);
           } else if (q_seq_len >= 192) {
-            cpu_flash_attention<scalar_t, scalar_t, 64, 512>(
+            FLASH_ATTENTION_KERNEL(
+                cpu_flash_attention,
+                vnni,
+                scalar_t,
+                scalar_t,
+                64,
+                512,
                 output,
                 logsumexp,
                 query,
@@ -1459,7 +1477,13 @@ void flash_attention_kernel_impl(
                 attention_mask,
                 scale);
           } else {
-            cpu_flash_attention<scalar_t, scalar_t, 32, 512>(
+            FLASH_ATTENTION_KERNEL(
+                cpu_flash_attention,
+                vnni,
+                scalar_t,
+                scalar_t,
+                32,
+                512,
                 output,
                 logsumexp,
                 query,
@@ -1476,7 +1500,13 @@ void flash_attention_kernel_impl(
               "flash_attention_mask",
               [&]() {
                 if (q_seq_len >= 768) {
-                  cpu_flash_attention<scalar_t, mask_t, 256, 512>(
+                  FLASH_ATTENTION_KERNEL(
+                      cpu_flash_attention,
+                      vnni,
+                      scalar_t,
+                      mask_t,
+                      256,
+                      512,
                       output,
                       logsumexp,
                       query,
@@ -1487,7 +1517,13 @@ void flash_attention_kernel_impl(
                       attention_mask,
                       scale);
                 } else if (q_seq_len >= 192) {
-                  cpu_flash_attention<scalar_t, mask_t, 64, 512>(
+                  FLASH_ATTENTION_KERNEL(
+                      cpu_flash_attention,
+                      vnni,
+                      scalar_t,
+                      mask_t,
+                      64,
+                      512,
                       output,
                       logsumexp,
                       query,
@@ -1498,7 +1534,13 @@ void flash_attention_kernel_impl(
                       attention_mask,
                       scale);
                 } else {
-                  cpu_flash_attention<scalar_t, mask_t, 32, 512>(
+                  FLASH_ATTENTION_KERNEL(
+                      cpu_flash_attention,
+                      vnni,
+                      scalar_t,
+                      mask_t,
+                      32,
+                      512,
                       output,
                       logsumexp,
                       query,
@@ -1513,6 +1555,8 @@ void flash_attention_kernel_impl(
         }
       });
 }
+
+#undef FLASH_ATTENTION_KERNEL
 
 std::tuple<at::Tensor, at::Tensor> flash_attention_kernel(
     const at::Tensor& query,
