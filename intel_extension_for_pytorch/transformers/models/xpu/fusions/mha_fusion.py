@@ -336,7 +336,6 @@ class _IPEXVarlenScaledDotProductXPU(nn.Module):
                 is_causal,
                 return_softmax,
                 gen_,
-                softcap,
             )
         return out
 
