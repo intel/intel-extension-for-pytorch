@@ -548,6 +548,27 @@ class TestInt4Linear(TestCase):
             rtol=checking_rtol,
         )
 
+        # check gemm + bias + silu + mul
+        res0 = torch.rand([m, n], device="xpu", dtype=dtype)
+        with torch.xpu.compute_eng(torch.xpu.XPUComputeEng.XETLA):
+            out_xetla_silu = torch.ops.torch_ipex.mm_bias_silu_mul_int4(
+                input,
+                shuffled_weight.t().contiguous(),
+                bias,
+                scales.t().contiguous(),
+                zero_points,
+                group_size,
+                res0,
+                g_idx4kernel,
+            )
+        silu_mul_out = torch.nn.SiLU()(out_torch_bias) * res0.cpu().float()
+        self.assertEqual(
+            out_xetla_silu.cpu().float(),
+            silu_mul_out.float(),
+            atol=checking_atol,
+            rtol=checking_rtol,
+        )
+
         # check gemm + bias + residual + residual
         res0 = torch.rand([m, n], device="xpu", dtype=dtype)
         res1 = torch.rand([m, n], device="xpu", dtype=dtype)
