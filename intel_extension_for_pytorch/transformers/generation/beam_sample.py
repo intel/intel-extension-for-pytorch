@@ -178,6 +178,12 @@ def _beam_sample(
             "Maira2ForConditionalGeneration",
         ]:
             first_token = False
+            if hasattr(self.config, "kv_cache_dtype"):
+                kv_cache_dtype = self.config.kv_cache_dtype
+            elif hasattr(self, "dtype"):
+                kv_cache_dtype = self.dtype
+            else:
+                kv_cache_dtype = torch.float
             if model_inputs["past_key_values"] is None:
                 first_token = True
                 if self.model_backbone == "T5ForConditionalGeneration":
@@ -189,8 +195,12 @@ def _beam_sample(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 self.decoder.block[i]
@@ -247,10 +257,14 @@ def _beam_sample(
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros(
                                     [int(batch_size * num_beams), num_head, 1, head_dim]
-                                ).contiguous(),
+                                )
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 torch.zeros(
                                     [int(batch_size * num_beams), num_head, 1, head_dim]
-                                ).contiguous(),
+                                )
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                             )
                             for i in range(self.config.num_hidden_layers)
@@ -265,8 +279,12 @@ def _beam_sample(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 self.model.decoder.layers[i]
@@ -324,8 +342,12 @@ def _beam_sample(
                                     torch.zeros(
                                         1, 0, 0, 1, dtype=torch.long
                                     ).contiguous(),
-                                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    torch.zeros([1, 1, 1, 1])
+                                    .contiguous()
+                                    .to(kv_cache_dtype),
+                                    torch.zeros([1, 1, 1, 1])
+                                    .contiguous()
+                                    .to(kv_cache_dtype),
                                     beam_idx_tmp,
                                 )
                                 if i
@@ -343,8 +365,12 @@ def _beam_sample(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                             )
                             for i in range(num_hidden_layers)

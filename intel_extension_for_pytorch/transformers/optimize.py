@@ -1047,7 +1047,12 @@ def model_convert_reference(_model):
 
 def get_dummy_input(_model, return_dict=False):
     sample_inputs = None
-
+    if hasattr(_model.config, "kv_cache_dtype"):
+        kv_cache_dtype = _model.config.kv_cache_dtype
+    elif hasattr(_model, "dtype"):
+        kv_cache_dtype = _model.dtype
+    else:
+        kv_cache_dtype = torch.float
     if hasattr(_model.config, "n_layer"):
         model_num_layers = _model.config.n_layer
     elif hasattr(_model.config, "num_hidden_layers"):
@@ -1071,8 +1076,8 @@ def get_dummy_input(_model, return_dict=False):
                 (
                     (
                         torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
                         torch.zeros(1, 4, dtype=torch.long),
                         torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                         torch.zeros(
@@ -1115,8 +1120,8 @@ def get_dummy_input(_model, return_dict=False):
                 (
                     (
                         torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
                         torch.zeros(1, 4, dtype=torch.long),
                     )
                     if i not in _model.config.text_config.cross_attention_layers
@@ -1134,8 +1139,8 @@ def get_dummy_input(_model, return_dict=False):
                 (
                     (
                         torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
-                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                        torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
                         torch.zeros(1, 4, dtype=torch.long),
                     )
                 )
@@ -1359,7 +1364,11 @@ def get_dummy_input(_model, return_dict=False):
 
 
 def ipex_quantization_flow(
-    _model, dtype, sample_inputs, qconfig, static_qconfig_file=None
+    _model,
+    dtype,
+    sample_inputs,
+    qconfig,
+    static_qconfig_file=None,
 ):
     from intel_extension_for_pytorch.quantization import prepare, convert
 

@@ -170,6 +170,12 @@ def _greedy_search(
             "Maira2ForConditionalGeneration",
         ]:
             first_token = False
+            if hasattr(self.config, "kv_cache_dtype"):
+                kv_cache_dtype = self.config.kv_cache_dtype
+            elif hasattr(self, "dtype"):
+                kv_cache_dtype = self.dtype
+            else:
+                kv_cache_dtype = torch.float
             input_bs = input_ids.size()[0]
             if model_inputs["past_key_values"] is None:
                 first_token = True
@@ -182,8 +188,12 @@ def _greedy_search(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 self.decoder.block[i]
@@ -232,8 +242,12 @@ def _greedy_search(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 self.model.decoder.layers[i]
@@ -291,12 +305,12 @@ def _greedy_search(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros(
-                                    [input_bs, num_head, 1, head_dim]
-                                ).contiguous(),
-                                torch.zeros(
-                                    [input_bs, num_head, 1, head_dim]
-                                ).contiguous(),
+                                torch.zeros([input_bs, num_head, 1, head_dim])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([input_bs, num_head, 1, head_dim])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                             )
                             for i in range(num_hidden_layers)
@@ -314,8 +328,12 @@ def _greedy_search(
                                     torch.zeros(
                                         1, 0, 0, 1, dtype=torch.long
                                     ).contiguous(),
-                                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    torch.zeros([1, 1, 1, 1])
+                                    .contiguous()
+                                    .to(kv_cache_dtype),
+                                    torch.zeros([1, 1, 1, 1])
+                                    .contiguous()
+                                    .to(kv_cache_dtype),
                                     beam_idx_tmp,
                                 )
                                 if i
@@ -333,8 +351,12 @@ def _greedy_search(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                             )
                             for i in range(num_hidden_layers)

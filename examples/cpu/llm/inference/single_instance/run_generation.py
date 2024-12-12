@@ -105,6 +105,17 @@ parser.add_argument(
     action="store_true",
     help="whether or not it is vision-text multi-model structure",
 )
+parser.add_argument(
+    "--kv-cache-dtype",
+    type=str,
+    choices=[
+        "auto",
+        "fp8_e5m2",
+    ],
+    default="auto",
+    help='Data type for kv cache storage. If "auto", will use model '
+    "data type. fp8 type now supports e5m2.",
+)
 
 args = parser.parse_args()
 print(args)
@@ -154,6 +165,13 @@ else:
         trust_remote_code=True,
         torch_dtype=amp_dtype,
     )
+
+if args.kv_cache_dtype == "auto":
+    kv_cache_dtype = None
+elif args.kv_cache_dtype == "fp8_e5m2":
+    kv_cache_dtype = torch.float8_e5m2
+config.kv_cache_dtype = kv_cache_dtype
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "mpt" and args.prompt is None:

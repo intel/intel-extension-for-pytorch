@@ -163,16 +163,21 @@ class _IPEXScaleDotProductCPU(nn.Module):
         text_max_length: Optional[int] = 0,
         cutoff: Optional[torch.Tensor] = None,
         vision: Optional[torch.Tensor] = False,
+        cache_type: Optional[torch.dtype] = None,
     ):
+        if layer_past is None and cache_type is None:
+            cache_type = key.dtype
         if cutoff is not None:
             if layer_past is None:
                 layer_past = (
                     torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                     torch.zeros(
-                        [key.size(0), key.size(2), 1, key.size(-1)]
+                        [key.size(0), key.size(2), 1, key.size(-1)],
+                        dtype=cache_type,
                     ).contiguous(),
                     torch.zeros(
-                        [value.size(0), value.size(2), 1, value.size(-1)]
+                        [value.size(0), value.size(2), 1, value.size(-1)],
+                        dtype=cache_type,
                     ).contiguous(),
                     torch.zeros(1, int(query.size(0)), dtype=torch.long).contiguous(),
                 )
@@ -223,8 +228,8 @@ class _IPEXScaleDotProductCPU(nn.Module):
         if layer_past is None:
             layer_past = (
                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous().to(cache_type),
+                torch.zeros([1, 1, 1, 1]).contiguous().to(cache_type),
                 torch.zeros(1, int(query.size(0)), dtype=torch.long).contiguous(),
             )
         key_cache = layer_past[1].contiguous()
@@ -283,6 +288,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
         seq_info: Optional[torch.Tensor] = None,
         cutoff: Optional[torch.Tensor] = None,
         vision: Optional[torch.Tensor] = False,
+        cache_type: Optional[torch.dtype] = None,
     ):
         return self.apply_function(
             query,
@@ -298,6 +304,7 @@ class _IPEXScaleDotProductCPU(nn.Module):
             self.text_max_length,
             cutoff,
             vision,
+            cache_type,
         )
 
 

@@ -206,6 +206,12 @@ def _beam_search(
         ]:
             first_token = False
             has_position_id = model_inputs.get("position_ids", None) is not None
+            if hasattr(self.config, "kv_cache_dtype"):
+                kv_cache_dtype = self.config.kv_cache_dtype
+            elif hasattr(self, "dtype"):
+                kv_cache_dtype = self.dtype
+            else:
+                kv_cache_dtype = torch.float
             if model_inputs["past_key_values"] is None:
                 first_token = True
                 if self.model_backbone == "T5ForConditionalGeneration":
@@ -217,8 +223,12 @@ def _beam_search(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 self.decoder.block[i]
@@ -275,10 +285,14 @@ def _beam_search(
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 torch.zeros(
                                     [int(batch_size * num_beams), num_head, 1, head_dim]
-                                ).contiguous(),
+                                )
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 torch.zeros(
                                     [int(batch_size * num_beams), num_head, 1, head_dim]
-                                ).contiguous(),
+                                )
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                             )
                             for i in range(self.config.num_hidden_layers)
@@ -293,8 +307,12 @@ def _beam_search(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
                                 self.model.decoder.layers[i]
@@ -353,15 +371,23 @@ def _beam_search(
                                     torch.zeros(
                                         1, 0, 0, 1, dtype=torch.long
                                     ).contiguous(),
-                                    torch.zeros([1, 1, 1, 1]).contiguous(),
-                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    torch.zeros([1, 1, 1, 1])
+                                    .contiguous()
+                                    .to(kv_cache_dtype),
+                                    torch.zeros([1, 1, 1, 1])
+                                    .contiguous()
+                                    .to(kv_cache_dtype),
                                     beam_idx_tmp,
                                 )
                                 if i
                                 not in self.config.text_config.cross_attention_layers
                                 else (
-                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
-                                    torch.zeros([1, 1, 1, head_dim]).contiguous(),
+                                    torch.zeros([1, 1, 1, head_dim])
+                                    .contiguous()
+                                    .to(kv_cache_dtype),
+                                    torch.zeros([1, 1, 1, head_dim])
+                                    .contiguous()
+                                    .to(kv_cache_dtype),
                                 )
                             )
                             for i in range(num_hidden_layers)
@@ -372,8 +398,12 @@ def _beam_search(
                         [
                             (
                                 torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
-                                torch.zeros([1, 1, 1, 1]).contiguous(),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
+                                torch.zeros([1, 1, 1, 1])
+                                .contiguous()
+                                .to(kv_cache_dtype),
                                 beam_idx_tmp,
                             )
                             for i in range(num_hidden_layers)

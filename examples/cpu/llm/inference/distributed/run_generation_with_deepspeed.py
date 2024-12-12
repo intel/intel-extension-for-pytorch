@@ -198,6 +198,17 @@ parser.add_argument(
     " the cost of accuracy. It has not effect if you are loading low-precision checkpoints.",
 )
 parser.add_argument(
+    "--kv-cache-dtype",
+    type=str,
+    choices=[
+        "auto",
+        "fp8_e5m2",
+    ],
+    default="auto",
+    help='Data type for kv cache storage. If "auto", will use model '
+    "data type. fp8 type now supports e5m2.",
+)
+parser.add_argument(
     "--low-precision-checkpoint",
     default="",
     type=str,
@@ -205,6 +216,7 @@ parser.add_argument(
     " INT4 weights, scales, zero points, etc. For better accuracy of weight only"
     " quantization with INT4 weight.",
 )
+
 
 args = parser.parse_args()
 
@@ -350,6 +362,13 @@ else:
     config = AutoConfig.from_pretrained(
         args.config_file, torchscript=True, trust_remote_code=True
     )
+
+if args.kv_cache_dtype == "auto":
+    kv_cache_dtype = None
+elif args.kv_cache_dtype == "fp8_e5m2":
+    kv_cache_dtype = torch.float8_e5m2
+config.kv_cache_dtype = kv_cache_dtype
+
 if not hasattr(config, "text_max_length") and args.prompt is None:
     config.text_max_length = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "mpt" and args.prompt is None:

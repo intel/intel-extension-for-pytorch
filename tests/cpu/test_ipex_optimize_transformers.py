@@ -30,7 +30,7 @@ torch.manual_seed(128)
 curpath = os.path.abspath(os.path.dirname(__file__))
 
 
-def _get_gptj_example_inputs(batch_size=8):
+def _get_gptj_example_inputs(batch_size=8, kv_cache_dtype=torch.float):
     input_ids = torch.ones(batch_size).to(torch.long)
     attention_mask = torch.ones(len(input_ids))
     position_ids = torch.arange(len(input_ids))
@@ -38,8 +38,8 @@ def _get_gptj_example_inputs(batch_size=8):
         [
             (
                 torch.zeros(1, 1, 0, 1, dtype=torch.long).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
-                torch.zeros([1, 1, 1, 1]).contiguous(),
+                torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
+                torch.zeros([1, 1, 1, 1]).contiguous().to(kv_cache_dtype),
                 torch.zeros(1, 4, dtype=torch.long),
             )
             for i in range(1)
@@ -223,7 +223,7 @@ class OptimizeTransformersTester(TestCase):
             )
         # Ensure model can run without errors
         with torch.no_grad():
-            example_inputs = _get_gptj_example_inputs()
+            example_inputs = _get_gptj_example_inputs(kv_cache_dtype=model.dtype)
             y = model(*example_inputs)
             y_ref = orig_woq_model(
                 input_ids=example_inputs[0],
@@ -294,7 +294,9 @@ class OptimizeTransformersTester(TestCase):
                 model.transformer.h[0].linear_gelu.linear,
             ]
             with torch.no_grad(), torch.cpu.amp.autocast(enabled=True):
-                example_inputs = _get_gptj_example_inputs(batch_size=128)
+                example_inputs = _get_gptj_example_inputs(
+                    batch_size=128, kv_cache_dtype=model.dtype
+                )
                 y = model(*example_inputs)
                 y_ref = model_ref(*example_inputs)
                 for l in linear_list:
@@ -314,7 +316,7 @@ class OptimizeTransformersTester(TestCase):
         m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
         quant_m = copy.deepcopy(m)
         qconfig = ipex.quantization.get_smooth_quant_qconfig_mapping()
-        example_inputs = _get_gptj_example_inputs()
+        example_inputs = _get_gptj_example_inputs(kv_cache_dtype=m.dtype)
         quant_m = ipex.llm.optimize(
             quant_m, dtype=torch.float, quantization_config=qconfig, inplace=True
         )
@@ -405,7 +407,7 @@ class OptimizeTransformersTester(TestCase):
 
             # Ensure model can run without errors
             with torch.no_grad():
-                example_inputs = _get_gptj_example_inputs()
+                example_inputs = _get_gptj_example_inputs(kv_cache_dtype=ipex_m.dtype)
                 # the optimized model is ipex_m.trace_graph
                 ipex_m.trace_graph(*example_inputs)
 
@@ -469,7 +471,7 @@ class OptimizeTransformersTester(TestCase):
 
             # Ensure model can run without errors
             with torch.no_grad():
-                example_inputs = _get_gptj_example_inputs()
+                example_inputs = _get_gptj_example_inputs(kv_cache_dtype=ipex_m.dtype)
                 # the optimized model is ipex_m.trace_graph
                 ipex_m.trace_graph(*example_inputs)
 
@@ -556,7 +558,9 @@ class OptimizeTransformersTester(TestCase):
             model.transformer.h[0].linear_gelu.linear,
         ]
         with torch.no_grad(), torch.cpu.amp.autocast(enabled=True):
-            example_inputs = _get_gptj_example_inputs(batch_size=512)
+            example_inputs = _get_gptj_example_inputs(
+                batch_size=512, kv_cache_dtype=model.dtype
+            )
             y = model(*example_inputs)
             y_ref = model_ref(*example_inputs)
             assert all(hasattr(l, "weight_for_large_batch") for l in linear_list)

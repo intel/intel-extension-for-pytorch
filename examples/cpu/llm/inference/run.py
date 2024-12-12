@@ -300,6 +300,17 @@ def main(args_in: Optional[List[str]] = None) -> None:
         " In other cases, this feature is always turned on regardless of this argument and it does not"
         " conflict with the accuracy test.",
     )
+    parser.add_argument(
+        "--kv-cache-dtype",
+        type=str,
+        choices=[
+            "auto",
+            "fp8_e5m2",
+        ],
+        default="auto",
+        help='Data type for kv cache storage. If "auto", will use model '
+        "data type. fp8 type now supports e5m2.",
+    )
     args = parser.parse_args(args_in)
 
     parent_path = Path(__file__).parent.absolute()
@@ -335,6 +346,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             infer_cmd.extend(["--num-iter", str(args.num_iter)])
             infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
             infer_cmd.extend(["--batch-size", str(args.batch_size)])
+            infer_cmd.extend(["--kv-cache-dtype", args.kv_cache_dtype])
             if args.vision_text_model:
                 infer_cmd.extend(["--vision-text-model"])
             if args.greedy:
@@ -630,6 +642,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         infer_cmd.extend(["--num-iter", str(args.num_iter)])
         infer_cmd.extend(["--num-warmup", str(args.num_warmup)])
         infer_cmd.extend(["--batch-size", str(args.batch_size)])
+        infer_cmd.extend(["--kv-cache-dtype", args.kv_cache_dtype])
         if args.local_rank is not None:
             infer_cmd.extend(["--local_rank", str(args.local_rank)])
         if args.greedy:
