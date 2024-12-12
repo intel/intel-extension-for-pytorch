@@ -165,7 +165,7 @@ class TestOptimizeCases(TestCase):
                         any(
                             n.kind() == "ipex::batch_norm" for n in trace_graph.nodes()
                         ),
-                        not (linear_bn_folding),
+                        not (linear_bn_folding or (dim == 1 and level == "O1")),
                     )
 
     def test_optimize_conv_bn_linear_bn_parameters_behavior(self):
