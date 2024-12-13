@@ -224,25 +224,35 @@ import transformers
 TokenSequence = Union[List[int], torch.LongTensor, torch.Tensor, BatchEncoding]
 
 tp_grain_size = 64
-if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
-    pathname = args.low_precision_checkpoint
-    assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
-    if os.path.isdir(pathname):
-        try:
-            with open(pathname + "/config.json") as f:
-                quant_model_config = json.load(f)
-                tp_grain_size = int(
-                    quant_model_config["quantization_config"]["group_size"]
-                )
-        except Exception as e:
-            print("Failed to get group_size from config.json")
-    elif args.group_size > 0:
-        tp_grain_size = args.group_size
-    else:
-        print(
-            "Warning: cannot get group_size from config.json or --group-size, "
-            "using default value 64 for tp_grain_size"
-        )
+ds_init_inf_kwargs = {}
+# Need to check if this attr is available. Old DeepSpeep does not have it.
+if "tp_grain_size" in dir(deepspeed.inference.config.DeepSpeedTPConfig()):
+    if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
+        pathname = args.low_precision_checkpoint
+        assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
+        if os.path.isdir(pathname):
+            try:
+                with open(pathname + "/config.json") as f:
+                    quant_model_config = json.load(f)
+                    tp_grain_size = int(
+                        quant_model_config["quantization_config"]["group_size"]
+                    )
+            except Exception as e:
+                print("Failed to get group_size from config.json")
+        elif args.group_size > 0:
+            tp_grain_size = args.group_size
+        else:
+            print(
+                "Warning: cannot get group_size from config.json or --group-size, "
+                "using default value 64 for tp_grain_size"
+            )
+    ds_init_inf_kwargs.update(
+        {
+            "tensor_parallel": deepspeed.inference.config.DeepSpeedTPConfig(
+                tp_grain_size=tp_grain_size
+            )
+        }
+    )
 
 
 class HuggingFaceModel(BaseLM):
@@ -420,9 +430,7 @@ class HuggingFaceModel(BaseLM):
             base_dir=repo_root,
             dtype=infer_dtype,
             checkpoint=checkpoints_json,
-            tensor_parallel=deepspeed.inference.config.DeepSpeedTPConfig(
-                tp_grain_size=tp_grain_size
-            ),
+            **ds_init_inf_kwargs,
         )
 
         self.model = self.model.module
@@ -1495,9 +1503,7 @@ class LMMS(lmms):
             base_dir=repo_root,
             dtype=infer_dtype,
             checkpoint=checkpoints_json,
-            tensor_parallel=deepspeed.inference.config.DeepSpeedTPConfig(
-                tp_grain_size=tp_grain_size
-            ),
+            **ds_init_inf_kwargs,
         )
 
         self._model = self._model.module
@@ -2263,9 +2269,7 @@ class LibriSpeech:
             base_dir=repo_root,
             dtype=infer_dtype,
             checkpoint=checkpoints_json,
-            tensor_parallel=deepspeed.inference.config.DeepSpeedTPConfig(
-                tp_grain_size=tp_grain_size
-            ),
+            **ds_init_inf_kwargs,
         )
 
         self.model = self.model.module

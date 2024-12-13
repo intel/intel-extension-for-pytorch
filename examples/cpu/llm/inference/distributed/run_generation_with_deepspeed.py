@@ -486,25 +486,34 @@ else:
     dist.barrier()
 
 tp_grain_size = 64
-if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
-    pathname = args.low_precision_checkpoint
-    assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
-    if os.path.isdir(pathname):
-        try:
-            with open(pathname + "/config.json") as f:
-                quant_model_config = json.load(f)
-                tp_grain_size = int(
-                    quant_model_config["quantization_config"]["group_size"]
-                )
-        except Exception as e:
-            print("Failed to get group_size from config.json")
-    elif args.group_size > 0:
-        tp_grain_size = args.group_size
-    else:
-        print(
-            "Warning: cannot get group_size from config.json or --group-size, "
-            "using default value 64 for tp_grain_size"
-        )
+# Need to check if this attr is available. Old DeepSpeep does not have it.
+if "tp_grain_size" in dir(deepspeed.inference.config.DeepSpeedTPConfig()):
+    if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
+        pathname = args.low_precision_checkpoint
+        assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
+        if os.path.isdir(pathname):
+            try:
+                with open(pathname + "/config.json") as f:
+                    quant_model_config = json.load(f)
+                    tp_grain_size = int(
+                        quant_model_config["quantization_config"]["group_size"]
+                    )
+            except Exception as e:
+                print("Failed to get group_size from config.json")
+        elif args.group_size > 0:
+            tp_grain_size = args.group_size
+        else:
+            print(
+                "Warning: cannot get group_size from config.json or --group-size, "
+                "using default value 64 for tp_grain_size"
+            )
+    kwargs.update(
+        {
+            "tensor_parallel": deepspeed.inference.config.DeepSpeedTPConfig(
+                tp_grain_size=tp_grain_size
+            )
+        }
+    )
 
 model = deepspeed.init_inference(
     model,
@@ -512,9 +521,6 @@ model = deepspeed.init_inference(
     base_dir=repo_root,
     dtype=infer_dtype,
     checkpoint=checkpoints_json,
-    tensor_parallel=deepspeed.inference.config.DeepSpeedTPConfig(
-        tp_grain_size=tp_grain_size
-    ),
     **kwargs,
 )
 
@@ -659,6 +665,8 @@ if use_ipex:
         )
         if low_precision_checkpoint is not None:
             num_heads = model.config.num_attention_heads
+            if hasattr(model.config, "num_key_value_heads"):
+                num_heads = model.config.num_key_value_heads
             rank = local_rank
 
             mha_layers_split_by_N = [
@@ -712,7 +720,13 @@ if use_ipex:
                         # awq qweight: [K, N // 8]
                         # awq scales: [K // G, N]
                         # awq qzeros: [K // G, N // 8]
-                        dim = data.shape[-1] // head_range[-1]
+                        if data.shape[-1] % head_range[-1] == 0:
+                            dim = data.shape[-1] // head_range[-1]
+                        else:
+                            assert data.shape[-1] % world_size == 0
+                            dim = data.shape[-1] // world_size
+                            q_head_start = local_rank
+                            q_head_end = local_rank + 1
                         low_precision_checkpoint_dict[key] = data[
                             :, q_head_start * dim : q_head_end * dim
                         ]
