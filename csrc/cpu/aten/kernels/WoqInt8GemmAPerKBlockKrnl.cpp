@@ -105,10 +105,9 @@ at::Tensor woq_gemm_int8(
               if (quant_block_k <= 0)
                 quant_block_k = block_k;
               bool is_sym_quant = !is_asymmetric_quant_a(quant_a_mode);
-              auto [scale_a, zp_a] = compute_int8_qparams_per_block<act_type>(
-                  x, quant_block_k, quant_a_mode, is_sym_quant);
-              auto x_quantized = quantize_per_block<act_type>(
-                  x, scale_a, zp_a, quant_block_k, quant_a_mode, is_sym_quant);
+              auto [x_quantized, scale_a, zp_a] =
+                  dynamic_quantize_per_block<act_type>(
+                      x, quant_block_k, quant_a_mode);
               float* scale_a_ptr = (float*)scale_a.data_ptr();
               int32_t* zp_a_ptr =
                   is_sym_quant ? nullptr : (int32_t*)zp_a.data_ptr();

@@ -41,3 +41,15 @@
 #define QUANT_W_PER_K_BLOCK_SYM 3
 
 #define WOQ_N_BLOCK_SIZE 32
+
+constexpr bool is_asymmetric_quant_a(const int quant_a_mode) {
+  return quant_a_mode <= QUANT_A_PER_M_K_BLOCK;
+}
+
+constexpr bool is_asymmetric_quant_w(const int quant_w_mode) {
+  return quant_w_mode <= QUANT_W_PER_K_BLOCK;
+}
+
+constexpr bool is_4bit(const int qw_type) {
+  return qw_type == WOQ_DTYPE_INT4 || qw_type == WOQ_DTYPE_NF4;
+}
