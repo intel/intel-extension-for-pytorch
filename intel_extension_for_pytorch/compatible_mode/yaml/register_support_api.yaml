@@ -54,6 +54,7 @@ ddp_api:
 
 tensor_to_api:
   - torch.Tensor.to
+  - torch.Tensor.to.other
   - torch.Tensor.pin_memory
   - torch.nested.to_padded_tensor
 

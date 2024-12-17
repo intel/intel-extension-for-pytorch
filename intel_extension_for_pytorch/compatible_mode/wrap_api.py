@@ -11,6 +11,16 @@ class WrapAPI:
             device = kwargs.get("device")
             args_len = len(args)
             new_args = list(args)
+            # corner case for to_tensor
+            for arg_idx in range(1, args_len):
+                arg = args[arg_idx]
+                if isinstance(arg, torch.Tensor):
+                    # break to_tensor -> to_dtype and to_device
+                    # keep semantic align with to_tensor
+                    arg[0] = arg[0].to(arg.dtype)
+                    arg[0] = arg[0].to(arg.device)
+
+                    return api(*args, **kwargs)
 
             if device is not None and str(device).find("cuda") != -1:
                 # handle the "cuda:0" to "xpu:0"
