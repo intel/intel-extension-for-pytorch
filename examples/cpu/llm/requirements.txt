@@ -9,4 +9,4 @@ tiktoken
 unzip
 librosa
 soundfile
-setuptools==75.6.0
+setuptools>=50.0
