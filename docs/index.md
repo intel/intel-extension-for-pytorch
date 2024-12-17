@@ -84,7 +84,17 @@ The _\<FALCON3_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Fal
 ### 2.1.1 Run text generation with Falcon 3 7B model using Weight-only quantization (INT4) per CPU numa node
 
 #### 2.1.1.1 Quantization:
-You can use the auto-round tool to generate the INT4 WOQ model by yourself with the following steps:
+You can directly checkout the model card to download the existing quantized INT4 WOQ model of Falcon 3 7B [here](https://huggingface.co/OPEA/falcon-three-7b-int4-sym-inc) in the HF hub.
+```bash
+git lfs install # required to install git-lfs
+git clone https://huggingface.co/OPEA/Falcon3-7B-Base-int4-sym-inc
+cd Falcon3-7B-Base-int4-sym-inc
+git checkout e9aa317 # autoawq format
+cd ..
+export <INT4_MODEL_SAVE_PATH> = ./Falcon3-7B-Base-int4-sym-inc
+```
+
+Optionally, you can also try the auto-round tool to generate the INT4 WOQ model by yourself with the following steps (shall be same as above downloading one) :
 - Environment installation:
 ```bash
 pip install auto-round
@@ -100,6 +110,7 @@ auto-round  \
 --format 'auto_awq' \
 --output_dir <INT4_MODEL_SAVE_PATH>
 ```
+
 
 #### 2.1.1.2 Benchmark:
 - Command (benchmark):
