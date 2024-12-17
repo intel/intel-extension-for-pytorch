@@ -3,7 +3,6 @@ import sys
 import torch
 import functools
 import intel_extension_for_pytorch  # noqa:F401
-
 from .fake_module import common, nccl
 from collections import namedtuple
 from ruamel.yaml import YAML
@@ -131,6 +130,53 @@ def set_attr(mod, name, new_name):
         pass
 
 
+class device_meta_class(type):
+    def __instancecheck__(cls, instance):
+        if instance is None:
+            return False
+        return isinstance(instance, pre_device_class)
+
+
+class fake_device(metaclass=device_meta_class):
+    def __new__(cls, device_item, i=-1):
+        # device can be device_type, device_index, device_type:device_item
+        # deal with torch.device
+        if isinstance(device_item, pre_device_class):
+            if device_item.type == "xpu" or device_item.type == "cpu":
+                return pre_device_class(device_item.type, device_item.index)
+            elif device_item.type == "cuda":
+                return pre_device_class("xpu", device_item.index)
+            elif device_item.type == "meta":
+                return pre_device_class("meta", device_item.index)
+            else:
+                raise RuntimeError(
+                    "[Compatible mode] Met unexpected device type when creating new device object",
+                    device_item.type,
+                )
+
+        # special case for only index, torch will use cuda device
+        if isinstance(device_item, int):
+            return pre_device_class("xpu", device_item)
+
+        # met string here, may be cuda:0 or cuda
+        # need to check torch.xpu.current_device to get index
+        device_item = device_item.replace("cuda", "xpu")
+
+        if i == -1 and device_item.find(":") == -1:
+            current_device = torch.xpu.current_device()
+            if current_device != 0:
+                i = current_device
+
+        return (
+            pre_device_class(device_item)
+            if i == -1
+            else pre_device_class(device_item, i)
+        )
+
+    def __reduce__(self):
+        return (self.__class__, (self.type, self.index))
+
+
 class WrapHelper:
     def __init__(
         self, target_device="xpu", dist_backend="ccl", compile_backend="inductor"
@@ -248,52 +294,6 @@ class WrapHelper:
                 device_property.gpu_subslice_count
             )
             torch.cuda.amp.GradScaler = torch.amp.GradScaler
-
-            class device_meta_class(type):
-                def __instancecheck__(cls, instance):
-                    if instance is None:
-                        return False
-                    return isinstance(instance, pre_device_class)
-
-            class fake_device(metaclass=device_meta_class):
-                def __new__(cls, device_item, i=-1):
-                    # device can be device_type, device_index, device_type:device_item
-                    # deal with torch.device
-                    if isinstance(device_item, pre_device_class):
-                        if device_item.type == "xpu" or device_item.type == "cpu":
-                            return pre_device_class(device_item.type, device_item.index)
-                        elif device_item.type == "cuda":
-                            return pre_device_class("xpu", device_item.index)
-                        elif device_item.type == "meta":
-                            return pre_device_class("meta", device_item.index)
-                        else:
-                            raise RuntimeError(
-                                "[Compatible mode] Met unexpected device type when creating new device object",
-                                device_item.type,
-                            )
-
-                    # special case for only index, torch will use cuda device
-                    if isinstance(device_item, int):
-                        return pre_device_class("xpu", device_item)
-
-                    # met string here, may be cuda:0 or cuda
-                    # need to check torch.xpu.current_device to get index
-                    device_item = device_item.replace("cuda", "xpu")
-                    # prevent bad fork process go through here
-                    if (
-                        i == -1
-                        and device_item.find(":") == -1
-                        and not torch.xpu._is_in_bad_fork()
-                    ):
-                        current_device = torch.xpu.current_device()
-                        if current_device != 0:
-                            i = current_device
-
-                    return (
-                        pre_device_class(device_item)
-                        if i == -1
-                        else pre_device_class(device_item, i)
-                    )
 
             torch.device = fake_device
             # TODO: major, minor. Major means the arch, minor means the incremental imporvement
