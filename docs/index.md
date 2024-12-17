@@ -77,19 +77,18 @@ python run.py --help # for more detailed usages
 
 *Note:* You may need to log in your HuggingFace account to access the model files. Please refer to [HuggingFace login](https://huggingface.co/docs/huggingface_hub/quick-start#login).
 
-## 2.1 Usage of running Falcon 3 models
+## 2.1 Usage of running Falcon 3 7B models
 
 The _\<FALCON3_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Falcon 3 model you will run, which can be found from [HuggingFace Models](https://huggingface.co/models).
 
 ### 2.1.1 Run text generation with Falcon 3 7B model using Weight-only quantization (INT4) per CPU numa node
 
-#### 2.1.1.1 Commands:
-You can use auto-round tool to generate the INT4 WOQ model with the following steps.
+#### 2.1.1.1 Quantization:
+You can use the auto-round tool to generate the INT4 WOQ model by yourself with the following steps:
 - Environment installation:
 ```bash
 pip install auto-round
 ```
-
 - Command (quantize):
 ```bash
 auto-round  \
@@ -102,6 +101,15 @@ auto-round  \
 --output_dir <INT4_MODEL_SAVE_PATH>
 ```
 
+Optionally, you can also checkout the model card to download the existing quantized INT4 WOQ model of Falcon 3 7B [here](https://huggingface.co/OPEA/falcon-three-7b-int4-sym-inc) in the HF hub.
+```bash
+git clone https://huggingface.co/OPEA/falcon-three-7b-int4-sym-inc
+cd falcon-three-7b-int4-sym-inc
+git checkout e9aa317 # autoawq format
+cd ..
+export <INT4_MODEL_SAVE_PATH> = ./falcon-three-7b-int4-sym-inc
+```
+#### 2.1.1.2 Benchmark:
 - Command (benchmark):
 ```bash
 cd <LLM_DIR>
@@ -111,7 +119,7 @@ OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <physical cores list
 # Note that to get the best throughput on multiple CPU numa nodes, we could further tune how many cores per instance and batch sizes (according to the latency requirement) to run multiple instances at the same time. 
 ```
 
-#### 2.1.1.2 Notes:
+#### 2.1.1.3 Notes:
 
 (1) [_numactl_](https://linux.die.net/man/8/numactl) is used to specify memory and cores of your hardware to get better performance. _\<node N\>_ specifies the [numa](https://en.wikipedia.org/wiki/Non-uniform_memory_access) node id (e.g., 0 to use the memory from the first numa node). _\<physical cores list\>_ specifies phsysical cores which you are using from the _\<node N\>_ numa node. You can use [_lscpu_](https://man7.org/linux/man-pages/man1/lscpu.1.html) command in Linux to check the numa node information.
 
