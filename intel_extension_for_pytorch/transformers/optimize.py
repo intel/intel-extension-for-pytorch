@@ -53,6 +53,7 @@ def lowering_class_cpu(m, target_m, new_class, config, tpp=False, woq=False):
 
 
 distributed = False
+is_deepspeed = False
 
 
 def is_distributed(m, ds_layers):
@@ -62,6 +63,8 @@ def is_distributed(m, ds_layers):
             ds_layers,
         ):
             global distributed
+            global is_deepspeed
+            is_deepspeed = True
             distributed = True
             return
         is_distributed(sub_m, ds_layers)
@@ -465,7 +468,8 @@ def model_convert_reference(_model):
         rank = ipex_comm.get_rank() if ipex_comm.has_ccl else 0
         if world_size > 1:
             global distributed
-            if distributed:
+            global is_deepspeed
+            if is_deepspeed:
                 need_ipex_tp = False
             else:
                 need_ipex_tp = True
