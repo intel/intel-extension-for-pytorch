@@ -149,7 +149,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         #     URL_NIGHTLY="nightly/"
         # fi
         # echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu" >> ${AUX_INSTALL_SCRIPT}
-        echo "python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20241124%2Bcpu-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20241124%2Bcpu-cp310-cp310-linux_x86_64.whl >> ${AUX_INSTALL_SCRIPT}
         # Install PyTorch and Intel® Extension for PyTorch*
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
