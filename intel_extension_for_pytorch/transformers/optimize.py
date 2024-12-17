@@ -2039,11 +2039,15 @@ def optimize(
         return _model
 
     except RuntimeError as e:
-        logger.warning(
-            f"fail to apply ipex.llm.optimize due to: {e}, fallback to the origin model",
-            _type=WarningType.NotSupported,
-        )
-        return model
+        # if the model is not in the list, fallback without throwing errors
+        if not well_supported_model:
+            logger.warning(
+                f"fail to apply ipex.llm.optimize due to: {e}, fallback to the origin model",
+                _type=WarningType.NotSupported,
+            )
+            return model
+        else:
+            raise e
 
     return model
 
