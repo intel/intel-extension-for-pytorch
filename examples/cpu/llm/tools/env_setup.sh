@@ -159,7 +159,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         rm -rf compile_bundle.sh llvm-project llvm-release torch-ccl
     fi
 
-    echo "python -m pip install -r ./requirements.txt" >> ${AUX_INSTALL_SCRIPT}
+    # echo "python -m pip install -r ./requirements.txt" >> ${AUX_INSTALL_SCRIPT}
+    python -m pip install -r ./requirements.txt
 
     # Used for accuracy test only
     if [ -d lm-evaluation-harness ]; then
