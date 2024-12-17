@@ -80,9 +80,9 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
 
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20241124%2Bcpu-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
         echo "python -m pip install https://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgitb24885d-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
-        python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
+        python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20241124%2Bcpu-cp310-cp310-linux_x86_64.whl
         python -m pip install https://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgitb24885d-cp310-cp310-linux_x86_64.whl
     else
         function ver_compare() {
@@ -149,7 +149,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
         #     URL_NIGHTLY="nightly/"
         # fi
         # echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/${URL_NIGHTLY}cpu" >> ${AUX_INSTALL_SCRIPT}
-        echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install https://download.pytorch.org/whl/nightly/cpu/torch-2.6.0.dev20241124%2Bcpu-cp310-cp310-linux_x86_64.whl >> ${AUX_INSTALL_SCRIPT}
         # Install PyTorch and Intel® Extension for PyTorch*
         cp intel-extension-for-pytorch/scripts/compile_bundle.sh .
         sed -i "s/VER_IPEX=.*/VER_IPEX=/" compile_bundle.sh
