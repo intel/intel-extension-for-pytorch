@@ -288,12 +288,20 @@ struct group_row_reduce_t {
     load_payload_t sg_load_payload(slm_base, kTotal, 1, kTotal, 0, 0);
     subgroup::tile_load(sg_load, sg_load_payload);
 
-    auto data_2d = sg_load.reg.xetla_format<T, kNumSg, kNum>();
-    ret = data_2d.row(0);
+    // Use different ways to do reduce based on whether kNumSg is a power of 2
+    if constexpr ((kNumSg & (kNumSg - 1)) == 0) {
+      // Efficient reduction for power-of-2 sub-group sizes
+      ret = recur_row_reduce<reduce_kind, T, kNum, kNumSg>(sg_load.reg);
+    } else {
+      // General reduction for non-power-of-2 sub-group sizes
+      auto data_2d = sg_load.reg.xetla_format<T, kNumSg, kNum>();
+      ret = data_2d.row(0);
 #pragma unroll
-    for (int i = 1; i < kNumSg; i++) {
-      ret = reduce_helper<reduce_kind, T, kNum>(data_2d.row(i), ret);
+      for (int i = 1; i < kNumSg; i++) {
+        ret = reduce_helper<reduce_kind, T, kNum>(data_2d.row(i), ret);
+      }
     }
+
     return ret;
   }
 };
