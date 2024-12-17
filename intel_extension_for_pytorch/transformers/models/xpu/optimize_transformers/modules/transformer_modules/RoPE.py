@@ -1,6 +1,6 @@
 import torch
-import torch.nn as nn
 import math
+import torch.nn as nn
 import dataclasses
 from typing import Dict, Union, List
 from .._transformer_configuration import IPEXTransformerConfig
@@ -449,11 +449,61 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
         self.base = config.positional_embedding_base
         self.device = config.device
         self.dtype = dtype
-        if (
+        self.rope_type = "default"
+        if config.rope_scaling is not None:
+            self.rope_type = config.rope_scaling.get(
+                "rope_type", config.rope_scaling.get("type")
+            )
+        if self.rope_type == "su":
+            self.short_factor = config.rope_scaling["short_factor"]
+            self.long_factor = config.rope_scaling["long_factor"]
+            self.max_seq_len = config.max_positions
+            LlamaRotaryEmbedding.max_position_embedding = (
+                config.original_max_position_embeddings
+            )
+            self.original_max_position_embeddings = (
+                config.original_max_position_embeddings
+            )
+            self.create_sin_cos_cache_long_scaled_rope(
+                self.original_max_position_embeddings
+            )
+        elif (
             LlamaRotaryEmbedding.sin_cached is None
             or LlamaRotaryEmbedding.cos_cached is None
         ):
             self.create_sin_cos_cache(LlamaRotaryEmbedding.max_position_embedding)
+
+    def create_sin_cos_cache_long_scaled_rope(self, seq_len):
+        if seq_len > self.original_max_position_embeddings:
+            ext_factors = torch.tensor(
+                self.long_factor, dtype=torch.float32, device=self.device
+            )
+        else:
+            ext_factors = torch.tensor(
+                self.short_factor, dtype=torch.float32, device=self.device
+            )
+
+        inv_freq_shape = (
+            torch.arange(0, self.dim, 2, dtype=torch.int64, device=self.device).float()
+            / self.dim
+        )
+        inv_freq = 1.0 / (ext_factors * self.base**inv_freq_shape)
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+
+        device = self.inv_freq.device
+        t = torch.arange(seq_len, device=device, dtype=self.inv_freq.dtype)
+        freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+        emb = torch.cat((freqs, freqs), dim=-1)
+
+        scale = self.max_seq_len / self.original_max_position_embeddings
+        if scale <= 1.0:
+            scaling_factor = 1.0
+        else:
+            scaling_factor = math.sqrt(
+                1 + math.log(scale) / math.log(self.original_max_position_embeddings)
+            )
+        LlamaRotaryEmbedding.cos_cached = emb.cos().to(self.dtype) * scaling_factor
+        LlamaRotaryEmbedding.sin_cached = emb.sin().to(self.dtype) * scaling_factor
 
     def create_sin_cos_cache(self, pos):
         inv_freq = 1.0 / (
@@ -509,7 +559,10 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
     def update_cache_if_needed(self, kv_seq_len):
         if kv_seq_len >= LlamaRotaryEmbedding.max_position_embedding:
             new_cache_length = kv_seq_len + self.dynamic_cache_stride
-            self.create_sin_cos_cache(new_cache_length)
+            if self.rope_type == "su":
+                self.create_sin_cos_cache_long_scaled_rope(new_cache_length)
+            else:
+                self.create_sin_cos_cache(new_cache_length)
             LlamaRotaryEmbedding.max_position_embedding = new_cache_length
 
     def get_sin_cos(self, position_ids, layer_id, beam_size, kv_seq_len, cache_format):

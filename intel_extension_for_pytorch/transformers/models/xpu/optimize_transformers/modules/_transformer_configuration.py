@@ -26,9 +26,11 @@ class IPEXTransformerConfig:
     num_attention_head: int = 16
     num_key_value_head: int = None
     max_positions: int = 4096
+    original_max_position_embeddings: int = 4096
     max_out_positions: int = 256
     kv_channels: int = 128
     rotary_embedding_class: str = "GPTJRotaryEmbedding"
+    rope_scaling: dict = None
     rotary_pct: float = 1.0
     rotary_dim: int = 64
     rotary_half: bool = False
