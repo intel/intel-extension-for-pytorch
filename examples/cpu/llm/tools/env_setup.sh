@@ -90,9 +90,9 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
             exit 4
         else
             echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
-            echo "python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/" >> ${AUX_INSTALL_SCRIPT}
+            echo "python -m pip install https://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgitb24885d-cp310-cp310-linux_x86_64.whl" >> ${AUX_INSTALL_SCRIPT}
             python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
-            python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
+            python -m pip install https://intel-optimized-pytorch.s3.cn-north-1.amazonaws.com.cn/ipex_dev/cpu/intel_extension_for_pytorch-2.6.0%2Bgitb24885d-cp310-cp310-linux_x86_64.whl
         fi
     else
         function ver_compare() {
