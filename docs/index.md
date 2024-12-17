@@ -84,20 +84,22 @@ The _\<FALCON3_MODEL_ID_OR_LOCAL_PATH\>_ in the below commands specifies the Fal
 ### 2.1.1 Run text generation with Falcon 3 7B model using Weight-only quantization (INT4) per CPU numa node
 
 #### 2.1.1.1 Commands:
-You can use auto-round (part of INC) to generate the INT4 WOQ model with the following steps.
+You can use auto-round tool to generate the INT4 WOQ model with the following steps.
 - Environment installation:
 ```bash
-pip install git+https://github.com/intel/auto-round.git@llama/new/9
-git clone https://github.com/intel/auto-round.git
-cd auto-round
-git checkout -b llama/new/9 origin/llama/new/9
-cd examples/language-modeling
+pip install auto-round
 ```
 
 - Command (quantize):
 ```bash
-export model_name=/path/to/model
-python3 main.py --model_name  $model_name --device cpu --gradient_accumulate_steps 2 --model_dtype bfloat16 --group_size 128  --train_bs 4 --iters 1000 --nsample 512  --format auto_gptq   --disable_quanted_input  --disable_eval --output_dir <INT4_MODEL_SAVE_PATH>
+auto-round  \
+--model <FALCON3_MODEL_ID_OR_LOCAL_PATH> \
+--nsamples 512 \
+--seqlen 2048 \
+--iters 1000 \
+--model_dtype "float16" \
+--format 'auto_awq' \
+--output_dir <INT4_MODEL_SAVE_PATH>
 ```
 
 - Command (benchmark):
