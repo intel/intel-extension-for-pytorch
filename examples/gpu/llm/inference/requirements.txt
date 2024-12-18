@@ -1,7 +1,7 @@
 numpy
-deepspeed==0.14.4
+deepspeed==0.15.3
 tiktoken==0.8.0
 neural-compressor==3.1.1
 numba
 tbb
-transforme==4.44.2
+transformers==4.44.2

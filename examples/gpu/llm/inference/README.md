@@ -11,13 +11,14 @@ Here you can find the inference benchmarking scripts for large language models (
 
 Currently, only support Transformers 4.44.2. Support for newer versions of Transformers and more models will be available in the future.
 
-| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics |
-|---|:---:|:---:|:---:|:---:|:---:|
-|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |🟩| 🟩|🟩|🟩|
-|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |🟩| 🟩|🟩|🟩|
-|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct" |🟩| 🟩|🟩|🟩|
-|GPT-J| "EleutherAI/gpt-j-6b" | 🟩 | 🟩 |🟩 | 🟩|
-|Qwen2|"Qwen2/Qwen2-7B"|🟩 | 🟩 |🟩 | 🟩|
+| MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics | Optimized on Intel® Arc™ B-Series Graphics (B580) | 
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |🟩| 🟩|🟩|🟩|$🟩^1$|
+|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |🟩| 🟩|🟩|🟩|$🟩^2$|
+|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct" |🟩| 🟩|🟩|🟩|$🟩^3$|
+|GPT-J| "EleutherAI/gpt-j-6b" | 🟩 | 🟩 |🟩 | 🟩| |
+|Qwen|"Qwen/Qwen2-7B"|🟩 | 🟩 |🟩 | 🟩| |
+|Qwen|"Qwen/Qwen2-7B-Instruct"| | | | | 🟩 |
 |OPT|"facebook/opt-6.7b", "facebook/opt-30b"| 🟩 | 🟥 |🟩 | 🟥 |
 |Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| 🟩 | 🟥 |🟩 | 🟥 |
 |GLM4-9B|"THUDM/glm-4-9b"| 🟩 | 🟥 |🟩 | 🟥 |
@@ -26,6 +27,13 @@ Currently, only support Transformers 4.44.2. Support for newer versions of Trans
 - 🟩 signifies that it is supported.
 
 - 🟥 signifies that it is not supported yet.
+  
+-  1: signifies that Llama-2-7b-hf is verified.
+  
+-  2: signifies that Meta-Llama-3-8B is verified.
+  
+-  3: signifies that Phi-3-mini-4k-instruct is verified.
+
 
 
 **Note**: The verified models mentioned above (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well-supported with all optimizations like indirect access KV cache and fused ROPE. For other LLM families, we are actively working to implement these optimizations, which will be reflected in the expanded model list above. 

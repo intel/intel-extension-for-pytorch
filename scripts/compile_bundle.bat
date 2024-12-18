@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set "VER_IPEX=xpu-main"
+set "VER_IPEX=v2.5.10+xpu"
 set "ENABLE_ONEAPI_INTEGRATION=1"
 
 if "%~2"=="" (
