@@ -98,9 +98,6 @@ at::Tensor woq_gemm_int8(
               auto quant_w_mode_ = std::get<1>(tuple);
               using act_type =
                   typename c10::impl::ScalarTypeToCPPType<act_dtype>::type;
-              TLA_ASSERT(
-                  qw_type == WOQ_DTYPE_INT4 || qw_type == WOQ_DTYPE_INT8,
-                  "LOWP_MODE_INT8 only support qw_type = INT4 or INT8");
               float scale_a;
               int32_t zp_a;
               bool is_sym_quant = !is_asymmetric_quant_a(quant_a_mode);

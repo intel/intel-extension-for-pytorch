@@ -2318,6 +2318,87 @@ class WeightOnlyQuantizationTester(TestCase):
         for M, use_bias, w_dtype in cases:
             test(M, use_bias, w_dtype)
 
+    def test_weight_only_quantization_nf4_lowp_mode_int8(self):
+
+        class Mod(nn.Module):
+            def __init__(self, has_bias):
+                super(Mod, self).__init__()
+                self.linear = torch.nn.Linear(K, N, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(has_bias, act_quant_mode, M):
+            dtype = torch.bfloat16
+            model = Mod(has_bias)
+            m = model.eval()
+            m2 = copy.deepcopy(m)
+            data = torch.rand(M, K) * 0.5
+            qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=WoqWeightDtype.NF4,
+                lowp_mode=WoqLowpMode.INT8,
+                act_quant_mode=act_quant_mode,
+                group_size=groupsize,
+            )
+            fake_quant_x = (
+                self._fakequant_by_group(data, act_quant_mode, groupsize)
+                if act_quant_mode < 4
+                else self._fakequant_by_group_sym(data, act_quant_mode, groupsize)
+            )
+            prepared_model = prepare(m2, qconfig_mapping, inplace=True)
+            with torch.no_grad(), torch.autocast(
+                device_type="cpu", enabled=True, dtype=dtype
+            ):
+                woq_model = convert(prepared_model)
+                w_scales = woq_model.linear._op_context.get_scales()
+                w_zero_points = woq_model.linear._op_context.get_zero_points()
+                w = copy.deepcopy(m.linear.weight.data)
+                qw, _, _ = quantize_per_block(
+                    w,
+                    WoqWeightDtype.NF4,
+                    groupsize,
+                    w_scales,
+                    w_zero_points,
+                    sym_quant=True,
+                )
+                fake_quant_w = dequantize_per_block(
+                    qw,
+                    w_scales,
+                    w_zero_points,
+                    WoqWeightDtype.NF4,
+                    groupsize,
+                    w.shape,
+                    dequant_nf4_via_int8=True,
+                )
+                m.linear.weight.data = fake_quant_w
+                y_ref = m(fake_quant_x).to(dtype)
+                y = woq_model(data)
+                try:
+                    torch.testing.assert_close(y, y_ref, atol=1e-2 * 5, rtol=1e-1 * 2)
+                except Exception:
+                    # The fallback kernel does not support act quant mode
+                    # It computes in fp32 by dequantizing weight.
+                    fake_quant_w = dequantize_per_block(
+                        qw,
+                        w_scales,
+                        w_zero_points,
+                        WoqWeightDtype.NF4,
+                        groupsize,
+                        w.shape,
+                    )
+                    y_ref = data @ fake_quant_w.T + (m.linear.bias if has_bias else 0)
+                    y_ref = y_ref.to(dtype)
+                    torch.testing.assert_close(y, y_ref, atol=1e-2, rtol=1e-1)
+
+        N, K = 64, 512
+        groupsize = 64
+        has_bias_list = [False, True]
+        quant_mode_list = [0, 1, 2, 3, 4, 5, 6, 7]
+        batch_size_list = [4, 1024]
+        cases = itertools.product(has_bias_list, quant_mode_list, batch_size_list)
+        for has_bias, quant_mode, M in cases:
+            test(has_bias, quant_mode, M)
+
 
 class QuantizedOpTester(TestCase):
     def test_dequantize_nf4(self):

@@ -362,7 +362,7 @@ ContextLinearWoq create(
       lowp_mode,
       act_quant_mode,
       cache_weight_for_large_batch);
-  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == LOWP_MODE_INT8) {
     auto compensation = woq_linear_compute_compensation(
         weight, weight_dtype, group_size, lowp_mode);
     context.cached_compensation_ =

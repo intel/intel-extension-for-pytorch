@@ -525,6 +525,51 @@ inline std::array<__m256i, 2> load_sint4_as_int8(uint8_t* qB) {
   return {low, high};
 }
 
+// load nf4
+inline std::array<__m256i, 2> load_nf4_as_int8(uint8_t* qB) {
+  __m256i packed = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qB));
+  const __m256i low_mask = _mm256_set1_epi8(0x0f);
+  __m256i high = _mm256_srli_epi16(packed, 4);
+  high = _mm256_and_si256(high, low_mask);
+  __m256i low = _mm256_and_si256(packed, low_mask);
+  const __m256i lut = _mm256_set_epi8(
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      127,
+      92,
+      71,
+      56,
+      43,
+      31,
+      20,
+      10,
+      0,
+      -12,
+      -23,
+      -36,
+      -50,
+      -67,
+      -88,
+      -127);
+  low = _mm256_permutexvar_epi8(low, lut);
+  high = _mm256_permutexvar_epi8(high, lut);
+  return {low, high};
+}
+
 #else
 inline std::array<__m256i, 2> load_zps_4vnni(int8_t* zps) {
   TLA_ASSERT(false, "not implemented");
@@ -537,6 +582,11 @@ inline std::array<__m256i, 2> load_uint4_as_int8(uint8_t* qB) {
 }
 
 inline std::array<__m256i, 2> load_sint4_as_int8(uint8_t* qB) {
+  TLA_ASSERT(false, "not implemented");
+  return std::array<__m256i, 2>();
+}
+
+inline std::array<__m256i, 2> load_nf4_as_int8(uint8_t* qB) {
   TLA_ASSERT(false, "not implemented");
   return std::array<__m256i, 2>();
 }
@@ -831,6 +881,10 @@ struct GemmMicroKernel<
     // Load scales and zps
     compile_time_for<COLS>::op([&](auto i) {
       vscales[i] = _mm512_loadu_ps(scales + i * 16);
+      if constexpr (qw_type == WOQ_DTYPE_NF4) {
+        const __m512 factor = _mm512_set1_ps(1.0f / 127.0f);
+        vscales[i] = _mm512_mul_ps(vscales[i], factor);
+      }
       // TODO(jgong5): should we use 512 or two 256 here?
       if constexpr (!sym_quant_w) {
         vzps[i] = combine_m256i(load_zps_4vnni(zps + i * 16));
@@ -859,8 +913,10 @@ struct GemmMicroKernel<
         if constexpr (!sym_quant_w) {
           vb[col] = combine_m256i(load_uint4_as_int8(pqB[k / 4][col * 16]));
           vb[col] = _mm512_sub_epi8(vb[col], vzps[col]);
-        } else {
+        } else if constexpr (qw_type == WOQ_DTYPE_INT4) {
           vb[col] = combine_m256i(load_sint4_as_int8(pqB[k / 4][col * 16]));
+        } else {
+          vb[col] = combine_m256i(load_nf4_as_int8(pqB[k / 4][col * 16]));
         }
         if constexpr (is_asymmetric_quant_a(quant_a_mode)) {
           vcompensate[col] =
@@ -1290,12 +1346,12 @@ struct Dequantize<half, ldb, N_GROUP_SIZE, qw_type, sym_quant_w> {
   }
 };
 
-template <long ldb, bool sym_quant_w>
+template <long ldb, int qw_type, bool sym_quant_w>
 struct Dequantize<
     int8_t,
     ldb,
     /*N_GROUP_SIZE*/ 16,
-    /*qw_type*/ WOQ_DTYPE_INT4,
+    qw_type,
     sym_quant_w> {
   template <int quant_a_mode>
   static inline void call(
@@ -1330,8 +1386,12 @@ struct Dequantize<
           auto [low, high] = load_uint4_as_int8(pqB[k][n]);
           vb_high = _mm256_sub_epi8(high, vzps_high);
           vb_low = _mm256_sub_epi8(low, vzps_low);
-        } else {
+        } else if constexpr (qw_type == WOQ_DTYPE_INT4) {
           auto [low, high] = load_sint4_as_int8(pqB[k][n]);
+          vb_low = low;
+          vb_high = high;
+        } else {
+          auto [low, high] = load_nf4_as_int8(pqB[k][n]);
           vb_low = low;
           vb_high = high;
         }
@@ -1585,6 +1645,7 @@ template <
     long ldb,
     bool transA,
     bool ACC,
+    int qw_type,
     int quant_a_mode,
     int quant_w_mode,
     long PREFETCH_K_DIST>
@@ -1598,7 +1659,7 @@ class DequantGemmTPP<
     ldb,
     transA,
     ACC,
-    /*qw_type*/ WOQ_DTYPE_INT4,
+    qw_type,
     quant_a_mode,
     quant_w_mode,
     PREFETCH_K_DIST> {
@@ -1696,7 +1757,7 @@ class DequantGemmTPP<
                   ACC,
                   quant_a_mode,
                   PREFETCH_K_DIST>::
-                  template call<WOQ_DTYPE_INT4, sym_quant_w>(
+                  template call<qw_type, sym_quant_w>(
                       K,
                       qA[m],
                       lda,
@@ -1725,7 +1786,7 @@ class DequantGemmTPP<
                         ACC,
                         quant_a_mode,
                         PREFETCH_K_DIST>::
-                        template call<WOQ_DTYPE_INT4, sym_quant_w>(
+                        template call<qw_type, sym_quant_w>(
                             K,
                             qA[m],
                             lda,
@@ -1748,12 +1809,7 @@ class DequantGemmTPP<
       int8_t B[K / 4][N][4];
       int32_t qC[M][N];
       int32_t compensation[N];
-      Dequantize<
-          int8_t,
-          ldb,
-          N_GROUP_SIZE,
-          /*qw_type*/ WOQ_DTYPE_INT4,
-          sym_quant_w>::
+      Dequantize<int8_t, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::
           template call<quant_a_mode>(qB, K, N, zps, B[0][0], compensation);
       (*pgemm)((int8_t*)qA[0], B[0][0], qC[0], 1, no_tile_cfg);
       if constexpr (PREFETCH_K_DIST > 0) {
@@ -1782,11 +1838,14 @@ class DequantGemmTPP<
             }
           }
           float c = 0;
+          auto scale = scales[n];
+          if constexpr (qw_type == WOQ_DTYPE_NF4) {
+            scale *= (1.0f / 127.0f);
+          }
           if constexpr (is_asymmetric_quant_a(quant_a_mode)) {
-            c = (qC[m][n] - compensation[n] * (*zp_a_m)) * (*scale_a_m) *
-                scales[n];
+            c = (qC[m][n] - compensation[n] * (*zp_a_m)) * (*scale_a_m) * scale;
           } else {
-            c = (qC[m][n]) * (*scale_a_m) * scales[n];
+            c = (qC[m][n]) * (*scale_a_m) * scale;
           }
           if constexpr (ACC) {
             C[m * ldc + n] += c;

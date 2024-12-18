@@ -825,6 +825,8 @@ NF4_DEQUANT_TABLE = [
     1.0,
 ]
 
+NF4_TO_INT8_TABLE = [round(x * 127) for x in NF4_DEQUANT_TABLE]
+
 
 def map_float_tensor_to_nf4(t, dtype=torch.uint8):
     # Map [-1, 1] to nf4
@@ -840,6 +842,14 @@ def map_nf4_tensor_to_float(t, dtype=torch.float32):
     out_dq = torch.empty(t.shape).to(dtype)
     for i in range(len(NF4_DEQUANT_TABLE)):
         out_dq[t == i] = NF4_DEQUANT_TABLE[i]
+    return out_dq
+
+
+def map_nf4_tensor_to_int8(t, dtype=torch.float32):
+    # Map nf4 to [-127, 127]
+    out_dq = torch.empty(t.shape).to(dtype)
+    for i in range(len(NF4_TO_INT8_TABLE)):
+        out_dq[t == i] = NF4_TO_INT8_TABLE[i]
     return out_dq
 
 
@@ -942,6 +952,7 @@ def dequantize_per_channel(
     zps: Optional[torch.Tensor],
     dtype,
     weight_shape=None,
+    dequant_nf4_via_int8=False,
 ):
     r"""
     Dequantize a weight tensor of Linear modules per channel.
@@ -955,6 +966,7 @@ def dequantize_per_channel(
         dtype: data type of the quantized tensor, int8, int4 or nf4
         weight_shape: True weight shape. INT4 tensor's input channel may
             be padded to even, so we need this to return the correct weight.
+        dequant_nf4_via_int8: If true, map nf4 to int8 then dequantize to float
 
     Returns:
         The dequantized tensor
@@ -988,7 +1000,10 @@ def dequantize_per_channel(
         )
         t[:, ::2] = qt.bitwise_and(0xF)
         t[:, 1::2] = qt.bitwise_right_shift(4)
-        t = map_nf4_tensor_to_float(t)
+        if dequant_nf4_via_int8:
+            t = map_nf4_tensor_to_int8(t) / 127.0
+        else:
+            t = map_nf4_tensor_to_float(t)
         if weight_shape is not None:
             t = t[: weight_shape[0], : weight_shape[1]].contiguous()
         t = t * scales.unsqueeze(-1)
@@ -1177,6 +1192,7 @@ def dequantize_per_block(
     dtype,
     group_size,
     weight_shape=None,
+    dequant_nf4_via_int8=False,
 ):
     r"""
     Dequantize a weight tensor of Linear modules per block.
@@ -1189,7 +1205,9 @@ def dequantize_per_block(
         zps: Zero points in shape [N, #block_k]
         dtype: data type of the quantized tensor, int8, int4 or nf4
         group_size: Size of group along input channel
-        block_oc: Block size of output channel, should be the same for weight packing
+        weight_shape: True weight shape. INT4 tensor's input channel may
+            be padded to even, so we need this to return the correct weight.
+        dequant_nf4_via_int8: If true, map nf4 to int8 then dequantize to float
 
     Returns:
         The dequantized tensor
@@ -1218,11 +1236,18 @@ def dequantize_per_block(
     qt_com = qt[:, : K - k_rem].view(N, K // group_size, group_size)
     scales_com = scales[:, : Kc - has_rem]
     if dtype == WoqWeightDtype.NF4:
-        t = (
-            (map_nf4_tensor_to_float(qt_com) * scales_com.unsqueeze(-1))
-            .view(N, K - k_rem)
-            .contiguous()
-        )
+        if dequant_nf4_via_int8:
+            t = (
+                (map_nf4_tensor_to_int8(qt_com) / 127.0 * scales_com.unsqueeze(-1))
+                .view(N, K - k_rem)
+                .contiguous()
+            )
+        else:
+            t = (
+                (map_nf4_tensor_to_float(qt_com) * scales_com.unsqueeze(-1))
+                .view(N, K - k_rem)
+                .contiguous()
+            )
     else:
         zps_com = zps[:, : Kc - has_rem]
         t = (
@@ -1237,11 +1262,18 @@ def dequantize_per_block(
         qt_rem = qt[:, K - k_rem :].view(N, 1, k_rem)
         scales_rem = scales[:, Kc - has_rem :]
         if dtype == WoqWeightDtype.NF4:
-            t_rem = (
-                (map_nf4_tensor_to_float(qt_rem) * scales_rem.unsqueeze(-1))
-                .view(N, k_rem)
-                .contiguous()
-            )
+            if dequant_nf4_via_int8:
+                t_rem = (
+                    (map_nf4_tensor_to_int8(qt_rem) / 127.0 * scales_rem.unsqueeze(-1))
+                    .view(N, k_rem)
+                    .contiguous()
+                )
+            else:
+                t_rem = (
+                    (map_nf4_tensor_to_float(qt_rem) * scales_rem.unsqueeze(-1))
+                    .view(N, k_rem)
+                    .contiguous()
+                )
         else:
             zps_rem = zps[:, Kc - has_rem :]
             t_rem = (

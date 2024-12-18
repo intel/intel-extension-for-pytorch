@@ -363,7 +363,7 @@ static size_t get_block_k(
     int64_t lowp_mode,
     int64_t group_size,
     int64_t K) {
-  size_t default_block_k = lowp_mode == 3 ? 128 : 64;
+  size_t default_block_k = lowp_mode == LOWP_MODE_INT8 ? 128 : 64;
   size_t block_k = group_size > 0
       ? std::min((size_t)group_size, default_block_k)
       : default_block_k;
@@ -389,7 +389,7 @@ at::Tensor woq_linear_pack_weight(
     size_t block_n = WOQ_N_BLOCK_SIZE;
     size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
     if (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4) {
-      if (block_k % 4 && lowp_mode == 3) {
+      if (block_k % 4 && lowp_mode == LOWP_MODE_INT8) {
         // This case is not supported by kernel
         return weight;
       }
@@ -428,7 +428,7 @@ at::Tensor woq_linear_compute_compensation(
   TORCH_CHECK(weight.dim() == 2);
   auto N = weight.size(0), K = weight.size(1);
   if (N % WOQ_N_BLOCK_SIZE == 0 && weight_dtype == WOQ_DTYPE_INT8 &&
-      lowp_mode == 3) {
+      lowp_mode == LOWP_MODE_INT8) {
     size_t block_k = get_block_k(weight_dtype, lowp_mode, group_size, K);
     int64_t Nc = N / WOQ_N_BLOCK_SIZE, Kc = K / block_k;
     auto weight_reshaped = weight.reshape({Nc, WOQ_N_BLOCK_SIZE, Kc, block_k});
@@ -445,7 +445,7 @@ at::Tensor woq_linear_unpack_weight(
     const at::Tensor& weight,
     int64_t weight_dtype,
     int64_t lowp_mode) {
-  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+  if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == LOWP_MODE_INT8) {
     // Unpack weight for INT8 GEMM.
     // weight is packed in 5d (Nc, Kc, block_k / 4, block_n, 4)
     // but viewd as 4d (Nc, Kc, block_k, block_n)
@@ -553,7 +553,8 @@ at::Tensor woq_linear_forward_v2(
       WOQ_DTYPE_MAP.find(weight_dtype) != WOQ_DTYPE_MAP.end(),
       "Unsupported weight dtype: ",
       weight_dtype);
-  if (WOQ_DTYPE_MAP.at(weight_dtype) == WOQ_DTYPE_INT8 && lowp_mode == 3) {
+  if (WOQ_DTYPE_MAP.at(weight_dtype) == WOQ_DTYPE_INT8 &&
+      lowp_mode == LOWP_MODE_INT8) {
     TORCH_CHECK(compensation.has_value() && compensation.value().defined());
   }
   static const at::Tensor empty_tensor = at::Tensor();

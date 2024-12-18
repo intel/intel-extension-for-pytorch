@@ -98,9 +98,6 @@ at::Tensor woq_gemm_int8(
               auto quant_w_mode_ = std::get<1>(tuple);
               using act_type =
                   typename c10::impl::ScalarTypeToCPPType<act_dtype>::type;
-              TLA_ASSERT(
-                  qw_type == WOQ_DTYPE_INT4 || qw_type == WOQ_DTYPE_INT8,
-                  "LOWP_MODE_INT8 only support qw_type = INT4 or INT8");
               auto block_k = w_sizes[2];
               if (quant_block_k <= 0)
                 quant_block_k = block_k;

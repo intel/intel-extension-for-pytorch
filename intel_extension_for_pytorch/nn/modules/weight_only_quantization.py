@@ -12,6 +12,7 @@ from intel_extension_for_pytorch.quantization import (
     quantize_per_block,
     WoqWeightDtype,
     WoqWeightQScheme,
+    WoqLowpMode,
 )
 from intel_extension_for_pytorch.nn.utils._model_convert import (
     prepack_awq_weight,
@@ -123,7 +124,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         # otherwise, it may overflow when we subtract zero points from int8 weight.
         sym_quant = qconfig.weight_qscheme == WoqWeightQScheme.SYMMETRIC
         if dtype == WoqWeightDtype.NF4 or (
-            dtype == WoqWeightDtype.INT8 and lowp_mode == 3
+            dtype == WoqWeightDtype.INT8 and lowp_mode == WoqLowpMode.INT8
         ):
             assert (
                 sym_quant is True

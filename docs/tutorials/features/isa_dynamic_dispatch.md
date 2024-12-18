@@ -74,9 +74,9 @@ The CodeGen will copy each cpp files from **Kernel implementation**, and then ad
 >
 > AVX512_BF16: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_BF16.cpp -O3 -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -DCPU_CAPABILITY=AVX512_BF16 -DCPU_CAPABILITY_AVX512_BF16`
 >
-> AMX: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AMX.cpp -O3  -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -DCPU_CAPABILITY=AMX -DCPU_CAPABILITY_AMX`
+> AMX: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AMX.cpp -O3  -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vbmi -mavx512vnni -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -DCPU_CAPABILITY=AMX -DCPU_CAPABILITY_AMX`
 >
-> AVX512_FP16: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_FP16.cpp -O3  -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -mavx512fp16 -DCPU_CAPABILITY_AMX -DCPU_CAPABILITY=AVX512_FP16 -DCPU_CAPABILITY_AVX512_FP16`
+> AVX512_FP16: `build/Release/csrc/isa_codegen/cpu/aten/kernels/AdaptiveAveragePoolingKrnl.cpp.AVX512_FP16.cpp -O3  -D__AVX512F__ -DCPU_CAPABILITY_AVX512 -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vbmi -mavx512vnni -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -mavx512fp16 -DCPU_CAPABILITY_AMX -DCPU_CAPABILITY=AVX512_FP16 -DCPU_CAPABILITY_AVX512_FP16`
 ---
 
 >**Note:**

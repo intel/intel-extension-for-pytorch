@@ -186,14 +186,14 @@ CHECK_SSE(CXX "AVX512_BF16" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx5
 
 # gcc start to support amx from version 11.2
 # https://gcc.gnu.org/onlinedocs/gcc-11.2.0/gcc/x86-Options.html#x86-Options
-CHECK_SSE(C "AMX" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma\
+CHECK_SSE(C "AMX" " ;-mavx512f -mavx512dq -mavx512vbmi -mavx512vl -mavx512bw -mavx512bf16 -mfma\
  -mamx-tile -mamx-int8 -mamx-bf16;/arch:AVX512")
-CHECK_SSE(CXX "AMX" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma\
+CHECK_SSE(CXX "AMX" " ;-mavx512f -mavx512dq -mavx512vbmi -mavx512vl -mavx512bw -mavx512bf16 -mfma\
  -mamx-tile -mamx-int8 -mamx-bf16;/arch:AVX512")
 
 # gcc starts to support avx512fp16 from version 12.1
 # https://gcc.gnu.org/onlinedocs/gcc-12.1.0/gcc/x86-Options.html#x86-Options
-CHECK_SSE(C "AVX512_FP16" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma\
+CHECK_SSE(C "AVX512_FP16" " ;-mavx512f -mavx512dq -mavx512vbmi -mavx512vl -mavx512bw -mavx512bf16 -mfma\
  -mamx-tile -mamx-int8 -mamx-bf16 -mavx512fp16;/arch:AVX512")
-CHECK_SSE(CXX "AVX512_FP16" " ;-mavx512f -mavx512dq -mavx512vl -mavx512bw -mavx512bf16 -mfma\
+CHECK_SSE(CXX "AVX512_FP16" " ;-mavx512f -mavx512dq -mavx512vbmi -mavx512vl -mavx512bw -mavx512bf16 -mfma\
  -mamx-tile -mamx-int8 -mamx-bf16 -mavx512fp16;/arch:AVX512")

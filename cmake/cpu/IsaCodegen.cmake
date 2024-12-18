@@ -44,7 +44,7 @@ if(CXX_AVX512_FP16_FOUND)
   else(MSVC)
     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -D__AVX512F__ ${AVX512_OPTIMIZE_FLAGS} -DCPU_CAPABILITY_AVX512 \
     -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -DCPU_CAPABILITY_AMX \
-    -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni \
+    -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vbmi -mavx512vnni \
     -mavx512bf16 -mfma -mamx-tile -mamx-int8 -mamx-bf16 -mavx512fp16")
   endif(MSVC)
 else(CXX_AVX512_FP16_FOUND)
@@ -60,7 +60,7 @@ if(CXX_AMX_FOUND)
     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG}/arch:AVX512") # TODO: CHECK HERE
   else(MSVC)
     list(APPEND CPU_CAPABILITY_FLAGS "${OPT_FLAG} -D__AVX512F__ ${AVX512_OPTIMIZE_FLAGS} -DCPU_CAPABILITY_AVX512 \
-    -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vnni -mavx512bf16 -mfma \
+    -DCPU_CAPABILITY_AVX512_VNNI -DCPU_CAPABILITY_AVX512_BF16 -mavx512f -mavx512bw -mavx512vl -mavx512dq -mavx512vbmi -mavx512vnni -mavx512bf16 -mfma \
     -mamx-tile -mamx-int8 -mamx-bf16")
   endif(MSVC)
 else(CXX_AMX_FOUND)
