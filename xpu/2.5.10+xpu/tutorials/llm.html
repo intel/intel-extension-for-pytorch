@@ -1,0 +1,376 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Large Language Models (LLM) Optimizations Overview &mdash; Intel&amp;#174 Extension for PyTorch* 2.5.10+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Transformers Optimization Frontend API" href="llm/llm_optimize_transformers.html" />
+    <link rel="prev" title="IPEX_LOG (Prototype)" href="features/ipex_log.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+<div class="version">
+            <a href="../../../">2.5.10+xpu ▼</a>
+            <p>Click link above to switch version</p>
+          </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Large Language Models (LLM)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="llm/llm_optimize_transformers.html">Transformers Optimization Frontend API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#validated-models-list">Validated Models List</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#llm-inference">LLM Inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#platforms">Platforms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#llm-fine-tuning-on-intel-data-center-max-1550-gpu">LLM fine-tuning on Intel® Data Center Max 1550 GPU</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#optimization-methodologies">Optimization Methodologies</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#linear-operator-optimization">Linear Operator Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#deep-fusion-policy">Deep Fusion Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#segment-kv-cache">Segment KV Cache</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#distributed-inference">Distributed Inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#low-precision-data-types">Low Precision Data Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#weight-only-quantization-int4">Weight Only Quantization INT4</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="llm/int4_weight_only_quantization.html">Weight-Only Quantization (Prototype)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/blogs.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.3.110%2bxpu">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Large Language Models (LLM) Optimizations Overview</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/llm.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="large-language-models-llm-optimizations-overview">
+<h1>Large Language Models (LLM) Optimizations Overview<a class="headerlink" href="#large-language-models-llm-optimizations-overview" title="Link to this heading"></a></h1>
+<p>In the current technological landscape, Generative AI (GenAI) workloads and models have gained widespread attention and popularity. LLMs have emerged as the dominant models driving these GenAI applications. Most of LLMs are GPT-like architectures that consist of multiple Decoder layers.
+The MultiHeadAttention and FeedForward layer are two key components of every Decoder layer. The generation task is memory bound because iterative decode and kv_cache require special management to reduce memory overheads. Intel® Extension for PyTorch* provides a lot of specific optimizations for these LLMs.
+On the operator level, the extension provides highly efficient GEMM kernel to speed up Linear layer and customized operators to reduce the memory footprint. To better trade-off the performance and accuracy, different low-precision solutions e.g., smoothQuant is enabled. Besides, tensor parallel can also adopt to get lower latency for LLMs.</p>
+<p>These LLM-specific optimizations can be automatically applied with a single frontend API function in Python interface, <cite>ipex.llm.optimize()</cite>. Check <a class="reference external" href="./llm/llm_optimize_transformers.html">ipex.llm.optimize</a> for more details.</p>
+<div class="toctree-wrapper compound">
+</div>
+<section id="validated-models-list">
+<h2>Validated Models List<a class="headerlink" href="#validated-models-list" title="Link to this heading"></a></h2>
+<section id="llm-inference">
+<h3>LLM Inference<a class="headerlink" href="#llm-inference" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model Family</p></th>
+<th class="head"><p>Verified models from Huggingface hub</p></th>
+<th class="head"><p>Dynamic KV-Cache</p></th>
+<th class="head"><p>Static KV-Cache</p></th>
+<th class="head"><p>FP16</p></th>
+<th class="head"><p>INT4 WoQ</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Llama2</p></td>
+<td><p>meta-llama/Llama-2-7b-hf, meta-llama/Llama-2-13b-hf, meta-llama/Llama-2-70b-hf</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-odd"><td><p>Llama3</p></td>
+<td><p>meta-llama/Meta-Llama-3-8B-Instruct, meta-llama/Meta-Llama-3-70B-Instruct</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-even"><td><p>Phi-3 mini</p></td>
+<td><p>microsoft/Phi-3-mini-4k-instruct, microsoft/Phi-3-mini-128k-instruct</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-odd"><td><p>GPT-J</p></td>
+<td><p>EleutherAI/gpt-j-6b</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-even"><td><p>Qwen</p></td>
+<td><p>Qwen/Qwen2-VL-7B-Instruct</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-odd"><td><p>GLM-Chat</p></td>
+<td><p>THUDM/glm-4-9b-chat</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-even"><td><p>Bloom</p></td>
+<td><p>bigscience/bloom-7b1</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>Baichuan2</p></td>
+<td><p>baichuan-inc/Baichuan2-13B-Chat</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>Falcon</p></td>
+<td><p>tiiuae/falcon-40b-instruct</p></td>
+<td><p>✅</p></td>
+<td></td>
+<td><p>✅</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>OPT</p></td>
+<td><p>facebook/opt-6.7b, facebook/opt-30b</p></td>
+<td><p>✅</p></td>
+<td></td>
+<td><p>✅</p></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="platforms">
+<h3>Platforms<a class="headerlink" href="#platforms" title="Link to this heading"></a></h3>
+<p>All above workloads are validated on Intel® Data Center Max 1550 GPU.
+The WoQ (Weight Only Quantization) int4 workloads are also partially validated on Intel® Core™ Ultra series (Lunar Lake) with Intel® Arc™ Graphics. Refer to Weight Only Quantization INT4 section.</p>
+<p><em>Note</em>: The above verified models (including other models in the same model family, like “meta-llama/Llama-2-7b-hf” from Llama family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and prepacked TPP Linear (fp16). For other LLMs families, we are working in progress to cover those optimizations, which will expand the model list above.</p>
+</section>
+<section id="llm-fine-tuning-on-intel-data-center-max-1550-gpu">
+<h3>LLM fine-tuning on Intel® Data Center Max 1550 GPU<a class="headerlink" href="#llm-fine-tuning-on-intel-data-center-max-1550-gpu" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model Family</p></th>
+<th class="head"><p>Verified models from Huggingface hub</p></th>
+<th class="head"><p>Mixed Precision (BF16+FP32)</p></th>
+<th class="head"><p>Full fine-tuning</p></th>
+<th class="head"><p>LoRA</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Llama2</p></td>
+<td><p>meta-llama/Llama-2-7b-hf</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-odd"><td><p>Llama2</p></td>
+<td><p>meta-llama/Llama-2-70b-hf</p></td>
+<td><p>✅</p></td>
+<td></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-even"><td><p>Llama3</p></td>
+<td><p>meta-llama/Meta-Llama-3-8B</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-odd"><td><p>Qwen</p></td>
+<td><p>Qwen/Qwen-1.5B</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+<tr class="row-even"><td><p>Phi-3-mini 3.8B</p></td>
+<td><p>Phi-3-mini-4k-instruct</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+<td><p>✅</p></td>
+</tr>
+</tbody>
+</table>
+<p>Check <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/tree/release/xpu/2.5.10/examples/gpu/llm">LLM best known practice</a> for instructions to install/setup environment and example scripts..</p>
+</section>
+</section>
+<section id="optimization-methodologies">
+<h2>Optimization Methodologies<a class="headerlink" href="#optimization-methodologies" title="Link to this heading"></a></h2>
+<p>The brief introduction of these optimizations are as following:</p>
+<section id="linear-operator-optimization">
+<h3>Linear Operator Optimization<a class="headerlink" href="#linear-operator-optimization" title="Link to this heading"></a></h3>
+<p>LLM inference is Linear weight memory bound task. There are three backends to speedup linear GEMM kernels in Intel® Extension for PyTorch*. They are Intel® oneDNN, Intel® Xe Templates for Linear Algebra (XeLTA) and customized linear kernels for weight only quantization.</p>
+</section>
+<section id="deep-fusion-policy">
+<h3>Deep Fusion Policy<a class="headerlink" href="#deep-fusion-policy" title="Link to this heading"></a></h3>
+<p>Operators fusion is a general approach to reduce the memory access and kernel launch overhead. Except for linear post ops fusion, e.g, linear + activation function, a lot of customized operators are also provided in Intel® Extension for PyTorch* for further performance improvement, for example, Rotary Position Embedding (RoPE) and Root Mean Square Layer Normalization (RMSNorm).</p>
+</section>
+<section id="segment-kv-cache">
+<h3>Segment KV Cache<a class="headerlink" href="#segment-kv-cache" title="Link to this heading"></a></h3>
+<p>KV Cache is used to reduce computation for decoder layer but it also brings memory overheads, for example, when we use beam search, the KV Cache should be reordered according to latest beam idx and the current key/value should also be concatenated with KV Cache in the attention layer to get entire context to do scale dot product attention. When the sequence is very long, memory overheads caused by the reorder_cache and concatenate will be performance bottleneck. Moreover, in standard
+implementation, prompt and response key/value will be kept in contiguous
+KV Cache buffers for attention context computation, making it memory
+wasting to extend the prompt key/value with Beam Width times. Segment KV
+Cache is provided to reduce these overheads. Firstly, prompt key/value
+will be computed at Prefill phase and kept on device during the decoding
+phase, the shapes of which will not be influenced by the Beam Width
+value. At decoding phase, we firstly pre-allocate buffers (key and value
+use different buffers) to store the response key/value hidden states and
+beam index information, then use beam index history which is shown in
+the following left figure to decide which beam should be used by a
+timestamp and this information will generate an offset to access the KV
+Cache buffer which means that the reorder_cache and concat overheads
+will be eliminated by this way. The SDPA kernel based on Segment KV
+cache policy is shown as the following right figure.</p>
+<a class="reference internal image-reference" href="../_images/llm_iakv_2.png"><img alt="The beam idx trace for every step" src="../_images/llm_iakv_2.png" style="width: 400px;" />
+</a>
+<a class="reference internal image-reference" href="../_images/llm_kvcache.png"><img alt="The beam idx trace for every step" src="../_images/llm_kvcache.png" style="width: 800px;" />
+</a>
+</section>
+<section id="distributed-inference">
+<h3>Distributed Inference<a class="headerlink" href="#distributed-inference" title="Link to this heading"></a></h3>
+<p>All above optimizations already help you to get very good performance
+with single GPU card/tile. To further reduce the inference latency and
+improve throughput, tensor parallel is also enabled in our solution. You
+can firstly use DeepSpeed to auto shard the model and then apply above
+optimizations with the frontend API function provided by Intel®
+Extension for PyTorch*.</p>
+</section>
+<section id="low-precision-data-types">
+<h3>Low Precision Data Types<a class="headerlink" href="#low-precision-data-types" title="Link to this heading"></a></h3>
+<p>While Generative AI (GenAI) workloads and models are getting more and
+more popular, large language models (LLM) used in these workloads are
+getting more and more parameters. The increasing size of LLM models
+enhances workload accuracies; however, it also leads to significantly
+heavier computations and places higher requirements to the underlying
+hardware. Given that, quantization becomes a more important methodology
+for inference workloads.</p>
+</section>
+</section>
+<section id="weight-only-quantization-int4">
+<h2>Weight Only Quantization INT4<a class="headerlink" href="#weight-only-quantization-int4" title="Link to this heading"></a></h2>
+<p>Large Language Models (LLMs) have shown remarkable performance in various natural language processing tasks.</p>
+<p>However, deploying them on devices with limited resources is challenging due to their high computational and memory requirements.</p>
+<p>To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike <a class="reference external" href="https://github.com/intel/intel-extension-for-transformers/blob/main/docs/quantization.md">normal quantization</a>, such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WoQ), which only quantizes the weights statically. WoQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WoQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.</p>
+<p>For more detailed information, check <a class="reference external" href="llm/int4_weight_only_quantization.html">WoQ INT4</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="features/ipex_log.html" class="btn btn-neutral float-left" title="IPEX_LOG (Prototype)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="llm/llm_optimize_transformers.html" class="btn btn-neutral float-right" title="Transformers Optimization Frontend API" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x71c6262eb970> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

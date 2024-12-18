@@ -1,0 +1,295 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Features &mdash; Intel&amp;#174 Extension for PyTorch* 2.5.10+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Channels Last" href="features/nhwc.html" />
+    <link rel="prev" title="Introduction" href="introduction.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+<div class="version">
+            <a href="../../../">2.5.10+xpu ▼</a>
+            <p>Click link above to switch version</p>
+          </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Features</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#easy-to-use-python-api">Easy-to-use Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#channels-last">Channels Last</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/nhwc.html">Channels Last</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/auto_channels_last.html">Auto Channels Last</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#auto-mixed-precision-amp">Auto Mixed Precision (AMP)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/amp_gpu.html">Auto Mixed Precision (AMP) on GPU</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#quantization">Quantization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/int8_overview_xpu.html">Intel® Extension for PyTorch* Optimizations for Quantization [GPU]</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/float8.html">Float8 Data Type Support (Prototype)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#distributed-training">Distributed Training</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/DDP.html">DistributedDataParallel (DDP)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/horovod.html">Horovod with PyTorch (Prototype)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dlpack-solution">DLPack Solution</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/DLPack.html">DLPack Solution</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#dpc-extension">DPC++ Extension</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/DPC%2B%2B_Extension.html">DPC++ Extension</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-configuration">Advanced Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/advanced_configuration.html">Advanced Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#fully-sharded-data-parallel-fsdp">Fully Sharded Data Parallel (FSDP)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/FSDP.html">Fully Sharded Data Parallel (FSDP)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#torch-compile-for-gpu-beta">torch.compile for GPU (Beta)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/torch_compile_gpu.html">torch.compile for GPU (Beta)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/torch_compile_gpu.html#introduction">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/torch_compile_gpu.html#required-dependencies">Required Dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="features/torch_compile_gpu.html#example-usage">Example Usage</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#kineto-supported-profiler-tool-prototype">Kineto Supported Profiler Tool (Prototype)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/profiler_kineto.html">Kineto Profiler</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#compute-engine-prototype-feature-for-debug">Compute Engine (Prototype feature for debug)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/compute_engine.html">Compute Engine (Experimental feature for debug)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#ipex-log-prototype-feature-for-debug"><code class="docutils literal notranslate"><span class="pre">IPEX_LOG</span></code> (Prototype feature for debug)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="features/ipex_log.html"><code class="docutils literal notranslate"><span class="pre">IPEX_LOG</span></code> (Prototype)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="llm.html">Large Language Models (LLM)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/blogs.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.3.110%2bxpu">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Features</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/features.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="features">
+<h1>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h1>
+<section id="easy-to-use-python-api">
+<h2>Easy-to-use Python API<a class="headerlink" href="#easy-to-use-python-api" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* provides simple frontend Python APIs and utilities to get performance optimizations such as operator optimization.</p>
+<p>Check the <a class="reference external" href="api_doc.html">API Documentation</a> for API functions description and <a class="reference external" href="examples.html">Examples</a> for usage guidance.</p>
+</section>
+<section id="channels-last">
+<h2>Channels Last<a class="headerlink" href="#channels-last" title="Link to this heading"></a></h2>
+<p>Compared with the default NCHW memory format, using channels_last (NHWC) memory format can further accelerate convolutional neural networks. In Intel® Extension for PyTorch*, NHWC memory format has been enabled for most key CPU and GPU operators. More detailed information is available at <a class="reference external" href="features/nhwc.html">Channels Last</a>.</p>
+<p>Intel® Extension for PyTorch* automatically converts a model to channels last memory format when users optimize the model with <code class="docutils literal notranslate"><span class="pre">ipex.optimize(model)</span></code>. With this feature, users do not need to manually apply <code class="docutils literal notranslate"><span class="pre">model=model.to(memory_format=torch.channels_last)</span></code> anymore. However, models running on Intel® Data Center GPU Flex Series will choose oneDNN layout, so users still need to manually convert the model and data to channels last format. More detailed information is available at <a class="reference external" href="features/auto_channels_last.html">Auto Channels Last</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="auto-mixed-precision-amp">
+<h2>Auto Mixed Precision (AMP)<a class="headerlink" href="#auto-mixed-precision-amp" title="Link to this heading"></a></h2>
+<p>Benefiting from less memory usage and computation, low precision data types typically speed up both training and inference workloads.
+On GPU side, support of BFloat16 and Float16 are both available in Intel® Extension for PyTorch*. BFloat16 is the default low precision floating data type when AMP is enabled.</p>
+<p>Detailed information of AMP for GPU are available at <a class="reference external" href="features/amp_gpu.html">Auto Mixed Precision (AMP) on GPU</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="quantization">
+<h2>Quantization<a class="headerlink" href="#quantization" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* currently supports imperative mode and TorchScript mode for post-training static quantization on GPU. This section illustrates the quantization workflow on Intel GPUs.</p>
+<p>Check more detailed information for <a class="reference external" href="features/int8_overview_xpu.html">INT8 Quantization</a>.</p>
+<p>On Intel® GPUs, Intel® Extension for PyTorch* also provides FP8 Quantization.  Check more detailed information for <a class="reference external" href="./features/float8.html">FP8 Quantization</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="distributed-training">
+<h2>Distributed Training<a class="headerlink" href="#distributed-training" title="Link to this heading"></a></h2>
+<p>To meet demands of large scale model training over multiple devices, distributed training on Intel® GPUs is supported. Two alternative methodologies are available. Users can choose either to use PyTorch native distributed training module, <a class="reference external" href="https://pytorch.org/docs/stable/notes/ddp.html">Distributed Data Parallel (DDP)</a>, with <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html">Intel® oneAPI Collective Communications Library (oneCCL)</a> support via <a class="reference external" href="https://github.com/intel/torch-ccl">Intel® oneCCL Bindings for PyTorch (formerly known as torch_ccl)</a> or use Horovod with <a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/oneccl.html">Intel® oneAPI Collective Communications Library (oneCCL)</a> support (Prototype).</p>
+<p>For more detailed information, check <a class="reference external" href="features/DDP.html">DDP</a> and <a class="reference external" href="features/horovod.html">Horovod (Prototype)</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="dlpack-solution">
+<h2>DLPack Solution<a class="headerlink" href="#dlpack-solution" title="Link to this heading"></a></h2>
+<p>DLPack defines a stable in-memory data structure for sharing tensors among frameworks. It enables sharing of tensor data without copying when interoparating with other libraries. Intel® Extension for PyTorch* extends DLPack support in PyTorch* for XPU device particularly.</p>
+<p>For more detailed information, check <a class="reference external" href="features/DLPack.html">DLPack Solution</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="dpc-extension">
+<h2>DPC++ Extension<a class="headerlink" href="#dpc-extension" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* provides C++ APIs to get SYCL queue and configure floating-point math mode.</p>
+<p>Check the <a class="reference external" href="api_doc.html">API Documentation</a> for the details of API functions. <a class="reference external" href="features/DPC++_Extension.html">DPC++ Extension</a> describes how to write customized DPC++ kernels with a practical example and build it with setuptools and CMake.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="advanced-configuration">
+<h2>Advanced Configuration<a class="headerlink" href="#advanced-configuration" title="Link to this heading"></a></h2>
+<p>The default settings for Intel® Extension for PyTorch* are sufficient for most use cases. However, if you need to customize Intel® Extension for PyTorch*, advanced configuration is available at build time and runtime.</p>
+<p>For more detailed information, check <a class="reference external" href="features/advanced_configuration.html">Advanced Configuration</a>.</p>
+<p>A driver environment variable <cite>ZE_FLAT_DEVICE_HIERARCHY</cite> is currently used to select the device hierarchy model with which the underlying hardware is exposed. By default, each GPU tile is used as a device. Check the <a class="reference external" href="https://spec.oneapi.io/level-zero/latest/core/PROG.html#environment-variables">Level Zero Specification Documentation</a> for more details.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="fully-sharded-data-parallel-fsdp">
+<h2>Fully Sharded Data Parallel (FSDP)<a class="headerlink" href="#fully-sharded-data-parallel-fsdp" title="Link to this heading"></a></h2>
+<p><cite>Fully Sharded Data Parallel (FSDP)</cite> is a PyTorch* module that provides industry-grade solution for large model training. FSDP is a type of data parallel training, unlike DDP, where each process/worker maintains a replica of the model, FSDP shards model parameters, optimizer states and gradients across DDP ranks to reduce the GPU memory footprint used in training. This makes the training of some large-scale models feasible.</p>
+<p>For more detailed information, check <a class="reference external" href="features/FSDP.html">FSDP</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="torch-compile-for-gpu-beta">
+<h2>torch.compile for GPU (Beta)<a class="headerlink" href="#torch-compile-for-gpu-beta" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* now empowers users to seamlessly harness graph compilation capabilities for optimal PyTorch model performance on Intel GPU via the flagship <a class="reference external" href="https://pytorch.org/docs/stable/generated/torch.compile.html#torch-compile">torch.compile</a> API through the default “inductor” backend (<a class="reference external" href="https://dev-discuss.pytorch.org/t/torchinductor-a-pytorch-native-compiler-with-define-by-run-ir-and-symbolic-shapes/747/1">TorchInductor</a> ).</p>
+<p>For more detailed information, check <a class="reference external" href="features/torch_compile_gpu.html">torch.compile for GPU</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="kineto-supported-profiler-tool-prototype">
+<h2>Kineto Supported Profiler Tool (Prototype)<a class="headerlink" href="#kineto-supported-profiler-tool-prototype" title="Link to this heading"></a></h2>
+<p>The Kineto supported profiler tool is an extension of PyTorch* profiler for profiling operators’ executing time cost on GPU devices. With this tool, you can get information in many fields of the run models or code scripts. Build Intel® Extension for PyTorch* with Kineto support as default and enable this tool using the <cite>with</cite> statement before the code segment.</p>
+<p>For more detailed information, check <a class="reference external" href="features/profiler_kineto.html">Profiler Kineto</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="compute-engine-prototype-feature-for-debug">
+<h2>Compute Engine (Prototype feature for debug)<a class="headerlink" href="#compute-engine-prototype-feature-for-debug" title="Link to this heading"></a></h2>
+<p>Compute engine is a prototype feature which provides the capacity to choose specific backend for operators with multiple implementations.</p>
+<p>For more detailed information, check <a class="reference external" href="features/compute_engine.html">Compute Engine</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="ipex-log-prototype-feature-for-debug">
+<h2><code class="docutils literal notranslate"><span class="pre">IPEX_LOG</span></code> (Prototype feature for debug)<a class="headerlink" href="#ipex-log-prototype-feature-for-debug" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">IPEX_LOG</span></code> provides the capability to log verbose information from Intel® Extension for PyTorch* . Please use <code class="docutils literal notranslate"><span class="pre">IPEX_LOG</span></code> to get the log information or trace the execution from Intel® Extension for PyTorch*. Please continue using PyTorch* macros such as <code class="docutils literal notranslate"><span class="pre">TORCH_CHECK</span></code>, <code class="docutils literal notranslate"><span class="pre">TORCH_ERROR</span></code>, etc. to get the log information from PyTorch*.</p>
+<p>For more detailed information, check <a class="reference external" href="features/ipex_log.html">IPEX_LOG</a>.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="features/nhwc.html" class="btn btn-neutral float-right" title="Channels Last" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x71c626111fc0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

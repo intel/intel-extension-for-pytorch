@@ -1,0 +1,114 @@
+Advanced Configuration
+======================
+
+The default settings for Intel® Extension for PyTorch\* are sufficient for most use cases. However, if users want to customize Intel® Extension for PyTorch\*, advanced configuration is available at build time and runtime. 
+
+## Build Time Configuration
+
+The following build options are supported by Intel® Extension for PyTorch\*. Users who install Intel® Extension for PyTorch\* via source compilation could override the default configuration by explicitly setting a build option ON or OFF, and then build. 
+
+| **Build Option** | **Default<br>Value** | **Description** |
+| ------ | ------ | ------ |
+| USE_ONEMKL | ON | Use oneMKL BLAS |
+| USE_CHANNELS_LAST_1D | ON | Use channels last 1d. It is deprecated |
+| USE_PERSIST_STREAM | ON | Use persistent oneDNN stream |
+| USE_SCRATCHPAD_MODE | ON | Use oneDNN scratchpad mode |
+| USE_PRIMITIVE_CACHE | ON | Cache oneDNN primitives by FRAMEWORK for specific operators |
+| USE_QUEUE_BARRIER | ON | Use queue submit_barrier, otherwise use dummy kernel |
+| USE_OVERRIDE_OP | ON | Use the operator in IPEX to override the duplicated one in stock PyTorch |
+| USE_DS_KERNELS | ON | Build deepspeed kernels |
+| USE_SYCL_ASSERT | OFF | Enables assert in sycl kernel |
+| USE_ITT_ANNOTATION | OFF | Enables ITT annotation in sycl kernel |
+| USE_SPLIT_FP64_LOOPS | ON | Split FP64 loops into separate kernel for element-wise kernels |
+| BUILD_BY_PER_KERNEL | OFF | Build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST) |
+| BUILD_INTERNAL_DEBUG | OFF | Use internal debug code path |
+| BUILD_SEPARATE_OPS | OFF | Build each operator in separate library |
+| BUILD_CONV_CONTIGUOUS | ON | Require contiguous in oneDNN conv |
+| USE_AOT_DEVLIST | "" | Set device list for AOT build |
+| USE_XETLA | "ON" | Use XeTLA based customer kernels; Specify a comma-sep list of gpu architectures (e.g. xe_lpg,xe_hpg) to only enable kernels for specific platforms |
+| USE_ONEDNN_DIR | "" | Specify oneDNN source path which contains its include directory and lib directory |
+| USE_XETLA_SRC | "${IPEX_GPU_ROOT_DIR}/aten/operators/xetla/kernels/" | Specify XETLA source path which contains its include dir |
+| BUILD_OPT_LEVEL | "" | Add build option -Ox, accept values: 0/1 |
+| BUILD_WITH_SANITIZER | "" | Build with sanitizer check. Support one of address, thread, and leak options at a time. The default option is address. |
+| ------ | ------ | ------ |
+| USE_ONEMKL | ON | Use oneMKL BLAS |
+| USE_CHANNELS_LAST_1D | ON | Use channels last 1d. It is deprecated |
+| USE_PERSIST_STREAM | ON | Use persistent oneDNN stream |
+| USE_SCRATCHPAD_MODE | ON | Use oneDNN scratchpad mode |
+| USE_PRIMITIVE_CACHE | ON | Cache oneDNN primitives by FRAMEWORK for specific operators |
+| USE_QUEUE_BARRIER | ON | Use queue submit_barrier, otherwise use dummy kernel |
+| USE_OVERRIDE_OP | ON | Use the operator in IPEX to override the duplicated one in stock PyTorch |
+| USE_DS_KERNELS | ON | Build deepspeed kernels |
+| USE_SYCL_ASSERT | OFF | Enables assert in sycl kernel |
+| USE_ITT_ANNOTATION | OFF | Enables ITT annotation in sycl kernel |
+| USE_SPLIT_FP64_LOOPS | ON | Split FP64 loops into separate kernel for element-wise kernels |
+| BUILD_BY_PER_KERNEL | OFF | Build by DPC++ per_kernel option (exclusive with USE_AOT_DEVLIST) |
+| BUILD_INTERNAL_DEBUG | OFF | Use internal debug code path |
+| BUILD_SEPARATE_OPS | OFF | Build each operator in separate library |
+| BUILD_CONV_CONTIGUOUS | ON | Require contiguous in oneDNN conv |
+| USE_AOT_DEVLIST | "" | Set device list for AOT build |
+| USE_XETLA | "ON" | Use XeTLA based customer kernels; Specify a comma-sep list of gpu architectures (e.g. xe_lpg,xe_hpg) to only enable kernels for specific platforms |
+| USE_ONEDNN_DIR | "" | Specify oneDNN source path which contains its include directory and lib directory |
+| USE_XETLA_SRC | "${IPEX_GPU_ROOT_DIR}/aten/operators/xetla/kernels/" | Specify XETLA source path which contains its include dir |
+| BUILD_OPT_LEVEL | "" | Add build option -Ox, accept values: 0/1 |
+| BUILD_WITH_SANITIZER | "" | Build with sanitizer check. Support one of address, thread, and leak options at a time. The default option is address. |
+
+For above build options which can be configured to ON or OFF, users can configure them to 1 or 0 also, while ON equals to 1 and OFF equals to 0.
+
+## Runtime Configuration
+
+The following launch options are supported in Intel® Extension for PyTorch\*. Users who execute AI models on XPU could override the default configuration by explicitly setting the option value at runtime using environment variables, and then launch the execution.
+
+| **Launch Option<br>CPU, GPU** | **Default<br>Value** | **Description** |
+| ------ | ------ | ------ |
+| IPEX_FP32_MATH_MODE | FP32 | Set values for FP32 math mode (valid values: FP32, TF32, BF32). Refer to <a class="reference internal" href="../api_doc.html#_CPPv4N3xpu18set_fp32_math_modeE14FP32_MATH_MODE">API Documentation</a> for details. |
+| ------ | ------ | ------ |
+| IPEX_FP32_MATH_MODE | FP32 | Set values for FP32 math mode (valid values: FP32, TF32, BF32). Refer to <a class="reference internal" href="../api_doc.html#_CPPv4N3xpu18set_fp32_math_modeE14FP32_MATH_MODE">API Documentation</a> for details. |
+
+| **Launch Option<br>GPU ONLY** | **Default<br>Value** | **Description** |
+| ------ | ------ | ------ |
+| IPEX_LOG_LEVEL | -1 | Set log level to trace the execution and get log information, pls refer to 'ipex_log.md' for different log level. |
+| IPEX_LOG_COMPONENT | "ALL" | Set IPEX_LOG_COMPONENT = ALL to log all component message. Use ';' as separator to log more than one components, such as "OPS;RUNTIME". Use '/' as separator to log subcomponents. |
+| IPEX_LOG_ROTATE_SIZE | -1 | Set Rotate file size in MB for IPEX_LOG, less than 0 means unuse this setting. |
+| IPEX_LOG_SPLIT_SIZE | -1 | Set split file size in MB for IPEX_LOG, less than 0 means unuse this setting. |
+| IPEX_LOG_OUTPUT | "" | Set output file path for IPEX_LOG, default is null |
+| ------ | ------ | ------ |
+| IPEX_LOG_LEVEL | -1 | Set log level to trace the execution and get log information, pls refer to 'ipex_log.md' for different log level. |
+| IPEX_LOG_COMPONENT | "ALL" | Set IPEX_LOG_COMPONENT = ALL to log all component message. Use ';' as separator to log more than one components, such as "OPS;RUNTIME". Use '/' as separator to log subcomponents. |
+| IPEX_LOG_ROTATE_SIZE | -1 | Set Rotate file size in MB for IPEX_LOG, less than 0 means unuse this setting. |
+| IPEX_LOG_SPLIT_SIZE | -1 | Set split file size in MB for IPEX_LOG, less than 0 means unuse this setting. |
+| IPEX_LOG_OUTPUT | "" | Set output file path for IPEX_LOG, default is null |
+
+| **Launch Option<br>Experimental** | **Default<br>Value** | **Description** |
+| ------ | ------ | ------ |
+| ------ | ------ | ------ |
+
+| **Distributed Option<br>GPU ONLY** | **Default<br>Value** | **Description** |
+| ------ | ------ | ------ |
+| TORCH_LLM_ALLREDUCE | 0 | This is a prototype feature to provide better scale-up performance by enabling optimized collective algorithms in oneCCL and asynchronous execution in torch-ccl. This feature requires XeLink enabled for cross-cards communication. By default, this feature is not enabled with setting 0. |
+| CCL_BLOCKING_WAIT | 0 | This is a prototype feature to control over whether collectives execution on XPU is host blocking or non-blocking. By default, setting 0 enables blocking behavior. |
+| CCL_SAME_STREAM | 0 | This is a prototype feature to allow using a computation stream as communication stream to minimize overhead for streams synchronization. By default, setting 0 uses separate streams for communication. |
+
+For above launch options which can be configured to 1 or 0, users can configure them to ON or OFF also, while ON equals to 1 and OFF equals to 0.
+
+Examples to configure the launch options:</br>
+
+- Set one or more options before running the model
+
+```bash
+export IPEX_LOG_LEVEL=1
+export IPEX_FP32_MATH_MODE=TF32
+...
+python ResNet50.py
+```
+- Set one option when running the model
+
+```bash
+IPEX_LOG_LEVEL=1 python ResNet50.py
+```
+
+- Set more than one options when running the model
+
+```bash
+IPEX_LOG_LEVEL=1 IPEX_FP32_MATH_MODE=TF32 python ResNet50.py
+```

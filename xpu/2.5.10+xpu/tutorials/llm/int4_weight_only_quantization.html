@@ -1,0 +1,408 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weight-Only Quantization (Prototype) &mdash; Intel&amp;#174 Extension for PyTorch* 2.5.10+xpu documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
+
+  
+<script type="text/javascript">
+  // Configure TMS settings
+  window.wapProfile = 'profile-microsite'; // This is mapped by WAP authorize value
+  window.wapLocalCode = 'us-en'; // Dynamically set per localized site, see mapping table for values
+  window.wapSection = "intel-extension-for-pytorch"; // WAP team will give you a unique section for your site
+  window.wapEnv = 'prod'; // environment to be use in Adobe Tags.
+  // Load TMS
+  (() => {
+        let url = 'https://www.intel.com/content/dam/www/global/wap/main/wap-microsite.js';
+        let po = document.createElement('script'); po.type = 'text/javascript'; po.async = true; po.src = url;
+        let s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+  }) ();
+</script>
+
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Performance" href="../performance.html" />
+    <link rel="prev" title="Transformers Optimization Frontend API" href="llm_optimize_transformers.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Intel&#174 Extension for PyTorch*
+          </a>
+<div class="version">
+            <a href="../../../../">2.5.10+xpu ▼</a>
+            <p>Click link above to switch version</p>
+          </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">ABOUT</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">Features</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../llm.html">Large Language Models (LLM)</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="llm_optimize_transformers.html">Transformers Optimization Frontend API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../llm.html#validated-models-list">Validated Models List</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../llm.html#optimization-methodologies">Optimization Methodologies</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../llm.html#weight-only-quantization-int4">Weight Only Quantization INT4</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Weight-Only Quantization (Prototype)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#supported-framework-model-matrix">Supported Framework Model Matrix</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#weight-only-quantization-llm-features-in-intel-extension-for-pytorch">Weight-Only Quantization LLM features in Intel® Extension for PyTorch*</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#weight-only-quantization-initialization">Weight-Only Quantization Initialization</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#weight-only-quantization-runtime">Weight-Only Quantization Runtime</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#weight-only-quantization-linear-dispatch">Weight-Only Quantization Linear Dispatch</a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="#usage-of-running-weight-only-quantization-llm-for-intel-gpu">Usage of running Weight-Only Quantization LLM For Intel® GPU</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#environment-setup">Environment Setup</a></li>
+<li class="toctree-l5"><a class="reference internal" href="#run-weight-only-quantization-llm-on-intel-gpu">Run Weight-Only Quantization LLM on Intel® GPU</a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#install-neural-compressor">Install Neural-compressor</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#quantize-model-and-inference">Quantize Model and Inference</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#save-and-load-quantized-model-optional">Save and Load Quantized Model (Optional)</a></li>
+<li class="toctree-l6"><a class="reference internal" href="#execute-woq-benchmark-script">Execute WOQ benchmark script</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../technical_details.html">Technical Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Releases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../known_issues.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/blogs.html">Blogs &amp; Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/index.html#installation?platform=gpu&amp;version=v2.3.110%2bxpu">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER REFERENCE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_doc.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CONTRIBUTING GUIDE</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contribution.html">Contribution</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Intel&#174 Extension for PyTorch*</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../llm.html">Large Language Models (LLM) Optimizations Overview</a></li>
+      <li class="breadcrumb-item active">Weight-Only Quantization (Prototype)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/llm/int4_weight_only_quantization.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="weight-only-quantization-prototype">
+<h1>Weight-Only Quantization (Prototype)<a class="headerlink" href="#weight-only-quantization-prototype" title="Link to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h2>
+<p>Large Language Models (LLMs) have shown remarkable performance in various natural language processing tasks.</p>
+<p>However, deploying them on devices with limited resources is challenging due to their high computational and memory requirements.</p>
+<p>To overcome this issue, we propose quantization methods that reduce the size and complexity of LLMs. Unlike <a class="reference external" href="https://github.com/intel/intel-extension-for-transformers/blob/main/docs/quantization.md">normal quantization</a>, such as w8a8, that quantizes both weights and activations, we focus on Weight-Only Quantization (WOQ), which only quantizes the weights statically. WOQ is a better trade-off between efficiency and accuracy, as the main bottleneck of deploying LLMs is the memory bandwidth and WOQ usually preserves more accuracy. Experiments on Qwen-7B, a large-scale LLM, show that we can obtain accurate quantized models with minimal loss of quality.</p>
+</section>
+<section id="supported-framework-model-matrix">
+<h2>Supported Framework Model Matrix<a class="headerlink" href="#supported-framework-model-matrix" title="Link to this heading"></a></h2>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th style="text-align: center;">Support Device</th>
+<th style="text-align: center;">RTN*</th>
+<th style="text-align: center;">AWQ*</th>
+<th style="text-align: center;">TEQ*</th>
+<th style="text-align: center;">GPTQ*</th>
+<th style="text-align: center;">AutoRound*</th>
+<th style="text-align: center;">Data type of quantized weight</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">GPU</td>
+<td style="text-align: center;">&#10004;</td>
+<td style="text-align: center;">&#10004;</td>
+<td style="text-align: center;">stay tuned*</td>
+<td style="text-align: center;">&#10004;</td>
+<td style="text-align: center;">stay tuned*</td>
+<td style="text-align: center;">int4_fullrange</td>
+</tr>
+</tbody>
+</table><table border="1" class="docutils">
+<thead>
+<tr>
+<th style="text-align: center;">Model</th>
+<th style="text-align: center;">Datatype</th>
+<th style="text-align: center;">Device</th>
+<th style="text-align: center;">Algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">Llama3-8B</td>
+<td style="text-align: center;">INT4</td>
+<td style="text-align: center;">Intel® iGPU and dGPU</td>
+<td style="text-align: center;">RTN, GPTQ</td>
+</tr>
+<tr>
+<td style="text-align: center;">Phi3-mini</td>
+<td style="text-align: center;">INT4</td>
+<td style="text-align: center;">Intel® iGPU and dGPU</td>
+<td style="text-align: center;">RTN, GPTQ</td>
+</tr>
+<tr>
+<td style="text-align: center;">GPT-J-6B</td>
+<td style="text-align: center;">INT4</td>
+<td style="text-align: center;">Intel® iGPU and dGPU</td>
+<td style="text-align: center;">RTN, GPTQ</td>
+</tr>
+<tr>
+<td style="text-align: center;">Qwen2-7B</td>
+<td style="text-align: center;">INT4</td>
+<td style="text-align: center;">Intel® iGPU and dGPU</td>
+<td style="text-align: center;">RTN, GPTQ</td>
+</tr>
+<tr>
+<td style="text-align: center;">GLM-4-9b-chat</td>
+<td style="text-align: center;">INT4</td>
+<td style="text-align: center;">Intel® iGPU and dGPU</td>
+<td style="text-align: center;">RTN, GPTQ</td>
+</tr>
+</tbody>
+</table><p>Validation Platforms</p>
+<ul class="simple">
+<li><p>Intel® Data Center GPU Max Series</p></li>
+<li><p>Intel® Arc™ A-Series Graphics</p></li>
+<li><p>Intel® Core™ Ultra series</p></li>
+</ul>
+<blockquote>
+<div><p>Note: For algorithms marked as ‘stay tuned’ are highly recommended to wait for the availability of the INT4 models on the HuggingFace Model Hub, since the LLM quantization procedure is significantly constrained by the machine’s host memory and computation capabilities.</p>
+</div></blockquote>
+<p><strong>RTN</strong><a class="reference external" href="#1">[1]</a>: Rounding to Nearest (RTN) is an intuitively simple method that rounds values to the nearest integer. It boasts simplicity, requiring no additional datasets, and offers fast quantization. Besides, it could be easily applied in other datatype like NF4 (non-uniform). Typically, it performs well on configurations such as W4G32 or W8, but worse than advanced algorithms at lower precision level.</p>
+<p><strong>AWQ</strong><a class="reference external" href="#2">[2]</a>: AWQ is a popular method that explores weight min-max values and equivalent transformations in a handcrafted space. While effective, the equivalent transformation imposes certain requirements on model architecture, limiting its applicability to broader models or increasing engineering efforts.</p>
+<p><strong>TEQ</strong><a class="reference external" href="#3">[3]</a>: To our knowledge, it is the first trainable equivalent ransformation method (summited for peer review in 202306). However,  it requires more memory than other methods as model-wise loss is used and the equivalent transformation imposes certain requirements on model architecture.</p>
+<p><strong>GPTQ</strong><a class="reference external" href="#4">[4]</a>: GPTQ is a widely adopted method based on the Optimal Brain Surgeon. It quantizes weight block by block and fine-tunes the remaining unquantized ones to mitigate quantization errors. Occasionally, non-positive semidefinite matrices may occur, necessitating adjustments to hyperparameters.</p>
+<p><strong>AutoRound</strong><a class="reference external" href="#5">[5]</a>: AutoRound utilizes sign gradient descent to optimize rounding values and minmax values of weights within just 200 steps, showcasing impressive performance compared to recent methods like GPTQ/AWQ. Additionally, it offers hypeparameters tuning compatibility to further enhance performance. However, due to its reliance on gradient backpropagation, currently it is not quite fit for backends like ONNX.</p>
+<section id="references">
+<h3>References<a class="headerlink" href="#references" title="Link to this heading"></a></h3>
+<p><a id="1">[1]</a>
+Gunho Park, Baeseong Park, Se Jung Kwon, Byeongwook Kim, Youngjoo Lee, and Dongsoo Lee.
+nuqmm: Quantized matmul for efficient inference of large-scale generative language models.
+arXiv preprint arXiv:2206.09557, 2022.</p>
+<p><a id="2">[2]</a>
+Lin, Ji, et al.(2023).
+AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration.
+arXiv preprint arXiv:2306.00978.</p>
+<p><a id="3">[3]</a>
+Cheng, W., Cai, Y., Lv, K &amp; Shen, H. (2023).
+TEQ: Trainable Equivalent Transformation for Quantization of LLMs.
+arXiv preprint arXiv:2310.10944.</p>
+<p><a id="4">[4]</a>
+Frantar, Elias, et al. “Gptq: Accurate post-training quantization for generative pre-trained transformers.” arXiv preprint arXiv:2210.17323 (2022).</p>
+<p><a id="5">[5]</a>
+Cheng, W., Zhang, W., Shen, H., Cai, Y., He, X., &amp; Lv, K. (2023).
+Optimize weight rounding via signed gradient descent for the quantization of llms.
+arXiv preprint arXiv:2309.05516.</p>
+</section>
+</section>
+<section id="weight-only-quantization-llm-features-in-intel-extension-for-pytorch">
+<h2>Weight-Only Quantization LLM features in Intel® Extension for PyTorch*<a class="headerlink" href="#weight-only-quantization-llm-features-in-intel-extension-for-pytorch" title="Link to this heading"></a></h2>
+<p>In this section, we will describe the implementation of Weight-Only Quantization LLM features in Intel® Extension for PyTorch*. These operators are highly optimized on Intel® GPU platform.
+<img alt="image" src="../../_images/weight-only-quantization-flow.png" /></p>
+<section id="weight-only-quantization-initialization">
+<h3>Weight-Only Quantization Initialization<a class="headerlink" href="#weight-only-quantization-initialization" title="Link to this heading"></a></h3>
+<p>On Intel® GPU, the easiest way to load INT4 models is to use the <code class="docutils literal notranslate"><span class="pre">load_in_4bit</span></code> interface provided by <a class="reference external" href="https://github.com/intel/neural-compressor">Intel® Neural Compressor*</a>, which hooks the <code class="docutils literal notranslate"><span class="pre">AutoModelForCausalLM.from_pretrained</span></code> function to use <code class="docutils literal notranslate"><span class="pre">load_in_4bit</span></code> on Intel® GPU. Pass the argument <code class="docutils literal notranslate"><span class="pre">load_in_4bit=True</span></code> to load a model in 4bit when calling the <code class="docutils literal notranslate"><span class="pre">from_pretrained</span></code> method, which can read the model weight in INT4 format directly.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">qmodel</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="n">load_in_4bit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">device_map</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_llm_runtime</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Another option that Intel® Neural Compressor* offers is to extend the <code class="docutils literal notranslate"><span class="pre">AutoModelForCausalLM.from_pretrained</span></code> function to allow <code class="docutils literal notranslate"><span class="pre">quantization_config</span></code> to take <a class="reference external" href="https://github.com/intel/neural-compressor/blob/master/neural_compressor/transformers/utils/quantization_config.py#L27-L34"><code class="docutils literal notranslate"><span class="pre">WeightOnlyQuantConfig</span></code></a> as an argument, which enables conversion on the Intel® GPU platform. We currently support the RTN algorithm and the weight_dtype setting of <code class="docutils literal notranslate"><span class="pre">int4_fullrange</span></code> (which means that all linear weights are converted to INT4).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">woq_quantization_config</span> <span class="o">=</span> <span class="n">WeightOnlyQuantConfig</span><span class="p">(</span><span class="n">compute_dtype</span><span class="o">=</span><span class="s2">&quot;fp16&quot;</span><span class="p">,</span> <span class="n">weight_dtype</span><span class="o">=</span><span class="s2">&quot;int4_fullrange&quot;</span><span class="p">,</span> <span class="n">scale_dtype</span><span class="o">=</span><span class="s2">&quot;fp16&quot;</span><span class="p">,</span> <span class="n">group_size</span><span class="o">=</span><span class="mi">64</span><span class="p">)</span>
+<span class="n">qmodel</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="n">device_map</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">,</span> <span class="n">quantization_config</span><span class="o">=</span><span class="n">woq_quantization_config</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In Weight-Only Quantization INT4 case, when using <code class="docutils literal notranslate"><span class="pre">AutoModelForCausalLM.from_pretrained</span></code> from Intel® Neural Compressor* to load the model, it will use Intel® Neural Compressor according to the running device to perform quantization deployment.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>    <span class="n">inc_model</span> <span class="o">=</span> <span class="n">quantization</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">model</span><span class="p">,</span>
+                                    <span class="n">conf</span><span class="p">,</span>
+                                    <span class="n">calib_func</span><span class="o">=</span><span class="n">calib_func</span><span class="p">,</span>
+                                    <span class="n">calib_dataloader</span><span class="o">=</span><span class="n">calib_dataloader</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">inc_model</span><span class="o">.</span><span class="n">export_compressed_model</span><span class="p">(</span><span class="n">compression_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span>
+                                                <span class="n">compression_dim</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                                                <span class="n">use_optimum_format</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                                <span class="n">scale_dtype</span><span class="o">=</span><span class="n">convert_dtype_str2torch</span><span class="p">(</span><span class="s2">&quot;fp16&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>When running on Intel® GPU, it will replace the linear in the model with <code class="docutils literal notranslate"><span class="pre">WeightOnlyQuantizedLinear</span></code>. After that, the model linear weight loaded by <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> is in INT4 format, and it contains not only weight and bias information, but also scales, zero_points, and blocksize information. When optimizing transformers at the front end, Intel® Extension for PyTorch* will use <code class="docutils literal notranslate"><span class="pre">WeightOnlyQuantizedLinear</span></code> to initialize this information in the model if they are present, otherwise, it will use <code class="docutils literal notranslate"><span class="pre">IPEXTransformerLinear</span></code> to initialize the linear parameters in the model.</p>
+</section>
+<section id="weight-only-quantization-runtime">
+<h3>Weight-Only Quantization Runtime<a class="headerlink" href="#weight-only-quantization-runtime" title="Link to this heading"></a></h3>
+<p>On Intel® GPU, after using <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code>, Intel® Extension for PyTorch* will automatically replace the original attention module with <code class="docutils literal notranslate"><span class="pre">IPEXTransformerAttnOptimizedInt4</span></code> and the original MLP module with <code class="docutils literal notranslate"><span class="pre">IPEXTransformerMLPOptimizedInt4</span></code> in the model.</p>
+<p>The major changes between <code class="docutils literal notranslate"><span class="pre">IPEXTransformerAttnOptimizedInt4</span></code> for INT4 scenario and <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> for FP16 scenario include: replace the linear used to calculate qkv with <code class="docutils literal notranslate"><span class="pre">torch.ops.torch_ipex.mm_qkv_out_int4</span></code> and out_linear with <code class="docutils literal notranslate"><span class="pre">torch.ops.torch_ipex.mm_bias_int4</span></code>.</p>
+<p>The major changes between <code class="docutils literal notranslate"><span class="pre">IPEXTransformerMLPOptimizedInt4</span></code> for INT4 scenario and <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> for FP16 scenario include: replace the linear used in MLP with <code class="docutils literal notranslate"><span class="pre">torch.ops.torch_ipex.mm_bias_int4</span></code>, if activation is used in the MLP module, then correspondingly, it will be replaced with our fused linear+activation kernel, such as <code class="docutils literal notranslate"><span class="pre">torch.ops.torch_ipex.mm_silu_mul_int4</span></code>.</p>
+</section>
+<section id="weight-only-quantization-linear-dispatch">
+<h3>Weight-Only Quantization Linear Dispatch<a class="headerlink" href="#weight-only-quantization-linear-dispatch" title="Link to this heading"></a></h3>
+<p>As explained before, after applying <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code>, The linear kernel that Intel® Extension for PyTorch* has registered to substitute the original linear will be used in the model.</p>
+<p>The method is:</p>
+<p>Firstly, a new operator in Intel® Extension for PyTorch* will be registered through <code class="docutils literal notranslate"><span class="pre">IPEX_OP_REGISTER(&quot;mm_bias_int4.xpu&quot;,</span> <span class="pre">at::AtenIpexTypeXPU::mm_bias_int4)</span></code> and the operator name will be <code class="docutils literal notranslate"><span class="pre">mm_bias_int4</span></code>.</p>
+<p>Then <code class="docutils literal notranslate"><span class="pre">HGEMMXetla_INT4</span></code> will be used to register the corresponding policy for <code class="docutils literal notranslate"><span class="pre">mm_bias_int4</span></code> beforehand. Later, we use <code class="docutils literal notranslate"><span class="pre">policy.run()</span></code> to make the configured policy take effect.</p>
+<p>During execution, Intel® Extension for PyTorch* will determine the current running platform according to the machine configuration <code class="docutils literal notranslate"><span class="pre">Settings::I().has_2d_block_array(curDevID)</span></code> and look for a suitable policy for it. If it is Intel® Data Center GPU Max Series platform, it will use the policy implemented in <code class="docutils literal notranslate"><span class="pre">ORDERED_GEMM_WINT4_CONFIG_SET_PVC</span></code>. If it is Intel® Arc™ A-Series Graphics platform, it will use the policy implemented in <code class="docutils literal notranslate"><span class="pre">ORDERED_GEMM_WINT4_CONFIG_SET_ARC</span></code>.</p>
+<p>After the policy is selected, Intel® Extension for PyTorch* will use <code class="docutils literal notranslate"><span class="pre">HGEMM_INT4_COMMON_DISPATCH</span></code> to dispatch the operator to different kernels based on different linear configuration parameters and platforms. For example, <code class="docutils literal notranslate"><span class="pre">mm_bias_int4</span></code> on the Intel® Arc™ A-Series Graphics platform will be dispatched to the <code class="docutils literal notranslate"><span class="pre">hgemm_bias_wint4_arc</span></code> kernel.</p>
+</section>
+</section>
+<section id="usage-of-running-weight-only-quantization-llm-for-intel-gpu">
+<h2>Usage of running Weight-Only Quantization LLM For Intel® GPU<a class="headerlink" href="#usage-of-running-weight-only-quantization-llm-for-intel-gpu" title="Link to this heading"></a></h2>
+<p>Intel® Extension for PyTorch* implements Weight-Only Quantization for Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics with Intel® Extension for Transformers*. Below section uses Qwen-7B to demonstrate the detailed usage.</p>
+<section id="environment-setup">
+<h3>Environment Setup<a class="headerlink" href="#environment-setup" title="Link to this heading"></a></h3>
+<p>Please refer to the <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/v2.1.30%2Bxpu/examples/gpu/inference/python/llm/README.md#environment-setup">instructions</a>.</p>
+</section>
+<section id="run-weight-only-quantization-llm-on-intel-gpu">
+<h3>Run Weight-Only Quantization LLM on Intel® GPU<a class="headerlink" href="#run-weight-only-quantization-llm-on-intel-gpu" title="Link to this heading"></a></h3>
+<section id="install-neural-compressor">
+<h4>Install Neural-compressor<a class="headerlink" href="#install-neural-compressor" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">neural</span><span class="o">-</span><span class="n">compressor</span>
+</pre></div>
+</div>
+</section>
+<section id="quantize-model-and-inference">
+<h4>Quantize Model and Inference<a class="headerlink" href="#quantize-model-and-inference" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">from</span> <span class="nn">neural_compressor.transformers</span> <span class="kn">import</span> <span class="n">AutoModelForCausalLM</span>
+<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoTokenizer</span>
+
+<span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;xpu&quot;</span>
+<span class="n">model_name</span> <span class="o">=</span> <span class="s2">&quot;Qwen/Qwen-7B&quot;</span>
+<span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">prompt</span> <span class="o">=</span> <span class="s2">&quot;Once upon a time, there existed a little girl,&quot;</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">input_ids</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+<span class="n">woq_quantization_config</span> <span class="o">=</span> <span class="n">WeightOnlyQuantConfig</span><span class="p">(</span><span class="n">compute_dtype</span><span class="o">=</span><span class="s2">&quot;fp16&quot;</span><span class="p">,</span> <span class="n">weight_dtype</span><span class="o">=</span><span class="s2">&quot;int4_fullrange&quot;</span><span class="p">,</span> <span class="n">scale_dtype</span><span class="o">=</span><span class="s2">&quot;fp16&quot;</span><span class="p">,</span> <span class="n">group_size</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+<span class="n">qmodel</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="n">device_map</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">,</span> <span class="n">quantization_config</span><span class="o">=</span><span class="n">woq_quantization_config</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># optimize the model with Intel® Extension for PyTorch*, it will improve performance.</span>
+<span class="n">qmodel</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">qmodel</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span> <span class="n">quantization_config</span><span class="o">=</span><span class="n">woq_quantization_config</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+
+<span class="n">output</span> <span class="o">=</span> <span class="n">qmodel</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+<blockquote>
+<div><p>Note: It is recommended quantizing and saving the model first, then loading the model as below on a GPU device without sufficient device memory. Otherwise you could skip below instruction, execute quantization and inference on your device directly.</p>
+</div></blockquote>
+</section>
+<section id="save-and-load-quantized-model-optional">
+<h4>Save and Load Quantized Model (Optional)<a class="headerlink" href="#save-and-load-quantized-model-optional" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="kn">from</span> <span class="nn">neural_compressor.transformers</span> <span class="kn">import</span> <span class="n">AutoModelForCausalLM</span>
+
+<span class="n">qmodel</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;Qwen/Qwen-7B&quot;</span><span class="p">,</span> <span class="n">load_in_4bit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">device_map</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Please note, saving model should be executed before ipex.llm.optimize function is called. </span>
+<span class="n">model</span><span class="o">.</span><span class="n">save_pretrained</span><span class="p">(</span><span class="s2">&quot;saved_dir&quot;</span><span class="p">)</span>
+
+<span class="c1"># Load model</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;saved_dir&quot;</span><span class="p">,</span> <span class="n">trust_remote_code</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Before executed the loaded model, you can call ipex.llm.optimize function.</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">loaded_model</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span> <span class="n">woq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
+
+<span class="n">output</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="execute-woq-benchmark-script">
+<h4>Execute <a class="reference external" href="https://github.com/intel/intel-extension-for-pytorch/blob/xpu-main/examples/gpu/inference/python/llm/run_benchmark_woq.sh">WOQ benchmark script</a><a class="headerlink" href="#execute-woq-benchmark-script" title="Link to this heading"></a></h4>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bash</span> <span class="n">run_benchmark_woq</span><span class="o">.</span><span class="n">sh</span>
+</pre></div>
+</div>
+<blockquote>
+<div><p>Note:</p>
+<ul class="simple">
+<li><p>Do save quantized model before call <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> function.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> function is designed to optimize transformer-based models within frontend python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. Please refer to <a class="reference internal" href="llm_optimize_transformers.html"><span class="doc">Transformers Optimization Frontend API</span></a> for the detail of <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code>.</p></li>
+</ul>
+</div></blockquote>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="llm_optimize_transformers.html" class="btn btn-neutral float-left" title="Transformers Optimization Frontend API" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../performance.html" class="btn btn-neutral float-right" title="Performance" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   <jinja2.runtime.BlockReference object at 0x71c625c0d4e0> 
+<p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
