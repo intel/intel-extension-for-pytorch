@@ -17,8 +17,8 @@ PARTITION_SIZE = 512
 DTYPES = [torch.float16]
 NUM_GEN_SEQS = [1]  # Arbitrary values for testing
 NUM_HEADS = [1]
-HEAD_SIZES = [64]
-BLOCK_SIZES = [32]
+HEAD_SIZES = [64, 128]
+BLOCK_SIZES = [16, 32]
 USE_ALIBI = [False]
 SEEDS = [0]
 

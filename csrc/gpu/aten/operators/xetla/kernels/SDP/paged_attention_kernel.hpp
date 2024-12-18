@@ -379,7 +379,8 @@ class paged_attention_kernel {
   // load path, the original 2d load paged attention path is disabled by default
   // here to prevent the accuracy issue brought by the surface width limitation
   // of 2d load.
-  static constexpr bool has_2d_ld_st = false;
+  static constexpr bool has_2d_ld_st =
+      (arch_tag == gpu_arch::XeHpc) ? true : false;
 
   // -------------------- // Context // -------------------- //
 
@@ -417,7 +418,7 @@ class paged_attention_kernel {
 
       //   const int kv_head_id = args.head_mapping[head_id];
       const int kv_head_id = head_id / args.num_queries_per_tokens;
-      kv_block_stride = args.num_kv_heads * args.head_size;
+      kv_block_stride = args.num_kv_heads * args.head_size * block_size;
       kv_head_stride = args.head_size * kv_head_id;
 
       const int max_num_blocks = DIVIDE_ROUND_UP(context_len, block_size);
@@ -556,13 +557,14 @@ class paged_attention_kernel {
       // Note, we didn't add correct boundary for context length, as we handled
       // this in following mask
       const int block_id = ctx.block_table[bid];
-      int32_t start_y = block_id * ctx.kv_block_stride + ctx.kv_head_stride;
+      int32_t start_y = ctx.kv_head_stride;
       uint32_t boundary_y = start_y + args.head_size;
       constexpr uint32_t boundary_x = block_size;
+      auto* cur_key_cache = args.key_cache + block_id * ctx.kv_block_stride;
       key_payload_t key_payload(
-          args.key_cache, boundary_x, boundary_y, block_size, 0, start_y);
+          cur_key_cache, boundary_x, boundary_y, block_size, 0, start_y);
       key_prefetch_payload_t key_prefetch_payload(
-          args.key_cache, boundary_x, boundary_y, block_size, 0, start_y);
+          cur_key_cache, boundary_x, boundary_y, block_size, 0, start_y);
 
       query_payload_t query_payload(
           slm_offset_query, max_head_size, 1, max_head_size, 0, 0);
@@ -740,13 +742,13 @@ class paged_attention_kernel {
       // assumption. As previous score already set unvalid seqlen to zero, it's
       // ok to load wrong v_cache for unvalid seq
       constexpr uint32_t boundary_x = block_size;
-      int32_t start_y = block_id * ctx.kv_block_stride + ctx.kv_head_stride;
+      int32_t start_y = ctx.kv_head_stride;
       uint32_t boundary_y = start_y + args.head_size;
-
+      auto* cur_value_cache = args.value_cache + block_id * ctx.kv_block_stride;
       value_payload_t value_payload(
-          args.value_cache, boundary_x, boundary_y, block_size, 0, start_y);
+          cur_value_cache, boundary_x, boundary_y, block_size, 0, start_y);
       value_prefetch_payload_t value_prefetch_payload(
-          args.value_cache, boundary_x, boundary_y, block_size, 0, start_y);
+          cur_value_cache, boundary_x, boundary_y, block_size, 0, start_y);
 
 #pragma unroll
       for (int i = 0; i < stages; i++) {
