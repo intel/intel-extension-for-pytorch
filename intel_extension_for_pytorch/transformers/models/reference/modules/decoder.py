@@ -1621,6 +1621,209 @@ def Maira2MultiModalProjector_forward(self, x: torch.Tensor) -> torch.FloatTenso
     return x  # type: ignore[no-any-return]
 
 
+def JambaAttentionDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value=None,
+    output_attentions: Optional[bool] = False,
+    output_router_logits: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    cache_position: Optional[torch.LongTensor] = None,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+        cache_position=cache_position,
+    )
+
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.o_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    # feed-forward (experts/MLP)
+    residual = hidden_states
+    hidden_states = self.pre_ff_layernorm(hidden_states)
+
+    # ff_outputs = self.feed_forward(hidden_states)
+    mlp_gate = self.linear_silu_mul(hidden_states)
+
+    if not self.distributed:
+        ff_outputs = self.mlp_linear_add(mlp_gate, residual)
+    else:
+        hidden_states = self.mlp.down_proj(mlp_gate)
+        ff_outputs = residual + hidden_states
+
+    if isinstance(ff_outputs, tuple):
+        hidden_states, router_logits = ff_outputs
+    else:
+        hidden_states, router_logits = ff_outputs, None
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    if output_router_logits:
+        outputs += (router_logits,)
+
+    return outputs
+
+
+def JambaMambaDecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value=None,
+    output_attentions: Optional[bool] = False,
+    output_router_logits: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    cache_position: Optional[torch.LongTensor] = None,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+
+    hidden_states = self.input_layernorm(hidden_states)
+
+    hidden_states, present = self.mamba(
+        hidden_states=hidden_states,
+        cache_params=past_key_value,
+    )
+    self_attn_weights = None
+
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.mamba.o_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    # feed-forward (experts/MLP)
+    residual = hidden_states
+    hidden_states = self.pre_ff_layernorm(hidden_states)
+    if hasattr(self, "linear_silu_mul"):
+        ff_outputs = self.linear_silu_mul(hidden_states)
+        if not self.distributed:
+            hidden_states = self.mlp_linear_add(ff_outputs, residual)
+        else:
+            hidden_states = self.feed_forward.down_proj(ff_outputs)
+            hidden_states = residual + hidden_states
+    else:
+        # ff_outputs = self.feed_forward(hidden_states)
+        batch_size, sequence_length, hidden_dim = hidden_states.shape
+
+        hidden_states = hidden_states.view(-1, hidden_dim)
+        # router_logits: (batch * sequence_length, n_experts)
+        router_logits = self.feed_forward.router(hidden_states)
+        routing_weights = F.softmax(router_logits, dim=1, dtype=torch.float)
+        routing_weights, selected_experts = torch.topk(
+            routing_weights, self.feed_forward.top_k, dim=-1
+        )
+        # we cast back to the input dtype
+        routing_weights = routing_weights.to(hidden_states.dtype)
+
+        final_hidden_states = torch.zeros(
+            (batch_size * sequence_length, hidden_dim),
+            dtype=hidden_states.dtype,
+            device=hidden_states.device,
+        )
+
+        # One hot encode the selected experts to create an expert mask
+        # this will be used to easily index which expert is going to be sollicitated
+        expert_mask = torch.nn.functional.one_hot(
+            selected_experts, num_classes=self.feed_forward.num_experts
+        ).permute(2, 1, 0)
+
+        # Loop over all available experts in the model and perform the computation on each expert
+        for expert_idx in range(self.feed_forward.num_experts):
+            expert_layer = self.feed_forward.experts[expert_idx]
+            idx, top_x = torch.where(expert_mask[expert_idx])
+
+            if expert_layer.gate_proj.weight.dtype in [
+                torch.qint8,
+                torch.int8,
+                torch.uint8,
+            ]:
+                final_hidden_states = torch.ops.torch_ipex.mixtral_moe_woq(
+                    hidden_states,
+                    top_x,
+                    idx,
+                    expert_layer.gate_proj._op_context.get_data_handle(),
+                    expert_layer.up_proj._op_context.get_data_handle(),
+                    expert_layer.down_proj._op_context.get_data_handle(),
+                    routing_weights,
+                    final_hidden_states,
+                    self.distributed,
+                )
+            elif (
+                hasattr(expert_layer.gate_proj, "use_dnnl")
+                and expert_layer.gate_proj.use_dnnl
+            ):
+                final_hidden_states = torch.ops.torch_ipex.mixtral_moe(
+                    hidden_states,
+                    top_x,
+                    idx,
+                    expert_layer.gate_proj._get_forward_weight(),
+                    expert_layer.gate_proj.ctx.get_data_handle(),
+                    expert_layer.up_proj._get_forward_weight(),
+                    expert_layer.up_proj.ctx.get_data_handle(),
+                    expert_layer.down_proj._get_forward_weight(),
+                    expert_layer.down_proj.ctx.get_data_handle(),
+                    hasattr(expert_layer.gate_proj, "use_dnnl")
+                    and expert_layer.gate_proj.use_dnnl,
+                    routing_weights,
+                    final_hidden_states,
+                    self.distributed,
+                )
+            else:
+                final_hidden_states = torch.ops.torch_ipex.mixtral_moe_tpp(
+                    hidden_states,
+                    top_x,
+                    idx,
+                    expert_layer.gate_proj.weight,
+                    expert_layer.up_proj.weight,
+                    expert_layer.down_proj.weight,
+                    (
+                        expert_layer.gate_proj.tpp_fallback
+                        if hasattr(expert_layer.gate_proj, "tpp_fallback")
+                        else True
+                    ),
+                    routing_weights,
+                    final_hidden_states,
+                    self.distributed,
+                )
+        final_hidden_states = final_hidden_states.reshape(
+            batch_size, sequence_length, hidden_dim
+        )
+        hidden_states = residual + final_hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present,)
+
+    if output_router_logits:
+        outputs += (router_logits,)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -1872,6 +2075,36 @@ class _IPEXDecoderLayerRef(nn.Module):
                 self.linear_gelus = torch.nn.Sequential(*linear_gelus)
                 for i in range(len(module.layers) - 1):
                     del self.__dict__["_modules"]["layers"][0]
+        elif self.model_backbone == "JambaForCausalLM":
+            if hasattr(module, "self_attn"):
+                if not self.distributed:
+                    self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
+                    self.mlp_linear_add = _IPEXlinearAddRef(
+                        module.feed_forward.down_proj
+                    )
+                    del self.__dict__["_modules"]["self_attn"].o_proj
+                    del self.__dict__["_modules"]["feed_forward"].down_proj
+                self.linear_silu_mul = _IPEXlinearSiluMulRef(
+                    module.feed_forward.gate_proj, module.feed_forward.up_proj
+                )
+                del self.__dict__["_modules"]["feed_forward"].gate_proj
+                del self.__dict__["_modules"]["feed_forward"].up_proj
+            elif config.layers_num_experts[module.mamba.layer_idx] == 1:
+                if not self.distributed:
+                    self.mlp_linear_add = _IPEXlinearAddRef(
+                        module.feed_forward.down_proj
+                    )
+                    del self.__dict__["_modules"]["feed_forward"].down_proj
+                self.linear_silu_mul = _IPEXlinearSiluMulRef(
+                    module.feed_forward.gate_proj, module.feed_forward.up_proj
+                )
+                del self.__dict__["_modules"]["feed_forward"].gate_proj
+                del self.__dict__["_modules"]["feed_forward"].up_proj
+            if hasattr(module, "mamba"):
+                if not self.distributed:
+                    self.mha_linear_add = _IPEXlinearAddRef(module.mamba.out_proj)
+                    del self.__dict__["_modules"]["mamba"].out_proj
+
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -1900,6 +2133,7 @@ class _IPEXDecoderLayerRef(nn.Module):
         output_router_logits: Optional[bool] = False,
         pixel_values_present: Optional[bool] = False,
         vision: Optional[bool] = False,
+        cache_position=None,
     ):
         if self.model_backbone in ["GPTJForCausalLM", "CodeGenForCausalLM"]:
             return GPTJBlock_forward(
@@ -2174,6 +2408,30 @@ class _IPEXDecoderLayerRef(nn.Module):
                 return Maira2ViTDecoderLayer_forward(self, hidden_states)
             else:
                 return Maira2MultiModalProjector_forward(self, hidden_states)
+        elif self.model_backbone == "JambaForCausalLM":
+            if hasattr(self, "self_attn"):
+                return JambaAttentionDecoderLayer_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    position_ids,
+                    past_key_value,
+                    output_attentions,
+                    output_router_logits,
+                    use_cache,
+                )
+            else:
+                return JambaMambaDecoderLayer_forward(
+                    self,
+                    hidden_states,
+                    attention_mask,
+                    position_ids,
+                    past_key_value,
+                    output_attentions,
+                    output_router_logits,
+                    use_cache,
+                    cache_position,
+                )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 

@@ -209,6 +209,9 @@ def model_convert_reference(_model):
         WhisperModel_forward,
         WhisperDecoderLayer_forward,
         LlavaForConditionalGeneration_forward,
+        JambaModel_forward,
+        JambaMambaMixer_forward,
+        JambaForCausalLM_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptj,
         prepare_inputs_for_generation_gptbigcode,
@@ -224,6 +227,8 @@ def model_convert_reference(_model):
         detect_language,
         _postprocess_outputs_whisper,
         _prepare_encoder_decoder_kwargs_for_generation,
+        prepare_inputs_for_generation_jamba,
+        _update_causal_mask,
     )
 
     if not hasattr(_model.config, "architectures"):
@@ -1046,6 +1051,45 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "JambaForCausalLM":
+        convert_function(_model, "forward", JambaForCausalLM_forward)
+        convert_function(_model.model, "forward", JambaModel_forward)
+        convert_function(
+            _model, "prepare_inputs_for_generation", prepare_inputs_for_generation_jamba
+        )
+        for i in range(_model.config.num_hidden_layers):
+            if hasattr(_model.model.layers[i], "mamba"):
+                convert_function(
+                    _model.model.layers[i].mamba, "forward", JambaMambaMixer_forward
+                )
+                _model.model.layers[i].mamba.register_buffer(
+                    "conv1d_weight", _model.model.layers[i].mamba.conv1d.weight.clone()
+                )
+                _model.model.layers[i].mamba.A_log = torch.nn.Parameter(
+                    _model.model.layers[i].mamba.A_log.transpose(-1, -2).contiguous()
+                )
+        convert_function(_model.model, "_update_causal_mask", _update_causal_mask)
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[_model.config.attn_layer_offset]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[_model.config.attn_layer_offset].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
     return _model
 
 
@@ -1074,6 +1118,8 @@ def get_dummy_input(_model, return_dict=False):
             False,
             "Cannot support the dummy sample_inputs for your model, please use your sample_inputs as the inputs and run again",
         )
+
+    batch_size = _model.config.batch_size if hasattr(_model.config, "batch_size") else 1
     if _model.config.architectures[0] == "T5ForConditionalGeneration":
         past_key_values = tuple(
             [
@@ -1135,6 +1181,41 @@ def get_dummy_input(_model, return_dict=False):
                     )
                 )
                 for i in range(model_num_layers)
+            ]
+        )
+    elif _model.config.architectures[0] == "JambaForCausalLM":
+        intermediate_size = _model.config.mamba_expand * _model.config.hidden_size
+        conv_kernel_size = _model.config.mamba_d_conv
+        ssm_state_size = _model.config.mamba_d_state
+        dtype = _model.config.dtype if hasattr(_model.config, "dtype") else _model.dtype
+        past_key_values = tuple(
+            [
+                (
+                    (
+                        torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros([1, 1, 1, 1]).contiguous(),
+                        torch.zeros(1, 4, dtype=torch.long),
+                    )
+                    if i % _model.config.attn_layer_period
+                    == _model.config.attn_layer_offset
+                    else (
+                        torch.zeros(
+                            batch_size,
+                            intermediate_size,
+                            ssm_state_size,
+                            dtype=dtype,
+                        ).contiguous(),
+                        torch.zeros(
+                            batch_size,
+                            intermediate_size,
+                            conv_kernel_size,
+                            dtype=dtype,
+                        ).contiguous(),
+                        torch.tensor(False).contiguous(),
+                    )
+                )
+                for i in range(_model.config.num_hidden_layers)
             ]
         )
     else:
@@ -1257,9 +1338,6 @@ def get_dummy_input(_model, return_dict=False):
             else (input_ids, attention_mask, past_key_values)
         )
     if _model.config.architectures[0] == "GitForCausalLM":
-        batch_size = (
-            _model.config.batch_size if hasattr(_model.config, "batch_size") else 1
-        )
         num_head = _model.git.encoder.layer[0].attention.self.num_attention_heads
         head_dim = int(
             _model.git.encoder.layer[0].attention.self.hidden_size / num_head
@@ -1353,6 +1431,12 @@ def get_dummy_input(_model, return_dict=False):
                 position_ids,
                 past_key_values,
             )
+    if _model.config.architectures[0] == "JambaForCausalLM":
+        if return_dict:
+            sample_inputs["output_router_logits"] = torch.tensor(False)
+            sample_inputs["num_logits_to_keep"] = torch.tensor(1)
+        else:
+            sample_inputs = sample_inputs + (torch.tensor(False), torch.tensor(1))
     if "return_last_logit" in model_inputs:
         if return_dict:
             sample_inputs["return_last_logit"] = torch.tensor(True)
@@ -1543,6 +1627,10 @@ def model_convert_lowering(
                 supported_classes.append(
                     transformers.models.mixtral.modeling_mixtral.MixtralRMSNorm
                 )
+            if _model.config.architectures[0] == "JambaForCausalLM":
+                supported_classes.append(
+                    type(_model.model.layers[0].mamba.dt_layernorm)
+                )
             for supported_class in supported_classes:
                 lowering_class_cpu(
                     _model,
@@ -1639,7 +1727,7 @@ def model_convert_lowering(
                         first_token_optimized_model=trace_model_first,
                     )
 
-                if _model.config.architectures[0] == "YuanForCausalLM":
+                elif _model.config.architectures[0] == "YuanForCausalLM":
                     sample_inputs.pop("past_key_values", None)
                     batch_size = (
                         _model.config.batch_size
@@ -1667,7 +1755,7 @@ def model_convert_lowering(
                         optimized_model=trace_model,
                         first_token_optimized_model=trace_model_first,
                     )
-                if _model.config.architectures[0] == "Maira2ForConditionalGeneration":
+                elif _model.config.architectures[0] == "Maira2ForConditionalGeneration":
                     pixel_values = torch.zeros(1, 3, 518, 518)
                     sample_inputs["pixel_values"] = pixel_values
                     trace_model_first = torch.jit.trace(
@@ -1682,7 +1770,44 @@ def model_convert_lowering(
                         optimized_model=trace_model,
                         first_token_optimized_model=trace_model_first,
                     )
-
+                elif _model.config.architectures[0] == "JambaForCausalLM":
+                    input_ids = torch.ones(1).to(torch.long).unsqueeze(0)
+                    sample_inputs["input_ids"] = input_ids
+                    sample_inputs["attention_mask"] = torch.ones_like(input_ids)
+                    sample_inputs["position_ids"] = torch.arange(
+                        input_ids.shape[-1]
+                    ).unsqueeze(0)
+                    sample_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                sample_inputs["past_key_values"][i]
+                                if i % _model.config.attn_layer_period
+                                == _model.config.attn_layer_offset
+                                else (
+                                    sample_inputs["past_key_values"][i][0][
+                                        0, ...
+                                    ].unsqueeze(0),
+                                    sample_inputs["past_key_values"][i][1][
+                                        0, ...
+                                    ].unsqueeze(0),
+                                    torch.tensor(True).contiguous(),
+                                )
+                            )
+                            for i in range(_model.config.num_hidden_layers)
+                        ]
+                    )
+                    trace_model_next = torch.jit.trace(
+                        _model,
+                        example_kwarg_inputs=sample_inputs,
+                        strict=False,
+                        check_trace=False,
+                    )
+                    trace_model_next = torch.jit.freeze(trace_model_next)
+                    _model = _set_optimized_model_for_generation(
+                        _model,
+                        optimized_model=trace_model_next,
+                        first_token_optimized_model=trace_model,
+                    )
                 else:
                     _model = _set_optimized_model_for_generation(
                         _model, optimized_model=trace_model
@@ -1821,6 +1946,7 @@ def optimize(
                 "Phi3ForCausalLM",
                 "WhisperForConditionalGeneration",
                 "Maira2ForConditionalGeneration",
+                "JambaForCausalLM",
             ]
         if well_supported_model:
             check_transformers_for_llm_support()

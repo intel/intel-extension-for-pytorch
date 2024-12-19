@@ -377,13 +377,14 @@ if model_type == "whisper":
     config.text_max_length = config.max_source_positions + config.max_target_positions
 if model_type == "llava":
     config.use_cache = True
-
+if model_type == "jamba":
+    config.use_mamba_kernels = False
 if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
 if model_type == "maira2" and not hasattr(config.text_config, "lm_head_generation"):
     config.text_config.lm_head_generation = True
 num_beams = 1 if args.greedy else 4
-if model_type in ["git", "llava"]:
+if model_type in ["git", "llava", "jamba"]:
     config.batch_size = int(args.batch_size) * num_beams
 # XXX: can't automatically derive dtype via config's `from_pretrained`
 # dtype = torch.bfloat16 if model_name in ["bigscience/bloom", "bigscience/bigscience-small-testing"] else torch.float16
@@ -417,6 +418,7 @@ elif world_size == 1 or model_type in [
     "qwen",
     "yuan",
     "whisper",
+    "jamba",
 ]:
     model = model_class[0].from_pretrained(
         model_name,

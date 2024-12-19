@@ -176,6 +176,7 @@ def _beam_sample(
             "WhisperForConditionalGeneration",
             "Qwen2ForCausalLM",
             "Maira2ForConditionalGeneration",
+            "JambaForCausalLM",
         ]:
             first_token = False
             if hasattr(self.config, "kv_cache_dtype"):
@@ -360,6 +361,49 @@ def _beam_sample(
                             for i in range(num_hidden_layers)
                         ]
                     )
+                elif self.model_backbone == "JambaForCausalLM":
+                    intermediate_size = (
+                        self.config.mamba_expand * self.config.hidden_size
+                    )
+                    conv_kernel_size = self.config.mamba_d_conv
+                    ssm_state_size = self.config.mamba_d_state
+                    dtype = (
+                        self.config.dtype
+                        if hasattr(self.config, "dtype")
+                        else self.dtype
+                    )
+                    model_inputs["past_key_values"] = tuple(
+                        [
+                            (
+                                (
+                                    torch.zeros(
+                                        1, 0, 0, 1, dtype=torch.long
+                                    ).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                                    beam_idx_tmp,
+                                )
+                                if i % self.config.attn_layer_period
+                                == self.config.attn_layer_offset
+                                else (
+                                    torch.zeros(
+                                        int(batch_size * num_beams),
+                                        intermediate_size,
+                                        ssm_state_size,
+                                        dtype=dtype,
+                                    ).contiguous(),
+                                    torch.zeros(
+                                        int(batch_size * num_beams),
+                                        intermediate_size,
+                                        conv_kernel_size,
+                                        dtype=dtype,
+                                    ).contiguous(),
+                                    torch.tensor(False).contiguous(),
+                                )
+                            )
+                            for i in range(self.config.num_hidden_layers)
+                        ]
+                    )
                 else:
                     model_inputs["past_key_values"] = tuple(
                         [
@@ -409,6 +453,13 @@ def _beam_sample(
                 model_inputs.pop("pixel_values", None)
 
             model_inputs.pop("cache_position", None)
+            if self.model_backbone == "JambaForCausalLM":
+                model_inputs["output_router_logits"] = torch.tensor(
+                    model_inputs["output_router_logits"]
+                )
+                model_inputs["num_logits_to_keep"] = torch.tensor(
+                    model_inputs["num_logits_to_keep"]
+                )
             if hasattr(self, "trace_graph"):
                 if first_token and hasattr(self, "trace_graph_first"):
                     outputs = self.trace_graph_first(**model_inputs)

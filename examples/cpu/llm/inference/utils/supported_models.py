@@ -34,6 +34,7 @@ MODEL_CLASSES = {
     "whisper": (WhisperForConditionalGeneration, AutoProcessor),
     "maira2": (AutoModelForCausalLM, AutoProcessor),
     "maira-2": (AutoModelForCausalLM, AutoProcessor),
+    "jamba": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

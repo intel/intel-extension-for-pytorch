@@ -59,6 +59,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "Qwen2ForCausalLM",
             "YuanForCausalLM",
             "Maira2ForConditionalGeneration",
+            "JambaForCausalLM",
         ]:
             if not self.distributed:
                 if hasattr(module, "linear_add"):

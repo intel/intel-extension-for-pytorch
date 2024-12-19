@@ -209,6 +209,13 @@ supported_models = [
         lambda m: m.language_model.model.layers[0].self_attn.__class__,
         lambda m: m.language_model.model.layers[0].__class__,
     ),
+    model_info(
+        "jamba",
+        transformers.models.jamba.modeling_jamba.JambaForCausalLM,
+        True,
+        lambda m: m.model.layers[m.config.attn_layer_offset].self_attn.__class__,
+        lambda m: m.model.layers[m.config.attn_layer_offset].__class__,
+    ),
 ]
 
 
@@ -247,6 +254,8 @@ class OptimizeTransformersNightlyTester(TestCase):
             model.load_state_dict(state_dict)
         elif m.name == "llava":
             model.get_vision_tower().load_model()
+        elif m.name == "jamba":
+            model.config.dtype = dtype
         model.eval()
         ref_m = copy.deepcopy(model)
         ipex_m = copy.deepcopy(model)
@@ -320,12 +329,20 @@ class OptimizeTransformersNightlyTester(TestCase):
                 "position_ids": position_ids,
                 "pixel_values": pixel_values,
             }
+        if m.name == "jamba":
+            input_dict["output_router_logits"] = torch.tensor(False)
+            input_dict["num_logits_to_keep"] = torch.tensor(1)
+            model.config.dtype = dtype
 
         with torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
             dtype=dtype,
         ):
             key_hf = ref_m(**input_dict)
+        if m.name == "jamba":
+            input_dict["past_key_values"] = ipex.transformers.optimize.get_dummy_input(
+                model, True
+            )["past_key_values"]
         with torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
             dtype=dtype,

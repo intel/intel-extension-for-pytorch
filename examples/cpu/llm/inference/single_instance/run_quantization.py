@@ -44,6 +44,7 @@ from llm.inference.utils.model_class.phi import Phi3Config
 from llm.inference.utils.model_class.yuan import YuanConfig
 from llm.inference.utils.model_class.whisper import WhisperConfig
 from llm.inference.utils.model_class.maira2 import MAIRA2Config
+from llm.inference.utils.model_class.jamba import JambaConfig
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -431,6 +432,8 @@ elif re.search("maira2", config.architectures[0], re.IGNORECASE):
         return Image.open(response.raw)
 
     model = MAIRA2Config(args.model_id)
+elif re.search("jamba", config.architectures[0], re.IGNORECASE):
+    model = JambaConfig(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 
@@ -452,7 +455,7 @@ if model.name == "mpt" and args.prompt is None:
     if hasattr(config, "max_seq_len") and config.max_seq_len > max_seq_len:
         max_seq_len = config.max_seq_len
     config.max_seq_len = max_seq_len
-if model.name in ["git", "llava"]:
+if model.name in ["git", "llava", "jamba"]:
     config.batch_size = int(args.batch_size) * num_beams
 if model.name == "whisper":
     config.text_max_length = config.max_source_positions + config.max_target_positions
@@ -567,6 +570,41 @@ if model.name == "maira2":
             for i in range(user_model.config.text_config.num_hidden_layers)
         ]
     )
+if model.name == "jamba":
+    intermediate_size = user_model.config.mamba_expand * user_model.config.hidden_size
+    conv_kernel_size = user_model.config.mamba_d_conv
+    ssm_state_size = user_model.config.mamba_d_state
+    user_model.config.dtype = amp_dtype
+    global_past_key_value = tuple(
+        [
+            (
+                (
+                    torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros([1, 1, 1, 1]).contiguous(),
+                    torch.zeros(1, 4, dtype=torch.long),
+                )
+                if i % user_model.config.attn_layer_period
+                == user_model.config.attn_layer_offset
+                else (
+                    torch.zeros(
+                        int(args.batch_size * num_beams),
+                        intermediate_size,
+                        ssm_state_size,
+                        dtype=amp_dtype,
+                    ).contiguous(),
+                    torch.zeros(
+                        int(args.batch_size * num_beams),
+                        intermediate_size,
+                        conv_kernel_size,
+                        dtype=amp_dtype,
+                    ).contiguous(),
+                    torch.tensor(False).contiguous(),
+                )
+            )
+            for i in range(user_model.config.num_hidden_layers)
+        ]
+    )
 
 
 def get_example_inputs(model):
@@ -594,6 +632,15 @@ def get_example_inputs(model):
                 attention_mask,
                 position_ids,
                 tuple(global_past_key_value),
+            )
+        elif model.name == "jamba":
+            example_inputs = (
+                input_ids.unsqueeze(0),
+                attention_mask.unsqueeze(0),
+                position_ids.unsqueeze(0),
+                tuple(global_past_key_value),
+                torch.tensor(False),
+                torch.tensor(1),
             )
         else:
             example_inputs = (
@@ -1267,6 +1314,38 @@ elif args.ipex_weight_only_quantization:
             )
             self_jit_first = torch.jit.freeze(self_jit_first.eval())
             self_jit_first.save(args.output_dir + "/" + args.quant_model_name + "2")
+        elif model.name == "jamba":
+            input_ids = torch.ones(1).to(torch.long).unsqueeze(0)
+            attention_mask = torch.ones_like(input_ids)
+            position_ids = torch.arange(input_ids.shape[-1]).unsqueeze(0)
+            past_key_values = tuple(
+                [
+                    (
+                        global_past_key_value[i]
+                        if i % user_model.config.attn_layer_period
+                        == user_model.config.attn_layer_offset
+                        else (
+                            global_past_key_value[i][0][0, ...].unsqueeze(0),
+                            global_past_key_value[i][1][0, ...].unsqueeze(0),
+                            torch.tensor(True).contiguous(),
+                        )
+                    )
+                    for i in range(user_model.config.num_hidden_layers)
+                ]
+            )
+            example_inputs = (
+                input_ids,
+                attention_mask,
+                position_ids,
+                past_key_values,
+                torch.tensor(False),
+                torch.tensor(1),
+            )
+            self_jit_next = torch.jit.trace(
+                user_model.eval(), example_inputs, strict=False, check_trace=False
+            )
+            self_jit_next = torch.jit.freeze(self_jit_next.eval())
+            self_jit_next.save(args.output_dir + "/" + args.quant_model_name + "2")
 
 
 if args.benchmark:
@@ -1287,6 +1366,9 @@ if args.benchmark:
             if model.name in ["yuan", "mllama", "maira2"]:
                 self_jit_first = torch.jit.load(args.quantized_model_path + "2")
                 self_jit_first = torch.jit.freeze(self_jit_first.eval())
+            if model.name in ["jamba"]:
+                self_jit_next = torch.jit.load(args.quantized_model_path + "2")
+                self_jit_next = torch.jit.freeze(self_jit_next.eval())
         except Exception as e:
             print("warning: loading failed.", e)
             self_jit = quant_model
@@ -1295,6 +1377,12 @@ if args.benchmark:
                 user_model,
                 optimized_model=self_jit,
                 first_token_optimized_model=self_jit_first,
+            )
+        elif model.name in ["jamba"]:
+            ipex._set_optimized_model_for_generation(
+                user_model,
+                optimized_model=self_jit_next,
+                first_token_optimized_model=self_jit,
             )
         else:
             ipex._set_optimized_model_for_generation(

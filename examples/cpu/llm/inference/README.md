@@ -45,6 +45,7 @@
 |Phi| microsoft/Phi-3-medium-128k-instruct | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
 |Whisper| openai/whisper-large-v2 | 🟩 | 🟩 | 🟩 | 🟩 |   |
 |Maira| microsoft/maira-2 | 🟩 | 🟩 |   | 🟩 |   |
+|Jamba| ai21labs/Jamba-v0.1 | 🟩 | 🟩 |   | 🟩 |   |
 
 ## 1.2 Verified for distributed inference mode via DeepSpeed
 

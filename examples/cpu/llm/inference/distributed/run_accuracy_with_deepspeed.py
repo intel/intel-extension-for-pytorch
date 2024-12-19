@@ -297,6 +297,7 @@ class HuggingFaceModel(BaseLM):
             elif dtype == "int8":
                 load_dtype = torch.float32
                 infer_dtype = torch.int8
+        self.load_dtype = load_dtype
 
         model_type = next(
             (x for x in MODEL_CLASSES.keys() if x in model_id.lower()), "auto"
@@ -331,6 +332,7 @@ class HuggingFaceModel(BaseLM):
             "gptbigcode",
             "qwen",
             "yuan",
+            "jamba",
         ]:
             self.model = model_class[0].from_pretrained(
                 model_id,
@@ -855,6 +857,40 @@ class HuggingFaceModel(BaseLM):
                     for i in range(num_hidden_layers)
                 ]
             )
+        if re.search("jamba", self.config.architectures[0], re.IGNORECASE):
+            intermediate_size = self.config.mamba_expand * self.config.hidden_size
+            conv_kernel_size = self.config.mamba_d_conv
+            ssm_state_size = self.config.mamba_d_state
+            past_key_values = tuple(
+                [
+                    (
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros(1, 4, dtype=torch.long),
+                        )
+                        if i % self.config.attn_layer_period
+                        == self.config.attn_layer_offset
+                        else (
+                            torch.zeros(
+                                input_bs,
+                                intermediate_size,
+                                ssm_state_size,
+                                dtype=self.load_dtype,
+                            ).contiguous(),
+                            torch.zeros(
+                                input_bs,
+                                intermediate_size,
+                                conv_kernel_size,
+                                dtype=self.load_dtype,
+                            ).contiguous(),
+                            torch.tensor(False).contiguous(),
+                        )
+                    )
+                    for i in range(self.config.num_hidden_layers)
+                ]
+            )
         return past_key_values
 
     def _model_call(
@@ -922,7 +958,7 @@ class HuggingFaceModel(BaseLM):
             inputs, attention_mask=attention_mask_batched
         )
         has_position_ids = model_inputs.get("position_ids", None) is not None
-        if self._with_jit:
+        if self._with_ipex:
             example_dict["attention_mask"] = attention_mask_batched
             example_dict["past_key_values"] = past_key_values
             example_dict["return_dict"] = torch.tensor(False)
@@ -930,6 +966,10 @@ class HuggingFaceModel(BaseLM):
                 example_dict["position_ids"] = position_ids_batched
         if "return_last_logit" in model_inputs:
             example_dict["return_last_logit"] = torch.tensor(True)
+        if "output_router_logits" in model_inputs:
+            example_dict["output_router_logits"] = torch.tensor(
+                model_inputs["output_router_logits"]
+            )
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if args.quant_with_amp or self._dtype == "bfloat16" else False,
