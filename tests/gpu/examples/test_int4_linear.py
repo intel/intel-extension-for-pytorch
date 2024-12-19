@@ -637,6 +637,9 @@ class TestInt4Linear(TestCase):
         group_num = k // group_size
 
         scales = torch.rand([group_num, n], device="xpu", dtype=dtype)
+        if qmode == QuantMode.ASYM:
+            scales /= 2  # avoid overflow as ASYM has larger range
+
         if qmode == QuantMode.SYM:
             zero_points = None
         elif qmode == QuantMode.ASYM:
@@ -655,6 +658,9 @@ class TestInt4Linear(TestCase):
         # mlp silu mul
         weight_up = self.rand_int4(k * n, torch.int32, "xpu").reshape(k // 8, n)
         scales_up = torch.rand([group_num, n], device="xpu", dtype=dtype)
+        if qmode == QuantMode.ASYM:
+            scales_up /= 2  # avoid overflow as ASYM has larger range
+
         if qmode == QuantMode.SYM:
             zero_points_up = None
         elif qmode == QuantMode.ASYM:
