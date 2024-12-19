@@ -7,20 +7,20 @@
     "commit": "llvmorg-16.0.6"
   },
   "pytorch": {
-    "version": "2.5.1.post0+xpu",
+    "version": "2.5.1+cxx11.abi",
     "commit": "v2.5.1"
   },
   "torchaudio": {
-    "version": "2.5.1.post0+xpu",
+    "version": "2.5.1+cxx11.abi",
     "commit": "v2.5.1"
   },
   "torchvision": {
-    "version": "0.20.1.post0+xpu",
+    "version": "0.20.1+cxx11.abi",
     "commit": "v0.20.1"
   },
   "torch-ccl": {
-    "version": "2.5.10+xpu",
-    "commit": "v2.5.10+xpu"
+    "version": "2.5.0+xpu",
+    "commit": "v2.5.0+xpu"
   },
   "basekit": {
     "dpcpp-cpp-rt": {
