@@ -149,7 +149,7 @@ class Test4bitDequant(TestCase):
         for dtype in [torch.bfloat16, torch.float16]:
             for shape in shapes:
                 weight = torch.randn(shape, dtype=dtype, device="xpu")
-                input = torch.randn((8, shape[0]), dtype=dtype, device="xpu")
+                input = torch.randn((8, shape[1]), dtype=dtype, device="xpu")
 
                 # quantize
                 quant_weight, state = self.quantize_nf4(
@@ -158,7 +158,7 @@ class Test4bitDequant(TestCase):
 
                 # dequantize ref
                 dequant_ref = self.dequantize_nf4(quant_weight, state, quant_type="nf4")
-                linear_ref = torch.nn.functional.linear(input, dequant_ref.t())
+                linear_ref = torch.nn.functional.linear(input, dequant_ref)
 
                 # nf4 dequantize
                 dequant_output = torch.ops.torch_ipex.dequantize_4bit(

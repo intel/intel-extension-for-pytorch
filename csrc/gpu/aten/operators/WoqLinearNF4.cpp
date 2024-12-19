@@ -275,8 +275,7 @@ at::Tensor woq_linear(
   Attr attr;
   bool is_fused;
   Tensor result;
-  return impl::matmul_fusion_variants(
-      result, input, dq_output, true, attr, is_fused);
+  impl::matmul_fusion_variants(result, input, dq_output, false, attr, is_fused);
 
   return result;
 }
