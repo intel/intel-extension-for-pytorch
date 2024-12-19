@@ -4,36 +4,39 @@
     "min-version": "12.3.0"
   },
   "llvm": {
-    "version": "16.0.6"
+    "commit": "llvmorg-16.0.6"
   },
   "pytorch": {
-    "version": "2.3.1+cxx11.abi",
-    "commit": "v2.3.1"
+    "version": "2.5.1+cxx11.abi",
+    "commit": "v2.5.1"
   },
   "torchaudio": {
-    "version": "2.3.1+cxx11.abi",
-    "commit": "v2.3.1"
+    "version": "2.5.1+cxx11.abi",
+    "commit": "v2.5.1"
   },
   "torchvision": {
-    "version": "0.18.1+cxx11.abi",
-    "commit": "v0.18.1"
+    "version": "0.20.1+cxx11.abi",
+    "commit": "v0.20.1"
   },
   "torch-ccl": {
-    "version": "2.3.100+xpu",
-    "commit": "v2.3.100+xpu"
+    "version": "2.5.0+xpu",
+    "commit": "v2.5.0+xpu"
   },
   "basekit": {
     "dpcpp-cpp-rt": {
-      "version": "2024.2.1"
+      "version": "2025.0.4"
     },
     "mkl-dpcpp": {
-      "version": "2024.2.1"
+      "version": "2025.0.1"
     },
     "oneccl-devel": {
-      "version": "2021.13.1"
+      "version": "2021.14.1"
     },
     "impi-devel": {
-      "version": "2021.13.1"
+      "version": "2021.14.0"
+    },
+    "intel-pti": {
+      "version": "0.10.0"
     }
   }
 }
