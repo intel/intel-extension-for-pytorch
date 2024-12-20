@@ -427,6 +427,12 @@ at::Tensor IpexWoqLinearOpContext::get_at_packed_weight() {
 }
 
 c10::optional<at::Tensor> IpexWoqLinearOpContext::get_at_bias() {
+  if (op_context_.at_bias_.has_value()) {
+    auto b = op_context_.at_bias_.value();
+    if (b.size(0) > op_context_.weight_shape_[0]) {
+      return c10::make_optional(b.narrow(0, 0, op_context_.weight_shape_[0]));
+    }
+  }
   return op_context_.at_bias_;
 }
 

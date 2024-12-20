@@ -911,7 +911,7 @@ class WeightOnlyQuantizationTester(TestCase):
         shape_list = [
             [3, 31, 31],
             [4, 4096, 4096],
-            [9, 4095, 4095],
+            [4, 4096, 4080],
             [196, 4095, 16383],
             [1024, 512, 512],
         ]
@@ -2181,6 +2181,99 @@ class WeightOnlyQuantizationTester(TestCase):
         )
         for shape, use_bias, w_dtype, lowp_mode, enable_amp in cases:
             test(shape, use_bias, w_dtype, lowp_mode, enable_amp)
+
+    def test_weight_padding(self):
+        """
+        If N of weight shape N * K is not a multiple of block_n, it is padded to be a multiple of block_n.
+        """
+
+        class Mod(nn.Module):
+            def __init__(self, input_channel, output_channel, has_bias):
+                super(Mod, self).__init__()
+                self.linear = torch.nn.Linear(input_channel, output_channel, has_bias)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        def test(M, has_bias, w_dtype):
+            N, K, N_padded = 500, 512, 512
+            model = Mod(K, N, has_bias)
+            m = model.eval()
+            m_ref = Mod(K, N_padded, False).eval()
+            data = torch.rand(M, K)
+            weight = model.linear.weight
+            weight_int4, w_scales, w_zero_points = quantize_per_channel(
+                weight,
+                w_dtype,
+                sym_quant=True if w_dtype == WoqWeightDtype.NF4 else False,
+            )
+            weight_fp32 = dequantize_per_channel(
+                weight_int4, w_scales, w_zero_points, w_dtype, weight.shape
+            )
+            if has_bias:
+                bias = model.linear.bias
+                output1 = torch.matmul(data, weight_fp32.T) + bias
+            else:
+                output1 = torch.matmul(data, weight_fp32.T)
+
+            qconfig = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=w_dtype
+            )
+            prepared_model = prepare(m, qconfig, example_inputs=data, inplace=False)
+            prepared_model_ref = prepare(
+                m_ref, qconfig, example_inputs=data, inplace=False
+            )
+            with torch.no_grad():
+                woq_model = convert(prepared_model)
+                woq_model_ref = convert(prepared_model_ref)
+                assert (
+                    woq_model.linear.weight.shape == woq_model_ref.linear.weight.shape
+                )
+
+                output2 = woq_model(data)
+                torch.testing.assert_close(output1, output2)
+
+        M_list = [4, 1024]
+        use_bias_list = [True, False]
+        w_dtype_list = [WoqWeightDtype.INT8, WoqWeightDtype.INT4, WoqWeightDtype.NF4]
+        cases = itertools.product(M_list, use_bias_list, w_dtype_list)
+        for M, use_bias, w_dtype in cases:
+            test(M, use_bias, w_dtype)
+
+
+class QuantizedOpTester(TestCase):
+    def test_dequantize_nf4(self):
+        dtype_list = [torch.float, torch.bfloat16, torch.half]
+        group_size_list = [-1, 32, 128]
+        cases = itertools.product(dtype_list, group_size_list)
+        for dtype, group_size in cases:
+            t_fp = torch.randn(1024, 1024, dtype=dtype)
+            scale_dtype_list = list(set([dtype, torch.float]))
+            for scale_dtype in scale_dtype_list:
+                if group_size < 0:
+                    t, scales, zp = quantize_per_channel(
+                        t_fp, WoqWeightDtype.NF4, None, None, sym_quant=True
+                    )
+                    scales = scales.to(scale_dtype)
+                    out_ref = dequantize_per_channel(
+                        t, scales, zp, WoqWeightDtype.NF4, t_fp.shape
+                    ).to(dtype)
+                    out = torch.ops.torch_ipex.dequantize_nf4(
+                        t, scales, group_size, dtype
+                    )
+                    assert torch.allclose(out, out_ref)
+                else:
+                    t, scales, zp = quantize_per_block(
+                        t_fp, WoqWeightDtype.NF4, group_size, None, None, sym_quant=True
+                    )
+                    scales = scales.to(scale_dtype)
+                    out_ref = dequantize_per_block(
+                        t, scales, zp, WoqWeightDtype.NF4, group_size, t_fp.shape
+                    ).to(dtype)
+                    out = torch.ops.torch_ipex.dequantize_nf4(
+                        t, scales, group_size, dtype
+                    )
+                    assert torch.allclose(out, out_ref)
 
 
 if __name__ == "__main__":

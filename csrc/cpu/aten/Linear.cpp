@@ -6,6 +6,7 @@
 #include "WeightPack.h"
 #include "autocast/autocast_mode.h"
 #include "ideep/IDeepConversions.h"
+#include "utils/woq_defines.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -404,7 +405,10 @@ at::Tensor woq_linear_pack_weight(
           kCPU, weight_int4, weight_dtype, block_n, block_k, lowp_mode);
     }
     if (N % block_n) {
-      return weight;
+      at::Tensor weight_padded =
+          at::pad(weight, {0, 0, 0, block_n - N % block_n}, "constant", 0);
+      return woq_tpp_gemm_packB_stub(
+          kCPU, weight_padded, weight_dtype, block_n, block_k, lowp_mode);
     } else {
       return woq_tpp_gemm_packB_stub(
           kCPU, weight, weight_dtype, block_n, block_k, lowp_mode);
@@ -763,6 +767,15 @@ at::Tensor woq_linear_mul_forward(
              op_context.data_ptr<int64_t>()[0])
       ->run_binary(input, "mul", others);
 }
+
+IPEX_DEFINE_DISPATCH(dequant_nf4_stub);
+at::Tensor dequantize_nf4(
+    const at::Tensor& t,
+    const at::Tensor& scales,
+    int64_t group_size,
+    c10::ScalarType out_dtype) {
+  return dequant_nf4_stub(kCPU, t, scales, group_size, out_dtype);
+}
 #endif
 
 } // namespace cpu
@@ -1065,6 +1078,10 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
       "woq_linear",
       c10::DispatchKey::AutocastCPU,
       torch_ipex::autocast::woq_linear_forward_v2);
+  m.def(
+      "dequantize_nf4(Tensor t, Tensor scales, int group_size, ScalarType out_dtype) -> Tensor");
+  m.impl(
+      "dequantize_nf4", c10::DispatchKey::CPU, torch_ipex::cpu::dequantize_nf4);
 #endif
   // fuse eltwise
   m.def(

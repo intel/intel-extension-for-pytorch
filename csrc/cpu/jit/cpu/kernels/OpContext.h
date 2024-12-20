@@ -383,7 +383,7 @@ class WoqLinearOpContext : public torch::jit::CustomClassHolder {
     auto orig_weight_ = this->to_public(this->get_at_packed_weight());
     auto weight_dtype_ = this->get_context().weight_dtype_;
     auto weight_shape_ = this->get_weight_shape();
-    auto orig_bias_ = this->get_context().at_bias_;
+    auto orig_bias_ = this->get_at_bias();
     auto scales = this->get_scales();
     auto zero_points = this->get_zero_points();
     auto g_idx = this->get_g_idx();
