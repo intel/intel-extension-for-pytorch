@@ -8,7 +8,7 @@ import unittest
 NUM_HEADS = [32]
 NUM_QUERIES_PER_KV = [1, 4]
 HEAD_SIZES = [128, 64]
-DTYPES = [torch.bfloat16, torch.float32]
+DTYPES = [torch.bfloat16, torch.float32, torch.float16]
 
 
 def mha_ref(q, k, v, scale, is_causal):

@@ -1280,6 +1280,57 @@ void flash_attn_varlen_cpu_kernel_impl(
           v_scale);
     }
 
+  } else if (query.scalar_type() == at::ScalarType::Half) {
+    if (max_seqlen_q >= 768) {
+      flash_attn_varlen_kernel<at::Half, at::Half, 128>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          k_scale,
+          v_scale);
+    } else if (max_seqlen_q >= 192) {
+      flash_attn_varlen_kernel<at::Half, at::Half, 64>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          k_scale,
+          v_scale);
+    } else {
+      flash_attn_varlen_kernel<at::Half, at::Half, 32>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          k_scale,
+          v_scale);
+    }
+
   } else {
     TORCH_CHECK(false, "Unsupported data type for ipex::flash_attn_varlen");
   }
