@@ -1773,15 +1773,13 @@ Tensor chunked_prefill(
   TORCH_CHECK(
       check_if_xetla_valid_for_varlen(query, head_dim),
       "Invalid head dim for chunked prefill");
-  printf("block size is: %d\n", block_size);
-  printf("max seqlen k: %d\n", max_seqlen_k);
+
 #if defined(USE_XETLA)
   TORCH_CHECK(
       dpcppGetDeviceHasXMX(),
       "SDP kernel requires XMX, but the current platform has no XMX ...");
   XetlaType xeType = sdp::aten_to_Xetla_dtype(query);
   static gpu::xetla::gpu_arch arch_tag = gpu::xetla::get_device_gpu_arch();
-  // std::cout << "before kernel call" << std::endl;
   if (block_size >= 64) {
     auto cgfs = gpu::xetla::fmha_forward_kernel(
         arch_tag,
@@ -1834,7 +1832,7 @@ Tensor chunked_prefill(
     int32_t num_partitions =
         (max_seqlen_k + partition_size - 1) / partition_size;
     if (max_seqlen_k > partition_size) {
-      printf("split kv\n");
+      // split kv
       Tensor tmp_out = at::empty(
           {num_tokens, num_heads_q, num_partitions, head_dim},
           query.options().dtype(query.scalar_type()).device(query.device()));
@@ -1873,7 +1871,7 @@ Tensor chunked_prefill(
            is_causal});
       DPCPP_Q_SUBMIT_CGFS(dpcpp_queue, cgfs);
     } else {
-      printf("slice kv\n");
+      // slice kv
       auto cgfs = gpu::xetla::chunked_prefill_slice_kv(
           arch_tag,
           xeType,
