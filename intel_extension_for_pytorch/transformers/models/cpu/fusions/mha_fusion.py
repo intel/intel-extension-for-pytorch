@@ -341,12 +341,17 @@ class _IPEXFastLayerNormCPU(nn.Module):
 
 class _IPEXPagedAttentionCPU:
     @classmethod
-    def reshape_and_cache(cls, key, value, key_cache, value_cache, slot_mapping):
+    def reshape_and_cache(cls, key, value,
+                        key_cache, is_key_cache_vnni,
+                        value_cache, is_value_cache_vnni,
+                        slot_mapping):
         torch.ops.torch_ipex.reshape_and_cache(
             key,
             value,
             key_cache,
+            is_key_cache_vnni,
             value_cache,
+            is_value_cache_vnni,
             slot_mapping.int() if slot_mapping.dtype is torch.long else slot_mapping,
         )
 
@@ -356,7 +361,9 @@ class _IPEXPagedAttentionCPU:
         output,
         query,
         key_cache,
+        is_key_cache_vnni,
         value_cache,
+        is_value_cache_vnni,
         head_mapping,
         scale,
         block_tables,
@@ -369,7 +376,9 @@ class _IPEXPagedAttentionCPU:
             output,
             query,
             key_cache,
+            is_key_cache_vnni,
             value_cache,
+            is_value_cache_vnni,
             head_mapping,
             scale,
             block_tables,

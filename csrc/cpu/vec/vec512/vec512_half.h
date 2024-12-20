@@ -72,7 +72,8 @@ IPEX_FORCE_INLINE void move_ker(
   }
 }
 
-static IPEX_FORCE_INLINE void zero_ker(at::Half* out, int64_t len) {
+template <>
+IPEX_FORCE_INLINE void zero_ker(at::Half* out, int64_t len) {
   int64_t i = 0;
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)

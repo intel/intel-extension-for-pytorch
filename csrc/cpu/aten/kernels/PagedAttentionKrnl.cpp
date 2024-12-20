@@ -359,6 +359,781 @@ at::Tensor deduce_prompt(
  * (num_heads).
  */
 template <typename scalar_t>
+void single_query_cached_kv_attention_vnni_v_kernel(
+    at::Tensor& out,
+    at::Tensor& query,
+    at::Tensor& key_cache,
+    at::Tensor& value_cache,
+    const double scale,
+    at::Tensor& block_tables,
+    at::Tensor& context_lens,
+    int64_t block_size,
+    int64_t max_context_len,
+    const c10::optional<at::Tensor>& alibi_slopes) {
+  auto out_ptr = out.data_ptr<scalar_t>();
+  auto query_ptr = query.data_ptr<scalar_t>();
+  auto key_cache_ptr = key_cache.data_ptr<scalar_t>();
+  auto value_cache_ptr = value_cache.data_ptr<scalar_t>();
+  auto block_tables_ptr = block_tables.data_ptr<int>();
+  auto context_lens_ptr = context_lens.data_ptr<int>();
+  auto alibi_slopes_ptr = alibi_slopes.has_value()
+      ? alibi_slopes.value().data_ptr<float>()
+      : nullptr;
+  auto num_seqs = query.size(0);
+  auto num_heads = query.size(1);
+  auto head_size = query.size(2);
+  auto num_kv_heads = key_cache.size(1);
+  auto kv_head_group_size = num_heads / num_kv_heads;
+  auto max_num_blocks_per_seq = block_tables.size(1);
+
+  constexpr bool is_reduced_type = is_reduced_floating_point_v<scalar_t>;
+  auto prompt_block_nums = deduce_prompt(block_tables);
+  auto prompt_block_nums_ptr = prompt_block_nums.data_ptr<int>();
+  int batch_size = prompt_block_nums.size(0);
+  int beam_size = num_seqs / batch_size;
+
+  if (alibi_slopes.has_value()) {
+    auto alibi_slopes_size = alibi_slopes.value().size(0);
+    TORCH_CHECK(
+        alibi_slopes_size == num_heads,
+        "alibi_slopes size is not equal to num_heads");
+  }
+
+  auto thread_numbers = omp_get_max_threads();
+  auto attn_weights = at::empty(
+      {num_seqs, num_heads, max_context_len},
+      query.options().dtype(at::ScalarType::Float));
+  auto attn_weights_reduced = at::empty(
+      {num_seqs, num_heads, is_reduced_type ? max_context_len : 0},
+      query.options());
+  auto fp32_attn_outs = at::zeros({num_seqs, num_heads, head_size}, at::kFloat);
+  at::Tensor key_t_reorder = at::empty(
+        {thread_numbers, head_size, block_size},
+        c10::CppTypeToScalarType<scalar_t>::value);
+  at::Tensor attn_pad = at::empty(
+        {thread_numbers, block_size},
+        at::kFloat);
+  at::Tensor attn_pad_reduced = at::empty(
+        {thread_numbers, is_reduced_type ? block_size : 0},
+        query.options());
+
+  // strides
+  auto kv_block_strideN = key_cache.stride(0);
+  auto kv_block_strideP = key_cache.stride(2);
+  auto kv_block_strideH = key_cache.stride(1);
+  auto fp32_attn_out_strideN = fp32_attn_outs.stride(0);
+  auto fp32_attn_out_strideH = fp32_attn_outs.stride(1);
+  auto attn_out_strideN = out.stride(0);
+  auto attn_out_strideH = out.stride(1);
+  auto q_strideN = query.stride(0);
+  auto q_strideH = query.stride(1);
+  auto attn_weights_strideN = attn_weights.stride(0);
+  auto attn_weights_strideH = attn_weights.stride(1);
+  auto key_t_reorder_strideT = key_t_reorder.stride(0);
+
+  // get pointers
+  auto attn_weights_ptr = attn_weights.data_ptr<float>();
+  auto attn_weights_reduced_ptr = is_reduced_type ?
+        attn_weights_reduced.data_ptr<scalar_t>() : nullptr;
+  auto fp32_attn_out_ptr = fp32_attn_outs.data_ptr<float>();
+  auto key_t_reorder_ptr = key_t_reorder.data_ptr<scalar_t>();
+  auto attn_pad_ptr = attn_pad.data_ptr<float>();
+  auto attn_pad_reduced_ptr = is_reduced_type ?
+        attn_pad_reduced.data_ptr<scalar_t>() : nullptr;
+
+  // TODO: support padding
+  TORCH_CHECK(
+    head_size % 2 == 0,
+    "head size is not even");
+  auto k_xform = SCOPEIT(
+      XformExtTPP<scalar_t>(
+          /*in_rows*/ block_size,
+          /*in_cols*/ head_size,
+          /*out_rows*/ head_size,
+          /*out_cols*/ block_size,
+          /*ldi*/ kv_block_strideP,
+          /*ldo*/ block_size,
+          /*xtype*/ XformTPP::XFORM_XPOSE_N2V_TPP,
+          /*ignore_vnni_for_fp32*/ true),
+      XPOSE);
+
+  auto qk_gemm_prompt = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ beam_size,
+      /*N*/ block_size,
+      /*K*/ head_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ q_strideN,
+      /*ldb*/ block_size,
+      /*ldc*/ attn_weights_strideN,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+  auto qk_gemm_rest = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ 1,
+      /*N*/ block_size,
+      /*K*/ head_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ q_strideN,
+      /*ldb*/ block_size,
+      /*ldc*/ attn_weights_strideN,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+  auto av_gemm_prompt = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ beam_size,
+      /*N*/ head_size,
+      /*K*/ block_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ attn_weights_strideN,
+      /*ldb*/ head_size,
+      /*ldc*/ fp32_attn_out_strideN,
+      /*beta*/ 1.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+  auto av_gemm_rest = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ 1,
+      /*N*/ head_size,
+      /*K*/ block_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ attn_weights_strideN,
+      /*ldb*/ head_size,
+      /*ldc*/ fp32_attn_out_strideN,
+      /*beta*/ 1.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+#pragma omp parallel for collapse(2) schedule(static, 1)
+  for (auto head_id = 0; head_id < num_heads; head_id++) {
+    for (auto batch_id = 0; batch_id < batch_size; batch_id++) {
+      auto ompIdx = omp_get_thread_num();
+      auto k_cache_reorder = key_t_reorder_ptr + ompIdx * key_t_reorder_strideT;
+      int kv_head_id = head_id / kv_head_group_size;
+      auto seq_id_start = batch_id * beam_size;
+      int context_len = context_lens_ptr[seq_id_start]; // the beams in one batch have the same context_len
+      int complete_block_num = int(context_len / block_size);
+      int prompt_block_num = std::min(prompt_block_nums_ptr[batch_id], complete_block_num);
+      int complete_token_length = complete_block_num * block_size;
+      auto query_ptr_start = query_ptr + seq_id_start * q_strideN + head_id * q_strideH;
+      auto attn_weights_ptr_start = attn_weights_ptr
+          + seq_id_start * attn_weights_strideN
+          + head_id * attn_weights_strideH;
+      // for prompt
+      for (auto seq_block_id = 0; seq_block_id < prompt_block_num; seq_block_id++) {
+        auto block_id = block_tables_ptr
+            [seq_id_start * max_num_blocks_per_seq + seq_block_id];
+        auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
+            kv_head_id * kv_block_strideH;
+        k_xform(k_cache_start, k_cache_reorder);
+        qk_gemm_prompt(
+            query_ptr_start,
+            k_cache_reorder,
+            attn_weights_ptr_start + seq_block_id * block_size,
+            1);
+      }
+      // for the rest complete blocks
+      for (auto beam_id = 0; beam_id < beam_size; beam_id++) {
+        auto seq_id = seq_id_start + beam_id;
+        auto q_ptr_start = query_ptr_start + beam_id * q_strideN;
+        for (auto seq_block_id = prompt_block_num; seq_block_id < complete_block_num; seq_block_id++) {
+          auto attn_w_pos = attn_weights_ptr_start
+              + beam_id * attn_weights_strideN
+              + seq_block_id * block_size;
+          auto block_id = block_tables_ptr
+              [seq_id * max_num_blocks_per_seq + seq_block_id];
+          auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
+              kv_head_id * kv_block_strideH;
+          k_xform(k_cache_start, k_cache_reorder);
+          qk_gemm_rest(
+              q_ptr_start,
+              k_cache_reorder,
+              attn_w_pos,
+              1);
+        }
+      }
+      // for the rest tail
+      for (auto beam_id = 0; beam_id < beam_size; beam_id++) {
+        auto seq_id = seq_id_start + beam_id;
+        auto q_ptr_start = query_ptr_start + beam_id * q_strideN;
+        for (auto token_id = complete_token_length; token_id < context_len; token_id++) {
+          auto attn_w_pos = attn_weights_ptr_start
+              + beam_id * attn_weights_strideN
+              + token_id;
+          auto block_id = block_tables_ptr
+              [seq_id * max_num_blocks_per_seq + token_id / block_size];
+          auto block_offset = token_id % block_size;
+          auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
+              block_offset * kv_block_strideP +
+              kv_head_id * kv_block_strideH;
+          reduce_head<scalar_t, scalar_t>(
+              q_ptr_start, k_cache_start, attn_w_pos, head_size);
+        }
+      }
+    }
+  }
+
+// div+add+softmax
+#pragma omp parallel for collapse(2) schedule(static, 1)
+  for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
+    for (auto head_id = 0; head_id < num_heads; head_id++) {
+      auto max_val = -10000.0f;
+      float sum = 0.0f;
+      auto context_len = context_lens_ptr[seq_id];
+      auto attn_w_start = attn_weights_ptr
+          + seq_id * attn_weights_strideN
+          + head_id * attn_weights_strideH;
+      auto attn_w_start_reduced = is_reduced_type ? attn_weights_reduced_ptr
+          + seq_id * attn_weights_strideN
+          + head_id * attn_weights_strideH : nullptr;
+#if defined(CPU_CAPABILITY_AVX512)
+      if (alibi_slopes_ptr != nullptr) {
+        auto alibi_slope = alibi_slopes_ptr[head_id];
+        torch_ipex::cpu::kernel::
+            _dil_div_add_alibi_and_reduce_max_fusion_kernel<float>(
+                attn_w_start,
+                scale,
+                context_len,
+                attn_w_start,
+                max_val,
+                alibi_slope,
+                true);
+      } else {
+        torch_ipex::cpu::kernel::
+            _dil_div_add_alibi_and_reduce_max_fusion_kernel<float>(
+                attn_w_start,
+                scale,
+                context_len,
+                attn_w_start,
+                max_val,
+                1,
+                false);
+      }
+      torch_ipex::cpu::kernel::_dil_exp_reduce_sum_fusion_kernel(
+          attn_w_start, context_len, attn_w_start, max_val);
+      torch_ipex::cpu::kernel::_dil_normalization_kernel<scalar_t>(
+          attn_w_start, max_val, context_len,
+          conditional_data_ptr(attn_w_start, attn_w_start_reduced));
+
+#else
+      // div+add+softmax
+      for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+        attn_w_start[token_id] = attn_w_start[token_id] * scale;
+        if (alibi_slopes_ptr != nullptr) {
+          auto alibi_slope = alibi_slopes_ptr[head_id];
+          auto alibi_slopes_val =
+              alibi_slope * (token_id + 1 - context_lens_ptr[seq_id]);
+          attn_w_start[token_id] = attn_w_start[token_id] + alibi_slopes_val;
+        }
+        if (attn_w_start[token_id] > max_val) {
+          max_val = attn_w_start[token_id];
+        }
+      }
+      // exp and sum
+      for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+        attn_w_start[token_id] = exp(attn_w_start[token_id] - max_val);
+        sum += attn_w_start[token_id];
+      }
+      // normalize
+      if (is_reduced_type) {
+        for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+          attn_w_start_reduced[token_id] = (scalar_t)(attn_w_start[token_id] / sum);
+        }
+      } else {
+        for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+          attn_w_start[token_id] = attn_w_start[token_id] / sum;
+        }
+      }
+#endif
+    }
+  }
+
+// mul and accumulate
+#pragma omp parallel for collapse(2) schedule(static, 1)
+  for (auto head_id = 0; head_id < num_heads; head_id++) {
+    for (auto batch_id = 0; batch_id < batch_size; batch_id++) {
+      auto ompIdx = omp_get_thread_num();
+      auto attn_pad_start = conditional_data_ptr(attn_pad_ptr, attn_pad_reduced_ptr)
+            + ompIdx * block_size;
+      int kv_head_id = head_id / kv_head_group_size;
+      int context_len = context_lens_ptr[batch_id * beam_size]; // the beams in one batch have the same context_len
+      int complete_block_num = int(context_len / block_size);
+      int prompt_block_num = std::min(prompt_block_nums_ptr[batch_id], complete_block_num);
+      if (context_len % block_size != 0) {
+        complete_block_num ++;
+      }
+      int complete_token_length = complete_block_num * block_size;
+      auto seq_id_start = batch_id * beam_size;
+      auto attn_weights_start = conditional_data_ptr(attn_weights_ptr, attn_weights_reduced_ptr)
+            + seq_id_start * attn_weights_strideN +
+               head_id * attn_weights_strideH;
+      auto fp32_attn_out_start = fp32_attn_out_ptr + seq_id_start * fp32_attn_out_strideN
+              + head_id * fp32_attn_out_strideH;
+      // for prompt
+      for (auto seq_block_id = 0; seq_block_id < prompt_block_num; seq_block_id++) {
+        auto block_id = block_tables_ptr
+            [seq_id_start * max_num_blocks_per_seq + seq_block_id];
+        auto v_cache_start = value_cache_ptr + block_id * kv_block_strideN +
+            kv_head_id * kv_block_strideH;
+        av_gemm_prompt(
+            attn_weights_start + seq_block_id * block_size,
+            v_cache_start,
+            fp32_attn_out_start,
+            1);
+      }
+      // for the rest complete blocks
+      for (auto beam_id = 0; beam_id < beam_size; beam_id++) {
+        auto seq_id = seq_id_start + beam_id;
+        auto attn_out_start = fp32_attn_out_start +
+            beam_id * fp32_attn_out_strideN;
+        for (auto seq_block_id = prompt_block_num; seq_block_id < complete_block_num; seq_block_id++) {
+          auto attn_w = attn_weights_start
+              + beam_id * attn_weights_strideN + seq_block_id * block_size;
+          auto block_id = block_tables_ptr
+              [seq_id * max_num_blocks_per_seq + seq_block_id];
+          auto v_cache_start = value_cache_ptr + block_id * kv_block_strideN +
+              kv_head_id * kv_block_strideH;
+          if (seq_block_id == complete_block_num - 1 && (context_len % block_size) != 0) {
+            auto cnt = context_len % block_size;
+            torch_ipex::cpu::kernel::move_ker<scalar_t, scalar_t>(
+              attn_pad_start, attn_w, cnt);
+            torch_ipex::cpu::kernel::zero_ker<scalar_t>(
+              attn_pad_start + cnt, block_size - cnt);
+            av_gemm_rest(
+              attn_pad_start,
+              v_cache_start,
+              attn_out_start,
+              1);
+          } else {
+            av_gemm_rest(
+              attn_w,
+              v_cache_start,
+              attn_out_start,
+              1);
+          }
+        }
+        // write to the output after the last token is done
+        auto out_start = out_ptr +
+          seq_id * attn_out_strideN + head_id * attn_out_strideH;
+        torch_ipex::cpu::kernel::move_ker<scalar_t, float>(
+            out_start, attn_out_start, head_size);
+      }
+    }
+  }
+
+} // single_query_cached_kv_attention_vnni_v_kernel
+
+/**
+ * Performs scale-dot-product for the next token based on cached key-value
+ * attention.
+ *
+ * This function computes the attention weights and applies the attention
+ * mechanism to obtain the final output. It takes in tensors representing the
+ * query, key cache, value cache, head mapping, scale, block tables, context
+ * lengths, block size, max context length, and optional alibi slopes. The
+ * output tensor is updated with the computed attention values.
+ *
+ * @param out           Output tensor [num_seqs, num_heads, head_size].
+ * @param query         Query tensor [num_seqs, num_heads, head_size].
+ * @param key_cache     The pre-allocated buffer to store the key cache. The
+ * shape should be [num_blocks, num_key_value_heads, head_size, block_size].
+ * @param value_cache   The pre-allocated buffer to store the value cache. The
+ * shape should be [num_blocks, num_key_value_heads, block_size, head_size].
+ * @param scale         Scaling factor for attention weights. In general, it is:
+ * float(1.0 / (head_size ** 0.5)).
+ * @param block_tables  Block tables tensor [num_seqs, max_num_blocks_per_seq].
+ * @param context_lens  Context lengths tensor [num_seqs].
+ * @param block_size    The block size which means the number of token in every
+ * block.
+ * @param max_context_len Maximum context length.
+ * @param alibi_slopes  Optional tensor of alibi slopes with the shape of
+ * (num_heads).
+ */
+template <typename scalar_t>
+void single_query_cached_kv_attention_vnni_kernel(
+    at::Tensor& out,
+    at::Tensor& query,
+    at::Tensor& key_cache,
+    at::Tensor& value_cache,
+    const double scale,
+    at::Tensor& block_tables,
+    at::Tensor& context_lens,
+    int64_t block_size,
+    int64_t max_context_len,
+    const c10::optional<at::Tensor>& alibi_slopes) {
+  auto out_ptr = out.data_ptr<scalar_t>();
+  auto query_ptr = query.data_ptr<scalar_t>();
+  auto key_cache_ptr = key_cache.data_ptr<scalar_t>();
+  auto value_cache_ptr = value_cache.data_ptr<scalar_t>();
+  auto block_tables_ptr = block_tables.data_ptr<int>();
+  auto context_lens_ptr = context_lens.data_ptr<int>();
+  auto alibi_slopes_ptr = alibi_slopes.has_value()
+      ? alibi_slopes.value().data_ptr<float>()
+      : nullptr;
+  auto num_seqs = query.size(0);
+  auto num_heads = query.size(1);
+  auto head_size = query.size(2);
+  auto num_kv_heads = key_cache.size(1);
+  auto kv_head_group_size = num_heads / num_kv_heads;
+  auto max_num_blocks_per_seq = block_tables.size(1);
+
+  constexpr bool is_reduced_type = is_reduced_floating_point_v<scalar_t>;
+  auto prompt_block_nums = deduce_prompt(block_tables);
+  auto prompt_block_nums_ptr = prompt_block_nums.data_ptr<int>();
+  int batch_size = prompt_block_nums.size(0);
+  int beam_size = num_seqs / batch_size;
+
+  if (alibi_slopes.has_value()) {
+    auto alibi_slopes_size = alibi_slopes.value().size(0);
+    TORCH_CHECK(
+        alibi_slopes_size == num_heads,
+        "alibi_slopes size is not equal to num_heads");
+  }
+
+  auto thread_numbers = omp_get_max_threads();
+  auto attn_weights = at::empty(
+      {num_seqs, num_heads, max_context_len},
+      query.options().dtype(at::ScalarType::Float));
+  auto attn_weights_reduced = at::empty(
+      {num_seqs, num_heads, is_reduced_type ? max_context_len : 0},
+      query.options());
+  auto fp32_attn_outs = at::zeros({num_seqs, num_heads, head_size}, at::kFloat);
+  at::Tensor attn_pad = at::empty(
+        {thread_numbers, block_size},
+        at::kFloat);
+  at::Tensor attn_pad_reduced = at::empty(
+        {thread_numbers, is_reduced_type ? block_size : 0},
+        query.options());
+
+  // strides
+  auto kv_block_strideN = key_cache.stride(0);
+  auto kv_block_strideP = value_cache.stride(2);
+  auto kv_block_strideS = key_cache.stride(2);
+  auto kv_block_strideH = key_cache.stride(1);
+  auto fp32_attn_out_strideN = fp32_attn_outs.stride(0);
+  auto fp32_attn_out_strideH = fp32_attn_outs.stride(1);
+  auto attn_out_strideN = out.stride(0);
+  auto attn_out_strideH = out.stride(1);
+  auto q_strideN = query.stride(0);
+  auto q_strideH = query.stride(1);
+  auto attn_weights_strideN = attn_weights.stride(0);
+  auto attn_weights_strideH = attn_weights.stride(1);
+
+  // get pointers
+  auto attn_weights_ptr = attn_weights.data_ptr<float>();
+  auto attn_weights_reduced_ptr = is_reduced_type ?
+        attn_weights_reduced.data_ptr<scalar_t>() : nullptr;
+  auto fp32_attn_out_ptr = fp32_attn_outs.data_ptr<float>();
+  auto attn_pad_ptr = attn_pad.data_ptr<float>();
+  auto attn_pad_reduced_ptr = is_reduced_type ?
+        attn_pad_reduced.data_ptr<scalar_t>() : nullptr;
+
+  auto qk_gemm_prompt = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ beam_size,
+      /*N*/ block_size,
+      /*K*/ head_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ q_strideN,
+      /*ldb*/ block_size,
+      /*ldc*/ attn_weights_strideN,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+  auto qk_gemm_rest = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ 1,
+      /*N*/ block_size,
+      /*K*/ head_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ q_strideN,
+      /*ldb*/ block_size,
+      /*ldc*/ attn_weights_strideN,
+      /*beta*/ 0.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+  auto av_gemm_prompt = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ beam_size,
+      /*N*/ head_size,
+      /*K*/ block_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ attn_weights_strideN,
+      /*ldb*/ head_size,
+      /*ldc*/ fp32_attn_out_strideN,
+      /*beta*/ 1.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+  auto av_gemm_rest = SCOPEITGEMM((BrgemmTPP<scalar_t, float>(
+      /*M*/ 1,
+      /*N*/ head_size,
+      /*K*/ block_size,
+      /*str_a*/ 1,
+      /*str_b*/ 1,
+      /*lda*/ attn_weights_strideN,
+      /*ldb*/ head_size,
+      /*ldc*/ fp32_attn_out_strideN,
+      /*beta*/ 1.0,
+      /*a_trans*/ 0,
+      /*unroll_hint*/ 1,
+      /*b_vnni*/ 1)));
+
+#pragma omp parallel for collapse(2) schedule(static, 1)
+  for (auto head_id = 0; head_id < num_heads; head_id++) {
+    for (auto batch_id = 0; batch_id < batch_size; batch_id++) {
+      auto ompIdx = omp_get_thread_num();
+      auto attn_pad_start = attn_pad_ptr + ompIdx * block_size;
+      int kv_head_id = head_id / kv_head_group_size;
+      auto seq_id_start = batch_id * beam_size;
+      int context_len = context_lens_ptr[seq_id_start]; // the beams in one batch have the same context_len
+      int complete_block_num = int(context_len / block_size);
+      int prompt_block_num = std::min(prompt_block_nums_ptr[batch_id], complete_block_num);
+      if (context_len % block_size != 0) {
+        complete_block_num ++;
+      }
+      auto query_ptr_start = query_ptr + seq_id_start * q_strideN + head_id * q_strideH;
+      auto attn_weights_ptr_start = attn_weights_ptr
+          + seq_id_start * attn_weights_strideN
+          + head_id * attn_weights_strideH;
+      // for prompt
+      for (auto seq_block_id = 0; seq_block_id < prompt_block_num; seq_block_id++) {
+        auto block_id = block_tables_ptr
+            [seq_id_start * max_num_blocks_per_seq + seq_block_id];
+        auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
+            kv_head_id * kv_block_strideH;
+        qk_gemm_prompt(
+            query_ptr_start,
+            k_cache_start,
+            attn_weights_ptr_start + seq_block_id * block_size,
+            1);
+      }
+      // for the rest complete blocks
+      for (auto beam_id = 0; beam_id < beam_size; beam_id++) {
+        auto seq_id = seq_id_start + beam_id;
+        auto q_ptr_start = query_ptr_start + beam_id * q_strideN;
+        for (auto seq_block_id = prompt_block_num; seq_block_id < complete_block_num; seq_block_id++) {
+          auto attn_w_pos = attn_weights_ptr_start
+              + beam_id * attn_weights_strideN
+              + seq_block_id * block_size;
+          auto block_id = block_tables_ptr
+              [seq_id * max_num_blocks_per_seq + seq_block_id];
+          auto k_cache_start = key_cache_ptr + block_id * kv_block_strideN +
+              kv_head_id * kv_block_strideH;
+          if (seq_block_id == complete_block_num - 1 && (context_len % block_size) != 0) {
+            auto cnt = context_len % block_size;
+            torch_ipex::cpu::kernel::zero_ker<float>(
+              attn_pad_start, block_size);
+            qk_gemm_rest(
+              q_ptr_start,
+              k_cache_start,
+              attn_pad_start,
+              1);
+            torch_ipex::cpu::kernel::move_ker<float, float>(
+              attn_w_pos, attn_pad_start, cnt);
+          } else {
+            qk_gemm_rest(
+              q_ptr_start,
+              k_cache_start,
+              attn_w_pos,
+              1);
+          }
+        }
+      }
+    }
+  }
+
+// div+add+softmax
+#pragma omp parallel for collapse(2) schedule(static, 1)
+  for (auto seq_id = 0; seq_id < num_seqs; seq_id++) {
+    for (auto head_id = 0; head_id < num_heads; head_id++) {
+      auto max_val = -10000.0f;
+      float sum = 0.0f;
+      auto context_len = context_lens_ptr[seq_id];
+      auto attn_w_start = attn_weights_ptr
+          + seq_id * attn_weights_strideN
+          + head_id * attn_weights_strideH;
+      auto attn_w_start_reduced = is_reduced_type ? attn_weights_reduced_ptr
+          + seq_id * attn_weights_strideN
+          + head_id * attn_weights_strideH : nullptr;
+#if defined(CPU_CAPABILITY_AVX512)
+      if (alibi_slopes_ptr != nullptr) {
+        auto alibi_slope = alibi_slopes_ptr[head_id];
+        torch_ipex::cpu::kernel::
+            _dil_div_add_alibi_and_reduce_max_fusion_kernel<float>(
+                attn_w_start,
+                scale,
+                context_len,
+                attn_w_start,
+                max_val,
+                alibi_slope,
+                true);
+      } else {
+        torch_ipex::cpu::kernel::
+            _dil_div_add_alibi_and_reduce_max_fusion_kernel<float>(
+                attn_w_start,
+                scale,
+                context_len,
+                attn_w_start,
+                max_val,
+                1,
+                false);
+      }
+      torch_ipex::cpu::kernel::_dil_exp_reduce_sum_fusion_kernel(
+          attn_w_start, context_len, attn_w_start, max_val);
+      torch_ipex::cpu::kernel::_dil_normalization_kernel<scalar_t>(
+          attn_w_start, max_val, context_len,
+          conditional_data_ptr(attn_w_start, attn_w_start_reduced));
+
+#else
+      // div+add+softmax
+      for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+        attn_w_start[token_id] = attn_w_start[token_id] * scale;
+        if (alibi_slopes_ptr != nullptr) {
+          auto alibi_slope = alibi_slopes_ptr[head_id];
+          auto alibi_slopes_val =
+              alibi_slope * (token_id + 1 - context_lens_ptr[seq_id]);
+          attn_w_start[token_id] = attn_w_start[token_id] + alibi_slopes_val;
+        }
+        if (attn_w_start[token_id] > max_val) {
+          max_val = attn_w_start[token_id];
+        }
+      }
+      // exp and sum
+      for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+        attn_w_start[token_id] = exp(attn_w_start[token_id] - max_val);
+        sum += attn_w_start[token_id];
+      }
+      // normalize
+      if (is_reduced_type) {
+        for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+          attn_w_start_reduced[token_id] = (scalar_t)(attn_w_start[token_id] / sum);
+        }
+      } else {
+        for (auto token_id = 0; token_id < context_lens_ptr[seq_id]; token_id++) {
+          attn_w_start[token_id] = attn_w_start[token_id] / sum;
+        }
+      }
+#endif
+    }
+  }
+
+// mul and accumulate
+#pragma omp parallel for collapse(2) schedule(static, 1)
+  for (auto head_id = 0; head_id < num_heads; head_id++) {
+    for (auto batch_id = 0; batch_id < batch_size; batch_id++) {
+      auto ompIdx = omp_get_thread_num();
+      auto attn_pad_start = conditional_data_ptr(attn_pad_ptr, attn_pad_reduced_ptr)
+            + ompIdx * block_size;
+      int kv_head_id = head_id / kv_head_group_size;
+      int context_len = context_lens_ptr[batch_id * beam_size]; // the beams in one batch have the same context_len
+      int complete_block_num = int(context_len / block_size);
+      int prompt_block_num = std::min(prompt_block_nums_ptr[batch_id], complete_block_num);
+      if (context_len % block_size != 0) {
+        complete_block_num ++;
+      }
+      // int complete_token_length = complete_block_num * block_size;
+      auto seq_id_start = batch_id * beam_size;
+      auto attn_weights_start = conditional_data_ptr(attn_weights_ptr, attn_weights_reduced_ptr)
+            + seq_id_start * attn_weights_strideN +
+               head_id * attn_weights_strideH;
+      auto fp32_attn_out_start = fp32_attn_out_ptr + seq_id_start * fp32_attn_out_strideN
+              + head_id * fp32_attn_out_strideH;
+      // for prompt
+      for (auto seq_block_id = 0; seq_block_id < prompt_block_num; seq_block_id++) {
+        auto block_id = block_tables_ptr
+            [seq_id_start * max_num_blocks_per_seq + seq_block_id];
+        auto v_cache_start = value_cache_ptr + block_id * kv_block_strideN +
+            kv_head_id * kv_block_strideH;
+        av_gemm_prompt(
+            attn_weights_start + seq_block_id * block_size,
+            v_cache_start,
+            fp32_attn_out_start,
+            1);
+      }
+      // for the rest complete blocks
+      for (auto beam_id = 0; beam_id < beam_size; beam_id++) {
+        auto seq_id = seq_id_start + beam_id;
+        auto attn_out_start = fp32_attn_out_start +
+            beam_id * fp32_attn_out_strideN;
+        for (auto seq_block_id = prompt_block_num; seq_block_id < complete_block_num; seq_block_id++) {
+          auto attn_w = attn_weights_start
+              + beam_id * attn_weights_strideN + seq_block_id * block_size;
+          auto block_id = block_tables_ptr
+              [seq_id * max_num_blocks_per_seq + seq_block_id];
+          auto v_cache_start = value_cache_ptr + block_id * kv_block_strideN +
+              kv_head_id * kv_block_strideH;
+          if (seq_block_id == complete_block_num - 1 && (context_len % block_size) != 0) {
+            auto cnt = context_len % block_size;
+            torch_ipex::cpu::kernel::move_ker<scalar_t, scalar_t>(
+              attn_pad_start, attn_w, cnt);
+            torch_ipex::cpu::kernel::zero_ker<scalar_t>(
+              attn_pad_start + cnt, block_size - cnt);
+            av_gemm_rest(
+              attn_pad_start,
+              v_cache_start,
+              attn_out_start,
+              1);
+          } else {
+            av_gemm_rest(
+              attn_w,
+              v_cache_start,
+              attn_out_start,
+              1);
+          }
+        }
+        // write to the output after the last token is done
+        auto out_start = out_ptr +
+          seq_id * attn_out_strideN + head_id * attn_out_strideH;
+        torch_ipex::cpu::kernel::move_ker<scalar_t, float>(
+            out_start, attn_out_start, head_size);
+      }
+    }
+  }
+
+} // single_query_cached_kv_attention_vnni_kernel
+
+/**
+ * Performs scale-dot-product for the next token based on cached key-value
+ * attention.
+ *
+ * This function computes the attention weights and applies the attention
+ * mechanism to obtain the final output. It takes in tensors representing the
+ * query, key cache, value cache, head mapping, scale, block tables, context
+ * lengths, block size, max context length, and optional alibi slopes. The
+ * output tensor is updated with the computed attention values.
+ *
+ * @param out           Output tensor [num_seqs, num_heads, head_size].
+ * @param query         Query tensor [num_seqs, num_heads, head_size].
+ * @param key_cache     The pre-allocated buffer to store the key cache. The
+ * shape should be [num_blocks, num_key_value_heads, block_size, head_size].
+ * @param value_cache   The pre-allocated buffer to store the value cache. The
+ * shape should be [num_blocks, num_key_value_heads, block_size, head_size].
+ * @param scale         Scaling factor for attention weights. In general, it is:
+ * float(1.0 / (head_size ** 0.5)).
+ * @param block_tables  Block tables tensor [num_seqs, max_num_blocks_per_seq].
+ * @param context_lens  Context lengths tensor [num_seqs].
+ * @param block_size    The block size which means the number of token in every
+ * block.
+ * @param max_context_len Maximum context length.
+ * @param alibi_slopes  Optional tensor of alibi slopes with the shape of
+ * (num_heads).
+ */
+template <typename scalar_t>
 void single_query_cached_kv_attention_opt_kernel(
     at::Tensor& out,
     at::Tensor& query,
@@ -1068,6 +1843,262 @@ void single_query_cached_kv_attention_kernel(
  * @param value The input value tensor.  The shape should be [num_seqs,
  * num_heads, head_size].
  * @param key_cache The output key cache tensor. The pre-allocated buffer to
+ * store the key cache. The shape should be [num_blocks, num_key_value_heads
+ * block_size, head_size].
+ * @param value_cache The output value cache tensor. The pre-allocated buffer to
+ * store the value cache. The shape should be [num_blocks, num_key_value_heads
+ * block_size, head_size].
+ * @param slot_mapping The slot mapping tensor. It stores the position to store
+ * the key/value in the pre-allocated buffers. The shape should be the number of
+ * sequences. For sequence i, the slot_mapping[i]//block_number can get the
+ * block index, and the slot_mapping%block_size can get the offset of this
+ * block.
+ *
+ * @tparam DST_T The data type of the output tensors.
+ * @tparam SRC_T The data type of the input tensors.
+ */
+template <typename DST_T, typename SRC_T>
+void reshape_and_cache_vnni_v_kernel(
+    at::Tensor& key,
+    at::Tensor& value,
+    at::Tensor& key_cache,
+    at::Tensor& value_cache,
+    at::Tensor& slot_mapping) {
+  auto num_tokens = key.size(0);
+  auto head_num = key.size(1);
+  auto head_size = key.size(2);
+  auto block_size = key_cache.size(2);
+  auto hidden_size = head_num * head_size;
+  auto key_cache_ptr = key_cache.data_ptr<DST_T>();
+  auto key_ptr = key.data_ptr<SRC_T>();
+  auto value_cache_ptr = value_cache.data_ptr<DST_T>();
+  auto value_ptr = value.data_ptr<SRC_T>();
+  auto slot_mapping_ptr = slot_mapping.data_ptr<int>();
+  auto cache_strideN = key_cache.stride(0);
+  auto cache_strideP = key_cache.stride(2);
+  auto cache_strideH = key_cache.stride(1);
+  auto key_state_strideN = key.stride(0);
+  auto key_state_strideH = key.stride(1);
+  auto value_state_strideN = value.stride(0);
+  auto value_state_strideH = value.stride(1);
+
+  auto thread_numbers = omp_get_max_threads();
+  auto v_xform = SCOPEIT(
+      XformExtTPP<SRC_T>(
+          /*in_rows*/ 2, //block_size,
+          /*in_cols*/ head_size,
+          /*out_rows*/ 2, //block_size,
+          /*out_cols*/ head_size,
+          /*ldi*/ cache_strideP,
+          /*ldo*/ head_size,
+          /*xtype*/ XformTPP::XFORM_N2V_TPP,
+          /*ignore_vnni_for_fp32*/ true),
+      XPOSE);
+
+  int64_t size_per_thread =
+    /* value_pad */ 2 * head_size +
+    /* value_reorder */ 2 * head_size;
+
+  at::Tensor total_buf = at::empty(
+      {thread_numbers, size_per_thread},
+      c10::CppTypeToScalarType<SRC_T>::value);
+  auto total_buf_ptr = total_buf.data_ptr<SRC_T>();
+
+#pragma omp parallel for collapse(2)
+  for (auto ti = 0; ti < num_tokens; ti++) {
+    for (auto hi = 0; hi < head_num; hi++) {
+      auto ompIdx = omp_get_thread_num();
+      SRC_T* buf = total_buf_ptr + ompIdx * size_per_thread;
+      SRC_T* v_pad = buf;
+      SRC_T* v_reorder = v_pad + 2 * head_size;
+      auto physical_block_id = slot_mapping_ptr[ti] / block_size;
+      auto block_offset = slot_mapping_ptr[ti] % block_size;
+      auto cache_offset = physical_block_id * cache_strideN +
+          block_offset * cache_strideP + hi * cache_strideH;
+      auto curr_block_offset = block_offset % 2 ? block_offset - 1 : block_offset;
+      auto v_cache_offset = physical_block_id * cache_strideN +
+          curr_block_offset * cache_strideP + hi * cache_strideH;
+      auto key_state_offset = ti * key_state_strideN + hi * key_state_strideH;
+      auto value_state_offset =
+          ti * value_state_strideN + hi * value_state_strideH;
+      auto key_cache_start = key_cache_ptr + cache_offset;
+      auto key_ptr_start = key_ptr + key_state_offset;
+      auto value_cache_start = value_cache_ptr + v_cache_offset;
+      auto value_ptr_start = value_ptr + value_state_offset;
+      // for key
+      torch_ipex::cpu::kernel::move_ker<DST_T, SRC_T>(
+            key_cache_start, key_ptr_start, head_size);
+      // for value
+      if (block_offset % 2 == 0) {
+        // even case
+        torch_ipex::cpu::kernel::move_ker<SRC_T, SRC_T>(
+          v_pad, value_ptr_start, head_size);
+        torch_ipex::cpu::kernel::zero_ker<SRC_T>(
+          v_pad + head_size, head_size);
+      } else {
+        // odd case
+        torch_ipex::cpu::kernel::move_ker<SRC_T, SRC_T>(
+          v_pad + head_size, value_ptr_start, head_size);
+        torch_ipex::cpu::kernel::zero_ker<SRC_T>(
+          v_pad, head_size);
+      }
+      v_xform(v_pad, v_reorder);
+      torch_ipex::cpu::kernel::mask_move_ker<DST_T, SRC_T>(
+        value_cache_start, v_reorder, 2 * head_size);
+    }
+  }
+}
+
+/**
+ * Reshapes and caches the key and value tensors based on the provided slot
+ * mapping.
+ *
+ * @param key The input key tensor. The shape should be [num_seqs, num_heads,
+ * head_size].
+ * @param value The input value tensor.  The shape should be [num_seqs,
+ * num_heads, head_size].
+ * @param key_cache The output key cache tensor. The pre-allocated buffer to
+ * store the key cache. The shape should be [num_blocks, num_key_value_heads
+ * head_size, block_size].
+ * @param value_cache The output value cache tensor. The pre-allocated buffer to
+ * store the value cache. The shape should be [num_blocks, num_key_value_heads
+ * block_size, head_size].
+ * @param slot_mapping The slot mapping tensor. It stores the position to store
+ * the key/value in the pre-allocated buffers. The shape should be the number of
+ * sequences. For sequence i, the slot_mapping[i]//block_number can get the
+ * block index, and the slot_mapping%block_size can get the offset of this
+ * block.
+ *
+ * @tparam DST_T The data type of the output tensors.
+ * @tparam SRC_T The data type of the input tensors.
+ */
+template <typename DST_T, typename SRC_T>
+void reshape_and_cache_vnni_kernel(
+    at::Tensor& key,
+    at::Tensor& value,
+    at::Tensor& key_cache,
+    at::Tensor& value_cache,
+    at::Tensor& slot_mapping) {
+  auto num_tokens = key.size(0);
+  auto head_num = key.size(1);
+  auto head_size = key.size(2);
+  auto block_size = key_cache.size(3);
+  auto hidden_size = head_num * head_size;
+  auto key_cache_ptr = key_cache.data_ptr<DST_T>();
+  auto key_ptr = key.data_ptr<SRC_T>();
+  auto value_cache_ptr = value_cache.data_ptr<DST_T>();
+  auto value_ptr = value.data_ptr<SRC_T>();
+  auto slot_mapping_ptr = slot_mapping.data_ptr<int>();
+  auto cache_strideN = key_cache.stride(0);
+  auto cache_strideP = value_cache.stride(2);
+  auto cache_strideS = key_cache.stride(2);
+  auto cache_strideH = key_cache.stride(1);
+  auto key_state_strideN = key.stride(0);
+  auto key_state_strideH = key.stride(1);
+  auto value_state_strideN = value.stride(0);
+  auto value_state_strideH = value.stride(1);
+
+  auto thread_numbers = omp_get_max_threads();
+  auto k_xform = SCOPEIT(
+      XformExtTPP<SRC_T>(
+          /*in_rows*/ block_size,
+          /*in_cols*/ head_size,
+          /*out_rows*/ head_size,
+          /*out_cols*/ block_size,
+          /*ldi*/ head_size,
+          /*ldo*/ block_size,
+          /*xtype*/ XformTPP::XFORM_XPOSE_N2V_TPP,
+          /*ignore_vnni_for_fp32*/ true),
+      XPOSE);
+
+  auto v_xform = SCOPEIT(
+      XformExtTPP<SRC_T>(
+          /*in_rows*/ 2, //block_size,
+          /*in_cols*/ head_size,
+          /*out_rows*/ 2, //block_size,
+          /*out_cols*/ head_size,
+          /*ldi*/ head_size,
+          /*ldo*/ head_size,
+          /*xtype*/ XformTPP::XFORM_N2V_TPP,
+          /*ignore_vnni_for_fp32*/ true),
+      XPOSE);
+
+  int64_t size_per_thread =
+    /* key_pad */ block_size * head_size +
+    /* key_reorder */ head_size * block_size +
+    /* value_pad */ 2 * head_size +
+    /* value_reorder */ 2 * head_size;
+
+  at::Tensor total_buf = at::empty(
+      {thread_numbers, size_per_thread},
+      c10::CppTypeToScalarType<SRC_T>::value);
+  auto total_buf_ptr = total_buf.data_ptr<SRC_T>();
+
+#pragma omp parallel for collapse(2)
+  for (auto ti = 0; ti < num_tokens; ti++) {
+    for (auto hi = 0; hi < head_num; hi++) {
+      auto ompIdx = omp_get_thread_num();
+      SRC_T* buf = total_buf_ptr + ompIdx * size_per_thread;
+      SRC_T* k_pad = buf;
+      SRC_T* k_reorder = k_pad + block_size * head_size;
+      SRC_T* v_pad = k_reorder + head_size * block_size;
+      SRC_T* v_reorder = v_pad + 2 * head_size;
+      auto physical_block_id = slot_mapping_ptr[ti] / block_size;
+      auto block_offset = slot_mapping_ptr[ti] % block_size;
+      auto cache_offset = physical_block_id * cache_strideN +
+          block_offset * cache_strideP + hi * cache_strideH;
+      auto k_cache_offset = physical_block_id * cache_strideN +
+          hi * cache_strideH;
+      auto curr_block_offset = block_offset % 2 ? block_offset - 1 : block_offset;
+      auto v_cache_offset = physical_block_id * cache_strideN +
+          curr_block_offset * cache_strideP + hi * cache_strideH;
+      auto key_state_offset =
+          ti * key_state_strideN + hi * key_state_strideH;
+      auto value_state_offset =
+          ti * value_state_strideN + hi * value_state_strideH;
+      auto key_cache_start = key_cache_ptr + k_cache_offset;
+      auto key_ptr_start = key_ptr + key_state_offset;
+      auto value_cache_start = value_cache_ptr + v_cache_offset;
+      auto value_ptr_start = value_ptr + value_state_offset;
+      // for key
+      torch_ipex::cpu::kernel::zero_ker<SRC_T>(
+          k_pad, block_size * head_size);
+      torch_ipex::cpu::kernel::move_ker<SRC_T, SRC_T>(
+          k_pad + block_offset * head_size, key_ptr_start, head_size);
+      k_xform(k_pad, k_reorder);
+      torch_ipex::cpu::kernel::mask_move_ker<DST_T, SRC_T>(
+          key_cache_start, k_reorder, head_size * block_size);
+      // for value
+      if (block_offset % 2 == 0) {
+        // even case
+        torch_ipex::cpu::kernel::move_ker<SRC_T, SRC_T>(
+          v_pad, value_ptr_start, head_size);
+        torch_ipex::cpu::kernel::zero_ker<SRC_T>(
+          v_pad + head_size, head_size);
+      } else {
+        // odd case
+        torch_ipex::cpu::kernel::move_ker<SRC_T, SRC_T>(
+          v_pad + head_size, value_ptr_start, head_size);
+        torch_ipex::cpu::kernel::zero_ker<SRC_T>(
+          v_pad, head_size);
+      }
+      v_xform(v_pad, v_reorder);
+      torch_ipex::cpu::kernel::mask_move_ker<DST_T, SRC_T>(
+        value_cache_start, v_reorder, 2 * head_size);
+    }
+  }
+}
+
+
+/**
+ * Reshapes and caches the key and value tensors based on the provided slot
+ * mapping.
+ *
+ * @param key The input key tensor. The shape should be [num_seqs, num_heads,
+ * head_size].
+ * @param value The input value tensor.  The shape should be [num_seqs,
+ * num_heads, head_size].
+ * @param key_cache The output key cache tensor. The pre-allocated buffer to
  * store the key cache. The shape should be [num_blocks, block_size, num_heads,
  * head_size].
  * @param value_cache The output value cache tensor. The pre-allocated buffer to
@@ -1383,7 +2414,9 @@ void single_query_cached_kv_attention_kernel_impl(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
     at::Tensor& query, // [num_seqs, num_heads, head_size]
     at::Tensor& key_cache, // [num_blocks,  block_size, num_heads, head_size]
+    bool is_key_cache_vnni,
     at::Tensor& value_cache, // [num_blocks,  block_size, num_heads, head_size]
+    bool is_value_cache_vnni,
     at::Tensor& head_mapping, // [num_heads]
     const double scale,
     at::Tensor& block_tables, // [num_seqs, max_num_blocks_per_seq]
@@ -1397,45 +2430,129 @@ void single_query_cached_kv_attention_kernel_impl(
   // dispatch kernel according to the data type of input tensor
   auto head_size = query.size(2);
   if (head_size % 2 == 0 && block_size % 2 == 0) {
-    if (out.scalar_type() == at::ScalarType::Float) {
-      single_query_cached_kv_attention_opt_kernel<float>(
-          out,
-          query,
-          key_cache,
-          value_cache,
-          scale,
-          block_tables,
-          context_lens,
-          block_size,
-          max_context_len,
-          alibi_slopes);
-    } else if (out.scalar_type() == at::ScalarType::BFloat16) {
-      single_query_cached_kv_attention_opt_kernel<at::BFloat16>(
-          out,
-          query,
-          key_cache,
-          value_cache,
-          scale,
-          block_tables,
-          context_lens,
-          block_size,
-          max_context_len,
-          alibi_slopes);
-    } else if (out.scalar_type() == at::ScalarType::Half) {
-      single_query_cached_kv_attention_opt_kernel<at::Half>(
-          out,
-          query,
-          key_cache,
-          value_cache,
-          scale,
-          block_tables,
-          context_lens,
-          block_size,
-          max_context_len,
-          alibi_slopes);
+    if (is_key_cache_vnni && is_value_cache_vnni) {
+      if (out.scalar_type() == at::ScalarType::Float) {
+        single_query_cached_kv_attention_vnni_kernel<float>(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes);
+      } else if (out.scalar_type() == at::ScalarType::BFloat16) {
+        single_query_cached_kv_attention_vnni_kernel<at::BFloat16>(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes);
+      } else if (out.scalar_type() == at::ScalarType::Half) {
+        single_query_cached_kv_attention_vnni_kernel<at::Half>(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes);
+      } else {
+        TORCH_CHECK(
+            false, "Unsupported data type for single_query_cached_kv_attention");
+      }
+    } else if (is_value_cache_vnni) {
+      if (out.scalar_type() == at::ScalarType::Float) {
+        single_query_cached_kv_attention_vnni_v_kernel<float>(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes);
+      } else if (out.scalar_type() == at::ScalarType::BFloat16) {
+        single_query_cached_kv_attention_vnni_v_kernel<at::BFloat16>(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes);
+      } else if (out.scalar_type() == at::ScalarType::Half) {
+        single_query_cached_kv_attention_vnni_v_kernel<at::Half>(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes);
+      } else {
+        TORCH_CHECK(
+            false, "Unsupported data type for single_query_cached_kv_attention");
+      }
     } else {
-      TORCH_CHECK(
-          false, "Unsupported data type for single_query_cached_kv_attention");
+      if (out.scalar_type() == at::ScalarType::Float) {
+        single_query_cached_kv_attention_opt_kernel<float>(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes);
+      } else if (out.scalar_type() == at::ScalarType::BFloat16) {
+        single_query_cached_kv_attention_opt_kernel<at::BFloat16>(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes);
+      } else if (out.scalar_type() == at::ScalarType::Half) {
+        single_query_cached_kv_attention_opt_kernel<at::Half>(
+            out,
+            query,
+            key_cache,
+            value_cache,
+            scale,
+            block_tables,
+            context_lens,
+            block_size,
+            max_context_len,
+            alibi_slopes);
+      } else {
+        TORCH_CHECK(
+            false, "Unsupported data type for single_query_cached_kv_attention");
+      }
     }
   } else {
     if (out.scalar_type() == at::ScalarType::Float) {
@@ -1486,7 +2603,9 @@ void reshape_and_cache_cpu_kernel_impl(
     at::Tensor& key,
     at::Tensor& value,
     at::Tensor& key_cache,
+    bool is_key_cache_vnni,
     at::Tensor& value_cache,
+    bool is_value_cache_vnni,
     at::Tensor& slot_mapping) {
   TORCH_CHECK(
       key.scalar_type() == value.scalar_type(),
@@ -1499,17 +2618,45 @@ void reshape_and_cache_cpu_kernel_impl(
   RECORD_FUNCTION(
       "ipex::reshape_and_cache_cpu_kernel_impl",
       c10::ArrayRef<c10::IValue>({}));
-  if (key.scalar_type() == at::ScalarType::Float) {
-    reshape_and_cache_kernel<float, float>(
-        key, value, key_cache, value_cache, slot_mapping);
-  } else if (key.scalar_type() == at::ScalarType::BFloat16) {
-    reshape_and_cache_kernel<at::BFloat16, at::BFloat16>(
-        key, value, key_cache, value_cache, slot_mapping);
-  } else if (key.scalar_type() == at::ScalarType::Half) {
-    reshape_and_cache_kernel<at::Half, at::Half>(
-        key, value, key_cache, value_cache, slot_mapping);
+  if (is_key_cache_vnni && is_value_cache_vnni) {
+    if (key.scalar_type() == at::ScalarType::Float) {
+      reshape_and_cache_vnni_kernel<float, float>(
+          key, value, key_cache, value_cache, slot_mapping);
+    } else if (key.scalar_type() == at::ScalarType::BFloat16) {
+      reshape_and_cache_vnni_kernel<at::BFloat16, at::BFloat16>(
+          key, value, key_cache, value_cache, slot_mapping);
+    } else if (key.scalar_type() == at::ScalarType::Half) {
+      reshape_and_cache_vnni_kernel<at::Half, at::Half>(
+          key, value, key_cache, value_cache, slot_mapping);
+    } else {
+      TORCH_CHECK(false, "Unsupported data type for ipex::reshape_and_cache");
+    }
+  } else if (is_value_cache_vnni) {
+    if (key.scalar_type() == at::ScalarType::Float) {
+      reshape_and_cache_vnni_v_kernel<float, float>(
+          key, value, key_cache, value_cache, slot_mapping);
+    } else if (key.scalar_type() == at::ScalarType::BFloat16) {
+      reshape_and_cache_vnni_v_kernel<at::BFloat16, at::BFloat16>(
+          key, value, key_cache, value_cache, slot_mapping);
+    } else if (key.scalar_type() == at::ScalarType::Half) {
+      reshape_and_cache_vnni_v_kernel<at::Half, at::Half>(
+          key, value, key_cache, value_cache, slot_mapping);
+    } else {
+      TORCH_CHECK(false, "Unsupported data type for ipex::reshape_and_cache");
+    }
   } else {
-    TORCH_CHECK(false, "Unsupported data type for ipex::reshape_and_cache");
+    if (key.scalar_type() == at::ScalarType::Float) {
+      reshape_and_cache_kernel<float, float>(
+          key, value, key_cache, value_cache, slot_mapping);
+    } else if (key.scalar_type() == at::ScalarType::BFloat16) {
+      reshape_and_cache_kernel<at::BFloat16, at::BFloat16>(
+          key, value, key_cache, value_cache, slot_mapping);
+    } else if (key.scalar_type() == at::ScalarType::Half) {
+      reshape_and_cache_kernel<at::Half, at::Half>(
+          key, value, key_cache, value_cache, slot_mapping);
+    } else {
+      TORCH_CHECK(false, "Unsupported data type for ipex::reshape_and_cache");
+    }
   }
 }
 

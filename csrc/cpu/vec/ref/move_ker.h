@@ -17,6 +17,19 @@ IPEX_FORCE_INLINE void move_ker(
   }
 }
 
+// inout=in if in != 0
+// inout=inout else
+template <typename dst_type, typename src_type>
+IPEX_FORCE_INLINE void mask_move_ker(
+    dst_type* inout,
+    const src_type* in,
+    int64_t len) {
+#pragma omp simd
+  for (int64_t i = 0; i < len; i++) {
+    *(inout + i) = *(in + i) == 0 ? *(inout + i) : *(in + i);
+  }
+}
+
 } // namespace kernel
 } // namespace cpu
 } // namespace torch_ipex

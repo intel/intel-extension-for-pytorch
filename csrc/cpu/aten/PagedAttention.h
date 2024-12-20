@@ -12,7 +12,9 @@ void single_query_cached_kv_attention(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
     at::Tensor& query, // [num_seqs, num_heads, head_size]
     at::Tensor& key_cache, // [num_blocks,  block_size, num_heads, head_size]
+    bool is_key_cache_vnni,
     at::Tensor& value_cache, // [num_blocks,  block_size, num_heads, head_size]
+    bool is_value_cache_vnni,
     at::Tensor& head_mapping, // [num_heads]
     const double scale,
     at::Tensor& block_tables, // [num_seqs, max_num_blocks_per_seq]
@@ -26,7 +28,9 @@ void reshape_and_cache(
     at::Tensor& key,
     at::Tensor& value,
     at::Tensor& key_cache,
+    bool is_key_cache_vnni,
     at::Tensor& value_cache,
+    bool is_value_cache_vnni,
     at::Tensor& slot_mapping);
 
 void flash_attn_varlen(
@@ -47,7 +51,9 @@ using single_query_cached_kv_attention_fn = void (*)(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
     at::Tensor& query, // [num_seqs, num_heads, head_size]
     at::Tensor& key_cache, // [num_blocks,  block_size, num_heads, head_size]
+    bool is_key_cache_vnni,
     at::Tensor& value_cache, // [num_blocks,  block_size, num_heads, head_size]
+    bool is_value_cache_vnni,
     at::Tensor& head_mapping, // [num_heads]
     const double scale,
     at::Tensor& block_tables, // [num_seqs, max_num_blocks_per_seq]
@@ -60,7 +66,9 @@ using reshape_and_cache_fn = void (*)(
     at::Tensor& key,
     at::Tensor& value,
     at::Tensor& key_cache,
+    bool is_key_cache_vnni,
     at::Tensor& value_cache,
+    bool is_value_cache_vnni,
     at::Tensor& slot_mapping);
 
 using flash_attn_var_len_fn = void (*)(

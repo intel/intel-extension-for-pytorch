@@ -17,7 +17,9 @@ void single_query_cached_kv_attention_forward_cpu(
     at::Tensor& out, // [num_seqs, num_heads, head_size]
     at::Tensor& query, // [num_seqs, num_heads, head_size]
     at::Tensor& key_cache, // [num_blocks,  block_size, num_heads, head_size]
+    bool is_key_cache_vnni,
     at::Tensor& value_cache, // [num_blocks,  block_size, num_heads, head_size]
+    bool is_value_cache_vnni,
     at::Tensor& head_mapping, // [num_heads]
     const double scale,
     at::Tensor& block_tables, // [num_seqs, max_num_blocks_per_seq]
@@ -30,7 +32,9 @@ void single_query_cached_kv_attention_forward_cpu(
       out,
       query,
       key_cache,
+      is_key_cache_vnni,
       value_cache,
+      is_value_cache_vnni,
       head_mapping,
       scale,
       block_tables,
@@ -44,10 +48,15 @@ void reshape_and_cache_cpu(
     at::Tensor& key,
     at::Tensor& value,
     at::Tensor& key_cache,
+    bool is_key_cache_vnni,
     at::Tensor& value_cache,
+    bool is_value_cache_vnni,
     at::Tensor& slot_mapping) {
   return reshape_and_cache_kernel_stub(
-      kCPU, key, value, key_cache, value_cache, slot_mapping);
+      kCPU, key, value,
+      key_cache, is_key_cache_vnni,
+      value_cache, is_value_cache_vnni,
+      slot_mapping);
 }
 
 void flash_attn_varlen_cpu(

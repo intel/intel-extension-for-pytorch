@@ -468,7 +468,52 @@ IPEX_FORCE_INLINE void move_ker(int32_t* out, const int32_t* in, int64_t len) {
   }
 }
 
-static IPEX_FORCE_INLINE void zero_ker(float* out, int64_t len) {
+template <>
+IPEX_FORCE_INLINE void mask_move_ker(
+    float* out,
+    const float* in,
+    int64_t len) {
+  int64_t i = 0;
+  auto all_zeros = _mm512_set1_epi32(0);
+#pragma unroll(4)
+  for (i = 0; i < len - 15; i += 16) {
+    auto out0 = _mm512_loadu_ps(out + i);
+    auto in0 = _mm512_loadu_ps(in + i);
+    auto mask_ = _mm512_cmp_epi32_mask(_mm512_castps_si512(in0), all_zeros, _MM_CMPINT_NE);
+    auto res = _mm512_mask_blend_ps(mask_, out0, in0);
+    _mm512_storeu_ps(out + i, res);
+  }
+
+#pragma omp simd
+  for (i = len - 15; i < len; i++) {
+    *(out + i) = *(in + i) == 0 ? *(out + i) : *(in + i);
+  }
+}
+
+template <>
+IPEX_FORCE_INLINE void mask_move_ker(
+    at::BFloat16* out,
+    const at::BFloat16* in,
+    int64_t len) {
+  int64_t i = 0;
+  auto all_zeros = _mm512_set1_epi16(0);
+#pragma unroll(4)
+  for (i = 0; i < len - 31; i += 32) {
+    auto out0 = _mm512_loadu_si512(out + i);
+    auto in0 = _mm512_loadu_si512(in + i);
+    auto mask_ = _mm512_cmp_epi16_mask(in0, all_zeros, _MM_CMPINT_NE);
+    auto res = _mm512_mask_blend_epi16(mask_, out0, in0);
+    _mm512_storeu_si512(out + i, res);
+  }
+
+#pragma omp simd
+  for (i = len - 31; i < len; i++) {
+    *(out + i) = *(in + i) == 0 ? *(out + i) : *(in + i);
+  }
+}
+
+template <>
+IPEX_FORCE_INLINE void zero_ker(float* out, int64_t len) {
   int64_t i = 0;
   __m512 zero_512 = _mm512_setzero_ps();
 #pragma unroll(4)
@@ -482,7 +527,8 @@ static IPEX_FORCE_INLINE void zero_ker(float* out, int64_t len) {
   }
 }
 
-static IPEX_FORCE_INLINE void zero_ker(at::BFloat16* out, int64_t len) {
+template <>
+IPEX_FORCE_INLINE void zero_ker(at::BFloat16* out, int64_t len) {
   int64_t i = 0;
   __m512i zero_512 = _mm512_setzero_si512();
 #pragma unroll(4)

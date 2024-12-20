@@ -543,12 +543,17 @@ class PagedAttention:
         key: torch.Tensor,
         value: torch.Tensor,
         key_cache: torch.Tensor,
+        is_key_cache_vnni: bool,
         value_cache: torch.Tensor,
+        is_value_cache_vnni: bool,
         slot_mapping: torch.Tensor,
     ):
         return cls.runtime_ops.get_module_from_device(
             key.device.type, IPEXCustomOpType.PAGED_ATTENTION, False
-        ).reshape_and_cache(key, value, key_cache, value_cache, slot_mapping)
+        ).reshape_and_cache(key, value,
+                            key_cache, is_key_cache_vnni,
+                            value_cache, is_value_cache_vnni,
+                            slot_mapping)
 
     @classmethod
     def single_query_cached_kv_attention(
@@ -556,7 +561,9 @@ class PagedAttention:
         output: torch.Tensor,
         query: torch.Tensor,
         key_cache: torch.Tensor,
+        is_key_cache_vnni: bool,
         value_cache: torch.Tensor,
+        is_value_cache_vnni: bool,
         head_mapping: torch.Tensor,
         scale: float,
         block_tables: torch.Tensor,
@@ -571,7 +578,9 @@ class PagedAttention:
             output,
             query,
             key_cache,
+            is_key_cache_vnni,
             value_cache,
+            is_value_cache_vnni,
             head_mapping,
             scale,
             block_tables,
