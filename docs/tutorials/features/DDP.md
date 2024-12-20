@@ -25,9 +25,9 @@ For more detailed information, check [Installation Guide](https://intel.github.i
 
 ```
 # Generic Python* for CPU
-REPO_URL: https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
+REPO_URL: https://pytorch-extension.intel.com/release-whl/stable/cpu/cn/
 # Generic Python* for GPU
-REPO_URL: https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+REPO_URL: https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/
 ```
 
 Installation from either repository shares the command below. Replace the place holder `<REPO_URL>` with a real URL mentioned above.

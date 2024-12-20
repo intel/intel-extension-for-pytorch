@@ -65,7 +65,7 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
     echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
     echo "set -e" >> ${AUX_INSTALL_SCRIPT}
     if [ $((${MODE} & 0x04)) -ne 0 ]; then
-        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/" >> ${AUX_INSTALL_SCRIPT}
+        echo "python -m pip install torch==${VER_TORCH} intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/" >> ${AUX_INSTALL_SCRIPT}
     else
         DPCPP_ROOT=
         ONEMKL_ROOT=

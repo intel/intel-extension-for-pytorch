@@ -18,11 +18,11 @@ if [[ ${IMAGE_TYPE} = "xpu" ]]; then
                  --build-arg TORCHVISION_VERSION=0.20.1+cxx11.abi \
                  --build-arg TORCHAUDIO_VERSION=2.5.1+cxx11.abi \
                  --build-arg ONECCL_BIND_PT_VERSION=2.5.0+xpu \
-                 --build-arg TORCH_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
-                 --build-arg IPEX_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
-                 --build-arg TORCHVISION_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
-                 --build-arg TORCHAUDIO_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
-                 --build-arg ONECCL_BIND_PT_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/us/ \
+                 --build-arg TORCH_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/ \
+                 --build-arg IPEX_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/ \
+                 --build-arg TORCHVISION_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/ \
+                 --build-arg TORCHAUDIO_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/ \
+                 --build-arg ONECCL_BIND_PT_WHL_URL=https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/ \
                  -t ${IMAGE_NAME} \
                  -f Dockerfile.prebuilt .
 fi
