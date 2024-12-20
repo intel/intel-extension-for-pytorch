@@ -70,6 +70,8 @@ class IpexFastLinear(IPEXOpForInference):
         super().__init__(module)
         self.weight = None
         self.bias = None
+        self.in_features = module.in_features
+        self.out_features = module.out_features
         self.port_data()
 
     def port_data(self):
