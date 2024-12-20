@@ -3,6 +3,9 @@ setlocal
 
 set "VER_IPEX=v2.3.110+xpu"
 set "ENABLE_ONEAPI_INTEGRATION=1"
+set CMAKE_SHARED_LINKER_FLAGS=/FORCE:MULTIPLE
+set CMAKE_MODULE_LINKER_FLAGS=/FORCE:MULTIPLE
+set CMAKE_EXE_LINKER_FLAGS=/FORCE:MULTIPLE
 
 if "%~2"=="" (
     echo Usage: %~nx0 ^<DPCPPROOT^> ^<MKLROOT^> [AOT]
@@ -56,6 +59,9 @@ rem Save current directory path
 set "BASEFOLDER=%~dp0"
 cd "%BASEFOLDER%"
 
+if not exist intel-extension-for-pytorch (
+    git clone https://github.com/intel/intel-extension-for-pytorch.git
+)
 
 rem Checkout the latest Intel(R) Extension for PyTorch source
 cd intel-extension-for-pytorch
@@ -86,9 +92,7 @@ if not exist vision (
 if not exist audio (
     git clone https://github.com/pytorch/audio.git
 )
-if not exist intel-extension-for-pytorch (
-    git clone https://github.com/intel/intel-extension-for-pytorch.git
-)
+
 
 rem Checkout required branch/commit and update submodules
 cd pytorch
