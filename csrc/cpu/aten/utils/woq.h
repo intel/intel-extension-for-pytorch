@@ -1051,11 +1051,95 @@ struct dequant_n_grouped {
       }
     }
   }
+
+  template <typename Lambda1, typename Lambda2, typename Lambda3>
+  static inline void call_with_g_idx(
+      uint8_t* qB,
+      long K,
+      long N,
+      Tin* scales,
+      Tin* zps,
+      Tin* B,
+      long k_start,
+      int* g_idx,
+      const Lambda1& load_qparam,
+      const Lambda2& load_qint_as_fp,
+      const Lambda3& store) {
+    using VA = VecArray<N_GROUP_SIZE, Tin>;
+    using VAT = typename VA::type;
+    constexpr bool is_4bit_flag = is_4bit(qw_type);
+    for (int n = 0; n < N; n += N_GROUP_SIZE) {
+      for (int k = 0; k < K; k++) {
+        // load scales and zps
+        int g = g_idx[k_start + k];
+        auto vscales = load_qparam(scales + g * N + n);
+        VAT vzps;
+        if constexpr (!sym_quant_w) {
+          vzps = load_qparam(zps + g * N + n);
+        }
+        // load and dequant qB to vb
+        auto vbs = load_qint_as_fp(
+            is_4bit_flag ? &qB[k * ldb / 2 + n / 2] : &qB[k * ldb + n],
+            vscales,
+            vzps);
+        // prefetch qB data
+        if constexpr (PREFETCH_K_DIST > 0) {
+          auto prefetch_addr = is_4bit_flag
+              ? &qB[(k + PREFETCH_K_DIST) * ldb / 2 + n / 2]
+              : &qB[(k + PREFETCH_K_DIST) * ldb + n];
+          _mm_prefetch(prefetch_addr, _MM_HINT_T0);
+        }
+        // store vb to B
+        store(B + k * N + n, vbs);
+      }
+    }
+  }
 };
 
 #if defined(CPU_CAPABILITY_AVX512)
 template <long ldb, long N_GROUP_SIZE, int qw_type, bool sym_quant_w>
 struct dequant_n_grouped<bfloat16, ldb, N_GROUP_SIZE, qw_type, sym_quant_w> {
+  // For vnni, we need to interleave the 2 bfloat16 values
+  static inline std::array<__m512, 2> interleave(__m512 v0, __m512 v1) {
+    __m512i idx_low = _mm512_set_epi32(
+        0x17,
+        0x07,
+        0x16,
+        0x06,
+        0x15,
+        0x05,
+        0x14,
+        0x04,
+        0x13,
+        0x03,
+        0x12,
+        0x02,
+        0x11,
+        0x01,
+        0x10,
+        0x00);
+    __m512i idx_high = _mm512_set_epi32(
+        0x1f,
+        0x0f,
+        0x1e,
+        0x0e,
+        0x1d,
+        0x0d,
+        0x1c,
+        0x0c,
+        0x1b,
+        0x0b,
+        0x1a,
+        0x0a,
+        0x19,
+        0x09,
+        0x18,
+        0x08);
+    return std::array<__m512, 2>(
+        {_mm512_permutex2var_ps(v0, idx_low, v1),
+         _mm512_permutex2var_ps(v0, idx_high, v1)});
+  };
+
   template <typename Lambda1, typename Lambda2, typename Lambda3>
   static inline void call(
       uint8_t* qB,
@@ -1081,50 +1165,81 @@ struct dequant_n_grouped<bfloat16, ldb, N_GROUP_SIZE, qw_type, sym_quant_w> {
       }
       // convert to vnni: [K/2, N, 2]
       for (int k = 0; k < K; k += 2) {
-        auto interleave = [](__m512 v0, __m512 v1) {
-          __m512i idx_low = _mm512_set_epi32(
-              0x17,
-              0x07,
-              0x16,
-              0x06,
-              0x15,
-              0x05,
-              0x14,
-              0x04,
-              0x13,
-              0x03,
-              0x12,
-              0x02,
-              0x11,
-              0x01,
-              0x10,
-              0x00);
-          __m512i idx_high = _mm512_set_epi32(
-              0x1f,
-              0x0f,
-              0x1e,
-              0x0e,
-              0x1d,
-              0x0d,
-              0x1c,
-              0x0c,
-              0x1b,
-              0x0b,
-              0x1a,
-              0x0a,
-              0x19,
-              0x09,
-              0x18,
-              0x08);
-          return std::array<__m512, 2>(
-              {_mm512_permutex2var_ps(v0, idx_low, v1),
-               _mm512_permutex2var_ps(v0, idx_high, v1)});
-        };
         // load and dequant qB to vb
         auto vbs_k0 = load_qint_as_fp(
             is_4bit_flag ? &qB[k * ldb / 2 + n / 2] : &qB[k * ldb + n],
             vscales,
             vzps);
+        auto vbs_k1 = load_qint_as_fp(
+            is_4bit_flag ? &qB[(k + 1) * ldb / 2 + n / 2]
+                         : &qB[(k + 1) * ldb + n],
+            vscales,
+            vzps);
+        // prefetch qB data
+        if constexpr (PREFETCH_K_DIST > 0) {
+          auto prefetch_addr = is_4bit_flag
+              ? &qB[(k + PREFETCH_K_DIST) * ldb / 2 + n / 2]
+              : &qB[(k + PREFETCH_K_DIST) * ldb + n];
+          _mm_prefetch(prefetch_addr, _MM_HINT_T0);
+        }
+        typename VA::type vbs[2];
+        compile_time_for<COLS>::op([&](auto i) {
+          auto [low, high] = interleave(vbs_k0[i], vbs_k1[i]);
+          vbs[i * 2 / COLS][i * 2 % COLS] = low;
+          vbs[(i * 2 + 1) / COLS][(i * 2 + 1) % COLS] = high;
+        });
+        // store vb to B: low: [k + n*2 / N, n*2 % N], high: [k +
+        // (n*2+N_GROUP_SIZE) / N, (n*2+N_GROUP_SIZE) % N]
+        store(ADDRESS(B, k + (n * 2) / N, (n * 2) % N, N), vbs[0]);
+        store(
+            ADDRESS(
+                B,
+                k + (n * 2 + N_GROUP_SIZE) / N,
+                (n * 2 + N_GROUP_SIZE) % N,
+                N),
+            vbs[1]);
+      }
+    }
+  }
+
+  template <typename Lambda1, typename Lambda2, typename Lambda3>
+  static inline void call_with_g_idx(
+      uint8_t* qB,
+      long K,
+      long N,
+      bfloat16* scales,
+      bfloat16* zps,
+      bfloat16* B,
+      long k_start,
+      int* g_idx,
+      const Lambda1& load_qparam,
+      const Lambda2& load_qint_as_fp,
+      const Lambda3& store) {
+    using VA = VecArray<N_GROUP_SIZE, float>;
+    using VAT = typename VA::type;
+    constexpr long COLS = VA::num_vec;
+    constexpr bool is_4bit_flag = is_4bit(qw_type);
+
+    for (int n = 0; n < N; n += N_GROUP_SIZE) {
+      // convert to vnni: [K/2, N, 2]
+      for (int k = 0; k < K; k += 2) {
+        // load scales and zps
+        int g = g_idx[k_start + k];
+        auto vscales = load_qparam(scales + g * N + n);
+        VAT vzps;
+        if constexpr (!sym_quant_w) {
+          vzps = load_qparam(zps + g * N + n);
+        }
+        // load and dequant qB to vb
+        auto vbs_k0 = load_qint_as_fp(
+            is_4bit_flag ? &qB[k * ldb / 2 + n / 2] : &qB[k * ldb + n],
+            vscales,
+            vzps);
+        g = g_idx[k_start + k + 1];
+        vscales = load_qparam(scales + g * N + n);
+        if constexpr (!sym_quant_w) {
+          vzps = load_qparam(zps + g * N + n);
+        }
         auto vbs_k1 = load_qint_as_fp(
             is_4bit_flag ? &qB[(k + 1) * ldb / 2 + n / 2]
                          : &qB[(k + 1) * ldb + n],
@@ -1164,20 +1279,36 @@ template <
     long ldb,
     long N_GROUP_SIZE,
     int qw_type,
-    bool sym_quant_w>
+    bool sym_quant_w,
+    bool use_g_idx>
 struct Dequantize {
-  static void call(uint8_t* qB, long K, long N, Tin* scales, Tin* zps, Tin* B);
+  static void call(
+      uint8_t* qB,
+      long K,
+      long N,
+      Tin* scales,
+      Tin* zps,
+      Tin* B,
+      int k_start = 0,
+      int* g_idx = nullptr);
 };
 
-template <long ldb, long N_GROUP_SIZE, int qw_type, bool sym_quant_w>
-struct Dequantize<float, ldb, N_GROUP_SIZE, qw_type, sym_quant_w> {
+template <
+    long ldb,
+    long N_GROUP_SIZE,
+    int qw_type,
+    bool sym_quant_w,
+    bool use_g_idx>
+struct Dequantize<float, ldb, N_GROUP_SIZE, qw_type, sym_quant_w, use_g_idx> {
   static inline void call(
       uint8_t* qB,
       long K,
       long N,
       float* scales,
       float* zps,
-      float* B) {
+      float* B,
+      int k_start = 0,
+      int* g_idx = nullptr) {
 #if defined(__AVX512F__)
     using T = float;
     using VT = typename VecType<T>::type;
@@ -1198,42 +1329,67 @@ struct Dequantize<float, ldb, N_GROUP_SIZE, qw_type, sym_quant_w> {
       }
     }
 
-    dequant_n_grouped<float, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::call(
-        qB,
-        K,
-        N,
-        scales,
-        zps,
-        B,
-        [&](float* p) { return VA::load1d(p); },
-        [&](uint8_t* p, auto vscales, auto vzps) {
-          if constexpr (is_4bit_flag) {
-            return load_dequant_4bit<N_GROUP_SIZE, sym_quant_w, T>::call(
-                p, vscales, lut, vzps);
-          } else {
-            return load_dequant_int8<N_GROUP_SIZE, sym_quant_w, T>::call(
-                p, vscales, vzps);
-          }
-        },
-        [&](auto p, auto vbs) {
-          compile_time_for<COLS>::op(
-              [&](auto idx) { _mm512_storeu_ps(p + idx * VLEN, vbs[idx]); });
-        });
+    auto load_qparam = [&](float* p) { return VA::load1d(p); };
+    auto load_qint_as_fp = [&](uint8_t* p, auto vscales, auto vzps) {
+      if constexpr (is_4bit_flag) {
+        return load_dequant_4bit<N_GROUP_SIZE, sym_quant_w, T>::call(
+            p, vscales, lut, vzps);
+      } else {
+        return load_dequant_int8<N_GROUP_SIZE, sym_quant_w, T>::call(
+            p, vscales, vzps);
+      }
+    };
+    auto store = [&](auto p, auto vbs) {
+      compile_time_for<COLS>::op(
+          [&](auto idx) { _mm512_storeu_ps(p + idx * VLEN, vbs[idx]); });
+    };
+
+    if constexpr (use_g_idx) {
+      dequant_n_grouped<float, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::
+          call_with_g_idx(
+              qB,
+              K,
+              N,
+              scales,
+              zps,
+              B,
+              k_start,
+              g_idx,
+              load_qparam,
+              load_qint_as_fp,
+              store);
+    } else {
+      dequant_n_grouped<float, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::call(
+          qB, K, N, scales, zps, B, load_qparam, load_qint_as_fp, store);
+    }
 #else
     TLA_ASSERT(false, "not implemented");
 #endif
   }
 };
 
-template <long ldb, long N_GROUP_SIZE, int qw_type, bool sym_quant_w>
-struct Dequantize<bfloat16, ldb, N_GROUP_SIZE, qw_type, sym_quant_w> {
+template <
+    long ldb,
+    long N_GROUP_SIZE,
+    int qw_type,
+    bool sym_quant_w,
+    bool use_g_idx>
+struct Dequantize<
+    bfloat16,
+    ldb,
+    N_GROUP_SIZE,
+    qw_type,
+    sym_quant_w,
+    use_g_idx> {
   static inline void call(
       uint8_t* qB,
       long K,
       long N,
       bfloat16* scales,
       bfloat16* zps,
-      bfloat16* B) {
+      bfloat16* B,
+      int k_start = 0,
+      int* g_idx = nullptr) {
 #if defined(CPU_CAPABILITY_AVX512)
     using T = bfloat16;
     using VT = typename VecType<T>::type;
@@ -1257,44 +1413,63 @@ struct Dequantize<bfloat16, ldb, N_GROUP_SIZE, qw_type, sym_quant_w> {
       }
     }
 
-    dequant_n_grouped<bfloat16, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::call(
-        qB,
-        K,
-        N,
-        scales,
-        zps,
-        B,
-        [&](bfloat16* p) { return VA::load1d(p); },
-        [&](uint8_t* p, auto vscales, auto vzps) {
-          if constexpr (is_4bit_flag) {
-            return load_dequant_4bit<N_GROUP_SIZE, sym_quant_w, float>::call(
-                p, vscales, lut, vzps);
-          } else {
-            return load_dequant_int8<N_GROUP_SIZE, sym_quant_w, float>::call(
-                p, vscales, vzps);
-          }
-        },
-        [&](auto p, auto vbs) {
-          compile_time_for<COLS / 2>::op([&](auto idx) {
-            _vec_store_two_floats_as_bfloat16(
-                p + idx * 32, vbs[idx * 2], vbs[idx * 2 + 1]);
-          });
-        });
+    auto load_qparam = [&](bfloat16* p) { return VA::load1d(p); };
+    auto load_qint_as_fp = [&](uint8_t* p, auto vscales, auto vzps) {
+      if constexpr (is_4bit_flag) {
+        return load_dequant_4bit<N_GROUP_SIZE, sym_quant_w, float>::call(
+            p, vscales, lut, vzps);
+      } else {
+        return load_dequant_int8<N_GROUP_SIZE, sym_quant_w, float>::call(
+            p, vscales, vzps);
+      }
+    };
+    auto store = [&](auto p, auto vbs) {
+      compile_time_for<COLS / 2>::op([&](auto idx) {
+        _vec_store_two_floats_as_bfloat16(
+            p + idx * 32, vbs[idx * 2], vbs[idx * 2 + 1]);
+      });
+    };
+
+    if constexpr (use_g_idx) {
+      dequant_n_grouped<bfloat16, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::
+          call_with_g_idx(
+              qB,
+              K,
+              N,
+              scales,
+              zps,
+              B,
+              k_start,
+              g_idx,
+              load_qparam,
+              load_qint_as_fp,
+              store);
+    } else {
+      dequant_n_grouped<bfloat16, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::
+          call(qB, K, N, scales, zps, B, load_qparam, load_qint_as_fp, store);
+    }
 #else
     TLA_ASSERT(false, "not implemented");
 #endif
   }
 };
 
-template <long ldb, long N_GROUP_SIZE, int qw_type, bool sym_quant_w>
-struct Dequantize<half, ldb, N_GROUP_SIZE, qw_type, sym_quant_w> {
+template <
+    long ldb,
+    long N_GROUP_SIZE,
+    int qw_type,
+    bool sym_quant_w,
+    bool use_g_idx>
+struct Dequantize<half, ldb, N_GROUP_SIZE, qw_type, sym_quant_w, use_g_idx> {
   static inline void call(
       uint8_t* qB,
       long K,
       long N,
       half* scales,
       half* zps,
-      half* B) {
+      half* B,
+      int k_start = 0,
+      int* g_idx = nullptr) {
 #if defined(CPU_CAPABILITY_AVX512_FP16)
     using T = half;
     using VT = typename VecType<T>::type;
@@ -1319,27 +1494,39 @@ struct Dequantize<half, ldb, N_GROUP_SIZE, qw_type, sym_quant_w> {
       }
     }
 
-    dequant_n_grouped<half, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::call(
-        qB,
-        K,
-        N,
-        scales,
-        zps,
-        B,
-        [&](half* p) { return VA::load1d(p); },
-        [&](uint8_t* p, auto vscales, auto vzps) {
-          if constexpr (is_4bit_flag) {
-            return load_dequant_4bit<N_GROUP_SIZE, sym_quant_w, T>::call(
-                p, vscales, lut, vzps);
-          } else {
-            return load_dequant_int8<N_GROUP_SIZE, sym_quant_w, T>::call(
-                p, vscales, vzps);
-          }
-        },
-        [&](auto p, auto vbs) {
-          compile_time_for<COLS>::op(
-              [&](auto idx) { _mm512_storeu_ph(p + idx * VLEN, vbs[idx]); });
-        });
+    auto load_qparam = [&](half* p) { return VA::load1d(p); };
+    auto load_qint_as_fp = [&](uint8_t* p, auto vscales, auto vzps) {
+      if constexpr (is_4bit_flag) {
+        return load_dequant_4bit<N_GROUP_SIZE, sym_quant_w, T>::call(
+            p, vscales, lut, vzps);
+      } else {
+        return load_dequant_int8<N_GROUP_SIZE, sym_quant_w, T>::call(
+            p, vscales, vzps);
+      }
+    };
+    auto store = [&](auto p, auto vbs) {
+      compile_time_for<COLS>::op(
+          [&](auto idx) { _mm512_storeu_ph(p + idx * VLEN, vbs[idx]); });
+    };
+
+    if constexpr (use_g_idx) {
+      dequant_n_grouped<half, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::
+          call_with_g_idx(
+              qB,
+              K,
+              N,
+              scales,
+              zps,
+              B,
+              k_start,
+              g_idx,
+              load_qparam,
+              load_qint_as_fp,
+              store);
+    } else {
+      dequant_n_grouped<half, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::call(
+          qB, K, N, scales, zps, B, load_qparam, load_qint_as_fp, store);
+    }
 #else
     TLA_ASSERT(false, "not implemented");
 #endif
@@ -1352,7 +1539,8 @@ struct Dequantize<
     ldb,
     /*N_GROUP_SIZE*/ 16,
     qw_type,
-    sym_quant_w> {
+    sym_quant_w,
+    /*use_g_idx*/ false> {
   template <int quant_a_mode>
   static inline void call(
       uint8_t* qB,
@@ -1431,7 +1619,8 @@ template <
     int qw_type,
     int quant_a_mode,
     int quant_w_mode,
-    long PREFETCH_K_DIST = 0>
+    long PREFETCH_K_DIST = 0,
+    bool use_g_idx = false>
 class DequantGemmTPP {
  public:
   DequantGemmTPP(
@@ -1454,7 +1643,8 @@ class DequantGemmTPP {
       int32_t k_groups = -1,
       int32_t count = 64,
       int kc_start = 0,
-      int quant_block_multiple = 1) {
+      int quant_block_multiple = 1,
+      int* g_idx = nullptr) {
     TLA_ASSERT(false, "not implemented");
   }
 
@@ -1478,7 +1668,8 @@ template <
     int qw_type,
     int quant_a_mode,
     int quant_w_mode,
-    long PREFETCH_K_DIST>
+    long PREFETCH_K_DIST,
+    bool use_g_idx>
 class DequantGemmTPP<
     Tin,
     Tout,
@@ -1492,7 +1683,8 @@ class DequantGemmTPP<
     qw_type,
     quant_a_mode,
     quant_w_mode,
-    PREFETCH_K_DIST> {
+    PREFETCH_K_DIST,
+    use_g_idx> {
  public:
   DequantGemmTPP(
       long M,
@@ -1536,9 +1728,10 @@ class DequantGemmTPP<
       int32_t k_groups = -1,
       int32_t count = 64,
       int kc_start = 0,
-      int quant_block_multiple = 1) {
+      int quant_block_multiple = 1,
+      int* g_idx = nullptr) {
     constexpr bool sym_quant_w = quant_w_mode >= QUANT_W_PER_CHANNEL_SYM;
-    if (M < SMALL_BATCH_THRESHOLD &&
+    if (M < SMALL_BATCH_THRESHOLD && g_idx == nullptr &&
         ((std::is_same<Tin, half>() && std::is_same<Tout, half>()) ||
          (std::is_same<Tin, float>() && std::is_same<Tout, float>()))) {
       for (long m = 0; m < M; m += BLOCK_M) {
@@ -1603,17 +1796,20 @@ class DequantGemmTPP<
       // TODO(jgong5): add prefetch
       for (int cnt = 0; cnt < count; cnt++) {
         int32_t quant_offset = quant_w_mode == QUANT_W_PER_CHANNEL ||
-                quant_w_mode == QUANT_W_PER_CHANNEL_SYM
+                quant_w_mode == QUANT_W_PER_CHANNEL_SYM || g_idx
             ? 0
             : (kc_start + cnt) / quant_block_multiple -
                 kc_start / quant_block_multiple;
-        Dequantize<Tin, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::call(
-            qB + K * N * cnt,
-            K,
-            N,
-            scales + N * quant_offset,
-            sym_quant_w ? nullptr : zps + N * quant_offset,
-            B[cnt][0]);
+        Dequantize<Tin, ldb, N_GROUP_SIZE, qw_type, sym_quant_w, use_g_idx>::
+            call(
+                qB + K * N * cnt,
+                K,
+                N,
+                scales + N * quant_offset,
+                sym_quant_w ? nullptr : zps + N * quant_offset,
+                B[cnt][0],
+                (kc_start + cnt) * K,
+                g_idx);
       }
       (*pgemm)(A, B[0][0], C, count, no_tile_cfg);
     }
@@ -1662,7 +1858,8 @@ class DequantGemmTPP<
     qw_type,
     quant_a_mode,
     quant_w_mode,
-    PREFETCH_K_DIST> {
+    PREFETCH_K_DIST,
+    /*use_g_idx*/ false> {
   using TBrgemmTPP = BrgemmTPP<int8_t, int32_t>;
 
  public:
@@ -1712,7 +1909,8 @@ class DequantGemmTPP<
       int32_t k_groups = -1,
       int32_t count = 1,
       int kc_start = 0,
-      int quant_block_multiple = 1) {
+      int quant_block_multiple = 1,
+      int* g_idx = nullptr) {
     constexpr bool sym_quant_w = !is_asymmetric_quant_w(quant_w_mode);
     auto qA = GetVLAPtr<uint8_t>(A, {lda});
 #if defined(CPU_CAPABILITY_AVX512_VNNI)
@@ -1809,7 +2007,13 @@ class DequantGemmTPP<
       int8_t B[K / 4][N][4];
       int32_t qC[M][N];
       int32_t compensation[N];
-      Dequantize<int8_t, ldb, N_GROUP_SIZE, qw_type, sym_quant_w>::
+      Dequantize<
+          int8_t,
+          ldb,
+          N_GROUP_SIZE,
+          qw_type,
+          sym_quant_w,
+          /*use_g_idx*/ false>::
           template call<quant_a_mode>(qB, K, N, zps, B[0][0], compensation);
       (*pgemm)((int8_t*)qA[0], B[0][0], qC[0], 1, no_tile_cfg);
       if constexpr (PREFETCH_K_DIST > 0) {
@@ -2047,7 +2251,8 @@ void qlinear_woq_affine_dequant_upfront_impl(
     int fusion_type,
     const TensorList& others_list,
     int64_t quant_block_k,
-    const at::Tensor& zps = at::Tensor()) { // dtype is TComp
+    const at::Tensor& zps = at::Tensor(), // dtype is TComp
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt) {
   const bool asym_quant_w = is_asymmetric_quant_w(quant_w_mode);
   auto x_sizes = x.sizes();
   auto w_sizes = qw_packed.sizes();
@@ -2091,24 +2296,28 @@ void qlinear_woq_affine_dequant_upfront_impl(
   auto pzps = asym_quant_w ? GetVLAPtr<TComp>(zps, {scales_kc, Nb})
                            : GetVLAPtr<TComp>(nullptr, {1, 1});
   product_dispatcher<
-      std::tuple</*qw_type*/ int, /*BLOCK_N*/ long>,
+      std::tuple</*qw_type*/ int, /*BLOCK_N*/ long, /*use g_idx*/ bool>,
       std::tuple<
           enumerate_dispatcher<
               int,
               WOQ_DTYPE_INT8,
               WOQ_DTYPE_INT4,
               WOQ_DTYPE_NF4>,
-          enumerate_dispatcher<long, WOQ_N_BLOCK_SIZE>>>::
+          enumerate_dispatcher<long, WOQ_N_BLOCK_SIZE>,
+          enumerate_dispatcher<bool, false, true>>>::
       call(
-          std::make_tuple(qw_type, Nb),
+          std::make_tuple(qw_type, Nb, g_idx.has_value()),
           [&](auto tuple) {
             auto qw_type_ = std::get<0>(tuple);
             auto block_n = std::get<1>(tuple);
+            auto use_g_idx = std::get<2>(tuple);
             auto loop_scheme = "bA";
             auto dequant_loop =
                 ThreadedLoop<2>({{Nc}, {0, Kc, Kc}}, loop_scheme);
             constexpr const int N_GROUP_SIZE = get_n_group_size(block_n);
             constexpr bool sym_quant_w = !is_asymmetric_quant_w(quant_w_mode);
+            int* g_idx_ptr =
+                use_g_idx ? g_idx.value().data_ptr<int>() : nullptr;
             dequant_loop(
                 [&](int* idx) {
                   int nc = idx[0];
@@ -2121,7 +2330,7 @@ void qlinear_woq_affine_dequant_upfront_impl(
                     TZero* zp_w = nullptr;
                     if constexpr (
                         quant_w_mode == QUANT_W_PER_CHANNEL ||
-                        quant_w_mode == QUANT_W_PER_CHANNEL_SYM) {
+                        quant_w_mode == QUANT_W_PER_CHANNEL_SYM || use_g_idx) {
                       scale_w = pscales[nc][0];
                       if constexpr (asym_quant_w) {
                         zp_w = pzps[nc][0];
@@ -2132,19 +2341,23 @@ void qlinear_woq_affine_dequant_upfront_impl(
                         zp_w = pzps[nc][quant_offset];
                       }
                     }
+                    int k_start = use_g_idx ? kc * Kb : 0;
                     Dequantize<
                         TComp,
                         block_n,
                         N_GROUP_SIZE,
                         qw_type_,
-                        sym_quant_w>::
+                        sym_quant_w,
+                        use_g_idx>::
                         call(
                             pw[nc][kc],
                             Kb,
                             block_n,
                             scale_w,
                             zp_w,
-                            dqw_ptr[nc][kc][0]);
+                            dqw_ptr[nc][kc][0],
+                            k_start,
+                            g_idx_ptr);
                   }
                 },
                 [&]() {},
@@ -2426,7 +2639,8 @@ void qlinear_woq_affine_impl(
     const at::Tensor& zps = at::Tensor(), // dtype is TComp
     float* scales_a_ptr = nullptr,
     int32_t* zps_a_ptr = nullptr,
-    const c10::optional<at::Tensor>& compensation = c10::nullopt) {
+    const c10::optional<at::Tensor>& compensation = c10::nullopt,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt) {
   const bool is_4bit_flag = is_4bit(qw_type);
   constexpr bool asym_quant_w = is_asymmetric_quant_w(quant_w_mode);
   bool no_dequant_weight = compensation.has_value();
@@ -2475,9 +2689,13 @@ void qlinear_woq_affine_impl(
           fusion_type,
           others_list,
           quant_block_k,
-          zps);
+          zps,
+          g_idx);
       return;
     }
+  } else {
+    TLA_ASSERT(
+        !g_idx.has_value(), "WOQ: g_idx is not supported for int8 computation");
   }
 
   // select BLOCK_M according to M
@@ -2532,6 +2750,12 @@ void qlinear_woq_affine_impl(
           quant_w_mode == QUANT_W_PER_CHANNEL_SYM
       ? 1
       : quant_k_blocks;
+  if (g_idx.has_value()) {
+    TLA_ASSERT(
+        scales.dim() == 3,
+        "scale is expected to be a 3D tensor if g_idx is used");
+    scales_kc = scales.sizes()[1];
+  }
   auto pscales = GetVLAPtr<TScale>(scales, {scales_kc, Nb});
   auto pzps = asym_quant_w ? GetVLAPtr<TZero>(zps, {scales_kc, Nb})
                            : GetVLAPtr<TZero>(nullptr, {1, 1});
@@ -2544,6 +2768,7 @@ void qlinear_woq_affine_impl(
       ? GetVLAPtr<int32_t>(compensation.value(), {Kc, Nb})
       : /*[Nc, Kc, Nb]*/
       GetVLAPtr<int32_t>(nullptr, {1, 1});
+  auto g_idx_ptr = g_idx.has_value() ? g_idx.value().data_ptr<int>() : nullptr;
 
   auto copy_bias_out_tpp = CpyBiasTPP<TGemmOut>(BLOCK_M, Nb, ldy);
   auto copy_bias_buf_tpp = CpyBiasTPP<TGemmOut>(BLOCK_M, Nb, Nb);
@@ -2626,7 +2851,8 @@ void qlinear_woq_affine_impl(
       qw_type,                                       \
       quant_a_mode,                                  \
       quant_w_mode,                                  \
-      prefetch_dist>(                                \
+      prefetch_dist,                                 \
+      use_g_idx>(                                    \
       /*M*/ block_m, /*K*/ Kb, lda, ldc, IPEX_KCB_BLOCK_SIZE, str_a);
 
 #define GET_NO_DEQUANT_GEMM_TPP(prefetch_dist, block_m) \
@@ -2655,7 +2881,8 @@ void qlinear_woq_affine_impl(
       k_groups,                                               \
       count,                                                  \
       kc_start,                                               \
-      quant_block_multiple);
+      quant_block_multiple,                                   \
+      g_idx_ptr);
 
 #define RUN_NO_DEQUANT_GEMM_TPP(                              \
     gemm_kernel, no_tile_cfg, kc_start, quant_block_multiple) \
@@ -2677,7 +2904,11 @@ void qlinear_woq_affine_impl(
 
   constexpr long MICRO_BLOCK_M = 8;
   product_dispatcher<
-      std::tuple</*BLOCK_N*/ long, /*qw_type*/ int, /*no_dequant_weight*/ bool>,
+      std::tuple<
+          /*BLOCK_N*/ long,
+          /*qw_type*/ int,
+          /*no_dequant_weight*/ bool,
+          /*use_g_idx*/ bool>,
       std::tuple<
           enumerate_dispatcher<long, WOQ_N_BLOCK_SIZE>,
           enumerate_dispatcher<
@@ -2685,13 +2916,15 @@ void qlinear_woq_affine_impl(
               WOQ_DTYPE_INT8,
               WOQ_DTYPE_INT4,
               WOQ_DTYPE_NF4>,
+          enumerate_dispatcher<bool, false, true>,
           enumerate_dispatcher<bool, false, true>>>::
       call(
-          std::make_tuple(Nb, qw_type, no_dequant_weight),
+          std::make_tuple(Nb, qw_type, no_dequant_weight, g_idx.has_value()),
           [&](auto tuple) {
             auto BLOCK_N = std::get<0>(tuple);
             auto qw_type = std::get<1>(tuple);
             auto no_dequant_w = std::get<2>(tuple);
+            auto use_g_idx = std::get<3>(tuple);
             auto dequant_gemm_tpp =
                 GET_DEQUANT_GEMM_TPP(PREFETCH_K_DIST, BLOCK_M);
             auto dequant_gemm_no_prefetch_tpp =
@@ -2752,7 +2985,8 @@ void qlinear_woq_affine_impl(
                     float* scale_a = nullptr;
                     int32_t* zp_a = nullptr;
                     int32_t k_groups = -1;
-                    int32_t quant_offset = kc / quant_block_multiple;
+                    int32_t quant_offset =
+                        g_idx_ptr ? 0 : kc / quant_block_multiple;
                     if constexpr (std::is_same<TComp, uint8_t>()) {
                       if constexpr (
                           quant_a_mode == QUANT_A_PER_TENSOR ||
@@ -2814,17 +3048,17 @@ void qlinear_woq_affine_impl(
                       if (kc < Kc - 1) {
                         if constexpr (no_dequant_w) {
                           RUN_NO_DEQUANT_GEMM_TPP(
-                              no_dequant_gemm_tpp, true, 0, 1);
+                              no_dequant_gemm_tpp, true, kc, 1);
                         } else {
-                          RUN_DEQUANT_GEMM_TPP(dequant_gemm_tpp, true, 0, 1);
+                          RUN_DEQUANT_GEMM_TPP(dequant_gemm_tpp, true, kc, 1);
                         }
                       } else {
                         if constexpr (no_dequant_w) {
                           RUN_NO_DEQUANT_GEMM_TPP(
-                              no_dequant_gemm_no_prefetch_tpp, true, 0, 1);
+                              no_dequant_gemm_no_prefetch_tpp, true, kc, 1);
                         } else {
                           RUN_DEQUANT_GEMM_TPP(
-                              dequant_gemm_no_prefetch_tpp, true, 0, 1);
+                              dequant_gemm_no_prefetch_tpp, true, kc, 1);
                         }
                         if (fusion_type > 0) {
                           post_ops_fn(m, nc);
@@ -2842,21 +3076,24 @@ void qlinear_woq_affine_impl(
                       if (kc < Kc - 1) {
                         if constexpr (no_dequant_w) {
                           RUN_NO_DEQUANT_GEMM_TPP(
-                              no_dequant_gemm_rem_tpp, false, 0, 1);
+                              no_dequant_gemm_rem_tpp, false, kc, 1);
                           no_dequant_gemm_tpp.config();
                         } else {
                           RUN_DEQUANT_GEMM_TPP(
-                              dequant_gemm_rem_tpp, false, 0, 1);
+                              dequant_gemm_rem_tpp, false, kc, 1);
                           dequant_gemm_tpp.config();
                         }
                       } else {
                         if constexpr (no_dequant_w) {
                           RUN_NO_DEQUANT_GEMM_TPP(
-                              no_dequant_gemm_no_prefetch_rem_tpp, false, 0, 1);
+                              no_dequant_gemm_no_prefetch_rem_tpp,
+                              false,
+                              kc,
+                              1);
                           no_dequant_gemm_no_prefetch_tpp.config();
                         } else {
                           RUN_DEQUANT_GEMM_TPP(
-                              dequant_gemm_no_prefetch_rem_tpp, false, 0, 1);
+                              dequant_gemm_no_prefetch_rem_tpp, false, kc, 1);
                           dequant_gemm_no_prefetch_tpp.config();
                         }
                         if (fusion_type > 0) {
@@ -2948,7 +3185,8 @@ void qlinear_woq_affine_impl(
                       float* scale_a = nullptr;
                       int32_t* zp_a = nullptr;
                       int32_t k_groups = -1;
-                      int32_t quant_offset = kc / quant_block_multiple;
+                      int32_t quant_offset =
+                          g_idx_ptr ? 0 : kc / quant_block_multiple;
                       if constexpr (std::is_same<TComp, uint8_t>()) {
                         if constexpr (
                             quant_a_mode == QUANT_A_PER_TENSOR ||
@@ -3151,7 +3389,8 @@ static at::Tensor woq_gemm_ref_impl(
     int64_t fusion_type,
     const TensorList& others_list,
     int64_t quant_w_mode = 0,
-    int64_t quant_block_k = 0) {
+    int64_t quant_block_k = 0,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt) {
   constexpr size_t fp32_idx = 0, fp16_idx = 1, bf16_idx = 2, int8_idx = 3;
   auto biases = bias_list.empty()
       ? TensorList({at::Tensor(), at::Tensor(), at::Tensor()})
@@ -3165,19 +3404,40 @@ static at::Tensor woq_gemm_ref_impl(
   auto M = x.numel() / K;
   auto N = qw.size(0);
   at::Tensor scale, zp;
-  scale = scales_list[fp32_idx].unsqueeze(-1);
-  if (is_asymmetric_quant_w(quant_w_mode)) {
-    zp = zp_list[fp32_idx].unsqueeze(-1);
+  if (g_idx.has_value()) {
+    TORCH_CHECK(
+        g_idx.value().numel() == K,
+        "WOQ: g_idx must have the same number of elements as K, got ",
+        g_idx.value().numel(),
+        " elements, expected ",
+        K,
+        " elements");
+    TORCH_CHECK(scales_list[fp32_idx].dim() == 2);
+    using namespace at::indexing;
+    scale = at::empty({N, K}, scales_list[fp32_idx].options());
+    for (int k = 0; k < K; ++k) {
+      auto g = g_idx.value()[k].item<int32_t>();
+      scale.index_put_({Slice(), k}, scales_list[fp32_idx].index({Slice(), g}));
+    }
+    if (is_asymmetric_quant_w(quant_w_mode)) {
+      zp = at::empty({N, K}, zp_list[fp32_idx].options());
+      for (int k = 0; k < K; ++k) {
+        auto g = g_idx.value()[k].item<int32_t>();
+        zp.index_put_({Slice(), k}, zp_list[fp32_idx].index({Slice(), g}));
+      }
+    }
+  } else {
+    scale = scales_list[fp32_idx].unsqueeze(-1);
+    if (is_asymmetric_quant_w(quant_w_mode)) {
+      zp = zp_list[fp32_idx].unsqueeze(-1);
+    }
   }
   auto w = torch_ipex::cpu::dequantize_woq_weight(
                qw, {N, K}, scale, zp, qw_type, quant_block_k)
                .to(compute_dtype);
   auto x_reshape = x.reshape({M, K});
   auto x_fp = x_reshape.to(compute_dtype);
-  // PyTorch does not support computing in half yet
-  auto y = compute_dtype == at::kHalf
-      ? at::linear(x_fp.to(c10::kFloat), w.to(c10::kFloat))
-      : at::linear(x_fp, w);
+  auto y = at::linear(x_fp, w);
   if (biases[0].defined()) {
     auto b_index = compute_dtype == at::kFloat ? fp32_idx
         : compute_dtype == at::kHalf           ? fp16_idx

@@ -157,7 +157,8 @@ at::Tensor woq_linear_kernel(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation = c10::nullopt);
+    const c10::optional<at::Tensor>& compensation = c10::nullopt,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt);
 
 at::Tensor woq_linear_unary_kernel(
     const at::Tensor& self,
@@ -172,7 +173,8 @@ at::Tensor woq_linear_unary_kernel(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation = c10::nullopt);
+    const c10::optional<at::Tensor>& compensation = c10::nullopt,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt);
 
 at::Tensor woq_linear_binary_kernel(
     const at::Tensor& self,
@@ -186,7 +188,8 @@ at::Tensor woq_linear_binary_kernel(
     const c10::string_view& post_op,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation = c10::nullopt);
+    const c10::optional<at::Tensor>& compensation = c10::nullopt,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt);
 
 namespace {
 void woq_gemm_kernel_impl(
@@ -232,6 +235,7 @@ using woq_tpp_gemm_kernel_fn = at::Tensor (*)(
     int64_t,
     int64_t,
     int64_t,
+    const c10::optional<at::Tensor>&,
     const c10::optional<at::Tensor>&);
 
 using woq_gemm_kernel_fn = at::Tensor (*)(
@@ -244,7 +248,8 @@ using woq_gemm_kernel_fn = at::Tensor (*)(
     int64_t,
     const std::vector<at::Tensor>&,
     int64_t,
-    int64_t);
+    int64_t,
+    const c10::optional<at::Tensor>&);
 
 using woq_int8_gemm_kernel_fn = at::Tensor (*)(
     const at::Tensor&,

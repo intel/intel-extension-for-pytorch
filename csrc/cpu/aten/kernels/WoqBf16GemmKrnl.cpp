@@ -51,7 +51,8 @@ at::Tensor woq_gemm_bf16(
     int64_t fusion_type,
     const TensorList& others_list,
     int64_t quant_w_mode = 0,
-    int64_t quant_block_k = 0) {
+    int64_t quant_block_k = 0,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt) {
   const int64_t k_splits = 0;
   quant_block_k = std::max(0L, quant_block_k);
   // int8_idx is only valid with zp_list when lowp_mode == LOWP_MODE_INT8
@@ -111,7 +112,11 @@ at::Tensor woq_gemm_bf16(
                   fusion_type,
                   others_list,
                   quant_block_k,
-                  zp_list[bf16_idx]);
+                  zp_list[bf16_idx],
+                  nullptr, // scales_a_ptr
+                  nullptr, // zps_a_ptr
+                  c10::nullopt, // compensation
+                  g_idx);
             },
             [](auto tuple) { failing_fallback(); });
     return y;
@@ -127,7 +132,8 @@ at::Tensor woq_gemm_bf16(
         fusion_type,
         others_list,
         quant_w_mode,
-        quant_block_k);
+        quant_block_k,
+        g_idx);
   }
 }
 
@@ -143,7 +149,8 @@ at::Tensor woq_gemm_bf16(
     int64_t fusion_type,
     const TensorList& others_list,
     int64_t quant_w_mode = 0,
-    int64_t quant_block_k = 0) {
+    int64_t quant_block_k = 0,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt) {
   return woq_gemm_ref_impl(
       x,
       qw,
@@ -155,7 +162,8 @@ at::Tensor woq_gemm_bf16(
       fusion_type,
       others_list,
       quant_w_mode,
-      quant_block_k);
+      quant_block_k,
+      g_idx);
 }
 
 #endif // defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)

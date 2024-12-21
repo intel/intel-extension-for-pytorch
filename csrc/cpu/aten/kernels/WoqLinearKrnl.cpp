@@ -66,7 +66,8 @@ at::Tensor qlinear_woq_affine(
     int64_t quant_a_mode = -1,
     int64_t quant_w_mode = 0,
     int64_t quant_block_k = 0,
-    const c10::optional<at::Tensor>& compensation = c10::nullopt) {
+    const c10::optional<at::Tensor>& compensation = c10::nullopt,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt) {
   auto K = x.size(-1);
   auto M = x.numel() / K;
   auto act_dtype = x.scalar_type();
@@ -85,7 +86,8 @@ at::Tensor qlinear_woq_affine(
         fusion_type,
         others_list,
         quant_w_mode,
-        quant_block_k);
+        quant_block_k,
+        g_idx);
   } else if (
       (lowp_mode == LOWP_MODE_NONE && act_dtype == at::kBFloat16) ||
       lowp_mode == LOWP_MODE_BF16 && M >= SMALL_BATCH_THRESHOLD) {
@@ -100,7 +102,8 @@ at::Tensor qlinear_woq_affine(
         fusion_type,
         others_list,
         quant_w_mode,
-        quant_block_k);
+        quant_block_k,
+        g_idx);
   } else if (lowp_mode == LOWP_MODE_INT8) {
 #define CALL_INT8_KERNEL(kernel) \
   kernel(                        \
@@ -153,7 +156,8 @@ at::Tensor qlinear_woq_affine(
       fusion_type,
       others_list,
       quant_w_mode,
-      quant_block_k);
+      quant_block_k,
+      g_idx);
 }
 
 } // namespace

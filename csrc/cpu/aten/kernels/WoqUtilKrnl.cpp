@@ -286,7 +286,8 @@ at::Tensor dequantize_int4_weight_to_int8_packed(
                         block_n,
                         N_GROUP_SIZE,
                         /*qw_type*/ WOQ_DTYPE_INT4,
-                        sym_quant_w>::
+                        sym_quant_w,
+                        /*use_g_idx*/ false>::
                         template call<quant_a_mode>(
                             pw[nc][kc],
                             Kb,

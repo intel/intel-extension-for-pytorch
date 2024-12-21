@@ -1721,8 +1721,15 @@ class WeightOnlyQuantizationTester(TestCase):
 
         shape_list = [[1, 32, 32], [16, 64, 64], [32, 128, 128]]
         group_size_list = [4, 16]
-        cases = itertools.product(shape_list, group_size_list)
-        for shape, group_size in cases:
+        lowp_mode_list = [
+            WoqLowpMode.NONE,
+            WoqLowpMode.FP16,
+            WoqLowpMode.BF16,
+            WoqLowpMode.INT8,
+        ]
+        compute_dtype_list = [torch.float, torch.half, torch.bfloat16, torch.float]
+        cases = itertools.product(shape_list, group_size_list, lowp_mode_list)
+        for shape, group_size, lowp_mode in cases:
             bs, ic, oc = shape
             n_groups = ic // group_size
             int4_weight = torch.randint(0, 15, (oc, ic), dtype=torch.uint8)
@@ -1731,7 +1738,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 .bitwise_left_shift(4)
                 .bitwise_or_(int4_weight[:, ::2])
             )
-            scales = torch.randn((oc, n_groups), dtype=torch.half)
+            scales = torch.rand((oc, n_groups), dtype=torch.half) * 0.1
             zeros = torch.randint(6, 9, (oc, n_groups), dtype=torch.uint8)
             packed_zeros = torch.zeros(
                 (oc, (n_groups * 4 + 32 - 1) // 32), dtype=torch.int32
@@ -1742,14 +1749,16 @@ class WeightOnlyQuantizationTester(TestCase):
                 )
             g_idx = torch.arange(0, n_groups).to(torch.int64).repeat(group_size)
             x = torch.randn((bs, ic), dtype=torch.float)
+            compute_dtype = compute_dtype_list[int(lowp_mode)]
             for has_bias in [True, False]:
                 # woq path
                 m = Mod(ic=ic, oc=oc, has_bias=has_bias)
                 b = m.linear.bias.detach() if has_bias else None
+                b = b.to(compute_dtype).float() if has_bias else None
                 qconfig_mapping = (
                     ipex.quantization.get_weight_only_quant_qconfig_mapping(
                         weight_dtype=WoqWeightDtype.INT4,
-                        lowp_mode=ipex.quantization.WoqLowpMode.INT8,
+                        lowp_mode=lowp_mode,
                         act_quant_mode=ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
                         group_size=group_size,
                     )
@@ -1768,32 +1777,46 @@ class WeightOnlyQuantizationTester(TestCase):
                 y = woq_m(x)
 
                 # ref path
-                x_shuffled = torch.empty_like(x)
-                for g in range(n_groups):
-                    indices = (g_idx == g).nonzero().flatten()
-                    for i in range(indices.numel()):
-                        x_shuffled[:, g * group_size + i] = x[:, indices[i]]
-                fqx_shuffled = self._fakequant_by_group(
-                    x_shuffled, 1, group_size
-                ).float()
-                fqx = torch.empty_like(fqx_shuffled)
-                for g in range(n_groups):
-                    indices = (g_idx == g).nonzero().flatten()
-                    for i in range(indices.numel()):
-                        fqx[:, indices[i]] = fqx_shuffled[:, g * group_size + i]
-                scales_expanded = scales.repeat(1, group_size)
-                zeros_expanded = zeros.repeat(1, group_size)
+                if lowp_mode == WoqLowpMode.INT8:
+                    # shuffle x so that each group is contiguous for fake quantization
+                    # then shuffle back after fake quantization
+                    x_shuffled = torch.empty_like(x)
+                    for g in range(n_groups):
+                        indices = (g_idx == g).nonzero().flatten()
+                        for i in range(indices.numel()):
+                            x_shuffled[:, g * group_size + i] = x[:, indices[i]]
+                    fqx_shuffled = self._fakequant_by_group(
+                        x_shuffled, 1, group_size
+                    ).float()
+                    fqx = torch.empty_like(fqx_shuffled)
+                    for g in range(n_groups):
+                        indices = (g_idx == g).nonzero().flatten()
+                        for i in range(indices.numel()):
+                            fqx[:, indices[i]] = fqx_shuffled[:, g * group_size + i]
+                else:
+                    fqx = x
+                fqx = fqx.to(compute_dtype).float()
+                scales_expanded = scales.repeat(1, group_size).to(compute_dtype).float()
+                zeros_expanded = zeros.repeat(1, group_size).to(compute_dtype).float()
                 dqw = (int4_weight.to(torch.float) - zeros_expanded) * scales_expanded
                 y_ref = torch.nn.functional.linear(fqx, dqw, bias=b)
                 y_ref_2 = torch.nn.functional.linear(x, dqw, bias=b)
 
                 # check results
+                atol = 1e-4
+                rtol = 1e-5
+                if lowp_mode == WoqLowpMode.FP16:
+                    atol = 5e-2
+                    rtol = 1e-3
+                elif lowp_mode == WoqLowpMode.BF16:
+                    atol = 1e-1
+                    rtol = 1e-3
                 try:
-                    torch.testing.assert_close(y, y_ref, atol=1e-4, rtol=1e-5)
+                    torch.testing.assert_close(y, y_ref, atol=atol, rtol=rtol)
                 except Exception:
                     # In IPEX CI, UT will run with different ISA
                     # This check is for the ref kernel, where x is not quantized
-                    torch.testing.assert_close(y, y_ref_2, atol=1e-4, rtol=1e-5)
+                    torch.testing.assert_close(y, y_ref_2, atol=atol, rtol=rtol)
 
     def test_unpack_with_g_idx(self):
         class Mod(nn.Module):
@@ -1806,8 +1829,9 @@ class WeightOnlyQuantizationTester(TestCase):
 
         shape_list = [[64, 64], [256, 256]]
         group_size_list = [4, 16]
-        cases = itertools.product(shape_list, group_size_list)
-        for shape, group_size in cases:
+        lowp_mode_list = [WoqLowpMode.BF16, WoqLowpMode.INT8]
+        cases = itertools.product(shape_list, group_size_list, lowp_mode_list)
+        for shape, group_size, lowp_mode in cases:
             ic, oc = shape
             n_groups = ic // group_size
             int4_weight = torch.randint(0, 15, (oc, ic), dtype=torch.uint8)
@@ -1832,7 +1856,7 @@ class WeightOnlyQuantizationTester(TestCase):
                 qconfig_mapping = (
                     ipex.quantization.get_weight_only_quant_qconfig_mapping(
                         weight_dtype=WoqWeightDtype.INT4,
-                        lowp_mode=ipex.quantization.WoqLowpMode.INT8,
+                        lowp_mode=lowp_mode,
                         act_quant_mode=ipex.quantization.WoqActQuantMode.PER_IC_BLOCK,
                         group_size=group_size,
                     )
@@ -1879,6 +1903,122 @@ class WeightOnlyQuantizationTester(TestCase):
                 dqw_2 = (qw_uint8_2.to(torch.float) - zeros_expanded) * scales_expanded
                 # Dequantized weights should be close
                 torch.testing.assert_close(dqw, dqw_2)
+
+    def test_g_idx_tp(self):
+        """
+        Test g_idx with autoTP and weight is split by K. For lowp_mode != INT8.
+        Since it's complicated to write a test case for deepspeed,
+        here we do the sharding manually to simulate the behavior.
+        """
+
+        class Mod(nn.Module):
+            def __init__(self, ic, oc):
+                super(Mod, self).__init__()
+                # set bias to false and we add it ourselves
+                self.linear = torch.nn.Linear(ic, oc, bias=False)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        shape_list = [[1, 32, 32], [32, 128, 128], [128, 128, 128], [1024, 128, 128]]
+        group_size_list = [4, 16]
+        lowp_mode_list = [WoqLowpMode.NONE, WoqLowpMode.FP16, WoqLowpMode.BF16]
+        has_bias_list = [False, True]
+        cases = itertools.product(
+            shape_list, group_size_list, lowp_mode_list, has_bias_list
+        )
+        for shape, group_size, lowp_mode, has_bias in cases:
+            bs, ic, oc = shape
+            n_groups = ic // group_size
+            dtype = torch.float
+            if lowp_mode == WoqLowpMode.BF16:
+                dtype = torch.bfloat16
+            elif lowp_mode == WoqLowpMode.FP16:
+                dtype = torch.half
+            int4_weight = torch.randint(0, 15, (oc, ic), dtype=torch.uint8)
+            packed_weight = (
+                int4_weight[:, 1::2]
+                .bitwise_left_shift(4)
+                .bitwise_or_(int4_weight[:, ::2])
+            )
+            scales = torch.rand((oc, n_groups), dtype=torch.half) * 0.1
+            zeros = torch.randint(6, 9, (oc, n_groups), dtype=torch.uint8)
+            packed_zeros = torch.zeros(
+                (oc, (n_groups * 4 + 32 - 1) // 32), dtype=torch.int32
+            )
+            for i in range(n_groups):
+                packed_zeros[:, i // 8] = packed_zeros[:, i // 8].bitwise_or_(
+                    zeros[:, i].int().bitwise_left_shift(4 * (i % 8))
+                )
+            g_idx = torch.arange(0, n_groups).to(torch.int).repeat(group_size)
+            x = torch.randn((bs, ic), dtype=torch.float)
+
+            # woq path
+            b = torch.randn(oc).to(dtype) if has_bias else None
+            qconfig_mapping = ipex.quantization.get_weight_only_quant_qconfig_mapping(
+                weight_dtype=WoqWeightDtype.INT4,
+                lowp_mode=lowp_mode,
+                group_size=group_size,
+            )
+            m = Mod(ic=ic // 2, oc=oc)
+            woq_m_0 = copy.deepcopy(m)
+            woq_m_0.linear.qconfig = qconfig_mapping.global_qconfig
+            packed_weight_0 = packed_weight[
+                :, : packed_weight.shape[1] // 2
+            ].contiguous()
+            g_idx_0 = g_idx[: g_idx.shape[0] // 2]
+            woq_m_0.linear = (
+                ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
+                    woq_m_0.linear,
+                    packed_weight_0,
+                    scales,
+                    packed_zeros,
+                    None,  # bias
+                    group_size=group_size,
+                    g_idx=g_idx_0,
+                )
+            )
+            woq_m_1 = copy.deepcopy(m)
+            woq_m_1.linear.qconfig = qconfig_mapping.global_qconfig
+            packed_weight_1 = packed_weight[
+                :, packed_weight.shape[1] // 2 :
+            ].contiguous()
+            g_idx_1 = g_idx[g_idx.shape[0] // 2 :]
+            woq_m_1.linear = (
+                ipex.nn.modules.WeightOnlyQuantizedLinear.from_float_and_int4_weight(
+                    woq_m_1.linear,
+                    packed_weight_1,
+                    scales,
+                    packed_zeros,
+                    None,  # bias
+                    group_size=group_size,
+                    g_idx=g_idx_1,
+                )
+            )
+            x_0 = x[:, : x.shape[1] // 2].contiguous()
+            y_0 = woq_m_0(x_0.to(dtype))
+            x_1 = x[:, x.shape[1] // 2 :].contiguous()
+            y_1 = woq_m_1(x_1.to(dtype))
+            y = y_0 + y_1 + b if has_bias else y_0 + y_1
+
+            # ref path
+            scales_expanded = scales.repeat(1, group_size)
+            zeros_expanded = zeros.repeat(1, group_size)
+            dqw = (int4_weight.float() - zeros_expanded) * scales_expanded
+            dqw = dqw.to(dtype)
+            x = x.to(dtype)
+            y_ref = torch.nn.functional.linear(x, dqw, bias=b).to(dtype)
+
+            # check results
+            atol = 1e-4
+            rtol = 1e-5
+            if lowp_mode == WoqLowpMode.BF16:
+                atol = 1e-1
+                rtol = 1e-3
+            elif lowp_mode == WoqLowpMode.FP16:
+                atol = 1.5e-2
+                rtol = 1e-3
+            torch.testing.assert_close(y, y_ref, atol=atol, rtol=rtol)
 
     def test_weight_only_quantization_weight_for_first_token(self):
         class M(nn.Module):

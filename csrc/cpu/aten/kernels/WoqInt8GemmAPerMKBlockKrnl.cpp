@@ -133,7 +133,8 @@ at::Tensor woq_gemm_int8(
         fusion_type,
         others_list,
         quant_w_mode,
-        quant_block_k);
+        quant_block_k,
+        c10::nullopt);
   }
 }
 
@@ -163,7 +164,8 @@ at::Tensor woq_gemm_int8(
       fusion_type,
       others_list,
       quant_w_mode,
-      quant_block_k);
+      quant_block_k,
+      c10::nullopt);
 }
 
 #endif // defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)

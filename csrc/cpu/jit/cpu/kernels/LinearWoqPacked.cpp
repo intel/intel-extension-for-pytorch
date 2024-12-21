@@ -293,8 +293,13 @@ ContextLinearWoq create(
   bool is_4bit =
       (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4);
   // GPTQ with act-order
-  // Shuffle weight along ic to make channels contiguous in group
-  if (is_4bit && group_size > 0 && g_idx.has_value()) {
+  bool handle_g_idx_in_kernel = lowp_mode != LOWP_MODE_INT8 && group_size > 0 &&
+      group_size * scales.size(1) != K;
+  if (is_4bit && group_size > 0 && g_idx.has_value() &&
+      !handle_g_idx_in_kernel) {
+    TORCH_CHECK(
+        K == g_idx.value().numel(),
+        "g_idx size and weight shape mismatch for lowp_mode INT8");
     // Shuffle weight along ic to make channels contiguous in group
     auto shuffled_weight = woq_shuffle_tensor_by_group_idx</* is_4bit */ true>(
         weight, weight_shape, g_idx.value(), group_size);
@@ -361,7 +366,8 @@ ContextLinearWoq create(
       group_size,
       lowp_mode,
       act_quant_mode,
-      cache_weight_for_large_batch);
+      cache_weight_for_large_batch,
+      handle_g_idx_in_kernel);
   if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == LOWP_MODE_INT8) {
     auto compensation = woq_linear_compute_compensation(
         weight, weight_dtype, group_size, lowp_mode);
@@ -377,7 +383,7 @@ static at::Tensor _shuffle_input_channels_if_needed(
   // GPTQ with act-order
   // Shuffle input channels to align with weight
   if (context.is_4bit_ && context.group_size_ > 0 &&
-      context.g_idx_.has_value()) {
+      context.g_idx_.has_value() && !context.handle_g_idx_in_kernel_) {
     auto& g_idx = context.g_idx_.value();
     auto K = input.size(-1);
     std::vector<int64_t> input_shape = {input.numel() / K, K};
@@ -522,7 +528,8 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
       context.group_size_,
       context.lowp_mode_,
       context.act_quant_mode_,
-      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt,
+      context.handle_g_idx_in_kernel_ ? context.g_idx_ : c10::nullopt);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
     return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
@@ -612,7 +619,8 @@ at::Tensor run_unary(
       context.group_size_,
       context.lowp_mode_,
       context.act_quant_mode_,
-      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt,
+      context.handle_g_idx_in_kernel_ ? context.g_idx_ : c10::nullopt);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
     return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
@@ -697,7 +705,8 @@ at::Tensor run_binary(
       post_op,
       others,
       context.act_quant_mode_,
-      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt,
+      context.handle_g_idx_in_kernel_ ? context.g_idx_ : c10::nullopt);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
     return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
@@ -719,7 +728,8 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
   // With g_idx, weight's input channels are shuffled along ic so that
   // those in the same group are contiguous.
   // Here we need to shuffle them to the original order.
-  if (context.group_size_ > 0 && context.g_idx_.has_value()) {
+  if (context.group_size_ > 0 && context.g_idx_.has_value() &&
+      !context.handle_g_idx_in_kernel_) {
     auto group_size = context.group_size_;
     auto& g_idx = context.g_idx_.value();
     unpacked_weight = woq_shuffle_weight_back_by_group_idx(

@@ -51,7 +51,8 @@ at::Tensor woq_gemm_fp32(
     int64_t fusion_type,
     const TensorList& others_list,
     int64_t quant_w_mode = 0,
-    int64_t quant_block_k = 0) {
+    int64_t quant_block_k = 0,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt) {
   TORCH_CHECK(x.scalar_type() == at::kFloat, "Input must be in float format");
   const int64_t k_splits = 0;
   quant_block_k = std::max(0L, quant_block_k);
@@ -99,7 +100,11 @@ at::Tensor woq_gemm_fp32(
               fusion_type,
               others_list,
               quant_block_k,
-              zp_list[fp32_idx]);
+              zp_list[fp32_idx],
+              nullptr, // scales_a_ptr
+              nullptr, // zps_a_ptr
+              c10::nullopt, // compensation
+              g_idx);
         },
         [](auto quant_w_mode_) { failing_fallback(); });
     return y;
@@ -115,7 +120,8 @@ at::Tensor woq_gemm_fp32(
         fusion_type,
         others_list,
         quant_w_mode,
-        quant_block_k);
+        quant_block_k,
+        g_idx);
   }
 }
 
@@ -131,7 +137,8 @@ at::Tensor woq_gemm_fp32(
     int64_t fusion_type,
     const TensorList& others_list,
     int64_t quant_w_mode = 0,
-    int64_t quant_block_k = 0) {
+    int64_t quant_block_k = 0,
+    const c10::optional<at::Tensor>& g_idx = c10::nullopt) {
   return woq_gemm_ref_impl(
       x,
       qw,
@@ -143,7 +150,8 @@ at::Tensor woq_gemm_fp32(
       fusion_type,
       others_list,
       quant_w_mode,
-      quant_block_k);
+      quant_block_k,
+      g_idx);
 }
 
 #endif // defined(CPU_CAPABILITY_AVX512_FP16) && defined(COMPILER_PREREQ_MET)
