@@ -1,14 +1,14 @@
 # Running benchmarks for Intel Extension for PyTorch Custom OPs
-Evaluate performance for custom operator with [launcher](../../../../tutorials/intro_launch.md).
+Evaluate performance for custom operator with [launcher](../../../../docs/tutorials/performance_tuning/launch_script.md).
 ## Prepare envrioment
-Follow [performance_tuning_guide](../../../../tutorials/Performance_Tuning.md) to install Memory_Allocator(you can choose Tcmalloc or Jemalloc).
+Follow [performance_tuning_guide](../../../../docs/tutorials/performance_tuning/tuning_guide.md) to install Memory_Allocator(you can choose Tcmalloc or Jemalloc).
 Install intel-openmp:
 
 ```
 pip install intel-openmp=2024.1.2
 ```
 
-## Evaluate [Interaction](../../../../intel_extension_for_pytorch/nn/functional/interaction.py)
+## Evaluate [Interaction](../../../../intel_extension_for_pytorch/cpu/nn/interaction.py)
 
 1.Inference: 1 instance per core in real world scenario
 
@@ -34,7 +34,7 @@ python -m intel_extension_for_pytorch.cpu.launch --node-id 0 optimizer.py --opti
 python -m intel_extension_for_pytorch.cpu.launch --node-id 0 optimizer.py --optimizer adam # for adam
 ```
 
-## Evaluate IPEX [MergedEmbeddingBag](../../../../intel_extension_for_pytorch/nn/module/merged_embeddingbag.py)
+## Evaluate IPEX [MergedEmbeddingBag](../../../../intel_extension_for_pytorch/nn/modules/merged_embeddingbag.py)
 ```
 export CORES=`lscpu | grep Core | awk '{print $4}'`
 export BATCHSIZE=$((128*CORES))
