@@ -17,9 +17,14 @@ class add_layernorm(torch.nn.Module):
 
 class AddLayerNormTester(TestCase):
     def test_add_layernorm(self):
+        dtypes = []
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
+        if torch.ops.mkldnn._is_mkldnn_fp16_supported():
+            dtypes.append(torch.float16)
         for size in [10, 16, 35]:
             for dim in [2, 3, 4, 5]:
-                for dtype in [torch.bfloat16, torch.float16]:
+                for dtype in dtypes:
                     with torch.cpu.amp.autocast(dtype=dtype), torch.no_grad():
                         input_size = [
                             3,

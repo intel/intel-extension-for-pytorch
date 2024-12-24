@@ -1000,7 +1000,11 @@ class TestDictInput(JitLlgaTestCase):
                 x3 = self.linear3(x3)
                 return x1 + x2 + x3
 
-        int8_bf16_list = [True, False]
+        int8_bf16_list = [
+            False,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            int8_bf16_list.append(True)
         for qconfig, int8_bf16 in itertools.product(static_qconfig, int8_bf16_list):
             # Step1: Test model with tuple(x1, x2, x3) input.
             m = M().eval()

@@ -572,8 +572,13 @@ class TestLLMModules(TestCase):
             self.assertEqual(ref_out, ipex_out)
 
     def test_moe_fusion(self):
+        dtypes = [
+            torch.float,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
         with torch.no_grad():
-            for dtype in [torch.float, torch.bfloat16]:
+            for dtype in dtypes:
                 for prepack in [True, False]:
                     moe_module = MixtralMoE(4, 2, 1024, 4096).eval().to(dtype)
                     x = torch.rand(1, 1024).to(dtype)

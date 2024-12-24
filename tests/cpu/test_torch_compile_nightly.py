@@ -34,6 +34,12 @@ convtranspose_module = {
     3: torch.nn.ConvTranspose3d,
 }
 
+dtypes = [
+    torch.float32,
+]
+if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+    dtypes.append(torch.bfloat16)
+
 
 class ConvNd_Relu(torch.nn.Module):
     def __init__(
@@ -128,7 +134,7 @@ class TestCompileCases(TestCase):
         for dim in [1, 2, 3]:
             input_shapes = {1: (4,), 2: (4, 4), 3: (4, 4, 4)}
             options = itertools.product(
-                [torch.float32, torch.bfloat16],
+                dtypes,
                 ["torchscript", "inductor"],
                 [True, False],
                 [True, False],
@@ -193,7 +199,7 @@ class TestCompileCases(TestCase):
         for dim in [1, 2, 3]:
             input_shapes = {1: (4,), 2: (4, 4), 3: (4, 4, 4)}
             options = itertools.product(
-                [torch.float32, torch.bfloat16],
+                dtypes,
                 ["inductor"],
                 [True, False],
                 [True, False],
@@ -285,7 +291,7 @@ class TestCompileCases(TestCase):
             output_channel_per_group = 3
             kernel_size = 3
             options = itertools.product(
-                [torch.float32, torch.bfloat16],
+                dtypes,
                 ["torchscript", "inductor"],
                 [True, False],
                 [True, False],
@@ -347,7 +353,7 @@ class TestCompileCases(TestCase):
             output_channel_per_group = 3
             kernel_size = 3
             options = itertools.product(
-                [torch.float32, torch.bfloat16],
+                dtypes,
                 ["inductor"],
                 [True, False],
                 [True, False],
@@ -432,7 +438,7 @@ class TestCompileCases(TestCase):
         input_shapes = [(2, in_features), (2, 2, in_features), (2, 2, 2, in_features)]
         options = itertools.product(
             input_shapes,
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
             [True, False],
@@ -487,7 +493,7 @@ class TestCompileCases(TestCase):
         input_shapes = [(2, in_features), (2, 2, in_features), (2, 2, 2, in_features)]
         options = itertools.product(
             input_shapes,
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["inductor"],
             [True, False],
             [True, False],
@@ -561,7 +567,7 @@ class TestCompileCases(TestCase):
 
     def test_lstm_inference(self):
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
             [True, False],
@@ -595,7 +601,7 @@ class TestCompileCases(TestCase):
 
     def test_bmm_add_inference(self):
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
         )
@@ -639,7 +645,7 @@ class TestCompileCases(TestCase):
     def test_frozen_batch_norm_inference(self):
         torch._dynamo.allow_in_graph(FrozenBatchNorm2d)
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
         )
@@ -669,7 +675,7 @@ class TestCompileCases(TestCase):
     def test_frozen_batch_norm_train(self):
         torch._dynamo.allow_in_graph(FrozenBatchNorm2d)
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             [
                 "inductor",
             ],
@@ -724,9 +730,8 @@ class TestCompileCases(TestCase):
     def test_linear_eltwise(self):
         torch._dynamo.allow_in_graph(ipex.nn.modules.IPEXLinearEltwise)
         input = torch.rand(5, 10).requires_grad_()
-
         options = itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             [
                 "inductor",
             ],
@@ -769,7 +774,7 @@ class TestCompileCases(TestCase):
         input = torch.LongTensor([1, 2, 4, 5, 4, 3, 2, 9])
         offsets = torch.LongTensor([0, 1, 2, 3, 4, 5, 6, 7])
         for dtype, compiler_backend, dynamic in itertools.product(
-            [torch.float32, torch.bfloat16],
+            dtypes,
             ["torchscript", "inductor"],
             [True, False],
         ):
@@ -825,7 +830,7 @@ class TestCompileCases(TestCase):
         pool_h, pool_w = pool_size, pool_size
 
         for dtype, compiler_backend, dynamic in itertools.product(
-            [torch.float32, torch.bfloat16], ["torchscript", "inductor"], [True, False]
+            dtypes, ["torchscript", "inductor"], [True, False]
         ):
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
@@ -863,7 +868,7 @@ class TestCompileCases(TestCase):
         pool_h, pool_w = pool_size, pool_size
 
         for dtype, compiler_backend, dynamic in itertools.product(
-            [torch.float32, torch.bfloat16], ["inductor"], [True, False]
+            dtypes, ["inductor"], [True, False]
         ):
             torch._dynamo.reset()
             ipex._set_compiler_backend(compiler_backend)
@@ -893,11 +898,6 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
-        dtypes = [
-            torch.float,
-        ]
-        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
-            dtypes.append(torch.bfloat16)
         options = itertools.product(
             [Linear_with_bias, Linear_without_bias],
             dtypes,
@@ -935,11 +935,6 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_gelu_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
-        dtypes = [
-            torch.float,
-        ]
-        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
-            dtypes.append(torch.bfloat16)
         options = itertools.product(
             dtypes,
             ["torchscript", "inductor"],
@@ -980,11 +975,6 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_silu_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
-        dtypes = [
-            torch.float,
-        ]
-        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
-            dtypes.append(torch.bfloat16)
         options = itertools.product(
             dtypes,
             ["torchscript", "inductor"],
@@ -1025,11 +1015,6 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_relu_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
-        dtypes = [
-            torch.float,
-        ]
-        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
-            dtypes.append(torch.bfloat16)
         options = itertools.product(
             dtypes,
             ["torchscript", "inductor"],
@@ -1070,11 +1055,6 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_mul_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
-        dtypes = [
-            torch.float,
-        ]
-        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
-            dtypes.append(torch.bfloat16)
         options = itertools.product(
             dtypes,
             ["torchscript", "inductor"],
@@ -1115,11 +1095,6 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_add_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
-        dtypes = [
-            torch.float,
-        ]
-        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
-            dtypes.append(torch.bfloat16)
         options = itertools.product(
             dtypes,
             ["torchscript", "inductor"],
@@ -1160,11 +1135,6 @@ class TestCompileCases(TestCase):
     def test_tpp_linear_add2_torchcompile(self):
         x = torch.rand(2, 2, 4096)
 
-        dtypes = [
-            torch.float,
-        ]
-        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
-            dtypes.append(torch.bfloat16)
         options = itertools.product(
             dtypes,
             ["torchscript", "inductor"],
