@@ -12,6 +12,12 @@ namespace cpu {
 
 namespace {
 
+inline bool is_first_token_optimizable(at::Tensor key) {
+  return key.scalar_type() == at::kFloat ||
+      key.scalar_type() == at::kBFloat16 ||
+      (key.scalar_type() == at::kHalf && utils::isa_has_avx512_fp16_support());
+}
+
 template <typename T, typename KT, typename CT>
 inline void reduce_head(
     const T* q_ptr_start,
@@ -2303,10 +2309,7 @@ first_token_masked_mha(
   }
   auto attn_outputs = at::Tensor();
   auto attn_weights = at::Tensor();
-  if ((key.scalar_type() == at::kFloat || key.scalar_type() == at::kBFloat16 ||
-       (key.scalar_type() == at::kHalf &&
-        utils::isa_has_avx512_fp16_support())) &&
-      attention_mask.stride(-1) == 1) {
+  if (is_first_token_optimizable(key) && attention_mask.stride(-1) == 1) {
     query = query.transpose(1, 2);
     key = key.transpose(1, 2);
     value = value.transpose(1, 2);
@@ -2342,6 +2345,25 @@ first_token_masked_mha(
   return std::make_tuple(
       attn_outputs, attn_weights, key_cache, value_cache, beam_idx);
 }
+
+inline std::optional<at::Tensor> convert_boolean_attn_mask(
+    const std::optional<at::Tensor>& attn_mask,
+    caffe2::TypeMeta dtype) {
+  // Pass through
+  if (!attn_mask.has_value()) {
+    return c10::nullopt;
+  }
+  // Convert boolean mask to additive mask
+  if (attn_mask->dtype() == at::kBool) {
+    auto new_attn_mask = at::zeros_like(attn_mask.value(), dtype);
+    new_attn_mask.masked_fill_(
+        attn_mask->logical_not(), -std::numeric_limits<double>::infinity());
+    return new_attn_mask;
+  }
+  // Otherwise, attn_mask represents an additive attention tensor
+  return attn_mask;
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 masked_multihead_self_attention_kernel_impl(
     at::Tensor& query,
@@ -2373,7 +2395,11 @@ masked_multihead_self_attention_kernel_impl(
   query = query.contiguous();
   key = key.contiguous();
   value = value.contiguous();
-  auto attention_mask_v = attention_mask.value().contiguous();
+  std::optional<at::Tensor> attn_mask = attention_mask;
+  if (!is_first_token_optimizable(key)) {
+    attn_mask = convert_boolean_attn_mask(attention_mask, query.dtype());
+  }
+  auto attention_mask_v = attn_mask.value().contiguous();
   attention_mask_v = attention_mask_v.to(query.dtype());
   auto beam_batch = beam_idx.size(1); // need to prepare the fake beam_idx as
                                       // (max_position, bs) for the first token

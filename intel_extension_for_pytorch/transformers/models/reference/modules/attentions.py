@@ -895,7 +895,7 @@ def _GLM2Attention_forward(
                 mixed_x_layer, 3
             )
 
-    if attention_mask is None:
+    if attention_mask is None and past_len == 0:
         attention_mask = torch.ones(
             query_layer.size(0),
             1,
@@ -905,6 +905,8 @@ def _GLM2Attention_forward(
         )
         attention_mask.tril_()
         attention_mask = ~attention_mask
+    if attention_mask is not None:
+        attention_mask.masked_fill_(attention_mask, float("-inf"))
     (
         attn_output,
         attn_weights,
