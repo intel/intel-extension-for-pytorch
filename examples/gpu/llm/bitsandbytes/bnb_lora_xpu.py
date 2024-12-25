@@ -10,6 +10,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_name", default="facebook/opt-6.7b", required=False, type=str, help="model_name")
 parser.add_argument("--quant_type", default="int8", type=str, help="quant type", choices=["int8", "nf4", "fp4"])
 parser.add_argument("--device", default="cpu", type=str, help="device type", choices=["cpu", "xpu"])
+parser.add_argument("--rank", default=8, type=int, help="LoRA rank")
+parser.add_argument("--lora_alpha", default=8, type=int, help="LoRA alpha")
+parser.add_argument("--max_seq_length", default=1, type=int, help="Maximum sequence length. Sequences will be right padded (and possibly truncated).")
+parser.add_argument("--per_device_train_batch_size", default=1, type=int)
+parser.add_argument("--gradient_accumulation_steps", default=1, type=int)
 args = parser.parse_args()
 
 import intel_extension_for_pytorch
@@ -39,7 +44,7 @@ model_id = args.model_name
 model = AutoModelForCausalLM.from_pretrained(model_id, device_map=device_map,quantization_config=quantization_config)
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
-model = prepare_model_for_kbit_training(model)
+#model = prepare_model_for_kbit_training(model)
     
 tokenizer.pad_token = tokenizer.eos_token
 
@@ -58,22 +63,22 @@ def print_trainable_parameters(model):
     )
 
 config = LoraConfig(
-    r=16, lora_alpha=32, target_modules=["q_proj", "v_proj"], lora_dropout=0.05, bias="none", task_type="CAUSAL_LM"
+    r=args.rank, lora_alpha=args.lora_alpha, target_modules=["q_proj", "v_proj"], lora_dropout=0.05, bias="none", task_type="CAUSAL_LM"
 )
 
 model = get_peft_model(model, config)
 print_trainable_parameters(model)
 
 data = load_dataset("Abirate/english_quotes")
-data = data.map(lambda samples: tokenizer(samples["quote"], padding="max_length", max_length=64, truncation=True), batched=True)
+data = data.map(lambda samples: tokenizer(samples["quote"], padding="max_length", max_length=args.max_seq_length, truncation=True), batched=True)
 
 
 trainer = Trainer(
     model=model,
     train_dataset=data["train"],
     args=TrainingArguments(
-        per_device_train_batch_size=4,
-        gradient_accumulation_steps=4,
+        per_device_train_batch_size=args.per_device_train_batch_size,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
         warmup_steps=100,
         max_steps=200,
         learning_rate=2e-4,
