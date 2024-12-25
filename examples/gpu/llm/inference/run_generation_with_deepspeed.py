@@ -37,6 +37,7 @@ MODEL_CLASSES = {
     "llama": (AutoModelForCausalLM, AutoTokenizer),
     "t5": (T5ForConditionalGeneration, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "mistral": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -291,9 +292,9 @@ if args.ipex:
         model = ipex.optimize(model.eval().to("xpu"), dtype=infer_dtype)
     else:
         if "low_precision_checkpoint" in ipex.optimize_transformers.__code__.co_varnames:
-            model = ipex.optimize_transformers(model.eval(), dtype=infer_dtype, device="xpu", inplace=True)
+            model = ipex.llm.optimize(model.eval(), dtype=infer_dtype, device="xpu", inplace=True)
         else:
-            model = ipex.optimize_transformers(model.eval().to("xpu"), dtype=infer_dtype)
+            model = ipex.llm.optimize(model.eval().to("xpu"), dtype=infer_dtype)
     print_rank0("*** model after optimize_transformers", model)
 
 # bypass assertion for beam4

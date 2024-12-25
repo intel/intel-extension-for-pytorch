@@ -32,6 +32,7 @@ MODEL_CLASSES = {
     "chatglm3": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "glm-4": (AutoModelForCausalLM, AutoTokenizer),
+    "mistral": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -200,14 +201,14 @@ if args.ipex:
                 woq_config = {}
                 woq_config['groups'] = args.calib_group_size
                 woq_config_and_weight = (torch.load(woq_weight_path), woq_config)
-            model = ipex.optimize_transformers(model.eval(), dtype=amp_dtype, device=args.device, inplace=True, low_precision_checkpoint=woq_config_and_weight)
+            model = ipex.llm.optimize(model.eval(), dtype=amp_dtype, device=args.device, inplace=True, low_precision_checkpoint=woq_config_and_weight)
         else:
             woq_config = {}
             if args.woq:
                 woq_config['is_int4'] = args.calib_wbits == 4
                 woq_config['group_size'] = args.calib_group_size
                 woq_config['weight_path'] = woq_weight_path
-            model = ipex.optimize_transformers(model.eval(), dtype=amp_dtype, **woq_config)
+            model = ipex.llm.optimize(model.eval(), dtype=amp_dtype, **woq_config)
     get_memory_usage("Ipex", args)
 
 

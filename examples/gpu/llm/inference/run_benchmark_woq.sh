@@ -165,6 +165,20 @@ Run_benchmark_Phi3-small_int4() {
 }
 
 
+# Mistral-v0.2
+Run_benchmark_Mistral_int4() {
+    model=mistralai/Mistral-7B-Instruct-v0.2
+    sub_model_name=mistral
+    dir=int4_perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}
+    mkdir -p ${dir}
+    python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e
+    mv log_e2e ${dir}
+    PROFILE=1 python -u run_generation_woq.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16
+    mv profile*pt ${dir}
+    mv trace.json ${dir}
+}
+
+
 main() {
 
     Run_benchmark_qwen-7b_int4
@@ -178,6 +192,7 @@ main() {
     Run_benchmark_Phi3-small_int4
     Run_benchmark_chatglm3-6b-chat_int4
     Run_benchmark_glm4-9b-chat
+    Run_benchmark_Mistral_int4
 }
 
 main

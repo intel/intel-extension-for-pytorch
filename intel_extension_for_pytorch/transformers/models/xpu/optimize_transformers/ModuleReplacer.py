@@ -34,6 +34,7 @@ from intel_extension_for_pytorch.nn.utils._quantize_convert import (
 from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
 from .modules.llama import IPEXLLAMABlock
+from .modules.mistral import NewIPEXMistralBlock
 from .modules.opt import NewIPEXOPTBlock
 from .modules.falcon import NewIPEXFalconBlock
 from .modules.qwen import NewIPEXQWENBlock
@@ -58,6 +59,7 @@ def default_replaced_module_dict():
     default_replace_modules = {
         transformers.models.gptj.modeling_gptj.GPTJBlock: NewIPEXGPTJBlock,
         transformers.models.llama.modeling_llama.LlamaDecoderLayer: IPEXLLAMABlock,
+        transformers.models.mistral.modeling_mistral.MistralDecoderLayer: NewIPEXMistralBlock,
         transformers.models.opt.modeling_opt.OPTDecoderLayer: NewIPEXOPTBlock,
         transformers.models.bloom.modeling_bloom.BloomBlock: NewIPEXBloomBlock,
         # only support transformers version model, not in-library model

@@ -1578,6 +1578,9 @@ def model_convert_lowering(
         from .models.xpu.optimize_transformers.Converter import Converter
         from .models.xpu.optimize_transformers.modules.gptj import NewIPEXGPTJBlock
         from .models.xpu.optimize_transformers.modules.llama import IPEXLLAMABlock
+        from .models.xpu.optimize_transformers.modules.mistral import (
+            NewIPEXMistralBlock,
+        )
         from .models.xpu.optimize_transformers.modules.opt import NewIPEXOPTBlock
         from .models.xpu.optimize_transformers.modules.bloom import NewIPEXBloomBlock
         from .models.xpu.optimize_transformers.modules.falcon import NewIPEXFalconBlock
@@ -1590,6 +1593,8 @@ def model_convert_lowering(
                 replace_block = NewIPEXGPTJBlock
             elif re.search("LLAMA", _model.config.architecture[0], re.IGNORECASE):
                 replace_block = IPEXLLAMABlock
+            elif re.search("Mistral", _model.config.architecture[0], re.IGNORECASE):
+                replace_block = NewIPEXMistralBlock
             elif re.search("OPT", _model.config.architecture[0], re.IGNORECASE):
                 replace_block = NewIPEXOPTBlock
             elif re.search("BLOOM", _model.config.architecture[0], re.IGNORECASE):
@@ -1681,7 +1686,7 @@ def check_xpu_llm_support(model):
     # ipex.optimize_transformers supports GPT-J, Llama, OPT, Bloom, Falcon, QWen, Baichuan, ChatGLM
     if ipex._C._has_2d_block_array(0) and ipex._C._has_xmx(0):
         xpu_2d_load_and_xmx_supported_pattern = (
-            r"GPTJ|llama|OPT|Bloom|Falcon|QWen|Baichuan|ChatGLM|Phi3"
+            r"GPTJ|llama|OPT|Bloom|Falcon|QWen|Baichuan|ChatGLM|Phi3|Mistral"
         )
         xpu_supported_model = re.search(
             xpu_2d_load_and_xmx_supported_pattern,
