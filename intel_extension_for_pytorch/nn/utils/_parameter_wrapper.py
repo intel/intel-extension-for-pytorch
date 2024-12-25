@@ -46,6 +46,13 @@ def IPEX_WEIGHT_PREPACK_MODULE_CPU():
             deepspeed_modules_mapping.update(
                 {LmHeadLinearAllreduce: _IPEXLmHeadLinearAllreduce}
             )
+        if len(deepspeed_modules) > 3:
+            for module in deepspeed_modules[3:]:
+                if module not in deepspeed_modules_mapping:
+                    if issubclass(module, LinearAllreduce):
+                        deepspeed_modules_mapping[module] = _IPEXLinearAllreduce
+                    elif issubclass(module, LinearLayer):
+                        deepspeed_modules_mapping[module] = _IPEXLinear
         torch_modules.update(deepspeed_modules_mapping)
 
     return torch_modules
