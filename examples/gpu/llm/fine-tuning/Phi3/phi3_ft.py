@@ -48,18 +48,10 @@ class TrainingArguments(transformers.TrainingArguments):
         default=False,
         metadata={
             "help": "Test an example for inference."
-        })
-    lora_rank: bool = field(
-        default=8,
-        metadata={"help": "LoRA rank."},
-    )
-    lora_alpha: bool = field(
-        default=8,
-        metadata={"help": "LoRA alpha."},
-    )
+        })    
 
 # loading dataset
-dataset = load_dataset("financial_phrasebank", "sentences_allagree", trust_remote_code=True)
+dataset = load_dataset("financial_phrasebank", "sentences_allagree")
 dataset = dataset["train"].train_test_split(test_size=0.1)
 dataset["validation"] = dataset["test"]
 del dataset["test"]
@@ -154,7 +146,7 @@ def train():
     # PEFT LoRA setting
     if model_args.use_peft:
         lora_config = LoraConfig(
-            r=training_args.lora_rank, lora_alpha=training_args.lora_alpha, target_modules=["qkv_proj"], lora_dropout=0.05, bias="none", task_type="CAUSAL_LM"
+            r=16, lora_alpha=32, target_modules=["qkv_proj"], lora_dropout=0.05, bias="none", task_type="CAUSAL_LM"
         )
         model = get_peft_model(model, lora_config)
 
@@ -182,7 +174,6 @@ def train():
 
     train_dataset = processed_datasets["train"]
     eval_dataset = processed_datasets["validation"]
-    training_args.gradient_checkpoint= True
 
     trainer = Trainer(
         model=model,
