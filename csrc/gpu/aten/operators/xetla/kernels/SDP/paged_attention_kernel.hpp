@@ -1046,11 +1046,18 @@ class paged_attention_reduce {
       float init_value) {
     using ld_tile_desc_t = subgroup::tile_desc_t<partition_stride, 1, 1, 1>;
     using ld_tile_t = subgroup::tile_t<accum_t, ld_tile_desc_t>;
-    using ld_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
-        ld_tile_desc_t,
-        msg_type::block_1d,
-        arch_tag>;
+    using ld_payload_t = std::conditional_t<
+        has_2d_ld_st,
+        subgroup::mem_payload_t<
+            mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
+            ld_tile_desc_t,
+            msg_type::block_2d,
+            arch_tag>,
+        subgroup::mem_payload_t<
+            mem_desc_t<accum_t, mem_layout::row_major, mem_space::global>,
+            ld_tile_desc_t,
+            msg_type::block_1d,
+            arch_tag>>;
     static constexpr tdesc_update_dir update_dir = tdesc_update_dir::x_dir;
 
     int32_t start_x = ctx.sg_id * partition_stride;
@@ -1272,11 +1279,18 @@ class paged_attention_reduce {
     using st_tile_desc_t =
         subgroup::tile_desc_t<head_size_per_sg, 1, sg_tile_size_x, 1>;
     using global_st_tile_t = subgroup::tile_t<scalar_t, st_tile_desc_t>;
-    using global_st_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
-        st_tile_desc_t,
-        msg_type::block_1d,
-        arch_tag>;
+    using global_st_payload_t = std::conditional_t<
+        has_2d_ld_st,
+        subgroup::mem_payload_t<
+            mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+            st_tile_desc_t,
+            msg_type::block_2d,
+            arch_tag>,
+        subgroup::mem_payload_t<
+            mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>,
+            st_tile_desc_t,
+            msg_type::block_1d,
+            arch_tag>>;
 
     // store out data of each subgroup to slm
     int32_t start_y = ctx.sg_id;

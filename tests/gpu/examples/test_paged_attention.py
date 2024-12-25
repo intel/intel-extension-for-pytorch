@@ -5,6 +5,9 @@ import intel_extension_for_pytorch as ipex  # noqa
 import pytest
 from torch.testing._internal.common_utils import (
     TestCase,
+    instantiate_parametrized_tests,
+    parametrize,
+    run_tests,
 )
 
 FLOAT32_BYTES = torch.finfo(torch.float).bits // 8
@@ -145,10 +148,11 @@ class TestPagedAttention(TestCase):
             value_caches.append(value_cache)
         return key_caches, value_caches
 
-    def paged_attention(self, version, dtype_) -> None:
+    def paged_attention(
+        self, version, dtype_, seqlens, head_size, num_heads, block_size
+    ) -> None:
         num_seqs = 4
         num_heads = [16, 16]
-        head_size = 256
         use_alibi = False
         block_size = 32
         dtype = dtype_
@@ -168,7 +172,7 @@ class TestPagedAttention(TestCase):
             num_queries_per_kv,
         )
         alibi_slopes = None
-        seqlens = 128 if version == "v1" else 512
+
         context_lens = [seqlens + i for i in range(num_seqs)]
 
         max_context_len = max(context_lens)
@@ -339,14 +343,30 @@ class TestPagedAttention(TestCase):
         )
         print(f"attention {version} {dtype} accuracy test passed")
 
-    def test_fp16(self):
-        for version in ["v1", "v2"]:
-            self.paged_attention(version, torch.float16)
+    @parametrize("version, seqlens", [("v1", 128), ("v2", 512), ("v2", 877)])
+    @parametrize("head_size", [128, 256])
+    @parametrize("num_heads", [[16, 16], [32, 32]])
+    @parametrize("block_size", [32, 49])
+    def test_fp16(self, version, seqlens, head_size, num_heads, block_size):
+        self.paged_attention(
+            version, torch.float16, seqlens, head_size, num_heads, block_size
+        )
 
     @pytest.mark.skipif(
         not torch.xpu.has_xmx(),
         reason="Paged_attention: No bf16 support for current gpu arch.",
     )
-    def test_bf16(self):
-        for version in ["v1", "v2"]:
-            self.paged_attention(version, torch.bfloat16)
+    @parametrize("version, seqlens", [("v1", 128), ("v2", 512)])
+    @parametrize("head_size", [256])
+    @parametrize("num_heads", [[16, 16]])
+    @parametrize("block_size", [32])
+    def test_bf16(self, version, seqlens, head_size, num_heads, block_size):
+        self.paged_attention(
+            version, torch.bfloat16, seqlens, head_size, num_heads, block_size
+        )
+
+
+instantiate_parametrized_tests(TestPagedAttention)
+
+if __name__ == "__main__":
+    run_tests()
