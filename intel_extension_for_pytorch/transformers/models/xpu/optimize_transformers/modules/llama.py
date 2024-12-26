@@ -113,6 +113,7 @@ class IPEXLLAMABlock(IPEXTransformerBlock):
             max_positions=max(self.config.max_position_embeddings, MAX_SEQ_LEN),
             max_out_positions=MAX_OUT_SEQ_LEN,
             rotary_embedding_class=LlamaRotaryEmbedding,
+            rope_scaling=self.config.rope_scaling,
             rotary_dim=None,
             rotary_half=True,
             rotate_every_two=False,

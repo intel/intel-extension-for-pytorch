@@ -1,8 +1,6 @@
 import torch
 import math
 import torch.nn as nn
-import dataclasses
-from typing import Dict, Union, List
 from .._transformer_configuration import IPEXTransformerConfig
 from .CacheUtils import CacheFormat
 
@@ -454,7 +452,7 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
             self.rope_type = config.rope_scaling.get(
                 "rope_type", config.rope_scaling.get("type")
             )
-        if self.rope_type == "su":
+        if self.rope_type == "su" or self.rope_type == "longrope":
             self.short_factor = config.rope_scaling["short_factor"]
             self.long_factor = config.rope_scaling["long_factor"]
             self.max_seq_len = config.max_positions
@@ -471,18 +469,67 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
             LlamaRotaryEmbedding.sin_cached is None
             or LlamaRotaryEmbedding.cos_cached is None
         ):
+            inv_freq = 1.0 / (
+                self.base
+                ** (torch.arange(0, self.dim, 2).float().to(self.device) / self.dim)
+            )
+            if self.rope_type == "llama3":
+                inv_freq = self.compute_llama3_parameters(inv_freq, config)
+            self.register_buffer("inv_freq", inv_freq, persistent=False)
             self.create_sin_cos_cache(LlamaRotaryEmbedding.max_position_embedding)
 
+    def compute_llama3_parameters(self, inv_freq, config: IPEXTransformerConfig):
+        factor = config.rope_scaling["factor"]
+        low_freq_factor = config.rope_scaling["low_freq_factor"]
+        high_freq_factor = config.rope_scaling["high_freq_factor"]
+        old_context_len = config.rope_scaling["original_max_position_embeddings"]
+
+        low_freq_wavelen = old_context_len / low_freq_factor
+        high_freq_wavelen = old_context_len / high_freq_factor
+
+        wavelen = 2 * math.pi / inv_freq
+        # wavelen < high_freq_wavelen: do nothing
+        # wavelen > low_freq_wavelen: divide by factor
+        inv_freq_llama = torch.where(
+            wavelen > low_freq_wavelen, inv_freq / factor, inv_freq
+        )
+        # otherwise: interpolate between the two, using a smooth factor
+        smooth_factor = (old_context_len / wavelen - low_freq_factor) / (
+            high_freq_factor - low_freq_factor
+        )
+        smoothed_inv_freq = (
+            1 - smooth_factor
+        ) * inv_freq_llama / factor + smooth_factor * inv_freq_llama
+        is_medium_freq = ~(wavelen < high_freq_wavelen) * ~(wavelen > low_freq_wavelen)
+        inv_freq = torch.where(is_medium_freq, smoothed_inv_freq, inv_freq_llama)
+        return inv_freq
+
+    def _calc_mscale(self, scale: torch.Tensor) -> torch.Tensor:
+        if scale <= 1.0:
+            return 1.0
+        return math.sqrt(
+            1 + math.log(scale) / math.log(self.original_max_position_embeddings)
+        )
+
     def create_sin_cos_cache_long_scaled_rope(self, seq_len):
+        scale = self.max_seq_len / self.original_max_position_embeddings
+        scaling_factor = self._calc_mscale(scale)
         if seq_len > self.original_max_position_embeddings:
             ext_factors = torch.tensor(
                 self.long_factor, dtype=torch.float32, device=self.device
             )
+            if self.config.rope_scaling.get("long_mscale", None) is not None:
+                long_mscale = self.config.rope_scaling["long_mscale"]
+                scaling_factor = (
+                    long_mscale if long_mscale > 0 else self._calc_mscale(scale)
+                )
         else:
             ext_factors = torch.tensor(
                 self.short_factor, dtype=torch.float32, device=self.device
             )
-
+            if self.config.rope_scaling.get("short_mscale", None) is not None:
+                short_mscale = self.config.rope_scaling["short_mscale"]
+                scaling_factor = short_mscale if short_mscale > 0 else 1.0
         inv_freq_shape = (
             torch.arange(0, self.dim, 2, dtype=torch.int64, device=self.device).float()
             / self.dim
@@ -490,29 +537,15 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
         inv_freq = 1.0 / (ext_factors * self.base**inv_freq_shape)
         self.register_buffer("inv_freq", inv_freq, persistent=False)
 
-        device = self.inv_freq.device
-        t = torch.arange(seq_len, device=device, dtype=self.inv_freq.dtype)
+        t = torch.arange(seq_len, device=self.device, dtype=self.inv_freq.dtype)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         emb = torch.cat((freqs, freqs), dim=-1)
 
-        scale = self.max_seq_len / self.original_max_position_embeddings
-        if scale <= 1.0:
-            scaling_factor = 1.0
-        else:
-            scaling_factor = math.sqrt(
-                1 + math.log(scale) / math.log(self.original_max_position_embeddings)
-            )
         LlamaRotaryEmbedding.cos_cached = emb.cos().to(self.dtype) * scaling_factor
         LlamaRotaryEmbedding.sin_cached = emb.sin().to(self.dtype) * scaling_factor
 
     def create_sin_cos_cache(self, pos):
-        inv_freq = 1.0 / (
-            self.base
-            ** (torch.arange(0, self.dim, 2).float().to(self.device) / self.dim)
-        )
-        self.register_buffer("inv_freq", inv_freq, persistent=False)
-        device = self.inv_freq.device
-        t = torch.arange(pos, device=device, dtype=self.inv_freq.dtype)
+        t = torch.arange(pos, device=self.device, dtype=self.inv_freq.dtype)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = torch.cat((freqs, freqs), dim=-1)
@@ -559,7 +592,7 @@ class LlamaRotaryEmbedding(PositionalEmbedding):
     def update_cache_if_needed(self, kv_seq_len):
         if kv_seq_len >= LlamaRotaryEmbedding.max_position_embedding:
             new_cache_length = kv_seq_len + self.dynamic_cache_stride
-            if self.rope_type == "su":
+            if self.rope_type == "su" or self.rope_type == "longrope":
                 self.create_sin_cos_cache_long_scaled_rope(new_cache_length)
             else:
                 self.create_sin_cos_cache(new_cache_length)
@@ -719,168 +752,9 @@ class Phi3RotaryEmbedding(LlamaRotaryEmbedding):
         super().__init__(config, dtype)
 
 
-_is_dacite_available = False
-try:
-    import dacite
-
-    _is_dacite_available = True
-except ImportError:
-    pass
-
-
-@dataclasses.dataclass
-class LongRopeConfig(object):
-    short_factor: List[float]
-    long_factor: List[float]
-    original_max_position_embeddings: int
-    type: str = "longrope"
-    short_mscale: float = -1
-    long_mscale: float = -1
-
-    def __post_init__(self):
-        assert self.type in (
-            "longrope",
-            "su",
-        ), f"Invalid type {self.type} for LongRopeConfig. Expected longrope / su"
-
-    @classmethod
-    def from_dict(
-        cls, config_dict: Dict[str, Union[float, List[float], int]]
-    ) -> "LongRopeConfig":
-        if _is_dacite_available:
-            # Preferred since we can also type check the input
-            return dacite.from_dict(data_class=cls, data=config_dict)
-        kwargs = {}
-        for field in dataclasses.fields(cls):
-            if field.name in config_dict:
-                if field.init:
-                    kwargs[field.name] = config_dict[field.name]
-                else:
-                    raise ValueError(f"Field {field.name} is not initiable")
-            else:
-                if field.default is dataclasses.MISSING:
-                    raise ValueError(f"Field {field.name} is required")
-        extra_keys = set(config_dict.keys()) - set(kwargs.keys())
-        if len(extra_keys) > 0:
-            for key in extra_keys:
-                print(f"Unrecognized key {key} in config_dict")
-            raise ValueError("Unrecognized keys in config_dict")
-        return cls(**kwargs)
-
-
 class Phi3SmallRotaryEmbedding(LlamaRotaryEmbedding):
-    """
-    Phi3-small ROPE
-    Standard rope for 4k instruct version, which is the same as Llama used
-    Long rope where addtional scaling factors are defined for 128k instruct version
-    """
-
     def __init__(self, config: IPEXTransformerConfig, dtype):
         super().__init__(config, dtype)
-        self.position_scale = config.rope_position_scale
-        self.max_seq_len = config.max_positions
-        self.longrope_config = None
-        if config.rope_scaling is not None:
-            self.longrope_config = LongRopeConfig.from_dict(self.config.rope_scaling)
-
-        if self.is_longrope:
-            # clear normal cache and create new one for long rope
-            self.clear_cache()
-            self.register_buffer(
-                "range_vector",
-                torch.arange(
-                    LlamaRotaryEmbedding.max_position_embedding,
-                    device=self.device,
-                    dtype=torch.float32,
-                ),
-                persistent=False,
-            )
-            self.register_buffer(
-                "short_factors",
-                torch.tensor(self.longrope_config.short_factor, dtype=torch.float32),
-                persistent=False,
-            )
-            self.register_buffer(
-                "long_factors",
-                torch.tensor(self.longrope_config.long_factor, dtype=torch.float32),
-                persistent=False,
-            )
-            LlamaRotaryEmbedding.max_position_embedding = self.original_max_seq_len
-            self.create_longrope_cache(
-                seq_len=LlamaRotaryEmbedding.max_position_embedding,
-                use_long_factor=False,
-            )
-
-    def clear_cache(self):
-        LlamaRotaryEmbedding.sin_cached = None
-        LlamaRotaryEmbedding.cos_cached = None
-
-    @property
-    def is_longrope(self):
-        return self.longrope_config is not None
-
-    @property
-    def original_max_seq_len(self):
-        if self.longrope_config is not None:
-            return self.longrope_config.original_max_position_embeddings
-        print(
-            (
-                "``original_max_seq_len'' is being accessed, but longrope_config has not been set. "
-                "Please only do this if you are sure about the context."
-            )
-        )
-        return self.max_seq_len
-
-    def _calc_mscale(self, scale: torch.Tensor) -> torch.Tensor:
-        if scale <= 1.0:
-            return 1.0
-        return math.sqrt(1 + math.log(scale) / math.log(self.original_max_seq_len))
-
-    def create_longrope_cache(
-        self,
-        seq_len: int,
-        use_long_factor: bool,
-    ) -> None:
-        if use_long_factor:
-            t = torch.arange(seq_len, device=self.device, dtype=torch.float32)
-            rescale_factors = self.long_factors.to(self.device)
-            long_mscale = self.longrope_config.long_mscale
-            mscale = (
-                long_mscale
-                if long_mscale > 0
-                else self._calc_mscale(self.max_seq_len / self.original_max_seq_len)
-            )
-        else:
-            t = torch.arange(
-                self.original_max_seq_len, device=self.device, dtype=torch.float32
-            )
-            rescale_factors = self.short_factors.to(self.device)
-            short_mscale = self.longrope_config.short_mscale
-            mscale = short_mscale if short_mscale > 0 else 1.0
-        assert rescale_factors.shape == (self.dim // 2,), (
-            f"misaligned shape for LongRoPE rescale factors:\n"
-            f"\tExpected {(self.dim_model // 2, )}, got {rescale_factors.shape}."
-        )
-        inv_freq = 1.0 / (
-            rescale_factors
-            * (
-                self.base
-                ** (torch.arange(0, self.dim, 2).float().to(self.device) / self.dim)
-            )
-        )
-
-        freqs = torch.outer(t, inv_freq)
-        emb = torch.cat((freqs, freqs), dim=-1)
-        LlamaRotaryEmbedding.sin_cached = (emb.sin() * mscale).to(self.dtype)
-        LlamaRotaryEmbedding.cos_cached = (emb.cos() * mscale).to(self.dtype)
-
-    def update_cache_if_needed(self, kv_seq_len):
-        if not self.is_longrope:
-            return super().update_cache_if_needed(kv_seq_len)
-        if kv_seq_len > LlamaRotaryEmbedding.max_position_embedding:
-            new_cache_length = kv_seq_len + self.dynamic_cache_stride
-            LlamaRotaryEmbedding.max_position_embedding = new_cache_length
-            self.create_longrope_cache(new_cache_length, use_long_factor=True)
 
 
 class Qwen2RotaryEmbedding(LlamaRotaryEmbedding):

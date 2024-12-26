@@ -30,7 +30,7 @@ class IPEXTransformerConfig:
     max_out_positions: int = 256
     kv_channels: int = 128
     rotary_embedding_class: str = "GPTJRotaryEmbedding"
-    rope_scaling: dict = None
+    rope_scaling: Optional[Dict[str, Union[float, List[float], int]]] = None
     rotary_pct: float = 1.0
     rotary_dim: int = 64
     rotary_half: bool = False
@@ -71,7 +71,6 @@ class IPEXTransformerConfigChatGLM(IPEXTransformerConfig):
 @dataclass
 class IPEXTransformerConfigPhi3Small(IPEXTransformerConfig):
     rope_position_scale: float = 1.0
-    rope_scaling: Optional[Dict[str, Union[float, List[float], int]]] = None
     # Block Sparse Attention Pattern
     blocksparse_homo_head_pattern: bool = False
     blocksparse_block_size: int = 64

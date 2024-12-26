@@ -61,7 +61,16 @@ def _get_mask_dense(query, key, block_size, vert_stride, local_blocks, device):
 
 
 def _phi3small_sdp(
-    self, query, key, value, past_key_value, attention_mask, head_mask, alibi
+    self,
+    query,
+    key,
+    value,
+    past_key_value,
+    attention_mask,
+    head_mask,
+    alibi,
+    scale,
+    use_causal,
 ):
     """
     q: (bs_beam, num_attn_head, q_len, head_dim), kv: (bs_beam, num_kv_head, kv_seq_len, head_dim)
