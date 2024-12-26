@@ -3,6 +3,10 @@ import os
 import tempfile
 import unittest
 
+from intel_extension_for_pytorch.llm.utils import (
+    load_low_precision_checkpoint,
+    shard_low_precision_checkpoint,
+)
 import torch
 import torch.nn as nn
 from torch.testing._internal.jit_utils import JitTestCase
@@ -26,6 +30,7 @@ from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
 )
 
 from test_weight_prepack import module_found
+import json
 
 try:
     import transformers
@@ -422,6 +427,113 @@ class DeepspeedTester(JitTestCase):
         )
         with torch.no_grad():
             model(*example_inputs)
+
+    def test_shard_awq_low_precision_checkpoint(self):
+        curpath = os.path.abspath(os.path.dirname(__file__))
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/llama", return_dict=False
+        )
+        ds_world_size = int(os.getenv("WORLD_SIZE", "1"))
+        if ds_world_size != 2:
+            print("Warning: Expect ds_world_size to be 2.")
+            return
+        local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        model = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
+        with tempfile.TemporaryDirectory() as work_dir:
+            # Generate dummy checkpoint
+            checkpoint_file_name = work_dir + "/checkpoint.pt"
+            state_dict = model.state_dict()
+            linear_keys = []
+            for k, v in state_dict.items():
+                if any(
+                    k.endswith(suffix)
+                    for suffix in ["proj.weight", "fc_in.weight", "fc_out.weight"]
+                ):
+                    linear_keys.append(k[:-7])
+            group_size = 128
+            comp_ratio = 8
+            for k in linear_keys:
+                N = state_dict[k + ".weight"].shape[0]
+                K = state_dict[k + ".weight"].shape[1]
+                del state_dict[k + ".weight"]
+                n_groups = K // group_size
+                stored_weight_shape = (K, N // comp_ratio)
+                stored_scales_shape = (n_groups, N)
+                stored_zeros_shape = (n_groups, N // comp_ratio)
+                state_dict[k + ".qweight"] = torch.randint(
+                    -(2**31), 2**31 - 1, stored_weight_shape, dtype=torch.int32
+                )
+                state_dict[k + ".scales"] = torch.randn(
+                    stored_scales_shape, dtype=torch.half
+                )
+                state_dict[k + ".qzeros"] = torch.randint(
+                    -(2**31), 2**31 - 1, stored_zeros_shape, dtype=torch.int32
+                )
+
+            torch.save(state_dict, checkpoint_file_name)
+            config_dict = {
+                "quant_method": "awq",
+                "group_size": group_size,
+                "desc_act": False,
+            }
+            config_file_name = work_dir + "/config.json"
+            with open(config_file_name, "w", encoding="utf-8") as file:
+                json.dump(config_dict, file, ensure_ascii=False, indent=4)
+            low_precision_checkpoint, quant_config = load_low_precision_checkpoint(
+                work_dir
+            )
+            quantization_method = quant_config["quant_method"]
+            group_size = quant_config["group_size"]
+            quantization_method = "awq"
+            sharded_low_precision_checkpoint = shard_low_precision_checkpoint(
+                low_precision_checkpoint,
+                config,
+                local_rank,
+                ds_world_size,
+                quantization_method,
+                group_size,
+            )
+            sharded_low_precision_checkpoint = (
+                sharded_low_precision_checkpoint,
+                quant_config,
+            )
+        shard_dict = {
+            "self_attn.q_proj.qweight": [4096, 256],
+            "self_attn.q_proj.scales": [32, 2048],
+            "self_attn.q_proj.zeros": [32, 256],
+            "self_attn.k_proj.qweight": [4096, 256],
+            "self_attn.k_proj.scales": [32, 2048],
+            "self_attn.k_proj.zeros": [32, 256],
+            "self_attn.v_proj.qweight": [4096, 256],
+            "self_attn.v_proj.scales": [32, 2048],
+            "self_attn.v_proj.zeros": [32, 256],
+            "self_attn.o_proj.qweight": [2048, 512],
+            "self_attn.o_proj.scales": [16, 4096],
+            "self_attn.o_proj.zeros": [16, 512],
+            "mlp.up_proj.qweight": [4096, 688],
+            "mlp.up_proj.scales": [32, 5504],
+            "mlp.up_proj.zeros": [32, 688],
+            "mlp.gate_proj.qweight": [4096, 688],
+            "mlp.gate_proj.scales": [32, 5504],
+            "mlp.gate_proj.zeros": [32, 688],
+            "mlp.down_proj.qweight": [5504, 512],
+            "mlp.down_proj.scales": [43, 4096],
+            "mlp.down_proj.zeros": [43, 512],
+            "lm_head.weight": [32000, 2048],
+        }
+        assert quantization_method == "awq", "gptq is not supported yet"
+        low_precision_checkpoint_dict = sharded_low_precision_checkpoint[0].copy()
+        for key in low_precision_checkpoint_dict.keys():
+            for layer in shard_dict:
+                if layer not in key:
+                    continue
+                if "bias" in key:
+                    continue
+                assert (
+                    low_precision_checkpoint_dict[key].shape[0] == shard_dict[layer][0]
+                    and low_precision_checkpoint_dict[key].shape[1]
+                    == shard_dict[layer][1]
+                ), "shape after shard does not match"
 
 
 if __name__ == "__main__":

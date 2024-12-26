@@ -18,6 +18,8 @@ try:
         _get_cached_module_file,
         _get_imports,
         _pad,
+        load_low_precision_checkpoint,
+        shard_low_precision_checkpoint,
     )
     import transformers
 
