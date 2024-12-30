@@ -29,7 +29,6 @@ Example: Qwen 7B full fine-tuning.
 
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 
@@ -61,7 +60,6 @@ accelerate launch --config_file "fsdp_config.yaml" qwen2_ft.py \
 Example: Qwen 7B LoRA fine-tuning.
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 

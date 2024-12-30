@@ -32,7 +32,6 @@ MODEL_CLASSES = {
     "chatglm3": (AutoModelForCausalLM, AutoTokenizer),
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "glm-4": (AutoModelForCausalLM, AutoTokenizer),
-    "mistral": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 
@@ -371,8 +370,6 @@ def run_generate(num_tokens, num_input_tokens, num_beams):
         print("Accuracy check skip")
     elif acc_pass==args.num_iter:
         print("Accuracy check pass")
-    else:
-        print("Accuracy check fail, the wrong iteration number is:", args.num_iter - acc_pass)
 
 def to_list(obj):
     if not isinstance(obj, list):

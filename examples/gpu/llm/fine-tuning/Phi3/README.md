@@ -21,7 +21,6 @@ wandb login
 **Note**: Not support full finetuning and flash attention on this platform.
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export model="microsoft/Phi-3-mini-4k-instruct"
 
 python phi3_ft.py \
@@ -47,7 +46,6 @@ python phi3_ft.py \
 Example: Phi-3 Mini 4k full fine-tuning on single card. The default dataset `financial_phrasebank` is loaded in `phi3_ft.py`.
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export TORCH_LLM_ALLREDUCE=1
 
 export model="microsoft/Phi-3-mini-4k-instruct"
@@ -71,7 +69,6 @@ python phi3_ft.py \
 Example: Phi-3 Mini 4k LoRA fine-tuning on single card. The default dataset `financial_phrasebank` is loaded in `phi3_ft.py`.
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export TORCH_LLM_ALLREDUCE=1
 
 export model="microsoft/Phi-3-mini-4k-instruct"
@@ -102,7 +99,6 @@ Example: Phi-3 Mini 4k full fine-tuning.
 
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 
@@ -130,7 +126,6 @@ Example: Phi-3 Mini 4k LoRA fine-tuning.
 
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 
@@ -159,7 +154,6 @@ Example: Phi3-Mini 4k LoRA fine-tuning.
 
 
 ```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
 export CCL_PROCESS_LAUNCHER=none
 export TORCH_LLM_ALLREDUCE=1
 

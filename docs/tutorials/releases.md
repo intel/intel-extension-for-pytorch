@@ -1,6 +1,45 @@
 Releases
 =============
 
+## 2.5.10+xpu
+
+Intel® Extension for PyTorch\* v2.5.10+xpu is the new release which supports Intel® GPU platforms (Intel® Data Center GPU Max Series, Intel® Arc™ Graphics family, Intel® Core™ Ultra Processors with Intel® Arc™ Graphics, Intel® Core™ Ultra Series 2 with Intel® Arc™ Graphics and Intel® Data Center GPU Flex Series) based on PyTorch* 2.5.1.
+
+### Highlights
+
+- Intel® oneDNN v3.6 integration
+- Intel® oneAPI Base Toolkit 2025.0.1 compatibility
+- Intel® Arc™ B-series Graphics support on Windows (prototype)
+- Large Language Model (LLM) optimization
+  
+  Intel® Extension for PyTorch\* enhances KV Cache management to cover both Dynamic Cache and Static Cache methods defined by Hugging Face, which helps reduce computation time and improve response rates so as to optimize the performance of models in various generative tasks. Intel® Extension for PyTorch\* also supports new LLM features including speculative decoding which optimizes inference by making educated guesses about future tokens while generating the current token, sliding window attention which uses a fixed-size window to limit the attention span of each token thus significantly improves processing speed and efficiency for long documents, and multi-round conversations for supporting a natural human conversation where information is exchanged in multiple turns back and forth.
+
+  Besides that, Intel® Extension for PyTorch\* optimizes more LLM models for inference and finetuning. A full list of optimized models can be found at [LLM Optimizations Overview](https://intel.github.io/intel-extension-for-pytorch/xpu/latest/tutorials/llm.html).
+
+- Serving framework support
+  
+  Typical LLM serving frameworks including [vLLM](https://github.com/vllm-project/vllm) and [TGI](https://github.com/huggingface/text-generation-inference) can co-work with Intel® Extension for PyTorch\* on Intel® GPU platforms on Linux (intensively verified on Intel® Data Center GPU Max Series). The support to low precision such as INT4 Weight Only Quantization, which based on Generalized Post-Training Quantization (GPTQ) algorithm, is enhanced in this release.
+
+- Beta support of full fine-tuning and LoRA PEFT with mixed precision
+
+  Intel® Extension for PyTorch\* enhances this feature for optimizing typical LLM models and makes it reach Beta quality.
+
+- Kineto Profiler Support
+  
+  Intel® Extension for PyTorch\* removes this redundant feature as the support of Kineto Profiler based on [PTI](https://github.com/intel/pti-gpu) on Intel® GPU platforms is available in PyTorch\* 2.5.
+  
+- Hybrid ATen operator implementation
+  
+  Intel® Extension for PyTorch\* uses ATen operators available in [Torch XPU Operators](https://github.com/intel/torch-xpu-ops) as much as possible and overrides very limited operators for better performance and broad data type support.
+
+### Breaking Changes
+
+- Block format support: oneDNN Block format integration support has been removed since v2.5.10+xpu.
+
+### Known Issues
+
+Please refer to [Known Issues webpage](./known_issues.md).
+
 ## 2.3.110+xpu
 
 Intel® Extension for PyTorch\* v2.3.110+xpu is the new release which supports Intel® GPU platforms (Intel® Data Center GPU Flex Series, Intel® Data Center GPU Max Series and Intel® Arc™ A-Series Graphics) based on PyTorch\* 2.3.1.
@@ -39,6 +78,10 @@ Intel® Extension for PyTorch\* v2.3.110+xpu is the new release which supports I
 - Prototype support of full fine-tuning and LoRA PEFT with mixed precision
 
   Intel® Extension for PyTorch\* also provides new capability for supporting popular recipes with both full fine-tuning and [LoRA PEFT](https://github.com/huggingface/peft)  for mixed precision with BF16 and FP32. We optimized many typical LLM models including Llama 2 (7B and 70B), Llama 3 8B, Phi-3-Mini 3.8B model families and Chinese model Qwen-7B, on both single GPU and Multi-GPU (distributed fine-tuning based on PyTorch FSDP) use cases.
+
+### Breaking Changes
+
+- Block format support: oneDNN Block format integration support is being deprecated and will no longer be available starting from the release after v2.3.110+xpu.
 
 ### Known Issues
 

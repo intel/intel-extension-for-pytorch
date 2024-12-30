@@ -18,13 +18,13 @@ Troubleshooting
     ```bash
     ImportError: undefined symbol: _ZNK5torch8autograd4Node4nameB5cxx11Ev
     ```
-  - **Cause**: DPC++ does not support `_GLIBCXX_USE_CXX11_ABI=0`, Intel® Extension for PyTorch\* is always compiled with `_GLIBCXX_USE_CXX11_ABI=1`. This symbol undefined issue appears when PyTorch\* is
+  - **Cause**: Intel® Extension for PyTorch\* is compiled with `_GLIBCXX_USE_CXX11_ABI=1`. This symbol undefined issue appears when PyTorch\* is
     compiled with `_GLIBCXX_USE_CXX11_ABI=0`.
   - **Solution**: Pass `export GLIBCXX_USE_CXX11_ABI=1` and compile PyTorch\* with particular compiler which supports `_GLIBCXX_USE_CXX11_ABI=1`. We recommend using prebuilt wheels
-    in [download server](https:// developer.intel.com/ipex-whl-stable-xpu) to avoid this issue.
-- **Problem**: `-997 runtime error` when running some AI models on Intel® Arc™ A-Series GPUs.
-  - **Cause**:  Some of the `-997 runtime error` are actually out-of-memory errors. As Intel® Arc™ A-Series GPUs have less device memory than Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU
-    Max  Series, running some AI models on them may trigger out-of-memory errors and cause them to report failure such as `-997 runtime error` most likely. This is expected. Memory usage optimization is a work in progress to allow Intel® Arc™ A-Series GPUs to support more AI models.
+    in [download server](https://pytorch-extension.intel.com/release-whl/stable/xpu/cn/) to avoid this issue.
+- **Problem**: `-997 runtime error` when running some AI models on Intel® Arc™ Graphics family.
+  - **Cause**:  Some of the `-997 runtime error` are actually out-of-memory errors. As Intel® Arc™ Graphics GPUs have less device memory than Intel® Data Center GPU Flex Series 170 and Intel® Data Center GPU
+    Max  Series, running some AI models on them may trigger out-of-memory errors and cause them to report failure such as `-997 runtime error` most likely. This is expected. Memory usage optimization is working in progress to allow Intel® Arc™ Graphics GPUs to support more AI models.
 - **Problem**: Building from source for Intel® Arc™ A-Series GPUs fails on WSL2 without any error thrown.
   - **Cause**: Your system probably does not have enough RAM, so Linux kernel's Out-of-memory killer was invoked. You can verify this by running `dmesg` on bash (WSL2 terminal).
   - **Solution**: If the OOM killer had indeed killed the build process, then you can try increasing the swap-size of WSL2, and/or decreasing the number of parallel build jobs with the environment
@@ -32,12 +32,6 @@ Troubleshooting
 - **Problem**: Some workloads terminate with an error `CL_DEVICE_NOT_FOUND` after some time on WSL2.
   - **Cause**:  This issue is due to the [TDR feature](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/tdr-registry-keys#tdrdelay) on Windows.
   - **Solution**: Try increasing TDRDelay in your Windows Registry to a large value, such as 20 (it is 2 seconds, by default), and reboot.
-- **Problem**: Random bad termination after AI model convergence test (>24 hours) finishes.
-  - **Cause**: This is a random issue when some AI model convergence test execution finishes. It is not user-friendly as the model execution ends ungracefully.
-  - **Solution**: Kill the process after the convergence test finished, or use checkpoints to divide the convergence test into several phases and execute separately.
-- **Problem**: Runtime error `munmap_chunk(): invalid pointer` when executing some scaling LLM workloads on Intel® Data Center GPU Max Series platform
-  - **Cause**: Users targeting GPU use, must set the environment variable ‘FI_HMEM=system’ to disable GPU support in underlying libfabric as Intel® MPI Library 2021.13.1 will offload the GPU support instead. This avoids a potential bug in libfabric GPU initialization.
-  - **Solution**: Set the environment variable ‘FI_HMEM=system’ to workaround this issue when encounter.
 
 ## Library Dependencies
 
@@ -83,14 +77,6 @@ Troubleshooting
 
     If you continue seeing similar issues for other shared object files, add the corresponding files under `${MKL_DPCPP_ROOT}/lib/intel64/` by `LD_PRELOAD`. Note that the suffix of the libraries may change (e.g. from .1 to .2), if more than one oneMKL library is installed on the system.
 
-- **Problem**: RuntimeError: could not create an engine.
-  - **Cause**: `OCL_ICD_VENDORS` path is wrongly set when activate a exist conda environment.
-  - **Solution**: `export OCL_ICD_VENDORS=/etc/OpenCL/vendors` after `conda activate`
-
-- **Problem**: If you encounter issues related to CCL environment variable configuration when running distributed tasks.
-  - **Cause**: `CCL_ROOT` path is wrongly set.
-  - **Solution**: `export CCL_ROOT=${CONDA_PREFIX}`
-
 - **Problem**: If you encounter issues related to MPI environment variable configuration when running distributed tasks.
   - **Cause**: MPI environment variable configuration not correct.
   - **Solution**: `conda deactivate` and then `conda activate` to activate the correct MPI environment variable automatically.
@@ -98,7 +84,37 @@ Troubleshooting
     ```
     conda deactivate
     conda activate
-    export OCL_ICD_VENDORS=/etc/OpenCL/vendors
+    ```
+
+- **Problem**: If you encounter issues Runtime error related to C++ compiler with `torch.compile`. Runtime Error: Failed to find C++ compiler. Please specify via CXX environment variable.
+  - **Cause**: Not install and activate DPC++/C++ Compiler correctly.
+  - **Solution**: [Install DPC++/C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler-download.html) and activate it by following commands.
+ 
+    ```bash
+    # {dpcpproot} is the location for dpcpp ROOT path and it is where you installed oneAPI DPCPP, usually it is /opt/intel/oneapi/compiler/latest or ~/intel/oneapi/compiler/latest
+    source {dpcpproot}/env/vars.sh
+    ```
+
+- **Problem**: RuntimeError: Cannot find a working triton installation. Either the package is not installed or it is too old. More information on installing Triton can be found at https://github.com/openai/triton
+  - **Cause**: No pytorch-triton-xpu installed
+  - **Solution**: Resolve the issue with following command:
+
+    ```bash
+    # Install correct version of pytorch-triton-xpu
+    pip install --pre pytorch-triton-xpu==3.1.0+91b14bf559  --index-url https://download.pytorch.org/whl/nightly/xpu
+    ```
+
+- **Problem**: LoweringException: ImportError: cannot import name 'intel' from 'triton._C.libtriton'
+  - **Cause**: Installing Triton causes pytorch-triton-xpu to stop working.
+  - **Solution**: Resolve the issue with following command:
+
+    ```bash
+    pip list | grep triton
+    # If triton related packages are listed, remove them
+    pip uninstall triton
+    pip uninstall pytorch-triton-xpu
+    # Reinstall correct version of pytorch-triton-xpu
+    pip install --pre pytorch-triton-xpu==3.1.0+91b14bf559  --index-url https://download.pytorch.org/whl/nightly/xpu
     ```
 
 ## Performance Issue
@@ -106,12 +122,4 @@ Troubleshooting
 - **Problem**: Extended durations for data transfers from the host system to the device (H2D) and from the device back to the host system (D2H).
   - **Cause**: Absence of certain Dynamic Kernel Module Support (DKMS) packages on Ubuntu 22.04 or earlier versions.
   - **Solution**: For those running Ubuntu 22.04 or below, it's crucial to follow all the recommended installation procedures, including those labeled as [optional](https://dgpu-docs.intel.com/driver/client/overview.html#optional-out-of-tree-kernel-mode-driver-install). These steps are likely necessary to install the missing DKMS packages and ensure your system is functioning optimally. The Kernel Mode Driver (KMD) package that addresses this issue has been integrated into the Linux kernel for Ubuntu 23.04 and subsequent releases.
-
-## Unit Test
-
-- Unit test failures on Intel® Data Center GPU Flex Series 170
-
-  The following unit test fails on Intel® Data Center GPU Flex Series 170 but the same test case passes on Intel® Data Center GPU Max Series. The root cause of the failure is under investigation.
-    - `test_weight_norm.py::TestNNMethod::test_weight_norm_differnt_type`
-
 

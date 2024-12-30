@@ -51,12 +51,3 @@ More examples, including training and usage of low precision data types are avai
 
 There are some environment variables in runtime that can be used to configure executions on GPU. Please check [Advanced Configuration](./features/advanced_configuration.html#runtime-configuration) for more detailed information.
 
-Set `OCL_ICD_VENDORS` with default path `/etc/OpenCL/vendors`.
-Set `CCL_ROOT` if you are using multi-GPU.
-
-```bash
-export OCL_ICD_VENDORS=/etc/OpenCL/vendors
-export CCL_ROOT=${CONDA_PREFIX} 
-python <script>
-```
-

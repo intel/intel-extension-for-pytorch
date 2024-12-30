@@ -49,7 +49,7 @@ if torch.xpu.is_available() and not args.woq:
     model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map="auto").eval().to("xpu").to(memory_format=torch.channels_last)
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     tokenizer.use_default_system_prompt = False
-    model = ipex.optimize_transformers(model.eval(), dtype=torch.float16, device="xpu")
+    model = ipex.llm.optimize(model.eval(), dtype=torch.float16, device="xpu")
 
 elif torch.xpu.is_available() and args.woq:
     from neural_compressor.transformers import AutoModelForCausalLM, RtnConfig
@@ -76,7 +76,7 @@ elif torch.xpu.is_available() and args.woq:
     print(model)
     tokenizer.use_default_system_prompt = False
 
-    model = ipex.optimize_transformers(model.eval(), device="xpu", inplace=True, quantization_config=woq_quantization_config)
+    model = ipex.llm.optimize(model.eval(), device="xpu", inplace=True, quantization_config=woq_quantization_config)
 
 else:
     raise RuntimeError("This demo requires an XPU device to run.")

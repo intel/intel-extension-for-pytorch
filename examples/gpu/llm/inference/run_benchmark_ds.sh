@@ -8,7 +8,7 @@
 # the PoC weekly check:
 # beam=1, bs=1, input=1024, out=128
 # beam=4, bs=1, input=1024, out=128
-beam=4
+beam=1
 bs=1
 input=1024
 out=128
@@ -118,9 +118,9 @@ Run_benchmark_opt-6.7b() {
     sub_model_name=opt-6.7b
     dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}_ranknum2
     mkdir -p ${dir}
-    mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
+    mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
     mv log_e2e_ds ${dir}
-    PROFILE=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
+    PROFILE=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
     mv profile*pt ${dir}
     mv trace.json ${dir}
 }
@@ -132,9 +132,9 @@ Run_benchmark_opt-30b() {
     sub_model_name=opt-30b
     dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}_ranknum2
     mkdir -p ${dir}
-    mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
+    mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
     mv log_e2e_ds ${dir}
-    PROFILE=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --use-static-cache --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
+    PROFILE=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
     mv profile*pt ${dir}
     mv trace.json ${dir}
 }
@@ -167,21 +167,6 @@ Run_benchmark_bloom-176b() {
     mv trace.json ${dir}
 }
 
-
-## Mistral-7b
-Run_benchmark_mistral-7b() {
-    model=mistralai/Mistral-7B-Instruct-v0.2
-    sub_model_name=mistral
-    dir=perf/${model}/beam${beam}_bs${bs}_input${input}_out${out}_ranknum2
-    mkdir -p ${dir}
-    mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency 2>&1 | tee log_e2e_ds
-    mv log_e2e_ds ${dir}
-    PROFILE=1 mpirun -np 2 --prepend-rank python -u run_generation_with_deepspeed.py --benchmark -m ${model} --sub-model-name ${sub_model_name} --num-beams ${beam} --num-iter ${iter} --batch-size ${bs} --input-tokens ${input} --max-new-tokens ${out} --device xpu --ipex --dtype float16 --token-latency
-    mv profile*pt ${dir}
-    mv trace.json ${dir}
-}
-
-
 main() {
     export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=2
     
@@ -196,7 +181,6 @@ main() {
     Run_benchmark_opt-30b
     Run_benchmark_bloom-7b
     Run_benchmark_bloom-176b
-    Run_benchmark_mistral-7b
 }
 
 main

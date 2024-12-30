@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Intel Corporation
+# SPDX-License-Identifier: Apache 2.0
+
 # NOTE: To build this you will need a docker version >= 19.03 and DOCKER_BUILDKIT=1
 #
 #       If you do not use buildkit you are not going to have a good time
@@ -14,14 +17,16 @@ RUN apt update && \
     apt full-upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y \
     git \
-    wget \
     curl \
+    wget \
     vim \
     patch \
     gcc \
     g++ \
     make \
     pkg-config \
+    unzip \
+    zip \
     software-properties-common \
     gnupg \
     gpg-agent
@@ -30,10 +35,9 @@ RUN bash ./basekit_driver_install_helper.sh driver
 
 WORKDIR /root
 
-RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/download/24.1.2-0/Miniforge3-24.1.2-0-Linux-x86_64.sh && \
+RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/download/24.7.1-2/Miniforge3-24.7.1-2-Linux-x86_64.sh && \
     bash miniforge.sh -b -p ./miniforge3 && \
-    rm miniforge.sh && \
-    echo "source ~/miniforge3/bin/activate" >> ./.bashrc
+    rm miniforge.sh
 
 FROM base AS dev
 RUN bash /basekit_driver_install_helper.sh dev
@@ -58,8 +62,13 @@ RUN . ./miniforge3/bin/activate && \
     python -m pip install ./wheels/*.whl && \
     python -m pip cache purge && \
     conda clean -a -y && \
-    rm -rf ./wheels && \
-    echo "conda activate py310" >> ./.bashrc && \
-    echo "export OCL_ICD_VENDORS=/etc/OpenCL/vendors" >> ./.bashrc && \
-    echo "export CCL_ROOT=${CONDA_PREFIX}" >> ./.bashrc && \
-    ldpreload=$(bash get_libstdcpp_lib.sh) && echo "export LD_PRELOAD=${ldpreload}" >> ./.bashrc && rm get_libstdcpp_lib.sh
+    rm -rf ./wheels
+RUN ENTRYPOINT=/usr/local/bin/entrypoint.sh && \
+    echo "#!/bin/bash" > ${ENTRYPOINT} && \
+    echo "CMDS=(); while [ \$# -gt 0 ]; do CMDS+=(\"\$1\"); shift; done;" >> ${ENTRYPOINT} && \
+    echo ". ~/miniforge3/bin/activate" >> ${ENTRYPOINT} && \
+    echo "conda activate py310" >> ${ENTRYPOINT} && \
+    ldpreload=$(bash get_libstdcpp_lib.sh) && echo "export LD_PRELOAD=${ldpreload}" >> ${ENTRYPOINT} && rm get_libstdcpp_lib.sh && \
+    echo "\"\${CMDS[@]}\"" >> ${ENTRYPOINT} && \
+    chmod +x ${ENTRYPOINT}
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

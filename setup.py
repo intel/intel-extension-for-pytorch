@@ -240,7 +240,7 @@ def _build_installation_dependency():
     install_requires.append("ruamel.yaml")
     if _check_env_flag("ENABLE_ONEAPI_INTEGRATION", default="OFF"):
         for key, value in _get_basekit_rt().items():
-            if (key == "oneccl-devel" or key == "impi-devel") and not IS_LINUX:
+            if key in ["oneccl-devel", "impi-devel", "intel-pti"] and not IS_LINUX:
                 continue
             install_requires.append(f"{key}=={value['version']}")
     return install_requires
@@ -370,6 +370,7 @@ def create_version_files(
         base_dir, PACKAGE_NAME, "..", "csrc", "utils", "version.h"
     )
     build_type_str = get_build_type()
+    build_aot = os.environ.get("USE_AOT_DEVLIST", "")
     # Check code fingerprint to avoid non-modify rebuild.
     current_code_fingerprint = get_code_fingerprint(
         ipex_build_version, ipex_git_sha, torch_git_sha, build_type_str
@@ -390,6 +391,7 @@ def create_version_files(
         py_buffer += '__gpu_onednn_gitrev__ = "{}"\n'.format(gpu_onednn_sha)
         py_buffer += '__cpu_ideep_gitrev__ = "{}"\n'.format(cpu_ideep_sha)
         py_buffer += '__build_type__ = "{}"\n'.format(build_type_str)
+        py_buffer += '__build_aot__ = "{}"\n'.format(build_aot)
 
         write_buffer_to_file(py_version_path, py_buffer)
 
@@ -412,6 +414,8 @@ def create_version_files(
         c_buffer += '{{ return "{}"; }}\n\n'.format(torch_git_sha)
         c_buffer += "const std::string __build_type__()\n"
         c_buffer += '{{ return "{}"; }}\n\n'.format(build_type_str)
+        c_buffer += "const std::string __build_aot__()\n"
+        c_buffer += '{{ return "{}"; }}\n\n'.format(build_aot)
         c_buffer += "}  // namespace torch_ipex\n"
 
         write_buffer_to_file(cpp_version_path, c_buffer)
@@ -681,7 +685,6 @@ class IPEXCPPLibBuild(build_clib, object):
             "IPEX_PROJ_NAME": PACKAGE_NAME,
             "LIBIPEX_GITREV": ipex_git_sha,
             "LIBIPEX_VERSION": ipex_build_version,
-            "RPATHS_LIST": ";".join(make_relative_rpath(lvl_relative_oneapi_lib=4)),
         }
 
         build_with_cpu = False if IS_WINDOWS else True  # Default ON
@@ -995,25 +998,13 @@ class IPEXPythonPackageBuild(build_py, object):
         super(IPEXPythonPackageBuild, self).finalize_options()
 
 
-def make_relative_rpath(path=".", lvl_relative_oneapi_lib=0):
-    rpaths = []
-    dir_lib_oneapi = ""
-    if lvl_relative_oneapi_lib > 0:
-        dir_lib_oneapi_list = [".."] * lvl_relative_oneapi_lib
-        dir_lib_oneapi = os.path.join(*dir_lib_oneapi_list)
+def make_relative_rpath(path):
     if IS_DARWIN:
-        if not dir_lib_oneapi == "":
-            rpaths.append(f"-Wl,-rpath,@loader_path/{dir_lib_oneapi}")
-        rpaths.append(f"-Wl,-rpath,@loader_path/{path}")
+        return "-Wl,-rpath,@loader_path/" + path
     elif IS_WINDOWS:
-        if not dir_lib_oneapi == "":
-            rpaths.append(dir_lib_oneapi)
-        rpaths.append(path)
+        return path
     else:
-        if not dir_lib_oneapi == "":
-            rpaths.append(f"-Wl,-rpath,$ORIGIN/{dir_lib_oneapi}")
-        rpaths.append(f"-Wl,-rpath,$ORIGIN/{path}")
-    return rpaths
+        return "-Wl,-rpath,$ORIGIN/" + path
 
 
 def pyi_module():
@@ -1058,7 +1049,7 @@ def pyi_module():
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
             library_dirs=library_dirs,
-            extra_link_args=make_relative_rpath("lib", lvl_relative_oneapi_lib=3),
+            extra_link_args=[make_relative_rpath("lib")],
         )
     else:
         library_dirs = ["bin", os.path.join(pytorch_install_dir, "lib")]
@@ -1144,7 +1135,7 @@ def pyi_isa_help_module():
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
             library_dirs=library_dirs,
-            extra_link_args=make_relative_rpath("lib", lvl_relative_oneapi_lib=3),
+            extra_link_args=[make_relative_rpath("lib")],
         )
     else:
         library_dirs = ["bin", os.path.join(pytorch_install_dir, "lib")]

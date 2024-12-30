@@ -4,4 +4,4 @@ fire
 tokenizers>=0.13.3
 wandb==0.17.5
 trl==0.9.4
-accelerate==0.28.0
+accelerate==1.1.1

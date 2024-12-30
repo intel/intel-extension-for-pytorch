@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Intel Corporation
+# SPDX-License-Identifier: Apache 2.0
+
 ARG BASE_IMAGE=ubuntu:22.04
 FROM ${BASE_IMAGE} AS base
 SHELL ["/bin/bash", "-c"]
@@ -8,8 +11,8 @@ RUN apt update && \
     apt full-upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y \
     git \
-    wget \
     curl \
+    wget \
     vim \
     patch \
     gcc \
@@ -17,6 +20,8 @@ RUN apt update && \
     make \
     libgomp1 \
     pkg-config \
+    unzip \
+    zip \
     software-properties-common \
     gnupg \
     gpg-agent
@@ -25,10 +30,9 @@ RUN bash ./basekit_driver_install_helper.sh driver
 
 WORKDIR /root
 
-RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/download/24.1.2-0/Miniforge3-24.1.2-0-Linux-x86_64.sh && \
+RUN curl -fsSL -v -o miniforge.sh -O https://github.com/conda-forge/miniforge/releases/download/24.7.1-2/Miniforge3-24.7.1-2-Linux-x86_64.sh && \
     bash miniforge.sh -b -p ./miniforge3 && \
-    rm miniforge.sh && \
-    echo "source ~/miniforge3/bin/activate" >> ./.bashrc
+    rm miniforge.sh
 
 FROM base AS dev
 # --build-arg COMPILE=ON to compile from source
@@ -50,8 +54,15 @@ RUN apt clean && \
     rm /basekit_driver_install_helper.sh
 RUN . ./miniforge3/bin/activate && \
     conda create -y -n py310 python=3.10 && conda activate py310 && conda install -y libstdcxx-ng && \
-    echo "conda activate py310" >> ./.bashrc && \
     cd ./llm && \
     bash tools/env_setup.sh 1 && \
     python -m pip cache purge && \
     conda clean -a -y
+RUN ENTRYPOINT=/usr/local/bin/entrypoint.sh && \
+    echo "#!/bin/bash" > ${ENTRYPOINT} && \
+    echo "CMDS=(); while [ \$# -gt 0 ]; do CMDS+=(\"\$1\"); shift; done;" >> ${ENTRYPOINT} && \
+    echo ". ~/miniforge3/bin/activate" >> ${ENTRYPOINT} && \
+    echo "conda activate py310" >> ${ENTRYPOINT} && \
+    echo "\"\${CMDS[@]}\"" >> ${ENTRYPOINT} && \
+    chmod +x ${ENTRYPOINT}
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

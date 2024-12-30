@@ -1,7 +1,7 @@
 From 0ad30cddfeb74434a1b0f96206546d0314ba51aa Mon Sep 17 00:00:00 2001
 From: zhuyuhua-v <yuhua.zhu@intel.com>
 Date: Wed, 21 Aug 2024 02:31:52 -0700
-Subject: [PATCH 1/6] Revert "Support XPU ABI=0 build (#130110)"
+Subject: [PATCH 1/5] Revert "Support XPU ABI=0 build (#130110)"
 
 This reverts commit 92bebb46fa9fd60523d8aeb7b5f1a3f488c4cd93.
 ---
