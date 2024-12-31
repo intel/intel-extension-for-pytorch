@@ -62,6 +62,13 @@ def gptj_forward_hook(model):
         model.forward = partial(GPTJModel_forward, model)
 
 
+def mixtral_forward_hook(model):
+    import transformers
+
+    if type(model) == transformers.models.mixtral.modeling_mixtral.MixtralForCausalLM:
+        pad_for_gptj_lm_head(model, is_int4(model))
+
+
 def llama_forward_hook(model):
     import transformers
 

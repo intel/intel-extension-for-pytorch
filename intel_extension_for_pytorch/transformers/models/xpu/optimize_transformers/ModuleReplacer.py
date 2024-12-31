@@ -13,6 +13,7 @@ from .modules.Functions import (
     baichuan_forward_hook,
     qwen_forward_hook,
     chatglm_forward_hook,
+    mixtral_forward_hook,
     ipex_build_bloom_alibi_tensor,
     ipex_static_cache,
     ipex_disable_attn_mask_prepare,
@@ -31,6 +32,7 @@ from .modules.Layers import (
 from intel_extension_for_pytorch.nn.utils._quantize_convert import (
     WeightOnlyQuantizedLinear,
 )
+from .modules.mixtral import NewIPEXMixtralBlock
 from .modules.gptj import NewIPEXGPTJBlock
 from .modules.bloom import NewIPEXBloomBlock
 from .modules.llama import IPEXLLAMABlock
@@ -66,6 +68,7 @@ def default_replaced_module_dict():
         transformers.models.falcon.modeling_falcon.FalconDecoderLayer: NewIPEXFalconBlock,
         transformers.models.bert.modeling_bert.BertSelfAttention: NewIPEXBertSelfAttention,
         transformers.models.qwen2.modeling_qwen2.Qwen2DecoderLayer: NewIPEXQWEN2DecoderLayer,
+        transformers.models.mixtral.modeling_mixtral.MixtralDecoderLayer: NewIPEXMixtralBlock,
         BasicTransformerBlock: NewIPEXBasicTransformerBlock,
     }
     return default_replace_modules
@@ -100,6 +103,7 @@ def default_override_function_list() -> List:
         opt_forward_hook,
         falcon_forward_hook,
         baichuan_forward_hook,
+        mixtral_forward_hook,
         qwen_forward_hook,
         chatglm_forward_hook,
         ipex_build_bloom_alibi_tensor,

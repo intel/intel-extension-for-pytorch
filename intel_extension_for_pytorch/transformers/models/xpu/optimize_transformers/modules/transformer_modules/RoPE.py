@@ -760,3 +760,102 @@ class Phi3SmallRotaryEmbedding(LlamaRotaryEmbedding):
 class Qwen2RotaryEmbedding(LlamaRotaryEmbedding):
     def __init__(self, config: IPEXTransformerConfig, dtype):
         super().__init__(config, dtype)
+
+
+class MixtralRotaryEmbedding(nn.Module):
+    def __init__(self, config: IPEXTransformerConfig, dtype):
+        super().__init__()
+        self.dim = int(config.embedding_dim / config.num_attention_head)
+        self.max_position_embeddings = config.max_positions
+        self.base = config.positional_embedding_base
+        device = config.device
+        inv_freq = 1.0 / (
+            self.base
+            ** (
+                torch.arange(0, self.dim, 2, dtype=torch.int64).float().to(device)
+                / self.dim
+            )
+        )
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+
+        # Build here to make `torch.jit.trace` work.
+        self._set_cos_sin_cache(
+            seq_len=self.max_position_embeddings,
+            device=self.inv_freq.device,
+            dtype=torch.get_default_dtype(),
+        )
+
+    def _set_cos_sin_cache(self, seq_len, device, dtype):
+        self.max_seq_len_cached = seq_len
+        t = torch.arange(
+            self.max_seq_len_cached, device=device, dtype=torch.int64
+        ).type_as(self.inv_freq)
+
+        freqs = torch.outer(t, self.inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        emb = torch.cat((freqs, freqs), dim=-1)
+        self.register_buffer("cos_cached", emb.cos().to(dtype), persistent=False)
+        self.register_buffer("sin_cached", emb.sin().to(dtype), persistent=False)
+
+    def get_cos_sin(self, x, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len=seq_len, device=x.device, dtype=x.dtype)
+
+        return (
+            self.cos_cached[:seq_len].to(dtype=x.dtype),
+            self.sin_cached[:seq_len].to(dtype=x.dtype),
+        )
+
+    def rotate_half(self, x):
+        """Rotates half the hidden dims of the input."""
+        x1 = x[..., : x.shape[-1] // 2]
+        x2 = x[..., x.shape[-1] // 2 :]
+        return torch.cat((-x2, x1), dim=-1)
+
+    def apply_rotary_pos_emb_ref(self, q, k, cos, sin, position_ids, unsqueeze_dim=1):
+        cos = cos[position_ids].unsqueeze(unsqueeze_dim)
+        sin = sin[position_ids].unsqueeze(unsqueeze_dim)
+        q_embed = (q * cos) + (self.rotate_half(q) * sin)
+        k_embed = (k * cos) + (self.rotate_half(k) * sin)
+        return q_embed, k_embed
+
+    # self.cos_cache/self.sin_cache shape: [seq_len, dim]
+    # q/k shape: [bs, seq_len, num_head, head_dim]
+    def apply_rotary_pos_emb(self, q, k, cos, sin, position_ids, unsqueeze_dim=1):
+        cos = cos[position_ids].unsqueeze(unsqueeze_dim)
+        sin = sin[position_ids].unsqueeze(unsqueeze_dim)
+
+        q_embed = torch.empty_like(q)
+        k_embed = torch.empty_like(k)
+        if q.shape == k.shape:
+            cos = cos.expand(q.shape)
+            sin = sin.expand(q.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_half_qk(
+                q, k, sin, cos, q_embed, k_embed
+            )
+        else:
+            cos_q = cos.expand(q.shape)
+            sin_q = sin.expand(q.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_half(q, sin_q, cos_q, q_embed)
+            cos_k = cos.expand(k.shape)
+            sin_k = sin.expand(k.shape)
+            torch.ops.torch_ipex.apply_rotary_embedding_half(k, sin_k, cos_k, k_embed)
+
+        return q_embed, k_embed
+
+    def forward(
+        self,
+        query,
+        key,
+        position_ids,
+        layer_id,
+        beam_size,
+        kv_seq_len,
+        cache_format=CacheFormat.BFNH,
+    ):
+        cos, sin = self.get_cos_sin(key, seq_len=kv_seq_len)
+        query, key = self.apply_rotary_pos_emb(
+            query, key, cos, sin, position_ids, unsqueeze_dim=-2
+        )
+        return query, key

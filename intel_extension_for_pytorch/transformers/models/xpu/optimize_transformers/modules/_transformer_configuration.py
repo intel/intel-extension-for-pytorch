@@ -21,6 +21,9 @@ class SupportedActivation(Enum):
 
 @dataclass
 class IPEXTransformerConfig:
+    num_experts_per_tok: int = 2
+    num_local_experts: int = 8
+    output_router_logits: bool = False
     embedding_dim: int = 4096
     intermediate_dim: int = None
     num_attention_head: int = 16
