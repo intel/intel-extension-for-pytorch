@@ -169,7 +169,9 @@ class OptimizeTransformersTester(TestCase):
             self.assertEqual(key_hf[0], key_ipex[0], prec=0.1, message=error_message)
 
     def test_model_replacement(self):
-        dtypes = [torch.bfloat16]
+        dtypes = []
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         enable_torchcompile = [False, True]
@@ -487,7 +489,9 @@ class OptimizeTransformersTester(TestCase):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False
         )
-        dtypes = [torch.bfloat16]
+        dtypes = []
+        if core.onednn_has_bf16_support():
+            dtypes.append(torch.bfloat16)
         if core.onednn_has_fp16_support():
             dtypes.append(torch.float16)
         for dtype in dtypes:
@@ -541,6 +545,10 @@ class OptimizeTransformersTester(TestCase):
                     )
                     self.assertEqual(ipex_res_dict.sequences, ref_res_dict.sequences)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_cache_weight_for_large_batch(self):
         config = AutoConfig.from_pretrained(
             f"{curpath}/hf_configs/gptj", return_dict=False

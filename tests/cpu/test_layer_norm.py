@@ -15,6 +15,10 @@ class M(torch.nn.Module):
 
 
 class LayerNormTester(TestCase):
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_layer_norm(self):
         # autocast inference path. layer_norm is fallthrough.
         for dim in [2, 3, 4, 5, 6, 7]:

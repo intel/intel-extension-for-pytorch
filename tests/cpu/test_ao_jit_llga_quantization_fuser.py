@@ -321,6 +321,10 @@ class TestOp(JitLlgaTestCase):
                 )
                 self.checkPatterns(graph, patterns)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_linear_int8_in_bf16_out(self):
         class M(nn.Module):
             def __init__(self, bias):
@@ -484,6 +488,10 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ["aten::matmul"])
         self.checkPatterns(graph, patterns)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_strided_bmm_int8_in_bf16_out(self):
         class M(nn.Module):
             def __init__(self):
@@ -522,6 +530,10 @@ class TestOp(JitLlgaTestCase):
         self.assertFused(graph, ["aten::matmul", "aten::dequantize"])
         self.checkPatterns(graph, patterns)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_mixed_precision_softmax(self):
         class M(torch.nn.Module):
             def __init__(self):
@@ -1354,6 +1366,10 @@ class TestFusionPattern(JitLlgaTestCase):
             )
             self.checkPatterns(graph, patterns)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_linear_dropout_sum_bf16(self):
         class M(nn.Module):
             def __init__(self):
@@ -1388,6 +1404,10 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ["aten::linear", "aten::add"])
         self.checkPatterns(graph, patterns)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_linear_gelu_bf16(self):
         class M(nn.Module):
             def __init__(self):
@@ -1512,6 +1532,10 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ["aten::dequantize", "aten::linear", "aten::matmul"])
         self.checkPatterns(graph, patterns)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_lift_up_to_quant_bf16(self):
         class M(nn.Module):
             def __init__(self, bias):
@@ -1715,6 +1739,10 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ["aten::matmul", "aten::div"])
         self.checkPatterns(graph, patterns)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_bmm_div_int8_in_bf16_out(self):
         class M(nn.Module):
             def __init__(self):
@@ -1736,6 +1764,10 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ["aten::dequantize", "aten::matmul", "aten::div"])
         self.checkPatterns(graph, patterns)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_bmm_method_bf16(self):
         class M(nn.Module):
             def __init__(self):
@@ -1777,6 +1809,10 @@ class TestFusionPattern(JitLlgaTestCase):
         self.assertFused(graph, ["aten::dequantize", "aten::matmul"])
         self.checkPatterns(graph, patterns)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_strided_bmm_div_int8_in_bf16_out(self):
         class M(nn.Module):
             def __init__(self):
@@ -1950,6 +1986,10 @@ class TestFusionPattern(JitLlgaTestCase):
             ],
         )
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     def test_bmm_div_add_int8_bf16(self):
         class M(nn.Module):
             def __init__(self):
