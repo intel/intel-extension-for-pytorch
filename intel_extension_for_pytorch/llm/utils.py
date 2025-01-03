@@ -1096,6 +1096,10 @@ def shard_low_precision_checkpoint(
                     ), "K must be divisible by tp_grain_size"
                     grains = data.shape[0] // (tp_grain_size // 8)
                     dim = tp_grain_size // 8
+                elif "g_idx" in key:
+                    assert data.shape[0] % tp_grain_size == 0
+                    grains = data.shape[0] // tp_grain_size
+                    dim = tp_grain_size
                 else:
                     grains = data.shape[0]
                     dim = 1
