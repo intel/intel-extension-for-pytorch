@@ -539,7 +539,6 @@ if args.benchmark:
 # to ipex
 if use_ipex:
     ipex_woq_enabled = args.ipex_weight_only_quantization
-    low_precision_checkpoint = None
     if ipex_woq_enabled:
         from intel_extension_for_pytorch.quantization import (
             WoqWeightDtype,
@@ -592,7 +591,17 @@ if use_ipex:
         if low_precision_checkpoint is not None:
             rank = local_rank
             assert "quant_method" in quant_config
+            assert "desc_act" in quant_config
             quant_method = quant_config["quant_method"]
+            desc_act = quant_config["desc_act"]
+            if (
+                world_size > 1
+                and desc_act
+                and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+            ):
+                raise AssertionError(
+                    "Lowp-mode INT8 is not supported for TP with desc_act = True"
+                )
             low_precision_checkpoint = shard_low_precision_checkpoint(
                 low_precision_checkpoint,
                 model.config,
@@ -600,6 +609,7 @@ if use_ipex:
                 world_size,
                 quant_method,
                 tp_grain_size,
+                desc_act,
             )
             low_precision_checkpoint = (low_precision_checkpoint, quant_config)
         else:

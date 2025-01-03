@@ -437,6 +437,7 @@ class HuggingFaceModel(BaseLM):
 
         if self._with_ipex:
             ipex_woq_enabled = args.ipex_weight_only_quantization
+            low_precision_ckpt = None
             if ipex_woq_enabled:
                 from intel_extension_for_pytorch.quantization import (
                     WoqWeightDtype,
@@ -491,7 +492,17 @@ class HuggingFaceModel(BaseLM):
                 if low_precision_checkpoint is not None:
                     rank = local_rank
                     assert "quant_method" in quant_config
+                    assert "desc_act" in quant_config
                     quant_method = quant_config["quant_method"]
+                    desc_act = quant_config["desc_act"]
+                    if (
+                        world_size > 1
+                        and desc_act
+                        and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+                    ):
+                        raise AssertionError(
+                            "Lowp-mode INT8 is not supported for TP with desc_act = True"
+                        )
                     low_precision_ckpt = shard_low_precision_checkpoint(
                         low_precision_checkpoint,
                         model.config,
@@ -499,10 +510,9 @@ class HuggingFaceModel(BaseLM):
                         world_size,
                         quant_method,
                         tp_grain_size,
+                        desc_act,
                     )
                     low_precision_ckpt = (low_precision_ckpt, quant_config)
-                else:
-                    low_precision_ckpt = None
             self.model = ipex.llm.optimize(
                 self.model.eval(),
                 dtype=infer_dtype,
@@ -1297,6 +1307,7 @@ class LMMS(lmms):
 
         if self._with_ipex:
             ipex_woq_enabled = args.ipex_weight_only_quantization
+            low_precision_ckpt = None
             if ipex_woq_enabled:
                 from intel_extension_for_pytorch.quantization import (
                     WoqWeightDtype,
@@ -1345,6 +1356,31 @@ class LMMS(lmms):
                     group_size=args.group_size,
                     weight_qscheme=weight_qscheme,
                 )
+                model = self.model
+                if low_precision_checkpoint is not None:
+                    rank = local_rank
+                    assert "quant_method" in quant_config
+                    assert "desc_act" in quant_config
+                    quant_method = quant_config["quant_method"]
+                    desc_act = quant_config["desc_act"]
+                    if (
+                        world_size > 1
+                        and desc_act
+                        and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+                    ):
+                        raise AssertionError(
+                            "Lowp-mode INT8 is not supported for TP with desc_act = True"
+                        )
+                    low_precision_ckpt = shard_low_precision_checkpoint(
+                        low_precision_checkpoint,
+                        model.config,
+                        rank,
+                        world_size,
+                        quant_method,
+                        tp_grain_size,
+                        desc_act,
+                    )
+                    low_precision_ckpt = (low_precision_ckpt, quant_config)
             self._model = ipex.llm.optimize(
                 self._model.eval(),
                 dtype=infer_dtype,
@@ -1352,6 +1388,7 @@ class LMMS(lmms):
                 inplace=True,
                 deployment_mode=False,
                 cache_weight_for_large_batch=args.cache_weight_for_large_batch,
+                low_precision_checkpoint=low_precision_ckpt,
             )
 
         self._base_model = self._model
@@ -2063,6 +2100,7 @@ class LibriSpeech:
 
         if self._with_ipex:
             ipex_woq_enabled = args.ipex_weight_only_quantization
+            low_precision_ckpt = None
             if ipex_woq_enabled:
                 from intel_extension_for_pytorch.quantization import (
                     WoqWeightDtype,
@@ -2113,6 +2151,31 @@ class LibriSpeech:
                     group_size=args.group_size,
                     weight_qscheme=weight_qscheme,
                 )
+                model = self.model
+                if low_precision_checkpoint is not None:
+                    rank = local_rank
+                    assert "quant_method" in quant_config
+                    assert "desc_act" in quant_config
+                    quant_method = quant_config["quant_method"]
+                    desc_act = quant_config["desc_act"]
+                    if (
+                        world_size > 1
+                        and desc_act
+                        and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+                    ):
+                        raise AssertionError(
+                            "Lowp-mode INT8 is not supported for TP with desc_act = True"
+                        )
+                    low_precision_ckpt = shard_low_precision_checkpoint(
+                        low_precision_checkpoint,
+                        model.config,
+                        rank,
+                        world_size,
+                        quant_method,
+                        tp_grain_size,
+                        desc_act,
+                    )
+                    low_precision_ckpt = (low_precision_ckpt, quant_config)
             self.model = ipex.llm.optimize(
                 self.model.eval(),
                 dtype=infer_dtype,
@@ -2120,6 +2183,7 @@ class LibriSpeech:
                 inplace=True,
                 deployment_mode=False,
                 cache_weight_for_large_batch=args.cache_weight_for_large_batch,
+                low_precision_checkpoint=low_precision_ckpt,
             )
 
         self.base_model = self.model

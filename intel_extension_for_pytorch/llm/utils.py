@@ -683,6 +683,15 @@ def _pad(
 
 
 def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
+    r"""
+    Load low precision checkpoint from a file or a directory containing multiple files.
+    Supported file format: .pt, .bin, .pth, .safetensors.
+    Args:
+        pathname (str or os.PathLike): Path to the checkpoint file or directory containing multiple checkpoint files.
+    Returns:
+        Tuple[Dict[str, torch.Tensor], Dict[str, Any]]: A tuple of low precision checkpoint and quantization config.
+        The quantization config contains quantization method, group size and desc_act.
+    """
     assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
     if os.path.isfile(pathname):
         low_precision_checkpoint = None
@@ -804,15 +813,61 @@ def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
 
 def shard_low_precision_checkpoint(
     low_precision_checkpoint,
-    config,
+    model_config,
     rank,
     world_size,
     quantization_method,
     tp_grain_size,
+    desc_act,
 ):
-    num_heads = config.num_attention_heads
-    if hasattr(config, "num_key_value_heads"):
-        num_heads = config.num_key_value_heads
+    r"""
+    Shard low-precision checkpoint for autoTP.
+    Sharding policy:
+        AWQ:
+            qweight shape: [K, N // 8]
+            scales shape: [K // G, N]
+            qzeros shape: [K // G, N // 8]
+            Attention:
+                Divide N or K by num_k_v_heads if available or num_attention_heads
+                Assign each rank a chunk of N or K evenly or by the 2:1:1 policy
+                - 2:1:1 policy: 4 heads for 3 ranks, the first rank gets 2 and others get 1.
+            MLP:
+                Divide N or K by tp_grain_size
+                Assign each rank a chunk of N or K evenly or by the 2:1:1 policy
+        GPTQ:
+            qweight shape: [K // 8, N]
+            scales shape: [K // G, N]
+            qzeros shape: [K // G, N // 8]
+            g_idx shape: [K]
+            Similar to AWQ, but with different paths if desc_act is True or False.
+            If desc_act is True:
+            - If sharding along N
+                - g_idx is not sharded
+                - Others are sharded as usual
+            - If sharding along K
+                - g_idx is shared the same way as qweight
+                - Scales and zero points are not sharded
+            If desc_act is False:
+            - g_idx is ignored
+            - Others are sharded as usual
+
+    Args:
+        low_precision_checkpoint (dict): Model's low_precision_checkpoint as a state dict.
+        model_config (object): HuggingFace model config.
+        rank (int): current rank for tp.
+        quantization_method (str): "awq" or "gptq".
+        tp_grain_size (int): Grain size for MLP sharding. Usually equal to group size for
+            quantization. Must be a multiple of 8.
+        desc_act (bool): desc_act (a.k.a. act_order) for GPTQ. False for AWQ.
+
+    Returns:
+        A sharded checkpoint dict.
+
+    """
+    assert tp_grain_size % 8 == 0, "tp_grain_size must be a multiple of 8"
+    num_heads = model_config.num_attention_heads
+    if hasattr(model_config, "num_key_value_heads"):
+        num_heads = model_config.num_key_value_heads
     local_rank = rank
 
     mha_layers_split_by_N = [
@@ -860,9 +915,9 @@ def shard_low_precision_checkpoint(
         if any(substring in key for substring in mha_layers_split_by_N):
             data = low_precision_checkpoint_dict[key]
             if quantization_method == "awq":
-                # awq qweight: [K, N // 8]
-                # awq scales: [K // G, N]
-                # awq qzeros: [K // G, N // 8]
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
                 if data.shape[-1] % head_range[-1] == 0:
                     dim = data.shape[-1] // head_range[-1]
                 else:
@@ -873,14 +928,33 @@ def shard_low_precision_checkpoint(
                 low_precision_checkpoint_dict[key] = data[
                     :, q_head_start * dim : q_head_end * dim
                 ]
+            elif quantization_method == "gptq":
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                if data.shape[-1] % head_range[-1] == 0:
+                    dim = data.shape[-1] // head_range[-1]
+                else:
+                    assert data.shape[-1] % world_size == 0
+                    dim = data.shape[-1] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                if "g_idx" in key:
+                    if not desc_act:
+                        low_precision_checkpoint_dict.pop(key)
+                else:
+                    low_precision_checkpoint_dict[key] = data[
+                        :, q_head_start * dim : q_head_end * dim
+                    ]
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
         elif any(substring in key for substring in mlp_layers_split_by_N):
             data = low_precision_checkpoint_dict[key]
             if quantization_method == "awq":
-                # awq qweight: [K, N // 8]
-                # awq scales: [K // G, N]
-                # awq qzeros: [K // G, N // 8]
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
                 if "scales" in key:
                     assert (
                         data.shape[1] % tp_grain_size == 0
@@ -906,14 +980,48 @@ def shard_low_precision_checkpoint(
                 low_precision_checkpoint_dict[key] = data[
                     :, grains_start * dim : grains_end * dim
                 ]
+            elif quantization_method == "gptq":
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                if "qzeros" in key:
+                    assert (
+                        data.shape[-1] * 8
+                    ) % tp_grain_size == 0, "N must be divisible by tp_grain_size"
+                    grains = data.shape[-1] // (tp_grain_size // 8)
+                    dim = tp_grain_size // 8
+                elif "g_idx" not in key:  # qweight, scales
+                    assert (
+                        data.shape[-1] % tp_grain_size == 0
+                    ), "N must be divisible by tp_grain_size"
+                    grains = data.shape[-1] // tp_grain_size
+                    dim = tp_grain_size
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                if "g_idx" in key:
+                    if not desc_act:
+                        low_precision_checkpoint_dict.pop(key)
+                else:
+                    low_precision_checkpoint_dict[key] = data[
+                        :, grains_start * dim : grains_end * dim
+                    ]
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
         elif any(substring in key for substring in mha_layers_split_by_K):
             data = low_precision_checkpoint_dict[key]
             if quantization_method == "awq":
-                # awq qweight: [K, N // 8]
-                # awq scales: [K // G, N]
-                # awq qzeros: [K // G, N // 8]
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
                 if data.shape[0] % head_range[-1] == 0:
                     dim = data.shape[0] // head_range[-1]
                 else:
@@ -924,14 +1032,37 @@ def shard_low_precision_checkpoint(
                 low_precision_checkpoint_dict[key] = data[
                     q_head_start * dim : q_head_end * dim
                 ]
+            elif quantization_method == "gptq":
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                if data.shape[0] % head_range[-1] == 0:
+                    dim = data.shape[0] // head_range[-1]
+                else:
+                    assert data.shape[0] % world_size == 0
+                    dim = data.shape[0] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                if desc_act is False:
+                    if "g_idx" in key:
+                        low_precision_checkpoint_dict.pop(key)
+                    else:
+                        low_precision_checkpoint_dict[key] = data[
+                            q_head_start * dim : q_head_end * dim
+                        ]
+                elif "g_idx" in key or "qweight" in key:
+                    low_precision_checkpoint_dict[key] = data[
+                        q_head_start * dim : q_head_end * dim
+                    ]
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
         elif any(substring in key for substring in mlp_layers_split_by_K):
             data = low_precision_checkpoint_dict[key]
             if quantization_method == "awq":
-                # awq qweight: [K, N // 8]
-                # awq scales: [K // G, N]
-                # awq qzeros: [K // G, N // 8]
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
                 if "qweight" in key:
                     assert (
                         data.shape[0] % tp_grain_size == 0
@@ -954,6 +1085,41 @@ def shard_low_precision_checkpoint(
                 low_precision_checkpoint_dict[key] = data[
                     grains_start * dim : grains_end * dim
                 ]
+            elif quantization_method == "gptq":
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                if "qweight" in key:
+                    assert (
+                        data.shape[0] * 8 % tp_grain_size == 0
+                    ), "K must be divisible by tp_grain_size"
+                    grains = data.shape[0] // (tp_grain_size // 8)
+                    dim = tp_grain_size // 8
+                else:
+                    grains = data.shape[0]
+                    dim = 1
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                if desc_act is False:
+                    if "g_idx" in key:
+                        low_precision_checkpoint_dict.pop(key)
+                    else:
+                        low_precision_checkpoint_dict[key] = data[
+                            grains_start * dim : grains_end * dim
+                        ]
+                elif "g_idx" in key or "qweight" in key:
+                    low_precision_checkpoint_dict[key] = data[
+                        grains_start * dim : grains_end * dim
+                    ]
             else:
                 raise AssertionError(f"{quantization_method} is not supported yet.")
         elif any(substring in key for substring in lm_head_layers):

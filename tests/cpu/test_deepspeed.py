@@ -471,11 +471,12 @@ class DeepspeedTester(JitTestCase):
                 )
 
             torch.save(state_dict, checkpoint_file_name)
-            config_dict = {
+            quantization_config = {
                 "quant_method": "awq",
                 "group_size": group_size,
                 "desc_act": False,
             }
+            config_dict = {"quantization_config": quantization_config}
             config_file_name = work_dir + "/config.json"
             with open(config_file_name, "w", encoding="utf-8") as file:
                 json.dump(config_dict, file, ensure_ascii=False, indent=4)
@@ -492,6 +493,7 @@ class DeepspeedTester(JitTestCase):
                 ds_world_size,
                 quantization_method,
                 group_size,
+                False,
             )
             sharded_low_precision_checkpoint = (
                 sharded_low_precision_checkpoint,
@@ -521,7 +523,7 @@ class DeepspeedTester(JitTestCase):
             "mlp.down_proj.zeros": [43, 512],
             "lm_head.weight": [32000, 2048],
         }
-        assert quantization_method == "awq", "gptq is not supported yet"
+        assert quantization_method == "awq"
         low_precision_checkpoint_dict = sharded_low_precision_checkpoint[0].copy()
         for key in low_precision_checkpoint_dict.keys():
             for layer in shard_dict:
@@ -534,6 +536,173 @@ class DeepspeedTester(JitTestCase):
                     and low_precision_checkpoint_dict[key].shape[1]
                     == shard_dict[layer][1]
                 ), "shape after shard does not match"
+
+    def test_shard_gptq_low_precision_checkpoint(self):
+        curpath = os.path.abspath(os.path.dirname(__file__))
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/llama", return_dict=False
+        )
+        ds_world_size = int(os.getenv("WORLD_SIZE", "1"))
+        if ds_world_size != 2:
+            print("Warning: Expect ds_world_size to be 2.")
+            return
+        local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        model = transformers.models.llama.modeling_llama.LlamaForCausalLM(config).eval()
+        for desc_act in {True, False}:
+            with tempfile.TemporaryDirectory() as work_dir:
+                # Generate dummy checkpoint
+                checkpoint_file_name = work_dir + "/checkpoint.pt"
+                state_dict = model.state_dict()
+                linear_keys = []
+                for k, v in state_dict.items():
+                    if any(
+                        k.endswith(suffix)
+                        for suffix in ["proj.weight", "fc_in.weight", "fc_out.weight"]
+                    ):
+                        linear_keys.append(k[:-7])
+                group_size = 32
+                comp_ratio = 8
+                for k in linear_keys:
+                    N = state_dict[k + ".weight"].shape[0]
+                    K = state_dict[k + ".weight"].shape[1]
+                    del state_dict[k + ".weight"]
+                    n_groups = K // group_size
+                    stored_weight_shape = (K, N // comp_ratio)
+                    stored_scales_shape = (n_groups, N)
+                    stored_zeros_shape = (n_groups, N // comp_ratio)
+                    stored_g_idx_shape = (K * 8,)
+                    state_dict[k + ".qweight"] = torch.randint(
+                        -(2**31), 2**31 - 1, stored_weight_shape, dtype=torch.int32
+                    )
+                    state_dict[k + ".scales"] = torch.randn(
+                        stored_scales_shape, dtype=torch.half
+                    )
+                    state_dict[k + ".qzeros"] = torch.randint(
+                        -(2**31), 2**31 - 1, stored_zeros_shape, dtype=torch.int32
+                    )
+                    state_dict[k + ".g_idx"] = torch.randint(
+                        -(2**31), 2**31 - 1, stored_g_idx_shape, dtype=torch.int32
+                    )
+
+                torch.save(state_dict, checkpoint_file_name)
+                quantization_config = {
+                    "quant_method": "gptq",
+                    "group_size": group_size,
+                    "desc_act": desc_act,
+                }
+                config_dict = {"quantization_config": quantization_config}
+                config_file_name = work_dir + "/config.json"
+                with open(config_file_name, "w", encoding="utf-8") as file:
+                    json.dump(config_dict, file, ensure_ascii=False, indent=4)
+                low_precision_checkpoint, quant_config = load_low_precision_checkpoint(
+                    work_dir
+                )
+                quantization_method = quant_config["quant_method"]
+                group_size = quant_config["group_size"]
+                sharded_low_precision_checkpoint = shard_low_precision_checkpoint(
+                    low_precision_checkpoint,
+                    config,
+                    local_rank,
+                    ds_world_size,
+                    quantization_method,
+                    group_size,
+                    desc_act,
+                )
+                sharded_low_precision_checkpoint = (
+                    sharded_low_precision_checkpoint,
+                    quant_config,
+                )
+            desc_true_shard_dict = {
+                "self_attn.q_proj.qweight": [4096, 256],
+                "self_attn.q_proj.scales": [128, 2048],
+                "self_attn.q_proj.zeros": [128, 256],
+                "self_attn.q_proj.g_idx": [32768],
+                "self_attn.k_proj.qweight": [4096, 256],
+                "self_attn.k_proj.scales": [128, 2048],
+                "self_attn.k_proj.zeros": [128, 256],
+                "self_attn.k_proj.g_idx": [32768],
+                "self_attn.v_proj.qweight": [4096, 256],
+                "self_attn.v_proj.scales": [128, 2048],
+                "self_attn.v_proj.zeros": [128, 256],
+                "self_attn.v_proj.g_idx": [32768],
+                "self_attn.o_proj.qweight": [2048, 512],
+                "self_attn.o_proj.scales": [128, 4096],
+                "self_attn.o_proj.zeros": [128, 512],
+                "self_attn.o_proj.g_idx": [16384],
+                "mlp.up_proj.qweight_0": [4096, 704],
+                "mlp.up_proj.qweight_1": [4096, 672],
+                "mlp.up_proj.scales": [128, 5504],
+                "mlp.up_proj.zeros_0": [128, 704],
+                "mlp.up_proj.zeros_1": [128, 672],
+                "mlp.up_proj.g_idx": [32768],
+                "mlp.gate_proj.qweight_0": [4096, 704],
+                "mlp.gate_proj.qweight_1": [4096, 672],
+                "mlp.gate_proj.scales": [128, 5504],
+                "mlp.gate_proj.zeros_0": [128, 704],
+                "mlp.gate_proj.zeros_1": [128, 672],
+                "mlp.gate_proj.g_idx": [32768],
+                "mlp.down_proj.qweight": [5504, 512],
+                "mlp.down_proj.scales": [344, 4096],
+                "mlp.down_proj.zeros": [344, 512],
+                "mlp.down_proj.g_idx": [44032],
+                "lm_head.weight": [32000, 2048],
+            }
+            desc_false_shard_dict = {
+                "self_attn.q_proj.qweight": [4096, 256],
+                "self_attn.q_proj.scales": [128, 2048],
+                "self_attn.q_proj.zeros": [128, 256],
+                "self_attn.k_proj.qweight": [4096, 256],
+                "self_attn.k_proj.scales": [128, 2048],
+                "self_attn.k_proj.zeros": [128, 256],
+                "self_attn.v_proj.qweight": [4096, 256],
+                "self_attn.v_proj.scales": [128, 2048],
+                "self_attn.v_proj.zeros": [128, 256],
+                "self_attn.o_proj.qweight": [2048, 512],
+                "self_attn.o_proj.scales": [64, 4096],
+                "self_attn.o_proj.zeros": [64, 512],
+                "mlp.up_proj.qweight_0": [4096, 704],
+                "mlp.up_proj.qweight_1": [4096, 672],
+                "mlp.up_proj.scales": [128, 5504],
+                "mlp.up_proj.zeros_1": [128, 704],
+                "mlp.up_proj.zeros_0": [128, 672],
+                "mlp.gate_proj.qweight_0": [4096, 704],
+                "mlp.gate_proj.qweight_1": [4096, 672],
+                "mlp.gate_proj.scales": [128, 5504],
+                "mlp.gate_proj.zeros_0": [128, 704],
+                "mlp.gate_proj.zeros_1": [128, 672],
+                "mlp.down_proj.qweight": [5504, 512],
+                "mlp.down_proj.scales": [172, 4096],
+                "mlp.down_proj.zeros": [172, 512],
+                "lm_head.weight": [32000, 2048],
+            }
+            if desc_act is True:
+                shard_dict = desc_true_shard_dict
+            else:
+                shard_dict = desc_false_shard_dict
+            assert quantization_method == "gptq"
+            low_precision_checkpoint_dict = sharded_low_precision_checkpoint[0].copy()
+            for key in low_precision_checkpoint_dict.keys():
+                for layer in shard_dict:
+                    if layer not in key:
+                        continue
+                    if "bias" in key:
+                        continue
+                    if "g_idx" in key:
+                        assert (
+                            low_precision_checkpoint_dict[key].shape[0]
+                            == shard_dict[layer][0]
+                        ), "shape after shard does not match"
+                    else:
+                        if ("up_proj" in layer or "gate_proj" in layer) and (
+                            "qweight" in key or "zeros" in key
+                        ):
+                            layer = layer + "_" + str(local_rank)
+                        assert (
+                            low_precision_checkpoint_dict[key].shape[0]
+                            == shard_dict[layer][0]
+                            and low_precision_checkpoint_dict[key].shape[1]
+                            == shard_dict[layer][1]
+                        ), "shape after shard does not match"
 
 
 if __name__ == "__main__":
