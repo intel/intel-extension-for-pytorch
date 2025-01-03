@@ -124,6 +124,9 @@ else()
 endif()
 set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -fsycl-max-parallel-link-jobs=${SYCL_MAX_PARALLEL_LINK_JOBS})
 
+# Enable device code compression
+set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} --offload-compress)
+
 if(BUILD_BY_PER_KERNEL)
   set(IPEX_SYCL_KERNEL_FLAGS ${IPEX_SYCL_KERNEL_FLAGS} -fsycl-device-code-split=per_kernel)
   set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -fsycl-device-code-split=per_kernel)
