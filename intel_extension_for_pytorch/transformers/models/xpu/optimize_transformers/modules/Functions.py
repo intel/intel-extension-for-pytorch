@@ -503,8 +503,10 @@ def _ipex_beam_search(
         else self.generation_config.eos_token_id
     )
 
-    if isinstance(eos_token_id, List):
-        raise ValueError("we only support one eos token")
+    if isinstance(eos_token_id, int):
+        eos_token_id = [eos_token_id]
+    eos_token_id = torch.tensor(eos_token_id)
+
     output_scores = (
         output_scores
         if output_scores is not None
@@ -859,8 +861,10 @@ def _ipex_beam_search_(
     latency_list = []
     pad_token_id = generation_config._pad_token_tensor
     eos_token_id = generation_config._eos_token_tensor
-    if type(eos_token_id) is List or type(eos_token_id) is torch.Tensor:
-        eos_token_id = eos_token_id[0]
+    if isinstance(eos_token_id, int):
+        eos_token_id = [eos_token_id]
+    eos_token_id = torch.tensor(eos_token_id)
+
     output_attentions = generation_config.output_attentions
     output_hidden_states = generation_config.output_hidden_states
     output_scores = generation_config.output_scores

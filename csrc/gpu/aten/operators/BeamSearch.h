@@ -165,7 +165,7 @@ struct BeamSearchTopkStage1KernelFunctor {
       const scalar_t* scores_,
       scalar_t* tmp_scores_,
       int64_t* tmp_idx_,
-      int64_t end_id_,
+      int64_t* end_id_,
       int64_t vocab_size_,
       int64_t beam_size_,
       int64_t batch_size_,
@@ -187,7 +187,7 @@ struct BeamSearchTopkStage1KernelFunctor {
   const scalar_t* scores;
   scalar_t* tmp_scores;
   int64_t* tmp_idx;
-  int64_t end_id;
+  int64_t* end_id;
   int64_t vocab_size;
   int64_t beam_size;
   int64_t batch_size;
@@ -203,7 +203,7 @@ void beam_search_topk_stage1(
     const scalar_t* scores,
     scalar_t* tmp_scores,
     int64_t* tmp_idx,
-    int64_t end_id,
+    int64_t* end_id,
     int64_t vocab_size,
     int64_t beam_size,
     int64_t batch_size,
@@ -433,8 +433,15 @@ struct BatchTopkKernelFunctor {
       int32_t selected_beams = 0; // the counter of beams selected without EOS
 
       for (int i = 0; i < MAX_K; ++i) {
-        if (topk_tmp_id_buf[wg_offset + total.p[i]] % vocab_size ==
-            eos_token_id) {
+        bool eos_token = false;
+        for (size_t j = 0; j < eos_token_size; ++j) {
+          if (topk_tmp_id_buf[wg_offset + total.p[i]] % vocab_size ==
+              eos_token_id[j]) {
+            eos_token = true;
+            break;
+          }
+        }
+        if (eos_token) {
           if (i >= beam_size) {
             // do nothing
           } else {
@@ -484,7 +491,7 @@ struct BatchTopkKernelFunctor {
             const int tgt_id_offset =
                 (wg_id * (beam_size * 2) + beam_idx) * max_out_seq_len;
             beam_hyps_output_ids_tgt[tgt_id_offset + cur_len] =
-                eos_token_id; // update output ids for last time step
+                eos_token_id[0]; // update output ids for last time step
 
             int prev_id =
                 (topk_tmp_id_buf[wg_offset + total.p[i]] / vocab_size) %
@@ -547,7 +554,8 @@ struct BatchTopkKernelFunctor {
       int64_t* top_token_,
       int64_t* top_beams_,
       int64_t pad_token_id_,
-      int64_t eos_token_id_,
+      int64_t* eos_token_id_,
+      size_t eos_token_size_,
       bool* finished_,
       int64_t* beam_hyps_num_beams_,
       scalar_t* beam_hyps_min_normed_scores_,
@@ -575,6 +583,7 @@ struct BatchTopkKernelFunctor {
         top_beams(top_beams_),
         pad_token_id(pad_token_id_),
         eos_token_id(eos_token_id_),
+        eos_token_size(eos_token_size_),
         finished(finished_),
         beam_hyps_num_beams(beam_hyps_num_beams_),
         beam_hyps_min_normed_scores(beam_hyps_min_normed_scores_),
@@ -603,7 +612,8 @@ struct BatchTopkKernelFunctor {
   int64_t* top_token;
   int64_t* top_beams;
   int64_t pad_token_id;
-  int64_t eos_token_id;
+  int64_t* eos_token_id;
+  size_t eos_token_size;
   bool* finished;
   int64_t* beam_hyps_num_beams;
   scalar_t* beam_hyps_min_normed_scores;
@@ -637,7 +647,8 @@ void batch_topk_kernel(
     int64_t* top_token, // out for for topk (global id)
     int64_t* top_beams, // out
     int64_t pad_token_id,
-    int64_t eos_token_id,
+    int64_t* eos_token_id,
+    size_t eos_token_size,
     bool* finished, // [batch_size]
     // parameters for beam_hyps
     int64_t* beam_hyps_num_beams, // [batch_size] number for eos candidates
@@ -674,6 +685,7 @@ void batch_topk_kernel(
         top_beams,
         pad_token_id,
         eos_token_id,
+        eos_token_size,
         finished,
         beam_hyps_num_beams,
         beam_hyps_min_normed_scores,
