@@ -2284,6 +2284,109 @@ def _JambaAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _DeepseekV2Attention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    **kwargs,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+
+    if self.q_lora_rank is None:
+        q = self.q_proj(hidden_states)
+    else:
+        q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
+    q = q.view(bsz, q_len, self.num_heads, self.q_head_dim)
+    q_nope = q[:, :, :, : self.qk_nope_head_dim]
+    q_pe = q[:, :, :, self.qk_nope_head_dim :]
+
+    compressed_kv = self.kv_a_proj_with_mqa(hidden_states)
+    compressed_kv, k_pe = torch.split(
+        compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1
+    )
+    k_pe = k_pe.view(bsz, q_len, 1, self.qk_rope_head_dim)
+    kv = self.kv_b_proj(self.kv_a_layernorm(compressed_kv)).view(
+        bsz, q_len, self.num_heads, self.qk_nope_head_dim + self.v_head_dim
+    )
+
+    k_nope = kv[:, :, :, : self.qk_nope_head_dim]
+    value_states = kv[:, :, :, self.qk_nope_head_dim :]
+
+    kv_seq_len = (
+        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
+    )
+    q_pe = (
+        q_pe.view(bsz, -1, self.num_heads, self.qk_rope_head_dim // 2, 2)
+        .transpose(4, 3)
+        .reshape(bsz, -1, self.num_heads, self.qk_rope_head_dim)
+        .contiguous()
+    )
+    k_pe = (
+        k_pe.view(bsz, -1, k_pe.size(2), self.qk_rope_head_dim // 2, 2)
+        .transpose(4, 3)
+        .reshape(bsz, -1, k_pe.size(2), self.qk_rope_head_dim)
+        .contiguous()
+    )
+
+    k_pe = self._IPEXROPE(
+        k_pe,
+        position_ids,
+        k_pe.size(2),
+        self.qk_rope_head_dim,
+        self.qk_rope_head_dim // 2,
+        self.qk_rope_head_dim,
+    )
+    q_pe = self._IPEXROPE(
+        q_pe,
+        position_ids,
+        self.num_attention_heads,
+        self.qk_rope_head_dim,
+        self.qk_rope_head_dim // 2,
+        self.qk_rope_head_dim,
+    )
+
+    query_states = torch.cat([q_nope, q_pe], dim=-1)
+    key_states = torch.cat(
+        [k_nope, k_pe.repeat(1, 1, self.num_key_value_heads, 1)], dim=-1
+    )
+
+    if self.q_head_dim != self.v_head_dim:
+        value_states = torch.nn.functional.pad(
+            value_states, [0, self.q_head_dim - self.v_head_dim]
+        )
+    (
+        attn_output,
+        attn_weights,
+        past_key_value,
+    ) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        1 / self.softmax_scale,
+        past_key_value,
+        None,
+        attention_mask,
+    )
+    if self.q_head_dim != self.v_head_dim:
+        attn_output = attn_output[:, :, :, : self.v_head_dim]
+
+    attn_output = attn_output.transpose(1, 2).contiguous()
+
+    attn_output = attn_output.reshape(bsz, q_len, -1)
+
+    # Move out of this function to fuse with add when possible
+    # attn_output = self.o_proj(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
 def _create_attention_mask_for_git(
     self, tgt, memory, tgt_mask, past_key_values_length, memory_key_padding_mask=None
 ):
@@ -2515,6 +2618,8 @@ class _IPEXAttentionRef(nn.Module):
                 self.pos_embd_dim = rotary_dim // 2
             elif self.model_backbone in ["StableLmForCausalLM", "PhiForCausalLM"]:
                 self.pos_embd_dim = self.rotary_emb.dim
+            elif self.model_backbone in ["DeepseekV2ForCausalLM"]:
+                self.pos_embd_dim = self.qk_rope_head_dim
             else:
                 self.pos_embd_dim = self.head_dim
             self.rope_base = 10000
@@ -2546,6 +2651,16 @@ class _IPEXAttentionRef(nn.Module):
                     )
                 if "rope_type" in config.rope_scaling:
                     extra_inputs["rope_type"] = config.rope_scaling["rope_type"]
+                if "beta_fast" in config.rope_scaling:
+                    extra_inputs["beta_fast"] = config.rope_scaling["beta_fast"]
+                if "beta_slow" in config.rope_scaling:
+                    extra_inputs["beta_slow"] = config.rope_scaling["beta_slow"]
+                if "mscale" in config.rope_scaling:
+                    extra_inputs["mscale"] = config.rope_scaling["mscale"]
+                if "mscale_all_dim" in config.rope_scaling:
+                    extra_inputs["mscale_all_dim"] = config.rope_scaling[
+                        "mscale_all_dim"
+                    ]
             if hasattr(config, "original_max_position_embeddings"):
                 extra_inputs["original_max_position_embeddings"] = (
                     config.original_max_position_embeddings
@@ -3043,6 +3158,16 @@ class _IPEXAttentionRef(nn.Module):
             )
         elif self.model_backbone == "JambaForCausalLM":
             return _JambaAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone == "DeepseekV2ForCausalLM":
+            return _DeepseekV2Attention_forward(
                 self,
                 hidden_states,
                 attention_mask,

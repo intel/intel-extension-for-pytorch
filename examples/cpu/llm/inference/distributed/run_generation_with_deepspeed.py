@@ -293,12 +293,14 @@ def get_repo_root(model_name_or_path):
 
 def get_checkpoint_files(model_name_or_path):
     cached_repo_dir = get_repo_root(model_name_or_path)
-
+    glob_pattern = "*.[bp][it][n]"
+    if re.search("deepseek-v2", model_name_or_path, re.IGNORECASE):
+        glob_pattern = "*.[sbp][ait][fn][e][t][e][n][s][o][r][s]"
     # extensions: .bin | .pt
     # creates a list of paths from all downloaded files in cache dir
     file_list = [
         str(entry)
-        for entry in Path(cached_repo_dir).rglob("*.[bp][it][n]")
+        for entry in Path(cached_repo_dir).rglob(glob_pattern)
         if entry.is_file()
     ]
     return file_list

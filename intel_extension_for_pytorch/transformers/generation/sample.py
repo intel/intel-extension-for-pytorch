@@ -196,6 +196,7 @@ def _sample(
             "Qwen2ForCausalLM",
             "Maira2ForConditionalGeneration",
             "JambaForCausalLM",
+            "DeepseekV2ForCausalLM",
         ]:
             first_token = False
             if hasattr(self.config, "kv_cache_dtype"):

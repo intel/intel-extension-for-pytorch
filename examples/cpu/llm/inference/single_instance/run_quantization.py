@@ -45,6 +45,7 @@ from llm.inference.utils.model_class.yuan import YuanConfig
 from llm.inference.utils.model_class.whisper import WhisperConfig
 from llm.inference.utils.model_class.maira2 import MAIRA2Config
 from llm.inference.utils.model_class.jamba import JambaConfig
+from llm.inference.utils.model_class.deepseek import DeepseekV2Config
 
 parser = argparse.ArgumentParser("LLM generation script (int8 path)", add_help=False)
 parser.add_argument(
@@ -434,6 +435,8 @@ elif re.search("maira2", config.architectures[0], re.IGNORECASE):
     model = MAIRA2Config(args.model_id)
 elif re.search("jamba", config.architectures[0], re.IGNORECASE):
     model = JambaConfig(args.model_id)
+elif re.search("deepseekv2", config.architectures[0], re.IGNORECASE):
+    model = DeepseekV2Config(args.model_id)
 else:
     raise AssertionError("Not support %s." % (args.model_id))
 

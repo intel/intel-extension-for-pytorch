@@ -204,6 +204,7 @@ def _beam_search(
             "Qwen2ForCausalLM",
             "Maira2ForConditionalGeneration",
             "JambaForCausalLM",
+            "DeepseekV2ForCausalLM",
         ]:
             first_token = False
             has_position_id = model_inputs.get("position_ids", None) is not None

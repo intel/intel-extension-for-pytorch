@@ -1824,6 +1824,139 @@ def JambaMambaDecoderLayer_forward(
     return outputs
 
 
+def moe_infer(self, x, topk_ids, topk_weight):
+    final_out = torch.zeros_like(x, dtype=x.dtype)
+    topk_weight = topk_weight.to(dtype=x.dtype)
+    expert_mask = torch.nn.functional.one_hot(
+        topk_ids, num_classes=len(self.mlp.experts)
+    ).permute(2, 1, 0)
+
+    # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
+    if self.moe_linear_type in [0, 1]:
+        final_out = torch.ops.torch_ipex.deepseek_moe_tpp(
+            x,
+            expert_mask,
+            self.gate_weights,
+            self.up_weights,
+            self.down_weights,
+            self.moe_linear_type == 0,
+            topk_weight,
+            final_out,
+            self.distributed,
+        )
+    elif self.moe_linear_type == 2:
+        final_out = torch.ops.torch_ipex.deepseek_moe(
+            x,
+            expert_mask,
+            self.gate_weights,
+            self.gate_ctx,
+            self.up_weights,
+            self.up_ctx,
+            self.down_weights,
+            self.down_ctx,
+            topk_weight,
+            final_out,
+            self.distributed,
+        )
+    elif self.moe_linear_type == 3:
+        final_out = torch.ops.torch_ipex.deepseek_moe_mkl(
+            x,
+            expert_mask,
+            self.gate_weights,
+            self.gate_ctx,
+            self.up_weights,
+            self.up_ctx,
+            self.down_weights,
+            self.down_ctx,
+            topk_weight,
+            final_out,
+            self.distributed,
+        )
+    else:
+        final_out = torch.ops.torch_ipex.deepseek_moe_woq(
+            x,
+            expert_mask,
+            self.gate_ctx,
+            self.up_ctx,
+            self.down_ctx,
+            topk_weight,
+            final_out,
+            self.distributed,
+        )
+    return final_out
+
+
+def DeepseekV2DecoderLayer_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
+    **kwargs,
+) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    residual = hidden_states
+    hidden_states = self.input_layernorm(hidden_states).to(dtype=hidden_states.dtype)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+        **kwargs,
+    )
+    if not self.distributed:
+        hidden_states = self.mha_linear_add(hidden_states, residual)
+    else:
+        hidden_states = self.self_attn.o_proj(hidden_states)
+        hidden_states = residual + hidden_states
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states).to(
+        dtype=hidden_states.dtype
+    )
+    if hasattr(self.mlp, "experts"):  # DeepseekV2MoE
+        identity = hidden_states
+        orig_shape = hidden_states.shape
+        topk_idx, topk_weight, aux_loss = self.mlp.gate(hidden_states)
+        hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
+        hidden_states = moe_infer(self, hidden_states, topk_idx, topk_weight).view(
+            *orig_shape
+        )
+        if hasattr(self.mlp, "shared_experts"):
+            identity = self.shared_linear_silu_mul(identity)
+            if not self.distributed:
+                hidden_states = self.shared_linear_add_add(
+                    identity, hidden_states, residual
+                )
+            else:
+                identity = self.mlp.shared_experts.down_proj(identity)
+                hidden_states = hidden_states + identity
+                hidden_states = residual + hidden_states
+    else:  # DeepseekV2MLP
+        hidden_states = self.mlp_linear_silu_mul(hidden_states)
+        if not self.distributed:
+            hidden_states = self.mlp_linear_add(hidden_states, residual)
+        else:
+            hidden_states = self.mlp.down_proj(hidden_states)
+            hidden_states = residual + hidden_states
+
+    outputs = (hidden_states,)
+
+    if output_attentions:
+        outputs += (self_attn_weights,)
+
+    if use_cache:
+        outputs += (present_key_value,)
+
+    return outputs
+
+
 class _IPEXDecoderLayerRef(nn.Module):
     def __init__(self, module, config, distributed=False):
         super().__init__()
@@ -2104,7 +2237,33 @@ class _IPEXDecoderLayerRef(nn.Module):
                 if not self.distributed:
                     self.mha_linear_add = _IPEXlinearAddRef(module.mamba.out_proj)
                     del self.__dict__["_modules"]["mamba"].out_proj
-
+        elif self.model_backbone == "DeepseekV2ForCausalLM":
+            if not self.distributed:
+                self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
+                del self.__dict__["_modules"]["self_attn"].o_proj
+            if hasattr(module.mlp, "experts"):  # DeepseekV2MoE
+                # shared_experts
+                if config.n_shared_experts is not None:
+                    if not self.distributed:
+                        self.shared_linear_add_add = _IPEXlinearAddAddRef(
+                            module.mlp.shared_experts.down_proj
+                        )
+                        del self.__dict__["_modules"]["mlp"].shared_experts.down_proj
+                    self.shared_linear_silu_mul = _IPEXlinearSiluMulRef(
+                        module.mlp.shared_experts.gate_proj,
+                        module.mlp.shared_experts.up_proj,
+                    )
+                    del self.__dict__["_modules"]["mlp"].shared_experts.gate_proj
+                    del self.__dict__["_modules"]["mlp"].shared_experts.up_proj
+            else:  # DeepseekV2MLP
+                if not self.distributed:
+                    self.mlp_linear_add = _IPEXlinearAddRef(module.mlp.down_proj)
+                    del self.__dict__["_modules"]["mlp"].down_proj
+                self.mlp_linear_silu_mul = _IPEXlinearSiluMulRef(
+                    module.mlp.gate_proj, module.mlp.up_proj
+                )
+                del self.__dict__["_modules"]["mlp"].gate_proj
+                del self.__dict__["_modules"]["mlp"].up_proj
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2432,6 +2591,16 @@ class _IPEXDecoderLayerRef(nn.Module):
                     use_cache,
                     cache_position,
                 )
+        elif self.model_backbone == "DeepseekV2ForCausalLM":
+            return DeepseekV2DecoderLayer_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 

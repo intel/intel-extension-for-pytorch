@@ -246,7 +246,7 @@ def _get_cached_module_file(
 
     # Now we move the module inside our cached dynamic modules.
     full_submodule = TRANSFORMERS_DYNAMIC_MODULE_NAME + os.path.sep + submodule
-    full_submodule = full_submodule.replace("-", "_")
+    full_submodule = full_submodule.replace("-", "_").replace("V2.5", "V2_5")
     create_dynamic_module(full_submodule)
     submodule_path = Path(HF_MODULES_CACHE) / full_submodule
     if submodule == os.path.basename(pretrained_model_name_or_path):

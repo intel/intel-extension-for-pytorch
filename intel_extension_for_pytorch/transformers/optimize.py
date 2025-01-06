@@ -212,6 +212,8 @@ def model_convert_reference(_model):
         JambaModel_forward,
         JambaMambaMixer_forward,
         JambaForCausalLM_forward,
+        DeepseekV2ForCausalLM_forward,
+        DeepseekV2Model_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptj,
         prepare_inputs_for_generation_gptbigcode,
@@ -1090,6 +1092,23 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
+    elif _model.config.architectures[0] == "DeepseekV2ForCausalLM":
+        convert_function(_model, "forward", DeepseekV2ForCausalLM_forward)
+        convert_function(_model.model, "forward", DeepseekV2Model_forward)
+        convert_class(
+            _model,
+            type(_model.model.layers[0].self_attn),
+            _IPEXAttentionRef,
+            _model.config,
+            distributed=distributed,
+        )
+        convert_class(
+            _model,
+            type(_model.model.layers[0]),
+            _IPEXDecoderLayerRef,
+            _model.config,
+            distributed=distributed,
+        )
     return _model
 
 
@@ -1631,6 +1650,8 @@ def model_convert_lowering(
                 supported_classes.append(
                     type(_model.model.layers[0].mamba.dt_layernorm)
                 )
+            if _model.config.architectures[0] == "DeepseekV2ForCausalLM":
+                supported_classes.append(type(_model.model.layers[0].input_layernorm))
             for supported_class in supported_classes:
                 lowering_class_cpu(
                     _model,
@@ -1854,7 +1875,7 @@ def optimize(
 
     Well supported model family with full functionalities:
     Llama, MLlama, GPT-J, GPT-Neox, OPT, Falcon, Bloom, CodeGen, Baichuan, ChatGLM, GPTBigCode,
-    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Whisper.
+    T5, Mistral, MPT, Mixtral, StableLM, QWen, Git, Llava, Yuan, Phi, Whisper, Maira2, Jamba, DeepSeekV2.
 
     For the model that is not in the scope of supported model family above, will try to
     apply default ipex.optimize transparently to get benifits (not include quantizations,
@@ -1947,6 +1968,7 @@ def optimize(
                 "WhisperForConditionalGeneration",
                 "Maira2ForConditionalGeneration",
                 "JambaForCausalLM",
+                "DeepseekV2ForCausalLM",
             ]
         if well_supported_model:
             check_transformers_for_llm_support()
@@ -1971,7 +1993,7 @@ def optimize(
                 logger.warning(
                     "ipex.llm.optimize supports quantizations on Llama, MLlama, GPT-J, GPT-Neox, Falcon, OPT, Bloom, CodeGen,"
                     + " Baichuan, ChatGLM, GPTBigCode, T5, Mistral, Mixtral, MPT, StableLM, QWen, Git, Llava, Yuan,"
-                    + " Phi, Whisper, and Maira2, fallback to origin model"
+                    + " Phi, Whisper, Maira2, Jamba and Deepseek, fallback to origin model"
                 )
                 return model
 

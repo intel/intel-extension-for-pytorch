@@ -1987,6 +1987,244 @@ class CPUOPsTester(TestCase):
                     torch.max(torch.abs(output_ref - output_fp32_ref)),
                 )
 
+    def test_deepseek_moe(self):
+        class DeepseekV2MLP(nn.Module):
+            def __init__(self, hidden_size=5120, intermediate_size=12288):
+                super().__init__()
+                self.hidden_size = hidden_size
+                self.intermediate_size = intermediate_size
+
+                self.gate_proj = nn.Linear(
+                    self.hidden_size, self.intermediate_size, bias=False
+                )
+                self.up_proj = nn.Linear(
+                    self.hidden_size, self.intermediate_size, bias=False
+                )
+                self.down_proj = nn.Linear(
+                    self.intermediate_size, self.hidden_size, bias=False
+                )
+                self.act_fn = nn.SiLU()
+
+            def forward(self, x):
+                down_proj = self.down_proj(
+                    self.act_fn(self.gate_proj(x)) * self.up_proj(x)
+                )
+                return down_proj
+
+        class MoETest(nn.Module):
+            def __init__(
+                self,
+                num_experts,
+                hidden_size,
+                intermediate_size,
+                moe_linear_type=0,
+                use_ipex=False,
+            ):
+                super().__init__()
+                self.experts = nn.ModuleList(
+                    [
+                        DeepseekV2MLP(hidden_size, intermediate_size)
+                        for _ in range(num_experts)
+                    ]
+                )
+                self.use_ipex = use_ipex
+                if use_ipex:
+                    self.moe_linear_type = moe_linear_type
+                    self.distributed = False
+                    # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
+                    if self.moe_linear_type == 1:
+                        from intel_extension_for_pytorch.cpu._auto_kernel_selection import (
+                            _enable_tpp,
+                            _disable_tpp,
+                        )
+
+                        _enable_tpp()
+                        self.experts = ipex.optimize(
+                            self.experts.eval(), dtype=torch.bfloat16
+                        )
+                        _disable_tpp()
+                    if self.moe_linear_type == 2:
+                        self.experts = ipex.optimize(
+                            self.experts.eval(), dtype=torch.bfloat16
+                        )
+                    if self.moe_linear_type == 3:
+                        ipex._disable_dnnl()
+                        self.experts = ipex.optimize(
+                            self.experts.eval(), dtype=torch.float32, level="O1"
+                        )
+                    if self.moe_linear_type == 4:
+                        qconfig_mapping = (
+                            ipex.quantization.get_weight_only_quant_qconfig_mapping()
+                        )
+                        from intel_extension_for_pytorch.quantization import (
+                            prepare,
+                            convert,
+                        )
+
+                        self.experts = copy.deepcopy(self.experts)
+                        self.experts = prepare(
+                            self.experts, qconfig_mapping, inplace=True
+                        )
+                        self.experts = convert(self.experts, inplace=True)
+                    self.gate_weights = []
+                    self.up_weights = []
+                    self.down_weights = []
+                    self.gate_ctx = []
+                    self.up_ctx = []
+                    self.down_ctx = []
+                    for expert_idx in range(len(self.experts)):
+                        expert_layer = self.experts[expert_idx]
+                        if self.moe_linear_type in [0, 1]:
+                            self.gate_weights.append(expert_layer.gate_proj.weight)
+                            self.up_weights.append(expert_layer.up_proj.weight)
+                            self.down_weights.append(expert_layer.down_proj.weight)
+                        elif self.moe_linear_type in [2, 3]:
+                            self.gate_weights.append(
+                                expert_layer.gate_proj._get_forward_weight()
+                            )
+                            self.up_weights.append(
+                                expert_layer.up_proj._get_forward_weight()
+                            )
+                            self.down_weights.append(
+                                expert_layer.down_proj._get_forward_weight()
+                            )
+                            self.gate_ctx.append(expert_layer.gate_proj.ctx)
+                            self.up_ctx.append(expert_layer.up_proj.ctx)
+                            self.down_ctx.append(expert_layer.down_proj.ctx)
+                        else:
+                            self.gate_ctx.append(expert_layer.gate_proj._op_context)
+                            self.up_ctx.append(expert_layer.up_proj._op_context)
+                            self.down_ctx.append(expert_layer.down_proj._op_context)
+
+            def forward(self, x, topk_ids, topk_weight):
+                if self.use_ipex:
+                    return self.moe_infer_ipex(x, topk_ids, topk_weight)
+                return self.moe_infer_ref(x, topk_ids, topk_weight)
+
+            def moe_infer_ref(self, x, topk_ids, topk_weight):
+                cnts = topk_ids.new_zeros((topk_ids.shape[0], len(self.experts)))
+                cnts.scatter_(1, topk_ids, 1)
+                tokens_per_expert = cnts.sum(dim=0)
+                idxs = topk_ids.view(-1).argsort()
+                sorted_tokens = x[idxs // topk_ids.shape[1]]
+                tokens_per_expert = tokens_per_expert.cpu().numpy()
+
+                outputs = []
+                start_idx = 0
+                for i, num_tokens in enumerate(tokens_per_expert):
+                    end_idx = start_idx + num_tokens
+                    if num_tokens == 0:
+                        continue
+                    expert = self.experts[i]
+                    tokens_for_this_expert = sorted_tokens[start_idx:end_idx]
+                    expert_out = expert(tokens_for_this_expert)
+                    outputs.append(expert_out)
+                    start_idx = end_idx
+
+                outs = (
+                    torch.cat(outputs, dim=0)
+                    if len(outputs)
+                    else sorted_tokens.new_empty(0)
+                )
+                new_x = torch.empty_like(outs)
+                new_x[idxs] = outs
+                final_out = (
+                    new_x.view(*topk_ids.shape, -1)
+                    .type(topk_weight.dtype)
+                    .mul_(topk_weight.unsqueeze(dim=-1))
+                    .sum(dim=1)
+                    .type(new_x.dtype)
+                )
+                return final_out
+
+            def moe_infer_ipex(self, x, topk_ids, topk_weight):
+                final_out = torch.zeros_like(x, dtype=x.dtype)
+                topk_weight = topk_weight.to(dtype=x.dtype)
+                expert_mask = torch.nn.functional.one_hot(
+                    topk_ids, num_classes=len(self.experts)
+                ).permute(2, 1, 0)
+
+                if self.moe_linear_type in [0, 1]:
+                    final_out = torch.ops.torch_ipex.deepseek_moe_tpp(
+                        x,
+                        expert_mask,
+                        self.gate_weights,
+                        self.up_weights,
+                        self.down_weights,
+                        self.moe_linear_type == 0,
+                        topk_weight,
+                        final_out,
+                        self.distributed,
+                    )
+                elif self.moe_linear_type == 2:
+                    final_out = torch.ops.torch_ipex.deepseek_moe(
+                        x,
+                        expert_mask,
+                        self.gate_weights,
+                        self.gate_ctx,
+                        self.up_weights,
+                        self.up_ctx,
+                        self.down_weights,
+                        self.down_ctx,
+                        topk_weight,
+                        final_out,
+                        self.distributed,
+                    )
+                elif self.moe_linear_type == 3:
+                    final_out = torch.ops.torch_ipex.deepseek_moe_mkl(
+                        x,
+                        expert_mask,
+                        self.gate_weights,
+                        self.gate_ctx,
+                        self.up_weights,
+                        self.up_ctx,
+                        self.down_weights,
+                        self.down_ctx,
+                        topk_weight,
+                        final_out,
+                        self.distributed,
+                    )
+                else:
+                    final_out = torch.ops.torch_ipex.deepseek_moe_woq(
+                        x,
+                        expert_mask,
+                        self.gate_ctx,
+                        self.up_ctx,
+                        self.down_ctx,
+                        topk_weight,
+                        final_out,
+                        self.distributed,
+                    )
+                return final_out
+
+        tokens = 1
+        hidden_size = 64
+        intermediate_size = 1024
+        num_experts = 8
+        selected_experts = 2
+        x = torch.rand(tokens, hidden_size)
+        topk_weight = torch.rand(tokens, selected_experts)
+        topk_ids = torch.randint(0, num_experts, (tokens, selected_experts))
+        with torch.no_grad():
+            model_ref = MoETest(num_experts, hidden_size, intermediate_size).eval()
+            output_ref = model_ref(x.clone(), topk_ids.clone(), topk_weight.clone())
+            for moe_linear_type in [0, 1, 2, 3, 4]:
+                amp_enabled = False if moe_linear_type == 3 else True
+                dtype = torch.float32 if moe_linear_type == 3 else torch.bfloat16
+                x_clone = x.clone().to(dtype)
+                topk_ids_clone = topk_ids.clone()
+                topk_weight_clone = topk_weight.clone().to(dtype)
+                with torch.cpu.amp.autocast(enabled=amp_enabled):
+                    model_ipex = MoETest(
+                        num_experts,
+                        hidden_size,
+                        intermediate_size,
+                        moe_linear_type,
+                        True,
+                    ).eval()
+                    output_ipex = model_ipex(x_clone, topk_ids_clone, topk_weight_clone)
+                    self.assertEqual(output_ref, output_ipex, prec=0.1)
+
 
 if __name__ == "__main__":
     test = unittest.main()

@@ -58,6 +58,16 @@ class _IPEXAttentionCPU(nn.Module):
                     )
                 if "rope_type" in config.rope_scaling:
                     extra_inputs["rope_type"] = config.rope_scaling["rope_type"]
+                if "beta_fast" in config.rope_scaling:
+                    extra_inputs["beta_fast"] = config.rope_scaling["beta_fast"]
+                if "beta_slow" in config.rope_scaling:
+                    extra_inputs["beta_slow"] = config.rope_scaling["beta_slow"]
+                if "mscale" in config.rope_scaling:
+                    extra_inputs["mscale"] = config.rope_scaling["mscale"]
+                if "mscale_all_dim" in config.rope_scaling:
+                    extra_inputs["mscale_all_dim"] = config.rope_scaling[
+                        "mscale_all_dim"
+                    ]
             if hasattr(config, "original_max_position_embeddings"):
                 extra_inputs["original_max_position_embeddings"] = (
                     config.original_max_position_embeddings
