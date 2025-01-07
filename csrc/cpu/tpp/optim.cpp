@@ -2,6 +2,7 @@
 #ifdef ENABLE_RTM
 #include "rtm.h"
 #endif
+#include "optim.h"
 #include "timing.h"
 #include "xsmm_functors.h"
 

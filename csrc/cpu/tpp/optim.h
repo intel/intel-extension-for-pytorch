@@ -1,21 +1,24 @@
+#include <ATen/ATen.h>
+#include <Macros.h>
+
 #include <iostream>
 #include <vector>
 
 namespace torch_ipex {
 namespace tpp {
 
-void dense_sparse_add_(
+IPEX_API void dense_sparse_add_(
     at::Tensor dense,
     at::Tensor sparse,
     /*torch::Scalar*/ float alpha);
 
-void bf16_split_add_(
+IPEX_API void bf16_split_add_(
     at::Tensor hi_bits,
     at::Tensor lo_bits,
     at::Tensor grad,
     float lr);
 
-void fused_adamw(
+IPEX_API void fused_adamw(
     at::Tensor& t_data,
     at::Tensor& t_grad,
     at::Tensor& t_exp_avg,
@@ -27,7 +30,7 @@ void fused_adamw(
     float weight_decay,
     float eps);
 
-void fused_split_adamw(
+IPEX_API void fused_split_adamw(
     at::Tensor& t_data_hi,
     at::Tensor& t_data_lo,
     at::Tensor& t_grad,
@@ -40,9 +43,9 @@ void fused_split_adamw(
     float weight_decay,
     float eps);
 
-double clip_grad_norm(std::vector<at::Tensor>& grads, double max_norm);
+IPEX_API double clip_grad_norm(std::vector<at::Tensor>& grads, double max_norm);
 
-float fused_lamb(
+IPEX_API float fused_lamb(
     at::Tensor& t_data,
     at::Tensor& t_grad,
     at::Tensor& t_exp_avg,
@@ -54,7 +57,7 @@ float fused_lamb(
     float weight_decay,
     float eps);
 
-void fused_lamb_v2(
+IPEX_API void fused_lamb_v2(
     at::Tensor& t_data,
     at::Tensor& t_grad,
     at::Tensor& t_exp_avg,

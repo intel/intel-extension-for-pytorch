@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ATen/Tensor.h>
+#include <Macros.h>
 #include <dyndisp/DispatchStub.h>
 #include <torch/all.h>
 #include <string>
@@ -8,15 +9,15 @@
 namespace torch_ipex {
 namespace cpu {
 
-std::string get_current_onednn_isa_level();
+IPEX_API std::string get_current_onednn_isa_level();
 
-std::string get_current_isa_level();
-std::string get_highest_cpu_support_isa_level();
-std::string get_highest_binary_support_isa_level();
+IPEX_API std::string get_current_isa_level();
+IPEX_API std::string get_highest_cpu_support_isa_level();
+IPEX_API std::string get_highest_binary_support_isa_level();
 
 namespace {
 
-std::string get_current_isa_level_kernel_impl();
+IPEX_API std::string get_current_isa_level_kernel_impl();
 
 }
 

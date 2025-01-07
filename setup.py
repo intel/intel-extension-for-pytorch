@@ -1099,6 +1099,7 @@ def pyi_isa_help_module():
     include_dirs = [
         os.path.realpath("."),
         os.path.realpath(os.path.join("csrc", "cpu", "isa")),
+        os.path.realpath(os.path.join("csrc", "include")),
         os.path.realpath(os.path.join(PACKAGE_NAME, "csrc")),
         os.path.join(pytorch_install_dir, "include"),
         os.path.join(pytorch_install_dir, "include", "torch", "csrc", "api", "include"),
@@ -1160,6 +1161,7 @@ def pyi_isa_help_module():
             "/wd4101",
             "/wd4996",
             "/wd4275",
+            "/DBUILD_IPEX_MAIN_LIB",
         ]
         C_ext = CppExtension(
             "{}._isa_help".format(PACKAGE_NAME),

@@ -62,13 +62,13 @@ enum class CPUCapability {
   NUM_OPTIONS
 };
 
-const char* CPUCapabilityToString(CPUCapability isa);
-CPUCapability _get_highest_cpu_support_isa_level();
-CPUCapability _get_highest_binary_support_isa_level();
+IPEX_API const char* CPUCapabilityToString(CPUCapability isa);
+IPEX_API CPUCapability _get_highest_cpu_support_isa_level();
+IPEX_API CPUCapability _get_highest_binary_support_isa_level();
 
-bool check_not_sync_onednn_isa_level();
+IPEX_API bool check_not_sync_onednn_isa_level();
 
-CPUCapability get_cpu_capability();
+IPEX_API CPUCapability get_cpu_capability();
 
 template <typename FnPtr, typename T>
 struct DispatchStub;

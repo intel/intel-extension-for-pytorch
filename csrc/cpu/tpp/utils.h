@@ -2,6 +2,7 @@
 #define _PCL_UTILS_H_
 
 #include <ATen/record_function.h>
+#include <Macros.h>
 #include <torch/csrc/autograd/VariableTypeUtils.h>
 //#include <torch/extension.h>
 
@@ -102,9 +103,9 @@ int srand48_r(uint64_t seed_val, struct drand48_data* buffer) {
 extern double ifreq;
 extern thread_local unsigned int* rng_state;
 extern thread_local struct drand48_data drng_state; // For non AVX512 version
-unsigned int* get_rng_state();
-void init_libxsmm();
-void xsmm_manual_seed(unsigned int seed);
+IPEX_API unsigned int* get_rng_state();
+IPEX_API void init_libxsmm();
+IPEX_API void xsmm_manual_seed(unsigned int seed);
 
 #ifdef __x86_64__
 #ifdef _WIN32
