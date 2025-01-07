@@ -874,6 +874,8 @@ def shard_low_precision_checkpoint(
         "q_proj",
         "k_proj",
         "v_proj",
+        "q_b_proj",
+        "kv_b_proj",
     ]
     # mlp is split with grain size = tp_grain_size
     mlp_layers_split_by_N = [
