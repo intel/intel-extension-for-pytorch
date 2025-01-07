@@ -37,6 +37,7 @@ MODEL_CLASSES = {
     "llama": (AutoModelForCausalLM, AutoTokenizer),
     "t5": (T5ForConditionalGeneration, AutoTokenizer),
     "falcon": (AutoModelForCausalLM, AutoTokenizer),
+    "mistral": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

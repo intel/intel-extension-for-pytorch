@@ -27,6 +27,7 @@ MODEL_CLASSES = {
     "phi-3": (AutoModelForCausalLM, AutoTokenizer),
     "chatglm3": (AutoModelForCausalLM, AutoTokenizer),
     "glm-4": (AutoModelForCausalLM, AutoTokenizer),
+    "mistral": (AutoModelForCausalLM, AutoTokenizer),
 }
 
 # Set console encoding to UTF-8
