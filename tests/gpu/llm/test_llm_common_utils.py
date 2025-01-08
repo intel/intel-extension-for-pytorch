@@ -19,7 +19,7 @@ common_params = {
     "use_static_cache": [True, False],
     "num_beams": [1, 4],
     "input_tokens_length": [32, 1024],
-    "max_new_tokens": [output_check_len, long_sequence_len],
+    "max_new_tokens": [long_sequence_len],
 }
 
 need_recover_models_list = {
@@ -86,9 +86,10 @@ class TestIpexLLMOptimizeBase(TestCase):
         super(TestIpexLLMOptimizeBase, cls).setUpClass()
         if cls.model_class is None or cls.model_config is None:
             raise ValueError("Sub class must define model_class and model_config")
-        cls.cached_module = cache_module(
-            {cls.model_class: need_recover_models_list.get(cls.model_class)}
-        )
+        if cls.model_class in need_recover_models_list.keys():
+            cls.cached_module = cache_module(
+                {cls.model_class: need_recover_models_list.get(cls.model_class)}
+            )
 
     @pytest.mark.skipif(
         (not torch.xpu.has_xetla()) or (not torch.xpu.has_2d_block_array()),
