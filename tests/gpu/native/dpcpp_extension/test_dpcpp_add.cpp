@@ -35,7 +35,7 @@ void add_dpcpp(torch::Tensor a, torch::Tensor b, torch::Tensor c) {
   int height = a.size(0);
   int width = a.size(1);
 
-  AT_DISPATCH_FLOATING_TYPES(a.type(), "add_dpcpp", ([&] {
+  AT_DISPATCH_FLOATING_TYPES(a.scalar_type(), "add_dpcpp", ([&] {
                                add_kernel_dpcpp<scalar_t>(
                                    a.data_ptr<scalar_t>(),
                                    b.data_ptr<scalar_t>(),

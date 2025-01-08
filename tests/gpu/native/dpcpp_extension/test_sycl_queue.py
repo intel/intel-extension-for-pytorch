@@ -2,21 +2,9 @@ import torch
 import intel_extension_for_pytorch  # noqa
 from torch.xpu.cpp_extension import load, IS_LINUX
 import os
-import subprocess
 
-
-def get_icpx_path():
-    result = subprocess.run(
-        ["which", "icpx"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
-    if result.returncode == 0:
-        return result.stdout.strip()
-    else:
-        raise FileNotFoundError("icpx not found in PATH")
-
-
-icpx_path = get_icpx_path()
-sycl_ext_path = icpx_path.rsplit("/", 2)[0] + "/include/sycl"
+dpcpp_path = os.getenv("CMPLR_ROOT")
+sycl_ext_path = os.path.join(dpcpp_path, "include", "sycl")
 
 module = load(
     name="mod_test_sycl_queue",
