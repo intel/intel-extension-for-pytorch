@@ -1020,6 +1020,8 @@ def shard_low_precision_checkpoint(
                 raise AssertionError(f"{quantization_method} is not supported yet.")
         elif any(substring in key for substring in mha_layers_split_by_K):
             data = low_precision_checkpoint_dict[key]
+            if ("scales" in key or "qzeros" in key) and data.shape[0] == 1:
+                continue
             if quantization_method == "awq":
                 # qweight shape: [K, N // 8]
                 # scales shape: [K // G, N]
@@ -1061,6 +1063,8 @@ def shard_low_precision_checkpoint(
                 raise AssertionError(f"{quantization_method} is not supported yet.")
         elif any(substring in key for substring in mlp_layers_split_by_K):
             data = low_precision_checkpoint_dict[key]
+            if ("scales" in key or "qzeros" in key) and data.shape[0] == 1:
+                continue
             if quantization_method == "awq":
                 # qweight shape: [K, N // 8]
                 # scales shape: [K // G, N]
