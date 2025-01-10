@@ -4,6 +4,8 @@
 #include <ATen/TensorUtils.h>
 #include <runtime/Utils.h>
 #ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
 #include "utils/CustomOperatorRegistration.h"
 #endif
 #include <utils/DPCPP.h>
@@ -176,12 +178,51 @@ Tensor glu_backward_jvp(
 
 #ifdef USE_OVERRIDE_OP
 namespace {
+at::Tensor wrapper_XPU__glu_backward(
+    const at::Tensor& grad_output,
+    const at::Tensor& self,
+    int64_t dim) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, grad_output, "wrapper_XPU__glu_backward", "grad_output");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__glu_backward", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::glu_backward(grad_output, self, dim);
+}
+
+at::Tensor& wrapper_XPU_grad_input_glu_backward_out(
+    const at::Tensor& grad_output,
+    const at::Tensor& self,
+    int64_t dim,
+    at::Tensor& grad_input) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device,
+      grad_input,
+      "wrapper_XPU_grad_input_glu_backward_out",
+      "grad_input");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      grad_output,
+      "wrapper_XPU_grad_input_glu_backward_out",
+      "grad_output");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_grad_input_glu_backward_out", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::glu_backward_out(
+      grad_output, self, dim, grad_input);
+}
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("glu_backward", TORCH_FN((&at::AtenIpexTypeXPU::glu_backward)));
+  m.impl("glu_backward", TORCH_FN(&wrapper_XPU__glu_backward));
   m.impl(
       "glu_backward.grad_input",
-      TORCH_FN((&at::AtenIpexTypeXPU::glu_backward_out)));
+      TORCH_FN(&wrapper_XPU_grad_input_glu_backward_out));
 }
 
 } // namespace

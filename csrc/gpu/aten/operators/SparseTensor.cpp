@@ -1,4 +1,6 @@
+#include <ATen/DeviceGuard.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/core/op_registration/adaption.h>
 #include <ATen/native/SparseTensorUtils.h>
 #include <core/Memory.h>
 #include <core/detail/ListUtils.h>
@@ -539,14 +541,51 @@ Tensor empty(
 } // namespace at
 
 namespace {
+at::Tensor wrapper_SparseXPU___sparse_coo_tensor_with_dims_and_tensors(
+    int64_t sparse_dim,
+    int64_t dense_dim,
+    c10::SymIntArrayRef size,
+    const at::Tensor& indices,
+    const at::Tensor& values,
+    c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Layout> layout,
+    c10::optional<at::Device> device,
+    c10::optional<bool> pin_memory,
+    c10::optional<bool> is_coalesced) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device,
+      indices,
+      "wrapper_SparseXPU___sparse_coo_tensor_with_dims_and_tensors",
+      "indices");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      values,
+      "wrapper_SparseXPU___sparse_coo_tensor_with_dims_and_tensors",
+      "values");
+
+  const DeviceGuard device_guard(device_or_default(device));
+
+  return at::AtenIpexTypeSparseXPU::_sparse_coo_tensor_with_dims_and_tensors(
+      sparse_dim,
+      dense_dim,
+      C10_AS_INTARRAYREF_SLOW(size),
+      indices,
+      values,
+      dtype,
+      layout,
+      device,
+      pin_memory,
+      is_coalesced);
+}
 
 IPEX_TORCH_LIBRARY_IMPL(aten, SparseXPU, m) {
   m.impl("_nnz", TORCH_FN((&at::AtenIpexTypeSparseXPU::_nnz)));
   m.impl("_values", TORCH_FN((&at::AtenIpexTypeSparseXPU::_values)));
   m.impl(
       "_sparse_coo_tensor_with_dims_and_tensors",
-      TORCH_FN((&at::AtenIpexTypeSparseXPU::
-                    _sparse_coo_tensor_with_dims_and_tensors)));
+      TORCH_FN((&wrapper_SparseXPU___sparse_coo_tensor_with_dims_and_tensors)));
 }
 
 } // namespace

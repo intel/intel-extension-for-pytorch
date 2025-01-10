@@ -8,6 +8,8 @@
 #include <core/detail/TensorInfo.h>
 #include <runtime/Utils.h>
 #ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
 #include <utils/CustomOperatorRegistration.h>
 #endif
 #include <utils/DPCPP.h>
@@ -1563,14 +1565,82 @@ Tensor take(const Tensor& self, const Tensor& index) {
 }
 
 #ifdef USE_OVERRIDE_OP
+at::Tensor& wrapper_XPU___index_put_impl_(
+    at::Tensor& self,
+    const c10::List<c10::optional<at::Tensor>>& indices,
+    const at::Tensor& values,
+    bool accumulate,
+    bool unsafe) {
+  // No device check
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::_index_put_impl_(
+      self, indices, values, accumulate, unsafe);
+}
+
+at::Tensor wrapper_XPU__index_select(
+    const at::Tensor& self,
+    int64_t dim,
+    const at::Tensor& index) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__index_select", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, index, "wrapper_XPU__index_select", "index");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::index_select(self, dim, index);
+}
+
+at::Tensor& wrapper_XPU_out_index_select_out(
+    const at::Tensor& self,
+    int64_t dim,
+    const at::Tensor& index,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_index_select_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_index_select_out", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, index, "wrapper_XPU_out_index_select_out", "index");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::index_select_out(self, dim, index, out);
+}
+
+at::Tensor wrapper_XPU__nonzero(const at::Tensor& self) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__nonzero", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::nonzero(self);
+}
+
+at::Tensor& wrapper_XPU_out_nonzero_out(
+    const at::Tensor& self,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_nonzero_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_nonzero_out", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::nonzero_out(self, out);
+}
+
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl(
-      "_index_put_impl_", TORCH_FN((&at::AtenIpexTypeXPU::_index_put_impl_)));
-  m.impl("index_select", TORCH_FN((&at::AtenIpexTypeXPU::index_select)));
-  m.impl(
-      "index_select.out", TORCH_FN((&at::AtenIpexTypeXPU::index_select_out)));
-  m.impl("nonzero", TORCH_FN((&at::AtenIpexTypeXPU::nonzero)));
-  m.impl("nonzero.out", TORCH_FN((&at::AtenIpexTypeXPU::nonzero_out)));
+  m.impl("_index_put_impl_", TORCH_FN((&wrapper_XPU___index_put_impl_)));
+  m.impl("index_select", TORCH_FN((&wrapper_XPU__index_select)));
+  m.impl("index_select.out", TORCH_FN((&wrapper_XPU_out_index_select_out)));
+  m.impl("nonzero", TORCH_FN((&wrapper_XPU__nonzero)));
+  m.impl("nonzero.out", TORCH_FN((&wrapper_XPU_out_nonzero_out)));
 }
 #endif
 

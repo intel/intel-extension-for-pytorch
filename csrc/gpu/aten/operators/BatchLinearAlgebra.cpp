@@ -13,6 +13,8 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 #ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
 #include "utils/CustomOperatorRegistration.h"
 #endif
 
@@ -698,11 +700,32 @@ Tensor& linalg_lu_solve_out(
 
 #ifdef USE_OVERRIDE_OP
 namespace {
+at::Tensor& wrapper_XPU_out_linalg_lu_solve_out(
+    const at::Tensor& LU,
+    const at::Tensor& pivots,
+    const at::Tensor& B,
+    bool left,
+    bool adjoint,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_linalg_lu_solve_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, LU, "wrapper_XPU_out_linalg_lu_solve_out", "LU");
+  c10::impl::check_and_update_common_device(
+      common_device, pivots, "wrapper_XPU_out_linalg_lu_solve_out", "pivots");
+  c10::impl::check_and_update_common_device(
+      common_device, B, "wrapper_XPU_out_linalg_lu_solve_out", "B");
+  const OptionalDeviceGuard device_guard(device_of(out));
+
+  return at::AtenIpexTypeXPU::linalg_lu_solve_out(
+      LU, pivots, B, left, adjoint, out);
+}
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl(
-      "linalg_lu_solve.out",
-      TORCH_FN((&at::AtenIpexTypeXPU::linalg_lu_solve_out)));
+      "linalg_lu_solve.out", TORCH_FN((&wrapper_XPU_out_linalg_lu_solve_out)));
 }
 
 } // namespace

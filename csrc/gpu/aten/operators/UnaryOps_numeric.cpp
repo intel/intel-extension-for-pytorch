@@ -1,5 +1,7 @@
 #include <ATen/ATen.h>
+#include <ATen/DeviceGuard.h>
 #include <ATen/OpMathType.h>
+#include <ATen/core/op_registration/adaption.h>
 #include <ATen/native/TensorIterator.h>
 #include <oneDNN/oneDNN.h>
 #include <utils/DPCPP.h>
@@ -157,9 +159,23 @@ Tensor& nan_to_num_(
 
 namespace {
 
+at::Tensor wrapper_XPU__angle(const at::Tensor& self) {
+  // No device check
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::angle(self);
+}
+
+at::Tensor& wrapper_XPU_out_angle_out(const at::Tensor& self, at::Tensor& out) {
+  // No device check
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::angle_out(self, out);
+}
+
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("angle", TORCH_FN((&at::AtenIpexTypeXPU::angle)));
-  m.impl("angle.out", TORCH_FN((&at::AtenIpexTypeXPU::angle_out)));
+  m.impl("angle", TORCH_FN((&wrapper_XPU__angle)));
+  m.impl("angle.out", TORCH_FN((&wrapper_XPU_out_angle_out)));
 }
 
 } // namespace

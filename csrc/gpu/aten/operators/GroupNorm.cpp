@@ -1,5 +1,7 @@
 #include "Norm.h"
 #ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
 #include "utils/CustomOperatorRegistration.h"
 #endif
 
@@ -993,13 +995,83 @@ std::tuple<Tensor, Tensor, Tensor> native_group_norm_backward(
 
 #ifdef USE_OVERRIDE_OP
 namespace {
+::std::tuple<at::Tensor, at::Tensor, at::Tensor> wrapper_XPU__native_group_norm(
+    const at::Tensor& input,
+    const c10::optional<at::Tensor>& weight,
+    const c10::optional<at::Tensor>& bias,
+    c10::SymInt N,
+    c10::SymInt C,
+    c10::SymInt HxW,
+    int64_t group,
+    double eps) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, input, "wrapper_XPU__native_group_norm", "input");
+  c10::impl::check_and_update_common_device(
+      common_device, weight, "wrapper_XPU__native_group_norm", "weight");
+  c10::impl::check_and_update_common_device(
+      common_device, bias, "wrapper_XPU__native_group_norm", "bias");
+  const OptionalDeviceGuard device_guard(device_of(input));
+  return at::AtenIpexTypeXPU::native_group_norm(
+      input,
+      weight,
+      bias,
+      N.guard_int(__FILE__, __LINE__),
+      C.guard_int(__FILE__, __LINE__),
+      HxW.guard_int(__FILE__, __LINE__),
+      group,
+      eps);
+}
 
+::std::tuple<at::Tensor, at::Tensor, at::Tensor>
+wrapper_XPU__native_group_norm_backward(
+    const at::Tensor& grad_out,
+    const at::Tensor& input,
+    const at::Tensor& mean,
+    const at::Tensor& rstd,
+    const c10::optional<at::Tensor>& weight,
+    c10::SymInt N,
+    c10::SymInt C,
+    c10::SymInt HxW,
+    int64_t group,
+    ::std::array<bool, 3> output_mask) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device,
+      grad_out,
+      "wrapper_XPU__native_group_norm_backward",
+      "grad_out");
+  c10::impl::check_and_update_common_device(
+      common_device, input, "wrapper_XPU__native_group_norm_backward", "input");
+  c10::impl::check_and_update_common_device(
+      common_device, mean, "wrapper_XPU__native_group_norm_backward", "mean");
+  c10::impl::check_and_update_common_device(
+      common_device, rstd, "wrapper_XPU__native_group_norm_backward", "rstd");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      weight,
+      "wrapper_XPU__native_group_norm_backward",
+      "weight");
+  const OptionalDeviceGuard device_guard(device_of(grad_out));
+  return at::AtenIpexTypeXPU::native_group_norm_backward(
+      grad_out,
+      input,
+      mean,
+      rstd,
+      weight,
+      N.guard_int(__FILE__, __LINE__),
+      C.guard_int(__FILE__, __LINE__),
+      HxW.guard_int(__FILE__, __LINE__),
+      group,
+      output_mask);
+}
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl(
-      "native_group_norm", TORCH_FN((&at::AtenIpexTypeXPU::native_group_norm)));
+  m.impl("native_group_norm", TORCH_FN((&wrapper_XPU__native_group_norm)));
   m.impl(
       "native_group_norm_backward",
-      TORCH_FN((&at::AtenIpexTypeXPU::native_group_norm_backward)));
+      TORCH_FN((&wrapper_XPU__native_group_norm_backward)));
 }
 
 } // namespace

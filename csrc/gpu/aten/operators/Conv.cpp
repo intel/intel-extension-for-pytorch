@@ -5,6 +5,8 @@
 #include <tensor/Tensor.h>
 #include <vector>
 
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
 #include <oneDNN/oneDNN.h>
 #include "ATen/core/ATen_fwd.h"
 #include "ATen/core/interned_strings.h"
@@ -3056,13 +3058,88 @@ TORCH_LIBRARY_FRAGMENT(torch_ipex, m) {
 }
 
 #ifdef USE_OVERRIDE_OP
+at::Tensor wrapper_XPU__convolution_overrideable(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    const c10::optional<at::Tensor>& bias,
+    c10::SymIntArrayRef stride,
+    c10::SymIntArrayRef padding,
+    c10::SymIntArrayRef dilation,
+    bool transposed,
+    c10::SymIntArrayRef output_padding,
+    c10::SymInt groups) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, input, "wrapper_XPU__convolution_overrideable", "input");
+  c10::impl::check_and_update_common_device(
+      common_device, weight, "wrapper_XPU__convolution_overrideable", "weight");
+  c10::impl::check_and_update_common_device(
+      common_device, bias, "wrapper_XPU__convolution_overrideable", "bias");
+  const OptionalDeviceGuard device_guard(device_of(input));
+
+  return at::AtenIpexTypeXPU::convolution_overrideable(
+      input,
+      weight,
+      bias,
+      C10_AS_INTARRAYREF_SLOW(stride),
+      C10_AS_INTARRAYREF_SLOW(padding),
+      C10_AS_INTARRAYREF_SLOW(dilation),
+      transposed,
+      C10_AS_INTARRAYREF_SLOW(output_padding),
+      groups.guard_int(__FILE__, __LINE__));
+}
+
+::std::tuple<at::Tensor, at::Tensor, at::Tensor>
+wrapper_XPU__convolution_backward_overrideable(
+    const at::Tensor& grad_output,
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    c10::SymIntArrayRef stride,
+    c10::SymIntArrayRef padding,
+    c10::SymIntArrayRef dilation,
+    bool transposed,
+    c10::SymIntArrayRef output_padding,
+    c10::SymInt groups,
+    ::std::array<bool, 3> output_mask) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device,
+      grad_output,
+      "wrapper_XPU__convolution_backward_overrideable",
+      "grad_output");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      input,
+      "wrapper_XPU__convolution_backward_overrideable",
+      "input");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      weight,
+      "wrapper_XPU__convolution_backward_overrideable",
+      "weight");
+  const OptionalDeviceGuard device_guard(device_of(grad_output));
+
+  return at::AtenIpexTypeXPU::convolution_backward_overrideable(
+      grad_output,
+      input,
+      weight,
+      C10_AS_INTARRAYREF_SLOW(stride),
+      C10_AS_INTARRAYREF_SLOW(padding),
+      C10_AS_INTARRAYREF_SLOW(dilation),
+      transposed,
+      C10_AS_INTARRAYREF_SLOW(output_padding),
+      groups.guard_int(__FILE__, __LINE__),
+      output_mask);
+}
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl(
       "convolution_overrideable",
-      TORCH_FN((&at::AtenIpexTypeXPU::convolution_overrideable)));
+      TORCH_FN((&wrapper_XPU__convolution_overrideable)));
   m.impl(
       "convolution_backward_overrideable",
-      TORCH_FN((&at::AtenIpexTypeXPU::convolution_backward_overrideable)));
+      TORCH_FN((&wrapper_XPU__convolution_backward_overrideable)));
 }
 #endif
 

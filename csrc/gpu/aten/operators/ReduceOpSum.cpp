@@ -13,6 +13,8 @@
 //#include "comm/RegistrationDeclarations.h"
 
 #ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
 #include <utils/CustomOperatorRegistration.h>
 #endif
 
@@ -167,30 +169,65 @@ Tensor nansum(const Tensor& self, c10::optional<ScalarType> dtype) {
 
 namespace {
 #ifdef USE_OVERRIDE_OP
-
-// Rename this function here because original sum function has overload
-// with different signature and can't be registered.
-Tensor sum_with_dim(
-    const Tensor& self,
-    OptionalIntArrayRef dim,
+at::Tensor wrapper_XPU_dim_IntList_sum(
+    const at::Tensor& self,
+    at::OptionalIntArrayRef dim,
     bool keepdim,
-    c10::optional<ScalarType> opt_dtype) {
-  return at::AtenIpexTypeXPU::sum(self, dim, keepdim, opt_dtype);
+    c10::optional<at::ScalarType> dtype) {
+  // No device check
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::sum(self, dim, keepdim, dtype);
 }
 
-Tensor nansum_ipex(
-    const Tensor& self,
-    c10::OptionalArrayRef<int64_t> opt_dim,
+at::Tensor& wrapper_XPU_IntList_out_sum_out(
+    const at::Tensor& self,
+    at::OptionalIntArrayRef dim,
     bool keepdim,
-    c10::optional<ScalarType> opt_dtype) {
-  return at::AtenIpexTypeXPU::nansum(self, opt_dim, keepdim, opt_dtype);
+    c10::optional<at::ScalarType> dtype,
+    at::Tensor& out) {
+  // No device check
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::sum_out(self, dim, keepdim, dtype, out);
+}
+
+at::Tensor wrapper_XPU__nansum(
+    const at::Tensor& self,
+    at::OptionalIntArrayRef dim,
+    bool keepdim,
+    c10::optional<at::ScalarType> dtype) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__nansum", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::nansum(self, dim, keepdim, dtype);
+}
+
+at::Tensor& wrapper_XPU_out_nansum_out(
+    const at::Tensor& self,
+    at::OptionalIntArrayRef dim,
+    bool keepdim,
+    c10::optional<at::ScalarType> dtype,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_nansum_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_nansum_out", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::nansum_out(self, dim, keepdim, dtype, out);
 }
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("sum.dim_IntList", TORCH_FN((&sum_with_dim)));
-  m.impl("sum.IntList_out", TORCH_FN((&at::AtenIpexTypeXPU::sum_out)));
-  m.impl("nansum", TORCH_FN((&nansum_ipex)));
-  m.impl("nansum.out", TORCH_FN((&at::AtenIpexTypeXPU::nansum_out)));
+  m.impl("sum.dim_IntList", TORCH_FN((&wrapper_XPU_dim_IntList_sum)));
+  m.impl("sum.IntList_out", TORCH_FN((&wrapper_XPU_IntList_out_sum_out)));
+  m.impl("nansum", TORCH_FN((&wrapper_XPU__nansum)));
+  m.impl("nansum.out", TORCH_FN((&wrapper_XPU_out_nansum_out)));
 }
 #endif
 } // namespace

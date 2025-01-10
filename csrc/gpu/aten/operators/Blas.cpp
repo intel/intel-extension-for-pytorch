@@ -6,6 +6,11 @@
 #include "BlasImpl.h"
 #include "utils/CustomOperatorRegistration.h"
 
+#ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
+#endif
+
 #if defined(USE_XETLA) && defined(USE_XETLA_XE_HPC)
 #include "XeGemm.h"
 #endif
@@ -1406,24 +1411,293 @@ IPEX_LIBRARY_FRAGMENT() {
 
 #ifdef USE_OVERRIDE_OP
 namespace {
+at::Tensor& wrapper_XPU_out__addmm_activation_out(
+    const at::Tensor& self,
+    const at::Tensor& mat1,
+    const at::Tensor& mat2,
+    const at::Scalar& beta,
+    const at::Scalar& alpha,
+    bool use_gelu,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out__addmm_activation_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out__addmm_activation_out", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, mat1, "wrapper_XPU_out__addmm_activation_out", "mat1");
+  c10::impl::check_and_update_common_device(
+      common_device, mat2, "wrapper_XPU_out__addmm_activation_out", "mat2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::_addmm_activation_out(
+      self, mat1, mat2, beta, alpha, use_gelu, out);
+}
+
+at::Tensor& wrapper_XPU_out_addmm_out(
+    const at::Tensor& self,
+    const at::Tensor& mat1,
+    const at::Tensor& mat2,
+    const at::Scalar& beta,
+    const at::Scalar& alpha,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_addmm_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_addmm_out", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, mat1, "wrapper_XPU_out_addmm_out", "mat1");
+  c10::impl::check_and_update_common_device(
+      common_device, mat2, "wrapper_XPU_out_addmm_out", "mat2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::addmm_out(self, mat1, mat2, beta, alpha, out);
+}
+
+at::Tensor& wrapper_XPU_out_addmv_out(
+    const at::Tensor& self,
+    const at::Tensor& mat,
+    const at::Tensor& vec,
+    const at::Scalar& beta,
+    const at::Scalar& alpha,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_addmv_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_addmv_out", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, mat, "wrapper_XPU_out_addmv_out", "mat");
+  c10::impl::check_and_update_common_device(
+      common_device, vec, "wrapper_XPU_out_addmv_out", "vec");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::addmv_out(self, mat, vec, beta, alpha, out);
+}
+
+at::Tensor wrapper_XPU__mm(const at::Tensor& self, const at::Tensor& mat2) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__mm", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, mat2, "wrapper_XPU__mm", "mat2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::mm(self, mat2);
+}
+
+at::Tensor& wrapper_XPU_out_mm_out(
+    const at::Tensor& self,
+    const at::Tensor& mat2,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_mm_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_mm_out", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, mat2, "wrapper_XPU_out_mm_out", "mat2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::mm_out(self, mat2, out);
+}
+
+at::Tensor wrapper_XPU__baddbmm(
+    const at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    const at::Scalar& beta,
+    const at::Scalar& alpha) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__baddbmm", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, batch1, "wrapper_XPU__baddbmm", "batch1");
+  c10::impl::check_and_update_common_device(
+      common_device, batch2, "wrapper_XPU__baddbmm", "batch2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+  auto _self = AtenIpexTypeXPU::to_plain_if_needed(self);
+  auto _batch1 = AtenIpexTypeXPU::to_plain_if_needed(batch1);
+  auto _batch2 = AtenIpexTypeXPU::to_plain_if_needed(batch2);
+  return at::AtenIpexTypeXPU::baddbmm(_self, _batch1, _batch2, beta, alpha);
+}
+
+at::Tensor& wrapper_XPU_out_baddbmm_out(
+    const at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    const at::Scalar& beta,
+    const at::Scalar& alpha,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_baddbmm_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_baddbmm_out", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, batch1, "wrapper_XPU_out_baddbmm_out", "batch1");
+  c10::impl::check_and_update_common_device(
+      common_device, batch2, "wrapper_XPU_out_baddbmm_out", "batch2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::baddbmm_out(
+      self, batch1, batch2, beta, alpha, out);
+}
+
+at::Tensor& wrapper_XPU__baddbmm_(
+    at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    const at::Scalar& beta,
+    const at::Scalar& alpha) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__baddbmm_", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, batch1, "wrapper_XPU__baddbmm_", "batch1");
+  c10::impl::check_and_update_common_device(
+      common_device, batch2, "wrapper_XPU__baddbmm_", "batch2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::baddbmm_(self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor wrapper_XPU__addbmm(
+    const at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    const at::Scalar& beta,
+    const at::Scalar& alpha) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__addbmm", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, batch1, "wrapper_XPU__addbmm", "batch1");
+  c10::impl::check_and_update_common_device(
+      common_device, batch2, "wrapper_XPU__addbmm", "batch2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::addbmm(self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor& wrapper_XPU_out_addbmm_out(
+    const at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    const at::Scalar& beta,
+    const at::Scalar& alpha,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_addbmm_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_addbmm_out", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, batch1, "wrapper_XPU_out_addbmm_out", "batch1");
+  c10::impl::check_and_update_common_device(
+      common_device, batch2, "wrapper_XPU_out_addbmm_out", "batch2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::addbmm_out(
+      self, batch1, batch2, beta, alpha, out);
+}
+
+at::Tensor& wrapper_XPU__addbmm_(
+    at::Tensor& self,
+    const at::Tensor& batch1,
+    const at::Tensor& batch2,
+    const at::Scalar& beta,
+    const at::Scalar& alpha) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__addbmm_", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, batch1, "wrapper_XPU__addbmm_", "batch1");
+  c10::impl::check_and_update_common_device(
+      common_device, batch2, "wrapper_XPU__addbmm_", "batch2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::addbmm_(self, batch1, batch2, beta, alpha);
+}
+
+at::Tensor wrapper_XPU__bmm(const at::Tensor& self, const at::Tensor& mat2) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU__bmm", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, mat2, "wrapper_XPU__bmm", "mat2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::bmm(self, mat2);
+}
+
+at::Tensor& wrapper_XPU_out_bmm_out(
+    const at::Tensor& self,
+    const at::Tensor& mat2,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_bmm_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_bmm_out", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, mat2, "wrapper_XPU_out_bmm_out", "mat2");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::bmm_out(self, mat2, out);
+}
+
+at::Tensor& wrapper_XPU_out_tensordot_out(
+    const at::Tensor& self,
+    const at::Tensor& other,
+    at::IntArrayRef dims_self,
+    at::IntArrayRef dims_other,
+    at::Tensor& out) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, out, "wrapper_XPU_out_tensordot_out", "out");
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_out_tensordot_out", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, other, "wrapper_XPU_out_tensordot_out", "other");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::tensordot_out(
+      self, other, dims_self, dims_other, out);
+}
 
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl(
       "_addmm_activation.out",
-      TORCH_FN((&at::AtenIpexTypeXPU::_addmm_activation_out)));
-  m.impl("addmm.out ", TORCH_FN((&at::AtenIpexTypeXPU::addmm_out)));
-  m.impl("addmv.out ", TORCH_FN((&at::AtenIpexTypeXPU::addmv_out)));
-  m.impl("mm", TORCH_FN((&at::AtenIpexTypeXPU::mm)));
-  m.impl("mm.out", TORCH_FN((&at::AtenIpexTypeXPU::mm_out)));
-  m.impl("baddbmm", TORCH_FN((&at::AtenIpexTypeXPU::baddbmm)));
-  m.impl("baddbmm.out", TORCH_FN((&at::AtenIpexTypeXPU::baddbmm_out)));
-  m.impl("baddbmm_", TORCH_FN((&at::AtenIpexTypeXPU::baddbmm_)));
-  m.impl("addbmm", TORCH_FN((&at::AtenIpexTypeXPU::addbmm)));
-  m.impl("addbmm.out", TORCH_FN((&at::AtenIpexTypeXPU::addbmm_out)));
-  m.impl("addbmm_", TORCH_FN((&at::AtenIpexTypeXPU::addbmm_)));
-  m.impl("bmm", TORCH_FN((&at::AtenIpexTypeXPU::bmm)));
-  m.impl("bmm.out", TORCH_FN((&at::AtenIpexTypeXPU::bmm_out)));
-  m.impl("tensordot.out", TORCH_FN((&at::AtenIpexTypeXPU::tensordot_out)));
+      TORCH_FN((&wrapper_XPU_out__addmm_activation_out)));
+  m.impl("addmm.out", TORCH_FN((&wrapper_XPU_out_addmm_out)));
+  m.impl("addmv.out", TORCH_FN((&wrapper_XPU_out_addmv_out)));
+  m.impl("mm", TORCH_FN((&wrapper_XPU__mm)));
+  m.impl("mm.out", TORCH_FN((&wrapper_XPU_out_mm_out)));
+  m.impl("baddbmm", TORCH_FN((&wrapper_XPU__baddbmm)));
+  m.impl("baddbmm.out", TORCH_FN((&wrapper_XPU_out_baddbmm_out)));
+  m.impl("baddbmm_", TORCH_FN((&wrapper_XPU__baddbmm_)));
+  m.impl("addbmm", TORCH_FN((&wrapper_XPU__addbmm)));
+  m.impl("addbmm.out", TORCH_FN((&wrapper_XPU_out_addbmm_out)));
+  m.impl("addbmm_", TORCH_FN((&wrapper_XPU__addbmm_)));
+  m.impl("bmm", TORCH_FN((&wrapper_XPU__bmm)));
+  m.impl("bmm.out", TORCH_FN((&wrapper_XPU_out_bmm_out)));
+  m.impl("tensordot.out", TORCH_FN((&wrapper_XPU_out_tensordot_out)));
 }
 
 } // namespace

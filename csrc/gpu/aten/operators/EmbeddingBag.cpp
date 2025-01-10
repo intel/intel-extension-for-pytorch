@@ -5,6 +5,8 @@
 #include <runtime/Utils.h>
 #include <torch/torch.h>
 #ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
 #include "utils/CustomOperatorRegistration.h"
 #endif
 #include <utils/DPCPP.h>
@@ -1300,12 +1302,95 @@ Tensor _embedding_bag_per_sample_weights_backward(
 
 #ifdef USE_OVERRIDE_OP
 namespace {
+::std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+wrapper_XPU___embedding_bag(
+    const at::Tensor& weight,
+    const at::Tensor& indices,
+    const at::Tensor& offsets,
+    bool scale_grad_by_freq,
+    int64_t mode,
+    bool sparse,
+    const c10::optional<at::Tensor>& per_sample_weights,
+    bool include_last_offset,
+    int64_t padding_idx) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, weight, "wrapper_XPU___embedding_bag", "weight");
+  c10::impl::check_and_update_common_device(
+      common_device, indices, "wrapper_XPU___embedding_bag", "indices");
+  c10::impl::check_and_update_common_device(
+      common_device, offsets, "wrapper_XPU___embedding_bag", "offsets");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      per_sample_weights,
+      "wrapper_XPU___embedding_bag",
+      "per_sample_weights");
+  const OptionalDeviceGuard device_guard(device_of(weight));
 
+  return at::AtenIpexTypeXPU::_embedding_bag(
+      weight,
+      indices,
+      offsets,
+      scale_grad_by_freq,
+      mode,
+      sparse,
+      per_sample_weights,
+      include_last_offset,
+      padding_idx);
+}
+
+::std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+wrapper_XPU___embedding_bag_forward_only(
+    const at::Tensor& weight,
+    const at::Tensor& indices,
+    const at::Tensor& offsets,
+    bool scale_grad_by_freq,
+    int64_t mode,
+    bool sparse,
+    const c10::optional<at::Tensor>& per_sample_weights,
+    bool include_last_offset,
+    int64_t padding_idx) {
+  c10::optional<Device> common_device = nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device,
+      weight,
+      "wrapper_XPU___embedding_bag_forward_only",
+      "weight");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      indices,
+      "wrapper_XPU___embedding_bag_forward_only",
+      "indices");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      offsets,
+      "wrapper_XPU___embedding_bag_forward_only",
+      "offsets");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      per_sample_weights,
+      "wrapper_XPU___embedding_bag_forward_only",
+      "per_sample_weights");
+  const OptionalDeviceGuard device_guard(device_of(weight));
+
+  return at::AtenIpexTypeXPU::_embedding_bag_forward_only(
+      weight,
+      indices,
+      offsets,
+      scale_grad_by_freq,
+      mode,
+      sparse,
+      per_sample_weights,
+      include_last_offset,
+      padding_idx);
+}
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("_embedding_bag", TORCH_FN((&at::AtenIpexTypeXPU::_embedding_bag)));
+  m.impl("_embedding_bag", TORCH_FN((&wrapper_XPU___embedding_bag)));
   m.impl(
       "_embedding_bag_forward_only",
-      TORCH_FN((&at::AtenIpexTypeXPU::_embedding_bag_forward_only)));
+      TORCH_FN((&wrapper_XPU___embedding_bag_forward_only)));
 }
 
 } // namespace

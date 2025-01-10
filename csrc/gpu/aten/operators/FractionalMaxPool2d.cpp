@@ -7,6 +7,12 @@
 #include "comm/AccumulateType.h"
 #include "comm/Atomics.h"
 
+#ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
+#include <utils/CustomOperatorRegistration.h>
+#endif
+
 using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
@@ -522,6 +528,20 @@ std::tuple<Tensor&, Tensor&> fractional_max_pool2d_out(
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
 
+#ifdef USE_OVERRIDE_OP
+std::tuple<Tensor, Tensor> fractional_max_pool2d(
+    const Tensor& self,
+    IntArrayRef kernel_size,
+    IntArrayRef output_size,
+    const Tensor& random_samples) {
+  Tensor output = at::empty({0}, self.options());
+  Tensor indices = at::empty({0}, self.options().dtype(kLong));
+  impl::fractional_max_pool2d_out_template(
+      output, indices, self, kernel_size, output_size, random_samples);
+  return std::tuple<Tensor&, Tensor&>(output, indices);
+}
+#endif
+
 Tensor& fractional_max_pool2d_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
@@ -536,3 +556,34 @@ Tensor& fractional_max_pool2d_backward_out(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+#ifdef USE_OVERRIDE_OP
+namespace {
+
+::std::tuple<at::Tensor, at::Tensor> wrapper_XPU_fractional_max_pool2d(
+    const at::Tensor& self,
+    at::IntArrayRef kernel_size,
+    at::IntArrayRef output_size,
+    const at::Tensor& random_samples) {
+  std::optional<Device> common_device = std::nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_fractional_max_pool2d", "self");
+  c10::impl::check_and_update_common_device(
+      common_device,
+      random_samples,
+      "wrapper_XPU_fractional_max_pool2d",
+      "random_samples");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::fractional_max_pool2d(
+      self, kernel_size, output_size, random_samples);
+}
+
+// IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+//   m.impl(
+//       "fractional_max_pool2d",
+//       TORCH_FN((&wrapper_XPU_fractional_max_pool2d)));
+// }
+} // namespace
+#endif
