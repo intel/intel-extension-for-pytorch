@@ -1232,7 +1232,11 @@ setup(
     zip_safe=False,
     ext_modules=ext_modules,
     cmdclass=cmdclass,
-    entry_points=entry_points,
+    entry_points={
+        "torch.backends": [
+            "intel_extension_for_pytorch = intel_extension_for_pytorch:_autoload",
+        ],
+    },
     license="https://www.apache.org/licenses/LICENSE-2.0",
     classifiers=[
         "License :: OSI Approved :: Apache Software License",

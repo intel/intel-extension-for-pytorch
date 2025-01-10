@@ -1,13 +1,17 @@
 # This Python file uses the following encoding: utf-8
 import re
 
+
+def _autoload():
+    # This is an entrypoint for pytorch autoload mechanism.
+    # Placed before 'import torch' to prevent circular imports.
+    try:
+        import torchvision
+    except ImportError:
+        pass  # skip if torchvision is not available
+
+
 import torch
-
-
-try:
-    import torchvision
-except ImportError:
-    pass  # skip if torchvision is not available
 
 
 from ._version import (

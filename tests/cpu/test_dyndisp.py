@@ -97,10 +97,10 @@ class TestDynDisp(unittest.TestCase):
         command = 'ATEN_CPU_CAPABILITY=avx2 python -c "import torch; import intel_extension_for_pytorch._C \
             as core; print(core._get_current_onednn_isa_level())" '
         with subprocess.Popen(
-            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         ) as p:
-            out = p.stdout.readlines()
-            onednn_isa_level = str(out[-1], "utf-8").strip()
+            stdout, _ = p.communicate()
+            onednn_isa_level = stdout.decode("ascii").strip()
             self.assertTrue(onednn_isa_level == "AVX2")
 
     @unittest.skipIf(
@@ -111,10 +111,10 @@ class TestDynDisp(unittest.TestCase):
             as core; print(core._get_current_isa_level().lower())" '
         cur_ipex_isa = get_currnet_isa_level()
         with subprocess.Popen(
-            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         ) as p:
-            out = p.stdout.readlines()
-            cur_ipex_isa_1 = str(out[-1], "utf-8").strip()
+            stdout, _ = p.communicate()
+            cur_ipex_isa_1 = stdout.decode("ascii").strip()
             self.assertTrue(cur_ipex_isa == cur_ipex_isa_1)
 
 
