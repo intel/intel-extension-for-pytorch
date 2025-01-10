@@ -26,6 +26,7 @@ from intel_extension_for_pytorch.transformers.models.xpu.fusions.linear_fusion i
     _IPEXlinearAddAddXPU,
     _IPEXlinearGeluXPU,
     _IPEXlinearSiluMulXPU,
+    _IPEXGatedMLPMOEXPU,
 )
 
 from intel_extension_for_pytorch.transformers.models.xpu.fusions.mha_fusion import (
@@ -86,6 +87,7 @@ XPU_fusion_modules = {
     IPEXCustomOpType.LINEAR_ADD_ADD: _IPEXlinearAddAddXPU,
     IPEXCustomOpType.LINEAR_GELU: _IPEXlinearGeluXPU,
     IPEXCustomOpType.LINEAR2_SILU_MUL: _IPEXlinearSiluMulXPU,
+    IPEXCustomOpType.LINEAR_MOE: _IPEXGatedMLPMOEXPU,
 }
 
 
