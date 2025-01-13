@@ -803,7 +803,7 @@ def LlavaForConditionalGeneration_forward(
         legacy_processing = (
             (input_ids == self.config.image_token_index).sum(1).max()
             < self.config.image_seq_length
-        ) or (input_ids.shape[-1] == 1 and pixel_values is not None)
+        ) or (inputs_embeds.shape[-2] == 1 and pixel_values is not None)
 
     image_features = None
     if pixel_values is not None:
@@ -814,7 +814,7 @@ def LlavaForConditionalGeneration_forward(
         )
     if legacy_processing:
         # prefill stage vs decoding stage (legacy behavior copied)
-        if input_ids.shape[1] != 1:
+        if inputs_embeds.shape[-2] != 1:
             inputs_embeds, attention_mask, labels, position_ids = (
                 self._merge_input_ids_with_image_features(
                     image_features, inputs_embeds, input_ids, attention_mask, labels
