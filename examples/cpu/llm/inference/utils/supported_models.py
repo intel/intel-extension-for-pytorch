@@ -35,7 +35,7 @@ MODEL_CLASSES = {
     "maira2": (AutoModelForCausalLM, AutoProcessor),
     "maira-2": (AutoModelForCausalLM, AutoProcessor),
     "jamba": (AutoModelForCausalLM, AutoTokenizer),
-    "deepseekv2": (AutoModelForCausalLM, AutoTokenizer),
+    "deepseek-v2": (AutoModelForCausalLM, AutoTokenizer),
     "auto": (AutoModelForCausalLM, AutoTokenizer),
 }
 

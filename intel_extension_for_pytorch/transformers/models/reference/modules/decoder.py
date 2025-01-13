@@ -1825,29 +1825,22 @@ def JambaMambaDecoderLayer_forward(
 
 
 def moe_infer(self, x, topk_ids, topk_weight):
-    final_out = torch.zeros_like(x, dtype=x.dtype)
-    topk_weight = topk_weight.to(dtype=x.dtype)
-    expert_mask = torch.nn.functional.one_hot(
-        topk_ids, num_classes=len(self.mlp.experts)
-    ).permute(2, 1, 0)
-
     # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
     if self.moe_linear_type in [0, 1]:
         final_out = torch.ops.torch_ipex.deepseek_moe_tpp(
             x,
-            expert_mask,
+            topk_ids,
             self.gate_weights,
             self.up_weights,
             self.down_weights,
             self.moe_linear_type == 0,
             topk_weight,
-            final_out,
             self.distributed,
         )
     elif self.moe_linear_type == 2:
         final_out = torch.ops.torch_ipex.deepseek_moe(
             x,
-            expert_mask,
+            topk_ids,
             self.gate_weights,
             self.gate_ctx,
             self.up_weights,
@@ -1855,13 +1848,12 @@ def moe_infer(self, x, topk_ids, topk_weight):
             self.down_weights,
             self.down_ctx,
             topk_weight,
-            final_out,
             self.distributed,
         )
     elif self.moe_linear_type == 3:
         final_out = torch.ops.torch_ipex.deepseek_moe_mkl(
             x,
-            expert_mask,
+            topk_ids,
             self.gate_weights,
             self.gate_ctx,
             self.up_weights,
@@ -1869,18 +1861,16 @@ def moe_infer(self, x, topk_ids, topk_weight):
             self.down_weights,
             self.down_ctx,
             topk_weight,
-            final_out,
             self.distributed,
         )
     else:
         final_out = torch.ops.torch_ipex.deepseek_moe_woq(
             x,
-            expert_mask,
+            topk_ids,
             self.gate_ctx,
             self.up_ctx,
             self.down_ctx,
             topk_weight,
-            final_out,
             self.distributed,
         )
     return final_out
@@ -1897,7 +1887,7 @@ def DeepseekV2DecoderLayer_forward(
     **kwargs,
 ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
     residual = hidden_states
-    hidden_states = self.input_layernorm(hidden_states).to(dtype=hidden_states.dtype)
+    hidden_states = self.input_layernorm(hidden_states)
 
     # Self Attention
     hidden_states, self_attn_weights, present_key_value = self.self_attn(
@@ -1917,14 +1907,12 @@ def DeepseekV2DecoderLayer_forward(
 
     # Fully Connected
     residual = hidden_states
-    hidden_states = self.post_attention_layernorm(hidden_states).to(
-        dtype=hidden_states.dtype
-    )
+    hidden_states = self.post_attention_layernorm(hidden_states)
     if hasattr(self.mlp, "experts"):  # DeepseekV2MoE
         identity = hidden_states
         orig_shape = hidden_states.shape
-        topk_idx, topk_weight, aux_loss = self.mlp.gate(hidden_states)
         hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
+        topk_idx, topk_weight, aux_loss = self.mlp.gate(hidden_states)
         hidden_states = moe_infer(self, hidden_states, topk_idx, topk_weight).view(
             *orig_shape
         )
