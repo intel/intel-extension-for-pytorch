@@ -307,24 +307,19 @@ class TestChunkedPrefill(TestCase):
             is_causal,
         )
 
-        torch.ops.torch_ipex.chunked_prefill(
+        ipex.llm.modules.PagedAttention.flash_attn_varlen_func(
+            output_xpu,
             query_xpu,
             key_cache_xpu,
             value_cache_xpu,
-            output_xpu,
             cu_seqlen_q_xpu,
             cu_seqlen_k_xpu,
-            None,
-            block_tables_xpu,
-            alibi_slopes_xpu,
             max_seqlen_q,
             max_seqlen_k,
-            0.0,
             scale,
-            False,
             is_causal,
-            False,
-            None,
+            block_tables_xpu,
+            alibi_slopes_xpu,
         )
 
         torch.testing.assert_close(output.cpu(), output_xpu.cpu(), atol=3e-3, rtol=1e-3)
@@ -334,7 +329,7 @@ class TestChunkedPrefill(TestCase):
     @parametrize("max_seqlen_k", [8, 1024, 2088])
     # @parametrize("max_seqlen_k", [76])
     @parametrize("num_heads", [(16, 16)])
-    @parametrize("head_size", [64, 128, 256])
+    @parametrize("head_size", [64, 70, 96, 128, 256])
     # @parametrize("head_size", [64])
     @parametrize("block_size", [16, 32, 64, 128])
     @parametrize("use_alibi", [False])
@@ -372,7 +367,7 @@ class TestChunkedPrefill(TestCase):
     @parametrize("max_seqlen_k", [8, 76, 512, 2088])
     # @parametrize("max_seqlen_k", [76])
     @parametrize("num_heads", [(16, 16)])
-    @parametrize("head_size", [64, 128, 256])
+    @parametrize("head_size", [64, 70, 96, 128, 256])
     # @parametrize("head_size", [64])
     @parametrize("block_size", [16, 32, 64, 128])
     @parametrize("use_alibi", [False])

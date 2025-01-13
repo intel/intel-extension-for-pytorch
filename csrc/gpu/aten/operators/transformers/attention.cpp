@@ -1770,10 +1770,6 @@ Tensor chunked_prefill(
   auto softmax_lse = at::empty({}, query.options().dtype(at::kFloat));
   constexpr const int partition_sizee = 512;
 
-  TORCH_CHECK(
-      check_if_xetla_valid_for_varlen(query, head_dim),
-      "Invalid head dim for chunked prefill");
-
 #if defined(USE_XETLA)
   TORCH_CHECK(
       dpcppGetDeviceHasXMX(),

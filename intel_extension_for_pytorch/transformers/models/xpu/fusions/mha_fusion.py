@@ -468,11 +468,22 @@ class _IPEXPagedAttentionXPU:
         block_table,
         alibi_slopes=None,
     ):
+        head_dim = query.size(-1)
+        pad_query = query
+        pad_k_cache = k_cache
+        pad_v_cache = v_cache
+        pad_output = output
+        if head_dim % 64 != 0:
+            pad_size = 64 - head_dim % 64
+            pad_query = torch.nn.functional.pad(query, (0, pad_size))
+            pad_k_cache = torch.nn.functional.pad(k_cache, (0, pad_size))
+            pad_v_cache = torch.nn.functional.pad(v_cache, (0, pad_size))
+            pad_output = torch.nn.functional.pad(output, (0, pad_size))
         torch.ops.torch_ipex.chunked_prefill(
-            query,
-            k_cache,
-            v_cache,
-            output,
+            pad_query,
+            pad_k_cache,
+            pad_v_cache,
+            pad_output,
             cu_seqlens_q,
             cu_seqlens_kv,
             None,
@@ -487,6 +498,8 @@ class _IPEXPagedAttentionXPU:
             False,
             None,
         )
+        if head_dim % 64 != 0:
+            output.copy_(pad_output[:, :, :head_dim])
 
     @classmethod
     def swap_blocks(cls, src, dst, block_mapping):
