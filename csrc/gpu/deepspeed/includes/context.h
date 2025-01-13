@@ -206,7 +206,6 @@ class TrainingContext {
 
   virtual ~TrainingContext() {
     _mklHandle = nullptr;
-    sycl::free(_workspace, *at::getCurrentSYCLStream());
   }
 
   static TrainingContext& Instance() {
@@ -302,7 +301,6 @@ class InferenceContext {
 
   virtual ~InferenceContext() {
     _mklHandle = nullptr;
-    sycl::free(_workspace, *at::getCurrentSYCLStream());
     delete _comp1_event;
     delete _comp2_event;
     delete _comp_event;
