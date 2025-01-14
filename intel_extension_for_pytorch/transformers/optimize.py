@@ -214,6 +214,7 @@ def model_convert_reference(_model):
         JambaForCausalLM_forward,
         DeepseekV2ForCausalLM_forward,
         DeepseekV2Model_forward,
+        DeepseekV2_MoEGate_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptj,
         prepare_inputs_for_generation_gptbigcode,
@@ -1095,6 +1096,12 @@ def model_convert_reference(_model):
     elif _model.config.architectures[0] == "DeepseekV2ForCausalLM":
         convert_function(_model, "forward", DeepseekV2ForCausalLM_forward)
         convert_function(_model.model, "forward", DeepseekV2Model_forward)
+        convert_functions(
+            _model,
+            type(_model.model.layers[1].mlp.gate),
+            "forward",
+            DeepseekV2_MoEGate_forward,
+        )
         convert_class(
             _model,
             type(_model.model.layers[0].self_attn),

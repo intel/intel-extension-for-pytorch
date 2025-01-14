@@ -2295,69 +2295,40 @@ def _DeepseekV2Attention_forward(
     **kwargs,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     bsz, q_len, _ = hidden_states.size()
-
-    if self.q_lora_rank is None:
-        q = self.q_proj(hidden_states)
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+        q, compressed_kv, k_pe = torch.split(
+            concat_qkv,
+            [self.q_lora_rank, self.kv_lora_rank, self.qk_rope_head_dim],
+            dim=-1,
+        )
+        q = self.q_b_proj(self.q_a_layernorm(q))
     else:
-        q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
-    q = q.view(bsz, q_len, self.num_heads, self.q_head_dim)
-    q_nope = q[:, :, :, : self.qk_nope_head_dim]
-    q_pe = q[:, :, :, self.qk_nope_head_dim :]
-
-    compressed_kv = self.kv_a_proj_with_mqa(hidden_states)
-    compressed_kv, k_pe = torch.split(
-        compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1
-    )
-    k_pe = k_pe.view(bsz, q_len, 1, self.qk_rope_head_dim)
+        if self.q_lora_rank is None:
+            q = self.q_proj(hidden_states)
+        else:
+            q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
+        compressed_kv = self.kv_a_proj_with_mqa(hidden_states)
+        compressed_kv, k_pe = torch.split(
+            compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1
+        )
     kv = self.kv_b_proj(self.kv_a_layernorm(compressed_kv)).view(
         bsz, q_len, self.num_heads, self.qk_nope_head_dim + self.v_head_dim
     )
-
-    k_nope = kv[:, :, :, : self.qk_nope_head_dim]
-    value_states = kv[:, :, :, self.qk_nope_head_dim :]
-
-    kv_seq_len = (
-        q_len + past_key_value[0].size(-2) if past_key_value is not None else q_len
-    )
-    q_pe = (
-        q_pe.view(bsz, -1, self.num_heads, self.qk_rope_head_dim // 2, 2)
-        .transpose(4, 3)
-        .reshape(bsz, -1, self.num_heads, self.qk_rope_head_dim)
-        .contiguous()
-    )
-    k_pe = (
-        k_pe.view(bsz, -1, k_pe.size(2), self.qk_rope_head_dim // 2, 2)
-        .transpose(4, 3)
-        .reshape(bsz, -1, k_pe.size(2), self.qk_rope_head_dim)
-        .contiguous()
-    )
-
-    k_pe = self._IPEXROPE(
-        k_pe,
-        position_ids,
-        k_pe.size(2),
-        self.qk_rope_head_dim,
-        self.qk_rope_head_dim // 2,
-        self.qk_rope_head_dim,
-    )
-    q_pe = self._IPEXROPE(
-        q_pe,
-        position_ids,
-        self.num_attention_heads,
-        self.qk_rope_head_dim,
-        self.qk_rope_head_dim // 2,
-        self.qk_rope_head_dim,
-    )
-
-    query_states = torch.cat([q_nope, q_pe], dim=-1)
-    key_states = torch.cat(
-        [k_nope, k_pe.repeat(1, 1, self.num_key_value_heads, 1)], dim=-1
-    )
-
-    if self.q_head_dim != self.v_head_dim:
-        value_states = torch.nn.functional.pad(
-            value_states, [0, self.q_head_dim - self.v_head_dim]
+    sin_cos, _, _ = self._IPEXROPE.embed_positions()
+    query_states, key_states, value_states = (
+        torch.ops.torch_ipex.rotary_position_embedding_deepseek(
+            q,
+            kv,
+            k_pe,
+            sin_cos,
+            position_ids,
+            self.num_attention_heads,
+            self.q_head_dim,
+            self.qk_nope_head_dim,
+            self.qk_rope_head_dim,
         )
+    )
     (
         attn_output,
         attn_weights,
@@ -2374,7 +2345,7 @@ def _DeepseekV2Attention_forward(
     if self.q_head_dim != self.v_head_dim:
         attn_output = attn_output[:, :, :, : self.v_head_dim]
 
-    attn_output = attn_output.transpose(1, 2).contiguous()
+    attn_output = attn_output.transpose(1, 2)
 
     attn_output = attn_output.reshape(bsz, q_len, -1)
 
@@ -2682,6 +2653,7 @@ class _IPEXAttentionRef(nn.Module):
             "LlavaLlamaForCausalLM",
             "PhiForCausalLM",
             "Qwen2ForCausalLM",
+            "DeepseekV2ForCausalLM",
         ]:
             supported_linear_types = [
                 torch.nn.Linear,
@@ -2710,6 +2682,14 @@ class _IPEXAttentionRef(nn.Module):
                     [module.q_proj, module.k_proj, module.v_proj]
                 )
                 del module.q_proj, module.k_proj, module.v_proj
+            if self.model_backbone in ["DeepseekV2ForCausalLM"]:
+                if hasattr(module, "q_a_proj") and hasattr(
+                    module, "kv_a_proj_with_mqa"
+                ):
+                    self.concat_qkv = _IPEXConcatLinearRef(
+                        [module.q_a_proj, module.kv_a_proj_with_mqa]
+                    )
+                    del module.q_a_proj, module.kv_a_proj_with_mqa
         if not (
             self.model_backbone == "MllamaForConditionalGeneration"
             and (

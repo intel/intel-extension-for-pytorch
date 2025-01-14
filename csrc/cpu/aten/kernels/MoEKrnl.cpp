@@ -11,6 +11,7 @@
 #include <torch/csrc/autograd/function.h>
 #include <algorithm>
 #include "tpp/kernels/TPPGEMMKrnl.h"
+#include "vec/vec.h"
 
 namespace torch_ipex {
 namespace cpu {
@@ -119,6 +120,39 @@ void fuse_index_mul_index_add<at::BFloat16>(
   }
 }
 
+inline at::Tensor fuse_index_unsqueeze(
+    const at::Tensor& hidden_states,
+    const at::Tensor& top_x) {
+  auto top_x_size0 = top_x.size(0);
+  auto in_size1 = hidden_states.size(1);
+  auto curr_state =
+      at::empty({1, top_x_size0, in_size1}, hidden_states.options());
+  if (hidden_states.scalar_type() == at::ScalarType::Float) {
+    auto in_ptr = hidden_states.data_ptr<float>();
+    auto out_ptr = curr_state.data_ptr<float>();
+    auto top_x_ptr = top_x.data_ptr<int64_t>();
+    for (int i = 0; i < top_x_size0; i++) {
+      auto in_offset = top_x_ptr[i] * in_size1;
+      auto out_offset = i * in_size1;
+      torch_ipex::cpu::kernel::move_ker<float, float>(
+          out_ptr + out_offset, in_ptr + in_offset, in_size1);
+    }
+  } else if (hidden_states.scalar_type() == at::ScalarType::BFloat16) {
+    auto in_ptr = hidden_states.data_ptr<at::BFloat16>();
+    auto out_ptr = curr_state.data_ptr<at::BFloat16>();
+    auto top_x_ptr = top_x.data_ptr<int64_t>();
+    for (int i = 0; i < top_x_size0; i++) {
+      auto in_offset = top_x_ptr[i] * in_size1;
+      auto out_offset = i * in_size1;
+      torch_ipex::cpu::kernel::move_ker<at::BFloat16, at::BFloat16>(
+          out_ptr + out_offset, in_ptr + in_offset, in_size1);
+    }
+  } else {
+    curr_state = hidden_states.index({top_x}).unsqueeze(0);
+  }
+  return curr_state;
+}
+
 at::Tensor mixtral_moe_tpp_kernl_impl(
     const at::Tensor& hidden_states,
     const at::Tensor& top_x,
@@ -130,7 +164,7 @@ at::Tensor mixtral_moe_tpp_kernl_impl(
     const at::Tensor& routing_weights,
     at::Tensor& output,
     bool is_distributed) {
-  auto curr_state = hidden_states.index({top_x}).unsqueeze(0);
+  auto curr_state = fuse_index_unsqueeze(hidden_states, top_x);
   if (tpp_fallback) {
     curr_state = at::linear(
         at::silu(at::linear(curr_state, gate_wei)) *
@@ -181,7 +215,7 @@ at::Tensor mixtral_moe_kernl_impl(
     const at::Tensor& routing_weights,
     at::Tensor& output,
     bool is_distributed) {
-  auto curr_state = hidden_states.index({top_x}).unsqueeze(0);
+  auto curr_state = fuse_index_unsqueeze(hidden_states, top_x);
   if (use_dnnl) {
     curr_state = ipex_linear(
         at::silu(ipex_linear(
@@ -232,7 +266,7 @@ at::Tensor mixtral_moe_woq_kernl_impl(
     const at::Tensor& routing_weights,
     at::Tensor& output,
     bool is_distributed) {
-  auto curr_state = hidden_states.index({top_x}).unsqueeze(0);
+  auto curr_state = fuse_index_unsqueeze(hidden_states, top_x);
   curr_state = woq_linear_forward(
       woq_linear_mul_forward(
           curr_state, up_wei, {woq_linear_silu_forward(curr_state, gate_wei)}),
@@ -255,6 +289,102 @@ at::Tensor mixtral_moe_woq_kernl_impl(
 
   return output;
 }
+
+template <typename T>
+std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel(
+    const at::Tensor& hidden_states,
+    const at::Tensor& scores,
+    const at::Tensor& routed_scaling_factor,
+    const int64_t n_group,
+    const int64_t topk_group,
+    const int64_t n_routed_experts,
+    const int64_t top_k) {
+  auto group_size = n_routed_experts / n_group;
+  auto n = scores.size(0);
+  auto h = scores.size(1);
+  auto group_scores = at::empty({n, n_group}, hidden_states.options());
+  auto group_scores_ptr = group_scores.data_ptr<T>();
+  auto scores_ptr = scores.data_ptr<T>();
+#pragma omp parallel for collapse(2)
+  for (auto i = 0; i < n; i++) {
+    for (auto j = 0; j < n_group; j++) {
+      auto k_start = j * group_size;
+      auto k_end = k_start + group_size;
+      auto max_val = scores_ptr[i * h + k_start];
+      for (auto k = k_start + 1; k < k_end; k++) {
+        max_val = std::max(max_val, scores_ptr[i * h + k]);
+      }
+      group_scores_ptr[i * n_group + j] = max_val;
+    }
+  }
+
+  auto group_idx = std::get<1>(group_scores.topk(topk_group, -1, true, false));
+  auto tmp_scores = at::zeros_like(scores, hidden_states.options());
+  auto group_idx_ptr = group_idx.data_ptr<int64_t>();
+  auto tmp_scores_ptr = tmp_scores.data_ptr<T>();
+  T scale = routed_scaling_factor.item<T>();
+#pragma omp parallel for collapse(2)
+  for (auto i = 0; i < n; i++) {
+    for (auto j = 0; j < topk_group; j++) {
+      auto selected_idx = group_idx_ptr[i * topk_group + j];
+      auto k_start = selected_idx * group_size;
+      auto k_end = k_start + group_size;
+      for (auto k = k_start; k < k_end; k++) {
+        tmp_scores_ptr[i * h + k] = scores_ptr[i * h + k] * scale;
+      }
+    }
+  }
+  at::Tensor topk, topk_weight;
+  std::tie(topk_weight, topk) = tmp_scores.topk(top_k, -1, true, false);
+  return std::make_tuple(topk, topk_weight);
+}
+
+std::tuple<at::Tensor, at::Tensor> deepseek_moegate_kernel_impl(
+    const at::Tensor& hidden_states,
+    const at::Tensor& scores,
+    const at::Tensor& routed_scaling_factor,
+    const int64_t n_group,
+    const int64_t topk_group,
+    const int64_t n_routed_experts,
+    const int64_t top_k) {
+  if (hidden_states.scalar_type() == at::ScalarType::Float) {
+    return deepseek_moegate_kernel<float>(
+        hidden_states,
+        scores,
+        routed_scaling_factor,
+        n_group,
+        topk_group,
+        n_routed_experts,
+        top_k);
+  } else if (hidden_states.scalar_type() == at::ScalarType::BFloat16) {
+    return deepseek_moegate_kernel<at::BFloat16>(
+        hidden_states,
+        scores,
+        routed_scaling_factor,
+        n_group,
+        topk_group,
+        n_routed_experts,
+        top_k);
+  }
+  auto n = hidden_states.size(0);
+  auto h = hidden_states.size(1);
+  auto group_size = n_routed_experts / n_group;
+  auto max_results = scores.view({n, n_group, -1}).max(-1);
+  auto group_scores = std::get<0>(max_results);
+
+  auto group_idx = std::get<1>(group_scores.topk(topk_group, -1, true, false));
+  auto group_mask = at::zeros_like(group_scores);
+  group_mask.scatter_(1, group_idx, 1);
+  auto score_mask = group_mask.unsqueeze(-1)
+                        .expand({n, n_group, group_size})
+                        .reshape({n, -1});
+  auto tmp_scores = scores.masked_fill(~score_mask.to(at::kBool), 0.0);
+  at::Tensor topk, topk_weight;
+  std::tie(topk_weight, topk) = tmp_scores.topk(top_k, -1, true, false);
+  topk_weight = topk_weight * routed_scaling_factor;
+  return std::make_tuple(topk, topk_weight.to(hidden_states.scalar_type()));
+}
+
 } // anonymous namespace
 
 IPEX_REGISTER_DISPATCH(
@@ -264,6 +394,9 @@ IPEX_REGISTER_DISPATCH(
     mixtral_moe_woq_kernel_stub,
     &mixtral_moe_woq_kernl_impl);
 IPEX_REGISTER_DISPATCH(mixtral_moe_kernel_stub, &mixtral_moe_kernl_impl);
+IPEX_REGISTER_DISPATCH(
+    deepseek_moegate_kernel_stub,
+    &deepseek_moegate_kernel_impl);
 
 } // namespace cpu
 } // namespace torch_ipex

@@ -2138,28 +2138,21 @@ class CPUOPsTester(TestCase):
                 return final_out
 
             def moe_infer_ipex(self, x, topk_ids, topk_weight):
-                final_out = torch.zeros_like(x, dtype=x.dtype)
-                topk_weight = topk_weight.to(dtype=x.dtype)
-                expert_mask = torch.nn.functional.one_hot(
-                    topk_ids, num_classes=len(self.experts)
-                ).permute(2, 1, 0)
-
                 if self.moe_linear_type in [0, 1]:
                     final_out = torch.ops.torch_ipex.deepseek_moe_tpp(
                         x,
-                        expert_mask,
+                        topk_ids,
                         self.gate_weights,
                         self.up_weights,
                         self.down_weights,
                         self.moe_linear_type == 0,
                         topk_weight,
-                        final_out,
                         self.distributed,
                     )
                 elif self.moe_linear_type == 2:
                     final_out = torch.ops.torch_ipex.deepseek_moe(
                         x,
-                        expert_mask,
+                        topk_ids,
                         self.gate_weights,
                         self.gate_ctx,
                         self.up_weights,
@@ -2167,13 +2160,12 @@ class CPUOPsTester(TestCase):
                         self.down_weights,
                         self.down_ctx,
                         topk_weight,
-                        final_out,
                         self.distributed,
                     )
                 elif self.moe_linear_type == 3:
                     final_out = torch.ops.torch_ipex.deepseek_moe_mkl(
                         x,
-                        expert_mask,
+                        topk_ids,
                         self.gate_weights,
                         self.gate_ctx,
                         self.up_weights,
@@ -2181,18 +2173,16 @@ class CPUOPsTester(TestCase):
                         self.down_weights,
                         self.down_ctx,
                         topk_weight,
-                        final_out,
                         self.distributed,
                     )
                 else:
                     final_out = torch.ops.torch_ipex.deepseek_moe_woq(
                         x,
-                        expert_mask,
+                        topk_ids,
                         self.gate_ctx,
                         self.up_ctx,
                         self.down_ctx,
                         topk_weight,
-                        final_out,
                         self.distributed,
                     )
                 return final_out
@@ -2224,6 +2214,58 @@ class CPUOPsTester(TestCase):
                     ).eval()
                     output_ipex = model_ipex(x_clone, topk_ids_clone, topk_weight_clone)
                     self.assertEqual(output_ref, output_ipex, prec=0.1)
+
+    def test_deepseek_moegate(self):
+        n_group = 8
+        topk_group = 3
+        n_routed_experts = 16
+        top_k = 6
+        routed_scaling_factor = 16.0
+
+        def moe_gate(scores):
+            n, h = scores.shape
+            group_scores = (
+                scores.view(n, n_group, -1).max(dim=-1).values
+            )  # [n, n_group]
+            group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[
+                1
+            ]  # [n, top_k_group]
+            group_mask = torch.zeros_like(group_scores)  # [n, n_group]
+            group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
+            score_mask = (
+                group_mask.unsqueeze(-1)
+                .expand(n, n_group, n_routed_experts // n_group)
+                .reshape(n, -1)
+            )  # [n, e]
+            tmp_scores = scores.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
+            topk_weight, topk_idx = torch.topk(
+                tmp_scores, k=top_k, dim=-1, sorted=False
+            )
+
+            topk_weight = topk_weight * routed_scaling_factor
+            return topk_idx, topk_weight
+
+        for dtype in [torch.float32, torch.bfloat16]:
+            hidden_states = torch.rand(10, 2560, dtype=dtype)
+            weight = torch.rand(16, 2560, dtype=dtype)
+            logits = torch.nn.functional.linear(
+                hidden_states.type(torch.float32), weight.type(torch.float32), None
+            )
+            scores = logits.softmax(dim=-1, dtype=dtype)
+            enable_autocast = dtype == torch.bfloat16
+            with torch.no_grad(), torch.cpu.amp.autocast(enabled=enable_autocast):
+                topk_idx_ref, topk_weight_ref = moe_gate(scores)
+                topk_idx_ipex, topk_weight_ipex = torch.ops.torch_ipex.deepseek_moegate(
+                    hidden_states,
+                    scores,
+                    torch.tensor(routed_scaling_factor),
+                    n_group,
+                    topk_group,
+                    n_routed_experts,
+                    top_k,
+                )
+                self.assertEqual(topk_idx_ref, topk_idx_ipex)
+                self.assertEqual(topk_weight_ref, topk_weight_ipex)
 
 
 if __name__ == "__main__":

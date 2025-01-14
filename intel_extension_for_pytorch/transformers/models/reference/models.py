@@ -5845,6 +5845,43 @@ def JambaForCausalLM_forward(
     return (loss,) + output if loss is not None else output
 
 
+def DeepseekV2_MoEGate_forward(self, hidden_states):
+    # compute gating score
+    logits = torch.nn.functional.linear(
+        hidden_states.type(torch.float32), self.weight.type(torch.float32), None
+    )
+
+    if self.scoring_func == "softmax":
+        scores = logits.softmax(dim=-1, dtype=hidden_states.dtype)
+    else:
+        raise NotImplementedError(
+            f"insupportable scoring function for MoE gating: {self.scoring_func}"
+        )
+
+    # select top-k experts
+    if self.topk_method == "greedy":
+        topk_weight, topk_idx = torch.topk(scores, k=self.top_k, dim=-1, sorted=False)
+    elif self.topk_method == "group_limited_greedy":
+        topk_idx, topk_weight = torch.ops.torch_ipex.deepseek_moegate(
+            hidden_states,
+            scores,
+            torch.tensor(self.routed_scaling_factor),
+            self.n_group,
+            self.topk_group,
+            self.n_routed_experts,
+            self.top_k,
+        )
+
+    # norm gate to sum 1
+    if self.top_k > 1 and self.norm_topk_prob:
+        denominator = topk_weight.sum(dim=-1, keepdim=True) + 1e-20
+        topk_weight = topk_weight / denominator
+    elif self.topk_method == "greedy":
+        topk_weight = topk_weight * self.routed_scaling_factor
+    aux_loss = None
+    return topk_idx, topk_weight, aux_loss
+
+
 def DeepseekV2Model_forward(
     self,
     input_ids: torch.LongTensor = None,
