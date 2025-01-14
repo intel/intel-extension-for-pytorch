@@ -134,7 +134,8 @@ at::Tensor woq_linear_pack_weight(
     int64_t weight_dtype,
     std::vector<int64_t>& weight_shape,
     int64_t group_size,
-    int64_t lowp_mode);
+    int64_t lowp_mode,
+    int64_t weight_format);
 
 at::Tensor woq_linear_compute_compensation(
     const at::Tensor& weight,
@@ -266,7 +267,7 @@ using woq_int8_gemm_kernel_fn = at::Tensor (*)(
     const c10::optional<at::Tensor>&);
 
 using woq_tpp_gemm_packB_fn =
-    at::Tensor (*)(const at::Tensor&, int, size_t, size_t, int64_t);
+    at::Tensor (*)(const at::Tensor&, int, size_t, size_t, int64_t, int64_t);
 
 using woq_tpp_gemm_unpackB_fn = at::Tensor (*)(const at::Tensor&, int, int64_t);
 
