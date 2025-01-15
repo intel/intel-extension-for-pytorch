@@ -733,6 +733,7 @@ def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
         quant_method = None
         group_size = None
         desc_act = None
+        backend = None  # needed by intel/auto-round
         for pattern in ["*.pt", "*.pth", "*.bin"]:
             files = list(pathlib.Path(pathname).glob(pattern))
             if files:
@@ -757,6 +758,11 @@ def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
             len(low_precision_checkpoint) > 0
         ), f"Cannot find checkpoint (.pt/.pth/.bin/.safetensors) files in path {pathname}."
         try:
+            assert (
+                os.path.exists(pathname + "/config.json")
+                or os.path.exists(pathname + "/quant_config.json")
+                or os.path.exists(pathname + "/quantize_config.json")
+            ), "Cannot find config.json or quant_config.json or quantize_config.json in path."
             model_config = None
             if os.path.exists(pathname + "/config.json"):
                 with open(pathname + "/config.json", "r", encoding="utf-8") as file:
@@ -766,6 +772,7 @@ def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
                 )
                 group_size = model_config["quantization_config"].get("group_size", None)
                 desc_act = model_config["quantization_config"].get("desc_act", None)
+                backend = model_config["quantization_config"].get("backend", None)
             config_path = None
             if os.path.exists(pathname + "/quant_config.json"):
                 config_path = pathname + "/quant_config.json"
@@ -780,6 +787,8 @@ def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
                     quant_method = quant_model_config.get("quant_method", None)
                 if desc_act is None:
                     desc_act = quant_model_config.get("desc_act", None)
+                if backend is None:
+                    backend = quant_model_config.get("backend", None)
 
         except Exception as e:
             print(
@@ -801,8 +810,21 @@ def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
     assert quant_method is not None, "quant_method should not be None"
     if quant_method == "gptq":
         assert desc_act is not None, "group_size should not be None"
-    else:
+    elif quant_method == "awq":
         desc_act = False
+    elif quant_method == "intel/auto-round":
+        if backend is None or "gptq" in backend:
+            quant_method = "gptq"
+        elif "awq" in backend:
+            quant_method = "awq"
+        else:
+            raise (
+                NotImplementedError,
+                f"Unsupported backend: {backend} of intel/auto-round",
+            )
+        desc_act = False
+    else:
+        raise (NotImplementedError, f"Unsupported quantization method: {quant_method}")
     quant_config = {
         "quant_method": quant_method,
         "group_size": group_size,
