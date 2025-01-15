@@ -23,10 +23,6 @@ try:
         _prepare_4d_causal_attention_mask,
     )
 
-    if hasattr(transformers.models, "mixtral"):
-        from transformers.models.mixtral.modeling_mixtral import (
-            load_balancing_loss_func,
-        )
     from transformers.modeling_outputs import (
         MoeCausalLMOutputWithPast,
         MoeModelOutputWithPast,
@@ -3277,10 +3273,12 @@ def MixtralForCausalLM_forward(
 
     aux_loss = None
     if output_router_logits:
-        aux_loss = load_balancing_loss_func(
-            outputs.router_logits if return_dict else outputs[-1],
-            self.num_experts,
-            self.num_experts_per_tok,
+        aux_loss = (
+            transformers.models.mixtral.modeling_mixtral.load_balancing_loss_func(
+                outputs.router_logits if return_dict else outputs[-1],
+                self.num_experts,
+                self.num_experts_per_tok,
+            )
         )
         if labels is not None:
             loss += self.router_aux_loss_coef * aux_loss
@@ -5828,7 +5826,7 @@ def JambaForCausalLM_forward(
 
     aux_loss = None
     if output_router_logits:
-        aux_loss = load_balancing_loss_func(
+        aux_loss = transformers.models.jamba.modeling_jamba.load_balancing_loss_func(
             outputs.router_logits if return_dict else outputs[-1],
             self.num_experts,
             self.num_experts_per_tok,
