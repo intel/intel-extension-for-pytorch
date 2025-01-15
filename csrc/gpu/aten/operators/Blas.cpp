@@ -1137,25 +1137,32 @@ at::Tensor trans_matmul_add_div_add(
     int64_t dim1,
     int64_t dim2,
     const at::Tensor& tensor1,
-    Scalar oscale,
-    Tensor& accumul1,
+    const c10::optional<Scalar>& oscale,
+    const c10::optional<Tensor>& accumul1,
     Scalar alpha1,
-    Tensor& accumul2,
+    const c10::optional<Tensor>& accumul2,
     Scalar alpha2) {
   RECORD_FUNCTION(
-      "trans_matmul_add_div",
-      std::vector<c10::IValue>({tensor1, tensor2, accumul1, accumul2}));
-  TORCH_CHECK(oscale.to<float>() != 0, "expected non-zero value of oscale");
+      "trans_matmul_add_div_add",
+      std::vector<c10::IValue>({tensor1, tensor2, accumul1, oscale, accumul2}));
   Attr attr;
-  attr.append_scale_binary(
-      attr.kind_with_binary_add, accumul1, alpha1.to<float>());
-  attr.append_post_eltwise( // append post linear
-      /* scale */ 1.f,
-      /* alpha */ 1.f / oscale.to<float>(),
-      /* beta */ 0.f,
-      attr.kind_with_linear);
-  attr.append_scale_binary(
-      attr.kind_with_binary_add, accumul2, alpha2.to<float>());
+  if (accumul1.has_value()) {
+    attr.append_scale_binary(
+        attr.kind_with_binary_add, accumul1.value(), alpha1.to<float>());
+  }
+  if (oscale.has_value()) {
+    TORCH_CHECK(
+        oscale.value().to<float>() != 0, "expected non-zero value of oscale");
+    attr.append_post_eltwise( // append post linear
+        /* scale */ 1.f,
+        /* alpha */ 1.f / oscale.value().to<float>(),
+        /* beta */ 0.f,
+        attr.kind_with_linear);
+  }
+  if (accumul2.has_value()) {
+    attr.append_scale_binary(
+        attr.kind_with_binary_add, accumul2.value(), alpha2.to<float>());
+  }
   bool is_fused;
   Tensor result;
   return matmul_fusion_variants(

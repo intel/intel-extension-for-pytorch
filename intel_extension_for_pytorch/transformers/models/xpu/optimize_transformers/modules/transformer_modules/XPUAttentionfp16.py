@@ -12,6 +12,7 @@ from .Linear import (
     GemmDtype,
 )
 from transformers.cache_utils import Cache
+from .model_utils import xpu_sdpa_support
 
 
 class IPEXAttention(IPEXTransformerAttnNaive):
@@ -240,6 +241,59 @@ class IPEXAttention(IPEXTransformerAttnNaive):
                 alibi = self.get_blocked_alibi(alibi, key.size(2), key.dtype)
         return scale, use_causal, attention_mask, alibi
 
+    def naive_sdp(
+        self,
+        query,
+        key,
+        value,
+        past_key_value,
+        attention_mask,
+        head_mask,
+        alibi,
+        scale,
+        use_causal,
+    ):
+        seq_len = query.size(2)
+        if (
+            self.beam_idx is not None
+            and seq_len == 1
+            and isinstance(past_key_value, IPEXStaticCache)
+        ):
+            key_prompt, value_prompt = past_key_value.get_prompt_for_beam_search(
+                self.layer_idx
+            )
+            key, value = self.reorder_cache(
+                key_prompt, value_prompt, key, value, self.beam_idx
+            )
+            # convert to FBNH layout
+            key = key.permute(2, 0, 1, 3).contiguous().permute(1, 2, 0, 3)
+            value = value.permute(2, 0, 1, 3).contiguous().permute(1, 2, 0, 3)
+        if not torch.xpu.has_xetla() or self.head_dim > 128:
+            attn_output, _ = self.naive_onednn_fused_sdp(
+                query,
+                key,
+                value,
+                attention_mask=attention_mask,
+                head_mask=head_mask,
+                alibi=alibi,
+                first_token=(seq_len > 1),
+            )
+        else:
+            attn_output = torch.xpu.IpexSDP(
+                query,
+                key,
+                value,
+                alibi,
+                attention_mask,
+                head_mask,
+                scale,
+                1.0,
+                0.0,
+                use_causal,
+                True,
+            )
+        return attn_output, None
+
     def sdp(
         self,
         query,
@@ -252,6 +306,22 @@ class IPEXAttention(IPEXTransformerAttnNaive):
         scale,
         use_causal,
     ):
+        if not xpu_sdpa_support(
+            self.beam_idx is not None,
+            self.beam_search_first_iter(query.size(2)),
+            self.head_dim,
+        ):
+            return self.naive_sdp(
+                query,
+                key,
+                value,
+                past_key_value,
+                attention_mask,
+                head_mask,
+                alibi,
+                scale,
+                use_causal,
+            )
         if (
             self.beam_idx is not None
             and query.size(-2) == 1

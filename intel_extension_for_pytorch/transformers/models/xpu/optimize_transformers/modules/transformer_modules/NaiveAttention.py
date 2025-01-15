@@ -555,6 +555,38 @@ class IPEXTransformerAttnNaive(IPEXTransformerAttn):
 
         return attn_output, attn_weights
 
+    def naive_onednn_fused_sdp(
+        self, query, key, value, attention_mask, head_mask, alibi, first_token
+    ):
+        if alibi is not None:
+            return self.naive_self_attention(
+                query, key, value, attention_mask, head_mask, alibi, first_token
+            )
+        causal_mask = None
+        if self.use_causal_mask:
+            query_length, key_length = query.size(-2), key.size(-2)
+            causal_mask = IPEXTransformerAttnNaive.attention_mask[
+                :, :, key_length - query_length : key_length, :key_length
+            ].contiguous()
+        attn_weights = torch.ops.torch_ipex.trans_matmul_add_div_add(
+            key,
+            0,
+            0,
+            query,
+            self.scale_attn_scalar,
+            causal_mask,
+            1.0,
+            attention_mask,
+            1.0,
+        )
+        attn_weights = nn.functional.softmax(attn_weights, dim=-1).to(query.dtype)
+        attn_weights = self.attn_drop(attn_weights)
+        if head_mask is not None:
+            attn_weights = attn_weights * head_mask
+        attn_output = torch.matmul(attn_weights, value)
+
+        return attn_output, attn_weights
+
     # ########################################################################### post sdp #############################
 
     def post_sdp(self, attn_output, residual=None):
