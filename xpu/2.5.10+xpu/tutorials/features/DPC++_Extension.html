@@ -7,7 +7,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DPC++ Extension &mdash; Intel&amp;#174 Extension for PyTorch* 2.5.10+xpu documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
 
@@ -159,10 +159,10 @@
 <section id="building-with-setuptools">
 <h3>Building with setuptools<a class="headerlink" href="#building-with-setuptools" title="Link to this heading"></a></h3>
 <p>For building with <code class="docutils literal notranslate"><span class="pre">setuptools</span></code>, we build our DPC++ extension by writing a <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> script that uses <code class="docutils literal notranslate"><span class="pre">setuptools</span></code> to compile our C++ code. For the Long-Long-Term-Memory unit (LLTM), it looks like this:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">setuptools</span> <span class="kn">import</span> <span class="n">setup</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
-<span class="kn">from</span> <span class="nn">torch.xpu.cpp_extension</span> <span class="kn">import</span> <span class="n">DPCPPExtension</span><span class="p">,</span> <span class="n">DpcppBuildExtension</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">setuptools</span><span class="w"> </span><span class="kn">import</span> <span class="n">setup</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.xpu.cpp_extension</span><span class="w"> </span><span class="kn">import</span> <span class="n">DPCPPExtension</span><span class="p">,</span> <span class="n">DpcppBuildExtension</span>
 
 <span class="n">setup</span><span class="p">(</span>
     <span class="n">name</span><span class="o">=</span><span class="s1">&#39;lltm&#39;</span><span class="p">,</span>
@@ -188,16 +188,16 @@
 <p><code class="docutils literal notranslate"><span class="pre">DpcppBuildExtension</span></code> performs a number of required configuration steps and checks and also manages compilation in the case of DPC++ extensions. And that’s all we really need to know about building DPC++ extensions for now.</p>
 <p>Let’s take a look at the implementation of our DPC++ extension, which goes into <code class="docutils literal notranslate"><span class="pre">lltm_xpu.cpp</span></code> and <code class="docutils literal notranslate"><span class="pre">lltm_xpu_kernel.cpp</span></code>.
 After building the Python module with DPC++ extension, the <code class="docutils literal notranslate"><span class="pre">lltm_xpu</span></code> is available for importing as an extension plug-in.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">lltm_xpu</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">lltm_xpu</span>
 </pre></div>
 </div>
 </section>
 <section id="jit-compiling-extensions">
 <h3>JIT Compiling Extensions<a class="headerlink" href="#jit-compiling-extensions" title="Link to this heading"></a></h3>
 <p>Previously, we mentioned that there were two ways of building DPC++ extensions: use setuptools as AOT or compile with JIT. Having the former one introduced, let’s elaborate on the latter one. The JIT compilation mechanism provides a methodology to compile and load your extensions on the fly by invoking a simple <code class="docutils literal notranslate"><span class="pre">torch</span></code> API function <code class="docutils literal notranslate"><span class="pre">torch.xpu.cpp_extension.load()</span></code>. For the LLTM, this would look as simple as this:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
-<span class="kn">from</span> <span class="nn">torch.xpu.cpp_extension</span> <span class="kn">import</span> <span class="n">load</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.xpu.cpp_extension</span><span class="w"> </span><span class="kn">import</span> <span class="n">load</span>
 
 <span class="n">lltm_xpu</span> <span class="o">=</span> <span class="n">load</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lltm_xpu&quot;</span><span class="p">,</span> <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;lltm_xpu.cpp&#39;</span><span class="p">,</span> <span class="s1">&#39;lltm_xpu_kernel.cpp&#39;</span><span class="p">,])</span>
 </pre></div>
@@ -282,8 +282,8 @@ In C++ code, you can fetch a <code class="docutils literal notranslate"><span cl
 </pre></div>
 </div>
 <p>In python code, you can use the below codes to get a <code class="docutils literal notranslate"><span class="pre">void*</span></code>, which can cast to a <code class="docutils literal notranslate"><span class="pre">sycl::queue</span></code> pointer.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
 <span class="n">stream</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">xpu</span><span class="o">.</span><span class="n">current_stream</span><span class="p">()</span>
 <span class="n">queue</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">sycl_queue</span> <span class="c1"># queue is a ``void*`` which can cast to a sycl::queue pointer</span>
 </pre></div>
@@ -636,7 +636,7 @@ In C++ code, you can fetch a <code class="docutils literal notranslate"><span cl
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x71c626135f30> 
+   <jinja2.runtime.BlockReference object at 0x78f7e1770280> 
 <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 

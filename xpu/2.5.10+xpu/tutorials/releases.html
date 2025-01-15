@@ -7,7 +7,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Releases &mdash; Intel&amp;#174 Extension for PyTorch* 2.5.10+xpu documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=a95c1af4" />
 
@@ -211,9 +211,9 @@
 <li><p>Large Language Model (LLM) optimization</p>
 <p>Intel® Extension for PyTorch* provides a new dedicated module, <code class="docutils literal notranslate"><span class="pre">ipex.llm</span></code>, to host for Large Language Models (LLMs) specific APIs. With <code class="docutils literal notranslate"><span class="pre">ipex.llm</span></code>, Intel® Extension for PyTorch* provides comprehensive LLM optimization on FP16 and INT4 datatypes. Specifically for low precision, Weight-Only Quantization is supported for various scenarios. And user can also run Intel® Extension for PyTorch* with Tensor Parallel to fit in the multiple ranks or multiple nodes scenarios to get even better performance.</p>
 <p>A typical API under this new module is <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code>, which is designed to optimize transformer-based models within frontend Python modules, with a particular focus on Large Language Models (LLMs). It provides optimizations for both model-wise and content-generation-wise. <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> is an upgrade API to replace previous <code class="docutils literal notranslate"><span class="pre">ipex.optimize_transformers</span></code>, which will bring you more consistent LLM experience and performance. Below shows a simple example of <code class="docutils literal notranslate"><span class="pre">ipex.llm.optimize</span></code> for fp16 inference:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>  <span class="kn">import</span> <span class="nn">torch</span>
-  <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
-  <span class="kn">import</span> <span class="nn">transformers</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>  <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+  <span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
+  <span class="kn">import</span><span class="w"> </span><span class="nn">transformers</span>
 
   <span class="n">model</span><span class="o">=</span> <span class="n">transformers</span><span class="o">.</span><span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_name_or_path</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 
@@ -341,8 +341,8 @@
 <ul>
 <li><p>A new API function, <code class="docutils literal notranslate"><span class="pre">ipex.optimize_transformers</span></code>, is designed to optimize transformer-based models within frontend Python modules, with a particular focus on LLMs. It provides optimizations for both model-wise and content-generation-wise. You just need to invoke the <code class="docutils literal notranslate"><span class="pre">ipex.optimize_transformers</span></code> API instead of the <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> API to apply all optimizations transparently. More detailed information can be found at <a class="reference external" href="https://intel.github.io/intel-extension-for-pytorch/xpu/2.1.10+xpu/tutorials/llm.html">Large Language Model optimizations overview</a>.</p></li>
 <li><p>A typical usage of this new feature is quite simple as below:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 <span class="o">...</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">ipex</span><span class="o">.</span><span class="n">optimize_transformers</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
 </pre></div>
@@ -610,7 +610,7 @@ conda<span class="w"> </span>install<span class="w"> </span>mkl-include
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x71c626199ed0> 
+   <jinja2.runtime.BlockReference object at 0x78f7e1773be0> 
 <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 

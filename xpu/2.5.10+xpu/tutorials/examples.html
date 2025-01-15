@@ -7,7 +7,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Examples &mdash; Intel&amp;#174 Extension for PyTorch* 2.5.10+xpu documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=a95c1af4" />
 
@@ -200,8 +200,8 @@ Before running these examples, install the <code class="docutils literal notrans
 <li><p>Convert input tensors, loss criterion and model to XPU, as shown below:</p></li>
 </ol>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 <span class="o">...</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span>
 <span class="n">criterion</span> <span class="o">=</span> <span class="o">...</span>
@@ -237,11 +237,11 @@ Before running these examples, install the <code class="docutils literal notrans
 <p>Below you can find complete code examples demonstrating how to use the extension on training for different data types:</p>
 <section id="float32">
 <h5>Float32<a class="headerlink" href="#float32" title="Link to this heading"></a></h5>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -299,11 +299,11 @@ Before running these examples, install the <code class="docutils literal notrans
 </section>
 <section id="bfloat16">
 <h5>BFloat16<a class="headerlink" href="#bfloat16" title="Link to this heading"></a></h5>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -373,11 +373,11 @@ model object.</p>
 <h5>Imperative Mode<a class="headerlink" href="#imperative-mode" title="Link to this heading"></a></h5>
 <section id="resnet50">
 <h6>Resnet50<a class="headerlink" href="#resnet50" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -400,11 +400,11 @@ model object.</p>
 </section>
 <section id="bert">
 <h6>BERT<a class="headerlink" href="#bert" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">BertModel</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -435,11 +435,11 @@ model object.</p>
 <p>We recommend using Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a> for further optimizations.</p>
 <section id="id2">
 <h6>Resnet50<a class="headerlink" href="#id2" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -469,11 +469,11 @@ model object.</p>
 </section>
 <section id="id3">
 <h6>BERT<a class="headerlink" href="#id3" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">BertModel</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -515,11 +515,11 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 <h5>Imperative Mode<a class="headerlink" href="#id5" title="Link to this heading"></a></h5>
 <section id="id6">
 <h6>Resnet50<a class="headerlink" href="#id6" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -545,11 +545,11 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </section>
 <section id="id7">
 <h6>BERT<a class="headerlink" href="#id7" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">BertModel</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -583,11 +583,11 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 <p>We recommend using Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a> for further optimizations.</p>
 <section id="id9">
 <h6>Resnet50<a class="headerlink" href="#id9" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -617,11 +617,11 @@ We recommend using Auto Mixed Precision (AMP) with BFloat16 data type.</p>
 </section>
 <section id="id10">
 <h6>BERT<a class="headerlink" href="#id10" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">BertModel</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -664,11 +664,11 @@ We recommend using Auto Mixed Precision (AMP) with Float16 data type.</p>
 <h5>Imperative Mode<a class="headerlink" href="#id11" title="Link to this heading"></a></h5>
 <section id="id12">
 <h6>Resnet50<a class="headerlink" href="#id12" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -694,11 +694,11 @@ We recommend using Auto Mixed Precision (AMP) with Float16 data type.</p>
 </section>
 <section id="id13">
 <h6>BERT<a class="headerlink" href="#id13" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">BertModel</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -732,11 +732,11 @@ We recommend using Auto Mixed Precision (AMP) with Float16 data type.</p>
 <p>We recommend using Intel® Extension for PyTorch* with <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">TorchScript</a> for further optimizations.</p>
 <section id="id15">
 <h6>Resnet50<a class="headerlink" href="#id15" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -766,11 +766,11 @@ We recommend using Auto Mixed Precision (AMP) with Float16 data type.</p>
 </section>
 <section id="id16">
 <h6>BERT<a class="headerlink" href="#id16" title="Link to this heading"></a></h6>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">BertModel</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">BertModel</span>
 
 <span class="c1">############# code changes ###############</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">############# code changes ###############</span>
 
@@ -808,21 +808,21 @@ We recommend using Auto Mixed Precision (AMP) with Float16 data type.</p>
 <section id="int8">
 <h4>INT8<a class="headerlink" href="#int8" title="Link to this heading"></a></h4>
 <p>We recommend using TorchScript for INT8 model because it has wider support for models. TorchScript mode also auto-enables our optimizations. For TorchScript INT8 model, inserting observer and model quantization is achieved through <code class="docutils literal notranslate"><span class="pre">prepare_jit</span></code> and <code class="docutils literal notranslate"><span class="pre">convert_jit</span></code> separately. Calibration process is required for collecting statistics from real data. After conversion, optimizations such as operator fusion would be auto-enabled.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch.jit._recursive</span> <span class="kn">import</span> <span class="n">wrap_cpp_module</span>
-<span class="kn">from</span> <span class="nn">torch.quantization.quantize_jit</span> <span class="kn">import</span> <span class="p">(</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.jit._recursive</span><span class="w"> </span><span class="kn">import</span> <span class="n">wrap_cpp_module</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.quantization.quantize_jit</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">convert_jit</span><span class="p">,</span>
     <span class="n">prepare_jit</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="c1">#################### code changes ####################</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span> <span class="k">as</span> <span class="nn">ipex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ipex</span>
 
 <span class="c1">######################################################</span>
 
 <span class="c1">##### Example Model #####</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet50</span><span class="p">(</span><span class="n">weights</span><span class="o">=</span><span class="s2">&quot;ResNet50_Weights.DEFAULT&quot;</span><span class="p">)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
@@ -843,7 +843,7 @@ We recommend using Auto Mixed Precision (AMP) with Float16 data type.</p>
 <span class="n">modelJit</span> <span class="o">=</span> <span class="n">prepare_jit</span><span class="p">(</span><span class="n">modelJit</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;&quot;</span><span class="p">:</span> <span class="n">qconfig</span><span class="p">},</span> <span class="kc">True</span><span class="p">)</span>
 
 <span class="c1">##### Example Dataloader #####</span>
-<span class="kn">import</span> <span class="nn">torchvision</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision</span>
 
 <span class="n">DOWNLOAD</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="n">DATA</span> <span class="o">=</span> <span class="s2">&quot;datasets/cifar10/&quot;</span>
@@ -884,11 +884,11 @@ We recommend using Auto Mixed Precision (AMP) with Float16 data type.</p>
 <section id="torch-xpu-optimize">
 <h4>torch.xpu.optimize<a class="headerlink" href="#torch-xpu-optimize" title="Link to this heading"></a></h4>
 <p>The <code class="docutils literal notranslate"><span class="pre">torch.xpu.optimize</span></code> function is an alternative to <code class="docutils literal notranslate"><span class="pre">ipex.optimize</span></code> in Intel® Extension for PyTorch*, and provides identical usage for XPU devices only. The motivation for adding this alias is to unify the coding style in user scripts base on <code class="docutils literal notranslate"><span class="pre">torch.xpu</span></code> modular. Refer to the example below for usage.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="c1">############# code changes #########</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
 
 <span class="c1">############# code changes #########</span>
 
@@ -1116,7 +1116,7 @@ $<span class="w"> </span>ldd<span class="w"> </span>example-app
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x71c626199750> 
+   <jinja2.runtime.BlockReference object at 0x78f7e220a1a0> 
 <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 

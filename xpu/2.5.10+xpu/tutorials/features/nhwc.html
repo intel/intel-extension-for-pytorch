@@ -7,7 +7,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Channels Last &mdash; Intel&amp;#174 Extension for PyTorch* 2.5.10+xpu documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a95c1af4" />
 
@@ -183,7 +183,7 @@
 <h3>a. NCHW (default)<a class="headerlink" href="#a-nchw-default" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span> <span class="c1"># or &#39;xpu&#39;</span>
 <span class="k">if</span> <span class="n">device</span> <span class="o">==</span> <span class="s1">&#39;xpu&#39;</span><span class="p">:</span>
-  <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+  <span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
 
 <span class="c1">## NB: internally blocked format will still be used.</span>
 <span class="c1">##   aka. we do &#39;reorder&#39; for &#39;input&#39;, &#39;weight&#39; and &#39;output&#39;,</span>
@@ -198,7 +198,7 @@
 <h3>b. NHWC<a class="headerlink" href="#b-nhwc" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span> <span class="c1"># or &#39;xpu&#39;</span>
 <span class="k">if</span> <span class="n">device</span> <span class="o">==</span> <span class="s1">&#39;xpu&#39;</span><span class="p">:</span>
-  <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+  <span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
 
 <span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
@@ -214,7 +214,7 @@
 </section>
 <section id="c-blocked-nchw16c-on-cpu">
 <h3>c. Blocked (nChw16c, on CPU)<a class="headerlink" href="#c-blocked-nchw16c-on-cpu" title="Link to this heading"></a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">torch.utils</span> <span class="kn">import</span> <span class="n">mkldnn</span> <span class="k">as</span> <span class="n">mkldnn_utils</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">mkldnn</span> <span class="k">as</span> <span class="n">mkldnn_utils</span>
 <span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 <span class="c1">## NB: convert to blocked memory format.</span>
@@ -262,7 +262,7 @@
 <h3>a. tensor creation<a class="headerlink" href="#a-tensor-creation" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span> <span class="c1"># or &#39;xpu&#39;</span>
 <span class="k">if</span> <span class="n">device</span> <span class="o">==</span> <span class="s1">&#39;xpu&#39;</span><span class="p">:</span>
-  <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+  <span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
 
 <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">memory_format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channels_last</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 </pre></div>
@@ -272,7 +272,7 @@
 <h3>b. tensor conversion<a class="headerlink" href="#b-tensor-conversion" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span> <span class="c1"># or &#39;xpu&#39;</span>
 <span class="k">if</span> <span class="n">device</span> <span class="o">==</span> <span class="s1">&#39;xpu&#39;</span><span class="p">:</span>
-  <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+  <span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
 
 <span class="c1">## .contiguous() transforms NHWC noncontiguous to NHWC contiguous.</span>
 <span class="c1">## .to() converts NCHW tensor to NHWC one, it is outplace.</span>
@@ -289,7 +289,7 @@
 <h3>c. model conversion<a class="headerlink" href="#c-model-conversion" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span> <span class="c1"># or &#39;xpu&#39;</span>
 <span class="k">if</span> <span class="n">device</span> <span class="o">==</span> <span class="s1">&#39;xpu&#39;</span><span class="p">:</span>
-  <span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+  <span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
 
 <span class="c1">## NB: tensor.to() is an outplace operation</span>
 <span class="c1">##   model.to() is inplace. It calls _apply() which is inplace.</span>
@@ -357,21 +357,21 @@
 <p>Both stock PyTorch and Intel® Extension for PyTorch* support Channels Last(2D) and Channels Last 3D, however, regarding Channels Last 1D, they are different. Stock PyTorch doesn’t support Channels Last 1D, while XPU could supply limited support for Channels Last 1D.
 We only support Channels Last 1D memory format in these operators: Conv1D, BatchNorm1D, MaxPool1D, Concat, binary add, binary div, upsample linear and upsample nearest.</p>
 <p>The usage of Channels Last 1D on XPU is different from stock PyTorch Channels Last(2D) or Channels Last 3D. We use torch.xpu.to_channels_last_1d() to do conversation for both input tensor and model. See below:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">intel_extension_for_pytorch</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">intel_extension_for_pytorch</span>
 
 <span class="n">sycl_device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;xpu&quot;</span><span class="p">)</span>
 
 
-<span class="k">class</span> <span class="nc">Model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">(</span><span class="n">Model</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">block</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
         <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">x</span>
 
@@ -426,7 +426,7 @@ We only support Channels Last 1D memory format in these operators: Conv1D, Batch
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   <jinja2.runtime.BlockReference object at 0x71c6261995d0> 
+   <jinja2.runtime.BlockReference object at 0x78f7e2379c00> 
 <p></p><div><a href='https://www.intel.com/content/www/us/en/privacy/intel-cookie-notice.html' data-cookie-notice='true'>Cookies</a> <a href='https://www.intel.com/content/www/us/en/privacy/intel-privacy-notice.html'>| Privacy</a> <a href="/#" data-wap_ref="dns" id="wap_dns"><small>| Your Privacy Choices</small></a> <a href=https://www.intel.com/content/www/us/en/privacy/privacy-residents-certain-states.html data-wap_ref="nac" id="wap_nac"><small>| Notice at Collection</small></a> </div> <p></p> <div>&copy; Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its subsidiaries. Other names and brands may be claimed as the property of others. No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that code included in this document is licensed subject to the Zero-Clause BSD open source license (OBSD), <a href='http://opensource.org/licenses/0BSD'>http://opensource.org/licenses/0BSD</a>. </div>
 
 
