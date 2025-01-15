@@ -13,6 +13,9 @@ libraries = ["ze_loader"] if IS_LINUX else []
 dpcpp_path = os.getenv("CMPLR_ROOT")
 sycl_ext_path = os.path.join(dpcpp_path, "include", "sycl")
 
+conda_path = os.getenv("CONDA_PREFIX")
+conda_cl_path = os.path.join(conda_path, "include", "sycl")
+
 setup(
     name="mod_test_add_non_ninja",
     ext_modules=[
@@ -23,7 +26,11 @@ setup(
             ],
             extra_compile_args=[],
             libraries=libraries,
-            include_dirs=[sycl_ext_path],
+            include_dirs=(
+                [sycl_ext_path]
+                if not os.path.exists(conda_cl_path)
+                else [conda_cl_path]
+            ),
         )
     ],
     cmdclass={"build_ext": DpcppBuildExtension.with_options(use_ninja=False)},
