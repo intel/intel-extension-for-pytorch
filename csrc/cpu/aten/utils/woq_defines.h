@@ -42,6 +42,14 @@
 
 #define WOQ_N_BLOCK_SIZE 32
 
+// INT4 weight format before packing
+// plain: [N, K / 2] in uint8
+// gptq: [K / 8, N] in int32
+// awq: [K, N / 8] in int32
+#define PLAIN_WEIGHT_FORMAT 0
+#define GPTQ_WEIGHT_FORMAT 1
+#define AWQ_WEIGHT_FORMAT 2
+
 constexpr bool is_asymmetric_quant_a(const int quant_a_mode) {
   return quant_a_mode <= QUANT_A_PER_M_K_BLOCK;
 }

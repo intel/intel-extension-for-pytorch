@@ -380,7 +380,8 @@ at::Tensor woq_linear_pack_weight(
     int64_t weight_dtype,
     std::vector<int64_t>& weight_shape,
     int64_t group_size,
-    int64_t lowp_mode) {
+    int64_t lowp_mode,
+    int64_t weight_format) {
   // TPP kernel does not support edge cases
   // It generates packed weight in 4d (Nc, Kc, block_k, block_n)
   auto N = weight_shape[0], K = weight_shape[1];
@@ -402,16 +403,34 @@ at::Tensor woq_linear_pack_weight(
       at::Tensor weight_int4 =
           at::pad(weight, {0, 0, 0, N_int4 - N}, "constant", 0);
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight_int4, weight_dtype, block_n, block_k, lowp_mode);
+          kCPU,
+          weight_int4,
+          weight_dtype,
+          block_n,
+          block_k,
+          lowp_mode,
+          weight_format);
     }
     if (N % block_n) {
       at::Tensor weight_padded =
           at::pad(weight, {0, 0, 0, block_n - N % block_n}, "constant", 0);
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight_padded, weight_dtype, block_n, block_k, lowp_mode);
+          kCPU,
+          weight_padded,
+          weight_dtype,
+          block_n,
+          block_k,
+          lowp_mode,
+          weight_format);
     } else {
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight, weight_dtype, block_n, block_k, lowp_mode);
+          kCPU,
+          weight,
+          weight_dtype,
+          block_n,
+          block_k,
+          lowp_mode,
+          weight_format);
     }
   }
   return weight;

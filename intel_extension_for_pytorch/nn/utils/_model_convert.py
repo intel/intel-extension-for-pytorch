@@ -86,6 +86,25 @@ def awq_reverse_reorder_int_tensor(int_tensor, bits: int):
     return int_tensor
 
 
+def _convert_awq_scales_qzeros(scales, qzeros, bits=4):
+    new_scales = scales.t().contiguous()
+    wf = torch.tensor(
+        list(range(0, 32, bits)), dtype=torch.int32, device=qzeros.device
+    ).unsqueeze(0)
+    zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2), wf.unsqueeze(0)).to(
+        torch.int16 if bits == 8 else torch.int8
+    )
+    torch.bitwise_and(zeros, (2**bits) - 1, out=zeros)
+
+    zeros = zeros.reshape(-1, 1, zeros.shape[1] * zeros.shape[2])
+    zeros = zeros.view(-1, zeros.shape[-1])
+
+    zeros = zeros.T.contiguous()
+    zeros = awq_reverse_reorder_int_tensor(zeros, bits)
+    new_qzeros = zeros.T.contiguous()
+    return new_scales, new_qzeros
+
+
 # ref weight unpack from AutoAWQ https://github.com/AutoGPTQ/AutoGPTQ/blob/v0.7.1/auto_gptq/modeling/_utils.py#L516
 def unpack_awq_weight(
     awq_qweight: torch.Tensor,
@@ -165,6 +184,47 @@ def prepack_awq_weight(
     return qweight_, scales_, zp_
 
 
+def _convert_gptq_scales_qzeros(scales, qzeros, inplace=True):
+    """
+    GPTQ format:
+        scales: (n_groups, N)
+        qzeros: (n_groups, N // 8)
+        qzeros are substracted by 1 before packing
+
+    Desired format:
+        scales: (N, n_groups)
+        qzeros: (N, n_groups)
+
+    Note:
+        N = output channels or output features
+        n_groups = math.ceil(IC / group_size)
+    """
+    N = scales.shape[1]
+    n_groups = scales.shape[0]
+    scales = scales.t_().contiguous() if inplace else scales.t().contiguous()
+    if qzeros is None:
+        return scales, qzeros
+    zp_dtype = torch.int32
+    zp = torch.empty((n_groups, N), dtype=zp_dtype)
+    # Steps to convert qzeros:
+    # (1) unpack qzeros to (n_groups, N)
+    # (2) take transpose
+    # (3) plus one and handle overflow
+    zp_bits = 4  # int4
+    comp_dtype_bits = 32  # int32
+    comp_ratio = comp_dtype_bits // zp_bits
+    mask = 2**zp_bits - 1
+    for i in range(comp_ratio):
+        zp[:, i::comp_ratio] = (qzeros >> (zp_bits * i)) & mask
+
+    zp = zp.t_().contiguous() if inplace else zp.t().contiguous()
+    zp += 1
+    # it may overflow after adding one
+    zp = torch.where(zp > (2**zp_bits - 1), 0, zp)
+
+    return scales, zp
+
+
 def _convert_optimum_format_to_desired(qweight, scales, qzeros, inplace=True):
     """
     Optimum format:
@@ -191,32 +251,7 @@ def _convert_optimum_format_to_desired(qweight, scales, qzeros, inplace=True):
         return qweight, scales, qzeros
     oc = qweight.shape[1]
     assert oc == scales.shape[1]
-    n_groups = scales.shape[0]
     qweight = qweight.t_().contiguous() if inplace else qweight.t().contiguous()
-    scales = scales.t_().contiguous() if inplace else scales.t().contiguous()
-    if qzeros is None:
-        return qweight, scales, qzeros
-    zp_dtype = torch.int32
-    zp = torch.empty((n_groups, oc), dtype=zp_dtype)
-    # Steps to convert qzeros:
-    # (1) unpack qzeros to (n_groups, OC)
-    # (2) take transpose
-    # (3) plus one and handle overflow
-    zp_bits = 4  # int4
-    comp_dtype_bits = 32  # int32
-    comp_ratio = comp_dtype_bits // zp_bits
-    mask = torch.tensor(2**zp_bits - 1, dtype=zp_dtype)
-    for j in range(qzeros.shape[1]):
-        packed_data = qzeros[:, j]
-        for e in range(comp_ratio):
-            index = j * comp_ratio + e
-            if index >= zp.shape[1]:
-                continue
-            data = (packed_data >> (zp_bits * e)) & mask
-            zp[:, index] = data.type(zp_dtype)
-    zp = zp.t_().contiguous() if inplace else zp.t().contiguous()
-    zp += 1
-    # it may overflow after adding one
-    zp = torch.where(zp > (2**zp_bits - 1), 0, zp)
+    scales, zp = _convert_gptq_scales_qzeros(scales, qzeros, inplace)
 
     return qweight, scales, zp

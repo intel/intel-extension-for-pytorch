@@ -29,6 +29,9 @@ from intel_extension_for_pytorch.quantization import (
     WoqWeightQScheme,
     WoqActQuantMode,
 )
+from intel_extension_for_pytorch.nn.modules.weight_only_quantization import (
+    Int4WeightFormat,
+)
 import os
 
 curpath = os.path.abspath(os.path.dirname(__file__))
@@ -2538,6 +2541,119 @@ class WeightOnlyQuantizationTester(TestCase):
         cases = itertools.product(has_bias_list, quant_mode_list, batch_size_list)
         for has_bias, quant_mode, M in cases:
             test(has_bias, quant_mode, M)
+
+    def test_pack_gptq_weight(self):
+        from intel_extension_for_pytorch.utils.weight_only_quantization import (
+            _convert_optimum_format_to_desired,
+            _convert_gptq_scales_qzeros,
+        )
+
+        N, K = 64, 256
+        G = 128  # group size
+        int32_min = -(2**31)
+        int32_max = 2**31 - 1
+        # gptq weight shape = [K // 8, N]
+        # gptq scales shape = [K // G, N]
+        # gptq qzeros shape = [K // G, N // 8]
+        qweight_gptq = torch.randint(
+            int32_min, int32_max, (K // 8, N), dtype=torch.int32
+        )
+        scales = torch.rand((K // G, N), dtype=torch.float16)
+        qzeros = torch.randint(
+            int32_min, int32_max, (K // G, N // 8), dtype=torch.int32
+        )
+        new_scales, new_qzeros = _convert_gptq_scales_qzeros(scales, qzeros, False)
+        new_qweight, new_scales_ref, new_qzeros_ref = (
+            _convert_optimum_format_to_desired(qweight_gptq, scales, qzeros, False)
+        )
+        for lowp_mode in [WoqLowpMode.BF16, WoqLowpMode.INT8]:
+            # We only support g_idx is None
+            op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
+                qweight_gptq,
+                new_scales,
+                new_qzeros,
+                None,  # bias
+                None,  # g_idx
+                None,  # batch size
+                G,
+                int(lowp_mode),
+                WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
+                False,  # cache weight
+                Int4WeightFormat.GPTQ_FORMAT,
+            )
+            packed_weight = op_context.get_weight()
+            op_context_ref = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
+                new_qweight,
+                new_scales_ref,
+                new_qzeros_ref,
+                None,  # bias
+                None,  # g_idx
+                None,  # batch size
+                G,
+                int(lowp_mode),
+                WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
+                False,  # cache weight
+                Int4WeightFormat.PLAIN_FORMAT,
+            )
+            packed_weight_ref = op_context_ref.get_weight()
+
+            torch.testing.assert_close(packed_weight, packed_weight_ref)
+
+    def test_pack_awq_weight(self):
+        from intel_extension_for_pytorch.nn.utils._model_convert import (
+            prepack_awq_weight,
+            _convert_awq_scales_qzeros,
+        )
+
+        N, K = 64, 256
+        G = 128  # group size
+        int32_min = -(2**31)
+        int32_max = 2**31 - 1
+        # awq weight shape = [K, N // 8]
+        # awq scales shape = [K // G, N]
+        # awq qzeros shape = [K // G, N // 8]
+        qweight_awq = torch.randint(
+            int32_min, int32_max, (K, N // 8), dtype=torch.int32
+        )
+        scales = torch.rand((K // G, N), dtype=torch.float16)
+        qzeros = torch.randint(
+            int32_min, int32_max, (K // G, N // 8), dtype=torch.int32
+        )
+        new_scales, new_qzeros = _convert_awq_scales_qzeros(scales, qzeros)
+        new_qweight, new_scales_ref, new_qzeros_ref = prepack_awq_weight(
+            qweight_awq, qzeros, scales, bits=4, group_size=G
+        )
+        for lowp_mode in [WoqLowpMode.BF16, WoqLowpMode.INT8]:
+            op_context = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
+                qweight_awq,
+                new_scales,
+                new_qzeros,
+                None,  # bias
+                None,  # g_idx
+                None,  # batch size
+                G,
+                int(lowp_mode),
+                WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
+                False,  # cache weight
+                Int4WeightFormat.AWQ_FORMAT,
+            )
+            packed_weight = op_context.get_weight()
+            op_context_ref = torch.ops.ipex_prepack.weight_only_qlinear_prepack_int4(
+                new_qweight,
+                new_scales_ref,
+                new_qzeros_ref,
+                None,  # bias
+                None,  # g_idx
+                None,  # batch size
+                G,
+                int(lowp_mode),
+                WoqActQuantMode.PER_BATCH_IC_BLOCK_SYM,
+                False,  # cache weight
+                Int4WeightFormat.PLAIN_FORMAT,
+            )
+            packed_weight_ref = op_context_ref.get_weight()
+
+            torch.testing.assert_close(packed_weight, packed_weight_ref)
 
 
 class QuantizedOpTester(TestCase):

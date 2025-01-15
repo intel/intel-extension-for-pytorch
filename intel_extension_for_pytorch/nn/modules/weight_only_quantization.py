@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from typing import Optional
+from enum import IntEnum
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     may_import_deepspeed_modules,
     _all_reduce_and_bias_add,
@@ -15,8 +16,9 @@ from intel_extension_for_pytorch.quantization import (
     WoqLowpMode,
 )
 from intel_extension_for_pytorch.nn.utils._model_convert import (
-    prepack_awq_weight,
     _convert_optimum_format_to_desired,
+    _convert_gptq_scales_qzeros,
+    _convert_awq_scales_qzeros,
 )
 
 from intel_extension_for_pytorch.llm.quantization.utils import QuantMethod, QuantDtype
@@ -26,6 +28,12 @@ from intel_extension_for_pytorch.quantization._qconfig import (
     WOQ_DTYPE_TO_STR,
     WOQ_QSCHEME_TO_STR,
 )
+
+
+class Int4WeightFormat(IntEnum):
+    PLAIN_FORMAT = 0
+    GPTQ_FORMAT = 1
+    AWQ_FORMAT = 2
 
 
 class WeightOnlyQuantizedLinear(nn.Module):
@@ -166,7 +174,15 @@ class WeightOnlyQuantizedLinear(nn.Module):
 
     @classmethod
     def from_float_and_int4_weight(
-        cls, mod, qweight, scales, zero_points, bias=None, group_size=-1, g_idx=None
+        cls,
+        mod,
+        qweight,
+        scales,
+        zero_points,
+        bias=None,
+        group_size=-1,
+        g_idx=None,
+        weight_format=Int4WeightFormat.PLAIN_FORMAT,
     ):
         r"""Create a weight-only quantized module from a float module and int4 weight
 
@@ -239,6 +255,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
             act_quant_mode,
             cache_weight_for_large_batch,
             True,  # is_from_int4_weight
+            weight_format,
         )
         del qweight
         mod.weight = torch.nn.Parameter()
@@ -301,14 +318,18 @@ class WeightOnlyQuantizedLinear(nn.Module):
         )
 
         qlinear = cls(in_features, out_features, dtype=WoqWeightDtype.INT4)
+        weight_format = Int4WeightFormat.PLAIN_FORMAT
         if quant_method == QuantMethod.AWQ_GEMM:
-            qweight, scales, zero_points = prepack_awq_weight(
-                qweight, zero_points, scales, 4, group_size
-            )
+            scales, zero_points = _convert_awq_scales_qzeros(scales, zero_points)
+            weight_format = Int4WeightFormat.AWQ_FORMAT
         elif quant_method == QuantMethod.GPTQ_GEMM:
-            qweight, scales, zero_points = _convert_optimum_format_to_desired(
-                qweight, scales, zero_points, inplace=False
-            )
+            if g_idx is not None:
+                qweight, scales, zero_points = _convert_optimum_format_to_desired(
+                    qweight, scales, zero_points, inplace=False
+                )
+            else:
+                scales, zero_points = _convert_gptq_scales_qzeros(scales, zero_points)
+                weight_format = Int4WeightFormat.GPTQ_FORMAT
 
         if bias is not None and torch.count_nonzero(bias) == 0:
             bias = None
@@ -323,6 +344,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
             int(lowp_mode),
             act_quant_mode,
             cache_weight_for_large_batch,
+            weight_format,
         )
         qlinear.weight = qlinear._op_context.get_weight()
         qlinear.bias = bias is not None
@@ -408,6 +430,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
         act_quant_mode,
         cache_weight_for_large_batch,
         is_from_int4_weight,
+        weight_format=Int4WeightFormat.PLAIN_FORMAT,
     ):
         if mod.bias is not None:
             bias = mod.bias
@@ -427,6 +450,7 @@ class WeightOnlyQuantizedLinear(nn.Module):
                     int(lowp_mode),
                     act_quant_mode,
                     cache_weight_for_large_batch,
+                    weight_format,
                 )
             )
         else:
@@ -503,6 +527,7 @@ class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
         act_quant_mode,
         cache_weight_for_large_batch,
         is_from_int4_weight,
+        weight_format=Int4WeightFormat.PLAIN_FORMAT,
     ):
         qlinear = cls._init_from_mod(mod, dtype)
         if is_from_int4_weight:
@@ -522,6 +547,7 @@ class IpexWoqLinearAllreduce(WeightOnlyQuantizedLinear):
                     int(lowp_mode),
                     act_quant_mode,
                     cache_weight_for_large_batch,
+                    weight_format,
                 )
             )
         else:

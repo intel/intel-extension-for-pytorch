@@ -510,7 +510,8 @@ class IpexWoqLinearOpContext final : public WoqLinearOpContext {
       int64_t group_size,
       int64_t lowp_mode,
       int64_t act_quant_mode,
-      bool cache_weight_for_large_batch);
+      bool cache_weight_for_large_batch,
+      int64_t weight_format);
 
   virtual void load_from_ctx(
       c10::intrusive_ptr<WoqLinearOpContext> other) override;
