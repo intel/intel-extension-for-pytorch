@@ -13,8 +13,19 @@ import copy
 from ...utils._logger import logger, WarningType
 
 try:
-    from transformers.modeling_utils import apply_chunking_to_forward
-    from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
+    import transformers
+
+    transformers_orig_is_tensor = transformers.file_utils.is_tensor
+
+    def is_tensor(x):
+        """Tests if ``x`` is a :obj:`torch.Tensor`, :obj:`tf.Tensor` or :obj:`np.ndarray`."""
+        if transformers_orig_is_tensor(x):
+            return True
+        if isinstance(x, BlockedTensor):
+            return True
+        return False
+
+    transformers.file_utils.is_tensor = is_tensor
 except ImportError:
     pass
 USE_BF16_PARAMS = True
@@ -976,7 +987,7 @@ class BertLayer(nn.Module):
             cross_attn_present_key_value = cross_attention_outputs[-1]
             present_key_value = present_key_value + cross_attn_present_key_value
 
-        layer_output = apply_chunking_to_forward(
+        layer_output = transformers.modeling_utils.apply_chunking_to_forward(
             self.feed_forward_chunk,
             self.chunk_size_feed_forward,
             self.seq_len_dim,
@@ -1109,7 +1120,7 @@ class BertEncoder(nn.Module):
                 ]
                 if v is not None
             )
-        return BaseModelOutputWithPastAndCrossAttentions(
+        return transformers.modeling_outputs.BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
             past_key_values=next_decoder_cache,
             hidden_states=all_hidden_states,
@@ -1177,23 +1188,6 @@ class BertLMPredictionHead(nn.Module):
 #     if S % 32 == 0: return [S//32, 32]
 #     return bm_default_blocking_factors
 # BlockedModule.default_blocking_factors = custom_blocking_factors
-
-try:
-    import transformers
-
-    transformers_orig_is_tensor = transformers.file_utils.is_tensor
-
-    def is_tensor(x):
-        """Tests if ``x`` is a :obj:`torch.Tensor`, :obj:`tf.Tensor` or :obj:`np.ndarray`."""
-        if transformers_orig_is_tensor(x):
-            return True
-        if isinstance(x, BlockedTensor):
-            return True
-        return False
-
-    transformers.file_utils.is_tensor = is_tensor
-except ImportError:
-    pass
 
 
 def block(model):
