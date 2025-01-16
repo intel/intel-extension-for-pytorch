@@ -62,6 +62,7 @@ class _IPEXDecoderLayerCPU(nn.Module):
             "Maira2ForConditionalGeneration",
             "JambaForCausalLM",
             "DeepseekV2ForCausalLM",
+            "DeepseekV3ForCausalLM",
         ]:
             if not self.distributed:
                 if hasattr(module, "linear_add"):
@@ -143,7 +144,10 @@ class _IPEXDecoderLayerCPU(nn.Module):
                     tpp=tpp,
                     woq=woq,
                 )
-            if self.model_backbone == "DeepseekV2ForCausalLM":
+            if self.model_backbone in [
+                "DeepseekV2ForCausalLM",
+                "DeepseekV3ForCausalLM",
+            ]:
                 if hasattr(self.mlp, "experts"):
                     # 0: Default, 1: TPP, 2: DNNL, 3: MKL, 4: WOQ
                     self.moe_linear_type = 0

@@ -170,6 +170,7 @@ def _greedy_search(
             "Maira2ForConditionalGeneration",
             "JambaForCausalLM",
             "DeepseekV2ForCausalLM",
+            "DeepseekV3ForCausalLM",
         ]:
             first_token = False
             if hasattr(self.config, "kv_cache_dtype"):

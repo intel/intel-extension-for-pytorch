@@ -2589,7 +2589,10 @@ class _IPEXAttentionRef(nn.Module):
                 self.pos_embd_dim = rotary_dim // 2
             elif self.model_backbone in ["StableLmForCausalLM", "PhiForCausalLM"]:
                 self.pos_embd_dim = self.rotary_emb.dim
-            elif self.model_backbone in ["DeepseekV2ForCausalLM"]:
+            elif self.model_backbone in [
+                "DeepseekV2ForCausalLM",
+                "DeepseekV3ForCausalLM",
+            ]:
                 self.pos_embd_dim = self.qk_rope_head_dim
             else:
                 self.pos_embd_dim = self.head_dim
@@ -3146,7 +3149,7 @@ class _IPEXAttentionRef(nn.Module):
                 output_attentions,
                 use_cache,
             )
-        elif self.model_backbone == "DeepseekV2ForCausalLM":
+        elif self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
             return _DeepseekV2Attention_forward(
                 self,
                 hidden_states,

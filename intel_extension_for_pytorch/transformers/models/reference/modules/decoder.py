@@ -1912,7 +1912,12 @@ def DeepseekV2DecoderLayer_forward(
         identity = hidden_states
         orig_shape = hidden_states.shape
         hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
-        topk_idx, topk_weight, aux_loss = self.mlp.gate(hidden_states)
+        moegate_outputs = self.mlp.gate(hidden_states)
+        if len(moegate_outputs) == 3:
+            topk_idx, topk_weight, aux_loss = moegate_outputs
+        else:
+            tok_idx, topk_weight = moegate_outputs
+            aux_loss = None
         hidden_states = moe_infer(self, hidden_states, topk_idx, topk_weight).view(
             *orig_shape
         )
@@ -2225,7 +2230,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                 if not self.distributed:
                     self.mha_linear_add = _IPEXlinearAddRef(module.mamba.out_proj)
                     del self.__dict__["_modules"]["mamba"].out_proj
-        elif self.model_backbone == "DeepseekV2ForCausalLM":
+        elif self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
             if not self.distributed:
                 self.mha_linear_add = _IPEXlinearAddRef(module.self_attn.o_proj)
                 del self.__dict__["_modules"]["self_attn"].o_proj
@@ -2579,7 +2584,7 @@ class _IPEXDecoderLayerRef(nn.Module):
                     use_cache,
                     cache_position,
                 )
-        elif self.model_backbone == "DeepseekV2ForCausalLM":
+        elif self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
             return DeepseekV2DecoderLayer_forward(
                 self,
                 hidden_states,
