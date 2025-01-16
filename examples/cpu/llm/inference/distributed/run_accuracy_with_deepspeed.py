@@ -327,6 +327,7 @@ class HuggingFaceModel(BaseLM):
         if world_size == 1 or model_type in [
             "falcon",
             "baichuan",
+            "baichuan2",
             "gptbigcode",
             "qwen",
             "yuan",
