@@ -25,6 +25,7 @@ common_params = {
 need_recover_models_list = {
     transformers.models.llama.modeling_llama.LlamaForCausalLM: "LlamaModel",
     transformers.models.qwen2.modeling_qwen2.Qwen2ForCausalLM: "Qwen2Model",
+    transformers.models.phi3.modeling_phi3.Phi3ForCausalLM: "Phi3Model",
 }
 
 
