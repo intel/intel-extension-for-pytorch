@@ -29,21 +29,21 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 
 | MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Arc™ A-Series Graphics (A770) | Optimized on Intel® Arc™ B-Series Graphics (B580) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |🟩| 🟩|🟩|🟩|$🟩^1$|
-|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |🟩| 🟩|🟩|🟩|$🟩^2$|
-|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct" |🟩| 🟩|🟩|🟩|$🟩^3$|
-|GPT-J| "EleutherAI/gpt-j-6b" | 🟩 | 🟩 |🟩 | 🟩||
-|Qwen|"Qwen/Qwen2-7B"|🟩 | 🟩 |🟩 | 🟩||
-|Qwen|"Qwen/Qwen2-7B-Instruct"| | | | |🟩|
-|OPT|"facebook/opt-6.7b", "facebook/opt-30b"| 🟩 | 🟥 |🟩 | 🟥 ||
-|Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| 🟩 | 🟥 |🟩 | 🟥 ||
-|ChatGLM3-6B|"THUDM/chatglm3-6b"| 🟩 | 🟥 |🟩 | 🟥 ||
-|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| 🟩 | 🟥 |🟩 | 🟥 ||
+|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |✅| ✅|✅|✅|$✅^1$|
+|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |✅| ✅|✅|✅|$✅^2$|
+|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct" |✅| ✅|✅|✅|$✅^3$|
+|GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ |✅ | ✅||
+|Qwen|"Qwen/Qwen2-7B"|✅ | ✅ |✅ | ✅||
+|Qwen|"Qwen/Qwen2-7B-Instruct"| | | | |✅|
+|OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ |  |✅| ||
+|Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ |  |✅ |  ||
+|ChatGLM3-6B|"THUDM/chatglm3-6b"| ✅ |  |✅ |  ||
+|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| ✅ |  |✅|  ||
 
 | Benchmark mode | FP16 | Weight only quantization INT4 |
 |---|:---:|:---:|
-|Single instance | 🟩 | 🟩 |
-| Distributed (autotp) |  🟩 | 🟥 |
+|Single instance | ✅ | ✅ |
+| Distributed (autotp) |  ✅ |  |
 
 
 #### LLM fine-tuning
@@ -53,22 +53,22 @@ In the current technological landscape, Generative AI (GenAI) workloads and mode
 
 | MODEL FAMILY | Verified < MODEL ID > (Hugging Face hub)| Mixed Precision (BF16+FP32) | Full fine-tuning | LoRA | Intel® Data Center Max 1550 GPU | Intel® Core™ Ultra Processors with Intel® Arc™ Graphics |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-|Llama 2 7B| "meta-llama/Llama-2-7b-hf" | 🟩 | 🟩 | 🟩 | 🟩 | 🟩 |
-|Llama 2 70B| "meta-llama/Llama-2-70b-hf" | 🟩 | 🟥 |🟩 | 🟩 | 🟥 |
-|Llama 3 8B| "meta-llama/Meta-Llama-3-8B" | 🟩 | 🟩 |🟩 | 🟩 | 🟩 |
-|Qwen 7B|"Qwen/Qwen-7B"| 🟩 | 🟩 |🟩 | 🟩| 🟥 |
-|Phi-3-mini 3.8B|"Phi-3-mini-4k-instruct"| 🟩 | 🟩 |🟩 | 🟥 | 🟩 |
+|Llama 2 7B| "meta-llama/Llama-2-7b-hf" | ✅ | ✅ | ✅ | ✅ | ✅ |
+|Llama 2 70B| "meta-llama/Llama-2-70b-hf" | ✅ |  |✅ | ✅ |  |
+|Llama 3 8B| "meta-llama/Meta-Llama-3-8B" | ✅ | ✅ |✅ | ✅ | ✅ |
+|Qwen 7B|"Qwen/Qwen-7B"| ✅ | ✅ |✅ | ✅| |
+|Phi-3-mini 3.8B|"Phi-3-mini-4k-instruct"| ✅ | ✅ |✅ |  | ✅ |
 
 
 
 | Benchmark mode | Full fine-tuning | LoRA |
 |---|:---:|:---:|
-|Single-GPU | 🟥 | 🟩 |
-|Multi-GPU (FSDP) |  🟩 | 🟩 |
+|Single-GPU |  | ✅ |
+|Multi-GPU (FSDP) |  ✅ | ✅ |
 
-- 🟩 signifies that it is supported.
+- ✅ signifies that it is supported.
 
-- 🟥 signifies that it is not supported yet.
+- A blank signifies that it is not supported yet.
   
 - 1: signifies that Llama-2-7b-hf is verified.
 

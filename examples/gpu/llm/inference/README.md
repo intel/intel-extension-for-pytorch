@@ -13,20 +13,20 @@ Currently, only support Transformers 4.44.2. Support for newer versions of Trans
 
 | MODEL FAMILY | Verified < MODEL ID > (Huggingface hub)| FP16 | Weight only quantization INT4 | Optimized on Intel® Data Center GPU Max Series (1550/1100) | Optimized on Intel® Core™ Ultra Processors with Intel® Arc™ Graphics | Optimized on Intel® Arc™ B-Series Graphics (B580) | 
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |🟩| 🟩|🟩|🟩|$🟩^1$|
-|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |🟩| 🟩|🟩|🟩|$🟩^2$|
-|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct" |🟩| 🟩|🟩|🟩|$🟩^3$|
-|GPT-J| "EleutherAI/gpt-j-6b" | 🟩 | 🟩 |🟩 | 🟩| |
-|Qwen|"Qwen/Qwen2-7B"|🟩 | 🟩 |🟩 | 🟩| |
-|Qwen|"Qwen/Qwen2-7B-Instruct"| | | | | 🟩 |
-|OPT|"facebook/opt-6.7b", "facebook/opt-30b"| 🟩 | 🟥 |🟩 | 🟥 |
-|Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| 🟩 | 🟥 |🟩 | 🟥 |
-|GLM4-9B|"THUDM/glm-4-9b"| 🟩 | 🟥 |🟩 | 🟥 |
-|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| 🟩 | 🟥 |🟩 | 🟥 |
+|Llama 2| "meta-llama/Llama-2-7b-hf", "meta-llama/Llama-2-13b-hf", "meta-llama/Llama-2-70b-hf" |✅| ✅|✅|✅|$✅^1$|
+|Llama 3| "meta-llama/Meta-Llama-3-8B", "meta-llama/Meta-Llama-3-70B" |✅| ✅|✅|✅|$✅^2$|
+|Phi-3 mini| "microsoft/Phi-3-mini-128k-instruct", "microsoft/Phi-3-mini-4k-instruct" |✅| ✅|✅|✅|$✅^3$|
+|GPT-J| "EleutherAI/gpt-j-6b" | ✅ | ✅ |✅ | ✅| |
+|Qwen|"Qwen/Qwen2-7B"|✅ | ✅ |✅ | ✅| |
+|Qwen|"Qwen/Qwen2-7B-Instruct"| | | | | ✅ |
+|OPT|"facebook/opt-6.7b", "facebook/opt-30b"| ✅ |  |✅ |  |
+|Bloom|"bigscience/bloom-7b1", "bigscience/bloom"| ✅ |  |✅ | |
+|GLM4-9B|"THUDM/glm-4-9b"| ✅ |  |✅ |  |
+|Baichuan2-13B|"baichuan-inc/Baichuan2-13B-Chat"| ✅ |  |✅ |  |
 
-- 🟩 signifies that it is supported.
+- ✅ signifies that it is supported.
 
-- 🟥 signifies that it is not supported yet.
+- A blank signifies that it is not supported yet.
   
 -  1: signifies that Llama-2-7b-hf is verified.
   
@@ -47,12 +47,12 @@ Currently, only support Transformers 4.44.2. Support for newer versions of Trans
 
 | Benchmark mode | FP16 | Weight only quantization INT4 |
 |---|:---:|:---:|
-|Single instance | 🟩 | 🟩 |
-| Distributed (autotp) |  🟩 | 🟥 |
+|Single instance | ✅ | ✅ |
+| Distributed (autotp) |  ✅ |  |
 
-- 🟩 signifies that it is supported.
+- ✅ signifies that it is supported.
 
-- 🟥 signifies that it is not supported yet.
+- A blank signifies that it is not supported yet.
 
 **Note**: During the execution, you may need to log in your Hugging Face account to access model files. Refer to [HuggingFace Login](https://huggingface.co/docs/huggingface_hub/quick-start#login)
 

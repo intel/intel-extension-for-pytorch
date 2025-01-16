@@ -23,17 +23,17 @@ Here we mainly focus on the memory-constrained fine-tuning on single GPU, and pr
 
 | Benchmark mode | Full fine-tuning | LoRA |
 |---|:---:|:---:|
-|Single-GPU | 🟥 | 🟩 |
-|Multi-GPU (FSDP) |  🟩 | 🟩 |
+|Single-GPU |  | ✅ |
+|Multi-GPU (FSDP) |  ✅ | ✅ |
 
 | MODEL FAMILY | Verified < MODEL ID > (Hugging Face hub)| Mixed Precision (BF16+FP32) | Full fine-tuning  | LoRA |  
 |---|:---:|:---:|:---:|:---:|
-|[Llama 2 7B](./Llama2/)| "meta-llama/Llama-2-7b-hf" | 🟩 | 🟩 | 🟩 | 
-|[Llama 2 70B](./Llama2/)| "meta-llama/Llama-2-70b-hf" | 🟩 | 🟥 |🟩 | 
-|[Llama 3 8B](./Llama3/)| "meta-llama/Meta-Llama-3-8B" | 🟩 | 🟩 |🟩 | 
-|[Llama 3 70B](./Llama3/)| "meta-llama/Meta-Llama-3-70B" | 🟩 | 🟥 |🟩 | 
-|[Qwen 7B](./Qwen/)|"Qwen/Qwen-7B"| 🟩 | 🟩 |🟩 | 
-|[Phi-3-mini 3.8B](./Phi3/README.md#fine-tuning-on-intel-data-center-max-1550-gpu-on-linux)|"Phi-3-mini-4k-instruct"| 🟩 | 🟩 |🟩 | 
+|[Llama 2 7B](./Llama2/)| "meta-llama/Llama-2-7b-hf" | ✅ | ✅ | ✅ | 
+|[Llama 2 70B](./Llama2/)| "meta-llama/Llama-2-70b-hf" | ✅ |  |✅ | 
+|[Llama 3 8B](./Llama3/)| "meta-llama/Meta-Llama-3-8B" | ✅ | ✅ |✅| 
+|[Llama 3 70B](./Llama3/)| "meta-llama/Meta-Llama-3-70B" | ✅ |  |✅| 
+|[Qwen 7B](./Qwen/)|"Qwen/Qwen-7B"| ✅ | ✅ |✅ | 
+|[Phi-3-mini 3.8B](./Phi3/README.md#fine-tuning-on-intel-data-center-max-1550-gpu-on-linux)|"Phi-3-mini-4k-instruct"| ✅ | ✅ |✅ | 
 
 
 \* Intel® Data Center Max 1550 GPU: support all the models in the model list above.
@@ -42,12 +42,12 @@ Here we mainly focus on the memory-constrained fine-tuning on single GPU, and pr
 
 | MODEL FAMILY | Verified < MODEL ID > (Hugging Face hub)| Mixed Precision (BF16+FP32) | Full fine-tuning  | LoRA |  
 |---|:---:|:---:|:---:|:---:|
-|[Phi-3-mini 3.8B](./Phi3/README.md#fine-tuning-on-intel-core-ultra-processors-with-intel-arc-graphics)|"Phi-3-mini-4k-instruct"| 🟩 | 🟩 |🟩 | 
+|[Phi-3-mini 3.8B](./Phi3/README.md#fine-tuning-on-intel-core-ultra-processors-with-intel-arc-graphics)|"Phi-3-mini-4k-instruct"| ✅ | ✅ |✅ | 
 
 
-- 🟩 signifies that it is supported.
+- ✅ signifies that it is supported.
 
-- 🟥 signifies that it is not supported yet.
+- A blank signifies that it is not supported yet.
 
 \* Intel® Core™ Ultra Processors with Intel® Arc™ Graphics: support Phi-3-Mini 3.8B.
 
