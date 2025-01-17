@@ -22,11 +22,16 @@ class GPTQShuffle(nn.Module):
         self.blocksize = blocksize
 
     def convert_idx(self, g_idx, k):
-        ret_idx = torch.zeros(k, dtype=int)
-        g_counter = torch.zeros((k + self.blocksize - 1) // self.blocksize, dtype=int)
-        for i in range(k):
-            ret_idx[g_idx[i] * self.blocksize + g_counter[g_idx[i]]] = i
-            g_counter[g_idx[i]] += 1
+        ret_idx = torch.zeros(k, dtype=int).to(g_idx.device)
+        groups = k // self.blocksize
+        remainder = k % self.blocksize
+        g_idx_2 = g_idx * self.blocksize
+        if remainder > 0:
+            g_idx_2[g_idx == groups] += torch.arange(remainder).to(g_idx.device)
+        arange_tensor = torch.arange(self.blocksize).to(g_idx.device)
+        for i in range(groups):
+            g_idx_2[g_idx == i] += arange_tensor
+        ret_idx[g_idx_2] = torch.arange(k).to(g_idx.device)
         return ret_idx.to(torch.int32)
 
     def unpack(self, qweight_int32):
