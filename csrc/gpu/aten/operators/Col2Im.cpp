@@ -5,11 +5,6 @@
 #include <core/Memory.h>
 #include <oneDNN/oneDNN.h>
 #include <runtime/Utils.h>
-#ifdef USE_OVERRIDE_OP
-#include <ATen/DeviceGuard.h>
-#include <ATen/core/op_registration/adaption.h>
-#include <utils/CustomOperatorRegistration.h>
-#endif
 #include <utils/DPCPP.h>
 
 #include "comm/ATDispatch.h"
@@ -179,50 +174,3 @@ Tensor col2im(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-
-#ifdef USE_OVERRIDE_OP
-namespace {
-at::Tensor wrapper_XPU__col2im(
-    const at::Tensor& self,
-    at::IntArrayRef output_size,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef dilation,
-    at::IntArrayRef padding,
-    at::IntArrayRef stride) {
-  c10::optional<Device> common_device = nullopt;
-  (void)common_device; // Suppress unused variable warning
-  c10::impl::check_and_update_common_device(
-      common_device, self, "wrapper_XPU__col2im", "self");
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::col2im(
-      self, output_size, kernel_size, dilation, padding, stride);
-}
-
-at::Tensor& wrapper_XPU_out_col2im_out(
-    const at::Tensor& self,
-    at::IntArrayRef output_size,
-    at::IntArrayRef kernel_size,
-    at::IntArrayRef dilation,
-    at::IntArrayRef padding,
-    at::IntArrayRef stride,
-    at::Tensor& out) {
-  c10::optional<Device> common_device = nullopt;
-  (void)common_device; // Suppress unused variable warning
-  c10::impl::check_and_update_common_device(
-      common_device, out, "wrapper_XPU_out_col2im_out", "out");
-  c10::impl::check_and_update_common_device(
-      common_device, self, "wrapper_XPU_out_col2im_out", "self");
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::col2im_out(
-      self, output_size, kernel_size, dilation, padding, stride, out);
-}
-
-IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("col2im", TORCH_FN((&wrapper_XPU__col2im)));
-  m.impl("col2im.out", TORCH_FN((&wrapper_XPU_out_col2im_out)));
-}
-
-} // namespace
-#endif

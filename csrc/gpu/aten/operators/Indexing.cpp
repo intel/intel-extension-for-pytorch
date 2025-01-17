@@ -1304,6 +1304,16 @@ Tensor& index_copy_out(
   return out;
 }
 
+#ifdef USE_OVERRIDE_OP
+at::Tensor& index_copy_(
+    at::Tensor& self,
+    int64_t dim,
+    const at::Tensor& index,
+    const at::Tensor& source) {
+  return index_copy_out(self, dim, index, source, self);
+}
+#endif
+
 Tensor& diag_out(const Tensor& self, int64_t diagonal, Tensor& out) {
   IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
       at::ScalarType::Half,
@@ -1563,8 +1573,11 @@ Tensor take(const Tensor& self, const Tensor& index) {
   Tensor out = at::empty({0}, self.options());
   return at::AtenIpexTypeXPU::take_out(self, index, out);
 }
+} // namespace AtenIpexTypeXPU
+} // namespace at
 
 #ifdef USE_OVERRIDE_OP
+namespace {
 at::Tensor& wrapper_XPU___index_put_impl_(
     at::Tensor& self,
     const c10::List<c10::optional<at::Tensor>>& indices,
@@ -1635,14 +1648,32 @@ at::Tensor& wrapper_XPU_out_nonzero_out(
   return at::AtenIpexTypeXPU::nonzero_out(self, out);
 }
 
+at::Tensor& wrapper_XPU_index_copy_(
+    at::Tensor& self,
+    int64_t dim,
+    const at::Tensor& index,
+    const at::Tensor& source) {
+  std::optional<Device> common_device = std::nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_index_copy_", "self");
+  c10::impl::check_and_update_common_device(
+      common_device, index, "wrapper_XPU_index_copy_", "index");
+  c10::impl::check_and_update_common_device(
+      common_device, source, "wrapper_XPU_index_copy_", "source");
+
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::index_copy_(self, dim, index, source);
+}
+
 IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
   m.impl("_index_put_impl_", TORCH_FN((&wrapper_XPU___index_put_impl_)));
   m.impl("index_select", TORCH_FN((&wrapper_XPU__index_select)));
   m.impl("index_select.out", TORCH_FN((&wrapper_XPU_out_index_select_out)));
   m.impl("nonzero", TORCH_FN((&wrapper_XPU__nonzero)));
   m.impl("nonzero.out", TORCH_FN((&wrapper_XPU_out_nonzero_out)));
+  m.impl("index_copy_", TORCH_FN((&wrapper_XPU_index_copy_)));
 }
+} // namespace
 #endif
-
-} // namespace AtenIpexTypeXPU
-} // namespace at

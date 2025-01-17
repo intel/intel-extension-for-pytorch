@@ -14,7 +14,11 @@
 #include "Loops.h"
 
 #include <ATen/Context.h>
-
+#ifdef USE_OVERRIDE_OP
+#include <ATen/DeviceGuard.h>
+#include <ATen/core/op_registration/adaption.h>
+#include <utils/CustomOperatorRegistration.h>
+#endif
 #include <utils/DPCPP.h>
 #include "comm/Numerics.h"
 #include "comm/Pointwise.h"
@@ -757,5 +761,60 @@ Tensor& special_airy_ai_out(const Tensor& self, at::Tensor& out) {
   return out;
 }
 
+#ifdef USE_OVERRIDE_OP
+at::Tensor special_erfcx(const at::Tensor& self) {
+  Tensor out;
+  TensorIterator iter;
+  iter.build_borrowing_unary_float_op(out, self);
+
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "erfcx", [&]() {
+        special_erfcx_out_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
+      });
+  return iter.output();
+}
+
+at::Tensor special_ndtri(const at::Tensor& self) {
+  Tensor out;
+  TensorIterator iter;
+  iter.build_borrowing_unary_float_op(out, self);
+
+  IPEX_DISPATCH_FLOATING_TYPES_AND(
+      at::ScalarType::BFloat16, iter.common_dtype(), "special_ndtri", [&]() {
+        special_ndtri_out_functor<scalar_t> f;
+        dpcpp_kernel_for_tensor_iter(iter, f);
+      });
+  return iter.output();
+}
+#endif
 } // namespace AtenIpexTypeXPU
 } // namespace at
+#ifdef USE_OVERRIDE_OP
+at::Tensor wrapper_XPU_special_erfcx(const at::Tensor& self) {
+  std::optional<Device> common_device = std::nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_special_erfcx", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::special_erfcx(self);
+}
+
+at::Tensor wrapper_XPU_special_ndtri(const at::Tensor& self) {
+  std::optional<Device> common_device = std::nullopt;
+  (void)common_device; // Suppress unused variable warning
+  c10::impl::check_and_update_common_device(
+      common_device, self, "wrapper_XPU_special_ndtri", "self");
+  const OptionalDeviceGuard device_guard(device_of(self));
+
+  return at::AtenIpexTypeXPU::special_ndtri(self);
+}
+
+namespace {
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl("special_erfcx", TORCH_FN((&wrapper_XPU_special_erfcx)));
+  m.impl("special_ndtri", TORCH_FN((&wrapper_XPU_special_ndtri)));
+}
+} // namespace
+#endif

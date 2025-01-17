@@ -66,7 +66,7 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
 }
 
 at::Tensor cos(const at::Tensor& self) {
-  return at::native::cos_nested(self);
+  return at::native::NestedTensor_cos(self);
 }
 
 at::Tensor div(const at::Tensor& self, const at::Tensor& other) {

@@ -10293,6 +10293,11 @@
   cases:
   - test_nestedtensor.py::TestNestedTensor::test_to__with_jagged_layout
   - test_nestedtensor.py::TestNestedTensor::test_to__with_strided_layout
+- reason: skip the case while pytorch also failed and ipex use pytorch implementation
+  cases:
+  - test_ops.py::TestCommonXPU::test_python_ref__refs_div_trunc_rounding_xpu_float64
+  - test_ops.py::TestCommonXPU::test_python_ref_executor__refs_div_trunc_rounding_executor_aten_xpu_float64
+  - test_ops.py::TestCommonXPU::test_python_ref_torch_fallback__refs_div_trunc_rounding_xpu_float64
 - reason: temp skip not broken ci
   cases:
   - test_autograd.py::TestSelectiveActivationCheckpoint::test_version_counter

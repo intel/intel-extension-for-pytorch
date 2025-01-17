@@ -1,9 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/native/TensorIterator.h>
 #include <oneDNN/oneDNN.h>
-#ifdef USE_OVERRIDE_OP
-#include <utils/CustomOperatorRegistration.h>
-#endif
 #include <utils/DPCPP.h>
 
 #include "comm/AccumulateType.h"
@@ -38,28 +35,3 @@ Tensor& fmod_(Tensor& self, const Scalar& other) {
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-
-#ifdef USE_OVERRIDE_OP
-namespace {
-
-at::Tensor& wrapper_XPU_out_ceil_out(const at::Tensor& self, at::Tensor& out) {
-  // No device check
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::ceil_out(self, out);
-}
-
-at::Tensor& wrapper_XPU_out_floor_out(const at::Tensor& self, at::Tensor& out) {
-  // No device check
-  const OptionalDeviceGuard device_guard(device_of(self));
-
-  return at::AtenIpexTypeXPU::floor_out(self, out);
-}
-
-IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-  m.impl("ceil.out", TORCH_FN((&wrapper_XPU_out_ceil_out)));
-  m.impl("floor.out", TORCH_FN((&wrapper_XPU_out_floor_out)));
-}
-
-} // namespace
-#endif

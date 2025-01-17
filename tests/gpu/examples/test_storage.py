@@ -18,7 +18,7 @@ class TestTorchMethod(TestCase):
         ckpt = tempfile.NamedTemporaryFile()
         with tempfile.NamedTemporaryFile(delete=False) as ckpt:
             torch.save(module, ckpt.name)
-        module2 = torch.load(ckpt.name)
+        module2 = torch.load(ckpt.name, weights_only=False)
 
     def test_storage_bfloat(self, dtype=torch.bfloat16):
         x = torch.ones(10, device=dpcpp_device, dtype=dtype)

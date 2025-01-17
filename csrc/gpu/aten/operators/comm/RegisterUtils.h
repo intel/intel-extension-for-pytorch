@@ -10,7 +10,7 @@
 namespace at::AtenIpexTypeXPU {
 namespace detail {
 
-TensorBase empty_xpu(
+inline TensorBase empty_xpu(
     IntArrayRef size,
     ScalarType dtype,
     c10::optional<Device> device_opt,
@@ -24,7 +24,7 @@ TensorBase empty_xpu(
       size, allocator, xpu_dks, dtype, memory_format_opt);
 }
 
-TensorBase empty_xpu(
+inline TensorBase empty_xpu(
     IntArrayRef size,
     c10::optional<ScalarType> dtype_opt,
     c10::optional<Layout> layout_opt,
@@ -41,7 +41,7 @@ TensorBase empty_xpu(
   return detail::empty_xpu(size, dtype, device_opt, memory_format_opt);
 }
 
-TensorBase empty_xpu(IntArrayRef size, const TensorOptions& options) {
+inline TensorBase empty_xpu(IntArrayRef size, const TensorOptions& options) {
   return detail::empty_xpu(
       size,
       optTypeMetaToScalarType(options.dtype_opt()),
@@ -51,7 +51,7 @@ TensorBase empty_xpu(IntArrayRef size, const TensorOptions& options) {
       options.memory_format_opt());
 }
 
-TensorBase empty_strided_xpu(
+inline TensorBase empty_strided_xpu(
     IntArrayRef size,
     IntArrayRef stride,
     ScalarType dtype,
@@ -65,7 +65,7 @@ TensorBase empty_strided_xpu(
       size, stride, allocator, xpu_dks, dtype);
 }
 
-TensorBase empty_strided_xpu(
+inline TensorBase empty_strided_xpu(
     IntArrayRef size,
     IntArrayRef stride,
     c10::optional<ScalarType> dtype_opt,
@@ -82,7 +82,7 @@ TensorBase empty_strided_xpu(
   return detail::empty_strided_xpu(size, stride, dtype, device_opt);
 }
 
-TensorBase empty_strided_xpu(
+inline TensorBase empty_strided_xpu(
     IntArrayRef size,
     IntArrayRef stride,
     const TensorOptions& options) {
@@ -105,6 +105,41 @@ inline Tensor create_out(
     return detail::empty_xpu(sizes, options);
   } else {
     return detail::empty_strided_xpu(sizes, strides, options);
+  }
+}
+
+inline void resize_out(
+    const Tensor& out,
+    IntArrayRef sizes,
+    IntArrayRef strides,
+    const TensorOptions& options) {
+  TORCH_CHECK(
+      options.dtype() == out.dtype(),
+      "Expected out tensor to have dtype ",
+      options.dtype(),
+      ", but got ",
+      out.dtype(),
+      " instead");
+  TORCH_CHECK(
+      options.device() == out.device(),
+      "Expected out tensor to have device ",
+      options.device(),
+      ", but got ",
+      out.device(),
+      " instead");
+  const bool resized = at::native::resize_output(out, sizes);
+  // Only restride if a resize occurred; otherwise we ignore the (advisory)
+  // strides from the meta function and directly use the output tensor's
+  // preexisting strides
+  if (resized) {
+    if (!strides.empty()) {
+      TORCH_INTERNAL_ASSERT(!options.memory_format_opt().has_value());
+      // TODO: avoid the redispatch here
+      out.as_strided_(sizes, strides);
+    } else if (options.memory_format_opt().has_value()) {
+      out.unsafeGetTensorImpl()->empty_tensor_restride(
+          *options.memory_format_opt());
+    }
   }
 }
 

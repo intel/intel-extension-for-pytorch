@@ -11,6 +11,7 @@
 #include <ATen/DeviceGuard.h>
 #include <ATen/core/op_registration/adaption.h>
 #include <utils/CustomOperatorRegistration.h>
+#include "comm/RegisterUtils.h"
 #endif
 
 using namespace torch_ipex::xpu::dpcpp;
@@ -527,21 +528,126 @@ std::tuple<Tensor&, Tensor&> fractional_max_pool2d_out(
       output, indices, self, kernel_size, output_size, random_samples);
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
-
 #ifdef USE_OVERRIDE_OP
+void fractional_max_pool2d_meta(
+    const at::Tensor& input,
+    IntArrayRef pool_size,
+    IntArrayRef output_size,
+    const at::Tensor& randomSamples,
+    Tensor& output,
+    Tensor& indices) {
+  TORCH_CHECK(
+      pool_size.size() == 2,
+      "fractional_max_pool2d: kernel_size must either be a single Int or tuple of Ints")
+  TORCH_CHECK(
+      output_size.size() == 2,
+      "fractional_max_pool2d: output_size must either be a single Int or tuple of Ints")
+  int64_t numBatch = 1;
+  int64_t planeDim = 0;
+  int64_t heightDim = 1;
+  int64_t widthDim = 2;
+  int64_t outputH = output_size[0];
+  int64_t outputW = output_size[1];
+  int64_t poolSizeH = pool_size[0];
+  int64_t poolSizeW = pool_size[1];
+
+  int64_t ndims = input.ndimension();
+  TORCH_CHECK(
+      ndims == 3 || ndims == 4,
+      "fractional_max_pool2d(): Expected 3D or 4D tensor, but got: ",
+      input.sizes());
+  for (const auto i : c10::irange(1, ndims)) {
+    TORCH_CHECK(
+        input.size(i) > 0,
+        "fractional_max_pool2d(): Expected input to have non-zero size for non-batch dimensions, but got",
+        input.sizes(),
+        " with dimension ",
+        i,
+        " being empty.");
+  }
+
+  if (ndims == 4) {
+    numBatch = input.size(0);
+    planeDim++;
+    heightDim++;
+    widthDim++;
+  }
+
+  /* sizes */
+  int64_t numPlanes = input.size(planeDim);
+  int64_t inputH = input.size(heightDim);
+  auto inputW = input.size(widthDim);
+
+  TORCH_CHECK(
+      outputH + poolSizeH - 1 <= inputH,
+      "fractional_max_pool2d(): pool height ",
+      poolSizeH,
+      " too large relative to input height ",
+      inputH);
+  TORCH_CHECK(
+      outputW + poolSizeW - 1 <= inputW,
+      "fractional_max_pool2d(): pool width ",
+      poolSizeW,
+      " too large relative to input width ",
+      inputW);
+
+  if (ndims == 3) {
+    if (output.defined()) {
+      at::AtenIpexTypeXPU::resize_out(
+          output, {numPlanes, outputH, outputW}, {}, input.options());
+    } else {
+      output = at::AtenIpexTypeXPU::create_out(
+          {numPlanes, outputH, outputW}, {}, input.options());
+    }
+    /* indices will contain the locations for each output point */
+    if (indices.defined()) {
+      at::AtenIpexTypeXPU::resize_out(
+          indices,
+          {numPlanes, outputH, outputW},
+          {},
+          input.options().dtype(kLong));
+    } else {
+      indices = at::AtenIpexTypeXPU::create_out(
+          {numPlanes, outputH, outputW}, {}, input.options().dtype(kLong));
+    }
+  } else {
+    if (output.defined()) {
+      at::AtenIpexTypeXPU::resize_out(
+          output, {numBatch, numPlanes, outputH, outputW}, {}, input.options());
+    } else {
+      output = at::AtenIpexTypeXPU::create_out(
+          {numBatch, numPlanes, outputH, outputW}, {}, input.options());
+    }
+    /* indices will contain the locations for each output point */
+    if (indices.defined()) {
+      at::AtenIpexTypeXPU::resize_out(
+          indices,
+          {numBatch, numPlanes, outputH, outputW},
+          {},
+          input.options().dtype(kLong));
+    } else {
+      indices = at::AtenIpexTypeXPU::create_out(
+          {numBatch, numPlanes, outputH, outputW},
+          {},
+          input.options().dtype(kLong));
+    }
+  }
+}
+
 std::tuple<Tensor, Tensor> fractional_max_pool2d(
     const Tensor& self,
     IntArrayRef kernel_size,
     IntArrayRef output_size,
     const Tensor& random_samples) {
-  Tensor output = at::empty({0}, self.options());
-  Tensor indices = at::empty({0}, self.options().dtype(kLong));
+  Tensor output;
+  Tensor indices;
+  fractional_max_pool2d_meta(
+      self, kernel_size, output_size, random_samples, output, indices);
   impl::fractional_max_pool2d_out_template(
       output, indices, self, kernel_size, output_size, random_samples);
   return std::tuple<Tensor&, Tensor&>(output, indices);
 }
 #endif
-
 Tensor& fractional_max_pool2d_backward_out(
     const Tensor& grad_output,
     const Tensor& self,
@@ -556,8 +662,8 @@ Tensor& fractional_max_pool2d_backward_out(
 
 } // namespace AtenIpexTypeXPU
 } // namespace at
-
 #ifdef USE_OVERRIDE_OP
+
 namespace {
 
 ::std::tuple<at::Tensor, at::Tensor> wrapper_XPU_fractional_max_pool2d(
@@ -580,10 +686,9 @@ namespace {
       self, kernel_size, output_size, random_samples);
 }
 
-// IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
-//   m.impl(
-//       "fractional_max_pool2d",
-//       TORCH_FN((&wrapper_XPU_fractional_max_pool2d)));
-// }
+IPEX_TORCH_LIBRARY_IMPL(aten, XPU, m) {
+  m.impl(
+      "fractional_max_pool2d", TORCH_FN((&wrapper_XPU_fractional_max_pool2d)));
+}
 } // namespace
 #endif

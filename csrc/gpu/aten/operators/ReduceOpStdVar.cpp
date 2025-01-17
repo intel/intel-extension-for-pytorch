@@ -19,7 +19,7 @@
 
 using namespace torch_ipex::xpu::dpcpp;
 using namespace at::native;
-
+#define device_sqrt std::sqrt
 namespace at {
 namespace AtenIpexTypeXPU {
 
@@ -29,7 +29,9 @@ struct WelfordData {
   scalar_t m2;
   index_t n;
   scalar_t nf;
+
   WelfordData() : mean(0), m2(0), n(0), nf(0) {}
+
   WelfordData(scalar_t mean, scalar_t m2, index_t n, scalar_t nf)
       : mean(mean), m2(m2), n(n), nf(nf) {}
 };
@@ -40,7 +42,7 @@ template <
     typename index_t,
     typename res_t>
 struct WelfordOps {
-  index_t correction;
+  acc_scalar_t correction;
   bool take_sqrt;
 
  public:
@@ -73,27 +75,24 @@ struct WelfordOps {
     return {
         a.mean + delta * nb_over_n,
         a.m2 + b.m2 + delta * delta * a.nf * nb_over_n,
+        // setting acc.n as -1 since acc.n might not be able to represent the
+        // count correctly within its range, setting it to -1 to avoid confusion
         -1,
         new_count};
   }
-  inline res_t project(acc_t acc) const {
+  inline res_t project(acc_t acc) const __ubsan_ignore_float_divide_by_zero__ {
     const auto mean = static_cast<scalar_t>(acc.mean);
     const auto divisor = acc.nf > correction ? acc.nf - correction : 0;
     const auto var = acc.m2 / divisor;
-    auto ret = take_sqrt ? std::sqrt(var) : var;
-
-    at::AtenIpexTypeXPU::pair<scalar_t, scalar_t> results{
-        (scalar_t)ret, (scalar_t)mean};
+    res_t results(take_sqrt ? device_sqrt(var) : var, mean);
     return results;
   }
-  inline acc_t sg_shfl_down(acc_t arg, int offset) const {
-    // FIXME:
-    return arg;
-  }
-  static inline acc_t translate_idx(acc_t acc, int64_t /*idx*/) {
+
+  static C10_DEVICE acc_t translate_idx(acc_t acc, int64_t /*base_idx*/) {
     return acc;
   }
-  WelfordOps(index_t correction, bool take_sqrt)
+
+  WelfordOps(acc_scalar_t correction, bool take_sqrt)
       : correction(correction), take_sqrt(take_sqrt) {}
 };
 
@@ -195,6 +194,19 @@ static double std_var_all_cpu(
   }
   return result;
 }
+static inline void warn_invalid_degrees_of_freedom(
+    const char* fname,
+    const TensorIterator& iter,
+    double correction) {
+  int64_t reducing_over_num_elements = iter.num_output_elements() == 0
+      ? 0
+      : iter.numel() / iter.num_output_elements();
+  if (reducing_over_num_elements - correction <= 0) {
+    TORCH_WARN(
+        fname,
+        "(): degrees of freedom is <= 0. Correction should be strictly less than the reduction factor (input numel divided by output numel).");
+  }
+}
 
 Tensor& std_var_out(
     const char* fname,
@@ -249,11 +261,11 @@ Tensor& std_var_out(
     }
     return result;
   }
-
   // Computation for floating point
   const auto correction = correction_opt.value_or(1).toDouble();
-  ScalarType dtype = get_dtype_from_result(result, {});
-  auto iter = make_reduction(fname, result, self, dim, keepdim, dtype);
+  ScalarType dtype = at::native::get_dtype_from_result(result, {});
+  auto iter =
+      at::native::make_reduction(fname, result, self, dim, keepdim, dtype);
   TORCH_CHECK(
       at::canCast(self.scalar_type(), result.scalar_type()),
       "result type ",
@@ -261,19 +273,11 @@ Tensor& std_var_out(
       " can't be cast to the "
       "desired output type ",
       result.scalar_type());
-
+  warn_invalid_degrees_of_freedom(fname, iter, correction);
   if (iter.numel() == 0) {
     // Trivial reduction
     result.fill_(std::numeric_limits<double>::quiet_NaN());
     return result;
-  } else if (
-      result.numel() == 1 && iter.device_type() == kCPU &&
-      iter.common_dtype() != kBFloat16 && iter.common_dtype() != kHalf) {
-    // NOTE: CPU performance significantly regressed when attempting to port to
-    // ATen,
-    //   so all-reduce has a custom implementation.
-    //   See https://github.com/pytorch/pytorch/pull/43858.
-    result.fill_(std_var_all_cpu(self, correction, take_sqrt));
   } else {
     std_var_kernel(iter, correction, take_sqrt);
   }
