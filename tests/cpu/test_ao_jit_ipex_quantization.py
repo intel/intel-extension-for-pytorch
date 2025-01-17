@@ -15,6 +15,7 @@ from test_ao_jit_llga_utils import (
     JitLlgaTestCase,
     LLGA_FUSION_GROUP,
     llga_fp32_bf16_test_env,
+    skipIfNoVNNI,
 )
 from torch.testing._internal.jit_utils import freeze_rng_state
 
@@ -108,6 +109,7 @@ class TestIpexOps(JitLlgaTestCase):
                 "at::dequantize"
             ).check("aten::adaptive_avg_pool2d").run(graph)
 
+    @skipIfNoVNNI
     def test_flatten_int8(self):
         class M(nn.Module):
             def __init__(self):
@@ -419,6 +421,7 @@ class TestIpexOps(JitLlgaTestCase):
         self.assertEqual(ori_out, out)
         self.assertGraphContainsExactly(graph, "quantized::add", 1)
 
+    @skipIfNoVNNI
     def test_lstm(self):
         class M(nn.Module):
             def __init__(
@@ -535,6 +538,7 @@ class TestIpexOps(JitLlgaTestCase):
         graph = self.checkQuantizeTrace(model, [seq, hid, mask])
         self.assertGraphContainsExactly(graph, "aten::lstm", 1)
 
+    @skipIfNoVNNI
     def test_linear_lstm(self):
         class M(nn.Module):
             def __init__(self):
@@ -556,6 +560,7 @@ class TestIpexOps(JitLlgaTestCase):
         self.assertGraphContainsExactly(graph, "ipex::quantized_lstm", 1)
         self.assertGraphContainsExactly(graph, "aten::lstm", 0)
 
+    @skipIfNoVNNI
     def test_conv2d_with_padding(self):
         class M(nn.Module):
             def __init__(self, padding_mode):
@@ -977,6 +982,7 @@ class TestDynamicQuantization(JitLlgaTestCase):
 
 
 class TestDictInput(JitLlgaTestCase):
+    @skipIfNoVNNI
     def test_only_dict_input(self):
         class SubModule(nn.Module):
             def __init__(self):
