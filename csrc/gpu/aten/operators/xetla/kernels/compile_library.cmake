@@ -51,7 +51,7 @@ function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
   target_link_libraries(${TARGET} PUBLIC ${GPU_TORCH_LIBS})
 
   # Set visibility to hidden to close the differences of Windows & Linux
-  set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+  set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden CXX_VISIBILITY_INLINES_HIDDEN ON)
   if(${USE_DOUBLE_GRF})
     target_compile_definitions(${TARGET} PRIVATE USE_DOUBLE_GRF)
   endif()

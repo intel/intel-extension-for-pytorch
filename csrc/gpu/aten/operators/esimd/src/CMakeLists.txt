@@ -5,7 +5,7 @@ set(TARGET esimd_kernels)
 
 FILE(GLOB_RECURSE kernels_src *.cpp)
 add_library(${TARGET} SHARED ${kernels_src})
-set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+set_target_properties(${TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden CXX_VISIBILITY_INLINES_HIDDEN ON)
 
 target_compile_options(${TARGET} PRIVATE -fsycl -ffast-math)
 if (USE_AOT_DEVLIST)

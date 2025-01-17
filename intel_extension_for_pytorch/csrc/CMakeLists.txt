@@ -36,6 +36,7 @@ if(BUILD_WITH_XPU)
 endif()
 
 add_library(intel-ext-pt-python SHARED ${PY_CPP_OBJS} init_python_bindings.cpp)
+set_target_properties(intel-ext-pt-python PROPERTIES CXX_VISIBILITY_PRESET hidden CXX_VISIBILITY_INLINES_HIDDEN ON)
 
 include(${IPEX_ROOT_DIR}/cmake/ClangFormat.cmake)
 if(CLANG_FORMAT)

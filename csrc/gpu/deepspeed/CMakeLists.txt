@@ -13,6 +13,7 @@ set(IPEX_DEEPSPEED_SRCS ${deepspeed_quantization_src} ${deepspeed_transformer_in
 set(IPEX_DEEPSPEED_INCLUDES ${deepspeed_inc})
 
 add_library(${DS_TARGET} SHARED ${IPEX_DEEPSPEED_SRCS})
+set_target_properties(${DS_TARGET} PROPERTIES CXX_VISIBILITY_PRESET hidden CXX_VISIBILITY_INLINES_HIDDEN ON)
 
 target_include_directories(${DS_TARGET} PRIVATE ${IPEX_DEEPSPEED_INCLUDES})
 target_link_libraries(${DS_TARGET} PRIVATE ${GPU_TORCH_LIBS})
