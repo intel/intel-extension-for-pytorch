@@ -140,8 +140,8 @@ model_type = next(
 )
 if model_type == "llama" and args.vision_text_model:
     model_type = "mllama"
-if model_type == "maira-2":
-    model_type = "maira2"
+if model_type in ["maira-2", "deepseek-v2", "deepseek-v3"]:
+    model_type = model_type.replace("-", "")
 model_class = MODEL_CLASSES[model_type]
 if args.config_file is None:
     if model_type == "chatglm":
