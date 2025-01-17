@@ -328,8 +328,8 @@ print_rank0(f"*** Loading the model {model_name}")
 model_type = next((x for x in MODEL_CLASSES.keys() if x in model_name.lower()), "auto")
 if model_type == "llama" and args.vision_text_model:
     model_type = "mllama"
-if model_type == "maira-2":
-    model_type = "maira2"
+if model_type in ["maira-2", "deepseek-v2", "deepseek-v3"]:
+    model_type = model_type.replace("-", "")
 model_class = MODEL_CLASSES[model_type]
 tokenizer = model_class[1].from_pretrained(model_name, trust_remote_code=True)
 
