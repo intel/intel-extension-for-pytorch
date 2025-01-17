@@ -209,7 +209,7 @@ class RotaryEmbedding(torch.nn.Module):
             self.emb = torch.cat((freqs, freqs), dim=-1).float()
             self.cos_cached = self.emb.cos()[None, :, :]
             self.sin_cached = self.emb.sin()[None, :, :]
-        elif self.model_backbone == "DeepseekV2ForCausalLM":
+        elif self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
             _mscale = float(
                 yarn_get_mscale(self.scaling_factor, self.mscale)
                 / yarn_get_mscale(self.scaling_factor, self.mscale_all_dim)

@@ -214,7 +214,7 @@ def model_convert_reference(_model):
         JambaForCausalLM_forward,
         DeepseekV2ForCausalLM_forward,
         DeepseekV2Model_forward,
-        DeepseekV2_MoEGate_forward,
+        Deepseek_MoEGate_forward,
         prepare_inputs_for_generation,
         prepare_inputs_for_generation_gptj,
         prepare_inputs_for_generation_gptbigcode,
@@ -1093,14 +1093,17 @@ def model_convert_reference(_model):
             _model.config,
             distributed=distributed,
         )
-    elif _model.config.architectures[0] == "DeepseekV2ForCausalLM":
+    elif _model.config.architectures[0] in [
+        "DeepseekV2ForCausalLM",
+        "DeepseekV3ForCausalLM",
+    ]:
         convert_function(_model, "forward", DeepseekV2ForCausalLM_forward)
         convert_function(_model.model, "forward", DeepseekV2Model_forward)
         convert_functions(
             _model,
-            type(_model.model.layers[1].mlp.gate),
+            type(_model.model.layers[_model.config.first_k_dense_replace].mlp.gate),
             "forward",
-            DeepseekV2_MoEGate_forward,
+            Deepseek_MoEGate_forward,
         )
         convert_class(
             _model,
@@ -1657,7 +1660,10 @@ def model_convert_lowering(
                 supported_classes.append(
                     type(_model.model.layers[0].mamba.dt_layernorm)
                 )
-            if _model.config.architectures[0] == "DeepseekV2ForCausalLM":
+            if _model.config.architectures[0] in [
+                "DeepseekV2ForCausalLM",
+                "DeepseekV3ForCausalLM",
+            ]:
                 supported_classes.append(type(_model.model.layers[0].input_layernorm))
             for supported_class in supported_classes:
                 lowering_class_cpu(
@@ -1976,6 +1982,7 @@ def optimize(
                 "Maira2ForConditionalGeneration",
                 "JambaForCausalLM",
                 "DeepseekV2ForCausalLM",
+                "DeepseekV3ForCausalLM",
             ]
         if well_supported_model:
             check_transformers_for_llm_support()

@@ -21,6 +21,7 @@ from hf_configs.phi.modeling_phi import PhiForCausalLM
 from hf_configs.phi3.modeling_phi3 import Phi3ForCausalLM
 from hf_configs.maira2.modeling_maira2 import Maira2ForConditionalGeneration
 from hf_configs.deepseekv2.modeling_deepseek import DeepseekV2ForCausalLM
+from hf_configs.deepseekv3.modeling_deepseek import DeepseekV3ForCausalLM
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _disable_tpp
 from intel_extension_for_pytorch.llm.utils import load_low_precision_checkpoint
 from intel_extension_for_pytorch.utils.weight_only_quantization import (
@@ -229,6 +230,13 @@ supported_models = [
     model_info(
         "deepseekv2",
         DeepseekV2ForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
+        "deepseekv3",
+        DeepseekV3ForCausalLM,
         True,
         lambda m: m.model.layers[0].self_attn.__class__,
         lambda m: m.model.layers[0].__class__,
