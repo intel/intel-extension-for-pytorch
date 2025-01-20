@@ -259,6 +259,7 @@ class IPEXAttention(IPEXTransformerAttnNaive):
             and seq_len == 1
             and isinstance(past_key_value, IPEXStaticCache)
         ):
+            use_causal = False
             key_prompt, value_prompt = past_key_value.get_prompt_for_beam_search(
                 self.layer_idx
             )
