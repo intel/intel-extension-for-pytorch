@@ -1,4 +1,4 @@
-# Serving ResNet50 INT8 model with TorchServe and Intel® Extension for PyTorch optimizations
+# Serving ResNet50 INT8 model with TorchServe and Intel® Extension for PyTorch optimizations (Deprecated)
 
 ## Description
 This sample provides code to integrate Intel® Extension for PyTorch with TorchServe. This project quantizes a ResNet50 model to use the INT8 Precision to improve performance on CPU.

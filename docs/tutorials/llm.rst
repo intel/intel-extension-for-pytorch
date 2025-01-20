@@ -30,7 +30,7 @@ Verified for distributed inference mode via DeepSpeed
 
 *Note*: The above verified models (including other models in the same model family, like "codellama/CodeLlama-7b-hf" from LLAMA family) are well supported with all optimizations like indirect access KV cache, fused ROPE, and customized linear kernels. We are working in progress to better support the models in the tables with various data types. In addition, more models will be optimized in the future.
 
-Please check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/main/examples/cpu/llm>`_ for instructions to install/setup environment and example scripts.
+Please check `LLM best known practice <https://github.com/intel/intel-extension-for-pytorch/tree/release/2.6/examples/cpu/llm>`_ for instructions to install/setup environment and example scripts.
 
 Module Level Optimization API for customized LLM (Prototype)
 ------------------------------------------------------------

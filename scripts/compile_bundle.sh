@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-VER_IPEX=main
+VER_IPEX=v2.6.0+cpu
 
 # Mode: Select which components to install. PyTorch and Intel® Extension for PyTorch* are always installed.
 # High bit: 8 7 6 5 4 3 2 1 :Low bit

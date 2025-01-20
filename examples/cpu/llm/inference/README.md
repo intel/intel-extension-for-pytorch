@@ -239,7 +239,7 @@ The docker image built in [the environment setup tutorial](../README.md#2-enviro
 Use the command below on all machines to launch the docker containers. This command uses the host network interfaces inside the docker container. Thus, you need to put the host ip addresses into the `hostfile.txt`. Do NOT launch multiple docker containers on one single machine from the same docker image. These docker containers listen on the same machine on the same port, will result in unpredicable ssh connections.
 
 ```bash
-docker run --rm -it --privileged -v /dev/shm:/dev/shm --net host ipex-llm:main bash
+docker run --rm -it --privileged -v /dev/shm:/dev/shm --net host ipex-llm:2.6.0 bash
 ```
 
 **Note:** For models on HuggingFace require access privileges, you need to run the `huggingface-cli login` command in each docker container to config a HuggingFace access token.
@@ -508,7 +508,7 @@ To convert model and run inference with INT4 checkpoints, you can run the follow
 OMP_NUM_THREADS=<physical cores num> numactl -m <node N> -C <cpu list> python run.py -m <MODEL_ID> --benchmark --ipex-weight-only-quantization --quant-with-amp --low-precision-checkpoint <PATH_TO_CHECKPOINT>
 ```
 
-To run accuracy tests, please follow the instructions in the [Accuracy Test](#32-accuracy-test) part
+To run accuracy tests, please follow the instructions in the [Accuracy Test](#32-accuracy-test) part.
 
 **Example**
 
