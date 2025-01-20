@@ -148,10 +148,8 @@ if(NOT USE_ITT_ANNOTATION)
 endif()
 
 # Handle huge binary issue for multi-target AOT build
-if(NOT BUILD_SEPARATE_OPS)
-  if(BUILD_BY_PER_KERNEL OR USE_AOT_DEVLIST)
-    set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -flink-huge-device-code)
-  endif()
+if(BUILD_BY_PER_KERNEL OR USE_AOT_DEVLIST)
+  set(IPEX_SYCL_LINK_FLAGS ${IPEX_SYCL_LINK_FLAGS} -flink-huge-device-code)
 endif()
 
 if (BUILD_WITH_SANITIZER)

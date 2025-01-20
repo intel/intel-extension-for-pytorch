@@ -892,5 +892,60 @@ static inline bool requires_runtime_zp(const Tensor& src) {
   return (src.q_zero_point() != 0);
 }
 
+struct cpu_timer {
+  cpu_timer(const char* f_name)
+      : f_name(f_name),
+        start(
+            enabled ? std::chrono::high_resolution_clock::now()
+                    : std::chrono::time_point<
+                          std::chrono::high_resolution_clock>()),
+        phase0(start),
+        phase1(start) {}
+  ~cpu_timer() {
+    if (enabled) {
+      auto end = std::chrono::high_resolution_clock::now();
+      auto delta0 = phase0 - start;
+      auto delta1 = phase1 - phase0;
+      auto delta2 = end - phase1;
+
+      auto elapse0 =
+          std::chrono::duration_cast<std::chrono::microseconds>(delta0).count();
+      auto elapse1 =
+          std::chrono::duration_cast<std::chrono::microseconds>(delta1).count();
+      auto elapse2 =
+          std::chrono::duration_cast<std::chrono::microseconds>(delta2).count();
+      printf(
+          "Host function %s elapsed %ldus, %ldus, %ldus\n",
+          f_name,
+          elapse0,
+          elapse1,
+          elapse2);
+      /* printf( */
+      /*     "Host function %s elapsed %ldus, %ldus\n", f_name, elapse1,
+       * elapse2); */
+    }
+  }
+
+  void phase0_end() {
+    if (enabled) {
+      phase0 = std::chrono::high_resolution_clock::now();
+      phase1 = phase0;
+    }
+  }
+
+  void phase1_end() {
+    if (enabled)
+      phase1 = std::chrono::high_resolution_clock::now();
+  }
+
+ private:
+  const char* f_name;
+  inline static bool enabled =
+      (nullptr != std::getenv("ENABLE_DNNL_INTERFACE_PROFILE"));
+  std::chrono::time_point<std::chrono::high_resolution_clock> start;
+  std::chrono::time_point<std::chrono::high_resolution_clock> phase0;
+  std::chrono::time_point<std::chrono::high_resolution_clock> phase1;
+};
+
 } // namespace oneDNN
 } // namespace torch_ipex::xpu

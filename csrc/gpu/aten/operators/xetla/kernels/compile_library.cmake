@@ -71,7 +71,7 @@ function(add_library_with_options TARGET USE_DOUBLE_GRF AOT_DEVLIST)
   endforeach()
 
   target_link_options(${TARGET} PRIVATE ${XETLA_KERNEL_FLAGS})
-  target_compile_options(${TARGET} PRIVATE -fsycl)
+  target_compile_options(${TARGET} PRIVATE -fsycl -O2 -g0)
   if (AOT_DEVLIST)
     target_compile_options(${TARGET} PRIVATE -fsycl-targets=spir64_gen)
   endif()
