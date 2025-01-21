@@ -63,7 +63,25 @@ We provide optimized LLAMA, GPT-J and OPT modeling files on the basis of [huggin
 
 ## Running example script
 
-Please refer to the [instructions](../../../llm/README.md#2-environment-setup) for environment setup.
+Please install the required packages via the following commands.
+
+```bash
+python -m pip install torch intel-extension-for-pytorch intel-openmp
+conda install gperftools -y
+# The example LLM modelings are showcased based on transformers v4.38.1
+python -m pip install transformers==4.38.1 accelerate
+
+# Set the environment variables for performance on Xeon
+export LD_PRELOAD=$(bash ../../../llm/tools/get_libstdcpp_lib.sh):${CONDA_PREFIX}/lib/libiomp5.so:${CONDA_PREFIX}/lib/libtcmalloc.so:${LD_PRELOAD}
+export KMP_BLOCKTIME=1
+export KMP_TPAUSE=0
+export KMP_FORKJOIN_BARRIER_PATTERN=dist,dist
+export KMP_PLAIN_BARRIER_PATTERN=dist,dist
+export KMP_REDUCTION_BARRIER_PATTERN=dist,dist
+
+# Download the example prompt file
+wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
+```
 
 The detail usage of `run.py` can be obtained by running
 
