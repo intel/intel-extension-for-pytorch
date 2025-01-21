@@ -197,12 +197,7 @@ class DeepspeedTester(JitTestCase):
     def test_ipex_optimize(self):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules[:2]
-            # TODO: remove check_lm_head logic once deepspeed LmHeadLinearAllreduce change has been upstream-ed.
-            check_lm_head = False
-            if len(deepspeed_modules) == 3:
-                check_lm_head = True
-                LmHeadLinearAllreduce = deepspeed_modules[2]
+            LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules
 
             x = torch.randn(2, 3, 64)
             m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
@@ -211,16 +206,7 @@ class DeepspeedTester(JitTestCase):
             ds_model = self._get_ds_model(m_linear)
             self.assertTrue(module_found(ds_model, LinearLayer))
             self.assertTrue(module_found(ds_model, LinearAllreduce))
-
-            # TODO: [Notes: LmHeadLinearAllreduce replacement test]
-            # On the public master of deepspeed,
-            # LmHeadLinearAllreduce replacement will only happen if checkpoint has been loaded:
-            # github.com/microsoft/DeepSpeed/blob/16c265c0ce103147d027d9cae32dd7680766af21/deepspeed/module_inject/replace_module.py
-            # #L352
-            # Need to figure out a way to use checkpoint in the UT to test LmHeadLinearAllreduce replacement.
-            # Disable the check for now.
-            if False:  # if check_lm_head:
-                self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
+            self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
 
             optimized = ipex.optimize(
                 ds_model.eval(),
@@ -237,10 +223,7 @@ class DeepspeedTester(JitTestCase):
                 jit_optimized = torch.jit.freeze(jit_optimized)
                 self.assertTrue(module_found(optimized, _IPEXLinear))
                 self.assertTrue(module_found(optimized, _IPEXLinearAllreduce))
-
-                # TODO: Check [Notes: LmHeadLinearAllreduce replacement test]
-                if False:  # if check_lm_head:
-                    self.assertTrue(module_found(optimized, _IPEXLmHeadLinearAllreduce))
+                self.assertTrue(module_found(optimized, _IPEXLmHeadLinearAllreduce))
 
                 jit_optimized(x)
                 graph = jit_optimized.graph_for(x)
@@ -258,23 +241,18 @@ class DeepspeedTester(JitTestCase):
     ):
         deepspeed_modules = may_import_deepspeed_modules()
         if deepspeed_modules is not None:
-            LinearAllreduce, LinearLayer = deepspeed_modules[:2]
-            # TODO: remove check_lm_head logic once deepspeed LmHeadLinearAllreduce change has been upstream-ed.
-            check_lm_head = False
-            if len(deepspeed_modules) == 3:
-                check_lm_head = True
-                LmHeadLinearAllreduce = deepspeed_modules[2]
+            LinearAllreduce, LinearLayer, LmHeadLinearAllreduce = deepspeed_modules
 
             x = torch.randn(2, 3, 64)
             m_linear = DeepSpeedTestM(MyLmHeadModel).eval()
             y = m_linear(x)
 
             ds_model = self._get_ds_model(m_linear)
+            y_ds = ds_model(x)
+            self.assertEqual(y, y_ds, atol=atol, rtol=rtol)
             self.assertTrue(module_found(ds_model, LinearLayer))
             self.assertTrue(module_found(ds_model, LinearAllreduce))
-            # TODO: Check [Notes: LmHeadLinearAllreduce replacement test]
-            if False:  # if check_lm_head:
-                self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
+            self.assertTrue(module_found(ds_model, LmHeadLinearAllreduce))
 
             prepared_model = prepare(
                 ds_model,
@@ -287,19 +265,26 @@ class DeepspeedTester(JitTestCase):
             self.assertTrue(
                 all(module_found(converted, qmodule) for qmodule in qmodules)
             )
+            prepared_model_ref = prepare(
+                m_linear,
+                dynamic_qconfig,
+                example_inputs=(x),
+                inplace=True,
+                bn_folding=False,
+            )
+            converted_ref = convert(prepared_model_ref, inplace=True)
 
-            # TODO: Check [Notes: LmHeadLinearAllreduce replacement test]
-            if False:  # if check_lm_head
-                self.assertTrue(
-                    all(
-                        module_found(converted, lm_head_qmodule)
-                        for lm_head_qmodule in lm_head_qmodules
-                    )
+            self.assertTrue(
+                all(
+                    module_found(converted, lm_head_qmodule)
+                    for lm_head_qmodule in lm_head_qmodules
                 )
+            )
 
             with torch.no_grad():
                 y_quantized = converted(x)
-                self.assertEqual(y, y_quantized, atol=atol, rtol=rtol)
+                y_ref = converted_ref(x)
+                self.assertEqual(y_ref, y_quantized, atol=atol, rtol=rtol)
 
                 converted = torch.jit.trace(converted, x)
                 traced = torch.jit.freeze(converted)
@@ -310,7 +295,7 @@ class DeepspeedTester(JitTestCase):
                     FileCheck().check(graph_string).run(graph)
 
                 y_traced = traced(x)
-                self.assertEqual(y, y_traced, atol=atol, rtol=rtol)
+                self.assertEqual(y_ref, y_traced, atol=atol, rtol=rtol)
 
                 with tempfile.TemporaryDirectory() as tmp:
                     path = os.path.join(tmp, "ds_model.pt")
@@ -324,7 +309,7 @@ class DeepspeedTester(JitTestCase):
                         FileCheck().check(graph_string).run(graph_loaded)
 
                     y_loaded = loaded(x)
-                    self.assertEqual(y, y_loaded, atol=atol, rtol=rtol)
+                    self.assertEqual(y_ref, y_loaded, atol=atol, rtol=rtol)
 
     def test_dynamic_quantization(self):
         self._test_quantization(
