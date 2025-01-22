@@ -415,6 +415,7 @@ supported:
 #  - upsample_trilinear3d.out
 #  - upsample_trilinear3d_backward.grad_input
 #  - xlogy.OutTensor
+  - _int_mm
 autograd:
 #  - cdist
   - lstm.input

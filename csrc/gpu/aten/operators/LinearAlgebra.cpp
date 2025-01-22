@@ -15,6 +15,8 @@
 #include "comm/Numerics.h"
 #include "comm/RegistrationDeclarations.h"
 
+#include <oneapi/dnnl/dnnl.hpp>
+
 using namespace torch_ipex::xpu::dpcpp;
 
 namespace at {
@@ -470,6 +472,168 @@ Tensor linalg_matrix_exp(const Tensor& a) {
   } else {
     return AtenIpexTypeXPU::mexp(a);
   }
+}
+
+dnnl::memory make_onednn_memory(
+    dnnl::memory::desc md,
+    dnnl::engine& engine,
+    void* ptr) {
+  return dnnl::sycl_interop::make_memory(
+      md,
+      engine,
+      dnnl::sycl_interop::memory_kind::usm,
+      ptr == nullptr ? DNNL_MEMORY_ALLOCATE : ptr);
+}
+
+static void _mkldnn_matmul_i8i8i32_with_primitive(
+    const Tensor& mat1,
+    const Tensor& mat2,
+    const Tensor& result) {
+  at::Tensor m1 = torch_ipex::xpu::oneDNN::is_onednn_matmul_strides(mat1)
+      ? mat1
+      : mat1.contiguous();
+  at::Tensor m2 = torch_ipex::xpu::oneDNN::is_onednn_matmul_strides(mat2)
+      ? mat2
+      : mat2.contiguous();
+  at::Tensor dst =
+      torch_ipex::xpu::oneDNN::is_onednn_matmul_strides(result, true)
+      ? result
+      : result.contiguous();
+  at::Device cur_device = at::Device(at::kXPU, c10::xpu::current_device());
+  auto engine =
+      torch_ipex::xpu::oneDNN::GpuEngineManager::Instance().get_engine(
+          cur_device);
+  auto stream =
+      torch_ipex::xpu::oneDNN::GpuStreamManager::Instance().get_stream();
+  // STEP1: create memory desc
+  dnnl::memory::desc m1_md = dnnl::memory::desc(
+      m1.sizes().vec(), dnnl::memory::data_type::s8, m1.strides().vec());
+  dnnl::memory::desc m2_md = dnnl::memory::desc(
+      m2.sizes().vec(), dnnl::memory::data_type::s8, m2.strides().vec());
+  dnnl::memory::desc dst_md = dnnl::memory::desc(
+      dst.sizes().vec(), dnnl::memory::data_type::s32, dst.strides().vec());
+  // STEP2: creat attribute
+  dnnl::primitive_attr pattr;
+  pattr.set_scratchpad_mode(dnnl::scratchpad_mode::user);
+  // STEP3: create primitive
+  dnnl::matmul::primitive_desc matmul_pd =
+      dnnl::matmul::primitive_desc(engine, m1_md, m2_md, dst_md, pattr);
+  dnnl::matmul matmul_p = dnnl::matmul(matmul_pd);
+  dnnl::memory::desc m1_usr_md = dnnl::memory::desc(
+      m1.sizes().vec(), dnnl::memory::data_type::s8, m1.strides().vec());
+  dnnl::memory::desc m2_usr_md = dnnl::memory::desc(
+      m2.sizes().vec(), dnnl::memory::data_type::s8, m2.strides().vec());
+  dnnl::memory::desc dst_usr_md = dnnl::memory::desc(
+      dst.sizes().vec(), dnnl::memory::data_type::s32, dst.strides().vec());
+  // STEP4: create memory
+  auto m1_usr_m = make_onednn_memory(m1_usr_md, engine, m1.data_ptr());
+  auto m2_usr_m = make_onednn_memory(m2_usr_md, engine, m2.data_ptr());
+  auto dst_usr_m = make_onednn_memory(dst_usr_md, engine, dst.data_ptr());
+  dnnl::memory m1_m = m1_usr_m, m2_m = m2_usr_m, dst_m = dst_usr_m;
+  size_t scratchpad_size = matmul_pd.scratchpad_desc().get_size();
+  at::Tensor scratchpad_tensor = at::empty(
+      {static_cast<int64_t>(scratchpad_size)},
+      m1.options().dtype(at::kByte),
+      std::nullopt);
+  auto scratchpad_memory = make_onednn_memory(
+      matmul_pd.scratchpad_desc(), engine, scratchpad_tensor.data_ptr());
+  DPCPP_ONEDNN_EXEC(
+      dnnl::matmul(matmul_p),
+      stream,
+      {{DNNL_ARG_SRC, m1_m},
+       {DNNL_ARG_WEIGHTS, m2_m},
+       {DNNL_ARG_DST, dst_m},
+       {DNNL_ARG_SCRATCHPAD, scratchpad_memory}});
+}
+
+void mkldnn_matmul_i8i8i32(
+    const Tensor& mat1,
+    const Tensor& mat2,
+    const Tensor& result) {
+  // x:s8 * w:s8 -> y:s32
+  // both inputs should be 2d
+  _mkldnn_matmul_i8i8i32_with_primitive(mat1, mat2, result);
+}
+
+Tensor& _int_mm_out_xpu(
+    const Tensor& self,
+    const Tensor& mat2,
+    Tensor& result) {
+#ifndef STRIP_ERROR_MESSAGES
+  static constexpr c10::string_view func_name = "int_mm_out_xpu";
+#endif
+  TORCH_CHECK(
+      self.dim() == 2,
+      func_name,
+      ": Expected self to be of dimension 2 but got ",
+      self.dim());
+  TORCH_CHECK(
+      mat2.dim() == 2,
+      func_name,
+      ": Expected mat2 to be of dimension 2 but got ",
+      mat2.dim());
+  TORCH_CHECK(
+      self.size(1) == mat2.size(0),
+      func_name,
+      ": self.size(1) needs to match mat2.size(0) but got ",
+      self.size(1),
+      " and ",
+      mat2.size(0));
+  TORCH_CHECK(
+      self.dtype() == at::kChar,
+      func_name,
+      ": Expected self dtype to be of type int8 but got ",
+      self.dtype());
+  TORCH_CHECK(
+      mat2.dtype() == at::kChar,
+      func_name,
+      ": Expected mat2 dtype to be of type int8 but got ",
+      mat2.dtype());
+  TORCH_CHECK(
+      result.dtype() == at::kInt,
+      func_name,
+      ": Expected result dtype to be of type kInt but got ",
+      result.dtype());
+  TORCH_CHECK(
+      result.size(0) == self.size(0),
+      func_name,
+      ": Expected result.size(0) to be ",
+      self.size(0),
+      " but got ",
+      result.size(0));
+  TORCH_CHECK(
+      result.size(1) == mat2.size(1),
+      func_name,
+      ": Expected result.size(1) to be ",
+      mat2.size(1),
+      " but got ",
+      result.size(1));
+  TORCH_CHECK(
+      result.dim() == 2,
+      func_name,
+      ": Expected result to be of dimension 2 but got ",
+      result.dim());
+  TORCH_CHECK(
+      result.is_contiguous(), func_name, ": Expected result to be contiguous.");
+  if (result.numel() == 0 || self.size(1) == 0) {
+    return result.zero_();
+  }
+  try {
+    mkldnn_matmul_i8i8i32(self, mat2, result);
+  } catch (const std::exception& e) {
+    TORCH_INTERNAL_ASSERT(false, func_name, " failed");
+  }
+  return result;
+}
+
+Tensor _int_mm_xpu(const Tensor& self, const Tensor& mat2) {
+  Tensor result =
+      at::empty({self.size(0), mat2.size(1)}, self.options().dtype(at::kInt));
+  return _int_mm_out_xpu(self, mat2, result);
+}
+
+Tensor _int_mm(const Tensor& self, const Tensor& mat2) {
+  return _int_mm_xpu(self, mat2);
 }
 
 } // namespace AtenIpexTypeXPU
