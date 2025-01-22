@@ -46,7 +46,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContext(
       group_size,
       lowp_mode,
       act_quant_mode,
-      cache_weight_for_large_batch);
+      cache_weight_for_large_batch,
+      PLAIN_WEIGHT_FORMAT);
 }
 
 c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
@@ -59,7 +60,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     int64_t group_size, // group_size along input channel
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    bool cache_weight_for_large_batch) {
+    bool cache_weight_for_large_batch,
+    int64_t weight_format) {
   RECORD_FUNCTION(
       "ipex_prepack::createWoqLinearPrePackOpContextInt4",
       c10::ArrayRef<c10::IValue>({}));
@@ -118,20 +120,25 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
     // Create empty weight with desired options then copy data
     int64_t N = weight.size(0);
     int64_t K_compressed = weight.size(1);
+    if (weight_format == GPTQ_WEIGHT_FORMAT) {
+      // weight shape = [K / 8, N] in int32
+      N = weight.size(1);
+      K_compressed = weight.size(0);
+      weight_int4 = weight;
+    } else if (weight_format == AWQ_WEIGHT_FORMAT) {
+      // weight shape = [K, N / 8] in int32
+      N = weight.size(1) * 8;
+      K_compressed = weight.size(0) / 8;
+      weight_int4 = weight;
+    }
     int64_t K_uint8 =
         weight.scalar_type() == c10::kInt ? K_compressed * 8 / 2 : K_compressed;
     weight_shape[0] = N;
     weight_shape[1] = K_uint8 * 2;
-    std::vector<int64_t> weight_size = {N, K_uint8};
-    // Create an empty uint8 weight to hold int4 data
-    weight_int4 = at::empty(weight_size, device(c10::kCPU).dtype(c10::kByte));
-    auto sizeof_dtype = weight.scalar_type() == c10::kInt
-        ? sizeof(uint32_t)
-        : sizeof(unsigned char);
-    std::memcpy(
-        weight_int4.data_ptr(),
-        weight.data_ptr(),
-        weight.numel() * sizeof_dtype);
+    if (weight_format == PLAIN_WEIGHT_FORMAT) {
+      // reinterpret as uint8
+      weight_int4 = weight.view(at::kByte);
+    }
   } else if (
       weight.scalar_type() == c10::kBFloat16 ||
       weight.scalar_type() == c10::kFloat ||
@@ -190,7 +197,8 @@ c10::intrusive_ptr<WoqLinearOpContext> createWoqLinearPrePackOpContextInt4(
       group_size,
       lowp_mode,
       act_quant_mode,
-      cache_weight_for_large_batch);
+      cache_weight_for_large_batch,
+      weight_format);
 }
 
 static const std::map<c10::string_view, int64_t> WOQ_DTYPE_MAP = {
@@ -232,6 +240,7 @@ packWoqLinearWeight(
       group_size,
       lowp_mode,
       /*act_quant_mode*/ 0,
+      /*weight_format*/ PLAIN_WEIGHT_FORMAT,
       /*cache_weight_for_large_batch*/ false);
   auto& packed_weight = context.at_weight_;
   auto& new_scales = context.scales_list_;
@@ -286,23 +295,39 @@ ContextLinearWoq create(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    bool cache_weight_for_large_batch) {
+    bool cache_weight_for_large_batch,
+    int64_t weight_format) {
   at::Tensor packed_weight;
   int64_t N = weight_shape[0];
   int64_t K = weight_shape[1];
   bool is_4bit =
       (weight_dtype == WOQ_DTYPE_INT4 || weight_dtype == WOQ_DTYPE_NF4);
   // GPTQ with act-order
-  // Shuffle weight along ic to make channels contiguous in group
-  if (is_4bit && group_size > 0 && g_idx.has_value()) {
+  bool handle_g_idx_in_kernel = lowp_mode != LOWP_MODE_INT8 && group_size > 0 &&
+      group_size * scales.size(1) != K;
+  if (is_4bit && group_size > 0 && g_idx.has_value() &&
+      !handle_g_idx_in_kernel) {
+    TORCH_CHECK(
+        K == g_idx.value().numel(),
+        "g_idx size and weight shape mismatch for lowp_mode INT8");
     // Shuffle weight along ic to make channels contiguous in group
     auto shuffled_weight = woq_shuffle_tensor_by_group_idx</* is_4bit */ true>(
         weight, weight_shape, g_idx.value(), group_size);
     packed_weight = woq_linear_pack_weight(
-        shuffled_weight, weight_dtype, weight_shape, group_size, lowp_mode);
+        shuffled_weight,
+        weight_dtype,
+        weight_shape,
+        group_size,
+        lowp_mode,
+        weight_format);
   } else {
     packed_weight = woq_linear_pack_weight(
-        weight, weight_dtype, weight_shape, group_size, lowp_mode);
+        weight,
+        weight_dtype,
+        weight_shape,
+        group_size,
+        lowp_mode,
+        weight_format);
   }
   auto packed_shape = packed_weight.sizes();
   // If OC is not a multiple of BLOCK_N, it may be padded.
@@ -361,7 +386,8 @@ ContextLinearWoq create(
       group_size,
       lowp_mode,
       act_quant_mode,
-      cache_weight_for_large_batch);
+      cache_weight_for_large_batch,
+      handle_g_idx_in_kernel);
   if (weight_dtype == WOQ_DTYPE_INT8 && lowp_mode == LOWP_MODE_INT8) {
     auto compensation = woq_linear_compute_compensation(
         weight, weight_dtype, group_size, lowp_mode);
@@ -377,7 +403,7 @@ static at::Tensor _shuffle_input_channels_if_needed(
   // GPTQ with act-order
   // Shuffle input channels to align with weight
   if (context.is_4bit_ && context.group_size_ > 0 &&
-      context.g_idx_.has_value()) {
+      context.g_idx_.has_value() && !context.handle_g_idx_in_kernel_) {
     auto& g_idx = context.g_idx_.value();
     auto K = input.size(-1);
     std::vector<int64_t> input_shape = {input.numel() / K, K};
@@ -522,7 +548,8 @@ at::Tensor run(ContextLinearWoq& context, const at::Tensor& input) {
       context.group_size_,
       context.lowp_mode_,
       context.act_quant_mode_,
-      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt,
+      context.handle_g_idx_in_kernel_ ? context.g_idx_ : c10::nullopt);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
     return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
@@ -612,7 +639,8 @@ at::Tensor run_unary(
       context.group_size_,
       context.lowp_mode_,
       context.act_quant_mode_,
-      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt,
+      context.handle_g_idx_in_kernel_ ? context.g_idx_ : c10::nullopt);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
     return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
@@ -697,7 +725,8 @@ at::Tensor run_binary(
       post_op,
       others,
       context.act_quant_mode_,
-      use_cached_compensation ? context.cached_compensation_ : c10::nullopt);
+      use_cached_compensation ? context.cached_compensation_ : c10::nullopt,
+      context.handle_g_idx_in_kernel_ ? context.g_idx_ : c10::nullopt);
   if (res.size(-1) != context.weight_shape_[0]) {
     int64_t N = context.weight_shape_[0];
     return at::narrow(res, /*dim*/ -1, /*start*/ 0, /*end*/ N);
@@ -719,7 +748,8 @@ at::Tensor unpack(ContextLinearWoq& context, const at::Tensor& tensor) {
   // With g_idx, weight's input channels are shuffled along ic so that
   // those in the same group are contiguous.
   // Here we need to shuffle them to the original order.
-  if (context.group_size_ > 0 && context.g_idx_.has_value()) {
+  if (context.group_size_ > 0 && context.g_idx_.has_value() &&
+      !context.handle_g_idx_in_kernel_) {
     auto group_size = context.group_size_;
     auto& g_idx = context.g_idx_.value();
     unpacked_weight = woq_shuffle_weight_back_by_group_idx(

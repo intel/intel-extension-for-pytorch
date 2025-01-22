@@ -895,7 +895,7 @@ def _GLM2Attention_forward(
                 mixed_x_layer, 3
             )
 
-    if attention_mask is None:
+    if attention_mask is None and past_len == 0:
         attention_mask = torch.ones(
             query_layer.size(0),
             1,
@@ -905,6 +905,8 @@ def _GLM2Attention_forward(
         )
         attention_mask.tril_()
         attention_mask = ~attention_mask
+    if attention_mask is not None:
+        attention_mask.masked_fill_(attention_mask, float("-inf"))
     (
         attn_output,
         attn_weights,
@@ -2223,6 +2225,139 @@ def _WhisperAttention_forward(
     return attn_output, attn_weights, past_key_value
 
 
+def _JambaAttention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    **kwargs,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    query = self.q_proj(hidden_states).view(bsz, q_len, -1, self.head_dim)
+    key = self.k_proj(hidden_states).view(bsz, q_len, -1, self.head_dim)
+    value = self.v_proj(hidden_states).view(bsz, q_len, -1, self.head_dim)
+    if use_cache:
+        (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+            query,
+            key,
+            value,
+            math.sqrt(self.head_dim),
+            past_key_value,
+            None,
+            attention_mask,
+        )
+    else:
+        value_states = value.transpose(1, 2)
+        query_states = query.transpose(1, 2)
+        key_states = key.transpose(1, 2)
+
+        past_key_value = None
+        # repeat k/v heads if n_kv_heads < n_heads
+        key_states = _repeat_kv(key_states, self.num_key_value_groups)
+        value_states = _repeat_kv(value_states, self.num_key_value_groups)
+
+        attn_weights = torch.matmul(
+            query_states, key_states.transpose(2, 3)
+        ) / math.sqrt(self.head_dim)
+
+        if attention_mask is not None:
+            attn_weights = torch.tensor(attn_weights) + torch.tensor(attention_mask)
+            attn_weights = torch.max(
+                attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min)
+            )
+
+        # upcast attention to fp32
+        attn_weights = nn.functional.softmax(
+            attn_weights, dim=-1, dtype=torch.float32
+        ).to(query_states.dtype)
+        attn_output = torch.matmul(attn_weights, value_states)
+
+    attn_output = attn_output.transpose(1, 2)
+    attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
+def _DeepseekV2Attention_forward(
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: bool = False,
+    use_cache: bool = False,
+    **kwargs,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    bsz, q_len, _ = hidden_states.size()
+    if hasattr(self, "concat_qkv"):
+        concat_qkv = self.concat_qkv(hidden_states)
+        q, compressed_kv, k_pe = torch.split(
+            concat_qkv,
+            [self.q_lora_rank, self.kv_lora_rank, self.qk_rope_head_dim],
+            dim=-1,
+        )
+        q = self.q_b_proj(self.q_a_layernorm(q))
+    else:
+        if self.q_lora_rank is None:
+            q = self.q_proj(hidden_states)
+        else:
+            q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
+        compressed_kv = self.kv_a_proj_with_mqa(hidden_states)
+        compressed_kv, k_pe = torch.split(
+            compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1
+        )
+    kv = self.kv_b_proj(self.kv_a_layernorm(compressed_kv)).view(
+        bsz, q_len, self.num_heads, self.qk_nope_head_dim + self.v_head_dim
+    )
+    sin_cos, _, _ = self._IPEXROPE.embed_positions()
+    query_states, key_states, value_states = (
+        torch.ops.torch_ipex.rotary_position_embedding_deepseek(
+            q,
+            kv,
+            k_pe,
+            sin_cos,
+            position_ids,
+            self.num_attention_heads,
+            self.q_head_dim,
+            self.qk_nope_head_dim,
+            self.qk_rope_head_dim,
+        )
+    )
+    (
+        attn_output,
+        attn_weights,
+        past_key_value,
+    ) = self._IPEXScaleDotProduct(
+        query_states,
+        key_states,
+        value_states,
+        1 / self.softmax_scale,
+        past_key_value,
+        None,
+        attention_mask,
+    )
+    if self.q_head_dim != self.v_head_dim:
+        attn_output = attn_output[:, :, :, : self.v_head_dim]
+
+    attn_output = attn_output.transpose(1, 2)
+
+    attn_output = attn_output.reshape(bsz, q_len, -1)
+
+    # Move out of this function to fuse with add when possible
+    # attn_output = self.o_proj(attn_output)
+
+    if not output_attentions:
+        attn_weights = None
+
+    return attn_output, attn_weights, past_key_value
+
+
 def _create_attention_mask_for_git(
     self, tgt, memory, tgt_mask, past_key_values_length, memory_key_padding_mask=None
 ):
@@ -2454,6 +2589,11 @@ class _IPEXAttentionRef(nn.Module):
                 self.pos_embd_dim = rotary_dim // 2
             elif self.model_backbone in ["StableLmForCausalLM", "PhiForCausalLM"]:
                 self.pos_embd_dim = self.rotary_emb.dim
+            elif self.model_backbone in [
+                "DeepseekV2ForCausalLM",
+                "DeepseekV3ForCausalLM",
+            ]:
+                self.pos_embd_dim = self.qk_rope_head_dim
             else:
                 self.pos_embd_dim = self.head_dim
             self.rope_base = 10000
@@ -2485,6 +2625,16 @@ class _IPEXAttentionRef(nn.Module):
                     )
                 if "rope_type" in config.rope_scaling:
                     extra_inputs["rope_type"] = config.rope_scaling["rope_type"]
+                if "beta_fast" in config.rope_scaling:
+                    extra_inputs["beta_fast"] = config.rope_scaling["beta_fast"]
+                if "beta_slow" in config.rope_scaling:
+                    extra_inputs["beta_slow"] = config.rope_scaling["beta_slow"]
+                if "mscale" in config.rope_scaling:
+                    extra_inputs["mscale"] = config.rope_scaling["mscale"]
+                if "mscale_all_dim" in config.rope_scaling:
+                    extra_inputs["mscale_all_dim"] = config.rope_scaling[
+                        "mscale_all_dim"
+                    ]
             if hasattr(config, "original_max_position_embeddings"):
                 extra_inputs["original_max_position_embeddings"] = (
                     config.original_max_position_embeddings
@@ -2506,6 +2656,7 @@ class _IPEXAttentionRef(nn.Module):
             "LlavaLlamaForCausalLM",
             "PhiForCausalLM",
             "Qwen2ForCausalLM",
+            "DeepseekV2ForCausalLM",
         ]:
             supported_linear_types = [
                 torch.nn.Linear,
@@ -2534,6 +2685,14 @@ class _IPEXAttentionRef(nn.Module):
                     [module.q_proj, module.k_proj, module.v_proj]
                 )
                 del module.q_proj, module.k_proj, module.v_proj
+            if self.model_backbone in ["DeepseekV2ForCausalLM"]:
+                if hasattr(module, "q_a_proj") and hasattr(
+                    module, "kv_a_proj_with_mqa"
+                ):
+                    self.concat_qkv = _IPEXConcatLinearRef(
+                        [module.q_a_proj, module.kv_a_proj_with_mqa]
+                    )
+                    del module.q_a_proj, module.kv_a_proj_with_mqa
         if not (
             self.model_backbone == "MllamaForConditionalGeneration"
             and (
@@ -2980,6 +3139,26 @@ class _IPEXAttentionRef(nn.Module):
                 layer_head_mask,
                 output_attentions,
             )
+        elif self.model_backbone == "JambaForCausalLM":
+            return _JambaAttention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
+        elif self.model_backbone in ["DeepseekV2ForCausalLM", "DeepseekV3ForCausalLM"]:
+            return _DeepseekV2Attention_forward(
+                self,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+            )
         else:
             AssertionError(False, "Do not support the optimization of your model yet")
 
@@ -2989,7 +3168,23 @@ def _reorder_cache(
 ) -> Tuple[Tuple[torch.Tensor]]:
     if isinstance(past_key_values[0], str):
         past_key_values = past_key_values[1]
-    if (
+    if hasattr(self, "config") and self.config.architectures[0] == "JambaForCausalLM":
+        for layer_past in past_key_values:
+            if len(layer_past) == 4:
+                layer_past[3][layer_past[0].size(-2) - 1] = beam_idx
+        return tuple(
+            (
+                layer_past
+                if len(layer_past) == 4
+                else (
+                    layer_past[0].index_select(0, beam_idx),
+                    layer_past[1].index_select(0, beam_idx),
+                    layer_past[2],
+                )
+            )
+            for layer_past in past_key_values
+        )
+    elif (
         len(past_key_values[0]) == 4 and past_key_values[0][0].shape[-1] == 1
     ):  # discrete kv_cache
         idx = 0

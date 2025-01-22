@@ -99,7 +99,22 @@ static at::Tensor dequantize_woq_weight(
     w_int8 = qw;
   }
   at::Tensor dqw;
-  if (group_size <= 0) {
+  if (scale.sizes().vec() == weight_shape) {
+    if (zp.defined()) {
+      TORCH_CHECK(
+          zp.sizes().vec() == weight_shape,
+          "Zero points must have the same shape as weight");
+    }
+    auto w_fp = qw_type == WOQ_DTYPE_NF4 ? map_nf4_tensor_to_float(w_int8)
+                                         : w_int8.to(at::kFloat);
+    if (qw_type == WOQ_DTYPE_INT4 && sym_quant) {
+      w_fp = w_fp - 8;
+    }
+    if (w_fp.sizes().vec() != weight_shape) {
+      w_fp = w_fp.narrow(1, 0, K).contiguous();
+    }
+    dqw = sym_quant ? w_fp * scale : (w_fp - zp) * scale;
+  } else if (group_size <= 0) {
     if (qw_type == WOQ_DTYPE_NF4) {
       dqw = map_nf4_tensor_to_float(w_int8) * scale;
     } else if (qw_type == WOQ_DTYPE_INT4 && sym_quant) {

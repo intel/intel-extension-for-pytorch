@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn.utils import skip_init
-from typing import Optional
+from typing import Optional, Callable
 import math
 from .....utils._logger import logger, WarningType
 import intel_extension_for_pytorch as ipex
@@ -587,6 +587,57 @@ class _IPEXGatedMLPMOECPU(nn.Module):
                 inplace=True,
             )
 
+    # This is used by the Deepseek-V2 and Deepseek-V3 model
+    # ref from:
+    # https://github.com/simon-mo/vllm/blob/main/vllm/model_executor/layers/fused_moe/fused_moe.py#L480
+    def grouped_topk(
+        self,
+        hidden_states: torch.Tensor,
+        gating_output: torch.Tensor,
+        topk: int,
+        renormalize: bool,
+        num_expert_group: int = 0,
+        topk_group: int = 0,
+        scoring_func: str = "softmax",
+        e_score_correction_bias: Optional[torch.Tensor] = None,
+    ):
+
+        assert (
+            hidden_states.shape[0] == gating_output.shape[0]
+        ), "Number of tokens mismatch"
+
+        if scoring_func == "softmax":
+            scores = torch.softmax(gating_output, dim=-1)
+        elif scoring_func == "sigmoid":
+            scores = gating_output.sigmoid()
+        else:
+            raise ValueError(f"Unsupported scoring function: {scoring_func}")
+
+        if e_score_correction_bias is not None:
+            scores.add_(e_score_correction_bias.unsqueeze(0))
+
+        num_token = scores.shape[0]
+        group_scores = (
+            scores.view(num_token, num_expert_group, -1).max(dim=-1).values
+        )  # [n, n_group]
+        group_idx = torch.topk(group_scores, k=topk_group, dim=-1, sorted=False)[
+            1
+        ]  # [n, top_k_group]
+        group_mask = torch.zeros_like(group_scores)  # [n, n_group]
+        group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
+        score_mask = (
+            group_mask.unsqueeze(-1)
+            .expand(num_token, num_expert_group, scores.shape[-1] // num_expert_group)
+            .reshape(num_token, -1)
+        )  # [n, e]
+        tmp_scores = scores.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
+        topk_weights, topk_ids = torch.topk(tmp_scores, k=topk, dim=-1, sorted=False)
+
+        if renormalize:
+            topk_weights = topk_weights / topk_weights.sum(dim=-1, keepdim=True)
+
+        return topk_weights, topk_ids
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -596,17 +647,42 @@ class _IPEXGatedMLPMOECPU(nn.Module):
         renormalize: bool,
         topk_group: Optional[int] = None,
         num_expert_group: Optional[int] = None,
+        custom_routing_function: Optional[Callable] = None,
+        scoring_func: str = "softmax",
+        e_score_correction_bias: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        assert not use_grouped_topk
-        assert num_expert_group is None
-        assert topk_group is None
         batch_size, head_dim = hidden_states.shape
-        routing_weights = torch.nn.functional.softmax(
-            router_logits, dim=1, dtype=torch.float32
-        )
-        routing_weights, selected_experts = torch.topk(routing_weights, top_k, dim=-1)
-        if renormalize:
-            routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
+        if use_grouped_topk:
+            assert topk_group is not None
+            assert num_expert_group is not None
+            routing_weights, selected_experts = self.grouped_topk(
+                hidden_states=hidden_states,
+                gating_output=router_logits,
+                topk=top_k,
+                renormalize=renormalize,
+                num_expert_group=num_expert_group,
+                topk_group=topk_group,
+                scoring_func=scoring_func,
+                e_score_correction_bias=e_score_correction_bias,
+            )
+        elif custom_routing_function is None:
+            assert scoring_func == "softmax"
+            routing_weights = torch.nn.functional.softmax(
+                router_logits, dim=1, dtype=torch.float32
+            )
+            routing_weights, selected_experts = torch.topk(
+                routing_weights, top_k, dim=-1
+            )
+            if renormalize:
+                routing_weights /= routing_weights.sum(dim=-1, keepdim=True)
+        else:
+            routing_weights, selected_experts = custom_routing_function(
+                hidden_states=hidden_states,
+                gating_output=router_logits,
+                topk=top_k,
+                renormalize=renormalize,
+            )
+
         routing_weights = routing_weights.to(hidden_states.dtype)
         final_hidden_states = torch.zeros(
             (batch_size, head_dim),
@@ -614,7 +690,7 @@ class _IPEXGatedMLPMOECPU(nn.Module):
             device=hidden_states.device,
         )
         expert_mask = torch.nn.functional.one_hot(
-            selected_experts, num_classes=self.num_experts
+            selected_experts.to(torch.int64), num_classes=self.num_experts
         ).permute(2, 1, 0)
         for expert_idx in range(self.num_experts):
             idx, top_x = torch.where(expert_mask[expert_idx])

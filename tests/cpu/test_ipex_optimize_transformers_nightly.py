@@ -9,6 +9,8 @@ import copy
 import re
 from collections import namedtuple
 import itertools
+import json
+import tempfile
 
 from hf_configs.baichuan.modeling_baichuan import BaichuanForCausalLM
 from hf_configs.chatglm.modeling_chatglm import ChatGLMForConditionalGeneration
@@ -18,7 +20,16 @@ from hf_configs.yuan.yuan_hf_model import YuanForCausalLM
 from hf_configs.phi.modeling_phi import PhiForCausalLM
 from hf_configs.phi3.modeling_phi3 import Phi3ForCausalLM
 from hf_configs.maira2.modeling_maira2 import Maira2ForConditionalGeneration
+from hf_configs.deepseekv2.modeling_deepseek import DeepseekV2ForCausalLM
+from hf_configs.deepseekv3.modeling_deepseek import DeepseekV3ForCausalLM
 from intel_extension_for_pytorch.cpu._auto_kernel_selection import _disable_tpp
+from intel_extension_for_pytorch.llm.utils import load_low_precision_checkpoint
+from intel_extension_for_pytorch.utils.weight_only_quantization import (
+    _gptq_lowp_checkpoint_config,
+    _awq_lowp_checkpoint_config,
+    _get_keys_from_config,
+)
+
 
 try:
     import transformers
@@ -209,6 +220,27 @@ supported_models = [
         lambda m: m.language_model.model.layers[0].self_attn.__class__,
         lambda m: m.language_model.model.layers[0].__class__,
     ),
+    model_info(
+        "jamba",
+        transformers.models.jamba.modeling_jamba.JambaForCausalLM,
+        True,
+        lambda m: m.model.layers[m.config.attn_layer_offset].self_attn.__class__,
+        lambda m: m.model.layers[m.config.attn_layer_offset].__class__,
+    ),
+    model_info(
+        "deepseekv2",
+        DeepseekV2ForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
+    model_info(
+        "deepseekv3",
+        DeepseekV3ForCausalLM,
+        True,
+        lambda m: m.model.layers[0].self_attn.__class__,
+        lambda m: m.model.layers[0].__class__,
+    ),
 ]
 
 
@@ -247,6 +279,8 @@ class OptimizeTransformersNightlyTester(TestCase):
             model.load_state_dict(state_dict)
         elif m.name == "llava":
             model.get_vision_tower().load_model()
+        elif m.name == "jamba":
+            model.config.dtype = dtype
         model.eval()
         ref_m = copy.deepcopy(model)
         ipex_m = copy.deepcopy(model)
@@ -320,12 +354,20 @@ class OptimizeTransformersNightlyTester(TestCase):
                 "position_ids": position_ids,
                 "pixel_values": pixel_values,
             }
+        if m.name == "jamba":
+            input_dict["output_router_logits"] = torch.tensor(False)
+            input_dict["num_logits_to_keep"] = torch.tensor(1)
+            model.config.dtype = dtype
 
         with torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
             dtype=dtype,
         ):
             key_hf = ref_m(**input_dict)
+        if m.name == "jamba":
+            input_dict["past_key_values"] = ipex.transformers.optimize.get_dummy_input(
+                model, True
+            )["past_key_values"]
         with torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if dtype in [torch.bfloat16, torch.float16] else False,
             dtype=dtype,
@@ -361,6 +403,143 @@ class OptimizeTransformersNightlyTester(TestCase):
                 continue
             self.model_replacement_check(m, dtype, jit, torchcompile, return_dict)
         _disable_tpp()
+
+    def test_load_low_precision_checkpoint(self):
+        config = AutoConfig.from_pretrained(
+            f"{curpath}/hf_configs/gptj", return_dict=False
+        )
+        m = transformers.models.gptj.modeling_gptj.GPTJForCausalLM(config).eval()
+        ipex_m = copy.deepcopy(m)
+
+        def get_shapes(quant_method, quant_backend, N, K, comp_ratio, n_groups):
+            if quant_method == "gptq" or (
+                quant_method == "intel/auto-round" and "gptq" in quant_backend
+            ):
+                return (K // comp_ratio, N), (n_groups, N), (n_groups, N // comp_ratio)
+            elif quant_method == "awq" or (
+                quant_method == "intel/auto-round" and "awq" in quant_backend
+            ):
+                return (K, N // comp_ratio), (n_groups, N), (n_groups, N // comp_ratio)
+            else:
+                raise AssertionError(
+                    f"{quant_method} is not supported, quant_method choice in [`gptq`, `awq`, `intel/auto-round`]."
+                )
+
+        with tempfile.TemporaryDirectory() as work_dir:
+            quant_method_backend_list = [
+                ("gptq", None),
+                ("intel/auto-round", "gptq"),
+                ("awq", None),
+                ("intel/auto-round", "awq"),
+            ]
+            for quant_method, quant_backend in quant_method_backend_list:
+                # Generate dummy config
+                for config_file_name in [
+                    "/config.json",
+                    "/quant_config.json",
+                    "/quantize_config.json",
+                ]:
+                    quantization_config = {
+                        "quant_method": quant_method,
+                        "group_size": 128,
+                        "desc_act": True if quant_method == "gptq" else False,
+                    }
+                    if quant_backend is not None:
+                        quantization_config["backend"] = quant_backend
+                    if config_file_name == "/config.json":
+                        config_dict = {"quantization_config": quantization_config}
+                    else:
+                        config_dict = quantization_config
+                    config_name = work_dir + config_file_name
+                    with open(config_name, "w", encoding="utf-8") as file:
+                        json.dump(config_dict, file, ensure_ascii=False, indent=4)
+                    # Generate dummy checkpoint
+                    checkpoint_name = work_dir + "/checkpoint.pt"
+                    state_dict = ipex_m.state_dict()
+                    linear_keys = []
+                    for k, v in state_dict.items():
+                        if any(
+                            k.endswith(suffix)
+                            for suffix in [
+                                "proj.weight",
+                                "fc_in.weight",
+                                "fc_out.weight",
+                            ]
+                        ):
+                            linear_keys.append(k[:-7])
+                    group_size = 64
+                    comp_ratio = 8
+                    for k in linear_keys:
+                        N = state_dict[k + ".weight"].shape[0]
+                        K = state_dict[k + ".weight"].shape[1]
+                        del state_dict[k + ".weight"]
+                        n_groups = K // group_size
+                        stored_weight_shape, stored_scales_shape, stored_zeros_shape = (
+                            get_shapes(
+                                quant_method, quant_backend, N, K, comp_ratio, n_groups
+                            )
+                        )
+                        state_dict[k + ".qweight"] = torch.randint(
+                            -(2**31), 2**31 - 1, stored_weight_shape, dtype=torch.int32
+                        )
+                        state_dict[k + ".scales"] = torch.randn(
+                            stored_scales_shape, dtype=torch.half
+                        )
+                        state_dict[k + ".qzeros"] = torch.randint(
+                            -(2**31), 2**31 - 1, stored_zeros_shape, dtype=torch.int32
+                        )
+                        g_idx = torch.arange(n_groups).repeat(group_size)
+                        g_idx[:] = g_idx[torch.randperm(K)]
+                        state_dict[k + ".g_idx"] = g_idx
+                    torch.save(state_dict, checkpoint_name)
+                    low_precision_checkpoint, quant_config = (
+                        load_low_precision_checkpoint(work_dir)
+                    )
+                    # os.remove(config_name)
+                    # os.remove(checkpoint_name)
+                    quantization_method = quant_config["quant_method"]
+                    if quant_method == "intel/auto-round":
+                        self.assertEqual(quantization_method, quant_backend)
+                    else:
+                        self.assertEqual(quantization_method, quant_method)
+                    checkpoint_group_size = quant_config["group_size"]
+                    self.assertEqual(checkpoint_group_size, 128)
+                    desc_act = quant_config["desc_act"]
+                    self.assertEqual(
+                        desc_act, True if quant_method == "gptq" else False
+                    )
+                    low_precision_ckp = low_precision_checkpoint
+                    assert isinstance(
+                        low_precision_ckp, dict
+                    ), "low_precision_checkpoint should be a state_dict"
+
+                    if quantization_method == "gptq":
+                        checkpoint_config = _gptq_lowp_checkpoint_config()
+                    elif quantization_method == "awq":
+                        checkpoint_config = _awq_lowp_checkpoint_config()
+                    else:
+                        raise AssertionError(
+                            f"{quantization_method} is not supported, quantization_method choice in [`gptq`, `awq`]."
+                        )
+
+                    state_dict = low_precision_ckp
+                    # Check that keys can be found in the state dict. Bias and g_idx are optional.
+                    weight_key, scales_key, zeros_key, _, _ = _get_keys_from_config(
+                        checkpoint_config
+                    )
+                    keys_found = [False] * 3
+                    for k, _ in state_dict.items():
+                        if k.endswith("." + weight_key):
+                            keys_found[0] = True
+                        if k.endswith("." + scales_key):
+                            keys_found[1] = True
+                        if k.endswith("." + zeros_key):
+                            keys_found[2] = True
+                        if all(keys_found):
+                            break
+                    assert all(
+                        keys_found
+                    ), "Error: Format of checkpoint and config do not match"
 
 
 if __name__ == "__main__":

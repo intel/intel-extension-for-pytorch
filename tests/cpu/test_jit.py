@@ -72,6 +72,12 @@ import torch.nn.functional as F
 
 from common_utils import TestCase
 
+dtypes_mkldnn_bf16_fp16 = []
+if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+    dtypes_mkldnn_bf16_fp16.append(torch.bfloat16)
+if torch.ops.mkldnn._is_mkldnn_fp16_supported():
+    dtypes_mkldnn_bf16_fp16.append(torch.float16)
+
 
 def get_rand_seed():
     return int(time.time() * 1000000000)
@@ -1774,7 +1780,7 @@ class Tester(TestCase):
         if use_te is None:
             use_te = [True, False]
         if dtype is None:
-            dtype = [torch.bfloat16, torch.float16]
+            dtype = dtypes_mkldnn_bf16_fp16
         modelName = base_model.__class__.__name__
         options = itertools.product(levels, use_channels_last, use_te, dtype)
         for level, use_channels_last, use_te, dtype in options:
@@ -2180,7 +2186,7 @@ class Tester(TestCase):
                 self.assertEqual(jit_res, ori_res)
 
                 # input bf16/fp16, weight fp32
-                for dtype in [torch.bfloat16, torch.float16]:
+                for dtype in dtypes_mkldnn_bf16_fp16:
                     model = AddLayerNorm(dim)
                     prec = 5e-2 if dtype == torch.bfloat16 else 5e-3
                     a_lowp = a.to(dtype)
@@ -2329,7 +2335,7 @@ class Tester(TestCase):
             prec=3e-2,
             node="ipex::mha_scores_calc",
         ):
-            for dtype in [torch.bfloat16, torch.float16]:
+            for dtype in dtypes_mkldnn_bf16_fp16:
                 mat1_lowp = mat1.to(dtype)
                 mat2_lowp = mat2.to(dtype)
                 bias_lowp = bias.to(dtype)
@@ -2504,7 +2510,7 @@ class Tester(TestCase):
             self.assertTrue(any(n.kind() == node for n in graph.nodes()))
 
         def _test_pure_lowp(model, trace_model, mat1, mat2, mask, prec=3e-2):
-            for dtype in [torch.bfloat16, torch.float16]:
+            for dtype in dtypes_mkldnn_bf16_fp16:
                 mat1_lowp = mat1.to(dtype)
                 mat2_lowp = mat2.to(dtype)
                 mask_lowp = mask.to(dtype)
@@ -2514,7 +2520,7 @@ class Tester(TestCase):
                 _check_match_mha(trace_model, mat1, mat2, mask)
 
         def _test_pure_lowp_parts(model, trace_model, qk, mask, prec=3e-2):
-            for dtype in [torch.bfloat16, torch.float16]:
+            for dtype in dtypes_mkldnn_bf16_fp16:
                 qk_lowp = qk.to(dtype)
                 mask_lowp = mask.to(dtype)
                 res_ref = model(qk_lowp, mask_lowp)
@@ -2600,7 +2606,8 @@ class Tester(TestCase):
                 res_jit = mha_jit(mat1, mat2, mask)
                 self.assertEqual(res_ref, res_jit)
                 _check_match_mha(mha_jit, mat1, mat2, mask)
-                _test_amp_bf16(mha_v1, mat1, mat2, mask)
+                if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+                    _test_amp_bf16(mha_v1, mat1, mat2, mask)
 
             mha_v2 = VitMHAScoresCalculation_v2(64).eval()
             with torch.no_grad():
@@ -3005,7 +3012,9 @@ class Tester(TestCase):
         in_channels = 3
         kernel_size = 3
         image_size = 16
-        dtypes = [torch.float32]
+        dtypes = [
+            torch.float32,
+        ]
         if torch.ops.mkldnn._is_mkldnn_bf16_supported():
             dtypes.append(torch.bfloat16)
         options = itertools.product(
@@ -5360,7 +5369,7 @@ class Tester(TestCase):
                 return self.pool(x)
 
         model = Model().eval()
-        for dtype in [torch.bfloat16, torch.float16]:
+        for dtype in dtypes_mkldnn_bf16_fp16:
             x = torch.randn(1, 3, 24, 24, dtype=dtype)
             with torch.no_grad():
                 ref_out = model(x)

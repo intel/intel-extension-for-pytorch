@@ -34,7 +34,8 @@ static inline scalar_t* conditional_data_ptr(scalar_t* ptr, scalar_t* ptr2) {
 
 template <
     typename scalar_t,
-    typename std::enable_if_t<is_reduced_floating_point_v<scalar_t>, int> = 0>
+    typename std::
+        enable_if_t<at::vec::is_reduced_floating_point_v<scalar_t>, int> = 0>
 static inline scalar_t* conditional_data_ptr(float* ptr, scalar_t* ptr2) {
   return ptr2;
 }
@@ -840,7 +841,8 @@ void flash_attn_varlen_kernel(
   auto qSliceMax = (max_seqlen_q + qSplitSize - 1) / qSplitSize;
   auto kvSliceMax = (max_seqlens_k + kvSplitSize - 1) / kvSplitSize;
 
-  constexpr bool is_reduced_type = is_reduced_floating_point_v<scalar_t>;
+  constexpr bool is_reduced_type =
+      at::vec::is_reduced_floating_point_v<scalar_t>;
   using accum_t = at::opmath_type<scalar_t>;
   using Vec = at::vec::Vectorized<accum_t>;
   // ToDo(liangan1): align the scale semantic with other repo
@@ -1264,6 +1266,57 @@ void flash_attn_varlen_cpu_kernel_impl(
           v_scale);
     } else {
       flash_attn_varlen_kernel<at::BFloat16, at::BFloat16, 32>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          k_scale,
+          v_scale);
+    }
+
+  } else if (query.scalar_type() == at::ScalarType::Half) {
+    if (max_seqlen_q >= 768) {
+      flash_attn_varlen_kernel<at::Half, at::Half, 128>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          k_scale,
+          v_scale);
+    } else if (max_seqlen_q >= 192) {
+      flash_attn_varlen_kernel<at::Half, at::Half, 64>(
+          out,
+          query,
+          key,
+          value,
+          cu_seqlens_q,
+          cu_seqlens_kv,
+          max_seqlen_q,
+          max_seqlen_kv,
+          softmax_scale,
+          is_causal,
+          block_table,
+          alibi_slopes,
+          k_scale,
+          v_scale);
+    } else {
+      flash_attn_varlen_kernel<at::Half, at::Half, 32>(
           out,
           query,
           key,

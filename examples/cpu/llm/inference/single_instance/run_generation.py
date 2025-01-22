@@ -140,8 +140,8 @@ model_type = next(
 )
 if model_type == "llama" and args.vision_text_model:
     model_type = "mllama"
-if model_type == "maira-2":
-    model_type = "maira2"
+if model_type in ["maira-2", "deepseek-v2", "deepseek-v3"]:
+    model_type = model_type.replace("-", "")
 model_class = MODEL_CLASSES[model_type]
 if args.config_file is None:
     if model_type == "chatglm":
@@ -178,6 +178,8 @@ if model_type == "mpt" and args.prompt is None:
     config.max_seq_len = int(args.input_tokens) + int(args.max_new_tokens)
 if model_type == "whisper":
     config.text_max_length = config.max_source_positions + config.max_target_positions
+if model_type == "jamba":
+    config.use_mamba_kernels = False
 
 if not hasattr(config, "lm_head_generation"):
     config.lm_head_generation = True
@@ -274,7 +276,9 @@ if re.search("llava", model.config.architectures[0], re.IGNORECASE):
         roles = ("user", "assistant")
     else:
         roles = conv.roles
-if re.search("yuan", model.config.architectures[0], re.IGNORECASE):
+if re.search("yuan", model.config.architectures[0], re.IGNORECASE) or re.search(
+    "jamba", model.config.architectures[0], re.IGNORECASE
+):
     model.config.batch_size = int(args.batch_size) * num_beams
 if re.search("whisper", model.config.architectures[0], re.IGNORECASE):
     import librosa

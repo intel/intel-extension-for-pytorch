@@ -34,12 +34,22 @@ at::Tensor qlinear_woq_pack(
     int qw_type,
     size_t block_n,
     size_t block_k,
-    int64_t lowp_mode) {
+    int64_t lowp_mode,
+    int64_t weight_format) {
   TLA_ASSERT(qw.is_contiguous(), "qw must be contiguous");
   bool is_4bit_flag = is_4bit(qw_type);
   auto sizes = qw.sizes();
   auto N = sizes[0];
   auto K = is_4bit_flag ? sizes[1] * 2 : sizes[1];
+  if (weight_format == GPTQ_WEIGHT_FORMAT) {
+    // weight shape = [K / 8, N] in int32
+    N = sizes[1];
+    K = sizes[0] * 8;
+  } else if (weight_format == AWQ_WEIGHT_FORMAT) {
+    // weight shape = [K, N / 8] in int32
+    N = sizes[1] * 8;
+    K = sizes[0];
+  }
   TLA_ASSERT(N % block_n == 0, "N must be multiple of block_n");
   TLA_ASSERT(K % block_k == 0, "K must be multiple of block_k");
   if (is_4bit_flag) {
@@ -56,8 +66,8 @@ at::Tensor qlinear_woq_pack(
   const int Nc = N / block_n;
   const int Kc = K / block_k;
   if (is_4bit_flag) {
-    // TODO(jgong5): support lowp_mode == LOWP_MODE_INT8
-    auto result = at::empty({Nc, Kc, block_k, block_n / 2}, qw.options());
+    auto result = at::empty(
+        {Nc, Kc, block_k, block_n / 2}, qw.options().dtype(at::kByte));
     // Pack weight in [N,K] to [N/block_n, K/block_k, block_k, block_n]
     // And then, pre-shuffle per 32 or 64 4-bit values to save shuffle at
     // runtime Take 32 4-bit values as an example below: x0 x1 x2 x3 x4 x5 x6 x7
@@ -67,32 +77,144 @@ at::Tensor qlinear_woq_pack(
     // 4-bit values.
     uint8_t* src_data = (uint8_t*)qw.data_ptr();
     uint8_t* dst_data = (uint8_t*)result.data_ptr();
-    auto psrc = GetVLAPtr<uint8_t>(src_data, {block_n, Kc, block_k / 2});
     auto pdst = GetVLAPtr<uint8_t>(dst_data, {Kc, block_k, block_n / 2});
     auto pdst_4vnni =
         GetVLAPtr<uint8_t>(dst_data, {Kc, block_k / 4, block_n / 2, 4});
-    auto pack_loop =
-        ThreadedLoop<3>({{Nc}, {Kc}, {0, block_n, N_GROUP_SIZE, false}}, "ABc");
-    pack_loop([&](int* idx) {
-      int nc = idx[0];
-      int kc = idx[1];
-      int nb = idx[2];
-      for (int i = 0; i < N_GROUP_SIZE / 2; i++) {
-        for (int kb = 0; kb < block_k; kb += 2) {
-          auto src0 = psrc[nc][nb + i][kc][kb / 2];
-          auto src1 = psrc[nc][nb + i + N_GROUP_SIZE / 2][kc][kb / 2];
-          auto dst0 = (src0 & 0xf) | ((src1 & 0xf) << 4);
-          auto dst1 = (src0 >> 4) | ((src1 >> 4) << 4);
-          if (lowp_mode != LOWP_MODE_INT8) {
-            pdst[nc][kc][kb][nb / 2 + i] = dst0;
-            pdst[nc][kc][kb + 1][nb / 2 + i] = dst1;
-          } else {
-            pdst_4vnni[nc][kc][kb / 4][nb / 2 + i][kb % 4] = dst0;
-            pdst_4vnni[nc][kc][(kb + 1) / 4][nb / 2 + i][(kb + 1) % 4] = dst1;
+    if (weight_format == PLAIN_WEIGHT_FORMAT) {
+      // weight shape = [N, K / 2] in uint8
+      auto psrc = GetVLAPtr<uint8_t>(src_data, {block_n, Kc, block_k / 2});
+      auto pack_loop = ThreadedLoop<3>(
+          {{Nc}, {Kc}, {0, block_n, N_GROUP_SIZE, false}}, "ABc");
+      pack_loop([&](int* idx) {
+        int nc = idx[0];
+        int kc = idx[1];
+        int nb = idx[2];
+        for (int i = 0; i < N_GROUP_SIZE / 2; i++) {
+          for (int kb = 0; kb < block_k; kb += 2) {
+            auto src0 = psrc[nc][nb + i][kc][kb / 2];
+            auto src1 = psrc[nc][nb + i + N_GROUP_SIZE / 2][kc][kb / 2];
+            auto dst0 = (src0 & 0xf) | ((src1 & 0xf) << 4);
+            auto dst1 = (src0 >> 4) | ((src1 >> 4) << 4);
+            if (lowp_mode != LOWP_MODE_INT8) {
+              pdst[nc][kc][kb][nb / 2 + i] = dst0;
+              pdst[nc][kc][kb + 1][nb / 2 + i] = dst1;
+            } else {
+              pdst_4vnni[nc][kc][kb / 4][nb / 2 + i][kb % 4] = dst0;
+              pdst_4vnni[nc][kc][(kb + 1) / 4][nb / 2 + i][(kb + 1) % 4] = dst1;
+            }
           }
         }
-      }
-    });
+      });
+    } else if (weight_format == GPTQ_WEIGHT_FORMAT) {
+      // weight shape = [K / 8, N] in int32
+      // weight shape = [K / 8, N, 4] in uint8
+      // view as [K / 8, Nc, block_n, 4]
+      auto psrc = GetVLAPtr<uint8_t>(src_data, {Nc, block_n, 4});
+      auto pack_loop = ThreadedLoop<3>(
+          {{Nc}, {Kc}, {0, block_n, N_GROUP_SIZE, false}}, "ABc");
+      pack_loop([&](int* idx) {
+        int nc = idx[0];
+        int kc = idx[1];
+        int nb = idx[2];
+        int k_start = kc * block_k;
+        for (int i = 0; i < N_GROUP_SIZE / 2; i++) {
+          for (int kb = 0; kb < block_k; kb += 2) {
+            int k = k_start + kb;
+            int k8_idx = k / 8;
+            int k8_off = k % 8;
+            auto src0 = psrc[k8_idx][nc][nb + i][k8_off / 2];
+            auto src1 = psrc[k8_idx][nc][nb + i + N_GROUP_SIZE / 2][k8_off / 2];
+            auto dst0 = (src0 & 0xf) | ((src1 & 0xf) << 4);
+            auto dst1 = (src0 >> 4) | ((src1 >> 4) << 4);
+            if (lowp_mode != LOWP_MODE_INT8) {
+              pdst[nc][kc][kb][nb / 2 + i] = dst0;
+              pdst[nc][kc][kb + 1][nb / 2 + i] = dst1;
+            } else {
+              pdst_4vnni[nc][kc][kb / 4][nb / 2 + i][kb % 4] = dst0;
+              pdst_4vnni[nc][kc][(kb + 1) / 4][nb / 2 + i][(kb + 1) % 4] = dst1;
+            }
+          }
+        }
+      });
+    } else { // AWQ_WEIGHT_FORMAT
+      TORCH_CHECK(
+          weight_format == AWQ_WEIGHT_FORMAT,
+          "Unsupported weight format: ",
+          weight_format);
+      // weight shape = [K, N / 8] in int32
+      // Every 8 int4 data along N are shuffled from [0, 1, 2, 3, 4, 5, 6, 7] to
+      // [0, 2, 4, 6, 1, 3, 5, 7] and they are packed as one int32 element.
+      // weight shape = [K, N / 2] in uint8
+      // view as [Kc, block_k, Nc, block_n / 2]
+      auto psrc = GetVLAPtr<uint8_t>(src_data, {block_k, Nc, block_n / 2});
+      auto pack_loop = ThreadedLoop<3>(
+          {{Nc}, {Kc}, {0, block_n, N_GROUP_SIZE, false}}, "ABc");
+      TORCH_CHECK(
+          (N_GROUP_SIZE / 2) % 8 == 0, "N_GROUP_SIZE must be multiple of 16");
+      pack_loop([&](int* idx) {
+        int nc = idx[0];
+        int kc = idx[1];
+        int nb = idx[2];
+        for (int kb = 0; kb < block_k; kb += 2) {
+          for (int i = 0; i < N_GROUP_SIZE / 2; i += 8) {
+            int n_base = (nb + i) / 2;
+            uint8_t src0_low[4] = {
+                psrc[kc][kb][nc][n_base],
+                psrc[kc][kb][nc][n_base + 1],
+                psrc[kc][kb][nc][n_base + 2],
+                psrc[kc][kb][nc][n_base + 3]};
+            uint8_t src0_high[4] = {
+                psrc[kc][kb + 1][nc][n_base],
+                psrc[kc][kb + 1][nc][n_base + 1],
+                psrc[kc][kb + 1][nc][n_base + 2],
+                psrc[kc][kb + 1][nc][n_base + 3]};
+
+            n_base += N_GROUP_SIZE / 2 / 2;
+            uint8_t src1_low[4] = {
+                psrc[kc][kb][nc][n_base],
+                psrc[kc][kb][nc][n_base + 1],
+                psrc[kc][kb][nc][n_base + 2],
+                psrc[kc][kb][nc][n_base + 3]};
+            uint8_t src1_high[4] = {
+                psrc[kc][kb + 1][nc][n_base],
+                psrc[kc][kb + 1][nc][n_base + 1],
+                psrc[kc][kb + 1][nc][n_base + 2],
+                psrc[kc][kb + 1][nc][n_base + 3]};
+
+            uint8_t dst0[8] = {
+                (src0_low[0] & 0xf) | ((src1_low[0] & 0xf) << 4),
+                (src0_low[2] & 0xf) | ((src1_low[2] & 0xf) << 4),
+                (src0_low[0] >> 4) | ((src1_low[0] >> 4) << 4),
+                (src0_low[2] >> 4) | ((src1_low[2] >> 4) << 4),
+                (src0_low[1] & 0xf) | ((src1_low[1] & 0xf) << 4),
+                (src0_low[3] & 0xf) | ((src1_low[3] & 0xf) << 4),
+                (src0_low[1] >> 4) | ((src1_low[1] >> 4) << 4),
+                (src0_low[3] >> 4) | ((src1_low[3] >> 4) << 4)};
+            uint8_t dst1[8] = {
+                (src0_high[0] & 0xf) | ((src1_high[0] & 0xf) << 4),
+                (src0_high[2] & 0xf) | ((src1_high[2] & 0xf) << 4),
+                (src0_high[0] >> 4) | ((src1_high[0] >> 4) << 4),
+                (src0_high[2] >> 4) | ((src1_high[2] >> 4) << 4),
+                (src0_high[1] & 0xf) | ((src1_high[1] & 0xf) << 4),
+                (src0_high[3] & 0xf) | ((src1_high[3] & 0xf) << 4),
+                (src0_high[1] >> 4) | ((src1_high[1] >> 4) << 4),
+                (src0_high[3] >> 4) | ((src1_high[3] >> 4) << 4)};
+            if (lowp_mode != LOWP_MODE_INT8) {
+              for (int j = 0; j < 8; j++) {
+                pdst[nc][kc][kb][nb / 2 + i + j] = dst0[j];
+                pdst[nc][kc][kb + 1][nb / 2 + i + j] = dst1[j];
+              }
+            } else {
+              for (int j = 0; j < 8; j++) {
+                pdst_4vnni[nc][kc][kb / 4][nb / 2 + i + j][kb % 4] = dst0[j];
+                pdst_4vnni[nc][kc][(kb + 1) / 4][nb / 2 + i + j][(kb + 1) % 4] =
+                    dst1[j];
+              }
+            }
+          }
+        }
+      });
+    }
     return result;
   } else {
     if (lowp_mode == LOWP_MODE_INT8) {
@@ -286,7 +408,8 @@ at::Tensor dequantize_int4_weight_to_int8_packed(
                         block_n,
                         N_GROUP_SIZE,
                         /*qw_type*/ WOQ_DTYPE_INT4,
-                        sym_quant_w>::
+                        sym_quant_w,
+                        /*use_g_idx*/ false>::
                         template call<quant_a_mode>(
                             pw[nc][kc],
                             Kb,
@@ -426,7 +549,58 @@ at::Tensor qlinear_woq_pack(
     int qw_type,
     size_t block_n,
     size_t block_k,
-    int64_t lowp_mode) {
+    int64_t lowp_mode,
+    int64_t weight_format) {
+  if (weight_format == GPTQ_WEIGHT_FORMAT) {
+    // weight shape = [K / 8, N] in int32
+    TORCH_CHECK(
+        qw.scalar_type() == at::kInt,
+        "Unsupported weight type: ",
+        qw.scalar_type());
+    auto qw_t = qw.t().contiguous();
+    auto qw_uint8 = at::empty(
+        {qw_t.size(0), qw_t.size(1) * 8}, qw_t.options().dtype(at::kByte));
+    using namespace at::indexing;
+    for (int i = 0; i < 8; ++i) {
+      qw_uint8.index_put_(
+          {Slice(), Slice(i, None, 8)},
+          (qw_t.bitwise_right_shift(4 * i)).bitwise_and(0xf).to(at::kByte));
+    }
+    auto new_qw =
+        qw_uint8.index({Slice(), Slice(1, None, 2)})
+            .bitwise_left_shift(4)
+            .bitwise_or_(qw_uint8.index({Slice(), Slice(None, None, 2)})
+                             .bitwise_and(0xF));
+    return new_qw;
+  } else if (weight_format == AWQ_WEIGHT_FORMAT) {
+    // weight shape = [K, N / 8] in int32
+    using namespace at::indexing;
+    auto qw_uint8 =
+        at::empty({qw.size(0), qw.size(1) * 8}, qw.options().dtype(at::kByte));
+    // logic for unpacking:
+    // for i in range(8):
+    //    unpacked[:, i::8] = (qw >> (4 * i)) & 0xf
+    for (int i = 0; i < 8; ++i) {
+      qw_uint8.index_put_(
+          {Slice(), Slice(i, None, 8)},
+          qw.bitwise_right_shift(4 * i).bitwise_and(0xf).to(at::kByte));
+    }
+    // Shuffling along N from [0, 2, 4, 6, 1, 3, 5, 7] to [0, 1, 2, 3, 4, 5, 6,
+    // 7]
+    auto qw_uint8_view =
+        qw_uint8.view({qw_uint8.size(0), qw_uint8.size(1) / 8, 8});
+    auto qw_uint8_shuffled = at::index_select(
+        qw_uint8_view, /* dim */ 2, at::tensor({0, 4, 1, 5, 2, 6, 3, 7}));
+    qw_uint8_shuffled =
+        qw_uint8_shuffled.view({qw_uint8.size(0), qw_uint8.size(1)});
+    auto qw_uint8_t = qw_uint8_shuffled.t().contiguous();
+    auto new_qw =
+        qw_uint8_t.index({Slice(), Slice(1, None, 2)})
+            .bitwise_left_shift(4)
+            .bitwise_or_(qw_uint8_t.index({Slice(), Slice(None, None, 2)})
+                             .bitwise_and(0xF));
+    return new_qw;
+  }
   return qw;
 }
 

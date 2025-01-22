@@ -1,4 +1,5 @@
 import copy
+import unittest
 import torch
 from torch.ao.quantization import MinMaxObserver, PerChannelMinMaxObserver, QConfig
 from functools import wraps
@@ -10,6 +11,7 @@ from torch.testing._internal.jit_utils import (
 from torch.jit._recursive import wrap_cpp_module
 
 import intel_extension_for_pytorch as ipex
+import intel_extension_for_pytorch._C as core
 
 LLGA_FUSION_GROUP = "ipex::LlgaFusionGroup"
 
@@ -20,6 +22,21 @@ default_static_qconfig = QConfig(
     weight=PerChannelMinMaxObserver.with_args(
         dtype=torch.qint8, qscheme=torch.per_channel_symmetric
     ),
+)
+
+try:
+    import torchvision  # noqa: F401
+
+    HAS_TORCHVISION = True
+except ImportError:
+    HAS_TORCHVISION = False
+except RuntimeError:
+    HAS_TORCHVISION = False
+
+skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
+skipIfNoVNNI = unittest.skipIf(
+    not core.isa_has_avx512_vnni_support(),
+    "OneDNN int8 GEMM may overflow without AVX512_VNNI",
 )
 
 

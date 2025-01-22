@@ -106,7 +106,14 @@ class inplace_softmax_dtype(torch.nn.Module):
 
 class SoftmaxTester(JitTestCase):
     def test_softmax(self):
-        for dtype in [torch.float32, torch.bfloat16, torch.float16]:
+        dtypes = [
+            torch.float32,
+        ]
+        if torch.ops.mkldnn._is_mkldnn_bf16_supported():
+            dtypes.append(torch.bfloat16)
+        if torch.ops.mkldnn._is_mkldnn_fp16_supported():
+            dtypes.append(torch.float16)
+        for dtype in dtypes:
             test1 = torch.tensor([[2.0, 2.0], [2.0, 2.0]])
             test2 = torch.tensor([[2.0, 2.0], [2.0, 2.0]])
             test3 = torch.tensor([[1.0, 1.0], [1.0, 1.0]])

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Optional
+from typing import Optional, Callable
 from intel_extension_for_pytorch.nn.utils._weight_prepack import (
     _IPEXLinear,
 )
@@ -431,7 +431,10 @@ class GatedMLPMOE(nn.Module):
         renomalize (bool): Whether to renormalize the logits in the fused_moe kernel
         topk_group (int): The topk group num when using use_grouped_topk
         num_expert_group (int): The expert group num when using use_grouped_topk
-
+        custom_routing_function (Callable): customized routing function
+                                          instead of existing topk/grouped_topk
+        scoring_func (str): Choice in "softmax", "sigmoid", default is "softmax"
+        e_score_correction_bias (torch.Tensor): score correction bias to apply after scoring_func
     Examples:
         >>> # module init:
         >>> ipex_fusion = ipex.llm.modules.GatedMLPMOE(W13, W2, prepack=True)
@@ -465,6 +468,9 @@ class GatedMLPMOE(nn.Module):
         renormalize: bool,
         topk_group: Optional[int] = None,
         num_expert_group: Optional[int] = None,
+        custom_routing_function: Optional[Callable] = None,
+        scoring_func: str = "softmax",
+        e_score_correction_bias: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         if self.device_type != hidden_states.device.type:
             self.init_on_device(hidden_states, IPEXCustomOpType.LINEAR_MOE)
@@ -477,4 +483,7 @@ class GatedMLPMOE(nn.Module):
             renormalize,
             topk_group,
             num_expert_group,
+            custom_routing_function,
+            scoring_func,
+            e_score_correction_bias,
         )

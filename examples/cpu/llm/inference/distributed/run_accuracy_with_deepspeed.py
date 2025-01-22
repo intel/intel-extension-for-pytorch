@@ -21,6 +21,10 @@ from transformers import (
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 import sys
+from intel_extension_for_pytorch.llm.utils import (
+    load_low_precision_checkpoint,
+    shard_low_precision_checkpoint,
+)
 
 sys.path.append(sys.path[0] + "/../../../")
 from llm.inference.utils.supported_models import MODEL_CLASSES
@@ -223,29 +227,23 @@ import transformers
 
 TokenSequence = Union[List[int], torch.LongTensor, torch.Tensor, BatchEncoding]
 
+low_precision_checkpoint = None
+quant_config = None
+if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
+    pathname = args.low_precision_checkpoint
+    low_precision_checkpoint, quant_config = load_low_precision_checkpoint(pathname)
+
 tp_grain_size = 64
 ds_init_inf_kwargs = {}
 # Need to check if this attr is available. Old DeepSpeep does not have it.
-if "tp_grain_size" in dir(deepspeed.inference.config.DeepSpeedTPConfig()):
-    if args.ipex_weight_only_quantization and args.low_precision_checkpoint != "":
-        pathname = args.low_precision_checkpoint
-        assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
-        if os.path.isdir(pathname):
-            try:
-                with open(pathname + "/config.json") as f:
-                    quant_model_config = json.load(f)
-                    tp_grain_size = int(
-                        quant_model_config["quantization_config"]["group_size"]
-                    )
-            except Exception as e:
-                print("Failed to get group_size from config.json")
-        elif args.group_size > 0:
-            tp_grain_size = args.group_size
-        else:
-            print(
-                "Warning: cannot get group_size from config.json or --group-size, "
-                "using default value 64 for tp_grain_size"
-            )
+if (
+    "tp_grain_size" in dir(deepspeed.inference.config.DeepSpeedTPConfig())
+    and quant_config is not None
+):
+    assert "group_size" in quant_config
+    group_size = quant_config["group_size"]
+    if group_size > 0:
+        tp_grain_size = group_size
     ds_init_inf_kwargs.update(
         {
             "tensor_parallel": deepspeed.inference.config.DeepSpeedTPConfig(
@@ -297,6 +295,7 @@ class HuggingFaceModel(BaseLM):
             elif dtype == "int8":
                 load_dtype = torch.float32
                 infer_dtype = torch.int8
+        self.load_dtype = load_dtype
 
         model_type = next(
             (x for x in MODEL_CLASSES.keys() if x in model_id.lower()), "auto"
@@ -328,9 +327,11 @@ class HuggingFaceModel(BaseLM):
         if world_size == 1 or model_type in [
             "falcon",
             "baichuan",
+            "baichuan2",
             "gptbigcode",
             "qwen",
             "yuan",
+            "jamba",
         ]:
             self.model = model_class[0].from_pretrained(
                 model_id,
@@ -400,12 +401,14 @@ class HuggingFaceModel(BaseLM):
 
         def get_checkpoint_files(model_name_or_path):
             cached_repo_dir = get_repo_root(model_name_or_path)
-
+            glob_pattern = "*.[bp][it][n]"
+            if re.search("deepseek-v2", model_name_or_path, re.IGNORECASE):
+                glob_pattern = "*.[sbp][ait][fn][e][t][e][n][s][o][r][s]"
             # extensions: .bin | .pt
             # creates a list of paths from all downloaded files in cache dir
             file_list = [
                 str(entry)
-                for entry in Path(cached_repo_dir).rglob("*.[bp][it][n]")
+                for entry in Path(cached_repo_dir).rglob(glob_pattern)
                 if entry.is_file()
             ]
             return file_list
@@ -434,86 +437,10 @@ class HuggingFaceModel(BaseLM):
         )
 
         self.model = self.model.module
-        import pathlib
 
-        low_precision_checkpoint = None
-        if args.low_precision_checkpoint != "":
-            pathname = args.low_precision_checkpoint
-            assert os.path.exists(
-                pathname
-            ), f"Checkpoint file does not exist: {pathname}"
-            if os.path.isfile(pathname):
-                if pathname.endswith(".pt") or pathname.endswith(".pth"):
-                    low_precision_checkpoint = torch.load(pathname, weights_only=True)
-                elif pathname.endswith(".safetensors"):
-                    try:
-                        import safetensors
-                    except ImportError:
-                        print(
-                            "Please install safetensors package to load safetensors checkpoint."
-                        )
-                        exit(1)
-                    low_precision_checkpoint = safetensors.torch.load_file(pathname)
-                assert (
-                    low_precision_checkpoint is not None
-                ), f"Invalid checkpoint file: {pathname}. Should be a .pt, .pth or .safetensors file."
-
-                quant_method = {"quant_method": "gptq"}
-
-            elif os.path.isdir(pathname):
-                low_precision_checkpoint = {}
-                for pattern in ["*.pt", "*.pth"]:
-                    files = list(pathlib.Path(pathname).glob(pattern))
-                    if files:
-                        for f in files:
-                            data_f = torch.load(f, weights_only=True)
-                            low_precision_checkpoint.update(data_f)
-                        break
-                if not low_precision_checkpoint:
-                    files = list(pathlib.Path(pathname).glob("*.safetensors"))
-                    if files:
-                        try:
-                            import safetensors
-                        except ImportError:
-                            print(
-                                "Please install safetensors package to load safetensors checkpoint."
-                            )
-                            exit(1)
-                        for f in files:
-                            data_f = safetensors.torch.load_file(f)
-                            low_precision_checkpoint.update(data_f)
-                assert (
-                    len(low_precision_checkpoint) > 0
-                ), f"Cannot find checkpoint (.pt/.pth/.safetensors) files in path {pathname}."
-
-                try:
-                    with open(pathname + "/config.json") as f:
-                        quant_model_config = json.load(f)
-                    quant_method = {
-                        "quant_method": quant_model_config["quantization_config"][
-                            "quant_method"
-                        ]
-                    }
-                except Exception as e:
-                    print(
-                        "warning: loading HF config.json to get `quant_method` failed, due to ",
-                        e,
-                    )
-                    print("warning: specifying `quant_method` = `gptq` by default.")
-                    quant_method = {"quant_method": "gptq"}
-
-            else:
-                raise AssertionError(
-                    f"Invalid low-precision-checkpoint: {pathname}."
-                    " Should be a .pt/.pth/.safetensors file or a directory containing them."
-                )
-
-            low_precision_checkpoint = (low_precision_checkpoint, quant_method)
-            low_precision_checkpoint_dict = low_precision_checkpoint[0]
-        else:
-            low_precision_checkpoint = None
         if self._with_ipex:
             ipex_woq_enabled = args.ipex_weight_only_quantization
+            low_precision_ckpt = None
             if ipex_woq_enabled:
                 from intel_extension_for_pytorch.quantization import (
                     WoqWeightDtype,
@@ -566,194 +493,29 @@ class HuggingFaceModel(BaseLM):
                 )
                 model = self.model
                 if low_precision_checkpoint is not None:
-                    num_heads = model.config.num_attention_heads
                     rank = local_rank
-
-                    mha_layers_split_by_N = [
-                        "q_proj",
-                        "k_proj",
-                        "v_proj",
-                    ]
-                    # mlp is split with grain size = tp_grain_size
-                    mlp_layers_split_by_N = [
-                        "gate_proj",
-                        "up_proj",
-                        "fc_in",
-                        "fc1",
-                        "query_key_value",
-                        "w1",
-                        "w3",
-                    ]
-                    mha_layers_split_by_K = [
-                        "o_proj",
-                        "out_proj",
-                    ]
-                    # mlp is split with grain size = tp_grain_size
-                    mlp_layers_split_by_K = [
-                        "down_proj",
-                        "fc_out",
-                        "fc2",
-                        "dense",
-                        "dense_4h_to_h",
-                        "w2",
-                    ]
-                    # lm_head is split with grain size = tp_grain_size
-                    lm_head_layers = ["lm_head"]  # split by K but not quantized
-                    quantization_method = quant_model_config["quantization_config"][
-                        "quant_method"
-                    ]
-                    head_range = [0]
-                    head_per_rank = num_heads // world_size
-                    for i in range(0, world_size):
-                        head_this_rank = head_per_rank
-                        if i < num_heads % world_size:
-                            head_this_rank += 1
-                        head_range.append(head_range[-1] + head_this_rank)
-                    for key in low_precision_checkpoint[0].keys():
-                        q_head_start = head_range[rank]
-                        q_head_end = q_head_start + (
-                            head_range[rank + 1] - head_range[rank]
+                    assert "quant_method" in quant_config
+                    assert "desc_act" in quant_config
+                    quant_method = quant_config["quant_method"]
+                    desc_act = quant_config["desc_act"]
+                    if (
+                        world_size > 1
+                        and desc_act
+                        and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+                    ):
+                        raise AssertionError(
+                            "Lowp-mode INT8 is not supported for TP with desc_act = True"
                         )
-                        if "bias" in key:
-                            continue
-                        if any(substring in key for substring in mha_layers_split_by_N):
-                            data = low_precision_checkpoint_dict[key]
-                            if quantization_method == "awq":
-                                # awq qweight: [K, N // 8]
-                                # awq scales: [K // G, N]
-                                # awq qzeros: [K // G, N // 8]
-                                dim = data.shape[-1] // head_range[-1]
-                                low_precision_checkpoint_dict[key] = data[
-                                    :, q_head_start * dim : q_head_end * dim
-                                ]
-                            else:
-                                raise AssertionError(
-                                    f"{quantization_method} is not supported yet."
-                                )
-                        elif any(
-                            substring in key for substring in mlp_layers_split_by_N
-                        ):
-                            data = low_precision_checkpoint_dict[key]
-                            if quantization_method == "awq":
-                                # awq qweight: [K, N // 8]
-                                # awq scales: [K // G, N]
-                                # awq qzeros: [K // G, N // 8]
-                                if "scales" in key:
-                                    assert (
-                                        data.shape[1] % tp_grain_size == 0
-                                    ), "N must be divisible by tp_grain_size"
-                                    grains = data.shape[1] // tp_grain_size
-                                    dim = tp_grain_size
-                                else:
-                                    assert (
-                                        data.shape[1] * 8
-                                    ) % tp_grain_size == 0, (
-                                        "N must be divisible by tp_grain_size"
-                                    )
-                                    grains = data.shape[1] // (tp_grain_size // 8)
-                                    dim = tp_grain_size // 8
-                                grains_per_rank = grains // world_size
-                                grains_rem = grains % world_size
-                                grains_start = grains_per_rank * local_rank + min(
-                                    local_rank, grains_rem
-                                )
-                                grains_end = (
-                                    grains_start
-                                    + grains_per_rank
-                                    + (1 if local_rank < grains_rem else 0)
-                                )
-                                low_precision_checkpoint_dict[key] = data[
-                                    :, grains_start * dim : grains_end * dim
-                                ]
-                            else:
-                                raise AssertionError(
-                                    f"{quantization_method} is not supported yet."
-                                )
-                        elif any(
-                            substring in key for substring in mha_layers_split_by_K
-                        ):
-                            data = low_precision_checkpoint_dict[key]
-                            if quantization_method == "awq":
-                                # awq qweight: [K, N // 8]
-                                # awq scales: [K // G, N]
-                                # awq qzeros: [K // G, N // 8]
-                                if data.shape[0] % head_range[-1] == 0:
-                                    dim = data.shape[0] // head_range[-1]
-                                else:
-                                    assert data.shape[0] % world_size == 0
-                                    dim = data.shape[0] // world_size
-                                    q_head_start = local_rank
-                                    q_head_end = local_rank + 1
-                                low_precision_checkpoint_dict[key] = data[
-                                    q_head_start * dim : q_head_end * dim
-                                ]
-                            else:
-                                raise AssertionError(
-                                    f"{quantization_method} is not supported yet."
-                                )
-                        elif any(
-                            substring in key for substring in mlp_layers_split_by_K
-                        ):
-                            data = low_precision_checkpoint_dict[key]
-                            if quantization_method == "awq":
-                                # awq qweight: [K, N // 8]
-                                # awq scales: [K // G, N]
-                                # awq qzeros: [K // G, N // 8]
-                                if "qweight" in key:
-                                    assert (
-                                        data.shape[0] % tp_grain_size == 0
-                                    ), "K must be divisible by tp_grain_size"
-                                    grains = data.shape[0] // tp_grain_size
-                                    dim = tp_grain_size
-                                else:
-                                    grains = data.shape[0]
-                                    dim = 1
-                                grains_per_rank = grains // world_size
-                                grains_rem = grains % world_size
-                                grains_start = grains_per_rank * local_rank + min(
-                                    local_rank, grains_rem
-                                )
-                                grains_end = (
-                                    grains_start
-                                    + grains_per_rank
-                                    + (1 if local_rank < grains_rem else 0)
-                                )
-                                low_precision_checkpoint_dict[key] = data[
-                                    grains_start * dim : grains_end * dim
-                                ]
-                            else:
-                                raise AssertionError(
-                                    f"{quantization_method} is not supported yet."
-                                )
-                        elif any(substring in key for substring in lm_head_layers):
-                            # lm_head: [N, K] (not quantized)
-                            # Same for both AWQ and GPTQ
-                            data = low_precision_checkpoint_dict[key]
-                            assert (
-                                data.shape[1] % tp_grain_size == 0
-                            ), "K must be divisible by tp_grain_size"
-                            grains = data.shape[1] // tp_grain_size
-                            dim = tp_grain_size
-                            grains_per_rank = grains // world_size
-                            grains_rem = grains % world_size
-                            grains_start = grains_per_rank * local_rank + min(
-                                local_rank, grains_rem
-                            )
-                            grains_end = (
-                                grains_start
-                                + grains_per_rank
-                                + (1 if local_rank < grains_rem else 0)
-                            )
-                            low_precision_checkpoint_dict[key] = data[
-                                :, grains_start * dim : grains_end * dim
-                            ]
-                    low_precision_checkpoint = (
-                        low_precision_checkpoint_dict,
+                    low_precision_ckpt = shard_low_precision_checkpoint(
+                        low_precision_checkpoint,
+                        model.config,
+                        rank,
+                        world_size,
                         quant_method,
+                        tp_grain_size,
+                        desc_act,
                     )
-                else:
-                    low_precision_checkpoint = None
-
+                    low_precision_ckpt = (low_precision_ckpt, quant_config)
             self.model = ipex.llm.optimize(
                 self.model.eval(),
                 dtype=infer_dtype,
@@ -761,7 +523,7 @@ class HuggingFaceModel(BaseLM):
                 inplace=True,
                 deployment_mode=False,
                 cache_weight_for_large_batch=args.cache_weight_for_large_batch,
-                low_precision_checkpoint=low_precision_checkpoint,
+                low_precision_checkpoint=low_precision_ckpt,
             )
 
         self.base_model = self.model
@@ -855,6 +617,40 @@ class HuggingFaceModel(BaseLM):
                     for i in range(num_hidden_layers)
                 ]
             )
+        if re.search("jamba", self.config.architectures[0], re.IGNORECASE):
+            intermediate_size = self.config.mamba_expand * self.config.hidden_size
+            conv_kernel_size = self.config.mamba_d_conv
+            ssm_state_size = self.config.mamba_d_state
+            past_key_values = tuple(
+                [
+                    (
+                        (
+                            torch.zeros(1, 0, 0, 1, dtype=torch.long).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros([1, 1, 1, 1]).contiguous(),
+                            torch.zeros(1, 4, dtype=torch.long),
+                        )
+                        if i % self.config.attn_layer_period
+                        == self.config.attn_layer_offset
+                        else (
+                            torch.zeros(
+                                input_bs,
+                                intermediate_size,
+                                ssm_state_size,
+                                dtype=self.load_dtype,
+                            ).contiguous(),
+                            torch.zeros(
+                                input_bs,
+                                intermediate_size,
+                                conv_kernel_size,
+                                dtype=self.load_dtype,
+                            ).contiguous(),
+                            torch.tensor(False).contiguous(),
+                        )
+                    )
+                    for i in range(self.config.num_hidden_layers)
+                ]
+            )
         return past_key_values
 
     def _model_call(
@@ -922,7 +718,7 @@ class HuggingFaceModel(BaseLM):
             inputs, attention_mask=attention_mask_batched
         )
         has_position_ids = model_inputs.get("position_ids", None) is not None
-        if self._with_jit:
+        if self._with_ipex:
             example_dict["attention_mask"] = attention_mask_batched
             example_dict["past_key_values"] = past_key_values
             example_dict["return_dict"] = torch.tensor(False)
@@ -930,6 +726,10 @@ class HuggingFaceModel(BaseLM):
                 example_dict["position_ids"] = position_ids_batched
         if "return_last_logit" in model_inputs:
             example_dict["return_last_logit"] = torch.tensor(True)
+        if "output_router_logits" in model_inputs:
+            example_dict["output_router_logits"] = torch.tensor(
+                model_inputs["output_router_logits"]
+            )
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if args.quant_with_amp or self._dtype == "bfloat16" else False,
@@ -1510,6 +1310,7 @@ class LMMS(lmms):
 
         if self._with_ipex:
             ipex_woq_enabled = args.ipex_weight_only_quantization
+            low_precision_ckpt = None
             if ipex_woq_enabled:
                 from intel_extension_for_pytorch.quantization import (
                     WoqWeightDtype,
@@ -1558,6 +1359,31 @@ class LMMS(lmms):
                     group_size=args.group_size,
                     weight_qscheme=weight_qscheme,
                 )
+                model = self.model
+                if low_precision_checkpoint is not None:
+                    rank = local_rank
+                    assert "quant_method" in quant_config
+                    assert "desc_act" in quant_config
+                    quant_method = quant_config["quant_method"]
+                    desc_act = quant_config["desc_act"]
+                    if (
+                        world_size > 1
+                        and desc_act
+                        and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+                    ):
+                        raise AssertionError(
+                            "Lowp-mode INT8 is not supported for TP with desc_act = True"
+                        )
+                    low_precision_ckpt = shard_low_precision_checkpoint(
+                        low_precision_checkpoint,
+                        model.config,
+                        rank,
+                        world_size,
+                        quant_method,
+                        tp_grain_size,
+                        desc_act,
+                    )
+                    low_precision_ckpt = (low_precision_ckpt, quant_config)
             self._model = ipex.llm.optimize(
                 self._model.eval(),
                 dtype=infer_dtype,
@@ -1565,6 +1391,7 @@ class LMMS(lmms):
                 inplace=True,
                 deployment_mode=False,
                 cache_weight_for_large_batch=args.cache_weight_for_large_batch,
+                low_precision_checkpoint=low_precision_ckpt,
             )
 
         self._base_model = self._model
@@ -2276,6 +2103,7 @@ class LibriSpeech:
 
         if self._with_ipex:
             ipex_woq_enabled = args.ipex_weight_only_quantization
+            low_precision_ckpt = None
             if ipex_woq_enabled:
                 from intel_extension_for_pytorch.quantization import (
                     WoqWeightDtype,
@@ -2326,6 +2154,31 @@ class LibriSpeech:
                     group_size=args.group_size,
                     weight_qscheme=weight_qscheme,
                 )
+                model = self.model
+                if low_precision_checkpoint is not None:
+                    rank = local_rank
+                    assert "quant_method" in quant_config
+                    assert "desc_act" in quant_config
+                    quant_method = quant_config["quant_method"]
+                    desc_act = quant_config["desc_act"]
+                    if (
+                        world_size > 1
+                        and desc_act
+                        and lowp_mode == ipex.quantization.WoqLowpMode.INT8
+                    ):
+                        raise AssertionError(
+                            "Lowp-mode INT8 is not supported for TP with desc_act = True"
+                        )
+                    low_precision_ckpt = shard_low_precision_checkpoint(
+                        low_precision_checkpoint,
+                        model.config,
+                        rank,
+                        world_size,
+                        quant_method,
+                        tp_grain_size,
+                        desc_act,
+                    )
+                    low_precision_ckpt = (low_precision_ckpt, quant_config)
             self.model = ipex.llm.optimize(
                 self.model.eval(),
                 dtype=infer_dtype,
@@ -2333,6 +2186,7 @@ class LibriSpeech:
                 inplace=True,
                 deployment_mode=False,
                 cache_weight_for_large_batch=args.cache_weight_for_large_batch,
+                low_precision_checkpoint=low_precision_ckpt,
             )
 
         self.base_model = self.model

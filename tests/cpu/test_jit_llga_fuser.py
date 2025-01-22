@@ -10,21 +10,12 @@ from test_ao_jit_llga_utils import (
     LLGA_FUSION_GROUP,
     llga_fp32_bf16_test_env,
     get_eltwise_fn,
+    skipIfNoTorchVision,
 )
 from torch.testing._internal.common_utils import run_tests, TEST_SCIPY
 
 
 import intel_extension_for_pytorch as ipex
-
-try:
-    import torchvision
-
-    HAS_TORCHVISION = True
-except ImportError:
-    HAS_TORCHVISION = False
-except RuntimeError:
-    HAS_TORCHVISION = False
-skipIfNoTorchVision = unittest.skipIf(not HAS_TORCHVISION, "no torchvision")
 
 
 class TestOp(JitLlgaTestCase):
@@ -210,6 +201,10 @@ class TestOp(JitLlgaTestCase):
             graph, _ = self.checkTrace(m, [x])
             self.assertGraphContainsExactly(graph, LLGA_FUSION_GROUP, 1)
 
+    @unittest.skipIf(
+        not torch.ops.mkldnn._is_mkldnn_bf16_supported(),
+        "mkldnn bf16 is not supported on this device",
+    )
     @llga_fp32_bf16_test_env
     def test_softmax_different_output_dtype(self):
         class M(nn.Module):
@@ -1125,6 +1120,8 @@ class TestModel(JitLlgaTestCase):
     @skipIfNoTorchVision
     @llga_fp32_bf16_test_env
     def _test_vision(self, model_name):
+        import torchvision
+
         m = getattr(torchvision.models, model_name)().eval()
         x = torch.rand(1, 3, 224, 224) / 10
         graph, _ = self.checkTrace(m, [x])

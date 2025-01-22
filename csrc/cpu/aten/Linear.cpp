@@ -380,7 +380,8 @@ at::Tensor woq_linear_pack_weight(
     int64_t weight_dtype,
     std::vector<int64_t>& weight_shape,
     int64_t group_size,
-    int64_t lowp_mode) {
+    int64_t lowp_mode,
+    int64_t weight_format) {
   // TPP kernel does not support edge cases
   // It generates packed weight in 4d (Nc, Kc, block_k, block_n)
   auto N = weight_shape[0], K = weight_shape[1];
@@ -402,16 +403,34 @@ at::Tensor woq_linear_pack_weight(
       at::Tensor weight_int4 =
           at::pad(weight, {0, 0, 0, N_int4 - N}, "constant", 0);
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight_int4, weight_dtype, block_n, block_k, lowp_mode);
+          kCPU,
+          weight_int4,
+          weight_dtype,
+          block_n,
+          block_k,
+          lowp_mode,
+          weight_format);
     }
     if (N % block_n) {
       at::Tensor weight_padded =
           at::pad(weight, {0, 0, 0, block_n - N % block_n}, "constant", 0);
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight_padded, weight_dtype, block_n, block_k, lowp_mode);
+          kCPU,
+          weight_padded,
+          weight_dtype,
+          block_n,
+          block_k,
+          lowp_mode,
+          weight_format);
     } else {
       return woq_tpp_gemm_packB_stub(
-          kCPU, weight, weight_dtype, block_n, block_k, lowp_mode);
+          kCPU,
+          weight,
+          weight_dtype,
+          block_n,
+          block_k,
+          lowp_mode,
+          weight_format);
     }
   }
   return weight;
@@ -486,7 +505,8 @@ at::Tensor woq_linear_kernel(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation) {
+    const c10::optional<at::Tensor>& compensation,
+    const c10::optional<at::Tensor>& g_idx) {
   int64_t quant_w_mode = zps_list[0].defined()
       ? (group_size > 0 ? QUANT_W_PER_K_BLOCK : QUANT_W_PER_CHANNEL)
       : (group_size > 0 ? QUANT_W_PER_K_BLOCK_SYM : QUANT_W_PER_CHANNEL_SYM);
@@ -514,7 +534,8 @@ at::Tensor woq_linear_kernel(
       act_quant_mode,
       quant_w_mode,
       group_size,
-      compensation);
+      compensation,
+      g_idx);
   if (m_padded) {
     auto out_size = self.sizes().vec();
     out_size.back() = y.size(-1);
@@ -602,7 +623,8 @@ at::Tensor woq_linear_unary_kernel(
     int64_t group_size,
     int64_t lowp_mode,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation) {
+    const c10::optional<at::Tensor>& compensation,
+    const c10::optional<at::Tensor>& g_idx) {
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
   if (post_op == "gelu") {
     if (algorithm == "none") {
@@ -642,7 +664,8 @@ at::Tensor woq_linear_unary_kernel(
       act_quant_mode,
       quant_w_mode,
       group_size,
-      compensation);
+      compensation,
+      g_idx);
   if (m_padded) {
     auto out_size = self.sizes().vec();
     out_size.back() = y.size(-1);
@@ -697,7 +720,8 @@ at::Tensor woq_linear_binary_kernel(
     const c10::string_view& post_op,
     const std::vector<at::Tensor>& others,
     int64_t act_quant_mode,
-    const c10::optional<at::Tensor>& compensation) {
+    const c10::optional<at::Tensor>& compensation,
+    const c10::optional<at::Tensor>& g_idx) {
   int64_t post_op_fusion_type = WOQ_FUSE_NONE;
   if (post_op == "add") {
     post_op_fusion_type = WOQ_FUSE_ADD;
@@ -733,7 +757,8 @@ at::Tensor woq_linear_binary_kernel(
       act_quant_mode,
       quant_w_mode,
       group_size,
-      compensation);
+      compensation,
+      g_idx);
   if (m_padded) {
     auto out_size = self.sizes().vec();
     out_size.back() = y.size(-1);

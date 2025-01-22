@@ -16,7 +16,7 @@ from transformers.dynamic_module_utils import (
     create_dynamic_module,
     get_class_in_module,
 )
-
+import json
 from transformers.utils import (
     HF_MODULES_CACHE,
     TRANSFORMERS_DYNAMIC_MODULE_NAME,
@@ -32,6 +32,8 @@ from transformers.utils import (
 from transformers.tokenization_utils_base import BatchEncoding, EncodedInput
 from collections.abc import Mapping, Sized
 import numpy as np
+import torch
+import pathlib
 
 
 def _get_relative_imports(module_file):
@@ -244,7 +246,7 @@ def _get_cached_module_file(
 
     # Now we move the module inside our cached dynamic modules.
     full_submodule = TRANSFORMERS_DYNAMIC_MODULE_NAME + os.path.sep + submodule
-    full_submodule = full_submodule.replace("-", "_")
+    full_submodule = full_submodule.replace("-", "_").replace("V2.5", "V2_5")
     create_dynamic_module(full_submodule)
     submodule_path = Path(HF_MODULES_CACHE) / full_submodule
     if submodule == os.path.basename(pretrained_model_name_or_path):
@@ -678,3 +680,496 @@ def _pad(
             batch_outputs[key].append(value)
 
     return BatchEncoding(batch_outputs, tensor_type=return_tensors)
+
+
+def load_low_precision_checkpoint(pathname: Union[str, os.PathLike]):
+    r"""
+    Load low precision checkpoint from a file or a directory containing multiple files.
+    Supported file format: .pt, .bin, .pth, .safetensors.
+    Args:
+        pathname (str or os.PathLike): Path to the checkpoint file or directory containing multiple checkpoint files.
+    Returns:
+        Tuple[Dict[str, torch.Tensor], Dict[str, Any]]: A tuple of low precision checkpoint and quantization config.
+        The quantization config contains quantization method, group size and desc_act.
+    """
+    assert os.path.exists(pathname), f"Checkpoint file does not exist: {pathname}"
+    if os.path.isfile(pathname):
+        low_precision_checkpoint = None
+        if pathname.endswith((".pt", ".pth", ".bin")):
+            low_precision_checkpoint = torch.load(pathname, weights_only=True)
+        elif pathname.endswith(".safetensors"):
+            try:
+                import safetensors
+            except ImportError:
+                print(
+                    "Please install safetensors package to load safetensors checkpoint."
+                )
+                exit(1)
+            low_precision_checkpoint = safetensors.torch.load_file(pathname)
+        assert (
+            low_precision_checkpoint is not None
+        ), f"Invalid checkpoint file: {pathname}. Should be a .pt, .pth, .bin or .safetensors file."
+
+        quant_method = "gptq"
+        prefix_key = next(
+            (
+                key[: -len("qweight")]
+                for key in low_precision_checkpoint
+                if key.endswith("qweight")
+            ),
+            None,
+        )
+        qweight_key = prefix_key + "qweight"
+        scales_key = prefix_key + "scales"
+        group_size = int(
+            low_precision_checkpoint[qweight_key].shape[0]
+            * 8
+            / low_precision_checkpoint[scales_key].shape[0]
+        )
+        desc_act = False
+
+    elif os.path.isdir(pathname):
+        low_precision_checkpoint = {}
+        quant_method = None
+        group_size = None
+        desc_act = None
+        backend = None  # needed by intel/auto-round
+        for pattern in ["*.pt", "*.pth", "*.bin"]:
+            files = list(pathlib.Path(pathname).glob(pattern))
+            if files:
+                for f in files:
+                    data_f = torch.load(f, weights_only=True)
+                    low_precision_checkpoint.update(data_f)
+                break
+        if not low_precision_checkpoint:
+            files = list(pathlib.Path(pathname).glob("*.safetensors"))
+            if files:
+                try:
+                    import safetensors
+                except ImportError:
+                    print(
+                        "Please install safetensors package to load safetensors checkpoint."
+                    )
+                    exit(1)
+                for f in files:
+                    data_f = safetensors.torch.load_file(f)
+                    low_precision_checkpoint.update(data_f)
+        assert (
+            len(low_precision_checkpoint) > 0
+        ), f"Cannot find checkpoint (.pt/.pth/.bin/.safetensors) files in path {pathname}."
+        try:
+            assert (
+                os.path.exists(pathname + "/config.json")
+                or os.path.exists(pathname + "/quant_config.json")
+                or os.path.exists(pathname + "/quantize_config.json")
+            ), "Cannot find config.json or quant_config.json or quantize_config.json in path."
+            model_config = None
+            if os.path.exists(pathname + "/config.json"):
+                with open(pathname + "/config.json", "r", encoding="utf-8") as file:
+                    model_config = json.load(file)
+                quant_method = model_config["quantization_config"].get(
+                    "quant_method", None
+                )
+                group_size = model_config["quantization_config"].get("group_size", None)
+                desc_act = model_config["quantization_config"].get("desc_act", None)
+                backend = model_config["quantization_config"].get("backend", None)
+            config_path = None
+            if os.path.exists(pathname + "/quant_config.json"):
+                config_path = pathname + "/quant_config.json"
+            if os.path.exists(pathname + "/quantize_config.json"):
+                config_path = pathname + "/quantize_config.json"
+            if config_path is not None:
+                with open(config_path, "r", encoding="utf-8") as file:
+                    quant_model_config = json.load(file)
+                if group_size is None:
+                    group_size = quant_model_config.get("group_size", None)
+                if quant_method is None:
+                    quant_method = quant_model_config.get("quant_method", None)
+                if desc_act is None:
+                    desc_act = quant_model_config.get("desc_act", None)
+                if backend is None:
+                    backend = quant_model_config.get("backend", None)
+
+        except Exception as e:
+            print(
+                "warning: loading HF config.json to get `config` failed, due to ",
+                e,
+            )
+            print(
+                "warning: specifying `quant_method` = `gptq`,`group_size` = 64,`desc_act` = `False` by default."
+            )
+            quant_method = "gptq"
+            group_size = 64
+            desc_act = False
+    else:
+        raise AssertionError(
+            f"Invalid low-precision-checkpoint: {pathname}."
+            " Should be a .pt/.pth/.safetensors file or a directory containing them."
+        )
+    assert group_size is not None, "group_size should not be None"
+    assert quant_method is not None, "quant_method should not be None"
+    if quant_method == "gptq":
+        assert desc_act is not None, "group_size should not be None"
+    elif quant_method == "awq":
+        desc_act = False
+    elif quant_method == "intel/auto-round":
+        if backend is None or "gptq" in backend:
+            quant_method = "gptq"
+        elif "awq" in backend:
+            quant_method = "awq"
+        else:
+            raise (
+                NotImplementedError,
+                f"Unsupported backend: {backend} of intel/auto-round",
+            )
+        desc_act = False
+    else:
+        raise (NotImplementedError, f"Unsupported quantization method: {quant_method}")
+    quant_config = {
+        "quant_method": quant_method,
+        "group_size": group_size,
+        "desc_act": desc_act,
+    }
+    return (low_precision_checkpoint, quant_config)
+
+
+def shard_low_precision_checkpoint(
+    low_precision_checkpoint,
+    model_config,
+    rank,
+    world_size,
+    quantization_method,
+    tp_grain_size,
+    desc_act,
+):
+    r"""
+    Shard low-precision checkpoint for autoTP.
+    Sharding policy:
+        AWQ:
+            qweight shape: [K, N // 8]
+            scales shape: [K // G, N]
+            qzeros shape: [K // G, N // 8]
+            Attention:
+                Divide N or K by num_k_v_heads if available or num_attention_heads
+                Assign each rank a chunk of N or K evenly or by the 2:1:1 policy
+                - 2:1:1 policy: 4 heads for 3 ranks, the first rank gets 2 and others get 1.
+            MLP:
+                Divide N or K by tp_grain_size
+                Assign each rank a chunk of N or K evenly or by the 2:1:1 policy
+        GPTQ:
+            qweight shape: [K // 8, N]
+            scales shape: [K // G, N]
+            qzeros shape: [K // G, N // 8]
+            g_idx shape: [K]
+            Similar to AWQ, but with different paths if desc_act is True or False.
+            If desc_act is True:
+            - If sharding along N
+                - g_idx is not sharded
+                - Others are sharded as usual
+            - If sharding along K
+                - g_idx is shared the same way as qweight
+                - Scales and zero points are not sharded
+            If desc_act is False:
+            - g_idx is ignored
+            - Others are sharded as usual
+
+    Args:
+        low_precision_checkpoint (dict): Model's low_precision_checkpoint as a state dict.
+        model_config (object): HuggingFace model config.
+        rank (int): current rank for tp.
+        quantization_method (str): "awq" or "gptq".
+        tp_grain_size (int): Grain size for MLP sharding. Usually equal to group size for
+            quantization. Must be a multiple of 8.
+        desc_act (bool): desc_act (a.k.a. act_order) for GPTQ. False for AWQ.
+
+    Returns:
+        A sharded checkpoint dict.
+
+    """
+    assert tp_grain_size % 8 == 0, "tp_grain_size must be a multiple of 8"
+    num_heads = model_config.num_attention_heads
+    if hasattr(model_config, "num_key_value_heads"):
+        num_heads = model_config.num_key_value_heads
+    local_rank = rank
+
+    mha_layers_split_by_N = [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "q_b_proj",
+        "kv_b_proj",
+    ]
+    # mlp is split with grain size = tp_grain_size
+    mlp_layers_split_by_N = [
+        "gate_proj",
+        "up_proj",
+        "fc_in",
+        "fc1",
+        "query_key_value",
+        "w1",
+        "w3",
+    ]
+    mha_layers_split_by_K = [
+        "o_proj",
+        "out_proj",
+    ]
+    # mlp is split with grain size = tp_grain_size
+    mlp_layers_split_by_K = [
+        "down_proj",
+        "fc_out",
+        "fc2",
+        "dense",
+        "dense_4h_to_h",
+        "w2",
+    ]
+    lm_head_layers = ["lm_head"]  # split by K but not quantized
+    low_precision_checkpoint_dict = low_precision_checkpoint.copy()
+    head_range = [0]
+    head_per_rank = num_heads // world_size
+    for i in range(0, world_size):
+        head_this_rank = head_per_rank
+        if i < num_heads % world_size:
+            head_this_rank += 1
+        head_range.append(head_range[-1] + head_this_rank)
+    for key in low_precision_checkpoint.keys():
+        q_head_start = head_range[rank]
+        q_head_end = q_head_start + (head_range[rank + 1] - head_range[rank])
+        if "bias" in key:
+            continue
+        if any(substring in key for substring in mha_layers_split_by_N):
+            data = low_precision_checkpoint_dict[key]
+            if quantization_method == "awq":
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                if data.shape[-1] % head_range[-1] == 0:
+                    dim = data.shape[-1] // head_range[-1]
+                else:
+                    assert data.shape[-1] % world_size == 0
+                    dim = data.shape[-1] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                low_precision_checkpoint_dict[key] = data[
+                    :, q_head_start * dim : q_head_end * dim
+                ]
+            elif quantization_method == "gptq":
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                if data.shape[-1] % head_range[-1] == 0:
+                    dim = data.shape[-1] // head_range[-1]
+                else:
+                    assert data.shape[-1] % world_size == 0
+                    dim = data.shape[-1] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                if "g_idx" in key:
+                    if not desc_act:
+                        low_precision_checkpoint_dict.pop(key)
+                else:
+                    low_precision_checkpoint_dict[key] = data[
+                        :, q_head_start * dim : q_head_end * dim
+                    ]
+            else:
+                raise AssertionError(f"{quantization_method} is not supported yet.")
+        elif any(substring in key for substring in mlp_layers_split_by_N):
+            data = low_precision_checkpoint_dict[key]
+            if quantization_method == "awq":
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                if "scales" in key:
+                    assert (
+                        data.shape[1] % tp_grain_size == 0
+                    ), "N must be divisible by tp_grain_size"
+                    grains = data.shape[1] // tp_grain_size
+                    dim = tp_grain_size
+                else:
+                    assert (
+                        data.shape[1] * 8
+                    ) % tp_grain_size == 0, "N must be divisible by tp_grain_size"
+                    grains = data.shape[1] // (tp_grain_size // 8)
+                    dim = tp_grain_size // 8
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                low_precision_checkpoint_dict[key] = data[
+                    :, grains_start * dim : grains_end * dim
+                ]
+            elif quantization_method == "gptq":
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                if "qzeros" in key:
+                    assert (
+                        data.shape[-1] * 8
+                    ) % tp_grain_size == 0, "N must be divisible by tp_grain_size"
+                    grains = data.shape[-1] // (tp_grain_size // 8)
+                    dim = tp_grain_size // 8
+                elif "g_idx" not in key:  # qweight, scales
+                    assert (
+                        data.shape[-1] % tp_grain_size == 0
+                    ), "N must be divisible by tp_grain_size"
+                    grains = data.shape[-1] // tp_grain_size
+                    dim = tp_grain_size
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                if "g_idx" in key:
+                    if not desc_act:
+                        low_precision_checkpoint_dict.pop(key)
+                else:
+                    low_precision_checkpoint_dict[key] = data[
+                        :, grains_start * dim : grains_end * dim
+                    ]
+            else:
+                raise AssertionError(f"{quantization_method} is not supported yet.")
+        elif any(substring in key for substring in mha_layers_split_by_K):
+            data = low_precision_checkpoint_dict[key]
+            if ("scales" in key or "qzeros" in key) and data.shape[0] == 1:
+                continue
+            if quantization_method == "awq":
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                if data.shape[0] % head_range[-1] == 0:
+                    dim = data.shape[0] // head_range[-1]
+                else:
+                    assert data.shape[0] % world_size == 0
+                    dim = data.shape[0] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                low_precision_checkpoint_dict[key] = data[
+                    q_head_start * dim : q_head_end * dim
+                ]
+            elif quantization_method == "gptq":
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                if data.shape[0] % head_range[-1] == 0:
+                    dim = data.shape[0] // head_range[-1]
+                else:
+                    assert data.shape[0] % world_size == 0
+                    dim = data.shape[0] // world_size
+                    q_head_start = local_rank
+                    q_head_end = local_rank + 1
+                if desc_act is False:
+                    if "g_idx" in key:
+                        low_precision_checkpoint_dict.pop(key)
+                    else:
+                        low_precision_checkpoint_dict[key] = data[
+                            q_head_start * dim : q_head_end * dim
+                        ]
+                elif "g_idx" in key or "qweight" in key:
+                    low_precision_checkpoint_dict[key] = data[
+                        q_head_start * dim : q_head_end * dim
+                    ]
+            else:
+                raise AssertionError(f"{quantization_method} is not supported yet.")
+        elif any(substring in key for substring in mlp_layers_split_by_K):
+            data = low_precision_checkpoint_dict[key]
+            if ("scales" in key or "qzeros" in key) and data.shape[0] == 1:
+                continue
+            if quantization_method == "awq":
+                # qweight shape: [K, N // 8]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                if "qweight" in key:
+                    assert (
+                        data.shape[0] % tp_grain_size == 0
+                    ), "K must be divisible by tp_grain_size"
+                    grains = data.shape[0] // tp_grain_size
+                    dim = tp_grain_size
+                else:
+                    grains = data.shape[0]
+                    dim = 1
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                low_precision_checkpoint_dict[key] = data[
+                    grains_start * dim : grains_end * dim
+                ]
+            elif quantization_method == "gptq":
+                # qweight shape: [K // 8, N]
+                # scales shape: [K // G, N]
+                # qzeros shape: [K // G, N // 8]
+                # g_idx shape: [K]
+                if "qweight" in key:
+                    assert (
+                        data.shape[0] * 8 % tp_grain_size == 0
+                    ), "K must be divisible by tp_grain_size"
+                    grains = data.shape[0] // (tp_grain_size // 8)
+                    dim = tp_grain_size // 8
+                elif "g_idx" in key:
+                    assert data.shape[0] % tp_grain_size == 0
+                    grains = data.shape[0] // tp_grain_size
+                    dim = tp_grain_size
+                else:
+                    grains = data.shape[0]
+                    dim = 1
+                grains_per_rank = grains // world_size
+                grains_rem = grains % world_size
+                grains_start = grains_per_rank * local_rank + min(
+                    local_rank, grains_rem
+                )
+                grains_end = (
+                    grains_start
+                    + grains_per_rank
+                    + (1 if local_rank < grains_rem else 0)
+                )
+                if desc_act is False:
+                    if "g_idx" in key:
+                        low_precision_checkpoint_dict.pop(key)
+                    else:
+                        low_precision_checkpoint_dict[key] = data[
+                            grains_start * dim : grains_end * dim
+                        ]
+                elif "g_idx" in key or "qweight" in key:
+                    low_precision_checkpoint_dict[key] = data[
+                        grains_start * dim : grains_end * dim
+                    ]
+            else:
+                raise AssertionError(f"{quantization_method} is not supported yet.")
+        elif any(substring in key for substring in lm_head_layers):
+            # lm_head: [N, K] (not quantized)
+            # Same for both AWQ and GPTQ
+            data = low_precision_checkpoint_dict[key]
+            assert (
+                data.shape[1] % tp_grain_size == 0
+            ), "K must be divisible by tp_grain_size"
+            grains = data.shape[1] // tp_grain_size
+            dim = tp_grain_size
+            grains_per_rank = grains // world_size
+            grains_rem = grains % world_size
+            grains_start = grains_per_rank * local_rank + min(local_rank, grains_rem)
+            grains_end = (
+                grains_start + grains_per_rank + (1 if local_rank < grains_rem else 0)
+            )
+            low_precision_checkpoint_dict[key] = data[
+                :, grains_start * dim : grains_end * dim
+            ]
+    return low_precision_checkpoint_dict
