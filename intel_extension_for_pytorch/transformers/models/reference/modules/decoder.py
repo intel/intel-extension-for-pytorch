@@ -98,7 +98,7 @@ def MllamaVisionEncoderLayer_forward(
             hidden_state = self.gate_ffn.tanh() * hidden_state
         else:
             hidden_state = self.mlp_linear_mul(
-                hidden_state, self.gate_ffn.tanh().expand_as(residual)
+                hidden_state, self.gate_ffn.tanh().expand_as(residual).contiguous()
             )
         hidden_state = residual + hidden_state
     else:
