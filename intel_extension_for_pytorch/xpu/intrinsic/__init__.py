@@ -26,6 +26,8 @@ __all__ = [
     "swap_blocks",
     "IpexPaged_attention",
     "IpexRmsNorm",
+    "IpexSDP_forward",
+    "IpexSDP_backward",
 ]
 
 
@@ -162,6 +164,46 @@ def IpexSDP_dropout(
 ) -> Tensor:
     return torch.ops.torch_ipex.xetla_sdp_dropout(
         query, key, value, attn_mask, dropout_p, is_causal, scale
+    )
+
+
+def IpexSDP_forward(
+    query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None
+) -> Tensor:
+    return torch.ops.torch_ipex.xetla_sdp_forward(
+        query, key, value, attn_mask, dropout_p, is_causal, scale
+    )
+
+
+def IpexSDP_backward(
+    out,
+    out_grad,
+    query,
+    key,
+    value,
+    attn_mask,
+    logsumexp,
+    seed,
+    offset,
+    dropout_p,
+    is_mask_grad,
+    is_causal,
+    scale,
+) -> Tensor:
+    return torch.ops.torch_ipex.xetla_sdp_backward(
+        out_grad,
+        query,
+        key,
+        value,
+        attn_mask,
+        out,
+        logsumexp,
+        seed,
+        offset,
+        dropout_p,
+        is_mask_grad,
+        is_causal,
+        scale,
     )
 
 

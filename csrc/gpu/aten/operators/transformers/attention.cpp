@@ -712,6 +712,65 @@ Tensor xetla_sdp_dropout(
   return out_and_lse[0];
 }
 
+std::tuple<Tensor, Tensor, Tensor, Tensor> xetla_sdp_forward(
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const c10::optional<at::Tensor>& attn_mask_,
+    double dropout_p,
+    bool is_causal,
+    c10::optional<double> scale) {
+  c10::optional<Tensor> attn_mask =
+      sdp::convert_boolean_attn_mask(attn_mask_, query.dtype());
+  if (attn_mask.has_value()) {
+    attn_mask.value() = preprocess_mask(attn_mask.value(), query, key, value);
+  }
+
+  int64_t B = query.size(0);
+  int64_t num_heads = query.size(1);
+  int64_t M = query.size(-2);
+  int64_t N = key.size(-2);
+
+  auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+      c10::nullopt, at::xpu::detail::getDefaultXPUGenerator());
+  std::pair<uint64_t, uint64_t> philox_state;
+  {
+    // See Note [Acquire lock when using random generators]
+    std::lock_guard<std::mutex> lock(gen->mutex_);
+    philox_state = gen->philox_engine_inputs(B * num_heads * M * N);
+  }
+  PhiloxState rng_engine_inputs(
+      std::get<0>(philox_state), std::get<1>(philox_state));
+  auto [seed, offset] = philox_unpack(rng_engine_inputs);
+  Tensor seed_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(seed)), at::dtype(at::kLong));
+  Tensor offset_t = at::scalar_tensor(
+      at::Scalar(static_cast<int64_t>(offset)), at::dtype(at::kLong));
+
+  auto softmax_lse = at::empty(
+      {query.size(0), query.size(1), query.size(2)},
+      query.options().dtype(at::kFloat));
+
+  auto out = _scaled_dot_product_efficient_attention_impl(
+      query,
+      key,
+      value,
+      attn_mask,
+      c10::nullopt,
+      seed_t,
+      offset_t,
+      softmax_lse,
+      is_causal,
+      true,
+      dropout_p,
+      scale);
+  return std::make_tuple(
+      std::move(out),
+      std::move(softmax_lse),
+      std::move(seed_t),
+      std::move(offset_t));
+}
+
 int64_t _fused_sdp_choice(
     const Tensor& query,
     const Tensor& key,
@@ -2773,6 +2832,13 @@ IPEX_LIBRARY_FRAGMENT() {
       "paged_attention",
       at::AtenIpexTypeXPU::paged_attention,
       c10::DispatchKey::XPU)
+}
+
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "xetla_sdp_forward",
+      at::AtenIpexTypeXPU::xetla_sdp_forward,
+      c10::DispatchKey::AutogradXPU);
 }
 } // namespace
 

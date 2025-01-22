@@ -1,9 +1,13 @@
 #include <ATen/ATen.h>
 #include <ATen/record_function.h>
+#include <ATen/xpu/XPUGeneratorImpl.h>
 #include <runtime/Device.h>
 #include <runtime/Utils.h>
 #include <utils/DPCPP.h>
+#include "../DistributionTemplates.h"
+#include "../RandomEngine.h"
 #include "sdp_utils.h"
+#include "utils/CustomOperatorRegistration.h"
 
 namespace at {
 namespace AtenIpexTypeXPU {
@@ -195,5 +199,79 @@ std::tuple<Tensor, Tensor, Tensor, Tensor> ipex_sdp_dropout_backward(
       scale);
 }
 
+std::tuple<Tensor, Tensor, Tensor, Tensor> xetla_sdp_backward(
+    const Tensor& grad_out,
+    const Tensor& query,
+    const Tensor& key,
+    const Tensor& value,
+    const Tensor& attn_bias,
+    const Tensor& out,
+    const Tensor& logsumexp,
+    const Tensor& philox_seed,
+    const Tensor& philox_offset,
+    double dropout_p,
+    bool grad_input_mask,
+    bool causal,
+    c10::optional<double> scale) {
+  if (!grad_out.defined()) {
+    return std::make_tuple(Tensor{}, Tensor{}, Tensor{}, Tensor{});
+  }
+
+  c10::optional<Tensor> seed_t, offset_t;
+  if (philox_seed.defined()) {
+    seed_t = philox_seed;
+    offset_t = philox_offset;
+  } else if (dropout_p > 0.0f) {
+    auto gen = get_generator_or_default<at::XPUGeneratorImpl>(
+        c10::nullopt, at::xpu::detail::getDefaultXPUGenerator());
+    std::pair<uint64_t, uint64_t> philox_state;
+    {
+      // See Note [Acquire lock when using random generators]
+      std::lock_guard<std::mutex> lock(gen->mutex_);
+      philox_state = gen->philox_engine_inputs(
+          query.size(0) * query.size(1) * query.size(-2) * key.size(-2));
+    }
+    PhiloxState rng_engine_inputs(
+        std::get<0>(philox_state), std::get<1>(philox_state));
+    auto [seed, offset] = philox_unpack(rng_engine_inputs);
+    seed_t = at::scalar_tensor(
+        at::Scalar(static_cast<int64_t>(seed)), at::dtype(at::kLong));
+    offset_t = at::scalar_tensor(
+        at::Scalar(static_cast<int64_t>(offset)), at::dtype(at::kLong));
+  }
+
+  // This is needed because SaveVarible automatically converts
+  // c10::optional to undefined tensor
+  c10::optional<Tensor> kernel_bias;
+  if (attn_bias.defined()) {
+    kernel_bias = attn_bias;
+  }
+
+  return _efficient_attention_backward_impl(
+      grad_out,
+      query,
+      key,
+      value,
+      kernel_bias,
+      out,
+      logsumexp,
+      causal,
+      dropout_p,
+      c10::nullopt,
+      seed_t,
+      offset_t,
+      grad_input_mask,
+      scale);
+}
+
 } // namespace AtenIpexTypeXPU
 } // namespace at
+
+namespace {
+IPEX_LIBRARY_FRAGMENT() {
+  IPEX_OP_REGISTER_DISPATCH(
+      "xetla_sdp_backward",
+      at::AtenIpexTypeXPU::xetla_sdp_backward,
+      c10::DispatchKey::AutogradXPU);
+}
+} // namespace
