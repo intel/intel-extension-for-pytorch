@@ -36,7 +36,7 @@
 - test_sort_and_select: 100
 - test_sparse: 422
 - test_sparse_csr: 646
-- test_spectral_ops: 100
+- test_spectral_ops: 1000
 - test_tensor_creation_ops: 180
 - test_testing: 320
 - test_torch: 999

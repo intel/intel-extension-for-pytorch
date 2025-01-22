@@ -10305,3 +10305,5 @@
   - test_ops.py::TestCompositeComplianceXPU::test_backward_nn_functional_batch_norm_without_cudnn_xpu_float32
   - nn/test_pooling.py::TestPoolingNNDeviceTypeXPU::test_max_pool_nan_inf_xpu_float32
   - test_nn.py::TestFusionUtils::test_fuse_linear_bn_requires_grad
+  - test_fx.py::TestFXAPIBackwardCompatibility::test_class_member_back_compat
+  - test_fx.py::TestFXAPIBackwardCompatibility::test_function_back_compat
