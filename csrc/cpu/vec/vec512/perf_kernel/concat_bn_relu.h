@@ -30,16 +30,17 @@ namespace kernel {
 using Tensor = at::Tensor;
 
 template <typename T, typename ACC_T>
-static typename std::enable_if<!is_reduced_floating_point_v<T>, void>::type
-_concat_bn_relu_kernel_channels_last(
-    const std::vector<const T*>& in_ptr,
-    const std::vector<int64_t>& in_ch,
-    T* out_ptr,
-    const ACC_T* scale_ptr,
-    const ACC_T* beta_ptr,
-    int64_t total_size_except_channels,
-    int64_t ci,
-    int64_t co) {
+static typename std::enable_if<!at::vec::is_reduced_floating_point_v<T>, void>::
+    type
+    _concat_bn_relu_kernel_channels_last(
+        const std::vector<const T*>& in_ptr,
+        const std::vector<int64_t>& in_ch,
+        T* out_ptr,
+        const ACC_T* scale_ptr,
+        const ACC_T* beta_ptr,
+        int64_t total_size_except_channels,
+        int64_t ci,
+        int64_t co) {
   auto zero = _mm512_set1_ps(0.0);
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)
@@ -66,16 +67,17 @@ _concat_bn_relu_kernel_channels_last(
 }
 
 template <typename T, typename ACC_T>
-static typename std::enable_if<is_reduced_floating_point_v<T>, void>::type
-_concat_bn_relu_kernel_channels_last(
-    const std::vector<const T*>& in_ptr,
-    const std::vector<int64_t>& in_ch,
-    T* out_ptr,
-    const float* scale_ptr,
-    const float* beta_ptr,
-    int64_t total_size_except_channels,
-    int64_t ci,
-    int64_t co) {
+static
+    typename std::enable_if<at::vec::is_reduced_floating_point_v<T>, void>::type
+    _concat_bn_relu_kernel_channels_last(
+        const std::vector<const T*>& in_ptr,
+        const std::vector<int64_t>& in_ch,
+        T* out_ptr,
+        const float* scale_ptr,
+        const float* beta_ptr,
+        int64_t total_size_except_channels,
+        int64_t ci,
+        int64_t co) {
   auto zero = _mm512_set1_ps(0.0);
 #ifdef _OPENMP
 #if (_OPENMP >= 201307)

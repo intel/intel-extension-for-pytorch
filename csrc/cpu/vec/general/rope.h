@@ -9,11 +9,10 @@ namespace torch_ipex {
 namespace cpu {
 namespace kernel {
 
-using namespace at::vec;
-
 template <typename scalar_t>
 inline typename std::enable_if_t<
-    !is_reduced_floating_point_v<scalar_t> && !std::is_same_v<float, scalar_t>,
+    !at::vec::is_reduced_floating_point_v<scalar_t> &&
+        !std::is_same_v<float, scalar_t>,
     void>
 apply_rope_along_head_kernel(
     scalar_t* in_ptr_start,
@@ -45,7 +44,7 @@ apply_rope_along_head_kernel(
     int64_t rotary_ndims,
     int64_t offset) {
   auto h = 0;
-  using Vec = Vectorized<float>;
+  using Vec = at::vec::Vectorized<float>;
   const int vec_size = Vec::size();
   for (h = 0; h <= rotary_ndims / 2 - vec_size; h += vec_size) {
     auto x = Vec::loadu(in_ptr_start + h);
@@ -70,25 +69,26 @@ apply_rope_along_head_kernel(
 }
 
 template <typename scalar_t>
-inline typename std::enable_if_t<is_reduced_floating_point_v<scalar_t>, void>
-apply_rope_along_head_kernel(
-    scalar_t* in_ptr_start,
-    scalar_t* out_ptr_start,
-    float* cos_start,
-    float* sin_start,
-    int64_t rotary_ndims,
-    int64_t offset) {
+inline typename std::
+    enable_if_t<at::vec::is_reduced_floating_point_v<scalar_t>, void>
+    apply_rope_along_head_kernel(
+        scalar_t* in_ptr_start,
+        scalar_t* out_ptr_start,
+        float* cos_start,
+        float* sin_start,
+        int64_t rotary_ndims,
+        int64_t offset) {
   auto h = 0;
-  using bVec = Vectorized<scalar_t>;
-  using fVec = Vectorized<float>;
+  using bVec = at::vec::Vectorized<scalar_t>;
+  using fVec = at::vec::Vectorized<float>;
   const int fvec_size = fVec::size();
   const int bvec_size = bVec::size();
   for (h = 0; h <= rotary_ndims / 2 - bvec_size; h += bvec_size) {
     bVec x = bVec::loadu(in_ptr_start + h);
     bVec y = bVec::loadu(in_ptr_start + h + offset);
     fVec x0, x1, y0, y1;
-    std::tie(x0, x1) = convert_to_float<scalar_t>(x);
-    std::tie(y0, y1) = convert_to_float<scalar_t>(y);
+    std::tie(x0, x1) = at::vec::convert_to_float<scalar_t>(x);
+    std::tie(y0, y1) = at::vec::convert_to_float<scalar_t>(y);
     fVec c0 = fVec::loadu(cos_start + h);
     fVec s0 = fVec::loadu(sin_start + h);
     fVec c1 = fVec::loadu(cos_start + h + fvec_size);
@@ -97,8 +97,8 @@ apply_rope_along_head_kernel(
     fVec x_out1 = x1 * c1 - y1 * s1;
     fVec y_out0 = y0 * c0 + x0 * s0;
     fVec y_out1 = y1 * c1 + x1 * s1;
-    bVec x_out = convert_from_float<scalar_t>(x_out0, x_out1);
-    bVec y_out = convert_from_float<scalar_t>(y_out0, y_out1);
+    bVec x_out = at::vec::convert_from_float<scalar_t>(x_out0, x_out1);
+    bVec y_out = at::vec::convert_from_float<scalar_t>(y_out0, y_out1);
     x_out.store(out_ptr_start + h);
     y_out.store(out_ptr_start + h + offset);
   }
