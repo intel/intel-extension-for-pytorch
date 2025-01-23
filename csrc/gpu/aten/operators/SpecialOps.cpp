@@ -179,33 +179,6 @@ Tensor& special_erfcx_out(const Tensor& self, Tensor& out) {
 }
 
 template <typename scalar_t>
-struct xlogy_OutFunctor {
-  scalar_t operator()(scalar_t x, scalar_t y) const {
-    if (at::_isnan(y)) {
-      return NAN;
-    }
-    if (x == 0) {
-      return 0;
-    }
-    return x * Numerics<scalar_t>::log(y);
-  }
-};
-
-Tensor& xlogy_out(const Tensor& self, const Tensor& other, at::Tensor& out) {
-  auto iter = TensorIterator::binary_float_op(out, self, other);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.common_dtype(),
-      "xlogy",
-      [&]() {
-        xlogy_OutFunctor<scalar_t> f;
-        dpcpp_kernel_with_scalars(iter, f);
-      });
-  return out;
-}
-
-template <typename scalar_t>
 struct special_xlog1py_OutFunctor {
   scalar_t operator()(scalar_t x, scalar_t y) const {
     if (at::_isnan(y)) {
