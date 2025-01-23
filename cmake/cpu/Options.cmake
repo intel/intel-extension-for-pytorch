@@ -7,6 +7,13 @@ set(Options_CPU_cmake_included true)
 # The options to build cpu
 include(CMakeDependentOption)
 
+option(USE_SYSTEM_LIBXSMM "Use system LIBXSMM library" OFF)
+option(USE_SYSTEM_ONEDNN "Use system oneDNN library" OFF)
+option(USE_SYSTEM_SLEEF "Use system SLEEF library" OFF)
+option(USE_SYSTEM_MKL "Use system MKL library" OFF)
+option(USE_SYSTEM_IDEEP "Use system ideep library" OFF)
+option(USE_SYSTEM_GTEST "Use system GoogleTest library" OFF)
+
 option(BUILD_LIBXSMM_VIA_CMAKE "Build LIBXSMM via CMake" ON)
 option(USE_LIBXSMM "Enable LIBXSMM" ON)
 option(USE_DNNL_GRAPH_COMPILER  "Build with DNNL Graph Compiler" ON)

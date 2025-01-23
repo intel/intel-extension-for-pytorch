@@ -72,6 +72,10 @@ endfunction()
 # IPEX CPU lib always download and install mkl-static lib and use static linker for mkl-static lib.
 # IPEX CPU lib can manual config to use the dynamic link for oneMKL lib.
 if(BUILD_MODULE_TYPE STREQUAL "GPU")
+  set(USE_SYSTEM_MKL ON)
+endif()
+
+if(USE_SYSTEM_MKL)
   get_mkl_from_env_var()
 else()
   if(BUILD_WITH_XPU)
