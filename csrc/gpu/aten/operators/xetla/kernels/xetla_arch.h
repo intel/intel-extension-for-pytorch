@@ -41,6 +41,7 @@ static inline gpu_arch get_device_gpu_arch() {
     case experimental::architecture::intel_gpu_dg2_g10:
     case experimental::architecture::intel_gpu_dg2_g11:
     case experimental::architecture::intel_gpu_dg2_g12:
+    case experimental::architecture::intel_gpu_arl_h:
       return gpu_arch::XeHpg;
     case experimental::architecture::intel_gpu_mtl_u:
     case experimental::architecture::intel_gpu_mtl_h:
