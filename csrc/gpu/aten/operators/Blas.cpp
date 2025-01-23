@@ -247,11 +247,6 @@ Tensor mm(const Tensor& self, const Tensor& mat2) {
   return result;
 }
 
-Tensor mv(const Tensor& self, const Tensor& vec) {
-  Tensor result = at::empty({self.size(0)}, self.options());
-  return at::addmv_(result, self, vec, 0, 1);
-}
-
 // result = beta * input + alpha * (batch1 @ batch2)
 Tensor& baddbmm_out(
     const Tensor& input,

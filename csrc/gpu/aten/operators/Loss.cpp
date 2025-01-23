@@ -91,39 +91,6 @@ void soft_margin_backward_kernel(TensorIterator& iter, Scalar norm) {
       });
 }
 
-template <typename scalar_t>
-struct smooth_l1_backward_kernel_functor {
-  scalar_t operator()(scalar_t input, scalar_t target, scalar_t grad_output)
-      const {
-    const auto x = input - target;
-    if (x < -beta_val)
-      return -norm_val * grad_output;
-    else if (x > beta_val)
-      return norm_val * grad_output;
-    else
-      return norm_val * x * grad_output / beta_val;
-  }
-  smooth_l1_backward_kernel_functor(scalar_t norm_val, scalar_t beta_val)
-      : norm_val(norm_val), beta_val(beta_val) {}
-
- private:
-  scalar_t norm_val;
-  scalar_t beta_val;
-};
-
-void smooth_l1_backward_kernel(TensorIterator& iter, Scalar norm, double beta) {
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      iter.dtype(),
-      "smooth_l1_backward_kernel",
-      [&iter, &norm, beta] {
-        auto norm_val = norm.to<scalar_t>();
-        scalar_t beta_val(beta);
-        smooth_l1_backward_kernel_functor<scalar_t> f(norm_val, beta_val);
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-}
-
 } // namespace impl
 
 Tensor soft_margin_loss(
@@ -197,39 +164,6 @@ Tensor soft_margin_loss_backward(
 
 Tensor l1_loss(const Tensor& self, const Tensor& target, int64_t reduction) {
   return apply_loss_reduction((self - target).abs(), reduction);
-}
-
-Tensor& smooth_l1_loss_backward_out(
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Tensor& target,
-    int64_t reduction,
-    double beta,
-    Tensor& grad_input) {
-  auto norm = reduction == Reduction::Mean ? 1. / self.numel() : 1.;
-  auto iter = at::TensorIteratorConfig()
-                  .add_output(grad_input)
-                  .add_input(self)
-                  .add_input(target)
-                  .add_input(grad_output)
-                  .promote_inputs_to_common_dtype(true)
-                  .cast_common_dtype_to_outputs(true)
-                  .enforce_safe_casting_to_output(true)
-                  .build();
-  impl::smooth_l1_backward_kernel(iter, norm, beta);
-  return grad_input;
-}
-
-Tensor smooth_l1_loss_backward(
-    const Tensor& grad_output,
-    const Tensor& self,
-    const Tensor& target,
-    int64_t reduction,
-    double beta) {
-  Tensor grad_input = at::zeros_like(
-      self, self.options().memory_format(LEGACY_CONTIGUOUS_MEMORY_FORMAT));
-  return at::AtenIpexTypeXPU::smooth_l1_loss_backward_out(
-      grad_output, self, target, reduction, beta, grad_input);
 }
 
 Tensor huber_loss_backward(

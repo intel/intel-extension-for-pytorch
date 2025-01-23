@@ -60,18 +60,6 @@ void igammac_kernel_xpu(TensorIterator& iter) {
 
 } // namespace impl
 
-Tensor& mvlgamma_out(const Tensor& self, int64_t p, Tensor& out) {
-  auto output = self.mvlgamma(p);
-  TORCH_CHECK(
-      at::can_cast(output.scalar_type(), out.scalar_type()),
-      "mvlgamma: result type ",
-      self.scalar_type(),
-      " can't be cast to the desired output type ",
-      output.scalar_type());
-  at::native::resize_output(out, output.sizes());
-  return out.copy_(output);
-}
-
 Tensor& igamma_out(const Tensor& self, const Tensor& other, Tensor& out) {
   auto iter = TensorIterator::binary_float_op(out, self, other);
   impl::igamma_kernel_xpu(iter);
