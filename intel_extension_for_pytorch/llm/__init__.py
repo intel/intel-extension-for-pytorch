@@ -29,7 +29,7 @@ try:
     transformers.dynamic_module_utils.get_class_from_dynamic_module = (
         _get_class_from_dynamic_module
     )
-    from packaing import version
+    from packaging import version
 
     if version.parse(transformers.__version__) < version.parse("4.36"):
         transformers.modeling_utils.PreTrainedModel.gradient_checkpointing_disable = (
