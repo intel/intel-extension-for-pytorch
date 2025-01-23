@@ -431,6 +431,8 @@ class HuggingFaceModel(BaseLM):
             example_dict["output_router_logits"] = torch.tensor(
                 model_inputs["output_router_logits"]
             )
+        if self.config.architectures[0] == "JambaForCausalLM":
+            example_dict["num_logits_to_keep"] = torch.tensor(0)
 
         with torch.inference_mode(), torch.no_grad(), torch.cpu.amp.autocast(
             enabled=True if args.quant_with_amp or self._dtype == "bfloat16" else False,
