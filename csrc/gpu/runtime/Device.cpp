@@ -68,6 +68,8 @@ bool dpcppGetDeviceHasXMX(DeviceId device_id) noexcept {
         case experimental::architecture::intel_gpu_mtl_u:
         case experimental::architecture::intel_gpu_mtl_h:
           return false;
+        case experimental::architecture::intel_gpu_arl_h:
+          return true;
         default:
           return true;
       }
