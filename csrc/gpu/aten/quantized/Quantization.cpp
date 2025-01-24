@@ -158,66 +158,6 @@ Tensor quantize_per_channel(
   return quantizer->quantize(self);
 }
 
-Tensor _empty_affine_quantized(
-    IntArrayRef size,
-    c10::optional<at::ScalarType> dtype,
-    c10::optional<at::Layout> layout,
-    c10::optional<at::Device> device,
-    c10::optional<bool> pin_memory,
-    double scale,
-    int64_t zero_point,
-    c10::optional<c10::MemoryFormat> optional_memory_format) {
-  TensorOptions options_ =
-      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
-          pin_memory);
-  TORCH_CHECK(
-      !(options_.has_memory_format() && optional_memory_format.has_value()),
-      "Cannot set memory_format both in TensorOptions and explicit argument; "
-      "please delete "
-      "the redundant setter.");
-  auto options = options_.memory_format(optional_memory_format);
-  TORCH_CHECK(
-      options.has_dtype(),
-      "Must provide data type for Tensor creation functions.");
-  return AtenIpexTypeXPU::new_qtensor(
-      size,
-      options,
-      dpcpp_make_per_tensor_affine_quantizer(
-          scale, zero_point, typeMetaToScalarType(options.dtype())));
-}
-
-Tensor _empty_per_channel_affine_quantized(
-    IntArrayRef size,
-    const Tensor& scales,
-    const Tensor& zero_points,
-    int64_t axis,
-    c10::optional<at::ScalarType> dtype,
-    c10::optional<at::Layout> layout,
-    c10::optional<at::Device> device,
-    c10::optional<bool> pin_memory,
-    c10::optional<c10::MemoryFormat> optional_memory_format) {
-  TensorOptions options_ =
-      TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(
-          pin_memory);
-  TORCH_CHECK(
-      !(options_.has_memory_format() && optional_memory_format.has_value()),
-      "Cannot set memory_format both in TensorOptions and explicit argument; "
-      "please delete "
-      "the redundant setter.");
-  auto options = options_.memory_format(optional_memory_format);
-  TORCH_CHECK(
-      options.has_dtype(),
-      "Must provide data type for Tensor creation functions.");
-  TORCH_CHECK(
-      options.dtype() == kQInt8 || options.dtype() == kQUInt8,
-      "Supported data type for tensor creation is int8 or uint8");
-  return AtenIpexTypeXPU::new_qtensor(
-      size,
-      options,
-      dpcpp_make_per_channel_affine_quantizer(
-          scales, zero_points, axis, typeMetaToScalarType(options.dtype())));
-}
-
 } // namespace AtenIpexTypeXPU
 
 namespace AtenIpexTypeQuantizedXPU {
