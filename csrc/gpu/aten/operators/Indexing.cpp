@@ -1161,7 +1161,7 @@ void index_copy_kernel(
       [&]() { index_copy_impl<scalar_t>(out, dim, index, source); });
 }
 
-Tensor& index_copy_out(
+Tensor& index_copy_out_(
     const at::Tensor& self,
     int64_t dim,
     const at::Tensor& index,
@@ -1199,7 +1199,7 @@ at::Tensor& index_copy_(
     int64_t dim,
     const at::Tensor& index,
     const at::Tensor& source) {
-  return index_copy_out(self, dim, index, source, self);
+  return index_copy_out_(self, dim, index, source, self);
 }
 #endif
 
