@@ -105,36 +105,6 @@ Tensor& special_erfcx_out(const Tensor& self, Tensor& out) {
 }
 
 template <typename scalar_t>
-struct special_xlog1py_OutFunctor {
-  scalar_t operator()(scalar_t x, scalar_t y) const {
-    if (at::_isnan(y)) {
-      return NAN;
-    }
-    if (x == 0) {
-      return 0;
-    }
-    return x * Numerics<scalar_t>::log1p(y);
-  }
-};
-
-Tensor& special_xlog1py_out(
-    const Tensor& self,
-    const Tensor& other,
-    at::Tensor& out) {
-  auto iter = TensorIterator::binary_float_op(out, self, other);
-  IPEX_DISPATCH_FLOATING_TYPES_AND2(
-      at::ScalarType::Half,
-      at::ScalarType::BFloat16,
-      iter.common_dtype(),
-      "xlog1py",
-      [&]() {
-        special_xlog1py_OutFunctor<scalar_t> f;
-        dpcpp_kernel_with_scalars(iter, f);
-      });
-  return out;
-}
-
-template <typename scalar_t>
 struct special_bessel_j0_out_functor {
   scalar_t operator()(scalar_t a) const {
     return bessel_j0_forward(a);
@@ -298,43 +268,6 @@ Tensor& special_chebyshev_polynomial_w_out(
 }
 
 template <typename scalar_t>
-struct SpecialZetaOutFunctor {
-  scalar_t operator()(scalar_t x, scalar_t q) const {
-    return zeta<scalar_t>(x, q);
-  }
-};
-
-Tensor& special_zeta_out(const Tensor& self, const Tensor& other, Tensor& out) {
-  auto iter = TensorIterator::binary_float_op(out, self, other);
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16, iter.common_dtype(), "zeta", [&]() {
-        SpecialZetaOutFunctor<scalar_t> f;
-        dpcpp_kernel_with_scalars(iter, f);
-      });
-  return out;
-}
-
-template <typename scalar_t>
-struct special_spherical_bessel_j0_out_functor {
-  scalar_t operator()(scalar_t a) const {
-    return spherical_bessel_j0_forward(a);
-  }
-};
-
-Tensor& special_spherical_bessel_j0_out(const Tensor& self, at::Tensor& out) {
-  auto iter = TensorIterator::unary_float_op(out, self);
-  IPEX_DISPATCH_FLOATING_TYPES_AND(
-      at::ScalarType::BFloat16,
-      iter.common_dtype(),
-      "spherical_bessel_j0",
-      [&]() {
-        special_spherical_bessel_j0_out_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-  return out;
-}
-
-template <typename scalar_t>
 struct SpecialHermitePolynomialHeOutFunctor {
   scalar_t operator()(scalar_t x, scalar_t n) const {
     return hermite_polynomial_he_forward<scalar_t>(x, n);
@@ -374,102 +307,6 @@ Tensor& special_hermite_polynomial_h_out(
         SpecialHermitePolynomialHOutFunctor<scalar_t> f;
         dpcpp_kernel_with_scalars(iter, f);
       });
-  return out;
-}
-
-template <typename scalar_t>
-struct special_shifted_chebyshev_polynomial_t_out_functor {
-  scalar_t operator()(scalar_t x, scalar_t n) const {
-    return shifted_chebyshev_polynomial_t_forward<scalar_t>(x, n);
-  }
-};
-
-Tensor& special_shifted_chebyshev_polynomial_t_out(
-    const Tensor& self,
-    const Tensor& other,
-    at::Tensor& out) {
-  auto iter = TensorIterator::binary_float_op(out, self, other);
-  IPEX_DISPATCH_FLOATING_TYPES(
-      iter.common_dtype(), "shifted_chebyshev_polynomial_t", [&]() {
-        special_shifted_chebyshev_polynomial_t_out_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-  return out;
-}
-
-template <typename scalar_t>
-struct special_shifted_chebyshev_polynomial_u_out_functor {
-  scalar_t operator()(scalar_t x, scalar_t n) const {
-    return shifted_chebyshev_polynomial_u_forward<scalar_t>(x, n);
-  }
-};
-
-Tensor& special_shifted_chebyshev_polynomial_u_out(
-    const Tensor& self,
-    const Tensor& other,
-    at::Tensor& out) {
-  auto iter = TensorIterator::binary_float_op(out, self, other);
-  IPEX_DISPATCH_FLOATING_TYPES(
-      iter.common_dtype(), "shifted_chebyshev_polynomial_u", [&]() {
-        special_shifted_chebyshev_polynomial_u_out_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-  return out;
-}
-
-template <typename scalar_t>
-struct special_shifted_chebyshev_polynomial_v_out_functor {
-  scalar_t operator()(scalar_t x, scalar_t n) const {
-    return shifted_chebyshev_polynomial_v_forward<scalar_t>(x, n);
-  }
-};
-
-Tensor& special_shifted_chebyshev_polynomial_v_out(
-    const Tensor& self,
-    const Tensor& other,
-    at::Tensor& out) {
-  auto iter = TensorIterator::binary_float_op(out, self, other);
-  IPEX_DISPATCH_FLOATING_TYPES(
-      iter.common_dtype(), "shifted_chebyshev_polynomial_v", [&]() {
-        special_shifted_chebyshev_polynomial_v_out_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-  return out;
-}
-
-template <typename scalar_t>
-struct special_shifted_chebyshev_polynomial_w_out_functor {
-  scalar_t operator()(scalar_t x, scalar_t n) const {
-    return shifted_chebyshev_polynomial_w_forward<scalar_t>(x, n);
-  }
-};
-
-Tensor& special_shifted_chebyshev_polynomial_w_out(
-    const Tensor& self,
-    const Tensor& other,
-    at::Tensor& out) {
-  auto iter = TensorIterator::binary_float_op(out, self, other);
-  IPEX_DISPATCH_FLOATING_TYPES(
-      iter.common_dtype(), "shifted_chebyshev_polynomial_w", [&]() {
-        special_shifted_chebyshev_polynomial_w_out_functor<scalar_t> f;
-        dpcpp_kernel_for_tensor_iter(iter, f);
-      });
-  return out;
-}
-
-template <typename scalar_t>
-struct special_airy_ai_out_functor {
-  scalar_t operator()(scalar_t x) const {
-    return airy_ai_forward(x);
-  }
-};
-
-Tensor& special_airy_ai_out(const Tensor& self, at::Tensor& out) {
-  auto iter = TensorIterator::unary_float_op(out, self);
-  IPEX_DISPATCH_FLOATING_TYPES(iter.common_dtype(), "airy_ai", [&]() {
-    special_airy_ai_out_functor<scalar_t> f;
-    dpcpp_kernel_for_tensor_iter(iter, f);
-  });
   return out;
 }
 

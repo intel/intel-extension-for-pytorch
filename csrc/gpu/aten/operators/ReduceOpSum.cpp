@@ -103,10 +103,6 @@ Tensor sum(
   return at::AtenIpexTypeXPU::sum_out(self, dim, keepdim, dtype, result);
 }
 
-Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype) {
-  return at::AtenIpexTypeXPU::sum(self, IntArrayRef{}, false, dtype);
-}
-
 template <
     typename scalar_t,
     typename acc_t = scalar_t,

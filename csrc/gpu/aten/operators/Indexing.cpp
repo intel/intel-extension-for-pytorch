@@ -32,8 +32,6 @@ using namespace torch_ipex::xpu::dpcpp;
 namespace at {
 namespace AtenIpexTypeXPU {
 
-Tensor sum(const Tensor& self, c10::optional<ScalarType> dtype);
-
 namespace impl {
 
 // Pretend that the scalar tensor is in fact a one-element vector.
@@ -883,115 +881,6 @@ void index_put_deterministic_impl(
   }
 }
 
-template <typename scalar_t>
-struct TakeDpcppKernelFunctor {
-  void operator()(sycl::nd_item<1> item) const {
-    auto linear_idx = item.get_global_linear_id();
-    if (linear_idx < dst_num_elem) {
-      auto idx_offset = IndexToOffset<int64_t, int64_t>::get(
-          linear_idx,
-          idx_info,
-          IndexToOffset<int64_t, int64_t>::NON_STRICT_CONTIGUOUS);
-      auto src_idx = idx_data[idx_offset];
-      if (src_idx < 0) {
-        src_idx += src_num_elem;
-      }
-      auto source_offset = IndexToOffset<scalar_t, int64_t>::get(
-          src_idx,
-          src_info,
-          IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
-      auto dst_offset = IndexToOffset<scalar_t, int64_t>::get(
-          linear_idx,
-          dst_info,
-          IndexToOffset<scalar_t, int64_t>::NON_STRICT_CONTIGUOUS);
-
-      dst_data[dst_offset] = src_data[source_offset];
-    }
-  }
-  TakeDpcppKernelFunctor(
-      ptrdiff_t src_num_elem_,
-      ptrdiff_t dst_num_elem_,
-      TensorInfo<scalar_t, int64_t> src_info_,
-      TensorInfo<scalar_t, int64_t> dst_info_,
-      TensorInfo<int64_t, int64_t> idx_info_,
-      scalar_t* src_data_,
-      scalar_t* dst_data_,
-      int64_t* idx_data_)
-      : src_num_elem(src_num_elem_),
-        dst_num_elem(dst_num_elem_),
-        src_info(src_info_),
-        dst_info(dst_info_),
-        idx_info(idx_info_),
-        src_data(src_data_),
-        dst_data(dst_data_),
-        idx_data(idx_data_) {}
-
- private:
-  ptrdiff_t src_num_elem;
-  ptrdiff_t dst_num_elem;
-  TensorInfo<scalar_t, int64_t> src_info;
-  TensorInfo<scalar_t, int64_t> dst_info;
-  TensorInfo<int64_t, int64_t> idx_info;
-  scalar_t* src_data;
-  scalar_t* dst_data;
-  int64_t* idx_data;
-};
-
-template <typename scalar_t>
-void take_dpcpp(Tensor& dst, const Tensor& src, const Tensor& index) {
-  ptrdiff_t src_num_elem = src.numel();
-  ptrdiff_t index_num_elem = index.numel();
-  TORCH_CHECK(src.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(dst.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(index.dim() <= MAX_DPCPPTORCH_DIMS, DPCPPTORCH_DIM_WARNING);
-  TORCH_CHECK(
-      !(src_num_elem == 0 && index_num_elem != 0),
-      "tried to take from an empty tensor");
-
-  dst = dst.resize_as_(index);
-
-  ptrdiff_t dst_num_elem = dst.numel();
-  if (dst_num_elem == 0) {
-    return;
-  }
-
-  TensorInfo<scalar_t, int64_t> src_info =
-      getTensorInfo<scalar_t, int64_t>(src);
-  src_info.collapseDims();
-
-  TensorInfo<scalar_t, int64_t> dst_info =
-      getTensorInfo<scalar_t, int64_t>(dst);
-  dst_info.collapseDims();
-
-  TensorInfo<int64_t, int64_t> idx_info =
-      getTensorInfo<int64_t, int64_t>(index);
-  idx_info.collapseDims();
-
-  auto& dpcpp_queue = dpcppGetCurrentQueue();
-  auto cgf = DPCPP_Q_CGF(cgh) {
-    auto src_data = src.data_ptr<scalar_t>();
-    auto dst_data = dst.data_ptr<scalar_t>();
-    auto idx_data = index.data_ptr<int64_t>();
-
-    TakeDpcppKernelFunctor<scalar_t> kfn(
-        src_num_elem,
-        dst_num_elem,
-        src_info,
-        dst_info,
-        idx_info,
-        src_data,
-        dst_data,
-        idx_data);
-    auto wgroup_size = dpcppMaxWorkGroupSize(kfn);
-    auto wgroup_range = (dst_num_elem + wgroup_size - 1) / wgroup_size;
-
-    cgh.parallel_for<decltype(kfn)>(
-        sycl::nd_range<1>({wgroup_range * wgroup_size}, {wgroup_size}), kfn);
-  };
-
-  DPCPP_Q_SUBMIT(dpcpp_queue, cgf);
-}
-
 static std::tuple<bool, Tensor> canDispatchToMaskedFill(
     const Tensor& self,
     const torch::List<c10::optional<at::Tensor>>& indices,
@@ -1452,51 +1341,6 @@ Tensor& _index_put_impl_(
   return self;
 }
 
-Tensor& take_out(const Tensor& self, const Tensor& index, Tensor& out) {
-  // Type and device checks
-  TORCH_CHECK(
-      index.scalar_type() == ScalarType::Long,
-      "take(): Expected a long tensor for index, but got ",
-      index.scalar_type());
-  TORCH_CHECK(
-      self.scalar_type() == out.scalar_type(),
-      "take(): self and out expected to havethe same dtype, but got self.dtype = ",
-      self.scalar_type(),
-      " and out.dtype = ",
-      out.scalar_type());
-  TORCH_CHECK(
-      self.device() == out.device() && self.device() == index.device(),
-      "take(): self, index and out expected to be in the same device, but got self.device = ",
-      self.device(),
-      ", index.device = ",
-      index.device(),
-      ", and out.device = ",
-      out.device());
-
-  // index checks
-  TORCH_CHECK_INDEX(
-      !(self.numel() == 0 && index.numel() != 0),
-      "take(): tried to take from an empty tensor");
-
-  at::assert_no_internal_overlap(out);
-  at::assert_no_overlap(out, index);
-  at::assert_no_overlap(out, self);
-
-  IPEX_DISPATCH_ALL_TYPES_AND_COMPLEX_AND3(
-      at::ScalarType::BFloat16,
-      at::ScalarType::Half,
-      at::ScalarType::Bool,
-      self.scalar_type(),
-      "take",
-      [&]() { impl::take_dpcpp<scalar_t>(out, self, index); });
-
-  return out;
-}
-
-Tensor take(const Tensor& self, const Tensor& index) {
-  Tensor out = at::empty({0}, self.options());
-  return at::AtenIpexTypeXPU::take_out(self, index, out);
-}
 } // namespace AtenIpexTypeXPU
 } // namespace at
 
