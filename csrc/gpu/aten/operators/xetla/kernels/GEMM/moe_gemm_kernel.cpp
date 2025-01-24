@@ -34,16 +34,12 @@ cgfs_t moe_gemm(
       total_rows_for_experts_host);
 
   switch (problem_count) {
-    case 1:
-      MoEKernelMicro(1);
-    case 2:
-      MoEKernelMicro(2);
-    case 4:
-      MoEKernelMicro(4);
     case 8:
       MoEKernelMicro(8);
+    case 16:
+      MoEKernelMicro(16);
     default:
-      TORCH_CHECK(false, "unsupported expert number: %d", problem_count);
+      TORCH_CHECK(false, "unsupported expert number: ", problem_count);
       return {};
   }
 #undef MoEKernelMicro

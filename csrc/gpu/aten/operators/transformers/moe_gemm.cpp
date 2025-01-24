@@ -31,13 +31,13 @@ namespace AtenIpexTypeXPU {
  * @throws std::runtime_error If the input tensors have invalid shapes or
  * unsupported data types.
  */
-Tensor moe_gemm(
+Tensor fused_moe_gemm(
     const Tensor& matrix_a, // [total_m, gemm_k]
     const Tensor& matrix_b, // [n_experts, gemm_k, gemm_n]
     const Tensor& rows_for_experts, //[n_experts]
     const Tensor& rows_for_experts_host, //[n_experts]
     const int64_t n_experts) {
-  RECORD_FUNCTION("xetla_moe_gemm", {});
+  RECORD_FUNCTION("xetla_fused_moe_gemm", {});
 
   int total_m = matrix_a.sizes()[0];
   int gemm_k = matrix_a.sizes()[1];
@@ -93,7 +93,7 @@ Tensor moe_gemm(
   }
 #else
   AT_ERROR(
-      "MoE GEMM failed to compile because the current hardware does not support 2D load and DPAS instructions.");
+      "Fused MoE GEMM failed to compile because the current hardware does not support 2D load and DPAS instructions.");
 #endif
   return output;
 }
@@ -103,7 +103,9 @@ Tensor moe_gemm(
 namespace {
 IPEX_LIBRARY_FRAGMENT() {
   IPEX_OP_REGISTER_DISPATCH(
-      "moe_gemm.moe", at::AtenIpexTypeXPU::moe_gemm, c10::DispatchKey::XPU);
+      "fused_moe_gemm.moe",
+      at::AtenIpexTypeXPU::fused_moe_gemm,
+      c10::DispatchKey::XPU);
 }
 
 } // namespace

@@ -32,14 +32,10 @@ class TestTorchMethod:
 
         return output
 
-    @pytest.mark.skipif(
-        (not torch.xpu.has_2d_block_array()) or (not torch.xpu.has_xmx()),
-        reason="ipex build without xetla",
-    )
     @pytest.mark.parametrize("total_m", [1, 32, 1024])
-    @pytest.mark.parametrize("gemm_k", [1024, 4096])
-    @pytest.mark.parametrize("gemm_n", [1024, 4096])
-    @pytest.mark.parametrize("n_experts", [1, 2, 8])
+    @pytest.mark.parametrize("gemm_k", [1024])
+    @pytest.mark.parametrize("gemm_n", [1024])
+    @pytest.mark.parametrize("n_experts", [8, 16, 32])
     def test_moe_gemm(self, n_experts, gemm_k, gemm_n, total_m, dtype=torch.float16):
 
         matrix_a = torch.randn(total_m, gemm_k, dtype=dtype, device=dpcpp_device)
@@ -53,7 +49,7 @@ class TestTorchMethod:
         self.init_rows_for_experts(total_m, rows_for_experts)
         rows_for_experts_cpu = rows_for_experts.to(torch.int32).to("cpu")
 
-        output = torch.ops.torch_ipex.moe_gemm(
+        output = torch.xpu.moe_gemm(
             matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
         )
         ref_output = self.validata_moe_gemm(

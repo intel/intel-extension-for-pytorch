@@ -33,21 +33,6 @@ acc_test = os.environ.get("LLM_ACC_TEST", "OFF").upper() in [
 ]
 
 
-def ref_moe_gemm(matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts):
-    total_m = matrix_a.shape[0]
-    gemm_k = matrix_a.shape[1]
-    gemm_n = matrix_b.shape[2]
-
-    output = torch.zeros(total_m, gemm_n, device=matrix_a.device, dtype=matrix_a.dtype)
-    start = 0
-    for i in range(n_experts):
-        end = start + rows_for_experts_cpu[i].item()
-        output[start:end] = torch.mm(matrix_a[start:end], matrix_b[i])
-        start = end
-
-    return output
-
-
 def ref_topk_softmax(gating_logits, n_topk):
     input_dtype = gating_logits.dtype
     gating_logits = gating_logits.to(torch.float)
@@ -158,7 +143,7 @@ class MixtralBlockSparseTop2MLP(nn.Module):
         use_optimized=False,
         residual=None,
     ):
-        hidden_states = torch.ops.torch_ipex.moe_gemm(
+        hidden_states = torch.xpu.moe_gemm(
             hidden_states,
             self.moe_w1.weight,
             rows_for_experts,
@@ -166,7 +151,7 @@ class MixtralBlockSparseTop2MLP(nn.Module):
             self.num_experts,
         )
         hidden_states = self.linear_silu_mul(hidden_states)
-        hidden_states = torch.ops.torch_ipex.moe_gemm(
+        hidden_states = torch.xpu.moe_gemm(
             hidden_states,
             self.moe_w2.weight,
             rows_for_experts,

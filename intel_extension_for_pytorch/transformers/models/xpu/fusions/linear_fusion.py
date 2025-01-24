@@ -104,6 +104,13 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             self.W13 = torch.transpose(torch.cat((W13, W3), dim=1), 1, 2).contiguous()
         self.W2 = torch.transpose(W2, 1, 2).contiguous()
 
+        # delete original weight to avoid memory pressure
+        W13.data = self.W13
+        W2.data = self.W2
+        if W3 is not None:
+            W3.data = self.W13
+        torch.xpu.empty_cache()
+
     def linear_silu_mul(self, x):
         half = x.shape[-1] // 2
         output_shape = x.shape[:-1] + (half,)
@@ -117,7 +124,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
         rows_for_experts_cpu=None,
         residual=None,
     ):
-        hidden_states = torch.ops.torch_ipex.moe_gemm(
+        hidden_states = torch.xpu.moe_gemm(
             hidden_states,
             self.W13,
             rows_for_experts,
@@ -125,7 +132,7 @@ class _IPEXGatedMLPMOEXPU(nn.Module):
             self.num_experts,
         )
         hidden_states = self.linear_silu_mul(hidden_states)
-        hidden_states = torch.ops.torch_ipex.moe_gemm(
+        hidden_states = torch.xpu.moe_gemm(
             hidden_states,
             self.W2,
             rows_for_experts,

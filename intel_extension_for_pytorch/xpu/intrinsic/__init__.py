@@ -28,6 +28,7 @@ __all__ = [
     "IpexRmsNorm",
     "IpexSDP_forward",
     "IpexSDP_backward",
+    "moe_gemm",
 ]
 
 
@@ -431,3 +432,48 @@ def swap_blocks(src, dst, block_mapping):
             block_mapping_tensor, device="xpu", dtype=torch.int64
         )
     return torch.ops.torch_ipex.swap_blocks(src, dst, block_mapping)
+
+
+def moe_gemm(
+    matrix_a,
+    matrix_b,
+    rows_for_experts,
+    rows_for_experts_cpu,
+    n_experts,
+):
+    """
+    Performs MoE (Mixture of Experts) GEMM operation.
+
+    @param matrix_a: 2D Tensor of shape [batch_size, hidden_dim], representing input data.
+    @param matrix_b: 3D Tensor of shape [n_experts, hidden_dim, output_dim], representing weights for each expert.
+    @param rows_for_experts: 2D Tensor of shape [n_experts], indicating rows belong to each expert.
+    @param rows_for_experts_cpu: 2D Tensor of shape [n_experts], same as rows_for_experts but on CPU for geting ndrange.
+    @param n_experts: Integer, the number of experts used in the model.
+
+    @note Fused moe_gemm is expected to work with n_experts < 1024, but to reduce binary size,
+          we currently only instantiate templates for n_experts = 8 and n_experts = 16.
+          Additional instances can be added in the future as needed.
+    """
+    use_fused_kernel = (
+        torch.xpu.has_2d_block_array()
+        and torch.xpu.has_xmx()
+        and (n_experts == 8 or n_experts == 16)
+    )
+    if use_fused_kernel:
+        return torch.ops.torch_ipex.fused_moe_gemm(
+            matrix_a, matrix_b, rows_for_experts, rows_for_experts_cpu, n_experts
+        )
+    else:
+        total_m = matrix_a.shape[0]
+        gemm_k = matrix_a.shape[1]
+        gemm_n = matrix_b.shape[2]
+        output = torch.zeros(
+            total_m, gemm_n, device=matrix_a.device, dtype=matrix_a.dtype
+        )
+        start = 0
+        for i in range(n_experts):
+            end = start + rows_for_experts_cpu[i].item()
+            output[start:end] = torch.mm(matrix_a[start:end], matrix_b[i])
+            start = end
+
+        return output

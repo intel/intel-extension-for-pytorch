@@ -2,9 +2,9 @@
 # This code tests the functionality of the MoE module.
 
 import torch
-import intel_extension_for_pytorch as ipex
-from torch.testing._internal.common_utils import TestCase
+import intel_extension_for_pytorch as ipex  # noqa
 import copy
+import pytest
 
 
 class MixtralMoE(torch.nn.Module):
@@ -109,9 +109,9 @@ class MixtralMoE(torch.nn.Module):
         return final_hidden_states
 
 
-class TestMoEModule(TestCase):
-    def test(self):
-        num_experts = 8
+class TestMoEModule:
+    @pytest.mark.parametrize("num_experts", [8, 16])
+    def test(self, num_experts):
         top_k = 2
         hidden_size = 2048
         intermediate_size = 14336
@@ -126,4 +126,4 @@ class TestMoEModule(TestCase):
         x_ = copy.deepcopy(x)
         ref_out = moe_module(x)
         ipex_out = moe_module(x_, use_ipex_api=True)
-        self.assertEqual(ref_out, ipex_out, atol=1e-2, rtol=1e-2)
+        torch.testing.assert_close(ref_out, ipex_out, atol=1e-2, rtol=1e-2)
