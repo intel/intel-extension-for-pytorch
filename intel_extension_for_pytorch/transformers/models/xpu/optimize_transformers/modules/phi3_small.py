@@ -23,6 +23,7 @@ from .transformer_modules.model_utils import (
     load_attn_fused_qkv_params,
     transpose_attn_fused_qkv_params,
     xpu_gemm_use_xetla,
+    xpu_sdpa_support,
 )
 from .transformer_modules.CacheUtils import IPEXStaticCache, CacheFormat
 
@@ -31,10 +32,16 @@ def _cdiv(x, y):
     return (x + y - 1) // y
 
 
-def _get_mask_dense(query, key, block_size, vert_stride, local_blocks, device):
-    bs, num_attn_head, q_len, head_dim = query.shape
-    kv_len = key.shape[-2]
-
+def _get_mask_dense(
+    bs,
+    num_attn_head,
+    kv_len,
+    is_first_token,
+    block_size,
+    vert_stride,
+    local_blocks,
+    device,
+):
     N_BLOCK = _cdiv(kv_len, block_size)
     q_pos = torch.arange(N_BLOCK)[None, :, None]
     k_pos = torch.arange(N_BLOCK)[None, None]
@@ -55,7 +62,20 @@ def _get_mask_dense(query, key, block_size, vert_stride, local_blocks, device):
         block_mask_dense, block_mask_dense.new_ones((block_size, block_size))
     )
     causal_mask = torch.tril(torch.ones(kv_len, kv_len)).type_as(mask_dense)
-    mask_dense = (mask_dense[..., -kv_len:, :kv_len] * causal_mask[None])[None, :, :, :]
+    if is_first_token:
+        mask_dense = (
+            (mask_dense[..., -kv_len:, :kv_len] * causal_mask[None])
+            .unsqueeze(0)
+            .expand(bs, -1, -1, -1)
+            .contiguous()
+        )
+    else:
+        mask_dense = (
+            (mask_dense[..., -1:, :kv_len] * causal_mask[None, -1:, :])
+            .unsqueeze(0)
+            .expand(bs, -1, -1, -1)
+            .contiguous()
+        )
 
     return mask_dense
 
@@ -79,53 +99,104 @@ def _phi3small_sdp(
     Phi3-small uses block-sparse attention and dense attention in a interleaving order,
     controlled by dense_attention_every_n_layers
     """
-    if self.config.dense_attention_every_n_layers and (
-        (self.layer_id + 1) % self.config.dense_attention_every_n_layers == 0
-    ):
-        # dense attention
-        causal_mask = None
-        if query.size(2) == key.size(2):
-            seq_len = query.size(2)
-            causal_mask = torch.ones((seq_len, seq_len), dtype=torch.uint8)
-            causal_mask = (
-                torch.tril(causal_mask)
-                .view(1, 1, seq_len, seq_len)
-                .repeat(1, self.num_heads, 1, 1)
-                .contiguous()
-            )
-            causal_mask = causal_mask.to(self.config.device)
-        else:
-            bs, num_head, q_len, _ = query.shape
-            kv_len = key.size(2)
-            causal_mask = torch.ones(
-                (bs, num_head, q_len, kv_len), dtype=torch.uint8
-            ).to(self.config.device)
-        attention_output = torch.ops.torch_ipex.fmha_esimd(
-            query.contiguous(),
-            key.contiguous(),
-            value.contiguous(),
-            causal_mask,
-            True,
-        )
+    apply_dense_attention = self.config.dense_attention_every_n_layers and (
+        (self.layer_idx + 1) % self.config.dense_attention_every_n_layers == 0
+    )
 
-    else:
-        # block sparse attention
-        block_mask_dense = _get_mask_dense(
+    if not apply_dense_attention:
+        # get block sparse attn_mask
+        if self.layer_idx == 0:
+            prompt_len = 0
+            if (
+                self.beam_idx is not None
+                and query.size(-2) == 1
+                and isinstance(past_key_value, IPEXStaticCache)
+            ):
+                prompt_len = past_key_value.get_prompt_len(self.layer_idx)
+            block_mask_dense = _get_mask_dense(
+                query.size(0),
+                query.size(1),
+                key.size(2) + prompt_len,
+                query.size(2) > 1,
+                self.config.blocksparse_block_size,
+                self.config.blocksparse_vert_stride,
+                self.config.blocksparse_num_local_blocks,
+                self.config.device,
+            )
+            block_mask_dense = block_mask_dense.to(dtype=torch.float16)
+            block_mask_dense.masked_fill_(
+                block_mask_dense == 0, torch.finfo(torch.float16).min
+            )
+            block_mask_dense.masked_fill_(block_mask_dense == 1, 0.0)
+            IPEXAttention.sparse_attn_mask = self.get_blocked_attn_mask(
+                block_mask_dense
+            )
+    scale = 1.0 / self.head_dim
+    if not xpu_sdpa_support(
+        self.beam_idx is not None,
+        self.beam_search_first_iter(query.size(2)),
+        self.head_dim,
+    ):
+        return self.naive_sdp(
             query,
             key,
-            self.config.blocksparse_block_size,
-            self.config.blocksparse_vert_stride,
-            self.config.blocksparse_num_local_blocks,
-            self.config.device,
+            value,
+            past_key_value,
+            attention_mask if apply_dense_attention else IPEXAttention.sparse_attn_mask,
+            head_mask,
+            alibi,
+            scale,
+            use_causal,
         )
-        if query.shape[-2] == 1:
-            block_mask_dense = block_mask_dense[:, :, -1:, :].contiguous()
-        attention_output = torch.ops.torch_ipex.fmha_esimd(
-            query.contiguous(),
-            key.contiguous(),
-            value.contiguous(),
-            block_mask_dense,
-            True,
+    if (
+        self.beam_idx is not None
+        and query.size(-2) == 1
+        and isinstance(past_key_value, IPEXStaticCache)
+    ):
+        key_prompt, value_prompt = past_key_value.get_prompt_for_beam_search(
+            self.layer_idx
+        )
+        curr_len = key.size(2)
+        attention_output = torch.xpu.IpexSDP_Index(
+            query,
+            key_prompt,
+            value_prompt,
+            key,
+            value,
+            self.beam_idx,
+            alibi,
+            attention_mask if apply_dense_attention else IPEXAttention.sparse_attn_mask,
+            head_mask,
+            curr_len,
+            scale,
+            1.0,
+            0.0,
+            False,
+        )
+    else:
+        if (
+            isinstance(past_key_value, IPEXStaticCache)
+            and past_key_value.cache_format == CacheFormat.FBNH
+        ):
+            seq_last = self.beam_idx is None
+        else:
+            seq_last = False
+        attention_output = torch.xpu.IpexSDP(
+            query,
+            key,
+            value,
+            alibi,
+            (
+                attention_mask
+                if apply_dense_attention
+                else IPEXAttention.sparse_attn_mask
+            ),
+            head_mask,
+            scale,
+            1.0,
+            0.0,
+            use_causal if apply_dense_attention else False,
+            seq_last,
         )
     return attention_output, None
 

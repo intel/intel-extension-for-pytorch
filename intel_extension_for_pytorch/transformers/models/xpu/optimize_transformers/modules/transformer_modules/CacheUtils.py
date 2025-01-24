@@ -197,6 +197,14 @@ try:
             # TODO: deprecate this function in favor of `cache_position`
             return self.seq_cnt
 
+        def get_prompt_len(self, layer_idx: Optional[int] = 0) -> int:
+            """return the sequence length of the prompt for beam search"""
+            return (
+                self.key_prompt[layer_idx].size(2)
+                if len(self.key_prompt) > layer_idx
+                else 0
+            )
+
         def get_max_length(self) -> Optional[int]:
             """Returns the maximum sequence length of the cached states."""
             return self.max_cache_len
