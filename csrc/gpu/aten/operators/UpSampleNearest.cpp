@@ -32,17 +32,6 @@ struct Nearest_index_op {
   }
 };
 
-// struct Nearest_bw_index_op {
-//   int operator()(const float scale, int dst_index, int output_size) const {
-//     // Equivalent to buggy OpenCV INTER_NEAREST
-//     // We keep this method for BC and consider as deprecated.
-//     // See nearest_exact as replacement
-//     const int src_index =
-//         min(static_cast<int>(ceilf(dst_index * scale)), output_size);
-//     return src_index;
-//   }
-// };
-
 static int lastPow2(unsigned int n) {
   n |= (n >> 1);
   n |= (n >> 2);
