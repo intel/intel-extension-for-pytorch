@@ -70,8 +70,9 @@ class IPEXWeightOnlyQuantizedLinear(nn.Module):
             bias,
             group_size,
             g_idx,
-            dtype,
             quant_method,
+            dtype,
+            **kwargs
         )
         return cls(woq_linear_impl)
 
